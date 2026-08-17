@@ -1,9 +1,10 @@
-import { Component, signal } from "@angular/core";
+import { Component, inject, signal } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { FormsModule } from "@angular/forms";
+import { ApiService } from "../core/services/api.service";
 
 interface Feature {
   icon: string;
@@ -28,8 +29,25 @@ interface Plan {
   styleUrl: "./landing.component.scss",
 })
 export class LandingComponent {
+  private api = inject(ApiService);
+
   readonly year = new Date().getFullYear();
   readonly demoUrl = signal("");
+  readonly appUrl = signal("");
+
+  constructor() {
+    // Resolve the panel origin once so CTAs cross hosts correctly in production
+    // (uvh.es → app.uvh.es). Falls back to same-origin /auth while loading.
+    this.api
+      .get<{ appUrl: string }>("/api/v1/config")
+      .then((c) => this.appUrl.set(c.appUrl))
+      .catch(() => {});
+  }
+
+  /** Absolute URL to the authenticated panel, honoring the resolved app host. */
+  authHref(): string {
+    return `${this.appUrl()}/auth?returnTo=${encodeURIComponent("/app/links")}`;
+  }
 
   readonly features: Feature[] = [
     {
@@ -142,6 +160,6 @@ export class LandingComponent {
   submitDemo(): void {
     // Creating links requires an authenticated, verified account.
     this.demoUrl.set("");
-    window.location.href = "/auth?returnTo=%2Fapp%2Flinks";
+    window.location.href = this.authHref();
   }
 }

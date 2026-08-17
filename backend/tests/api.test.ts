@@ -196,6 +196,34 @@ describe("Links + authorization (A vs B)", () => {
     const pause = await s.agent.post(`/api/v1/links/${id}/state`).set("X-CSRF-Token", s.token).send({ state: "paused" });
     expect(pause.status).toBe(200);
   });
+
+  it("edits alias and destination while preserving lifecycle state", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("irene"));
+    const created = await createLink(s, { destination: "https://example.com/original", alias: "antes" });
+    expect(created.status).toBe(201);
+    const id = created.body.link.id;
+
+    await s.agent.post(`/api/v1/links/${id}/state`).set("X-CSRF-Token", s.token).send({ state: "paused" }).expect(200);
+
+    const edited = await s.agent
+      .patch(`/api/v1/links/${id}`)
+      .set("X-CSRF-Token", s.token)
+      .send({ destination: "https://example.com/edited", alias: "despues" });
+    expect(edited.status).toBe(200);
+    expect(edited.body.link.alias).toBe("despues");
+    expect(edited.body.link.destination).toBe("https://example.com/edited");
+    expect(edited.body.link.state).toBe("paused");
+
+    const row = db.q.prepare(`SELECT alias, destination, state FROM links WHERE id = ?`).get(id) as {
+      alias: string;
+      destination: string;
+      state: string;
+    };
+    expect(row.alias).toBe("despues");
+    expect(row.destination).toBe("https://example.com/edited");
+    expect(row.state).toBe("paused");
+  });
 });
 
 describe("Redirect resolution", () => {

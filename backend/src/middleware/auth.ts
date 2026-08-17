@@ -25,10 +25,11 @@ export function currentUser(req: AuthedRequest): AuthUser | null {
 export function createSession(userId: number, req: Request): string {
   const token = randomToken(32);
   const expiresAt = new Date(Date.now() + config.sessionTtlDays * 86400_000).toISOString();
+  // Store only a hash of the session token; the raw token lives in the cookie.
   q.prepare(
     `INSERT INTO sessions (id, user_id, user_agent, ip_hash, expires_at)
      VALUES (?, ?, ?, ?, ?)`,
-  ).run(token, userId, req.headers["user-agent"] ?? null, req.ip ? sha256Hex(req.ip) : null, expiresAt);
+  ).run(sha256Hex(token), userId, req.headers["user-agent"] ?? null, req.ip ? sha256Hex(req.ip) : null, expiresAt);
   return token;
 }
 
@@ -64,7 +65,7 @@ export function hydrateSession(req: AuthedRequest, _res: Response, next: NextFun
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.id = ?`,
       )
-      .get(token) as
+      .get(sha256Hex(token)) as
       | {
           session_id: string;
           expires_at: string;

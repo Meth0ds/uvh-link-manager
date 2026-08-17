@@ -13,8 +13,8 @@
     <a href="#faq">FAQ</a>
   </nav>
   <div class="nav-cta">
-    <a class="link-btn" routerLink="/auth">Iniciar sesión</a>
-    <a class="solid-btn" routerLink="/auth" [queryParams]="{ returnTo: '/app/links' }">Crear cuenta</a>
+    <a class="link-btn" [href]="authHref()">Iniciar sesión</a>
+    <a class="solid-btn" [href]="authHref()">Crear cuenta</a>
   </div>
 </header>
 
@@ -157,7 +157,7 @@
     <article class="plan" [class.highlight]="p.highlight" *ngFor="let p of plans">
       <h3>{{ p.name }}</h3>
       <div class="plan-price"><b class="tnum">{{ p.price }}</b><span>{{ p.period }}</span></div>
-      <a class="plan-cta" [class.solid-btn]="p.highlight" [class.link-btn]="!p.highlight" routerLink="/auth" [queryParams]="{ returnTo: '/app/links' }">{{ p.cta }}</a>
+      <a class="plan-cta" [class.solid-btn]="p.highlight" [class.link-btn]="!p.highlight" [href]="authHref()">{{ p.cta }}</a>
       <ul>
         <li *ngFor="let f of p.features"><mat-icon>check</mat-icon>{{ f }}</li>
       </ul>
@@ -183,7 +183,7 @@
 <section class="cta-band">
   <h2>Empieza hoy. Controla cada clic.</h2>
   <p>Únete a UVH y convierte cualquier URL en una herramienta de medición.</p>
-  <a class="solid-btn big" routerLink="/auth" [queryParams]="{ returnTo: '/app/links' }">Crear cuenta gratis</a>
+  <a class="solid-btn big" [href]="authHref()">Crear cuenta gratis</a>
 </section>
 
 <!-- Footer -->
@@ -201,7 +201,7 @@
     <div class="footer-cols">
       <div class="footer-col">
         <h4>Producto</h4>
-        <a routerLink="/auth" [queryParams]="{ returnTo: '/app/links' }">Panel</a>
+        <a [href]="authHref()">Panel</a>
         <a href="#features">Funciones</a>
         <a href="#precios">Precios</a>
       </div>

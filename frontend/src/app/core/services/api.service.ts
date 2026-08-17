@@ -32,6 +32,16 @@ export class ApiService {
     return readCookie(CSRF_COOKIE);
   }
 
+  /** Ensure the CSRF cookie exists before a mutation (fetches it lazily if missing). */
+  private async ensureCsrf(): Promise<void> {
+    if (this.csrfToken()) return;
+    try {
+      await firstValueFrom(this.http.get<{ csrfToken: string }>("/api/v1/csrf"));
+    } catch {
+      // If the token cannot be obtained, the mutation will fail server-side (403).
+    }
+  }
+
   private headers(needsCsrf: boolean): Record<string, string> {
     const h: Record<string, string> = { "Content-Type": "application/json" };
     const ws = this.workspaces.currentId();
@@ -60,17 +70,20 @@ export class ApiService {
   }
 
   /** POST (mutation — requires CSRF). */
-  post<T>(path: string, body?: unknown): Promise<T> {
+  async post<T>(path: string, body?: unknown): Promise<T> {
+    await this.ensureCsrf();
     return firstValueFrom(this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }));
   }
 
   /** PATCH (mutation — requires CSRF). */
-  patch<T>(path: string, body?: unknown): Promise<T> {
+  async patch<T>(path: string, body?: unknown): Promise<T> {
+    await this.ensureCsrf();
     return firstValueFrom(this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }));
   }
 
   /** DELETE (mutation — requires CSRF). */
-  delete<T>(path: string): Promise<T> {
+  async delete<T>(path: string): Promise<T> {
+    await this.ensureCsrf();
     return firstValueFrom(this.http.delete<T>(path, { headers: this.headers(true) }));
   }
 

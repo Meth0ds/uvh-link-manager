@@ -61,7 +61,8 @@ El hosting de Freebuff es **Node.js-only** y ejecuta en un estado limpio:
 Para este proyecto:
 
 - **Install**: `cd backend && npm install && cd ../frontend && npm install`
-- **Build**: `cd frontend && npx ng build` (debe producir `dist/` y **salir**; no arrancar servidor) y, si se compila el backend, `cd backend && npm run build`.
+- **Build**: `cd frontend && npx ng build` (debe producir `dist/` y **salir**; no arrancar servidor) y `cd backend && npm run build` (emite `dist/src/index.js`).
+- **Run (backend)**: `cd backend && npm start` → `node dist/src/index.js`. No se usa `tsx` en producción.
 
 Verificar antes de desplegar:
 
@@ -84,7 +85,9 @@ freebuff-deploy env set '{"APP_SECRET":"...","COOKIE_SECURE":"true","RESEND_API_
 freebuff-deploy env unset KEY
 ```
 
-Claves requeridas en producción: `APP_SECRET` (obligatorio), `RESEND_API_KEY` (para email), `APP_URL` (URL real del panel), `PUBLIC_HOST=uvh.es`. Mantener `COOKIE_DOMAIN` vacío y `COOKIE_SECURE=true` bajo HTTPS.
+Claves requeridas en producción: `APP_SECRET` (obligatorio; el proceso **no arranca** si falta o usa el valor de desarrollo), `RESEND_API_KEY` (para email), `APP_URL`/`APP_HOST` (host real del panel, `app.uvh.es`), `PUBLIC_HOST=uvh.es`. Mantener `COOKIE_DOMAIN` vacío y `COOKIE_SECURE=true` bajo HTTPS.
+
+En producción el backend aplica **separación por host** (`backend/src/middleware/host.ts`): `/api/v1`, `/auth` y `/app` solo responden en `APP_HOST`; la landing, legales, sitemap/robots y la resolución de enlaces solo en `PUBLIC_HOST` o dominios personalizados.
 
 ## 4. Base de datos (SQLite / Turso)
 
@@ -120,7 +123,7 @@ La base es **compatible SQLite**. Para una base gestionada y persistente en prod
 1. **Sin PHP/Laravel**: sustituido por Express + TypeScript (equivalente soportado).
 2. **Sin workers/cron persistentes garantizados**: el scheduler (activación/caducidad/purga/reintentos de webhooks) corre **dentro** del proceso de la API (`setInterval`). Si la API se reinicia, los jobs se reanudan al arrancar. Para cargas altas, mover el scheduler a un worker externo o a un cron del proveedor cuando esté disponible.
 3. **Persistencia del SQLite local**: depende del filesystem del hosting. Usar Turso para producción.
-4. **Dominios personalizados (`uvh.es` / `app.uvh.es`) y HTTPS**: requieren la configuración de dominios del hosting de Freebuff; la app ya implementa toda la lógica (host validation, DNS TXT para dominios personalizados, cookie restringida a `app.uvh.es`).
+4. **Dominios personalizados (`uvh.es` / `app.uvh.es`) y HTTPS**: requieren la configuración de dominios del hosting de Freebuff; la app ya implementa toda la lógica (host validation, DNS TXT para dominios personalizados, cookie restringida a `app.uvh.es`, separación por host en producción).
 5. **Email**: requiere `RESEND_API_KEY`; sin ella, los correos se registran en log y no se envían (los flujos de verificación siguen funcionando en dev).
 
 ## 6. "Preparado para producción" — checklist

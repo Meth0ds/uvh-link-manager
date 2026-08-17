@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { db, q } from "../db.js";
 import { assertSafeUrl } from "../util/ssrf.js";
+import { decryptAtRest } from "../util/crypto.js";
 
 export const WEBHOOK_EVENTS = [
   "link.created",
@@ -51,7 +52,7 @@ async function attemptDelivery(deliveryId: number, attempt: number): Promise<voi
   try {
     // SSRF guard: webhook URLs are user-provided and fetched server-side.
     await assertSafeUrl(wh.url);
-    const signature = sign(delivery.payload, wh.secret);
+    const signature = sign(delivery.payload, decryptAtRest(wh.secret));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5_000);
     const res = await fetch(wh.url, {

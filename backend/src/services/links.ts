@@ -142,29 +142,37 @@ export function updateLink(
     .get(linkId, workspaceId) as Record<string, unknown> | undefined;
   if (!link) throw new LinkError("Enlace no encontrado", 404);
 
+  // `domain_id`/`alias` were previously computed but never written. Use the
+  // incoming value when provided (including explicit null = default host), else
+  // keep the current one.
+  const domainId = input.domainId !== undefined ? input.domainId : (link.domain_id as number | null);
   const alias = input.alias ? normalizeAlias(input.alias) : (link.alias as string);
   if (input.alias) {
     if (isReservedAlias(alias)) throw new LinkError("Este alias está reservado", 422);
     if (!isValidCustomAlias(alias)) throw new LinkError("Alias inválido", 422);
     const dup = q
       .prepare(`SELECT id FROM links WHERE domain_id IS ? AND alias = ? AND id != ?`)
-      .get(link.domain_id ?? null, alias, linkId);
+      .get(domainId, alias, linkId);
     if (dup) throw new LinkError("Este alias ya está en uso", 409);
   }
 
-  const state = deriveState(input);
+  // Editing must never change lifecycle state: a paused/blocked/archived link
+  // stays as-is. Time-based transitions are handled by the scheduler, not here.
+  const state = (link.state as LinkState) ?? "active";
   const utm = input.utm ?? {};
   return tx(() => {
     q.prepare(
       `UPDATE links SET
-         destination = ?, fallback_destination = ?, state = ?,
+         domain_id = ?, alias = ?,
+         destination = ?, fallback_destination = ?,
          password_hash = ?, max_clicks = ?, single_use = ?,
          scheduled_at = ?, expires_at = ?, notes = ?,
          utm_source = ?, utm_medium = ?, utm_campaign = ?, utm_term = ?, utm_content = ?,
          updated_at = ?
        WHERE id = ?`,
     ).run(
-      input.destination, input.fallbackDestination ?? null, state,
+      domainId, alias,
+      input.destination, input.fallbackDestination ?? null,
       input.passwordHash ?? link.password_hash,
       input.maxClicks ?? null, input.singleUse ? 1 : 0,
       input.scheduledAt ?? null, input.expiresAt ?? null, input.notes ?? null,

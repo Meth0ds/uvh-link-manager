@@ -5,6 +5,7 @@ import { requireAuth, requireVerified, type AuthedRequest } from "../middleware/
 import { requireWorkspace } from "../workspace.js";
 import { audit } from "../util/audit.js";
 import { randomToken } from "../util/ids.js";
+import { encryptAtRest } from "../util/crypto.js";
 import { resendDelivery } from "../services/webhooks.js";
 import { WEBHOOK_EVENTS } from "../services/webhooks.js";
 import { validateDestination } from "../util/url.js";
@@ -51,7 +52,7 @@ webhooksRouter.post("/", requireVerified, requireWorkspace("editor"), (req: Auth
   const secret = parsed.data.secret ?? randomToken(32);
   const info = db
     .prepare(`INSERT INTO webhooks (workspace_id, url, secret, events) VALUES (?, ?, ?, ?)`)
-    .run(workspaceId, parsed.data.url, secret, JSON.stringify(parsed.data.events));
+    .run(workspaceId, parsed.data.url, encryptAtRest(secret), JSON.stringify(parsed.data.events));
   audit({ userId: req.user!.id, ip: req.ip }, "webhook.create", "webhook", Number(info.lastInsertRowid), { url: parsed.data.url });
   const row = q.prepare(`SELECT * FROM webhooks WHERE id = ?`).get(Number(info.lastInsertRowid)) as Record<string, unknown>;
   res.status(201).json({ webhook: dto(row), secret });
@@ -90,7 +91,7 @@ webhooksRouter.patch("/:id", requireVerified, requireWorkspace("editor"), (req: 
     parsed.data.url ?? row.url,
     parsed.data.events ? JSON.stringify(parsed.data.events) : row.events,
     parsed.data.active !== undefined ? (parsed.data.active ? 1 : 0) : row.active,
-    parsed.data.secret ?? row.secret,
+    parsed.data.secret ? encryptAtRest(parsed.data.secret) : row.secret,
     new Date().toISOString(),
     id,
   );

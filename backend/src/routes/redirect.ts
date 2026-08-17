@@ -9,7 +9,7 @@ import { countryFromHeaders, parseUserAgent, referrerDomain, visitorHash } from 
 import { sign } from "../util/sign.js";
 import { normalizeAlias } from "../util/url.js";
 import { reportLimiter } from "../middleware/ratelimit.js";
-import { CSRF_COOKIE } from "../middleware/csrf.js";
+import { issueCsrfToken, verifyCsrf } from "../middleware/csrf.js";
 
 export const redirectRouter = Router();
 
@@ -27,7 +27,6 @@ function toResolveRequest(req: import("express").Request, alias: string): Resolv
     ip: req.ip,
     country: countryFromHeaders(req.headers as Record<string, string | undefined>),
     unlockToken: (req.cookies?.[UNLOCK_COOKIE] as string | undefined) ?? null,
-    csrfToken: (req as Request & { csrfToken?: string }).csrfToken,
     accepts: (t) => req.accepts(t) as unknown,
   };
 }
@@ -73,11 +72,10 @@ interface ResolveRequest {
   ip?: string;
   country?: string | null;
   unlockToken?: string | null;
-  csrfToken?: string;
   accepts: (t: string) => unknown;
 }
 
-function resolveAndRespond(req: ResolveRequest, res: import("express").Response): void {
+function resolveAndRespond(req: ResolveRequest, expressReq: import("express").Request, res: import("express").Response): void {
   const outcome = resolveLink(req);
   if (outcome.kind === "redirect") {
     enqueue(() => {
@@ -98,7 +96,8 @@ function resolveAndRespond(req: ResolveRequest, res: import("express").Response)
   }
   if (outcome.kind === "password_required") {
     if (wantsHtml(req)) {
-      res.status(403).send(passwordPage(req.alias, req.csrfToken));
+      // Issue CSRF only here (not on the redirect hot path) so the unlock form can submit.
+      res.status(403).send(passwordPage(req.alias, issueCsrfToken(expressReq, res)));
     } else {
       res.status(403).json({ error: "Enlace protegido con contraseña", passwordRequired: true });
     }
@@ -129,16 +128,20 @@ function resolveAndRespond(req: ResolveRequest, res: import("express").Response)
 
 // Canonical public surface: /{alias} (uvh.es) and /r/{alias} (API-friendly)
 redirectRouter.get("/r/:alias", (req, res) => {
-  resolveAndRespond(toResolveRequest(req, req.params.alias ?? ""), res);
+  resolveAndRespond(toResolveRequest(req, req.params.alias ?? ""), req, res);
 });
 
 redirectRouter.get("/:alias", (req, res) => {
   // Top-level paths resolve only when the Host is a UVH public domain.
-  resolveAndRespond(toResolveRequest(req, req.params.alias ?? ""), res);
+  resolveAndRespond(toResolveRequest(req, req.params.alias ?? ""), req, res);
 });
 
 // Unlock a password-protected link and follow with a redirect.
 redirectRouter.post("/r/:alias/unlock", reportLimiter, async (req, res) => {
+  if (!verifyCsrf(req)) {
+    res.status(403).json({ error: "Token CSRF inválido" });
+    return;
+  }
   const parsed = z.object({ password: z.string().min(1).max(256) }).safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({ error: "Contraseña requerida" });
@@ -161,10 +164,9 @@ redirectRouter.post("/r/:alias/unlock", reportLimiter, async (req, res) => {
     return;
   }
   const ok = await bcrypt.compare(parsed.data.password, link.password_hash);
-  const csrf = (req as Request & { csrfToken?: string }).csrfToken;
   if (!ok) {
     if (req.accepts("html")) {
-      res.status(403).send(passwordPage(alias, csrf).replace("</form>", `<div class="err">Contraseña incorrecta</div></form>`));
+      res.status(403).send(passwordPage(alias, issueCsrfToken(req, res)).replace("</form>", `<div class="err">Contraseña incorrecta</div></form>`));
     } else {
       res.status(403).json({ error: "Contraseña incorrecta" });
     }

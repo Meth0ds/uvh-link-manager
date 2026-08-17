@@ -6,7 +6,7 @@
   "description": "UVH backend API — Express + TypeScript + SQLite (node:sqlite)",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "start": "node dist/src/index.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

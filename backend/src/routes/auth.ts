@@ -14,7 +14,8 @@ import {
 } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/ratelimit.js";
 import { audit } from "../util/audit.js";
-import { randomToken } from "../util/ids.js";
+import { randomToken, sha256Hex } from "../util/ids.js";
+import { decryptAtRest, encryptAtRest } from "../util/crypto.js";
 import { resetPasswordEmail, sendMail, verificationEmail } from "../util/email.js";
 
 export const authRouter = Router();
@@ -136,7 +137,7 @@ authRouter.post("/mfa/verify", authLimiter, async (req: AuthedRequest, res) => {
     res.status(401).json({ error: "MFA no configurado" });
     return;
   }
-  const valid = authenticator.check(parsed.data.code, user.mfa_secret);
+  const valid = authenticator.check(parsed.data.code, decryptAtRest(user.mfa_secret));
   if (!valid) {
     res.status(401).json({ error: "Código incorrecto" });
     return;
@@ -159,7 +160,7 @@ authRouter.post("/mfa/recovery", authLimiter, async (req: AuthedRequest, res) =>
     return;
   }
   const codes = JSON.parse(user.recovery_codes) as string[];
-  const idx = codes.indexOf(parsed.data.code);
+  const idx = codes.indexOf(sha256Hex(parsed.data.code.trim().toUpperCase()));
   if (idx === -1) {
     res.status(401).json({ error: "Código de recuperación incorrecto" });
     return;
@@ -341,7 +342,7 @@ authRouter.post("/mfa/setup", requireAuth, async (req: AuthedRequest, res) => {
     return;
   }
   const secret = authenticator.generateSecret();
-  q.prepare(`UPDATE users SET mfa_secret = ? WHERE id = ?`).run(secret, req.user!.id);
+  q.prepare(`UPDATE users SET mfa_secret = ? WHERE id = ?`).run(encryptAtRest(secret), req.user!.id);
   const uri = authenticator.keyuri(req.user!.email, "UVH", secret);
   audit({ userId: req.user!.id }, "auth.mfa_setup", "user", req.user!.id);
   res.json({ secret, uri });
@@ -354,13 +355,14 @@ authRouter.post("/mfa/enable", requireAuth, async (req: AuthedRequest, res) => {
     return;
   }
   const user = q.prepare(`SELECT mfa_secret FROM users WHERE id = ?`).get(req.user!.id) as { mfa_secret: string | null };
-  if (!user.mfa_secret || !authenticator.check(parsed.data.code, user.mfa_secret)) {
+  if (!user.mfa_secret || !authenticator.check(parsed.data.code, decryptAtRest(user.mfa_secret))) {
     res.status(403).json({ error: "Código incorrecto" });
     return;
   }
   const recoveryCodes = Array.from({ length: 10 }, () => randomToken(5).toUpperCase().slice(0, 10));
+  // Store only hashes of the one-time recovery codes; the plaintext is shown once.
   q.prepare(`UPDATE users SET mfa_enabled = 1, recovery_codes = ?, updated_at = ? WHERE id = ?`).run(
-    JSON.stringify(recoveryCodes), new Date().toISOString(), req.user!.id,
+    JSON.stringify(recoveryCodes.map((c) => sha256Hex(c))), new Date().toISOString(), req.user!.id,
   );
   audit({ userId: req.user!.id }, "auth.mfa_enable", "user", req.user!.id);
   res.json({ recoveryCodes });

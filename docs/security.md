@@ -19,17 +19,19 @@ Implementación de seguridad y guía de endurecimiento (hardening).
 
 - Cookie `uvh_session` (nombre configurable) con `HttpOnly`, `SameSite`, `Secure` en producción, `Path=/`.
 - `COOKIE_DOMAIN` se mantiene **vacío**. Nunca `.uvh.es`: la cookie del panel pertenece solo a `app.uvh.es`.
-- CSRF de doble envío (`uvh_csrf` + `X-CSRF-Token`) en toda mutación.
+- El token de sesión se almacena **hasheado** (SHA-256); el valor en claro solo existe en la cookie.
+- Separación por host en producción (`middleware/host.ts`): panel/API solo en `app.uvh.es`; landing y resolución solo en `uvh.es` o dominios personalizados.
+- CSRF de doble envío (`uvh_csrf` + `X-CSRF-Token`) acotado a la API (`/api/v1`) y a los formularios públicos que mutan; la resolución de enlaces no emite cookies CSRF.
 - Regeneración de sesión al iniciar sesión; revocación de sesiones al cambiar o resetear contraseña.
 - Listado y revocación de sesiones desde Ajustes.
 
 ## 3. Contraseñas, MFA y tokens
 
 - bcrypt con coste 12.
-- MFA TOTP (`otplib`) con códigos de recuperación de un solo uso.
+- MFA TOTP (`otplib`) con códigos de recuperación de un solo uso; el secreto TOTP se cifra en reposo (AES-256-GCM) y los códigos de recuperación se guardan solo como hash.
 - Reautenticación (contraseña) para cambiar contraseña y para configurar/desactivar MFA.
 - API tokens: solo se guarda el hash (`sha256`); el token completo se muestra una sola vez; scopes (`links:read`, `links:write`, `analytics:read`, `domains:read`, `domains:write`), expiración y revocación.
-- Secretos de webhook firmados con HMAC-SHA256 (event id + timestamp) y almacenados solo como hash.
+- Secretos de webhook firmados con HMAC-SHA256 y **cifrados en reposo** (AES-256-GCM). No se usa hash irreversible: el secreto debe recuperarse para firmar cada entrega.
 
 ## 4. Validación de entrada y SSRF
 
@@ -55,6 +57,7 @@ Implementación de seguridad y guía de endurecimiento (hardening).
 
 - `.env`, `.env.local` y `.env.*.local` están en `.gitignore`.
 - Los secretos se inyectan por la pestaña API Keys de Freebuff y se leen con `process.env` en el backend.
+- `APP_SECRET` **falla cerrado** en producción: el proceso se niega a arrancar si falta, es demasiado corto o usa el valor de desarrollo.
 - En producción los secretos se definen aparte (ver `docs/deployment.md`).
 
 ## 8. Checklist de release
@@ -65,4 +68,5 @@ Implementación de seguridad y guía de endurecimiento (hardening).
 - [ ] Dominios personalizados verificados por TXT antes de `active`.
 - [ ] `RESEND_API_KEY` definida para emails.
 - [ ] CSP revisada para los assets reales servidos.
+- [ ] `APP_HOST=app.uvh.es` y `PUBLIC_HOST=uvh.es` definidos en producción (separación por host).
 - [ ] Límites de cuota por plan definidos.

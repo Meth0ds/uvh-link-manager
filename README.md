@@ -47,6 +47,7 @@ Crea un `.env.local` en la raíz (gitignored) y rellena los valores:
 | `COOKIE_SECURE` | prod | `true` en producción (HTTPS) |
 | `COOKIE_DOMAIN` | no | Mantener **vacío** (nunca `.uvh.es`) |
 | `APP_URL` | no | URL de la SPA (por defecto `http://localhost:4200`) |
+| `APP_HOST` | no | Host del panel/API (por defecto se deriva de `APP_URL`) |
 | `PUBLIC_HOST` | no | Host público de resolución (por defecto `uvh.es`) |
 | `RESEND_API_KEY` | no | Clave de Resend para email transaccional |
 | `MAIL_FROM` | no | Remitente de correo |
@@ -77,7 +78,7 @@ El proxy de desarrollo (`src/proxy.conf.js`) reenvía `/api` y `/r` al backend (
 **Backend** (`backend/package.json`)
 
 - `npm run dev` — desarrollo con recarga
-- `npm run start` — ejecutar el servidor
+- `npm run start` — ejecutar el servidor compilado (`node dist/src/index.js`; requiere `npm run build`)
 - `npm run build` — `tsc -p tsconfig.json`
 - `npm run typecheck` — `tsc --noEmit`
 - `npm test` — Vitest
@@ -93,6 +94,7 @@ El proxy de desarrollo (`src/proxy.conf.js`) reenvía `/api` y `/r` al backend (
 - `.env.local` y `.env.*.local` están ignorados por git; nunca subas secretos reales.
 - En producción activa `COOKIE_SECURE=true`.
 - Mantén `COOKIE_DOMAIN` vacío para que la cookie de sesión se restrinja a `app.uvh.es`.
+- En producción, `APP_SECRET` es obligatorio: el backend **no arranca** si falta o usa el valor de desarrollo.
 
 ## Estado
 
