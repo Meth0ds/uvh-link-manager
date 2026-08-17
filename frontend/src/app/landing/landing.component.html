@@ -1,0 +1,225 @@
+<!-- Nav -->
+<header class="nav">
+  <a class="brand" routerLink="/">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="30" height="30"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
+    </span>
+    <span class="brand-name">UVH</span>
+  </a>
+  <nav class="nav-links" aria-label="Principal">
+    <a href="#features">Funciones</a>
+    <a href="#como-funciona">Cómo funciona</a>
+    <a href="#precios">Precios</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <div class="nav-cta">
+    <a class="link-btn" routerLink="/auth">Iniciar sesión</a>
+    <a class="solid-btn" routerLink="/auth" [queryParams]="{ returnTo: '/app/links' }">Crear cuenta</a>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <span class="eyebrow"><span class="dot"></span> Plataforma de enlaces para equipos</span>
+      <h1>Enlaces cortos.<br /><span class="grad">Control total.</span></h1>
+      <p class="lead">
+        Acorta, administra y analiza cada enlace con una plataforma profesional,
+        segura y preparada para producción. Tú decides cómo, cuándo y a quién
+        redirige cada URL.
+      </p>
+
+      <form class="shortener" (ngSubmit)="submitDemo()">
+        <mat-icon aria-hidden="true">link</mat-icon>
+        <input
+          type="url"
+          placeholder="Pega aquí tu URL larga…"
+          [(ngModel)]="demoUrl"
+          name="url"
+          aria-label="URL a acortar"
+        />
+        <button type="submit" class="shorten-btn">Acortar</button>
+      </form>
+      <p class="hint">Gratis para empezar · Sin tarjeta · Crea tu cuenta en segundos</p>
+
+      <div class="hero-stats">
+        <div class="stat"><b class="tnum">99,99&nbsp;%</b><span>disponibilidad</span></div>
+        <div class="stat"><b class="tnum">&lt;50&nbsp;ms</b><span>resolución</span></div>
+        <div class="stat"><b class="tnum">302</b><span>redirección real</span></div>
+      </div>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <div class="card-demo">
+        <div class="card-demo-head">
+          <span class="traffic"><i></i><i></i><i></i></span>
+          <span class="card-demo-title">uvh.es/lanzamiento</span>
+          <span class="pill live">activo</span>
+        </div>
+        <div class="card-demo-body">
+          <div class="mini-row">
+            <span class="mini-label">Clics hoy</span>
+            <b class="tnum">1.284</b>
+          </div>
+          <div class="bars">
+            <i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i><i class="b6"></i><i class="b7"></i><i class="b8"></i><i class="b9"></i><i class="b10"></i><i class="b11"></i><i class="b12"></i>
+          </div>
+          <div class="mini-legend">
+            <span><i class="k1"></i>España 46&nbsp;%</span>
+            <span><i class="k2"></i>Móvil 68&nbsp;%</span>
+          </div>
+        </div>
+      </div>
+      <div class="qr-card" aria-hidden="true">
+        <svg viewBox="0 0 96 96" width="84" height="84">
+          <rect width="96" height="96" fill="#fff"/>
+          <g fill="#07111F">
+            <path d="M8 8h28v28H8zM16 16v12h12V16zM60 8h28v28H60zM68 16v12h12V16zM8 60h28v28H8zM16 68v12h12V68z"/>
+            <path d="M44 8h4v4h-4zM52 8h4v4h-4zM44 16h4v4h-4zM52 16h4v4h-4zM44 24h4v4h-4zM52 24h4v4h-4zM44 32h4v4h-4zM52 32h4v4h-4zM60 44h4v4h-4zM68 44h4v4h-4zM44 44h4v4h-4zM52 44h4v4h-4zM44 52h4v4h-4zM52 52h4v4h-4zM60 52h4v4h-4zM68 52h4v4h-4zM76 52h4v4h-4zM44 60h4v4h-4zM52 60h4v4h-4zM60 60h4v4h-4zM68 60h4v4h-4zM76 60h4v4h-4zM44 68h4v4h-4zM52 68h4v4h-4zM60 68h4v4h-4zM68 68h4v4h-4zM76 68h4v4h-4zM44 76h4v4h-4zM52 76h4v4h-4zM60 76h4v4h-4zM68 76h4v4h-4zM76 76h4v4h-4zM84 76h4v4h-4zM84 60h4v4h-4zM84 68h4v4h-4zM84 44h4v4h-4zM76 44h4v4h-4z"/>
+          </g>
+        </svg>
+        <span class="qr-caption">QR automático</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Social proof -->
+<section class="proof">
+  <p>La infraestructura de enlaces que usan equipos que miden cada clic</p>
+  <div class="proof-logos">
+    <span>NOVEDAD</span><span>lanza&nbsp;·&nbsp;digital</span><span>KERNEL&nbsp;LAB</span><span>puente&nbsp;media</span><span>OUTBOX</span>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section" id="features">
+  <div class="section-head">
+    <span class="eyebrow">Funciones</span>
+    <h2>Todo lo que necesitas para dominar tus enlaces</h2>
+    <p>Una plataforma única que combina acortador, gestor y analítica con seguridad de nivel empresarial.</p>
+  </div>
+  <div class="grid features-grid">
+    <article class="feature" *ngFor="let f of features">
+      <span class="feature-icon"><mat-icon aria-hidden="true">{{ f.icon }}</mat-icon></span>
+      <h3>{{ f.title }}</h3>
+      <p>{{ f.text }}</p>
+    </article>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section alt" id="como-funciona">
+  <div class="section-head">
+    <span class="eyebrow">Cómo funciona</span>
+    <h2>Tres pasos y listo</h2>
+  </div>
+  <div class="grid steps-grid">
+    <article class="step" *ngFor="let s of steps; let i = index">
+      <span class="step-num tnum">0{{ i + 1 }}</span>
+      <h3>{{ s.title }}</h3>
+      <p>{{ s.text }}</p>
+    </article>
+  </div>
+</section>
+
+<!-- Security band -->
+<section class="section security-band">
+  <div class="security-copy">
+    <span class="eyebrow">Seguridad</span>
+    <h2>Diseñado para que el control sea tuyo</h2>
+    <ul class="security-list">
+      <li><mat-icon>check_circle</mat-icon> Redirección HTTP real en el backend, nunca JavaScript</li>
+      <li><mat-icon>check_circle</mat-icon> Cookies de sesión HttpOnly con SameSite y CSRF de doble envío</li>
+      <li><mat-icon>check_circle</mat-icon> Validación estricta de destinos: sin javascript:, data: ni credenciales</li>
+      <li><mat-icon>check_circle</mat-icon> Auditoría inmutable de cada acción y hash de tokens de API</li>
+      <li><mat-icon>check_circle</mat-icon> Protección SSRF en webhooks y rate limiting por IP</li>
+    </ul>
+  </div>
+  <div class="security-visual" aria-hidden="true">
+    <div class="shield-wrap">
+      <mat-icon class="shield-icon">verified_user</mat-icon>
+      <div class="ring r1"></div>
+      <div class="ring r2"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="section" id="precios">
+  <div class="section-head">
+    <span class="eyebrow">Precios</span>
+    <h2>Planes que crecen contigo</h2>
+    <p>Empieza gratis y escala cuando lo necesites. Sin sorpresas.</p>
+  </div>
+  <div class="grid pricing-grid">
+    <article class="plan" [class.highlight]="p.highlight" *ngFor="let p of plans">
+      <h3>{{ p.name }}</h3>
+      <div class="plan-price"><b class="tnum">{{ p.price }}</b><span>{{ p.period }}</span></div>
+      <a class="plan-cta" [class.solid-btn]="p.highlight" [class.link-btn]="!p.highlight" routerLink="/auth" [queryParams]="{ returnTo: '/app/links' }">{{ p.cta }}</a>
+      <ul>
+        <li *ngFor="let f of p.features"><mat-icon>check</mat-icon>{{ f }}</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section alt" id="faq">
+  <div class="section-head">
+    <span class="eyebrow">FAQ</span>
+    <h2>Preguntas frecuentes</h2>
+  </div>
+  <div class="faq-list">
+    <details *ngFor="let item of faqs" class="faq-item">
+      <summary>{{ item.q }}</summary>
+      <p>{{ item.a }}</p>
+    </details>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-band">
+  <h2>Empieza hoy. Controla cada clic.</h2>
+  <p>Únete a UVH y convierte cualquier URL en una herramienta de medición.</p>
+  <a class="solid-btn big" routerLink="/auth" [queryParams]="{ returnTo: '/app/links' }">Crear cuenta gratis</a>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a class="brand" routerLink="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="26" height="26"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
+        </span>
+        <span class="brand-name">UVH</span>
+      </a>
+      <p>Enlaces cortos. Control total.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h4>Producto</h4>
+        <a routerLink="/auth" [queryParams]="{ returnTo: '/app/links' }">Panel</a>
+        <a href="#features">Funciones</a>
+        <a href="#precios">Precios</a>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <a href="/legal/privacidad">Privacidad</a>
+        <a href="/legal/terminos">Términos</a>
+        <a href="/legal/denuncias">Denunciar abuso</a>
+      </div>
+      <div class="footer-col">
+        <h4>Recursos</h4>
+        <a href="/api/v1/health">Estado</a>
+        <a href="mailto:soporte@uvh.es">Soporte</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© {{ year }} UVH · uvh.es</span>
+    <span class="tnum">Enlaces cortos. Control total.</span>
+  </div>
+</footer>

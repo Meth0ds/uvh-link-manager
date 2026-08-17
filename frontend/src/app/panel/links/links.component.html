@@ -1,0 +1,101 @@
+<div class="page-head">
+  <div>
+    <h1>Enlaces</h1>
+    <p>Administra, edita y mide todos tus enlaces cortos.</p>
+  </div>
+  <button mat-flat-button color="primary" (click)="create()" *ngIf="canWrite()">
+    <mat-icon>add</mat-icon> Nuevo enlace
+  </button>
+</div>
+
+<div class="filters">
+  <mat-form-field appearance="outline" class="search">
+    <mat-icon matPrefix>search</mat-icon>
+    <input matInput placeholder="Buscar por alias, destino o notas…" [value]="q()" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
+  </mat-form-field>
+  <mat-form-field appearance="outline" class="filter">
+    <mat-select [value]="state()" (selectionChange)="onState($event.value)" aria-label="Estado">
+      <mat-option value="">Todos los estados</mat-option>
+      <mat-option value="active">Activos</mat-option>
+      <mat-option value="paused">En pausa</mat-option>
+      <mat-option value="scheduled">Programados</mat-option>
+      <mat-option value="expired">Caducados</mat-option>
+      <mat-option value="archived">Archivados</mat-option>
+      <mat-option value="blocked">Bloqueados</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field appearance="outline" class="filter">
+    <mat-select [value]="sort()" (selectionChange)="onSort($event.value)" aria-label="Ordenar">
+      <mat-option value="created_at_desc">Más recientes</mat-option>
+      <mat-option value="created_at_asc">Más antiguos</mat-option>
+      <mat-option value="clicks_desc">Más clics</mat-option>
+      <mat-option value="alias_asc">Alias A–Z</mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>
+
+<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+
+<div class="alert error" *ngIf="error()">{{ error() }}</div>
+
+<div class="link-list" *ngIf="!loading()">
+  <article class="link-row" *ngFor="let link of links(); trackBy: trackByLink" (click)="router.navigate(['/app/links', link.id])">
+    <div class="link-main">
+      <div class="link-top">
+        <a class="short tnum" (click)="$event.stopPropagation(); router.navigate(['/app/links', link.id])">{{ displayUrl(link.shortUrl) }}</a>
+        <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
+        <span class="clicks tnum" *ngIf="link.clickCount > 0"><mat-icon>touch_app</mat-icon> {{ link.clickCount }}</span>
+      </div>
+      <p class="dest" [title]="link.destination">{{ link.destination }}</p>
+      <div class="meta" *ngIf="link.tags.length">
+        <span class="tag" *ngFor="let t of link.tags">#{{ t }}</span>
+      </div>
+    </div>
+
+    <div class="link-actions" (click)="$event.stopPropagation()">
+      <button mat-icon-button matTooltip="Copiar" (click)="copy(link.shortUrl)" aria-label="Copiar enlace">
+        <mat-icon>content_copy</mat-icon>
+      </button>
+      <button mat-icon-button matTooltip="QR" (click)="showQr(link.shortUrl)" aria-label="Generar QR">
+        <mat-icon>qr_code_2</mat-icon>
+      </button>
+      <button mat-icon-button matTooltip="Editar" (click)="edit(link)" aria-label="Editar enlace" *ngIf="canWrite()">
+        <mat-icon>edit</mat-icon>
+      </button>
+      <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+      <mat-menu #menu="matMenu">
+        <button mat-menu-item (click)="showQr(link.shortUrl)"><mat-icon>qr_code_2</mat-icon> QR</button>
+        <button mat-menu-item (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar URL</button>
+        <button mat-menu-item (click)="router.navigate(['/app/links', link.id])"><mat-icon>query_stats</mat-icon> Analítica</button>
+        <ng-container *ngIf="canWrite()">
+          <button mat-menu-item (click)="edit(link)"><mat-icon>edit</mat-icon> Editar</button>
+          <button mat-menu-item *ngIf="link.state === 'active'" (click)="setState(link, 'paused')"><mat-icon>pause</mat-icon> Pausar</button>
+          <button mat-menu-item *ngIf="link.state === 'paused'" (click)="setState(link, 'active')"><mat-icon>play_arrow</mat-icon> Reactivar</button>
+          <button mat-menu-item *ngIf="link.state !== 'archived'" (click)="setState(link, 'archived')"><mat-icon>archive</mat-icon> Archivar</button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item class="danger" (click)="remove(link)"><mat-icon>delete</mat-icon> Eliminar</button>
+        </ng-container>
+      </mat-menu>
+    </div>
+  </article>
+
+  <div class="empty" *ngIf="!links().length && !loading()">
+    <mat-icon>link_off</mat-icon>
+    <h3>Sin enlaces todavía</h3>
+    <p>Crea tu primer enlace corto para empezar a medir.</p>
+    <button mat-flat-button color="primary" (click)="create()" *ngIf="canWrite()">Crear enlace</button>
+  </div>
+</div>
+
+<mat-paginator
+  *ngIf="total() > pageSize()"
+  [length]="total()"
+  [pageSize]="pageSize()"
+  [pageIndex]="page()"
+  [pageSizeOptions]="[20, 50, 100]"
+  (page)="onPage($event)"
+  showFirstLastButtons
+  aria-label="Paginación de enlaces"
+></mat-paginator>

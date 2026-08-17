@@ -1,0 +1,144 @@
+<div class="page-head">
+  <h1>Ajustes</h1>
+  <p>Tu perfil, seguridad, sesiones y apariencia.</p>
+</div>
+
+<!-- Profile -->
+<div class="card-block">
+  <span class="section-title">Perfil</span>
+  <form class="stack" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+    <mat-form-field appearance="outline">
+      <mat-label>Email</mat-label>
+      <input matInput [value]="user()?.email ?? ''" readonly />
+      <mat-icon matPrefix>mail_outline</mat-icon>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre</mat-label>
+      <input matInput formControlName="name" autocomplete="name" />
+      <mat-icon matPrefix>person_outline</mat-icon>
+    </mat-form-field>
+    <div class="row-actions">
+      <button mat-flat-button color="primary" type="submit" [disabled]="profileForm.invalid || profileBusy()">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Password -->
+<div class="card-block">
+  <span class="section-title">Contraseña</span>
+  <form class="stack" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
+    <mat-form-field appearance="outline">
+      <mat-label>Contraseña actual</mat-label>
+      <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="current" autocomplete="current-password" />
+      <mat-icon matPrefix>lock_outline</mat-icon>
+    </mat-form-field>
+    <div class="grid-2">
+      <mat-form-field appearance="outline">
+        <mat-label>Nueva contraseña</mat-label>
+        <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="next" autocomplete="new-password" />
+        <mat-hint>Mínimo 10 caracteres</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Confirmar contraseña</mat-label>
+        <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" />
+      </mat-form-field>
+    </div>
+    <div class="row-actions">
+      <button mat-stroked-button type="button" (click)="hidePassword.set(!hidePassword())">
+        <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+        {{ hidePassword() ? 'Mostrar' : 'Ocultar' }}
+      </button>
+      <button mat-flat-button color="primary" type="submit" [disabled]="passwordForm.invalid || passwordBusy()">Actualizar contraseña</button>
+    </div>
+  </form>
+</div>
+
+<!-- MFA -->
+<div class="card-block">
+  <span class="section-title">Verificación en dos pasos (MFA)</span>
+
+  <ng-container *ngIf="!user()?.mfaEnabled; else mfaEnabled">
+    <ng-container *ngIf="!mfaSecret(); else mfaSetup">
+      <p class="muted">Añade una segunda capa de seguridad a tu cuenta con una aplicación de autenticación.</p>
+      <form class="stack" [formGroup]="mfaPasswordForm" (ngSubmit)="startMfaSetup()">
+        <mat-form-field appearance="outline">
+          <mat-label>Confirma tu contraseña</mat-label>
+          <input matInput type="password" formControlName="password" autocomplete="current-password" />
+          <mat-icon matPrefix>lock_outline</mat-icon>
+        </mat-form-field>
+        <div class="row-actions">
+          <button mat-flat-button color="primary" type="submit" [disabled]="mfaPasswordForm.invalid || mfaBusy()">Configurar MFA</button>
+        </div>
+      </form>
+    </ng-container>
+
+    <ng-template #mfaSetup>
+      <div class="mfa-setup">
+        <img *ngIf="mfaQr()" [src]="mfaQr()" alt="Código QR para configurar MFA" class="mfa-qr" />
+        <div class="mfa-secret">
+          <b>Clave secreta</b>
+          <code class="tnum">{{ mfaSecret() }}</code>
+          <p class="muted">Escanea el QR o introduce la clave en tu aplicación de autenticación.</p>
+        </div>
+      </div>
+      <form class="stack" [formGroup]="mfaCodeForm" (ngSubmit)="enableMfa()">
+        <mat-form-field appearance="outline">
+          <mat-label>Código de 6 dígitos</mat-label>
+          <input matInput formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+          <mat-icon matPrefix>verified_user</mat-icon>
+        </mat-form-field>
+        <div class="row-actions">
+          <button mat-stroked-button type="button" (click)="cancelMfaSetup()">Cancelar</button>
+          <button mat-flat-button color="primary" type="submit" [disabled]="mfaCodeForm.invalid || mfaBusy()">Activar MFA</button>
+        </div>
+      </form>
+    </ng-template>
+  </ng-container>
+
+  <ng-template #mfaEnabled>
+    <p class="muted">La verificación en dos pasos está <b>activada</b>. Las áreas administrativas la requieren.</p>
+    <form class="stack" [formGroup]="mfaPasswordForm" (ngSubmit)="disableMfa()">
+      <mat-form-field appearance="outline">
+        <mat-label>Contraseña para desactivar</mat-label>
+        <input matInput type="password" formControlName="password" autocomplete="current-password" />
+        <mat-icon matPrefix>lock_outline</mat-icon>
+      </mat-form-field>
+      <div class="row-actions">
+        <button mat-stroked-button type="submit" class="danger" [disabled]="mfaPasswordForm.invalid || mfaBusy()">Desactivar MFA</button>
+      </div>
+    </form>
+  </ng-template>
+
+  <div class="recovery" *ngIf="recoveryCodes().length">
+    <b>Códigos de recuperación</b>
+    <p class="muted">Guárdalos en un lugar seguro. Solo se muestran esta vez.</p>
+    <div class="codes tnum">
+      <code *ngFor="let c of recoveryCodes()">{{ c }}</code>
+    </div>
+  </div>
+</div>
+
+<!-- Sessions -->
+<div class="card-block">
+  <span class="section-title">Sesiones activas</span>
+  <mat-progress-bar mode="indeterminate" *ngIf="sessionsLoading()" />
+  <div class="session-row" *ngFor="let s of sessions()">
+    <div class="session-info">
+      <mat-icon>devices</mat-icon>
+      <div>
+        <b>{{ s.user_agent ?? 'Dispositivo desconocido' }}</b>
+        <span class="tnum">Última actividad {{ formatDate(s.last_used_at) }}</span>
+      </div>
+    </div>
+    <button mat-stroked-button (click)="revokeSession(s.id)">Revocar</button>
+  </div>
+  <p class="muted" *ngIf="!sessionsLoading() && !sessions().length">No hay sesiones activas.</p>
+</div>
+
+<!-- Appearance -->
+<div class="card-block">
+  <span class="section-title">Apariencia</span>
+  <mat-radio-group aria-label="Tema" [value]="themePref()" (change)="setTheme($event.value)">
+    <mat-radio-button *ngFor="let o of themeOptions" [value]="o.value">{{ o.label }}</mat-radio-button>
+  </mat-radio-group>
+</div>

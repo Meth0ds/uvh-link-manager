@@ -1,0 +1,55 @@
+<div class="page-head">
+  <div>
+    <h1>Dominios personalizados</h1>
+    <p>Usa tu propia marca en cada enlace corto.</p>
+  </div>
+</div>
+
+<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+<div class="alert error" *ngIf="error()">{{ error() }}</div>
+
+<div class="add-bar">
+  <mat-form-field appearance="outline" class="grow">
+    <mat-icon matPrefix>language</mat-icon>
+    <input matInput placeholder="tu-dominio.com" [(ngModel)]="newDomain" (keyup.enter)="add()" />
+  </mat-form-field>
+  <button mat-flat-button color="primary" (click)="add()" [disabled]="!newDomain().trim() || adding()">
+    <mat-icon>add</mat-icon> Añadir dominio
+  </button>
+</div>
+
+<div class="domain-list" *ngIf="!loading()">
+  <article class="domain-card" *ngFor="let d of domains(); trackBy: trackByDomain">
+    <div class="domain-head">
+      <b class="tnum">{{ d.domain }}</b>
+      <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
+    </div>
+
+    <div class="verify-box" *ngIf="d.state === 'pending' || d.state === 'error' || d.state === 'verifying'">
+      <p class="verify-title">1 · Añade este registro TXT en tu proveedor de DNS</p>
+      <div class="txt-row">
+        <code>TXT</code>
+        <code class="txt-value tnum">{{ d.verificationToken }}</code>
+        <button mat-icon-button (click)="copy(d.verificationToken)" aria-label="Copiar registro TXT"><mat-icon>content_copy</mat-icon></button>
+      </div>
+      <p class="verify-title">2 · Cuando el registro propague, verifica el dominio</p>
+      <button mat-stroked-button color="primary" (click)="verify(d)" [disabled]="verifyingId() === d.id">
+        <mat-icon>verified_user</mat-icon>
+        {{ verifyingId() === d.id ? "Verificando…" : "Verificar dominio" }}
+      </button>
+    </div>
+
+    <div class="domain-actions" *ngIf="d.state !== 'pending' && d.state !== 'verifying'">
+      <button mat-stroked-button *ngIf="d.state === 'verified'" (click)="activate(d)"><mat-icon>play_arrow</mat-icon> Activar</button>
+      <button mat-stroked-button *ngIf="d.state === 'active' || d.state === 'verified'" (click)="disable(d)"><mat-icon>pause</mat-icon> Desactivar</button>
+      <button mat-stroked-button (click)="verify(d)" [disabled]="verifyingId() === d.id"><mat-icon>refresh</mat-icon> Revalidar</button>
+      <button mat-stroked-button class="danger" (click)="remove(d)"><mat-icon>delete</mat-icon> Eliminar</button>
+    </div>
+  </article>
+
+  <div class="empty" *ngIf="!domains().length">
+    <mat-icon>language</mat-icon>
+    <h3>Sin dominios todavía</h3>
+    <p>Añade un dominio para acortar enlaces con tu propia marca.</p>
+  </div>
+</div>

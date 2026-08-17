@@ -1,0 +1,74 @@
+<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+
+<div class="alert error" *ngIf="error()">{{ error() }}</div>
+
+<ng-container *ngIf="link() as link">
+  <div class="head">
+    <a class="back" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> Enlaces</a>
+    <div class="title-row">
+      <div>
+        <h1 class="tnum">{{ displayUrl(link.shortUrl) }}</h1>
+        <p class="dest" [title]="link.destination">{{ link.destination }}</p>
+      </div>
+      <div class="actions">
+        <button mat-stroked-button (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar</button>
+        <button mat-stroked-button (click)="showQr()"><mat-icon>qr_code_2</mat-icon> QR</button>
+        <button mat-flat-button color="primary" (click)="edit()"><mat-icon>edit</mat-icon> Editar</button>
+        <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones"><mat-icon>more_vert</mat-icon></button>
+        <mat-menu #menu="matMenu">
+          <button mat-menu-item *ngIf="link.state === 'active'" (click)="setState('paused')"><mat-icon>pause</mat-icon> Pausar</button>
+          <button mat-menu-item *ngIf="link.state === 'paused'" (click)="setState('active')"><mat-icon>play_arrow</mat-icon> Reactivar</button>
+          <button mat-menu-item *ngIf="link.state !== 'archived'" (click)="setState('archived')"><mat-icon>archive</mat-icon> Archivar</button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item class="danger" (click)="remove()"><mat-icon>delete</mat-icon> Eliminar</button>
+        </mat-menu>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-cards">
+    <div class="stat-card"><span>Clics</span><b class="tnum">{{ link.clickCount }}</b></div>
+    <div class="stat-card"><span>Máx. clics</span><b class="tnum">{{ link.maxClicks ?? "∞" }}</b></div>
+    <div class="stat-card"><span>Estado</span><b>{{ link.state === "active" ? "Activo" : link.state }}</b></div>
+    <div class="stat-card"><span>Creado</span><b class="tnum">{{ link.createdAt.slice(0, 10) }}</b></div>
+  </div>
+
+  <div class="period-row">
+    <span class="section-title">Analítica</span>
+    <mat-form-field appearance="outline" class="period">
+      <mat-select [value]="period()" (selectionChange)="onPeriod($event.value)" aria-label="Periodo">
+        <mat-option value="24h">Últimas 24 horas</mat-option>
+        <mat-option value="7d">7 días</mat-option>
+        <mat-option value="30d">30 días</mat-option>
+        <mat-option value="90d">90 días</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <app-charts *ngIf="analytics() as a" [overview]="a" />
+
+  <span class="section-title">Reglas de redirección</span>
+  <div class="rules-block">
+    <div class="rule-card" *ngFor="let rule of rules(); let i = index">
+      <span class="rule-prio tnum">#{{ i + 1 }}</span>
+      <div class="rule-info">
+        <b>{{ ruleSummary(rule) }}</b>
+        <span class="rule-dest">{{ rule.destination }}</span>
+      </div>
+    </div>
+    <p class="none" *ngIf="!rules().length">Sin reglas condicionales. El enlace redirige siempre al destino principal.</p>
+  </div>
+
+  <span class="section-title">Actividad</span>
+  <div class="activity-block">
+    <div class="activity-row" *ngFor="let ev of activity()">
+      <mat-icon>history</mat-icon>
+      <div>
+        <b>{{ actionLabel(ev.action) }}</b>
+        <span>{{ ev.metadata }}</span>
+      </div>
+      <time class="tnum">{{ ev.created_at.slice(0, 16).replace("T", " ") }}</time>
+    </div>
+    <p class="none" *ngIf="!activity().length">Sin actividad registrada.</p>
+  </div>
+</ng-container>

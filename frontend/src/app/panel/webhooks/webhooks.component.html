@@ -1,0 +1,87 @@
+<div class="page-head">
+  <div>
+    <h1>Webhooks</h1>
+    <p>Recibe eventos de tus enlaces en tu propio servidor, firmados con HMAC.</p>
+  </div>
+  <button mat-flat-button color="primary" (click)="startCreate()" *ngIf="!showForm()">
+    <mat-icon>add</mat-icon> Nuevo webhook
+  </button>
+</div>
+
+<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+<div class="alert error" *ngIf="error()">{{ error() }}</div>
+
+<div class="create-card" *ngIf="showForm()">
+  <h3>{{ editId() ? "Editar webhook" : "Nuevo webhook" }}</h3>
+  <mat-form-field appearance="outline" class="full">
+    <mat-icon matPrefix>http</mat-icon>
+    <input matInput placeholder="https://tu-servidor.com/hooks/uvh" [(ngModel)]="url" />
+  </mat-form-field>
+
+  <div class="events">
+    <mat-checkbox
+      *ngFor="let e of eventOptions"
+      color="primary"
+      [checked]="selectedEvents().includes(e)"
+      (change)="toggleEvent(e)"
+    >
+      <code>{{ e }}</code>
+    </mat-checkbox>
+  </div>
+
+  <mat-form-field appearance="outline" class="full">
+    <mat-label>Secreto (opcional)</mat-label>
+    <input matInput type="password" placeholder="Mínimo 16 caracteres" [(ngModel)]="secret" />
+    <mat-hint>Si se omite, se genera uno automáticamente y se muestra al crear.</mat-hint>
+  </mat-form-field>
+
+  <div class="form-actions">
+    <button mat-button (click)="resetForm()">Cancelar</button>
+    <button mat-flat-button color="primary" (click)="save()" [disabled]="!url().trim() || !selectedEvents().length || saving()">
+      {{ saving() ? "Guardando…" : "Guardar webhook" }}
+    </button>
+  </div>
+</div>
+
+<div class="wh-list" *ngIf="!loading()">
+  <mat-accordion>
+    <mat-expansion-panel *ngFor="let w of webhooks(); trackBy: trackByWebhook" (opened)="loadDeliveries(w)">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="wh-url tnum">{{ w.url }}</span>
+          <span class="state-chip" [class.on]="w.active">{{ w.active ? "Activo" : "Pausado" }}</span>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+
+      <div class="wh-body">
+        <div class="event-chips">
+          <span class="event-chip" *ngFor="let e of w.events"><code>{{ e }}</code></span>
+        </div>
+
+        <div class="wh-actions">
+          <button mat-stroked-button (click)="toggleActive(w)">{{ w.active ? "Pausar" : "Activar" }}</button>
+          <button mat-stroked-button (click)="startEdit(w)"><mat-icon>edit</mat-icon> Editar</button>
+          <button mat-stroked-button (click)="test(w)"><mat-icon>send</mat-icon> Enviar ping</button>
+          <button mat-stroked-button class="danger" (click)="remove(w)"><mat-icon>delete</mat-icon> Eliminar</button>
+        </div>
+
+        <h4 class="deliveries-title">Entregas recientes</h4>
+        <div class="delivery" *ngFor="let d of deliveries()[w.id] ?? []">
+          <span class="del-status" [class]="'st-' + d.status">{{ d.status }}</span>
+          <span class="del-event"><code>{{ d.event }}</code></span>
+          <span class="del-meta tnum">intento {{ d.attempts }}{{ d.last_error ? " · " + d.last_error : "" }}</span>
+          <button mat-icon-button *ngIf="d.status === 'failed'" (click)="resend(w, d.id)" aria-label="Reenviar">
+            <mat-icon>refresh</mat-icon>
+          </button>
+        </div>
+        <p class="none" *ngIf="!(deliveries()[w.id] ?? []).length">Sin entregas todavía.</p>
+      </div>
+    </mat-expansion-panel>
+  </mat-accordion>
+
+  <div class="empty" *ngIf="!webhooks().length">
+    <mat-icon>webhook</mat-icon>
+    <h3>Sin webhooks</h3>
+    <p>Conecta UVH con tus sistemas para automatizar tu flujo.</p>
+  </div>
+</div>

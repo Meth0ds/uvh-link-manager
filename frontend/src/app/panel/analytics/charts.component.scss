@@ -1,0 +1,120 @@
+.chart-block {
+  background: #fff;
+  border: 1px solid var(--uvh-border);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.chart-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+  b {
+    font-size: 15px;
+  }
+  span {
+    font-size: 12.5px;
+    color: var(--uvh-muted);
+  }
+}
+
+.series-wrap {
+  position: relative;
+}
+
+.series {
+  width: 100%;
+  height: 220px;
+  display: block;
+}
+
+.no-data {
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--uvh-muted);
+  font-size: 14px;
+}
+
+.x-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--uvh-muted);
+  .x-label.hidden {
+    visibility: hidden;
+  }
+}
+
+.breakdowns {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.breakdown {
+  background: #fff;
+  border: 1px solid var(--uvh-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.breakdown-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--uvh-muted);
+  margin-bottom: 12px;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  .bar-label {
+    width: 110px;
+    font-size: 13px;
+    color: var(--uvh-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--uvh-surface);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--uvh-electric), var(--uvh-teal));
+    border-radius: 999px;
+    transition: width 300ms ease;
+  }
+  .bar-value {
+    width: 44px;
+    text-align: right;
+    font-size: 12.5px;
+    color: var(--uvh-muted);
+  }
+}
+
+.bar-empty {
+  color: var(--uvh-muted);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+@media (max-width: 720px) {
+  .breakdowns {
+    grid-template-columns: 1fr;
+  }
+}

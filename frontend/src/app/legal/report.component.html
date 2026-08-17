@@ -1,0 +1,60 @@
+<app-legal-shell>
+  <div class="report-head">
+    <span class="report-eyebrow">Confianza y seguridad</span>
+    <h1>Denunciar abuso</h1>
+    <p class="report-sub">
+      ¿Has encontrado un enlace de UVH que apunta a contenido dañino, engañoso o ilegal?
+      Cuéntanoslo. Nuestro equipo lo revisa manualmente.
+    </p>
+  </div>
+
+  <form class="report-card" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-progress-bar mode="indeterminate" *ngIf="busy()" class="report-progress" />
+
+    <mat-form-field appearance="outline">
+      <mat-label>Enlace corto o alias</mat-label>
+      <input matInput formControlName="link" placeholder="uvh.es/abc123" aria-label="Enlace corto o alias" />
+      <mat-icon matPrefix>link</mat-icon>
+      <mat-hint>Pega el enlace corto completo o solo el alias.</mat-hint>
+      <mat-error *ngIf="form.controls.link.hasError('required')">Introduce el enlace o alias a denunciar.</mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Motivo</mat-label>
+      <mat-select formControlName="reason" aria-label="Motivo de la denuncia">
+        <mat-option *ngFor="let r of reasons" [value]="r">{{ r }}</mat-option>
+      </mat-select>
+      <mat-icon matPrefix>flag</mat-icon>
+      <mat-error *ngIf="form.controls.reason.hasError('required')">Selecciona un motivo.</mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Detalles (opcional)</mat-label>
+      <textarea matInput formControlName="details" rows="4" maxlength="2000" aria-label="Detalles de la denuncia"></textarea>
+      <mat-icon matPrefix>notes</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Tu email (opcional)</mat-label>
+      <input matInput type="email" formControlName="email" autocomplete="email" aria-label="Tu email" />
+      <mat-icon matPrefix>mail_outline</mat-icon>
+      <mat-hint>Lo usamos solo para informarte del resultado de la revisión.</mat-hint>
+      <mat-error *ngIf="form.controls.email.hasError('email')">Introduce un email válido.</mat-error>
+    </mat-form-field>
+
+    <div class="alert error" *ngIf="error()">{{ error() }}</div>
+    <div class="alert ok" *ngIf="done()">
+      <mat-icon>check_circle</mat-icon>
+      <span>Denuncia enviada. Gracias por ayudarnos a mantener UVH seguro.</span>
+    </div>
+
+    <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()">
+      Enviar denuncia
+    </button>
+  </form>
+
+  <p class="report-foot">
+    Si se trata de una emergencia o de una amenaza inmediata, contacta con las autoridades locales.
+    Para consultas sobre tu cuenta, escribe a <a href="mailto:soporte@uvh.es">soporte&#64;uvh.es</a>.
+  </p>
+</app-legal-shell>

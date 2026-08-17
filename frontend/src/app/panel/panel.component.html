@@ -1,0 +1,77 @@
+<mat-sidenav-container class="shell">
+  <mat-sidenav #sidenav mode="over" [opened]="mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" fixedInViewport>
+    <div class="side-head">
+      <a class="brand" routerLink="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="30" height="30"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
+        </span>
+        <span class="brand-name">UVH</span>
+      </a>
+    </div>
+
+    <mat-nav-list class="nav-list">
+      <a
+        mat-list-item
+        *ngFor="let item of visibleNav()"
+        [routerLink]="item.path"
+        routerLinkActive="active"
+        (click)="mobileOpen.set(false)"
+        class="nav-item"
+      >
+        <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+        <span matListItemTitle>{{ item.label }}</span>
+      </a>
+    </mat-nav-list>
+
+    <div class="side-foot">
+      <button mat-button class="new-link" (click)="newLink()">
+        <mat-icon>add_link</mat-icon> Nuevo enlace
+      </button>
+    </div>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="content">
+    <mat-toolbar class="topbar">
+      <button mat-icon-button class="menu-btn" (click)="mobileOpen.set(!mobileOpen())" aria-label="Abrir menú">
+        <mat-icon>menu</mat-icon>
+      </button>
+
+      <mat-form-field appearance="outline" class="ws-switch" *ngIf="workspaces.list().length > 1">
+        <mat-select
+          [value]="workspaces.currentId()"
+          (selectionChange)="onWorkspaceChange($event.value)"
+          aria-label="Workspace"
+        >
+          <mat-option *ngFor="let w of workspaces.list()" [value]="w.id">{{ w.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <span class="ws-name" *ngIf="workspaces.list().length <= 1">
+        {{ workspaces.list()[0].name }}
+      </span>
+
+      <span class="spacer"></span>
+
+      <button mat-flat-button color="primary" class="new-link-top" (click)="newLink()">
+        <mat-icon>add</mat-icon> Nuevo enlace
+      </button>
+
+      <button mat-icon-button [matMenuTriggerFor]="userMenu" class="avatar-btn" aria-label="Menú de usuario">
+        <span class="avatar">{{ initials() }}</span>
+      </button>
+      <mat-menu #userMenu="matMenu" xPosition="before">
+        <div class="user-head">
+          <b>{{ user()?.name }}</b>
+          <span>{{ user()?.email }}</span>
+        </div>
+        <button mat-menu-item routerLink="/app/settings"><mat-icon>settings</mat-icon> Ajustes</button>
+        <button mat-menu-item routerLink="/app/team"><mat-icon>group</mat-icon> Equipo</button>
+        <mat-divider></mat-divider>
+        <button mat-menu-item (click)="logout()"><mat-icon>logout</mat-icon> Cerrar sesión</button>
+      </mat-menu>
+    </mat-toolbar>
+
+    <main class="main">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

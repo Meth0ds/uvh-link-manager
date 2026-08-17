@@ -1,0 +1,27 @@
+<header class="legal-nav">
+  <a class="brand" routerLink="/" aria-label="Volver a la página principal de UVH">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="28" height="28"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
+    </span>
+    <span class="brand-name">UVH</span>
+  </a>
+
+  <nav class="legal-nav-links" aria-label="Documentos legales">
+    <a routerLink="/legal/terminos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Términos</a>
+    <a routerLink="/legal/privacidad" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Privacidad</a>
+    <a routerLink="/legal/denuncias" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Denunciar abuso</a>
+  </nav>
+</header>
+
+<main class="legal-main">
+  <div class="legal-container">
+    <ng-content />
+  </div>
+</main>
+
+<footer class="legal-footer">
+  <div class="legal-footer-inner">
+    <span>© {{ year }} UVH · uvh.es</span>
+    <span class="tnum">Enlaces cortos. Control total.</span>
+  </div>
+</footer>

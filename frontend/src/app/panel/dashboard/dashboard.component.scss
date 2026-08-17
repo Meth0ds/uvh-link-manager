@@ -1,0 +1,133 @@
+.welcome {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  p {
+    color: var(--uvh-muted);
+    margin: 6px 0 0;
+    font-size: 14.5px;
+    b {
+      color: var(--uvh-ink);
+    }
+  }
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: #fff;
+  border: 1px solid var(--uvh-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  span {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--uvh-muted);
+  }
+  b {
+    font-size: 24px;
+    font-weight: 800;
+  }
+}
+
+.recent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recent-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid var(--uvh-border);
+  border-radius: 14px;
+  padding: 13px 16px;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  &:hover {
+    border-color: color-mix(in srgb, var(--uvh-electric) 45%, var(--uvh-border));
+    box-shadow: 0 10px 28px rgba(7, 17, 31, 0.07);
+  }
+  .recent-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    b {
+      font-size: 14px;
+      color: var(--uvh-electric);
+    }
+    span {
+      font-size: 13px;
+      color: var(--uvh-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 620px;
+    }
+  }
+  .recent-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    .clicks {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--uvh-muted);
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+    }
+  }
+}
+
+.empty {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--uvh-muted);
+  background: #fff;
+  border: 1px dashed var(--uvh-border);
+  border-radius: 14px;
+  p {
+    margin: 0 0 14px;
+  }
+}
+
+.see-all {
+  align-self: flex-end;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--uvh-electric);
+}
+
+@media (max-width: 720px) {
+  .stat-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

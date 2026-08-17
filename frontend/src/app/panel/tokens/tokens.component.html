@@ -1,0 +1,63 @@
+<div class="page-head">
+  <div>
+    <h1>Tokens de API</h1>
+    <p>Acceso programático a tu workspace mediante scopes.</p>
+  </div>
+</div>
+
+<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+<div class="alert error" *ngIf="error()">{{ error() }}</div>
+
+<div class="create-card">
+  <h3>Crear token</h3>
+  <mat-form-field appearance="outline" class="grow">
+    <mat-label>Nombre</mat-label>
+    <input matInput placeholder="CI, integración, cron…" [(ngModel)]="name" />
+  </mat-form-field>
+
+  <div class="scopes">
+    <mat-checkbox
+      *ngFor="let s of scopeOptions"
+      color="primary"
+      [checked]="selectedScopes().includes(s.value)"
+      (change)="toggleScope(s.value)"
+    >
+      <code>{{ s.value }}</code>
+    </mat-checkbox>
+  </div>
+
+  <button mat-flat-button color="primary" (click)="create()" [disabled]="!name().trim() || !selectedScopes().length || creating()">
+    <mat-icon>add</mat-icon> Generar token
+  </button>
+
+  <div class="plain-box" *ngIf="plainToken() as pt">
+    <p class="warning">⚠ Guarda este token ahora. Solo se muestra una vez y no podrás volver a verlo.</p>
+    <div class="plain-row">
+      <code class="tnum">{{ pt }}</code>
+      <button mat-icon-button (click)="copyPlain()" aria-label="Copiar token"><mat-icon>content_copy</mat-icon></button>
+    </div>
+  </div>
+</div>
+
+<div class="token-list" *ngIf="!loading()">
+  <article class="token-row" *ngFor="let t of tokens(); trackBy: trackByToken">
+    <div class="token-main">
+      <b>{{ t.name }}</b>
+      <div class="scope-chips">
+        <span class="scope-chip" *ngFor="let s of t.scopes"><code>{{ s }}</code></span>
+      </div>
+      <span class="meta tnum">
+        Creado {{ t.createdAt.slice(0, 10) }}{{ t.lastUsedAt ? " · Último uso " + t.lastUsedAt.slice(0, 10) : " · Sin usar" }}
+      </span>
+    </div>
+    <div class="token-actions">
+      <button mat-stroked-button class="danger" (click)="revoke(t)"><mat-icon>block</mat-icon> Revocar</button>
+    </div>
+  </article>
+
+  <div class="empty" *ngIf="!tokens().length">
+    <mat-icon>key_off</mat-icon>
+    <h3>Sin tokens</h3>
+    <p>Crea un token para integrar UVH con tus sistemas.</p>
+  </div>
+</div>

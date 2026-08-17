@@ -1,0 +1,43 @@
+<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+
+<div class="welcome">
+  <div>
+    <h1>Hola, {{ firstName() }} 👋</h1>
+    <p *ngIf="workspaceName()">Resumen de <b>{{ workspaceName() }}</b> — últimos 30 días.</p>
+  </div>
+  <button mat-flat-button color="primary" (click)="newLink()">
+    <mat-icon>add_link</mat-icon> Nuevo enlace
+  </button>
+</div>
+
+<ng-container *ngIf="overview() as o">
+  <div class="stat-cards">
+    <div class="stat-card"><span>Clics</span><b class="tnum">{{ o.totals.clicks }}</b></div>
+    <div class="stat-card"><span>Visitantes</span><b class="tnum">{{ o.totals.visitors }}</b></div>
+    <div class="stat-card"><span>Enlaces</span><b class="tnum">{{ o.topLinks.length }}</b></div>
+    <div class="stat-card"><span>Países</span><b class="tnum">{{ o.countries.length }}</b></div>
+  </div>
+
+  <app-charts [overview]="o" />
+</ng-container>
+
+<span class="section-title">Enlaces recientes</span>
+<div class="recent">
+  <article class="recent-row" *ngFor="let l of recent()" (click)="router.navigate(['/app/links', l.id])">
+    <div class="recent-main">
+      <b class="tnum">{{ displayUrl(l.shortUrl) }}</b>
+      <span>{{ l.destination }}</span>
+    </div>
+    <div class="recent-side">
+      <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ l.clickCount }}</span>
+      <button mat-icon-button (click)="$event.stopPropagation(); copy(l.shortUrl)" aria-label="Copiar">
+        <mat-icon>content_copy</mat-icon>
+      </button>
+    </div>
+  </article>
+  <div class="empty" *ngIf="!recent().length && !loading()">
+    <p>Aún no tienes enlaces. Crea el primero para empezar a medir.</p>
+    <button mat-stroked-button (click)="newLink()">Crear mi primer enlace</button>
+  </div>
+  <a class="see-all" routerLink="/app/links" *ngIf="recent().length">Ver todos los enlaces →</a>
+</div>

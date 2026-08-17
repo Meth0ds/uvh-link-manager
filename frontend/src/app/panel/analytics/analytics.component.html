@@ -1,0 +1,40 @@
+<div class="page-head">
+  <div>
+    <h1>Analítica</h1>
+    <p>Métricas agregadas de todos los enlaces del workspace.</p>
+  </div>
+  <mat-form-field appearance="outline" class="period">
+    <mat-select [value]="period()" (selectionChange)="onPeriod($event.value)" aria-label="Periodo">
+      <mat-option value="24h">Últimas 24 horas</mat-option>
+      <mat-option value="7d">7 días</mat-option>
+      <mat-option value="30d">30 días</mat-option>
+      <mat-option value="90d">90 días</mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>
+
+<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+<div class="alert error" *ngIf="error()">{{ error() }}</div>
+
+<ng-container *ngIf="overview() as o">
+  <div class="stat-cards">
+    <div class="stat-card"><span>Clics</span><b class="tnum">{{ o.totals.clicks }}</b></div>
+    <div class="stat-card"><span>Visitantes</span><b class="tnum">{{ o.totals.visitors }}</b></div>
+    <div class="stat-card"><span>Países</span><b class="tnum">{{ o.countries.length }}</b></div>
+    <div class="stat-card"><span>Referentes</span><b class="tnum">{{ o.referrers.length }}</b></div>
+  </div>
+
+  <app-charts [overview]="o" />
+
+  <span class="section-title">Enlaces con más clics</span>
+  <div class="top-links">
+    <article class="top-link" *ngFor="let l of o.topLinks" (click)="router.navigate(['/app/links', l.id])">
+      <div class="top-main">
+        <b class="tnum">{{ l.alias }}</b>
+        <span>{{ l.destination }}</span>
+      </div>
+      <div class="top-clicks tnum">{{ l.clicks }} clics</div>
+    </article>
+    <p class="none" *ngIf="!o.topLinks.length">Aún no hay datos de clics.</p>
+  </div>
+</ng-container>

@@ -1,0 +1,121 @@
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  p {
+    color: var(--uvh-muted);
+    margin: 4px 0 0;
+    font-size: 14.5px;
+  }
+  .period {
+    width: 180px;
+    margin-top: 18px;
+  }
+}
+
+.alert {
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 14px;
+  margin-bottom: 14px;
+  &.error {
+    background: rgba(220, 38, 38, 0.08);
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    color: #b91c1c;
+  }
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: #fff;
+  border: 1px solid var(--uvh-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  span {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--uvh-muted);
+  }
+  b {
+    font-size: 24px;
+    font-weight: 800;
+  }
+}
+
+.top-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.top-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid var(--uvh-border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  &:hover {
+    border-color: color-mix(in srgb, var(--uvh-electric) 45%, var(--uvh-border));
+    box-shadow: 0 10px 28px rgba(7, 17, 31, 0.07);
+  }
+  .top-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    b {
+      font-size: 14.5px;
+      color: var(--uvh-electric);
+    }
+    span {
+      font-size: 13px;
+      color: var(--uvh-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 560px;
+    }
+  }
+  .top-clicks {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--uvh-ink);
+    white-space: nowrap;
+  }
+}
+
+.none {
+  color: var(--uvh-muted);
+  font-size: 14px;
+  margin: 6px 0;
+}
+
+@media (max-width: 720px) {
+  .stat-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

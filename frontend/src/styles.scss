@@ -1,0 +1,121 @@
+@use "@angular/material" as mat;
+
+// ---------- UVH design tokens (seeds: #07111F ink, #F6F8FC surfaces, #2457F5 electric, #00A99D teal) ----------
+:root {
+  --uvh-ink: #07111f;
+  --uvh-surface: #f6f8fc;
+  --uvh-electric: #2457f5;
+  --uvh-teal: #00a99d;
+  --uvh-border: #e3e8f0;
+  --uvh-muted: #5b6b84;
+  --uvh-radius: 14px;
+}
+
+$uvh-theme: mat.define-theme((
+  color: (
+    theme-type: light,
+    primary: mat.$blue-palette,
+    tertiary: mat.$cyan-palette,
+  ),
+  typography: (
+    plain-family: "Manrope, system-ui, -apple-system, sans-serif",
+    brand-family: "Manrope, system-ui, -apple-system, sans-serif",
+  ),
+));
+
+$uvh-dark-theme: mat.define-theme((
+  color: (
+    theme-type: dark,
+    primary: mat.$blue-palette,
+    tertiary: mat.$cyan-palette,
+  ),
+  typography: (
+    plain-family: "Manrope, system-ui, -apple-system, sans-serif",
+    brand-family: "Manrope, system-ui, -apple-system, sans-serif",
+  ),
+));
+
+html {
+  @include mat.all-component-themes($uvh-theme);
+  @include mat.typography-hierarchy($uvh-theme);
+}
+
+html.dark {
+  @include mat.all-component-colors($uvh-dark-theme);
+  color-scheme: dark;
+  --uvh-ink: #eef2f9;
+  --uvh-surface: #0b1424;
+  --uvh-border: #1d2a40;
+  --uvh-muted: #93a1b8;
+}
+
+// ---------- Base ----------
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Manrope", system-ui, -apple-system, sans-serif;
+  background: var(--uvh-surface);
+  color: var(--uvh-ink);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 240ms ease, color 240ms ease;
+}
+
+a {
+  color: var(--uvh-electric);
+  text-decoration: none;
+}
+
+// Tabular figures for metrics
+.tnum {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+// Utility containers
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--uvh-muted);
+  margin: 28px 0 12px;
+}
+
+// Brand link chip
+.uvh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--uvh-surface);
+  border: 1px solid var(--uvh-border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+// Motion: respect reduced motion
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
