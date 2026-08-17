@@ -5,7 +5,7 @@ import { config } from "../config.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { getMembership, roleAtLeast, ROLE_ORDER, type Role } from "../workspace.js";
 import { audit } from "../util/audit.js";
-import { randomToken } from "../util/ids.js";
+import { randomToken, sha256Hex } from "../util/ids.js";
 import { invitationEmail, sendMail } from "../util/email.js";
 
 export const workspacesRouter = Router();
@@ -210,9 +210,11 @@ workspacesRouter.post("/:id/invitations", (req: AuthedRequest, res) => {
   }
   const token = randomToken(32);
   const expiresAt = new Date(Date.now() + 7 * 86400_000).toISOString();
+  // Only the hash is stored; the plaintext token is the bearer credential sent
+  // by email. Resending rotates the token (see below).
   q.prepare(
     `INSERT INTO invitations (workspace_id, email, role, token, invited_by, expires_at) VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(wid, email, parsed.data.role, token, req.user!.id, expiresAt);
+  ).run(wid, email, parsed.data.role, sha256Hex(token), req.user!.id, expiresAt);
   const ws = q.prepare(`SELECT name FROM workspaces WHERE id = ?`).get(wid) as { name: string };
   void sendMail(invitationEmail(email, `${config.appUrl}/invitations/accept?token=${encodeURIComponent(token)}`, ws.name, parsed.data.role));
   audit({ userId: req.user!.id, ip: req.ip }, "workspace.invite", "workspace", wid, { email, role: parsed.data.role });
@@ -226,7 +228,7 @@ workspacesRouter.post("/invitations/accept", (req: AuthedRequest, res) => {
     res.status(422).json({ error: "Token inválido" });
     return;
   }
-  const inv = q.prepare(`SELECT * FROM invitations WHERE token = ?`).get(parsed.data.token) as
+  const inv = q.prepare(`SELECT * FROM invitations WHERE token = ?`).get(sha256Hex(parsed.data.token)) as
     | { id: number; workspace_id: number; email: string; role: string; status: string; expires_at: string }
     | undefined;
   if (!inv || inv.status !== "pending" || new Date(inv.expires_at).getTime() < Date.now()) {
@@ -254,7 +256,7 @@ workspacesRouter.post("/invitations/reject", (req: AuthedRequest, res) => {
     res.status(422).json({ error: "Token inválido" });
     return;
   }
-  const inv = q.prepare(`SELECT * FROM invitations WHERE token = ?`).get(parsed.data.token) as
+  const inv = q.prepare(`SELECT * FROM invitations WHERE token = ?`).get(sha256Hex(parsed.data.token)) as
     | { id: number; email: string; status: string }
     | undefined;
   if (!inv || inv.status !== "pending" || inv.email.toLowerCase() !== req.user!.email.toLowerCase()) {
@@ -298,9 +300,12 @@ workspacesRouter.post("/:id/invitations/:invitationId/resend", (req: AuthedReque
     res.status(404).json({ error: "Invitación no encontrada o no pendiente" });
     return;
   }
+  // Resending rotates the token (the stored value is a hash, so the previous
+  // plaintext can never be recovered) and extends the expiry.
+  const newToken = randomToken(32);
   const expiresAt = new Date(Date.now() + 7 * 86400_000).toISOString();
-  q.prepare(`UPDATE invitations SET expires_at = ? WHERE id = ?`).run(expiresAt, inv.id);
+  q.prepare(`UPDATE invitations SET token = ?, expires_at = ? WHERE id = ?`).run(sha256Hex(newToken), expiresAt, inv.id);
   const ws = q.prepare(`SELECT name FROM workspaces WHERE id = ?`).get(wid) as { name: string };
-  void sendMail(invitationEmail(inv.email, `${config.appUrl}/invitations/accept?token=${encodeURIComponent(inv.token)}`, ws.name, inv.role));
+  void sendMail(invitationEmail(inv.email, `${config.appUrl}/invitations/accept?token=${encodeURIComponent(newToken)}`, ws.name, inv.role));
   res.json({ ok: true });
 });

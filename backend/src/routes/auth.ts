@@ -61,7 +61,12 @@ authRouter.post("/register", registerLimiter, async (req: AuthedRequest, res) =>
   const { name, email, password } = parsed.data;
   const exists = q.prepare(`SELECT id FROM users WHERE email = ?`).get(email.toLowerCase());
   if (exists) {
-    res.status(409).json({ error: "Ya existe una cuenta con este email" });
+    // Anti-enumeration: the response is byte-for-byte identical to a fresh
+    // registration (201 + { user: null }) and takes a similar time (dummy
+    // bcrypt), so the endpoint cannot be used to confirm account existence.
+    audit({}, "auth.register_duplicate", "user", exists.id as number);
+    await bcrypt.hash(password, 12); // timing equalization only
+    res.status(201).json({ user: null });
     return;
   }
   const passwordHash = await bcrypt.hash(password, 12);
@@ -79,20 +84,33 @@ authRouter.post("/register", registerLimiter, async (req: AuthedRequest, res) =>
     return uid;
   });
 
-  // Send verification email (fire and forget)
+  // Send verification email (fire and forget). Only the hash is stored; the
+  // plaintext token is the bearer credential in the email link.
   const token = randomToken(32);
   q.prepare(`INSERT INTO email_tokens (id, user_id, kind, expires_at) VALUES (?, ?, 'verify', ?)`).run(
-    token, userId, new Date(Date.now() + 86400_000).toISOString(),
+    sha256Hex(token), userId, new Date(Date.now() + 86400_000).toISOString(),
   );
   const verifyUrl = `${config.appUrl}/auth/verify-email?token=${encodeURIComponent(token)}`;
   void sendMail(verificationEmail(email, verifyUrl));
 
   audit({ userId }, "auth.register", "user", userId);
-  res.status(201).json({ user: publicUser(q.prepare(`SELECT * FROM users WHERE id = ?`).get(userId) as never) });
+  // Uniform response (anti-enumeration): identical shape to the duplicate path.
+  // No session is created at registration; the frontend always shows the
+  // "check your email" step.
+  res.status(201).json({ user: null });
 });
 
 // ---------------- Login (with MFA challenge) ----------------
 const mfaChallenges = new Map<string, { userId: number; expiresAt: number }>();
+const MFA_CHALLENGE_TTL = 5 * 60_000;
+
+/** Bound the in-memory challenge map: drop expired entries on every insert. */
+function pruneMfaChallenges(): void {
+  const now = Date.now();
+  for (const [k, v] of mfaChallenges) {
+    if (v.expiresAt < now) mfaChallenges.delete(k);
+  }
+}
 
 authRouter.post("/login", authLimiter, async (req: AuthedRequest, res) => {
   const parsed = z.object({ email: emailSchema, password: z.string().min(1) }).safeParse(req.body);
@@ -101,15 +119,19 @@ authRouter.post("/login", authLimiter, async (req: AuthedRequest, res) => {
     return;
   }
   const user = findUserByEmail(parsed.data.email);
-  const ok = user ? await bcrypt.compare(parsed.data.password, user.password_hash) : false;
+  // Constant-time-ish: always run bcrypt so the response time does not reveal
+  // whether the email exists (user enumeration via timing).
+  const DUMMY_HASH = "$2a$12$/GUN2z.VnhsX9hCNc/gLLeqmo0rqp7vEF.MoYHWfxDG8X7AnJCx32";
+  const ok = await bcrypt.compare(parsed.data.password, user ? user.password_hash : DUMMY_HASH);
   if (!user || !ok) {
     res.status(401).json({ error: "Credenciales incorrectas" });
     return;
   }
   audit({ userId: user.id }, "auth.login", "user", user.id);
   if (user.mfa_enabled === 1) {
+    pruneMfaChallenges();
     const challenge = randomToken(24);
-    mfaChallenges.set(challenge, { userId: user.id, expiresAt: Date.now() + 5 * 60_000 });
+    mfaChallenges.set(challenge, { userId: user.id, expiresAt: Date.now() + MFA_CHALLENGE_TTL });
     res.json({ mfaRequired: true, challenge });
     return;
   }
@@ -190,7 +212,7 @@ authRouter.post("/verify-email", async (req: AuthedRequest, res) => {
     res.status(422).json({ error: "Token inválido" });
     return;
   }
-  const row = q.prepare(`SELECT * FROM email_tokens WHERE id = ? AND kind = 'verify'`).get(parsed.data.token) as
+  const row = q.prepare(`SELECT * FROM email_tokens WHERE id = ? AND kind = 'verify'`).get(sha256Hex(parsed.data.token)) as
     | { id: string; user_id: number; expires_at: string; used_at: string | null }
     | undefined;
   if (!row || row.used_at || new Date(row.expires_at).getTime() < Date.now()) {
@@ -213,7 +235,7 @@ authRouter.post("/resend-verification", requireAuth, async (req: AuthedRequest, 
   }
   const token = randomToken(32);
   q.prepare(`INSERT INTO email_tokens (id, user_id, kind, expires_at) VALUES (?, ?, 'verify', ?)`).run(
-    token, user.id, new Date(Date.now() + 86400_000).toISOString(),
+    sha256Hex(token), user.id, new Date(Date.now() + 86400_000).toISOString(),
   );
   void sendMail(verificationEmail(user.email, `${config.appUrl}/auth/verify-email?token=${encodeURIComponent(token)}`));
   res.json({ ok: true });
@@ -230,7 +252,7 @@ authRouter.post("/forgot-password", authLimiter, async (req: AuthedRequest, res)
   if (user) {
     const token = randomToken(32);
     q.prepare(`INSERT INTO email_tokens (id, user_id, kind, expires_at) VALUES (?, ?, 'reset', ?)`).run(
-      token, user.id, new Date(Date.now() + 60 * 60_000).toISOString(),
+      sha256Hex(token), user.id, new Date(Date.now() + 60 * 60_000).toISOString(),
     );
     void sendMail(resetPasswordEmail(user.email, `${config.appUrl}/auth/reset-password?token=${encodeURIComponent(token)}`));
   }
@@ -244,7 +266,7 @@ authRouter.post("/reset-password", authLimiter, async (req: AuthedRequest, res) 
     res.status(422).json({ error: "Datos inválidos" });
     return;
   }
-  const row = q.prepare(`SELECT * FROM email_tokens WHERE id = ? AND kind = 'reset'`).get(parsed.data.token) as
+  const row = q.prepare(`SELECT * FROM email_tokens WHERE id = ? AND kind = 'reset'`).get(sha256Hex(parsed.data.token)) as
     | { id: string; user_id: number; expires_at: string; used_at: string | null }
     | undefined;
   if (!row || row.used_at || new Date(row.expires_at).getTime() < Date.now()) {

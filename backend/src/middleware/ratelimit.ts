@@ -22,6 +22,9 @@ export const registerLimiter = makeLimiter({ windowMs: 60 * 60_000, limit: Numbe
 export const linkCreateLimiter = makeLimiter({ windowMs: 60_000, limit: 30, message: "Demasiados enlaces en poco tiempo." });
 export const apiLimiter = makeLimiter({ windowMs: 60_000, limit: 120, message: "Rate limit de API excedido." });
 export const reportLimiter = makeLimiter({ windowMs: 60_000, limit: 10, message: "Demasiadas denuncias." });
+// Public link resolution: generous per-IP cap so a single NAT is not affected,
+// but scripted floods of the redirect hot path are slowed down.
+export const resolveLimiter = makeLimiter({ windowMs: 60_000, limit: Number(process.env.RESOLVE_LIMIT ?? 600), message: "Demasiadas resoluciones de enlaces." });
 export const adminLimiter = makeLimiter({ windowMs: 60_000, limit: 60, message: "Rate limit administrativo." });
 
 export function nextAfter(next: NextFunction): void {

@@ -85,7 +85,9 @@ freebuff-deploy env set '{"APP_SECRET":"...","COOKIE_SECURE":"true","RESEND_API_
 freebuff-deploy env unset KEY
 ```
 
-Claves requeridas en producción: `APP_SECRET` (obligatorio; el proceso **no arranca** si falta o usa el valor de desarrollo), `RESEND_API_KEY` (para email), `APP_URL`/`APP_HOST` (host real del panel, `app.uvh.es`), `PUBLIC_HOST=uvh.es`. Mantener `COOKIE_DOMAIN` vacío y `COOKIE_SECURE=true` bajo HTTPS.
+Claves requeridas en producción: `APP_SECRET` (obligatorio; el proceso **no arranca** si falta o usa el valor de desarrollo), `RESEND_API_KEY` (para email), `APP_URL`/`APP_HOST` (host real del panel, `app.uvh.es`), `PUBLIC_HOST=uvh.es`. Mantener `COOKIE_DOMAIN` vacío. `COOKIE_SECURE` ya es `true` por defecto en producción (solo override para tests).
+
+Opcionales: `TRUST_COUNTRY_HEADER=1` **solo** si hay un proxy de confianza que inyecte `COUNTRY_HEADER` (por defecto `cf-ipcountry`; sin esto la analítica por país ignora la cabecera y no se puede falsear). Retención: `SESSION_PURGE_DAYS`, `TOKEN_PURGE_DAYS`, `DELIVERY_PURGE_DAYS`, `AUDIT_PURGE_DAYS`, `ANALYTICS_RETENTION_DAYS`.
 
 En producción el backend aplica **separación por host** (`backend/src/middleware/host.ts`): `/api/v1`, `/auth` y `/app` solo responden en `APP_HOST`; la landing, legales, sitemap/robots y la resolución de enlaces solo en `PUBLIC_HOST` o dominios personalizados.
 

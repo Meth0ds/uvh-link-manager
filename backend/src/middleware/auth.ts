@@ -60,7 +60,7 @@ export function hydrateSession(req: AuthedRequest, _res: Response, next: NextFun
   if (token) {
     const row = db
       .prepare(
-        `SELECT s.id AS session_id, s.expires_at, s.revoked_at, u.id, u.email, u.name,
+        `SELECT s.id AS session_id, s.expires_at, s.revoked_at, s.last_used_at, u.id, u.email, u.name,
                 u.is_admin, u.email_verified_at, u.mfa_enabled
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.id = ?`,
@@ -70,6 +70,7 @@ export function hydrateSession(req: AuthedRequest, _res: Response, next: NextFun
           session_id: string;
           expires_at: string;
           revoked_at: string | null;
+          last_used_at: string;
           id: number;
           email: string;
           name: string;
@@ -88,10 +89,16 @@ export function hydrateSession(req: AuthedRequest, _res: Response, next: NextFun
         mfaEnabled: row.mfa_enabled === 1,
       };
       req.sessionId = row.session_id;
-      q.prepare(`UPDATE sessions SET last_used_at = ? WHERE id = ?`).run(
-        new Date().toISOString(),
-        row.session_id,
-      );
+      // Throttle the last_used_at write to at most once a minute per session:
+      // the redirect hot path and every API call would otherwise write to
+      // SQLite per request, amplifying write traffic for no real value.
+      const lastUsed = row.last_used_at ? new Date(row.last_used_at).getTime() : 0;
+      if (Date.now() - lastUsed > 60_000) {
+        q.prepare(`UPDATE sessions SET last_used_at = ? WHERE id = ?`).run(
+          new Date().toISOString(),
+          row.session_id,
+        );
+      }
     }
   }
   next();

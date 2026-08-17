@@ -65,6 +65,11 @@ export async function assertSafeUrl(raw: string): Promise<URL> {
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("SSRF: esquema no permitido");
   }
+  // Embedded credentials would be sent to the fetched host (and could bypass
+  // the allowlist via a different authority). Never fetch URLs with them.
+  if (url.username || url.password) {
+    throw new Error("SSRF: credenciales embebidas no permitidas");
+  }
   const port = url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
   if (![80, 443, 8080, 8443].includes(port)) {
     throw new Error("SSRF: puerto no permitido");

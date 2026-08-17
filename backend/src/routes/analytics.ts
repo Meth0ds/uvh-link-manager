@@ -1,16 +1,36 @@
 import { Router } from "express";
+import { z } from "zod";
 import { db, q } from "../db.js";
 import { requireAuth, requireVerified, type AuthedRequest } from "../middleware/auth.js";
 import { requireWorkspace } from "../workspace.js";
 import { requireApiToken } from "../middleware/apitoken.js";
+import { apiLimiter } from "../middleware/ratelimit.js";
 
 export const analyticsRouter = Router();
+
+const PERIODS = new Set(["24h", "7d", "30d", "90d"]);
+// Strict datetime validation: malformed `from`/`to` previously produced a 500.
+const dateParam = z.string().datetime().optional();
 
 function periodRange(period: string, from?: string, to?: string): { start: string; end: string } {
   const end = to ? new Date(to) : new Date();
   const days = period === "24h" ? 1 : period === "7d" ? 7 : period === "30d" ? 30 : period === "90d" ? 90 : 7;
   const start = from ? new Date(from) : new Date(end.getTime() - days * 86400_000);
   return { start: start.toISOString(), end: end.toISOString() };
+}
+
+function parseRange(
+  params: { period?: string; from?: string; to?: string },
+): { ok: true; period: string; from?: string; to?: string } | { ok: false; error: string } {
+  const period = params.period ?? "7d";
+  if (!PERIODS.has(period)) return { ok: false, error: "period inválido (24h|7d|30d|90d)" };
+  if (params.from !== undefined && !dateParam.safeParse(params.from).success) {
+    return { ok: false, error: "from debe ser una fecha ISO válida" };
+  }
+  if (params.to !== undefined && !dateParam.safeParse(params.to).success) {
+    return { ok: false, error: "to debe ser una fecha ISO válida" };
+  }
+  return { ok: true, period, from: params.from, to: params.to };
 }
 
 function mergeMaps(list: Array<string | null>): Record<string, number> {
@@ -87,10 +107,16 @@ function buildOverview(workspaceId: number, linkId: number | null, start: string
 analyticsRouter.get("/overview", requireVerified, requireWorkspace("viewer"), (req: AuthedRequest, res) => {
   const workspaceId = res.locals.workspaceId as number;
   const linkId = req.query.linkId ? Number(req.query.linkId) : null;
-  const period = String(req.query.period ?? "7d");
-  const from = req.query.from ? String(req.query.from) : undefined;
-  const to = req.query.to ? String(req.query.to) : undefined;
-  const { start, end } = periodRange(period, from, to);
+  const range = parseRange({
+    period: req.query.period ? String(req.query.period) : undefined,
+    from: req.query.from ? String(req.query.from) : undefined,
+    to: req.query.to ? String(req.query.to) : undefined,
+  });
+  if (!range.ok) {
+    res.status(422).json({ error: range.error });
+    return;
+  }
+  const { start, end } = periodRange(range.period, range.from, range.to);
   if (linkId) {
     const link = q.prepare(`SELECT id FROM links WHERE id = ? AND workspace_id = ?`).get(linkId, workspaceId);
     if (!link) {
@@ -101,12 +127,21 @@ analyticsRouter.get("/overview", requireVerified, requireWorkspace("viewer"), (r
   res.json(buildOverview(workspaceId, linkId, start, end));
 });
 
-// Public read analytics endpoint (API tokens)
-analyticsRouter.get("/public/overview", requireApiToken("analytics:read"), (req: AuthedRequest, res) => {
+// Public read analytics endpoint (API tokens). Rate limited so a leaked token
+// cannot be used to hammer the API.
+analyticsRouter.get("/public/overview", apiLimiter, requireApiToken("analytics:read"), (req: AuthedRequest, res) => {
   const workspaceId = req.apiAuth!.workspaceId;
   const linkId = req.query.linkId ? Number(req.query.linkId) : null;
-  const period = String(req.query.period ?? "7d");
-  const { start, end } = periodRange(period);
+  const range = parseRange({
+    period: req.query.period ? String(req.query.period) : undefined,
+    from: req.query.from ? String(req.query.from) : undefined,
+    to: req.query.to ? String(req.query.to) : undefined,
+  });
+  if (!range.ok) {
+    res.status(422).json({ error: range.error });
+    return;
+  }
+  const { start, end } = periodRange(range.period, range.from, range.to);
   if (linkId) {
     const link = q.prepare(`SELECT id FROM links WHERE id = ? AND workspace_id = ?`).get(linkId, workspaceId);
     if (!link) {

@@ -44,8 +44,14 @@ export const config = {
   // Auth / sessions
   sessionCookieName: process.env.SESSION_COOKIE ?? "uvh_session",
   sessionTtlDays: Number(process.env.SESSION_TTL_DAYS ?? 30),
-  cookieSecure: bool(process.env.COOKIE_SECURE, false),
+  // Secure cookies by default in production (always served over HTTPS there);
+  // override with COOKIE_SECURE=false only for testing.
+  cookieSecure: bool(process.env.COOKIE_SECURE, isProduction),
   cookieDomain: process.env.COOKIE_DOMAIN ?? undefined, // NEVER ".uvh.es" — panel cookie stays on app host
+  // Analytics country: only trust a proxy-supplied header when explicitly
+  // enabled, otherwise clients could spoof it to poison per-country stats.
+  trustCountryHeader: bool(process.env.TRUST_COUNTRY_HEADER, false),
+  countryHeader: process.env.COUNTRY_HEADER ?? "cf-ipcountry",
   // Hosts (uvh.es = public, app.uvh.es = panel/API)
   appUrl,
   appHost: process.env.APP_HOST ?? new URL(appUrl).hostname,

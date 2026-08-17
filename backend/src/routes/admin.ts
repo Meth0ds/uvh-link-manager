@@ -31,9 +31,9 @@ adminRouter.get("/overview", (req: AuthedRequest, res) => {
 });
 
 adminRouter.get("/users", (req: AuthedRequest, res) => {
-  const q = req.query.q ? String(req.query.q) : "";
-  const where = q ? "WHERE (u.email LIKE ? OR u.name LIKE ?)" : "";
-  const params = q ? [`%${q}%`, `%${q}%`] : [];
+  const search = req.query.q ? String(req.query.q) : "";
+  const where = search ? "WHERE (u.email LIKE ? OR u.name LIKE ?)" : "";
+  const params = search ? [`%${search}%`, `%${search}%`] : [];
   const rows = db
     .prepare(
       `SELECT u.id, u.email, u.name, u.is_admin, u.email_verified_at, u.mfa_enabled, u.created_at, u.deleted_at,

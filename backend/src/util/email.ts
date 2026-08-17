@@ -47,17 +47,17 @@ function layout(title: string, body: string): string {
 }
 
 export function verificationEmail(to: string, url: string): MailMessage {
-  const link = `<a href="${url}" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Verificar email</a>`;
+  const link = `<a href="${esc(url)}" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Verificar email</a>`;
   return {
     to,
     subject: "Verifica tu email en UVH",
-    html: layout("Verifica tu cuenta", `<p>Haz clic para confirmar tu dirección de correo y activar tu cuenta.</p><p style="margin:18px 0">${link}</p><p style="word-break:break-all;font-size:12px;color:#8A94A6">${url}</p>`),
+    html: layout("Verifica tu cuenta", `<p>Haz clic para confirmar tu dirección de correo y activar tu cuenta.</p><p style="margin:18px 0">${link}</p><p style="word-break:break-all;font-size:12px;color:#8A94A6">${esc(url)}</p>`),
     text: `Verifica tu cuenta en UVH: ${url}`,
   };
 }
 
 export function resetPasswordEmail(to: string, url: string): MailMessage {
-  const link = `<a href="${url}" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Restablecer contraseña</a>`;
+  const link = `<a href="${esc(url)}" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Restablecer contraseña</a>`;
   return {
     to,
     subject: "Restablece tu contraseña en UVH",
@@ -67,11 +67,21 @@ export function resetPasswordEmail(to: string, url: string): MailMessage {
 }
 
 export function invitationEmail(to: string, url: string, workspace: string, role: string): MailMessage {
-  const link = `<a href="${url}" style="display:inline-block;background:#00A99D;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Aceptar invitación</a>`;
+  const link = `<a href="${esc(url)}" style="display:inline-block;background:#00A99D;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Aceptar invitación</a>`;
   return {
     to,
     subject: `Te invitaron al workspace ${workspace} en UVH`,
-    html: layout("Invitación de equipo", `<p>Has sido invitado a <strong>${workspace}</strong> con rol <strong>${role}</strong>.</p><p style="margin:18px 0">${link}</p>`),
+    html: layout("Invitación de equipo", `<p>Has sido invitado a <strong>${esc(workspace)}</strong> con rol <strong>${esc(role)}</strong>.</p><p style="margin:18px 0">${link}</p>`),
     text: `Te invitaron a ${workspace} (rol ${role}) en UVH: ${url}`,
   };
+}
+
+/** Escape user-controlled values before interpolating them into HTML. */
+function esc(v: string): string {
+  return v
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

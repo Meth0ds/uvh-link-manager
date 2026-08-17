@@ -55,6 +55,8 @@ export function createApp() {
   // host/custom domains. No-op outside production (single-host dev/preview).
   app.use(hostGuard);
   app.use(express.json({ limit: "256kb" }));
+  // Needed by the public password-unlock form (HTML forms post urlencoded).
+  app.use(express.urlencoded({ extended: false, limit: "16kb" }));
   app.use(cookieParser());
   app.use(hydrateSession);
 

@@ -12,11 +12,13 @@ process.env.RESEND_API_KEY = "";
 process.env.NODE_ENV = "test";
 process.env.REGISTER_LIMIT = "1000";
 process.env.AUTH_LIMIT = "1000";
+process.env.RESOLVE_LIMIT = "100000";
 
 const { createApp } = await import("../src/app.js");
 const { migrate } = await import("../src/db.js");
 const db = await import("../src/db.js");
 const { assertSafeHost, assertSafeUrl } = await import("../src/util/ssrf.js");
+const { sha256Hex } = await import("../src/util/ids.js");
 
 const app = createApp();
 
@@ -62,8 +64,12 @@ async function registerVerifiedLogin(s: Session, email: string): Promise<void> {
     .send({ name: "Test User", email, password: PASSWORD })
     .expect(201);
   const user = db.q.prepare(`SELECT id FROM users WHERE email = ?`).get(email.toLowerCase()) as { id: number };
-  const tok = db.q.prepare(`SELECT id FROM email_tokens WHERE user_id = ? AND kind = 'verify' ORDER BY created_at DESC LIMIT 1`).get(user.id) as { id: string };
-  await s.agent.post("/api/v1/auth/verify-email").set("X-CSRF-Token", s.token).send({ token: tok.id }).expect(200);
+  // Tokens are stored hashed; the plaintext is what the user receives by email.
+  const plain = `verify-${userSeq}-${Date.now()}`;
+  db.q.prepare(`INSERT INTO email_tokens (id, user_id, kind, expires_at) VALUES (?, ?, 'verify', ?)`).run(
+    sha256Hex(plain), user.id, new Date(Date.now() + 3600_000).toISOString(),
+  );
+  await s.agent.post("/api/v1/auth/verify-email").set("X-CSRF-Token", s.token).send({ token: plain }).expect(200);
   await s.agent.post("/api/v1/auth/login").set("X-CSRF-Token", s.token).send({ email, password: PASSWORD }).expect(200);
 }
 
@@ -85,18 +91,34 @@ describe("Auth", () => {
     expect(me.body.user.emailVerified).toBe(true);
   });
 
-  it("rejects duplicate emails", async () => {
+  it("does not reveal existing accounts on registration (uniform response)", async () => {
     const s = await newSession();
-    await s.agent
+    const first = await s.agent
       .post("/api/v1/auth/register")
       .set("X-CSRF-Token", s.token)
-      .send({ name: "Alice Dup", email: "dup@example.com", password: PASSWORD })
-      .expect(201);
-    const res = await s.agent
+      .send({ name: "Alice Dup", email: "dup@example.com", password: PASSWORD });
+    const second = await s.agent
       .post("/api/v1/auth/register")
       .set("X-CSRF-Token", s.token)
       .send({ name: "Bob Dup", email: "dup@example.com", password: PASSWORD });
-    expect(res.status).toBe(409);
+    // Byte-identical responses (status + body): the endpoint cannot be used to
+    // confirm whether an account exists.
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(first.body).toEqual(second.body);
+    expect(first.body).toEqual({ user: null });
+  });
+
+  it("stores one-time email tokens hashed, never in plaintext", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("hash");
+    await registerVerifiedLogin(s, email);
+    const user = db.q.prepare(`SELECT id FROM users WHERE email = ?`).get(email) as { id: number };
+    const rows = db.q.prepare(`SELECT id FROM email_tokens WHERE user_id = ?`).all(user.id) as Array<{ id: string }>;
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.id).toMatch(/^[0-9a-f]{64}$/); // sha256 hex, not the raw bearer token
+    }
   });
 
   it("rejects wrong passwords", async () => {
@@ -131,8 +153,11 @@ describe("Auth", () => {
     await registerVerifiedLogin(s, email);
     await s.agent.post("/api/v1/auth/forgot-password").set("X-CSRF-Token", s.token).send({ email }).expect(200);
     const user = db.q.prepare(`SELECT id FROM users WHERE email = ?`).get(email) as { id: number };
-    const tok = db.q.prepare(`SELECT id FROM email_tokens WHERE user_id = ? AND kind = 'reset' LIMIT 1`).get(user.id) as { id: string };
-    await s.agent.post("/api/v1/auth/reset-password").set("X-CSRF-Token", s.token).send({ token: tok.id, password: "new-password-789" }).expect(200);
+    const plain = `reset-${userSeq}-${Date.now()}`;
+    db.q.prepare(`INSERT INTO email_tokens (id, user_id, kind, expires_at) VALUES (?, ?, 'reset', ?)`).run(
+      sha256Hex(plain), user.id, new Date(Date.now() + 3600_000).toISOString(),
+    );
+    await s.agent.post("/api/v1/auth/reset-password").set("X-CSRF-Token", s.token).send({ token: plain, password: "new-password-789" }).expect(200);
     const bad = await s.agent.post("/api/v1/auth/login").set("X-CSRF-Token", s.token).send({ email, password: PASSWORD });
     expect(bad.status).toBe(401);
     const good = await s.agent.post("/api/v1/auth/login").set("X-CSRF-Token", s.token).send({ email, password: "new-password-789" });
@@ -237,6 +262,15 @@ describe("Redirect resolution", () => {
     expect(res.headers.location).toBe("https://example.com/target");
   });
 
+  it("redirects are never cached (analytics/single-use integrity)", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("cache"));
+    await createLink(s, { destination: "https://example.com/nc", alias: "nocache" });
+    const res = await request(app).get("/r/nocache").set("Host", "uvh.es");
+    expect(res.status).toBe(302);
+    expect(res.headers["cache-control"]).toContain("no-store");
+  });
+
   it("does not resolve on unknown hosts", async () => {
     const res = await request(app).get("/r/destino").set("Host", "evil.example.org");
     expect(res.status).toBe(404);
@@ -290,10 +324,56 @@ describe("Redirect resolution", () => {
     expect(follow.headers.location).toBe("https://example.com/secret");
   });
 
+  it("unlocks via the real HTML form (urlencoded body + hidden _csrf)", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("form"));
+    await createLink(s, { destination: "https://example.com/form", alias: "formpw", password: "clave-form-123" });
+
+    const agent = request.agent(app);
+    const page = await agent.get("/r/formpw").set("Host", "uvh.es");
+    expect(page.status).toBe(403);
+    const m = (page.text ?? "").match(/name="_csrf" value="([^"]+)"/);
+    expect(m).not.toBeNull();
+
+    const res = await agent
+      .post("/r/formpw/unlock")
+      .set("Host", "uvh.es")
+      .type("form")
+      .send({ password: "clave-form-123", _csrf: m![1] });
+    expect(res.status).toBe(302);
+
+    const follow = await agent.get("/r/formpw").set("Host", "uvh.es");
+    expect(follow.status).toBe(302);
+    expect(follow.headers.location).toBe("https://example.com/form");
+  });
+
+  it("does not 500 on malformed Referer headers (hot path)", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("ref"));
+    await createLink(s, { destination: "https://example.com/r", alias: "refok" });
+    for (const ref of ["not-a-url", "http://[", "https://exa mple.com"]) {
+      const res = await request(app).get("/r/refok").set("Host", "uvh.es").set("Referer", ref);
+      expect(res.status).toBe(302);
+    }
+  });
+
   it("serves an unavailable page for paused links", async () => {
     const res = await request(app).get("/r/pausable").set("Host", "uvh.es");
     expect(res.status).toBe(404);
     expect(res.text).toContain("pausa");
+  });
+});
+
+describe("Analytics hardening", () => {
+  it("rejects malformed date ranges instead of crashing (500 → 422)", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("dates"));
+    const res = await s.agent.get("/api/v1/analytics/overview?from=not-a-date");
+    expect(res.status).toBe(422);
+    const badPeriod = await s.agent.get("/api/v1/analytics/overview?period=forever");
+    expect(badPeriod.status).toBe(422);
+    const good = await s.agent.get("/api/v1/analytics/overview?period=7d");
+    expect(good.status).toBe(200);
   });
 });
 
@@ -339,6 +419,15 @@ describe("SSRF guards", () => {
     await expect(assertSafeUrl("ftp://example.com")).rejects.toThrow(/esquema/);
     await expect(assertSafeUrl("file:///etc/passwd")).rejects.toThrow(/esquema/);
     await expect(assertSafeUrl("http://example.com:21/")).rejects.toThrow(/puerto/);
+    await expect(assertSafeUrl("https://user:pass@example.com/")).rejects.toThrow(/credenciales/);
+  });
+});
+
+describe("Analytics spoofing", () => {
+  it("ignores a spoofed country header unless explicitly trusted", async () => {
+    const { countryFromHeaders } = await import("../src/util/analytics.js");
+    // Default: TRUST_COUNTRY_HEADER is unset in tests → header ignored.
+    expect(countryFromHeaders({ "cf-ipcountry": "ES" })).toBeNull();
   });
 });
 
@@ -447,6 +536,23 @@ describe("Webhooks", () => {
 });
 
 describe("Workspaces", () => {
+  it("stores invitation tokens hashed and rotates them on resend", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("invite"));
+    const ws = await s.agent.post("/api/v1/workspaces").set("X-CSRF-Token", s.token).send({ name: "Equipo" }).expect(201);
+    const wsId = ws.body.workspace.id as number;
+    await s.agent
+      .post(`/api/v1/workspaces/${wsId}/invitations`)
+      .set("X-CSRF-Token", s.token)
+      .send({ email: "invitee@example.com", role: "viewer" })
+      .expect(201);
+    const row = db.q.prepare(`SELECT id, token FROM invitations WHERE workspace_id = ?`).get(wsId) as { id: number; token: string };
+    expect(row.token).toMatch(/^[0-9a-f]{64}$/); // hashed, never the bearer token
+    await s.agent.post(`/api/v1/workspaces/${wsId}/invitations/${row.id}/resend`).set("X-CSRF-Token", s.token).expect(200);
+    const row2 = db.q.prepare(`SELECT token FROM invitations WHERE id = ?`).get(row.id) as { token: string };
+    expect(row2.token).not.toBe(row.token); // resend rotates the token
+  });
+
   it("creates a workspace and lists memberships", async () => {
     const s = await newSession();
     await registerVerifiedLogin(s, uniqueEmail("ws"));

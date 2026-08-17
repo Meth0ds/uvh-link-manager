@@ -8,7 +8,7 @@ import { enqueue } from "../queue.js";
 import { countryFromHeaders, parseUserAgent, referrerDomain, visitorHash } from "../util/analytics.js";
 import { sign } from "../util/sign.js";
 import { normalizeAlias } from "../util/url.js";
-import { reportLimiter } from "../middleware/ratelimit.js";
+import { reportLimiter, resolveLimiter } from "../middleware/ratelimit.js";
 import { issueCsrfToken, verifyCsrf } from "../middleware/csrf.js";
 
 export const redirectRouter = Router();
@@ -89,8 +89,13 @@ function resolveAndRespond(req: ResolveRequest, expressReq: import("express").Re
         visitorHash: visitorHash(req.ip, req.userAgent),
       });
     });
-    // 302: allows link editing without breaking cached redirects
-    res.status(302).setHeader("Location", outcome.location);
+    // 302: allows link editing without breaking cached redirects. no-store is
+    // critical so browsers/proxies never serve a stale Location: every visit
+    // must hit the backend (click counting, single-use, max-clicks, expiry).
+    res.status(302)
+      .setHeader("Location", outcome.location)
+      .setHeader("Cache-Control", "no-store")
+      .setHeader("Pragma", "no-cache");
     res.end();
     return;
   }
@@ -127,11 +132,11 @@ function resolveAndRespond(req: ResolveRequest, expressReq: import("express").Re
 }
 
 // Canonical public surface: /{alias} (uvh.es) and /r/{alias} (API-friendly)
-redirectRouter.get("/r/:alias", (req, res) => {
+redirectRouter.get("/r/:alias", resolveLimiter, (req, res) => {
   resolveAndRespond(toResolveRequest(req, req.params.alias ?? ""), req, res);
 });
 
-redirectRouter.get("/:alias", (req, res) => {
+redirectRouter.get("/:alias", resolveLimiter, (req, res) => {
   // Top-level paths resolve only when the Host is a UVH public domain.
   resolveAndRespond(toResolveRequest(req, req.params.alias ?? ""), req, res);
 });

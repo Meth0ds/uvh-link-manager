@@ -15,6 +15,14 @@ app.listen(config.port, "0.0.0.0", () => {
 // ---------------- Scheduler (replaces Laravel cron; in-process) ----------------
 const RETENTION_DAYS = Number(process.env.ANALYTICS_RETENTION_DAYS ?? 180);
 const EVENTS_PURGE_BATCH = 5000;
+// Expired/revoked sessions older than this are deleted (configurable).
+const SESSION_PURGE_DAYS = Number(process.env.SESSION_PURGE_DAYS ?? 30);
+// Used/expired email tokens older than this are deleted.
+const TOKEN_PURGE_DAYS = Number(process.env.TOKEN_PURGE_DAYS ?? 7);
+// Successful webhook deliveries older than this are deleted (failed/pending are kept).
+const DELIVERY_PURGE_DAYS = Number(process.env.DELIVERY_PURGE_DAYS ?? 90);
+// Append-only audit trail retained for this long.
+const AUDIT_PURGE_DAYS = Number(process.env.AUDIT_PURGE_DAYS ?? 365);
 
 function runJobs(): void {
   const now = new Date().toISOString();
@@ -39,6 +47,19 @@ function runJobs(): void {
     for (const p of pending) {
       resendDelivery(p.id);
     }
+    // Housekeeping: stop tables from growing unboundedly.
+    const sessionCutoff = new Date(Date.now() - SESSION_PURGE_DAYS * 86400_000).toISOString();
+    q.prepare(
+      `DELETE FROM sessions WHERE (revoked_at IS NOT NULL OR expires_at < ?) AND expires_at < ?`,
+    ).run(now, sessionCutoff);
+    const tokenCutoff = new Date(Date.now() - TOKEN_PURGE_DAYS * 86400_000).toISOString();
+    q.prepare(`DELETE FROM email_tokens WHERE (used_at IS NOT NULL OR expires_at < ?) AND created_at < ?`).run(
+      now, tokenCutoff,
+    );
+    const deliveryCutoff = new Date(Date.now() - DELIVERY_PURGE_DAYS * 86400_000).toISOString();
+    q.prepare(`DELETE FROM webhook_deliveries WHERE status = 'success' AND delivered_at < ?`).run(deliveryCutoff);
+    const auditCutoff = new Date(Date.now() - AUDIT_PURGE_DAYS * 86400_000).toISOString();
+    q.prepare(`DELETE FROM audit_events WHERE created_at < ?`).run(auditCutoff);
   } catch (err) {
     console.error("[scheduler] job failed", err);
   }

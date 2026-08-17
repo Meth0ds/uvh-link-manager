@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import UAParser from "ua-parser-js";
+import { config } from "../config.js";
 
 export interface ClickMeta {
   country: string | null;
@@ -25,8 +26,11 @@ export function visitorHash(ip: string | undefined, userAgent: string | undefine
 }
 
 export function countryFromHeaders(headers: Record<string, string | undefined>): string | null {
-  // Cloudflare / proxy country header; never exposed to the panel user.
-  const cf = headers["cf-ipcountry"];
+  // Country is only accepted from a trusted proxy/edge header (set via
+  // TRUST_COUNTRY_HEADER=1). Without that, clients could trivially spoof
+  // `cf-ipcountry` and poison per-country analytics.
+  if (!config.trustCountryHeader) return null;
+  const cf = headers[config.countryHeader];
   if (cf && /^[A-Z]{2}$/.test(cf)) return cf;
   return null;
 }

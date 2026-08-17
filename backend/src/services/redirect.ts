@@ -102,7 +102,15 @@ export function resolveLink(ctx: ResolveContext): RedirectOutcome {
 
   const ua = parseUserAgent(ctx.userAgent);
   const referrer = referrerDomain(ctx.referrer);
-  const campaignFromReferrer = ctx.referrer ? new URL(ctx.referrer).searchParams.get("utm_campaign") : null;
+  // Never let an attacker-controlled Referer crash the redirect hot path.
+  let campaignFromReferrer: string | null = null;
+  if (ctx.referrer) {
+    try {
+      campaignFromReferrer = new URL(ctx.referrer).searchParams.get("utm_campaign");
+    } catch {
+      campaignFromReferrer = null;
+    }
+  }
   const lang = ctx.acceptLanguage?.split(",")[0]?.split("-")[0]?.toLowerCase() ?? null;
   const country = ctx.country?.toLowerCase() ?? null;
 

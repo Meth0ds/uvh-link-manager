@@ -41,12 +41,12 @@ html {
 }
 
 html.dark {
-  @include mat.all-component-colors($uvh-dark-theme);
   color-scheme: dark;
   --uvh-ink: #eef2f9;
   --uvh-surface: #0b1424;
   --uvh-border: #1d2a40;
   --uvh-muted: #93a1b8;
+  @include mat.all-component-colors($uvh-dark-theme);
 }
 
 // ---------- Base ----------

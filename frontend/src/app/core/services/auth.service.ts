@@ -64,9 +64,12 @@ export class AuthService {
     await this.refreshWorkspaces();
   }
 
-  async register(name: string, email: string, password: string): Promise<AuthUser> {
-    const res = await this.api.post<LoginResponse>("/api/v1/auth/register", { name, email, password });
-    return res.user;
+  /**
+   * Registration always returns the same generic body (anti-enumeration); it
+   * never creates a session. The UI then shows the "check your email" step.
+   */
+  async register(name: string, email: string, password: string): Promise<void> {
+    await this.api.post<{ user: null }>("/api/v1/auth/register", { name, email, password });
   }
 
   async logout(): Promise<void> {
