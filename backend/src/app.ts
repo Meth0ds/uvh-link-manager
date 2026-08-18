@@ -22,7 +22,14 @@ import { redirectRouter } from "./routes/redirect.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Angular's application builder emits the browser bundle one level down.
-const SPA_DIST = path.resolve(__dirname, "..", "..", "frontend", "dist", "uvh", "browser");
+// The compiled entry point lives one level deeper than the source one
+// (dist/src vs src), so resolve against candidates instead of assuming.
+const SPA_DIST_CANDIDATES = [
+  path.resolve(__dirname, "..", "..", "frontend", "dist", "uvh", "browser"), // src/app.ts
+  path.resolve(__dirname, "..", "..", "..", "frontend", "dist", "uvh", "browser"), // dist/src/app.js
+];
+const SPA_DIST =
+  SPA_DIST_CANDIDATES.find((p) => fs.existsSync(path.join(p, "index.html"))) ?? SPA_DIST_CANDIDATES[1]!;
 const SPA_ROUTES = ["/", "/auth", "/app", "/legal"];
 
 /** Serve the compiled SPA assets. Both the public and app hosts load this bundle. */

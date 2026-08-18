@@ -21,7 +21,10 @@ export async function sendMail(msg: MailMessage): Promise<void> {
   if (!resend) {
     // Log mailer fallback: keeps flows working in preview without leaking
     // secrets. JSON.stringify prevents CR/LF log injection via user content.
-    console.log("[mail:log]", JSON.stringify({ to: msg.to, subject: msg.subject }));
+    // The one-time link is included so preview flows (verification, reset,
+    // invitations) remain usable when no email provider is configured.
+    const link = /href="([^"]+)"/.exec(msg.html)?.[1] ?? null;
+    console.log("[mail:log]", JSON.stringify({ to: msg.to, subject: msg.subject, url: link }));
     return;
   }
   try {
