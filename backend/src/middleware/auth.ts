@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { db, q } from "../db.js";
 import { config } from "../config.js";
 import { randomToken, sha256Hex } from "../util/ids.js";
+import { hashIp } from "../util/crypto.js";
 
 export interface AuthUser {
   id: number;
@@ -29,7 +30,7 @@ export function createSession(userId: number, req: Request): string {
   q.prepare(
     `INSERT INTO sessions (id, user_id, user_agent, ip_hash, expires_at)
      VALUES (?, ?, ?, ?, ?)`,
-  ).run(sha256Hex(token), userId, req.headers["user-agent"] ?? null, req.ip ? sha256Hex(req.ip) : null, expiresAt);
+  ).run(sha256Hex(token), userId, req.headers["user-agent"] ?? null, req.ip ? hashIp(req.ip) : null, expiresAt);
   return token;
 }
 

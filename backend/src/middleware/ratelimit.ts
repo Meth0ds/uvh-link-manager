@@ -21,7 +21,7 @@ export function makeLimiter(opts: { windowMs: number; limit: number; message?: s
 // Limits are validated strictly at boot (intEnv throws on invalid values).
 export const authLimiter = makeLimiter({ windowMs: 15 * 60_000, limit: intEnv("AUTH_LIMIT", 10, { min: 1 }), message: "Demasiados intentos. Espera unos minutos." });
 export const registerLimiter = makeLimiter({ windowMs: 60 * 60_000, limit: intEnv("REGISTER_LIMIT", 10, { min: 1 }), message: "Demasiados registros desde esta IP." });
-export const linkCreateLimiter = makeLimiter({ windowMs: 60_000, limit: 30, message: "Demasiados enlaces en poco tiempo." });
+export const linkCreateLimiter = makeLimiter({ windowMs: 60_000, limit: intEnv("LINK_CREATE_LIMIT", 30, { min: 1 }), message: "Demasiados enlaces en poco tiempo." });
 export const apiLimiter = makeLimiter({ windowMs: 60_000, limit: 120, message: "Rate limit de API excedido." });
 export const reportLimiter = makeLimiter({ windowMs: 60_000, limit: 10, message: "Demasiadas denuncias." });
 // Public link resolution: generous per-IP cap so a single NAT is not affected,

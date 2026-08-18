@@ -154,7 +154,7 @@ linksRouter.get("/", requireVerified, requireWorkspace("viewer"), (req: AuthedRe
 });
 
 // Alias availability check (backend enforced)
-linksRouter.post("/check-alias", requireVerified, requireWorkspace("viewer"), (req: AuthedRequest, res) => {
+linksRouter.post("/check-alias", requireVerified, requireWorkspace("viewer"), linkCreateLimiter, (req: AuthedRequest, res) => {
   const parsed = z.object({ alias: z.string().min(1).max(64), domainId: z.number().int().positive().nullable().optional() }).safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({ error: "Alias inválido" });
@@ -376,7 +376,11 @@ linksRouter.post("/:id/restore", requireVerified, requireWorkspace("editor"), (r
     return;
   }
   tx(() => {
-    q.prepare(`UPDATE links SET deleted_at = NULL, state = 'active', updated_at = ? WHERE id = ?`).run(new Date().toISOString(), id);
+    // Restore re-derives the time-based state instead of blindly setting
+    // 'active' (a link whose expires_at already passed must come back expired).
+    const row = q.prepare(`SELECT expires_at FROM links WHERE id = ?`).get(id) as { expires_at: string | null };
+    const next = row.expires_at && new Date(row.expires_at).getTime() < Date.now() ? "expired" : "active";
+    q.prepare(`UPDATE links SET deleted_at = NULL, state = ?, updated_at = ? WHERE id = ?`).run(next, new Date().toISOString(), id);
   });
   audit({ userId: req.user!.id, ip: req.ip }, "link.restore", "link", id);
   res.json({ ok: true });

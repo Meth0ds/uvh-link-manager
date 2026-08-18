@@ -1,5 +1,5 @@
 import { db, q } from "../db.js";
-import { sha256Hex } from "./ids.js";
+import { hashIp } from "./crypto.js";
 
 export interface AuditContext {
   userId?: number | null;
@@ -26,6 +26,6 @@ export function audit(
     resourceType ?? null,
     resourceId == null ? null : String(resourceId),
     metadata ? JSON.stringify(metadata) : null,
-    ctx.ip ? sha256Hex(ctx.ip) : null,
+    ctx.ip ? hashIp(ctx.ip) : null,
   );
 }

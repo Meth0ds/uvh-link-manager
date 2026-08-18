@@ -107,6 +107,15 @@ Añadido contador de intentos por cuenta (10 intentos / 15 min → 429) sobre `/
 - **Sesgo de módulo en `randomAlias`**: muestreo por rechazo con `randomInt` (CSPRNG), sin sesgo.
 - **NaN en parámetros numéricos → 500**: `norm()` de db.ts convierte NaN/Infinity en NULL (los queries devuelven 404/empty en vez de 500) y la paginación de admin valida enteros seguros.
 - **Secretos at-rest legacy en claro**: `migrate()` re-cifra en el arranque los valores sin prefijo `enc:v1:` (`users.mfa_secret`, `webhooks.secret`).
+- **TOCTOU en la cuota de enlaces**: el COUNT se movió dentro de la transacción `BEGIN IMMEDIATE`.
+- **No se podía quitar la contraseña de un enlace** (bug de `??`): `password:null` ahora la elimina (`undefined` la conserva) + test.
+- **Fechas con offset de zona horaria**: `scheduledAt`/`expiresAt` se normalizan a UTC ISO al guardar, así las comparaciones textuales del scheduler son consistentes.
+- **`restore` fijaba `active` a ciegas**: ahora re-deriva el estado temporal (un enlace caducado vuelve como `expired`) + test.
+- **`ip_hash` sin sal** (reversible para IPv4): ahora es HMAC-SHA256 con `APP_SECRET` en sesiones y auditoría.
+- **`returnTo` aceptaba `//host`**: rechaza protocol-relative y backslash en el frontend.
+- **`check-alias` sin rate limit**: añadido `linkCreateLimiter` (`LINK_CREATE_LIMIT`, configurable).
+- **Workspaces ilimitados por usuario**: cap de 20 workspaces en propiedad (429).
+- **Rango reservado `240.0.0.0/4`** añadido al filtro SSRF.
 
 ## Documentados (riesgo residual aceptado)
 

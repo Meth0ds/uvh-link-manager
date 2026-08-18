@@ -86,17 +86,6 @@ export function createLink(
 ): { id: number; alias: string; state: LinkState } {
   const domainId = input.domainId ?? null;
 
-  // Quota enforcement
-  const quota = q.prepare(`SELECT links_limit FROM quotas WHERE workspace_id = ?`).get(workspaceId) as
-    | { links_limit: number }
-    | undefined;
-  const used = q
-    .prepare(`SELECT COUNT(*) AS c FROM links WHERE workspace_id = ? AND deleted_at IS NULL`)
-    .get(workspaceId) as { c: number };
-  if (quota && used.c >= quota.links_limit) {
-    throw new LinkError("Cuota de enlaces alcanzada", 429);
-  }
-
   let alias: string;
   if (input.alias) {
     alias = normalizeAlias(input.alias);
@@ -110,6 +99,18 @@ export function createLink(
   const utm = input.utm ?? {};
 
   return tx(() => {
+    // Quota enforcement INSIDE the transaction: the previous check-then-insert
+    // had a TOCTOU window that let concurrent creates exceed the quota.
+    const quota = q.prepare(`SELECT links_limit FROM quotas WHERE workspace_id = ?`).get(workspaceId) as
+      | { links_limit: number }
+      | undefined;
+    const used = q
+      .prepare(`SELECT COUNT(*) AS c FROM links WHERE workspace_id = ? AND deleted_at IS NULL`)
+      .get(workspaceId) as { c: number };
+    if (quota && used.c >= quota.links_limit) {
+      throw new LinkError("Cuota de enlaces alcanzada", 429);
+    }
+
     const info = q
       .prepare(
         `INSERT INTO links
@@ -122,7 +123,9 @@ export function createLink(
         workspaceId, userId, domainId, alias, input.destination, input.fallbackDestination ?? null, state,
         input.passwordHash ?? null,
         input.maxClicks ?? null, input.singleUse ? 1 : 0,
-        input.scheduledAt ?? null, input.expiresAt ?? null, input.notes ?? null,
+        input.scheduledAt ? new Date(input.scheduledAt).toISOString() : null,
+        input.expiresAt ? new Date(input.expiresAt).toISOString() : null,
+        input.notes ?? null,
         utm.source ?? null, utm.medium ?? null, utm.campaign ?? null, utm.term ?? null, utm.content ?? null,
       );
     const linkId = Number(info.lastInsertRowid);
@@ -173,9 +176,15 @@ export function updateLink(
     ).run(
       domainId, alias,
       input.destination, input.fallbackDestination ?? null,
-      input.passwordHash ?? link.password_hash,
+      // undefined = keep current hash; null = remove the password. The old
+      // `?? link.password_hash` made it impossible to ever remove one.
+      input.passwordHash !== undefined ? input.passwordHash : (link.password_hash as string | null),
       input.maxClicks ?? null, input.singleUse ? 1 : 0,
-      input.scheduledAt ?? null, input.expiresAt ?? null, input.notes ?? null,
+      // Normalize to UTC ISO so string-based comparisons (scheduler, links
+      // routes) are consistent regardless of the client's timezone offset.
+      input.scheduledAt ? new Date(input.scheduledAt).toISOString() : null,
+      input.expiresAt ? new Date(input.expiresAt).toISOString() : null,
+      input.notes ?? null,
       utm.source ?? null, utm.medium ?? null, utm.campaign ?? null, utm.term ?? null, utm.content ?? null,
       new Date().toISOString(), linkId,
     );

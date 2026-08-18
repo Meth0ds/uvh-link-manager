@@ -54,6 +54,14 @@ workspacesRouter.post("/", requireVerified, (req: AuthedRequest, res) => {
     res.status(422).json({ error: "Nombre inválido" });
     return;
   }
+  // Cap owned workspaces per user: workspaces are the vehicle for invitation
+  // emails, so unbounded creation would be a spam amplifier.
+  const MAX_OWNED_WORKSPACES = 20;
+  const owned = (q.prepare(`SELECT COUNT(*) AS c FROM workspaces WHERE owner_user_id = ?`).get(req.user!.id) as { c: number }).c;
+  if (owned >= MAX_OWNED_WORKSPACES) {
+    res.status(429).json({ error: "Límite de workspaces alcanzado" });
+    return;
+  }
   const wid = tx(() => {
     const info = db
       .prepare(`INSERT INTO workspaces (name, slug, owner_user_id) VALUES (?, ?, ?)`)

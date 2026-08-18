@@ -13,6 +13,7 @@ process.env.NODE_ENV = "test";
 process.env.REGISTER_LIMIT = "1000";
 process.env.AUTH_LIMIT = "1000";
 process.env.RESOLVE_LIMIT = "100000";
+process.env.LINK_CREATE_LIMIT = "100000";
 
 const { createApp } = await import("../src/app.js");
 const { migrate } = await import("../src/db.js");
@@ -1090,5 +1091,38 @@ describe("MFA step-up and email cooldown", () => {
     expect((await s.agent.post("/api/v1/auth/resend-verification").set("X-CSRF-Token", s.token).send({})).status).toBe(200);
     // …and the very next resend is throttled again.
     expect((await s.agent.post("/api/v1/auth/resend-verification").set("X-CSRF-Token", s.token).send({})).status).toBe(429);
+  });
+});
+describe("Link lifecycle hardening", () => {
+  it("allows removing a link password via PATCH (null clears it)", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("pwclear"));
+    const created = await createLink(s, { destination: "https://example.com/clear", alias: "pwclear", password: "clave-123456789" });
+    expect(created.status).toBe(201);
+    const linkId = created.body.link.id as number;
+
+    expect((await request(app).get("/r/pwclear").set("Host", "uvh.es")).status).toBe(403);
+
+    const cleared = await s.agent.patch("/api/v1/links/" + linkId).set("X-CSRF-Token", s.token).send({ password: null });
+    expect(cleared.status).toBe(200);
+    expect((db.q.prepare("SELECT password_hash FROM links WHERE id = ?").get(linkId) as { password_hash: string | null }).password_hash).toBeNull();
+
+    expect((await request(app).get("/r/pwclear").set("Host", "uvh.es")).status).toBe(302);
+  });
+
+  it("restores an expired link as expired, not active", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("restexp");
+    await registerVerifiedLogin(s, email);
+    const created = await createLink(s, { destination: "https://example.com/re", alias: "restexp" });
+    expect(created.status).toBe(201);
+    const linkId = created.body.link.id as number;
+
+    db.q.prepare("UPDATE links SET expires_at = ?, state = 'expired' WHERE id = ?").run(new Date(Date.now() - 3600_000).toISOString(), linkId);
+    await s.agent.delete("/api/v1/links/" + linkId).set("X-CSRF-Token", s.token).expect(200);
+    await s.agent.post("/api/v1/links/" + linkId + "/restore").set("X-CSRF-Token", s.token).expect(200);
+
+    expect((db.q.prepare("SELECT state FROM links WHERE id = ?").get(linkId) as { state: string }).state).toBe("expired");
+    expect((await request(app).get("/r/restexp").set("Host", "uvh.es")).status).toBe(404);
   });
 });
