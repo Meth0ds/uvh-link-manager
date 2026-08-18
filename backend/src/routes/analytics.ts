@@ -4,24 +4,21 @@ import { db, q } from "../db.js";
 import { requireAuth, requireVerified, type AuthedRequest } from "../middleware/auth.js";
 import { requireWorkspace } from "../workspace.js";
 import { requireApiToken } from "../middleware/apitoken.js";
-import { apiLimiter } from "../middleware/ratelimit.js";
+import { apiLimiter, apiTokenLimiter } from "../middleware/ratelimit.js";
 
 export const analyticsRouter = Router();
 
 const PERIODS = new Set(["24h", "7d", "30d", "90d"]);
+// Maximum explicit from/to span, aligned with the default analytics retention
+// (ANALYTICS_RETENTION_DAYS=180): asking for more cannot return more data, it
+// only amplifies the cost of rollup and click-event scans.
+const MAX_ANALYTICS_RANGE_MS = 180 * 86400_000;
 // Strict datetime validation: malformed `from`/`to` previously produced a 500.
 const dateParam = z.string().datetime().optional();
 
-function periodRange(period: string, from?: string, to?: string): { start: string; end: string } {
-  const end = to ? new Date(to) : new Date();
-  const days = period === "24h" ? 1 : period === "7d" ? 7 : period === "30d" ? 30 : period === "90d" ? 90 : 7;
-  const start = from ? new Date(from) : new Date(end.getTime() - days * 86400_000);
-  return { start: start.toISOString(), end: end.toISOString() };
-}
-
 function parseRange(
   params: { period?: string; from?: string; to?: string },
-): { ok: true; period: string; from?: string; to?: string } | { ok: false; error: string } {
+): { ok: true; start: string; end: string } | { ok: false; error: string } {
   const period = params.period ?? "7d";
   if (!PERIODS.has(period)) return { ok: false, error: "period inválido (24h|7d|30d|90d)" };
   if (params.from !== undefined && !dateParam.safeParse(params.from).success) {
@@ -30,7 +27,16 @@ function parseRange(
   if (params.to !== undefined && !dateParam.safeParse(params.to).success) {
     return { ok: false, error: "to debe ser una fecha ISO válida" };
   }
-  return { ok: true, period, from: params.from, to: params.to };
+  const days = period === "24h" ? 1 : period === "7d" ? 7 : period === "30d" ? 30 : 90;
+  const end = params.to ? new Date(params.to) : new Date();
+  const start = params.from ? new Date(params.from) : new Date(end.getTime() - days * 86400_000);
+  if (start.getTime() > end.getTime()) {
+    return { ok: false, error: "from debe ser anterior o igual a to" };
+  }
+  if (end.getTime() - start.getTime() > MAX_ANALYTICS_RANGE_MS) {
+    return { ok: false, error: "El rango solicitado supera el máximo de 180 días" };
+  }
+  return { ok: true, start: start.toISOString(), end: end.toISOString() };
 }
 
 function mergeMaps(list: Array<string | null>): Record<string, number> {
@@ -116,7 +122,7 @@ analyticsRouter.get("/overview", requireVerified, requireWorkspace("viewer"), (r
     res.status(422).json({ error: range.error });
     return;
   }
-  const { start, end } = periodRange(range.period, range.from, range.to);
+  const { start, end } = range;
   if (linkId) {
     const link = q.prepare(`SELECT id FROM links WHERE id = ? AND workspace_id = ?`).get(linkId, workspaceId);
     if (!link) {
@@ -127,9 +133,10 @@ analyticsRouter.get("/overview", requireVerified, requireWorkspace("viewer"), (r
   res.json(buildOverview(workspaceId, linkId, start, end));
 });
 
-// Public read analytics endpoint (API tokens). Rate limited so a leaked token
-// cannot be used to hammer the API.
-analyticsRouter.get("/public/overview", apiLimiter, requireApiToken("analytics:read"), (req: AuthedRequest, res) => {
+// Public read analytics endpoint (API tokens). Two rate-limit layers: per IP
+// (before auth) and per token (after auth), so a leaked token is capped in
+// aggregate even when requests fan out across many IPs.
+analyticsRouter.get("/public/overview", apiLimiter, requireApiToken("analytics:read"), apiTokenLimiter, (req: AuthedRequest, res) => {
   const workspaceId = req.apiAuth!.workspaceId;
   const linkId = req.query.linkId ? Number(req.query.linkId) : null;
   const range = parseRange({
@@ -141,7 +148,7 @@ analyticsRouter.get("/public/overview", apiLimiter, requireApiToken("analytics:r
     res.status(422).json({ error: range.error });
     return;
   }
-  const { start, end } = periodRange(range.period, range.from, range.to);
+  const { start, end } = range;
   if (linkId) {
     const link = q.prepare(`SELECT id FROM links WHERE id = ? AND workspace_id = ?`).get(linkId, workspaceId);
     if (!link) {

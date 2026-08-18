@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
+import { sha256Hex } from "./util/ids.js";
 
 // Load via createRequire so Vite/vitest never tries to resolve the very new
 // `node:sqlite` builtin (it is not in Vite's builtin list yet).
@@ -301,5 +302,41 @@ export function migrate() {
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   );
   CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_tokens(user_id);
+
+  -- Housekeeping purge indexes: keep the scheduler's DELETE ... WHERE scans
+  -- off the hot path once tables grow. Partial indexes keep them small.
+  CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+  CREATE INDEX IF NOT EXISTS idx_sessions_revoked ON sessions(revoked_at) WHERE revoked_at IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_email_tokens_created ON email_tokens(created_at);
+  CREATE INDEX IF NOT EXISTS idx_click_time ON click_events(occurred_at);
+  CREATE INDEX IF NOT EXISTS idx_deliveries_success_delivered ON webhook_deliveries(delivered_at) WHERE status = 'success';
   `);
+
+  // Data migrations (idempotent).
+  migrateLegacyTokens();
+}
+
+/**
+ * One-time upgrade for databases created before the token-hashing hardening
+ * (commit 4963dbc): email and invitation tokens used to be stored in plaintext
+ * (base64url, 43 chars), while the app now stores sha256 hex (64 lowercase hex
+ * chars) and looks tokens up by hash. Hash any legacy row in place so links
+ * that were already emailed keep working after deploying over an existing DB.
+ */
+function migrateLegacyTokens(): void {
+  const legacyTables = [
+    ["email_tokens", "id"],
+    ["invitations", "token"],
+  ] as const;
+  for (const [table, col] of legacyTables) {
+    const legacy = q
+      .prepare(`SELECT ${col} AS value FROM ${table} WHERE length(${col}) <> 64 OR ${col} GLOB '*[^0-9a-f]*'`)
+      .all() as Array<{ value: string }>;
+    if (legacy.length === 0) continue;
+    tx(() => {
+      for (const row of legacy) {
+        q.prepare(`UPDATE ${table} SET ${col} = ? WHERE ${col} = ?`).run(sha256Hex(row.value), row.value);
+      }
+    });
+  }
 }

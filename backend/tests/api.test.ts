@@ -375,6 +375,17 @@ describe("Analytics hardening", () => {
     const good = await s.agent.get("/api/v1/analytics/overview?period=7d");
     expect(good.status).toBe(200);
   });
+
+  it("rejects inverted and oversized from/to ranges", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("range"));
+    const inverted = await s.agent.get("/api/v1/analytics/overview?from=2025-06-01T00:00:00Z&to=2025-05-01T00:00:00Z");
+    expect(inverted.status).toBe(422);
+    const oversized = await s.agent.get("/api/v1/analytics/overview?from=2020-01-01T00:00:00Z&to=2020-12-31T00:00:00Z");
+    expect(oversized.status).toBe(422);
+    const ok = await s.agent.get("/api/v1/analytics/overview?from=2025-06-01T00:00:00Z&to=2025-06-30T00:00:00Z");
+    expect(ok.status).toBe(200);
+  });
 });
 
 describe("API tokens", () => {
@@ -561,5 +572,244 @@ describe("Workspaces", () => {
     const list = await s.agent.get("/api/v1/workspaces");
     expect(list.status).toBe(200);
     expect(list.body.workspaces.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("Legacy token migration (upgrade path)", () => {
+  it("hashes plaintext email tokens so old verification links keep working", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("legacy-mail");
+    await s.agent
+      .post("/api/v1/auth/register")
+      .set("X-CSRF-Token", s.token)
+      .send({ name: "Legacy User", email, password: PASSWORD })
+      .expect(201);
+    const user = db.q.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number };
+    // Simulate a row written by the pre-hashing code: plaintext bearer token.
+    const plain = "legacy-verify-token-" + userSeq + "-" + Date.now();
+    db.q.prepare("INSERT INTO email_tokens (id, user_id, kind, expires_at) VALUES (?, ?, 'verify', ?)").run(
+      plain,
+      user.id,
+      new Date(Date.now() + 3600_000).toISOString(),
+    );
+
+    migrate();
+
+    expect(db.q.prepare("SELECT id FROM email_tokens WHERE id = ?").get(sha256Hex(plain))).toBeDefined();
+    expect(db.q.prepare("SELECT id FROM email_tokens WHERE id = ?").get(plain)).toBeUndefined();
+
+    // The link that was already emailed still verifies end-to-end.
+    const res = await s.agent.post("/api/v1/auth/verify-email").set("X-CSRF-Token", s.token).send({ token: plain });
+    expect(res.status).toBe(200);
+  });
+
+  it("hashes plaintext invitation tokens so old invite links keep working", async () => {
+    const owner = await newSession();
+    await registerVerifiedLogin(owner, uniqueEmail("legacy-owner"));
+    const ws = await owner.agent.post("/api/v1/workspaces").set("X-CSRF-Token", owner.token).send({ name: "Legacy WS" }).expect(201);
+    const wsId = ws.body.workspace.id as number;
+    const inviteEmail = uniqueEmail("legacy-invitee");
+    await owner.agent
+      .post("/api/v1/workspaces/" + wsId + "/invitations")
+      .set("X-CSRF-Token", owner.token)
+      .send({ email: inviteEmail, role: "viewer" })
+      .expect(201);
+
+    const plain = "legacy-invite-token-" + userSeq + "-" + Date.now();
+    db.q.prepare("UPDATE invitations SET token = ? WHERE workspace_id = ?").run(plain, wsId);
+
+    migrate();
+
+    expect(db.q.prepare("SELECT token FROM invitations WHERE token = ?").get(sha256Hex(plain))).toBeDefined();
+    expect(db.q.prepare("SELECT token FROM invitations WHERE token = ?").get(plain)).toBeUndefined();
+
+    // The emailed link still works: the invitee registers and accepts with the
+    // old plaintext token.
+    const invitee = await newSession();
+    await invitee.agent
+      .post("/api/v1/auth/register")
+      .set("X-CSRF-Token", invitee.token)
+      .send({ name: "Invitee", email: inviteEmail, password: PASSWORD })
+      .expect(201);
+    // Registration no longer creates a session (anti-enumeration change), so
+    // the invitee logs in before accepting.
+    await invitee.agent.post("/api/v1/auth/login").set("X-CSRF-Token", invitee.token).send({ email: inviteEmail, password: PASSWORD }).expect(200);
+    const accept = await invitee.agent
+      .post("/api/v1/workspaces/invitations/accept")
+      .set("X-CSRF-Token", invitee.token)
+      .send({ token: plain });
+    expect(accept.status).toBe(200);
+  });
+});
+
+describe("Housekeeping scheduler", () => {
+  const daysAgo = (d: number) => new Date(Date.now() - d * 86400_000).toISOString();
+  const daysAhead = (d: number) => new Date(Date.now() + d * 86400_000).toISOString();
+
+  function insertUser(): number {
+    const info = db.q
+      .prepare("INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)")
+      .run(uniqueEmail("hk"), "HK User", "x");
+    return Number(info.lastInsertRowid);
+  }
+
+  const opts = {
+    analyticsRetentionDays: 180,
+    sessionPurgeDays: 30,
+    tokenPurgeDays: 7,
+    deliveryPurgeDays: 90,
+    auditPurgeDays: 365,
+    purgeBatch: 1000,
+    heavyIntervalMs: 0,
+  };
+
+  it("purges revoked sessions by revoked_at, not expires_at", async () => {
+    const { runPurges } = await import("../src/housekeeping.js");
+    const uid = insertUser();
+    const mk = (id: string, revoked: string | null, expires: string) =>
+      db.q
+        .prepare(
+          "INSERT INTO sessions (id, user_id, expires_at, revoked_at, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .run(id, uid, expires, revoked, daysAgo(40), daysAgo(40));
+    mk("s-revoked-old", daysAgo(31), daysAhead(10)); // old query kept this: expires_at in the future
+    mk("s-expired-old", null, daysAgo(31));
+    mk("s-revoked-recent", daysAgo(5), daysAhead(10));
+    mk("s-active", null, daysAhead(10));
+
+    runPurges(opts);
+
+    const rows = db.q.prepare("SELECT id FROM sessions WHERE user_id = ?").all(uid) as Array<{ id: string }>;
+    expect(new Set(rows.map((r) => r.id))).toEqual(new Set(["s-revoked-recent", "s-active"]));
+  });
+
+  it("purges deliveries and audit events in bounded batches", async () => {
+    const { runPurges } = await import("../src/housekeeping.js");
+    const uid = insertUser();
+    const wsId = Number(
+      db.q.prepare("INSERT INTO workspaces (name, slug, owner_user_id) VALUES ('HK', ?, ?)").run("hk-ws-" + userSeq, uid)
+        .lastInsertRowid,
+    );
+    const whId = Number(
+      db.q
+        .prepare("INSERT INTO webhooks (workspace_id, url, secret, events) VALUES (?, 'https://example.com/h', 'sec', '[]')")
+        .run(wsId).lastInsertRowid,
+    );
+    for (let i = 0; i < 25; i++) {
+      db.q
+        .prepare(
+          "INSERT INTO webhook_deliveries (webhook_id, event, event_id, payload, status, delivered_at) VALUES (?, 'link.created', ?, '{}', 'success', ?)",
+        )
+        .run(whId, "ev-" + i, daysAgo(100));
+      db.q.prepare("INSERT INTO audit_events (user_id, action, created_at) VALUES (?, 'test.action', ?)").run(uid, daysAgo(400));
+    }
+
+    runPurges({ ...opts, purgeBatch: 10 });
+
+    expect((db.q.prepare("SELECT COUNT(*) AS c FROM webhook_deliveries").get() as { c: number }).c).toBe(0);
+    // Only the rows this test inserted (400 days old) must be gone; audit rows
+    // written by earlier tests have recent timestamps and stay.
+    expect((db.q.prepare("SELECT COUNT(*) AS c FROM audit_events WHERE user_id = ?").get(uid) as { c: number }).c).toBe(0);
+  });
+
+  it("runs light jobs on every tick but throttles the heavy purge pass", async () => {
+    const { runHousekeeping, runPurges } = await import("../src/housekeeping.js");
+    const uid = insertUser();
+    const wsId = Number(
+      db.q.prepare("INSERT INTO workspaces (name, slug, owner_user_id) VALUES ('HKS', ?, ?)").run("hks-ws-" + userSeq, uid)
+        .lastInsertRowid,
+    );
+    const linkId = Number(
+      db.q
+        .prepare(
+          "INSERT INTO links (workspace_id, created_by, alias, destination, state, scheduled_at) VALUES (?, ?, ?, 'https://example.com/', 'scheduled', ?)",
+        )
+        .run(wsId, uid, "hk-sched-" + userSeq, daysAgo(1)).lastInsertRowid,
+    );
+    const whId = Number(
+      db.q
+        .prepare("INSERT INTO webhooks (workspace_id, url, secret, events) VALUES (?, 'https://example.com/h', 'sec', '[]')")
+        .run(wsId).lastInsertRowid,
+    );
+
+    const throttled = { ...opts, heavyIntervalMs: 60_000 };
+    runHousekeeping(throttled); // first call: light jobs + one heavy pass
+    expect((db.q.prepare("SELECT state FROM links WHERE id = ?").get(linkId) as { state: string }).state).toBe("active");
+
+    // Rows inserted after the heavy pass must survive the next tick (throttle).
+    for (let i = 0; i < 5; i++) {
+      db.q
+        .prepare(
+          "INSERT INTO webhook_deliveries (webhook_id, event, event_id, payload, status, delivered_at) VALUES (?, 'link.created', ?, '{}', 'success', ?)",
+        )
+        .run(whId, "th-" + i, daysAgo(100));
+    }
+    runHousekeeping(throttled); // heavy pass is throttled
+    expect((db.q.prepare("SELECT COUNT(*) AS c FROM webhook_deliveries WHERE webhook_id = ?").get(whId) as { c: number }).c).toBe(5);
+
+    // A direct purge call still cleans them up.
+    runPurges(opts);
+    expect((db.q.prepare("SELECT COUNT(*) AS c FROM webhook_deliveries WHERE webhook_id = ?").get(whId) as { c: number }).c).toBe(0);
+  });
+});
+
+describe("API token hardening", () => {
+  it("throttles api_tokens.last_used_at to one write per minute", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("tokthr"));
+    const created = await s.agent
+      .post("/api/v1/tokens")
+      .set("X-CSRF-Token", s.token)
+      .send({ name: "Throttle", scopes: ["analytics:read"] })
+      .expect(201);
+    const plain = created.body.plainToken as string;
+    const tokenId = created.body.token.id as number;
+    const lastUsed = () =>
+      (db.q.prepare("SELECT last_used_at FROM api_tokens WHERE id = ?").get(tokenId) as { last_used_at: string | null })
+        .last_used_at;
+
+    const first = await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain);
+    expect(first.status).toBe(200);
+    const t1 = lastUsed();
+    expect(t1).not.toBeNull();
+
+    const second = await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain);
+    expect(second.status).toBe(200);
+    expect(lastUsed()).toBe(t1); // no write on the second request
+
+    db.q.prepare("UPDATE api_tokens SET last_used_at = ? WHERE id = ?").run(
+      new Date(Date.now() - 120_000).toISOString(),
+      tokenId,
+    );
+    await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain).expect(200);
+    expect(lastUsed()).not.toBe(t1);
+  });
+});
+
+describe("Config hardening", () => {
+  it("rejects invalid booleans and integers instead of misinterpreting them", async () => {
+    const { bool, intEnv } = await import("../src/config.js");
+    // Case-insensitive: "TRUE" normalizes to "true" and is valid; a typo is not.
+    expect(bool("TRUE", false)).toBe(true);
+    expect(bool(" 1 ", false)).toBe(true);
+    expect(() => bool("ture", false)).toThrow();
+    expect(() => bool("yes please", false)).toThrow();
+    expect(bool("true", false)).toBe(true);
+    expect(bool("YES", false)).toBe(true);
+    expect(bool("0", true)).toBe(false);
+    expect(bool(undefined, true)).toBe(true);
+
+    process.env.UVH_TEST_INT = "hola";
+    expect(() => intEnv("UVH_TEST_INT", 30)).toThrow();
+    process.env.UVH_TEST_INT = "-1";
+    expect(() => intEnv("UVH_TEST_INT", 30)).toThrow();
+    process.env.UVH_TEST_INT = "99999999999999999999";
+    expect(() => intEnv("UVH_TEST_INT", 30)).toThrow();
+    process.env.UVH_TEST_INT = "0";
+    expect(() => intEnv("UVH_TEST_INT", 30, { min: 1 })).toThrow();
+    process.env.UVH_TEST_INT = "30";
+    expect(intEnv("UVH_TEST_INT", 7)).toBe(30);
+    delete process.env.UVH_TEST_INT;
+    expect(intEnv("UVH_TEST_INT", 30, { min: 1 })).toBe(30);
   });
 });
