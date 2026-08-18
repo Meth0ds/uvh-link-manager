@@ -1,6 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { db, q } from "../db.js";
-import { assertSafeUrl } from "../util/ssrf.js";
+import { assertSafeUrl, safeFetch } from "../util/ssrf.js";
 import { decryptAtRest } from "../util/crypto.js";
 
 export const WEBHOOK_EVENTS = [
@@ -51,11 +51,12 @@ async function attemptDelivery(deliveryId: number, attempt: number): Promise<voi
 
   try {
     // SSRF guard: webhook URLs are user-provided and fetched server-side.
-    await assertSafeUrl(wh.url);
+    // assertSafeUrl validates scheme/port/credentials and resolves the host;
+    // safeFetch re-validates every resolved IP at connect time (closing the
+    // DNS-rebinding TOCTOU) and never follows redirects.
+    const url = await assertSafeUrl(wh.url);
     const signature = sign(delivery.payload, decryptAtRest(wh.secret));
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5_000);
-    const res = await fetch(wh.url, {
+    const res = await safeFetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -64,16 +65,14 @@ async function attemptDelivery(deliveryId: number, attempt: number): Promise<voi
         "X-UVH-Event-Id": (JSON.parse(delivery.payload) as { event_id: string }).event_id,
       },
       body: delivery.payload,
-      signal: controller.signal,
-      redirect: "manual", // never follow user-controlled redirects
+      timeoutMs: 5_000,
     });
-    clearTimeout(timer);
-    if (res.status >= 200 && res.status < 300) {
+    if (res.ok) {
       q.prepare(`UPDATE webhook_deliveries SET status = 'success', delivered_at = ?, attempts = attempts + 1 WHERE id = ?`).run(
         new Date().toISOString(), deliveryId,
       );
     } else {
-      await scheduleRetry(deliveryId, attempt, `HTTP ${res.status}`);
+      await scheduleRetry(deliveryId, attempt, res.status !== null ? `HTTP ${res.status}` : "Error de red");
     }
   } catch (err) {
     await scheduleRetry(deliveryId, attempt, err instanceof Error ? err.message : "Error de red");

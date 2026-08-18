@@ -60,6 +60,13 @@ export function createApp() {
   app.use(cookieParser());
   app.use(hydrateSession);
 
+  // Never cache API responses: they carry per-user data and CSRF/session
+  // cookies, and a stale cached redirect/response could leak across users.
+  app.use("/api/v1", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+
   // CSRF for API + public mutating forms (never on the redirect hot path).
   app.use("/api/v1", csrfProtection);
 

@@ -312,6 +312,14 @@ export function migrate() {
   CREATE INDEX IF NOT EXISTS idx_deliveries_success_delivered ON webhook_deliveries(delivered_at) WHERE status = 'success';
   `);
 
+  // api_tokens.created_by was added later than the original schema; SQLite
+  // has no ALTER TABLE ... IF NOT EXISTS, so tolerate the duplicate-column error.
+  try {
+    db.exec(`ALTER TABLE api_tokens ADD COLUMN created_by INTEGER NULL REFERENCES users(id) ON DELETE SET NULL`);
+  } catch {
+    /* column already exists */
+  }
+
   // Data migrations (idempotent).
   migrateLegacyTokens();
 }

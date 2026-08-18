@@ -1,28 +1,39 @@
 /**
  * Lightweight in-process queue. The redirect response never waits on it.
- * Replaces Laravel queues in this Node runtime; documented in docs/deployment.md.
+ * Bounded (sheds load past a backlog cap) and yields to the event loop
+ * periodically so a click flood cannot stall request handling.
  */
 type Job = () => void | Promise<void>;
 
+const MAX_QUEUE = 10_000;
 const queue: Job[] = [];
+let head = 0;
 let draining = false;
 
 export function enqueue(job: Job): void {
+  if (queue.length - head >= MAX_QUEUE) return; // shed load instead of growing unbounded
   queue.push(job);
-  drain();
+  void drain();
 }
 
 async function drain(): Promise<void> {
   if (draining) return;
   draining = true;
-  while (queue.length > 0) {
-    const job = queue.shift();
-    if (!job) break;
-    try {
-      await job();
-    } catch (err) {
-      console.error("[queue] job failed", err);
+  try {
+    while (head < queue.length) {
+      const job = queue[head++]!;
+      try {
+        await job();
+      } catch (err) {
+        console.error("[queue] job failed", err);
+      }
+      if ((head & 31) === 0) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
     }
+    queue.length = 0;
+    head = 0;
+  } finally {
+    draining = false;
   }
-  draining = false;
 }

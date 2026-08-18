@@ -16,9 +16,12 @@ export function reputationProviderConfigured(): boolean {
 }
 
 export function getReputationStatus(): { externalAnalysis: boolean; provider: string | null } {
+  const configured = reputationProviderConfigured();
   return {
-    externalAnalysis: reputationProviderConfigured(),
-    provider: reputationProviderConfigured() ? (process.env.REPUTATION_PROVIDER_URL ?? null) : null,
+    externalAnalysis: configured,
+    // Never expose the raw provider URL on a public endpoint: it may embed
+    // credentials or reveal internal infrastructure.
+    provider: configured ? "configured" : null,
   };
 }
 
@@ -48,6 +51,13 @@ abuseRouter.post("/report", reportLimiter, (req, res) => {
     linkId = row ? (row as { id: number }).id : null;
   }
   if (!linkId) {
+    res.status(404).json({ error: "Enlace no encontrado" });
+    return;
+  }
+  // The id must reference an existing, non-deleted link; otherwise the insert
+  // would trip the FK and surface as an unhandled 500.
+  const link = q.prepare(`SELECT id FROM links WHERE id = ? AND deleted_at IS NULL`).get(linkId);
+  if (!link) {
     res.status(404).json({ error: "Enlace no encontrado" });
     return;
   }

@@ -104,6 +104,33 @@ authRouter.post("/register", registerLimiter, async (req: AuthedRequest, res) =>
 const mfaChallenges = new Map<string, { userId: number; expiresAt: number }>();
 const MFA_CHALLENGE_TTL = 5 * 60_000;
 
+// Per-account attempt throttling for MFA/recovery codes: the IP limiter is
+// the first line, but a per-user cap also stops distributed attempts against
+// one account.
+const mfaAttempts = new Map<number, { count: number; windowStart: number }>();
+const MFA_MAX_ATTEMPTS = 10;
+const MFA_ATTEMPT_WINDOW_MS = 15 * 60_000;
+
+function mfaTooManyAttempts(userId: number): boolean {
+  const a = mfaAttempts.get(userId);
+  if (!a) return false;
+  if (Date.now() - a.windowStart > MFA_ATTEMPT_WINDOW_MS) {
+    mfaAttempts.delete(userId);
+    return false;
+  }
+  return a.count >= MFA_MAX_ATTEMPTS;
+}
+
+function mfaRecordFailure(userId: number): void {
+  const now = Date.now();
+  const a = mfaAttempts.get(userId);
+  if (!a || now - a.windowStart > MFA_ATTEMPT_WINDOW_MS) {
+    mfaAttempts.set(userId, { count: 1, windowStart: now });
+  } else {
+    a.count += 1;
+  }
+}
+
 /** Bound the in-memory challenge map: drop expired entries on every insert. */
 function pruneMfaChallenges(): void {
   const now = Date.now();
@@ -152,18 +179,24 @@ authRouter.post("/mfa/verify", authLimiter, async (req: AuthedRequest, res) => {
     res.status(401).json({ error: "Sesión MFA caducada" });
     return;
   }
-  const user = q.prepare(`SELECT * FROM users WHERE id = ?`).get(ch.userId) as
+  const user = q.prepare(`SELECT * FROM users WHERE id = ? AND deleted_at IS NULL`).get(ch.userId) as
     | { id: number; email: string; name: string; is_admin: number; email_verified_at: string | null; mfa_enabled: number; mfa_secret: string | null }
     | undefined;
   if (!user?.mfa_secret) {
     res.status(401).json({ error: "MFA no configurado" });
     return;
   }
+  if (mfaTooManyAttempts(user.id)) {
+    res.status(429).json({ error: "Demasiados intentos. Espera unos minutos." });
+    return;
+  }
   const valid = authenticator.check(parsed.data.code, decryptAtRest(user.mfa_secret));
   if (!valid) {
+    mfaRecordFailure(user.id);
     res.status(401).json({ error: "Código incorrecto" });
     return;
   }
+  mfaAttempts.delete(user.id);
   mfaChallenges.delete(parsed.data.challenge);
   const session = createSession(user.id, req);
   setSessionCookie(res, session);
@@ -177,16 +210,24 @@ authRouter.post("/mfa/recovery", authLimiter, async (req: AuthedRequest, res) =>
     return;
   }
   const user = findUserByEmail(parsed.data.email);
+  // Uniform response: revealing that the account exists (or has MFA enabled)
+  // would break the anti-enumeration policy used everywhere else.
   if (!user || user.mfa_enabled !== 1 || !user.recovery_codes) {
-    res.status(401).json({ error: "No se puede usar un código de recuperación" });
+    res.status(401).json({ error: "Código de recuperación incorrecto" });
+    return;
+  }
+  if (mfaTooManyAttempts(user.id)) {
+    res.status(429).json({ error: "Demasiados intentos. Espera unos minutos." });
     return;
   }
   const codes = JSON.parse(user.recovery_codes) as string[];
   const idx = codes.indexOf(sha256Hex(parsed.data.code.trim().toUpperCase()));
   if (idx === -1) {
+    mfaRecordFailure(user.id);
     res.status(401).json({ error: "Código de recuperación incorrecto" });
     return;
   }
+  mfaAttempts.delete(user.id);
   codes.splice(idx, 1);
   q.prepare(`UPDATE users SET recovery_codes = ? WHERE id = ?`).run(JSON.stringify(codes), user.id);
   audit({ userId: user.id }, "auth.mfa_recovery", "user", user.id);
@@ -381,7 +422,9 @@ authRouter.post("/mfa/enable", requireAuth, async (req: AuthedRequest, res) => {
     res.status(403).json({ error: "Código incorrecto" });
     return;
   }
-  const recoveryCodes = Array.from({ length: 10 }, () => randomToken(5).toUpperCase().slice(0, 10));
+  // 80-bit codes (14 base64url chars): recovery codes are a passwordless
+  // login factor, so they must be too strong for offline/online guessing.
+  const recoveryCodes = Array.from({ length: 10 }, () => randomToken(10));
   // Store only hashes of the one-time recovery codes; the plaintext is shown once.
   q.prepare(`UPDATE users SET mfa_enabled = 1, recovery_codes = ?, updated_at = ? WHERE id = ?`).run(
     JSON.stringify(recoveryCodes.map((c) => sha256Hex(c))), new Date().toISOString(), req.user!.id,

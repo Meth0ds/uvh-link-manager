@@ -30,7 +30,7 @@ const ruleSchema = z.object({
 const linkSchema = z.object({
   destination: z.string().min(1).max(2048),
   alias: z.string().max(64).nullable().optional(),
-  domainId: z.number().int().nullable().optional(),
+  domainId: z.number().int().positive().nullable().optional(),
   fallbackDestination: z.string().max(2048).nullable().optional(),
   password: z.string().max(256).nullable().optional(),
   maxClicks: z.number().int().min(1).max(10_000_000).nullable().optional(),
@@ -155,7 +155,7 @@ linksRouter.get("/", requireVerified, requireWorkspace("viewer"), (req: AuthedRe
 
 // Alias availability check (backend enforced)
 linksRouter.post("/check-alias", requireVerified, requireWorkspace("viewer"), (req: AuthedRequest, res) => {
-  const parsed = z.object({ alias: z.string().min(1).max(64), domainId: z.number().int().nullable().optional() }).safeParse(req.body);
+  const parsed = z.object({ alias: z.string().min(1).max(64), domainId: z.number().int().positive().nullable().optional() }).safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({ error: "Alias inválido" });
     return;
@@ -169,8 +169,19 @@ linksRouter.post("/check-alias", requireVerified, requireWorkspace("viewer"), (r
     res.json({ available: false, reason: "invalid" });
     return;
   }
+  const domainId = parsed.data.domainId ?? null;
+  if (domainId != null) {
+    const workspaceId = res.locals.workspaceId as number;
+    const dom = q.prepare(`SELECT id FROM custom_domains WHERE id = ? AND workspace_id = ? AND state IN ('verified','active')`).get(domainId, workspaceId);
+    if (!dom) {
+      // Domains of other tenants are not our namespace: report unavailable
+      // without leaking cross-tenant alias state.
+      res.json({ available: false, reason: "domain" });
+      return;
+    }
+  }
   const exists = q.prepare(`SELECT id FROM links WHERE domain_id IS ? AND alias = ? AND deleted_at IS NULL`).get(
-    parsed.data.domainId ?? null, alias,
+    domainId, alias,
   );
   res.json({ available: !exists });
 });
@@ -254,6 +265,16 @@ linksRouter.patch("/:id", requireVerified, requireWorkspace("editor"), async (re
     res.status(404).json({ error: "Enlace no encontrado" });
     return;
   }
+  // Moving a link to a custom domain requires owning that domain in THIS
+  // workspace — same guard as creation. Without it, any editor could park
+  // their links on another workspace's verified domain (IDOR/domain abuse).
+  if (body.domainId) {
+    const dom = q.prepare(`SELECT id FROM custom_domains WHERE id = ? AND workspace_id = ? AND state IN ('verified','active')`).get(body.domainId, workspaceId);
+    if (!dom) {
+      res.status(403).json({ error: "Dominio no verificado o sin acceso" });
+      return;
+    }
+  }
   const input: LinkInput = {
     destination: body.destination ?? (current.destination as string),
     alias: body.alias ?? (current.alias as string),
@@ -307,6 +328,12 @@ linksRouter.post("/:id/state", requireVerified, requireWorkspace("editor"), (req
   const link = q.prepare(`SELECT state FROM links WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`).get(id, workspaceId) as { state: string } | undefined;
   if (!link) {
     res.status(404).json({ error: "Enlace no encontrado" });
+    return;
+  }
+  // Blocking is the platform's abuse control (admin area, MFA-gated). Editors
+  // must not be able to block links or to undo an admin block.
+  if ((parsed.data.state === "blocked" || link.state === "blocked") && !req.user!.isAdmin) {
+    res.status(403).json({ error: "Solo un administrador de la plataforma puede bloquear o desbloquear enlaces" });
     return;
   }
   tx(() => {

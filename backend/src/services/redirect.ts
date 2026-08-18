@@ -111,6 +111,9 @@ export function resolveLink(ctx: ResolveContext): RedirectOutcome {
       campaignFromReferrer = null;
     }
   }
+  // The Referer header is attacker-controlled and unbounded; a cap keeps
+  // distinct values from amplifying the metric_rollups JSON blobs.
+  if (campaignFromReferrer) campaignFromReferrer = campaignFromReferrer.slice(0, 100);
   const lang = ctx.acceptLanguage?.split(",")[0]?.split("-")[0]?.toLowerCase() ?? null;
   const country = ctx.country?.toLowerCase() ?? null;
 

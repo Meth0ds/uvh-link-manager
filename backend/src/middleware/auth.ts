@@ -62,7 +62,7 @@ export function hydrateSession(req: AuthedRequest, _res: Response, next: NextFun
       .prepare(
         `SELECT s.id AS session_id, s.expires_at, s.revoked_at, s.last_used_at, u.id, u.email, u.name,
                 u.is_admin, u.email_verified_at, u.mfa_enabled
-         FROM sessions s JOIN users u ON u.id = s.user_id
+         FROM sessions s JOIN users u ON u.id = s.user_id AND u.deleted_at IS NULL
          WHERE s.id = ?`,
       )
       .get(sha256Hex(token)) as

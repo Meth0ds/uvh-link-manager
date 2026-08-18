@@ -813,3 +813,243 @@ describe("Config hardening", () => {
     expect(intEnv("UVH_TEST_INT", 30, { min: 1 })).toBe(30);
   });
 });
+describe("Authorization hardening", () => {
+  it("prevents workspace admins from escalating to owner or managing admins", async () => {
+    const owner = await newSession();
+    await registerVerifiedLogin(owner, uniqueEmail("own"));
+    const ws = await owner.agent.post("/api/v1/workspaces").set("X-CSRF-Token", owner.token).send({ name: "Sec" }).expect(201);
+    const wsId = ws.body.workspace.id as number;
+
+    const adminS = await newSession();
+    const adminEmail = uniqueEmail("adm");
+    await registerVerifiedLogin(adminS, adminEmail);
+    const adminUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(adminEmail) as { id: number }).id;
+
+    const viewerS = await newSession();
+    const viewerEmail = uniqueEmail("vw");
+    await registerVerifiedLogin(viewerS, viewerEmail);
+    const viewerUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(viewerEmail) as { id: number }).id;
+
+    // Owner invites an admin and a viewer via the real invitation flow.
+    const plainA = "inv-admin-" + userSeq + "-" + Date.now();
+    await owner.agent.post("/api/v1/workspaces/" + wsId + "/invitations").set("X-CSRF-Token", owner.token).send({ email: adminEmail, role: "admin" }).expect(201);
+    db.q.prepare("UPDATE invitations SET token = ? WHERE workspace_id = ? AND email = ?").run(sha256Hex(plainA), wsId, adminEmail);
+    await adminS.agent.post("/api/v1/workspaces/invitations/accept").set("X-CSRF-Token", adminS.token).send({ token: plainA }).expect(200);
+
+    const plainV = "inv-viewer-" + userSeq + "-" + Date.now();
+    await owner.agent.post("/api/v1/workspaces/" + wsId + "/invitations").set("X-CSRF-Token", owner.token).send({ email: viewerEmail, role: "viewer" }).expect(201);
+    db.q.prepare("UPDATE invitations SET token = ? WHERE workspace_id = ? AND email = ?").run(sha256Hex(plainV), wsId, viewerEmail);
+    await viewerS.agent.post("/api/v1/workspaces/invitations/accept").set("X-CSRF-Token", viewerS.token).send({ token: plainV }).expect(200);
+
+    const asMember = (session: Session, method: "patch" | "delete", path: string, body?: unknown) =>
+      session.agent[method]("/api/v1/workspaces/" + wsId + path)
+        .set("X-Workspace-Id", String(wsId))
+        .set("X-CSRF-Token", session.token)
+        .send(body as Record<string, unknown>);
+
+    // The admin cannot promote themselves or anyone else to owner…
+    expect((await asMember(adminS, "patch", "/members/" + adminUid, { role: "owner" })).status).toBe(403);
+    expect((await asMember(adminS, "patch", "/members/" + viewerUid, { role: "owner" })).status).toBe(403);
+    // …but can promote a viewer to editor.
+    expect((await asMember(adminS, "patch", "/members/" + viewerUid, { role: "editor" })).status).toBe(200);
+    // The owner can promote the viewer to admin.
+    expect((await asMember(owner, "patch", "/members/" + viewerUid, { role: "admin" })).status).toBe(200);
+    // The admin cannot demote or remove another admin (owner-only power).
+    expect((await asMember(adminS, "patch", "/members/" + viewerUid, { role: "viewer" })).status).toBe(403);
+    expect((await asMember(adminS, "delete", "/members/" + viewerUid)).status).toBe(403);
+    // The owner still can.
+    expect((await asMember(owner, "delete", "/members/" + viewerUid)).status).toBe(200);
+  });
+
+  it("rejects moving a link to another workspace's custom domain", async () => {
+    const a = await newSession();
+    const aEmail = uniqueEmail("dom-a");
+    await registerVerifiedLogin(a, aEmail);
+    const created = await createLink(a, { destination: "https://example.com/a", alias: "dommove" });
+    const linkId = created.body.link.id as number;
+
+    const b = await newSession();
+    const bEmail = uniqueEmail("dom-b");
+    await registerVerifiedLogin(b, bEmail);
+    const bUser = db.q.prepare("SELECT id FROM users WHERE email = ?").get(bEmail) as { id: number };
+    const bWs = db.q.prepare("SELECT workspace_id FROM memberships WHERE user_id = ? ORDER BY id LIMIT 1").get(bUser.id) as { workspace_id: number };
+    const bDom = db.q.prepare("INSERT INTO custom_domains (workspace_id, domain, verification_token, state) VALUES (?, 'b.example.com', 'tok', 'active')").run(bWs.workspace_id);
+
+    const res = await a.agent.patch("/api/v1/links/" + linkId).set("X-CSRF-Token", a.token).send({ domainId: Number(bDom.lastInsertRowid) });
+    expect(res.status).toBe(403);
+    expect((db.q.prepare("SELECT domain_id FROM links WHERE id = ?").get(linkId) as { domain_id: number | null }).domain_id).toBeNull();
+
+    // The user's own workspace domain still works.
+    const aUser = db.q.prepare("SELECT id FROM users WHERE email = ?").get(aEmail) as { id: number };
+    const aWs = db.q.prepare("SELECT workspace_id FROM memberships WHERE user_id = ? ORDER BY id LIMIT 1").get(aUser.id) as { workspace_id: number };
+    const aDom = db.q.prepare("INSERT INTO custom_domains (workspace_id, domain, verification_token, state) VALUES (?, 'a.example.com', 'tok', 'active')").run(aWs.workspace_id);
+    const ok = await a.agent.patch("/api/v1/links/" + linkId).set("X-CSRF-Token", a.token).send({ domainId: Number(aDom.lastInsertRowid) });
+    expect(ok.status).toBe(200);
+  });
+});
+describe("SSRF IP classification", () => {
+  it("classifies IPv4-mapped, NAT64, 6to4 and Teredo addresses as private", async () => {
+    const { isPrivateIp } = await import("../src/util/ssrf.js");
+    const priv = [
+      "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:169.254.169.254", "::ffff:10.0.0.1",
+      "::ffff:192.168.1.1", "0:0:0:0:0:ffff:7f00:1", "::", "::1", "fc00::1", "fe80::1",
+      "64:ff9b::a00:1", "2002:7f00:1::", "2002:a9fe:a9fe::", "2001:0000:0000:0000:0000:0000:f5ff:fffe",
+      "127.0.0.1", "169.254.169.254", "100.64.0.1",
+    ];
+    for (const ip of priv) expect(isPrivateIp(ip), ip).toBe(true);
+    const pub = ["::ffff:8.8.8.8", "64:ff9b::808:808", "2002:808:808::", "8.8.8.8", "2606:4700:4700::1111", "2001:4860:4860::8888"];
+    for (const ip of pub) expect(isPrivateIp(ip), ip).toBe(false);
+  });
+});
+
+describe("Abuse reporting", () => {
+  it("rejects reports for non-existent links with 404 instead of 500", async () => {
+    const s = await newSession();
+    const res = await s.agent.post("/api/v1/report").set("X-CSRF-Token", s.token).send({ linkId: 999999999, reason: "spam" });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("Blocked accounts", () => {
+  it("existing sessions stop working once the user is blocked (deleted_at)", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("blocked");
+    await registerVerifiedLogin(s, email);
+    expect((await s.agent.get("/api/v1/auth/me")).status).toBe(200);
+    const user = db.q.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number };
+    db.q.prepare("UPDATE users SET deleted_at = ? WHERE id = ?").run(new Date().toISOString(), user.id);
+    expect((await s.agent.get("/api/v1/auth/me")).status).toBe(401);
+  });
+});
+
+describe("Invitation roles", () => {
+  it("only owners can invite new admins", async () => {
+    const owner = await newSession();
+    await registerVerifiedLogin(owner, uniqueEmail("inv-own"));
+    const ws = await owner.agent.post("/api/v1/workspaces").set("X-CSRF-Token", owner.token).send({ name: "InvSec" }).expect(201);
+    const wsId = ws.body.workspace.id as number;
+
+    const adminS = await newSession();
+    const adminEmail = uniqueEmail("inv-adm");
+    await registerVerifiedLogin(adminS, adminEmail);
+    const plain = "inv-admin2-" + userSeq + "-" + Date.now();
+    await owner.agent.post("/api/v1/workspaces/" + wsId + "/invitations").set("X-CSRF-Token", owner.token).send({ email: adminEmail, role: "admin" }).expect(201);
+    db.q.prepare("UPDATE invitations SET token = ? WHERE workspace_id = ? AND email = ?").run(sha256Hex(plain), wsId, adminEmail);
+    await adminS.agent.post("/api/v1/workspaces/invitations/accept").set("X-CSRF-Token", adminS.token).send({ token: plain }).expect(200);
+
+    const denied = await adminS.agent
+      .post("/api/v1/workspaces/" + wsId + "/invitations")
+      .set("X-Workspace-Id", String(wsId))
+      .set("X-CSRF-Token", adminS.token)
+      .send({ email: uniqueEmail("inv-adm2"), role: "admin" });
+    expect(denied.status).toBe(403);
+
+    const allowed = await adminS.agent
+      .post("/api/v1/workspaces/" + wsId + "/invitations")
+      .set("X-Workspace-Id", String(wsId))
+      .set("X-CSRF-Token", adminS.token)
+      .send({ email: uniqueEmail("inv-vw2"), role: "viewer" });
+    expect(allowed.status).toBe(201);
+  });
+});
+describe("Abuse controls", () => {
+  it("editors cannot block or unblock links (platform-admin only)", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("abuse");
+    await registerVerifiedLogin(s, email);
+    const created = await createLink(s, { destination: "https://example.com/ab", alias: "abusetest" });
+    const linkId = created.body.link.id as number;
+
+    // Editors cannot block.
+    const tryBlock = await s.agent.post("/api/v1/links/" + linkId + "/state").set("X-CSRF-Token", s.token).send({ state: "blocked" });
+    expect(tryBlock.status).toBe(403);
+
+    // Simulate an admin block, then the editor cannot unblock either.
+    db.q.prepare("UPDATE links SET state = 'blocked' WHERE id = ?").run(linkId);
+    const tryUnblock = await s.agent.post("/api/v1/links/" + linkId + "/state").set("X-CSRF-Token", s.token).send({ state: "active" });
+    expect(tryUnblock.status).toBe(403);
+
+    // A platform admin can.
+    db.q.prepare("UPDATE users SET is_admin = 1 WHERE id = (SELECT id FROM users WHERE email = ?)").run(email);
+    const ok = await s.agent.post("/api/v1/links/" + linkId + "/state").set("X-CSRF-Token", s.token).send({ state: "active" });
+    expect(ok.status).toBe(200);
+  });
+
+  it("does not leak cross-tenant alias availability via check-alias", async () => {
+    const a = await newSession();
+    await registerVerifiedLogin(a, uniqueEmail("ca-a"));
+    const b = await newSession();
+    const bEmail = uniqueEmail("ca-b");
+    await registerVerifiedLogin(b, bEmail);
+    const bUser = db.q.prepare("SELECT id FROM users WHERE email = ?").get(bEmail) as { id: number };
+    const bWs = db.q.prepare("SELECT workspace_id FROM memberships WHERE user_id = ? ORDER BY id LIMIT 1").get(bUser.id) as { workspace_id: number };
+    const dom = db.q.prepare("INSERT INTO custom_domains (workspace_id, domain, verification_token, state) VALUES (?, 'c.example.com', 'tok', 'active')").run(bWs.workspace_id);
+
+    const res = await a.agent.post("/api/v1/links/check-alias").set("X-CSRF-Token", a.token).send({ alias: "ca-secret", domainId: Number(dom.lastInsertRowid) });
+    expect(res.status).toBe(200);
+    expect(res.body.available).toBe(false);
+  });
+
+  it("rejects domainId = 0 when creating a link", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("domzero"));
+    const res = await createLink(s, { destination: "https://example.com/z", domainId: 0 });
+    expect(res.status).toBe(422);
+  });
+
+  it("revokes the user's API tokens when an admin blocks them", async () => {
+    const adminS = await newSession();
+    const adminEmail = uniqueEmail("padmin");
+    await registerVerifiedLogin(adminS, adminEmail);
+    const adminUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(adminEmail) as { id: number }).id;
+    db.q.prepare("UPDATE users SET is_admin = 1, mfa_enabled = 1 WHERE id = ?").run(adminUid);
+
+    const victim = await newSession();
+    const victimEmail = uniqueEmail("victim");
+    await registerVerifiedLogin(victim, victimEmail);
+    const created = await victim.agent.post("/api/v1/tokens").set("X-CSRF-Token", victim.token).send({ name: "Tok", scopes: ["analytics:read"] }).expect(201);
+    const plain = created.body.plainToken as string;
+    expect((await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain)).status).toBe(200);
+
+    const victimUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(victimEmail) as { id: number }).id;
+    const block = await adminS.agent.patch("/api/v1/admin/users/" + victimUid).set("X-CSRF-Token", adminS.token).send({ blocked: true });
+    expect(block.status).toBe(200);
+
+    expect((await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain)).status).toBe(401);
+  });
+
+  it("keeps at least one active platform admin", async () => {
+    const adminS = await newSession();
+    const adminEmail = uniqueEmail("lastadm");
+    await registerVerifiedLogin(adminS, adminEmail);
+    const adminUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(adminEmail) as { id: number }).id;
+    // Make this the ONLY active admin so the guard has to kick in.
+    db.q.prepare("UPDATE users SET is_admin = 0").run();
+    db.q.prepare("UPDATE users SET is_admin = 1, mfa_enabled = 1 WHERE id = ?").run(adminUid);
+
+    const res = await adminS.agent.patch("/api/v1/admin/users/" + adminUid).set("X-CSRF-Token", adminS.token).send({ isAdmin: false });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns a uniform response from /mfa/recovery (no account enumeration)", async () => {
+    const s = await newSession();
+    const ghost = await s.agent.post("/api/v1/auth/mfa/recovery").set("X-CSRF-Token", s.token).send({ email: "ghost-nonexistent@example.com", code: "AAAA-AAAA" });
+    const real = await newSession();
+    const email = uniqueEmail("nomfa");
+    await registerVerifiedLogin(real, email);
+    const res = await real.agent.post("/api/v1/auth/mfa/recovery").set("X-CSRF-Token", real.token).send({ email, code: "AAAA-AAAA" });
+    expect(ghost.status).toBe(401);
+    expect(res.status).toBe(401);
+    expect(ghost.body).toEqual(res.body);
+  });
+
+  it("requires a verified account to create workspaces and invitations", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("unver");
+    await s.agent.post("/api/v1/auth/register").set("X-CSRF-Token", s.token).send({ name: "Unverified", email, password: PASSWORD }).expect(201);
+    // Login works without verification; the verified-only routes must reject.
+    await s.agent.post("/api/v1/auth/login").set("X-CSRF-Token", s.token).send({ email, password: PASSWORD }).expect(200);
+    const ws = await s.agent.post("/api/v1/workspaces").set("X-CSRF-Token", s.token).send({ name: "NoVer" });
+    expect(ws.status).toBe(403);
+  });
+});

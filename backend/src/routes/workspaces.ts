@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, q, tx } from "../db.js";
 import { config } from "../config.js";
-import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
+import { requireAuth, requireVerified, type AuthedRequest } from "../middleware/auth.js";
 import { getMembership, roleAtLeast, ROLE_ORDER, type Role } from "../workspace.js";
 import { audit } from "../util/audit.js";
 import { randomToken, sha256Hex } from "../util/ids.js";
@@ -44,9 +44,12 @@ workspacesRouter.get("/", (req: AuthedRequest, res) => {
   res.json({ workspaces: rows.map((r) => workspaceDto(r, r.role as string)) });
 });
 
-// Create workspace
-workspacesRouter.post("/", (req: AuthedRequest, res) => {
-  const parsed = z.object({ name: z.string().trim().min(2).max(80) }).safeParse(req.body);
+// Create workspace — verified users only: unverified accounts must not be
+// able to farm workspaces (and invitations) freely.
+workspacesRouter.post("/", requireVerified, (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({ name: z.string().trim().min(2).max(80).regex(/^[^\u0000-\u001f\u007f]+$/, "El nombre contiene caracteres no permitidos") })
+    .safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({ error: "Nombre inválido" });
     return;
@@ -88,7 +91,9 @@ workspacesRouter.patch("/:id", (req: AuthedRequest, res) => {
     res.status(403).json({ error: "Permisos insuficientes" });
     return;
   }
-  const parsed = z.object({ name: z.string().trim().min(2).max(80) }).safeParse(req.body);
+  const parsed = z
+    .object({ name: z.string().trim().min(2).max(80).regex(/^[^\u0000-\u001f\u007f]+$/, "El nombre contiene caracteres no permitidos") })
+    .safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({ error: "Nombre inválido" });
     return;
@@ -122,6 +127,13 @@ workspacesRouter.patch("/:id/members/:userId", (req: AuthedRequest, res) => {
     res.status(403).json({ error: "No se puede cambiar el rol del propietario" });
     return;
   }
+  // Only the owner may assign the owner role or manage other admins; without
+  // this, any workspace admin could promote themselves to owner (privilege
+  // escalation) or demote their fellow admins.
+  if (m.role !== "owner" && (role === "owner" || targetM.role === "admin")) {
+    res.status(403).json({ error: "Solo el propietario puede asignar el rol de propietario o gestionar administradores" });
+    return;
+  }
   q.prepare(`UPDATE memberships SET role = ? WHERE workspace_id = ? AND user_id = ?`).run(role, wid, target);
   audit({ userId: req.user!.id, ip: req.ip }, "workspace.role_change", "workspace", wid, { userId: target, role });
   res.json({ ok: true });
@@ -143,6 +155,10 @@ workspacesRouter.delete("/:id/members/:userId", (req: AuthedRequest, res) => {
   }
   if (targetM.role === "owner") {
     res.status(403).json({ error: "No se puede eliminar al propietario" });
+    return;
+  }
+  if (m.role !== "owner" && targetM.role === "admin") {
+    res.status(403).json({ error: "Solo el propietario puede eliminar administradores" });
     return;
   }
   q.prepare(`DELETE FROM memberships WHERE workspace_id = ? AND user_id = ?`).run(wid, target);
@@ -185,7 +201,9 @@ workspacesRouter.delete("/:id", (req: AuthedRequest, res) => {
 });
 
 // ---------------- Invitations ----------------
-workspacesRouter.post("/:id/invitations", (req: AuthedRequest, res) => {
+// Invitations send real emails from the UVH domain; require a verified account
+// so unverified registrations cannot be used as a spam/phishing relay.
+workspacesRouter.post("/:id/invitations", requireVerified, (req: AuthedRequest, res) => {
   const wid = Number(req.params.id);
   const m = getMembership(req.user!.id, wid);
   if (!m || !roleAtLeast(m.role, "admin")) {
@@ -198,6 +216,12 @@ workspacesRouter.post("/:id/invitations", (req: AuthedRequest, res) => {
     return;
   }
   const email = parsed.data.email.toLowerCase();
+  // Only the owner may invite someone with the admin role; otherwise any
+  // workspace admin could mint new admins without owner consent.
+  if (parsed.data.role === "admin" && m.role !== "owner") {
+    res.status(403).json({ error: "Solo el propietario puede invitar administradores" });
+    return;
+  }
   const existing = q.prepare(`SELECT id FROM memberships WHERE workspace_id = ? AND user_id IN (SELECT id FROM users WHERE email = ?)`).get(wid, email);
   if (existing) {
     res.status(409).json({ error: "Este usuario ya es miembro" });
@@ -285,8 +309,8 @@ workspacesRouter.delete("/:id/invitations/:invitationId", (req: AuthedRequest, r
   res.json({ ok: true });
 });
 
-// Resend invitation
-workspacesRouter.post("/:id/invitations/:invitationId/resend", (req: AuthedRequest, res) => {
+// Resend invitation (verified accounts only — see above)
+workspacesRouter.post("/:id/invitations/:invitationId/resend", requireVerified, (req: AuthedRequest, res) => {
   const wid = Number(req.params.id);
   const m = getMembership(req.user!.id, wid);
   if (!m || !roleAtLeast(m.role, "admin")) {
