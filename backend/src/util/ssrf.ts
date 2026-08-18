@@ -79,6 +79,8 @@ export function isPrivateIp(ip: string): boolean {
     if (lower === "::" || lower === "::0") return true; // unspecified → local
     if (lower === "::1" || lower.startsWith("fc") || lower.startsWith("fd")) return true;
     if (/^fe[89ab]/.test(lower)) return true; // link-local fe80::/10
+    if (lower.startsWith("ff")) return true; // multicast ff00::/8
+    if (lower.startsWith("2001:db8:") || lower.startsWith("2001:0db8:")) return true; // documentation 2001:db8::/32
     const embedded = ipv4EmbeddedIn(lower);
     if (embedded !== null) return isPrivateIpv4(embedded);
     return false;

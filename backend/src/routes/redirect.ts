@@ -8,7 +8,7 @@ import { enqueue } from "../queue.js";
 import { countryFromHeaders, parseUserAgent, referrerDomain, visitorHash } from "../util/analytics.js";
 import { sign } from "../util/sign.js";
 import { normalizeAlias } from "../util/url.js";
-import { reportLimiter, resolveLimiter } from "../middleware/ratelimit.js";
+import { reportLimiter, resolveLimiter, makeLimiter } from "../middleware/ratelimit.js";
 import { issueCsrfToken, verifyCsrf } from "../middleware/csrf.js";
 
 export const redirectRouter = Router();
@@ -141,8 +141,18 @@ redirectRouter.get("/:alias", resolveLimiter, (req, res) => {
   resolveAndRespond(toResolveRequest(req, req.params.alias ?? ""), req, res);
 });
 
+// Per-(IP, alias) limiter: brute-forcing one specific link's password is
+// capped even if the attacker rotates across links (the global IP limiter
+// alone would let each alias be tried 10x/min).
+const unlockLimiter = makeLimiter({
+  windowMs: 60_000,
+  limit: 10,
+  message: "Demasiados intentos para este enlace.",
+  keyGenerator: (req: Request) => (req.ip ?? "unknown") + "|" + (req.params.alias ?? ""),
+});
+
 // Unlock a password-protected link and follow with a redirect.
-redirectRouter.post("/r/:alias/unlock", reportLimiter, async (req, res) => {
+redirectRouter.post("/r/:alias/unlock", reportLimiter, unlockLimiter, async (req, res) => {
   if (!verifyCsrf(req)) {
     res.status(403).json({ error: "Token CSRF inválido" });
     return;
@@ -177,7 +187,9 @@ redirectRouter.post("/r/:alias/unlock", reportLimiter, async (req, res) => {
     }
     return;
   }
-  const token = sign(JSON.stringify({ alias, host }), 10 * 60_000);
+  // Bind the token to the exact link: if the link is deleted and another is
+  // created with the same alias, a stale unlock token must not open it.
+  const token = sign(JSON.stringify({ alias, host, link: link.id }), 10 * 60_000);
   res.cookie(UNLOCK_COOKIE, token, {
     httpOnly: true,
     secure: req.secure,

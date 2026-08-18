@@ -116,6 +116,11 @@ Añadido contador de intentos por cuenta (10 intentos / 15 min → 429) sobre `/
 - **`check-alias` sin rate limit**: añadido `linkCreateLimiter` (`LINK_CREATE_LIMIT`, configurable).
 - **Workspaces ilimitados por usuario**: cap de 20 workspaces en propiedad (429).
 - **Rango reservado `240.0.0.0/4`** añadido al filtro SSRF.
+- **Token de unlock no ligado al enlace**: el token firma ahora `{alias, host, link.id}`; un enlace borrado y recreado con el mismo alias no acepta tokens antiguos + test.
+- **TOCTOU de estado en `resolveLink`**: los chequeos de ciclo de vida (blocked/paused/scheduled/expired) se re-evalúan sobre la fila fresca **dentro** de la transacción de consumo.
+- **Rate limit por (IP, alias) en el unlock**: fuerza bruta acotada por enlace (10/min) además del límite global.
+- **Log de email con `JSON.stringify`**: inmune a inyección de CR/LF vía subject.
+- **IPv6 multicast (`ff00::/8`) y documentación (`2001:db8::/32`)** bloqueados en el filtro SSRF.
 
 ## Documentados (riesgo residual aceptado)
 

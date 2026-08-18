@@ -895,7 +895,7 @@ describe("SSRF IP classification", () => {
       "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:169.254.169.254", "::ffff:10.0.0.1",
       "::ffff:192.168.1.1", "0:0:0:0:0:ffff:7f00:1", "::", "::1", "fc00::1", "fe80::1",
       "64:ff9b::a00:1", "2002:7f00:1::", "2002:a9fe:a9fe::", "2001:0000:0000:0000:0000:0000:f5ff:fffe",
-      "127.0.0.1", "169.254.169.254", "100.64.0.1",
+      "127.0.0.1", "169.254.169.254", "100.64.0.1", "ff02::1", "2001:db8::1",
     ];
     for (const ip of priv) expect(isPrivateIp(ip), ip).toBe(true);
     const pub = ["::ffff:8.8.8.8", "64:ff9b::808:808", "2002:808:808::", "8.8.8.8", "2606:4700:4700::1111", "2001:4860:4860::8888"];
@@ -1124,5 +1124,28 @@ describe("Link lifecycle hardening", () => {
 
     expect((db.q.prepare("SELECT state FROM links WHERE id = ?").get(linkId) as { state: string }).state).toBe("expired");
     expect((await request(app).get("/r/restexp").set("Host", "uvh.es")).status).toBe(404);
+  });
+});
+describe("Unlock token binding", () => {
+  it("does not accept stale unlock tokens for recreated links", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("bindtok"));
+    await createLink(s, { destination: "https://example.com/b1", alias: "bindtok", password: "clave-bind-123" });
+
+    const agent = request.agent(app);
+    const page = await agent.get("/r/bindtok").set("Host", "uvh.es");
+    const csrfCookie = (page.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith("uvh_csrf="));
+    const csrf = csrfCookie!.split(";")[0]!.split("=")[1]!;
+    await agent.post("/r/bindtok/unlock").set("Host", "uvh.es").type("form").send({ password: "clave-bind-123", _csrf: csrf }).expect(302);
+
+    // Delete (soft) + hard delete, then recreate the same alias.
+    const row = db.q.prepare("SELECT id FROM links WHERE alias = ? AND domain_id IS NULL").get("bindtok") as { id: number };
+    await s.agent.delete("/api/v1/links/" + row.id).set("X-CSRF-Token", s.token).expect(200);
+    db.q.prepare("DELETE FROM links WHERE id = ?").run(row.id);
+    await createLink(s, { destination: "https://example.com/b2", alias: "bindtok", password: "clave-bind-123" });
+
+    // The stale unlock cookie must NOT open the new link.
+    const after = await agent.get("/r/bindtok").set("Host", "uvh.es");
+    expect(after.status).toBe(403);
   });
 });

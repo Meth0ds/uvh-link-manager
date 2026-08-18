@@ -7,13 +7,18 @@ function key(req: Request): string {
   return req.ip ?? "unknown";
 }
 
-export function makeLimiter(opts: { windowMs: number; limit: number; message?: string }) {
+export function makeLimiter(opts: {
+  windowMs: number;
+  limit: number;
+  message?: string;
+  keyGenerator?: (req: Request) => string;
+}) {
   return rateLimit({
     windowMs: opts.windowMs,
     limit: opts.limit,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: key,
+    keyGenerator: opts.keyGenerator ?? key,
     message: { error: opts.message ?? "Demasiadas peticiones. Inténtalo más tarde." },
   });
 }
