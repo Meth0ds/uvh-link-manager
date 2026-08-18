@@ -1,225 +1,201 @@
-<!-- Nav -->
-<header class="nav">
-  <a class="brand" routerLink="/">
-    <span class="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 64 64" width="30" height="30"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
-    </span>
-    <span class="brand-name">UVH</span>
-  </a>
-  <nav class="nav-links" aria-label="Principal">
-    <a href="#features">Funciones</a>
-    <a href="#como-funciona">Cómo funciona</a>
-    <a href="#precios">Precios</a>
-    <a href="#faq">FAQ</a>
-  </nav>
-  <div class="nav-cta">
-    <a class="link-btn" [href]="authHref()">Iniciar sesión</a>
-    <a class="solid-btn" [href]="authHref()">Crear cuenta</a>
-  </div>
-</header>
-
-<!-- Hero -->
-<section class="hero">
-  <div class="hero-inner">
-    <div class="hero-copy">
-      <span class="eyebrow"><span class="dot"></span> Plataforma de enlaces para equipos</span>
-      <h1>Enlaces cortos.<br /><span class="grad">Control total.</span></h1>
-      <p class="lead">
-        Acorta, administra y analiza cada enlace con una plataforma profesional,
-        segura y preparada para producción. Tú decides cómo, cuándo y a quién
-        redirige cada URL.
-      </p>
-
-      <form class="shortener" (ngSubmit)="submitDemo()">
-        <mat-icon aria-hidden="true">link</mat-icon>
-        <input
-          type="url"
-          placeholder="Pega aquí tu URL larga…"
-          [(ngModel)]="demoUrl"
-          name="url"
-          aria-label="URL a acortar"
-        />
-        <button type="submit" class="shorten-btn">Acortar</button>
-      </form>
-      <p class="hint">Gratis para empezar · Sin tarjeta · Crea tu cuenta en segundos</p>
-
-      <div class="hero-stats">
-        <div class="stat"><b class="tnum">99,99&nbsp;%</b><span>disponibilidad</span></div>
-        <div class="stat"><b class="tnum">&lt;50&nbsp;ms</b><span>resolución</span></div>
-        <div class="stat"><b class="tnum">302</b><span>redirección real</span></div>
-      </div>
-    </div>
-
-    <div class="hero-visual" aria-hidden="true">
-      <div class="card-demo">
-        <div class="card-demo-head">
-          <span class="traffic"><i></i><i></i><i></i></span>
-          <span class="card-demo-title">uvh.es/lanzamiento</span>
-          <span class="pill live">activo</span>
-        </div>
-        <div class="card-demo-body">
-          <div class="mini-row">
-            <span class="mini-label">Clics hoy</span>
-            <b class="tnum">1.284</b>
-          </div>
-          <div class="bars">
-            <i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i><i class="b6"></i><i class="b7"></i><i class="b8"></i><i class="b9"></i><i class="b10"></i><i class="b11"></i><i class="b12"></i>
-          </div>
-          <div class="mini-legend">
-            <span><i class="k1"></i>España 46&nbsp;%</span>
-            <span><i class="k2"></i>Móvil 68&nbsp;%</span>
-          </div>
-        </div>
-      </div>
-      <div class="qr-card" aria-hidden="true">
-        <svg viewBox="0 0 96 96" width="84" height="84">
-          <rect width="96" height="96" fill="#fff"/>
-          <g fill="#07111F">
-            <path d="M8 8h28v28H8zM16 16v12h12V16zM60 8h28v28H60zM68 16v12h12V16zM8 60h28v28H8zM16 68v12h12V68z"/>
-            <path d="M44 8h4v4h-4zM52 8h4v4h-4zM44 16h4v4h-4zM52 16h4v4h-4zM44 24h4v4h-4zM52 24h4v4h-4zM44 32h4v4h-4zM52 32h4v4h-4zM60 44h4v4h-4zM68 44h4v4h-4zM44 44h4v4h-4zM52 44h4v4h-4zM44 52h4v4h-4zM52 52h4v4h-4zM60 52h4v4h-4zM68 52h4v4h-4zM76 52h4v4h-4zM44 60h4v4h-4zM52 60h4v4h-4zM60 60h4v4h-4zM68 60h4v4h-4zM76 60h4v4h-4zM44 68h4v4h-4zM52 68h4v4h-4zM60 68h4v4h-4zM68 68h4v4h-4zM76 68h4v4h-4zM44 76h4v4h-4zM52 76h4v4h-4zM60 76h4v4h-4zM68 76h4v4h-4zM76 76h4v4h-4zM84 76h4v4h-4zM84 60h4v4h-4zM84 68h4v4h-4zM84 44h4v4h-4zM76 44h4v4h-4z"/>
-          </g>
-        </svg>
-        <span class="qr-caption">QR automático</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Social proof -->
-<section class="proof">
-  <p>La infraestructura de enlaces que usan equipos que miden cada clic</p>
-  <div class="proof-logos">
-    <span>NOVEDAD</span><span>lanza&nbsp;·&nbsp;digital</span><span>KERNEL&nbsp;LAB</span><span>puente&nbsp;media</span><span>OUTBOX</span>
-  </div>
-</section>
-
-<!-- Features -->
-<section class="section" id="features">
-  <div class="section-head">
-    <span class="eyebrow">Funciones</span>
-    <h2>Todo lo que necesitas para dominar tus enlaces</h2>
-    <p>Una plataforma única que combina acortador, gestor y analítica con seguridad de nivel empresarial.</p>
-  </div>
-  <div class="grid features-grid">
-    <article class="feature" *ngFor="let f of features">
-      <span class="feature-icon"><mat-icon aria-hidden="true">{{ f.icon }}</mat-icon></span>
-      <h3>{{ f.title }}</h3>
-      <p>{{ f.text }}</p>
-    </article>
-  </div>
-</section>
-
-<!-- How it works -->
-<section class="section alt" id="como-funciona">
-  <div class="section-head">
-    <span class="eyebrow">Cómo funciona</span>
-    <h2>Tres pasos y listo</h2>
-  </div>
-  <div class="grid steps-grid">
-    <article class="step" *ngFor="let s of steps; let i = index">
-      <span class="step-num tnum">0{{ i + 1 }}</span>
-      <h3>{{ s.title }}</h3>
-      <p>{{ s.text }}</p>
-    </article>
-  </div>
-</section>
-
-<!-- Security band -->
-<section class="section security-band">
-  <div class="security-copy">
-    <span class="eyebrow">Seguridad</span>
-    <h2>Diseñado para que el control sea tuyo</h2>
-    <ul class="security-list">
-      <li><mat-icon>check_circle</mat-icon> Redirección HTTP real en el backend, nunca JavaScript</li>
-      <li><mat-icon>check_circle</mat-icon> Cookies de sesión HttpOnly con SameSite y CSRF de doble envío</li>
-      <li><mat-icon>check_circle</mat-icon> Validación estricta de destinos: sin javascript:, data: ni credenciales</li>
-      <li><mat-icon>check_circle</mat-icon> Auditoría inmutable de cada acción y hash de tokens de API</li>
-      <li><mat-icon>check_circle</mat-icon> Protección SSRF en webhooks y rate limiting por IP</li>
-    </ul>
-  </div>
-  <div class="security-visual" aria-hidden="true">
-    <div class="shield-wrap">
-      <mat-icon class="shield-icon">verified_user</mat-icon>
-      <div class="ring r1"></div>
-      <div class="ring r2"></div>
-    </div>
-  </div>
-</section>
-
-<!-- Pricing -->
-<section class="section" id="precios">
-  <div class="section-head">
-    <span class="eyebrow">Precios</span>
-    <h2>Planes que crecen contigo</h2>
-    <p>Empieza gratis y escala cuando lo necesites. Sin sorpresas.</p>
-  </div>
-  <div class="grid pricing-grid">
-    <article class="plan" [class.highlight]="p.highlight" *ngFor="let p of plans">
-      <h3>{{ p.name }}</h3>
-      <div class="plan-price"><b class="tnum">{{ p.price }}</b><span>{{ p.period }}</span></div>
-      <a class="plan-cta" [class.solid-btn]="p.highlight" [class.link-btn]="!p.highlight" [href]="authHref()">{{ p.cta }}</a>
-      <ul>
-        <li *ngFor="let f of p.features"><mat-icon>check</mat-icon>{{ f }}</li>
-      </ul>
-    </article>
-  </div>
-</section>
-
-<!-- FAQ -->
-<section class="section alt" id="faq">
-  <div class="section-head">
-    <span class="eyebrow">FAQ</span>
-    <h2>Preguntas frecuentes</h2>
-  </div>
-  <div class="faq-list">
-    <details *ngFor="let item of faqs" class="faq-item">
-      <summary>{{ item.q }}</summary>
-      <p>{{ item.a }}</p>
-    </details>
-  </div>
-</section>
-
-<!-- CTA -->
-<section class="cta-band">
-  <h2>Empieza hoy. Controla cada clic.</h2>
-  <p>Únete a UVH y convierte cualquier URL en una herramienta de medición.</p>
-  <a class="solid-btn big" [href]="authHref()">Crear cuenta gratis</a>
-</section>
-
-<!-- Footer -->
-<footer class="footer">
-  <div class="footer-top">
-    <div class="footer-brand">
-      <a class="brand" routerLink="/">
+<div class="landing-shell">
+  <header class="nav-shell nav-enter">
+    <div class="nav-inner">
+      <a class="brand ripple-control" routerLink="/" matRipple [matRippleColor]="'rgba(36, 87, 245, 0.12)'" aria-label="UVH, inicio">
         <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 64 64" width="26" height="26"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 64 64" width="30" height="30">
+            <rect width="64" height="64" rx="18" fill="#07111F" />
+            <path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00D2C4" stroke-width="5" stroke-linecap="round" />
+            <path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#5D7CFF" stroke-width="5" stroke-linecap="round" />
+          </svg>
         </span>
         <span class="brand-name">UVH</span>
       </a>
-      <p>Enlaces cortos. Control total.</p>
-    </div>
-    <div class="footer-cols">
-      <div class="footer-col">
-        <h4>Producto</h4>
-        <a [href]="authHref()">Panel</a>
-        <a href="#features">Funciones</a>
-        <a href="#precios">Precios</a>
+
+      <div class="nav-center">
+        <span class="service-status"><i></i> Plataforma operativa</span>
+        <nav class="nav-links" aria-label="Principal">
+          <a href="#features" matRipple [matRippleColor]="'rgba(36, 87, 245, 0.12)'">Funciones</a>
+          <a href="#como-funciona" matRipple [matRippleColor]="'rgba(36, 87, 245, 0.12)'">Cómo funciona</a>
+          <a href="#precios" matRipple [matRippleColor]="'rgba(36, 87, 245, 0.12)'">Precios</a>
+          <a href="#faq" matRipple [matRippleColor]="'rgba(36, 87, 245, 0.12)'">FAQ</a>
+        </nav>
       </div>
-      <div class="footer-col">
-        <h4>Legal</h4>
-        <a href="/legal/privacidad">Privacidad</a>
-        <a href="/legal/terminos">Términos</a>
-        <a href="/legal/denuncias">Denunciar abuso</a>
-      </div>
-      <div class="footer-col">
-        <h4>Recursos</h4>
-        <a href="/api/v1/health">Estado</a>
-        <a href="mailto:soporte@uvh.es">Soporte</a>
+
+      <div class="nav-actions">
+        <a class="text-link ripple-control" [href]="authHref()" matRipple [matRippleColor]="'rgba(36, 87, 245, 0.14)'">Entrar</a>
+        <a class="button button-primary button-compact ripple-control" [href]="authHref()" matRipple [matRippleColor]="'rgba(255, 255, 255, 0.22)'"><span>Probar UVH</span><mat-icon aria-hidden="true">north_east</mat-icon></a>
       </div>
     </div>
-  </div>
-  <div class="footer-bottom">
-    <span>© {{ year }} UVH · uvh.es</span>
-    <span class="tnum">Enlaces cortos. Control total.</span>
-  </div>
-</footer>
+  </header>
+
+  <main>
+    <section class="hero" id="inicio">
+      <div class="hero-glow hero-glow-one" aria-hidden="true"></div>
+      <div class="hero-glow hero-glow-two" aria-hidden="true"></div>
+      <div class="hero-glow hero-glow-three" aria-hidden="true"></div>
+      <div class="hero-spotlight" aria-hidden="true"></div>
+      <div class="hero-particles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="hero-grid">
+        <div class="hero-copy hero-copy-enter">
+          <a class="hero-badge ripple-control" href="#features" matRipple [matRippleColor]="'rgba(255, 255, 255, 0.16)'">
+            <span class="badge-dot" aria-hidden="true"></span>
+            Nuevo · Reglas de redirección inteligentes
+            <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+          </a>
+          <div class="eyebrow eyebrow-light"><span class="eyebrow-pulse"></span> Link intelligence para equipos</div>
+          <h1>Convierte cada <span class="hero-accent">enlace</span> en una señal de crecimiento.</h1>
+          <p class="hero-lead">
+            UVH une acortamiento, control y analítica en un solo lugar. Diseña la ruta de cada clic y descubre qué está funcionando de verdad.
+          </p>
+
+          <form class="hero-form" (ngSubmit)="submitDemo()">
+            <div class="input-leading" aria-hidden="true"><mat-icon>link</mat-icon></div>
+            <input
+              type="url"
+              placeholder="Pega una URL para empezar…"
+              [(ngModel)]="demoUrl"
+              name="url"
+              aria-label="URL a acortar"
+            />
+            <button class="button button-primary form-submit ripple-control" type="submit" matRipple [matRippleColor]="'rgba(255, 255, 255, 0.24)'"><span>Crear enlace</span><mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
+          </form>
+          <p class="form-note"><mat-icon aria-hidden="true">lock</mat-icon> Gratis para empezar · Sin tarjeta · Configuración en segundos</p>
+
+          <div class="hero-proof" aria-label="Ventajas principales">
+            <span><mat-icon aria-hidden="true">check</mat-icon> Redirección HTTP real</span>
+            <span><mat-icon aria-hidden="true">check</mat-icon> Datos de tu propio backend</span>
+            <span><mat-icon aria-hidden="true">check</mat-icon> Privacidad por diseño</span>
+          </div>
+
+          <div class="hero-metrics">
+            <div class="hero-metric"><strong class="tnum">99,99<span>%</span></strong><span>disponibilidad objetivo</span></div>
+            <div class="hero-metric"><strong class="tnum">&lt;50<span>ms</span></strong><span>tiempo de resolución</span></div>
+            <div class="hero-metric"><strong class="tnum">24<span>/7</span></strong><span>visibilidad de tu tráfico</span></div>
+          </div>
+        </div>
+
+        <div class="hero-stage stage-enter" aria-label="Vista previa del panel de analítica">
+          <div class="stage-grid" aria-hidden="true"></div>
+          <div class="stage-orbit orbit-one" aria-hidden="true"></div>
+          <div class="stage-orbit orbit-two" aria-hidden="true"></div>
+
+          <div class="product-window">
+            <div class="window-bar">
+              <span class="window-dots"><i></i><i></i><i></i></span>
+              <span class="window-address"><mat-icon aria-hidden="true">lock</mat-icon> app.uvh.es / analytics</span>
+              <mat-icon class="window-more" aria-hidden="true">more_horiz</mat-icon>
+            </div>
+            <div class="window-body">
+              <div class="window-nav">
+                <div class="window-logo"><span></span> UVH</div>
+                <div class="window-nav-item active"><mat-icon>space_dashboard</mat-icon> Resumen</div>
+                <div class="window-nav-item"><mat-icon>link</mat-icon> Enlaces</div>
+                <div class="window-nav-item"><mat-icon>insights</mat-icon> Analítica</div>
+                <div class="window-nav-item"><mat-icon>settings</mat-icon> Ajustes</div>
+                <div class="window-nav-profile"><span>MC</span></div>
+              </div>
+
+              <div class="window-content">
+                <div class="dashboard-heading">
+                  <div><span class="dashboard-kicker">Workspace / Lanzamiento</span><h3>Rendimiento de enlaces</h3></div>
+                  <span class="live-label"><i></i> En directo</span>
+                </div>
+                <div class="dashboard-cards">
+                  <div class="dashboard-stat stat-primary"><span>Total de clics</span><strong class="tnum">12.486</strong><small><mat-icon>trending_up</mat-icon> 18,4% esta semana</small></div>
+                  <div class="dashboard-stat"><span>Visitantes únicos</span><strong class="tnum">8.921</strong><small>71,5% del tráfico</small></div>
+                  <div class="dashboard-stat"><span>Conversión</span><strong class="tnum">4,8<span>%</span></strong><small class="positive"><mat-icon>north_east</mat-icon> 0,8 puntos</small></div>
+                </div>
+                <div class="analytics-card">
+                  <div class="analytics-card-head"><div><strong>Clics por día</strong><span>Últimos 30 días</span></div><button type="button" aria-label="Más opciones"><mat-icon>more_horiz</mat-icon></button></div>
+                  <div class="chart-area" aria-hidden="true">
+                    <div class="chart-y"><span>1.5k</span><span>1k</span><span>500</span><span>0</span></div>
+                    <div class="chart-plot">
+                      <i class="chart-line line-one"></i><i class="chart-line line-two"></i>
+                      <div class="chart-bars"><i class="bar bar-1"></i><i class="bar bar-2"></i><i class="bar bar-3"></i><i class="bar bar-4"></i><i class="bar bar-5"></i><i class="bar bar-6"></i><i class="bar bar-7"></i><i class="bar bar-8"></i><i class="bar bar-9"></i><i class="bar bar-10"></i><i class="bar bar-11"></i><i class="bar bar-12"></i><i class="bar bar-13"></i><i class="bar bar-14"></i><i class="bar bar-15"></i></div>
+                      <div class="chart-x"><span>01 Jun</span><span>08 Jun</span><span>15 Jun</span><span>22 Jun</span><span>30 Jun</span></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="window-bottom-row">
+                  <div class="mini-table"><div class="mini-table-head"><strong>Enlaces con más alcance</strong><span>Ver todo</span></div><div class="mini-link"><span class="mini-link-icon"><mat-icon>campaign</mat-icon></span><span><b>lanzamiento</b><small>uvh.es/lanzamiento</small></span><strong class="tnum">4.2k</strong></div><div class="mini-link"><span class="mini-link-icon teal"><mat-icon>bolt</mat-icon></span><span><b>summer-sale</b><small>uvh.es/summer-sale</small></span><strong class="tnum">2.8k</strong></div></div>
+                  <div class="device-card"><span class="device-icon"><mat-icon>smartphone</mat-icon></span><div><strong>Móvil</strong><small>68% del tráfico</small></div><b class="tnum">68%</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="floating-card floating-card-top"><span class="floating-icon"><mat-icon>verified</mat-icon></span><span><b>Destino validado</b><small>Sin riesgos detectados</small></span><mat-icon class="floating-check">check_circle</mat-icon></div>
+          <div class="floating-card floating-card-bottom"><span class="floating-icon teal"><mat-icon>public</mat-icon></span><span><b>+ 14 países</b><small>Alcance global en tiempo real</small></span></div>
+        </div>
+      </div>
+      <div class="hero-bottom-note"><span>Una capa de control entre tu campaña y cada destino</span><mat-icon aria-hidden="true">south</mat-icon></div>
+    </section>
+
+    <section class="proof-strip reveal" aria-label="Capacidades de UVH">
+      <div class="proof-inner">
+        <span class="proof-label">Hecho para el momento entre compartir y convertir</span>
+        <div class="proof-items">
+          <span><mat-icon>speed</mat-icon> Resolución ultrarrápida</span>
+          <span><mat-icon>security</mat-icon> Sesiones protegidas</span>
+          <span><mat-icon>hub</mat-icon> API y webhooks</span>
+          <span><mat-icon>qr_code_2</mat-icon> QR incluido</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section feature-section reveal" id="features">
+      <div class="section-heading split-heading">
+        <div><span class="eyebrow"><span class="eyebrow-pulse"></span> El sistema UVH</span><h2>Más que un acortador.<br /><em>Una central de control.</em></h2></div>
+        <p>Cada enlace puede ser una decisión medible. UVH te da las herramientas para crear rutas más inteligentes, compartir con confianza y optimizar con contexto.</p>
+      </div>
+      <div class="feature-grid reveal-group">
+        <article class="feature-card reveal-item ripple-surface" [class.feature-card-featured]="i === 0" *ngFor="let f of features; let i = index" matRipple [matRippleColor]="'rgba(36, 87, 245, 0.14)'">
+          <div class="feature-card-top"><span class="feature-icon"><mat-icon aria-hidden="true">{{ f.icon }}</mat-icon></span><span class="feature-index tnum">0{{ i + 1 }}</span></div>
+          <div class="feature-card-copy"><h3>{{ f.title }}</h3><p>{{ f.text }}</p><a *ngIf="i === 0" class="inline-link" href="#como-funciona">Ver cómo funciona <mat-icon>arrow_forward</mat-icon></a></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section process-section reveal" id="como-funciona">
+      <div class="section-heading centered-heading"><span class="eyebrow"><span class="eyebrow-pulse"></span> Flujo de trabajo</span><h2>Del destino al dato,<br /><em>sin pasos innecesarios.</em></h2><p>Un flujo simple para equipos que necesitan moverse rápido sin perder el control.</p></div>
+      <div class="process-rail">
+        <div class="process-line" aria-hidden="true"></div>
+        <article class="process-step reveal-item ripple-surface" *ngFor="let s of steps; let i = index" matRipple [matRippleColor]="'rgba(0, 169, 157, 0.14)'">
+          <span class="process-number tnum">0{{ i + 1 }}</span><span class="process-icon"><mat-icon>{{ s.icon }}</mat-icon></span><h3>{{ s.title }}</h3><p>{{ s.text }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="security-section reveal">
+      <div class="security-inner">
+        <div class="security-copy"><span class="eyebrow eyebrow-light"><span class="eyebrow-pulse"></span> Built for trust</span><h2>La velocidad importa.<br /><em>La confianza también.</em></h2><p>La infraestructura de UVH está pensada para que puedas compartir sin preguntarte qué ocurre detrás de cada clic.</p><ul class="security-list"><li><mat-icon>check_circle</mat-icon><span><strong>Redirecciones reales</strong> El servidor responde con HTTP; no hay trucos ni JavaScript intermedio.</span></li><li><mat-icon>check_circle</mat-icon><span><strong>Privacidad configurable</strong> Analítica útil con anonimización y retención bajo tu control.</span></li><li><mat-icon>check_circle</mat-icon><span><strong>Defensa en profundidad</strong> CSRF, rate limiting, validación SSRF y auditoría de acciones sensibles.</span></li></ul><a class="button button-ghost-light ripple-control" href="#faq" matRipple [matRippleColor]="'rgba(255, 255, 255, 0.16)'"><span>Conoce nuestra seguridad</span><mat-icon>arrow_forward</mat-icon></a></div>
+        <div class="security-visual" aria-hidden="true"><div class="security-orb"><div class="security-orb-ring ring-a"></div><div class="security-orb-ring ring-b"></div><div class="security-orb-core"><mat-icon>shield</mat-icon><span>UVH / secure</span></div><span class="orb-label label-top">CSRF</span><span class="orb-label label-right">HMAC</span><span class="orb-label label-bottom">SSRF</span><span class="orb-label label-left">MFA</span></div></div>
+      </div>
+    </section>
+
+    <section class="section pricing-section reveal" id="precios">
+      <div class="section-heading centered-heading"><span class="eyebrow"><span class="eyebrow-pulse"></span> Precios claros</span><h2>Empieza con el control<br /><em>que necesitas hoy.</em></h2><p>Sin contratos largos ni sorpresas. Cambia de plan cuando tu equipo crezca.</p></div>
+      <div class="pricing-grid">
+        <article class="plan-card ripple-surface" [class.plan-card-featured]="p.highlight" *ngFor="let p of plans" matRipple [matRippleColor]="p.highlight ? 'rgba(255, 255, 255, 0.16)' : 'rgba(36, 87, 245, 0.12)'">
+          <span class="plan-tag" *ngIf="p.highlight">Más elegido</span><div class="plan-head"><span class="plan-name">{{ p.name }}</span><span class="plan-mark"><mat-icon>{{ p.highlight ? 'auto_awesome' : 'radio_button_checked' }}</mat-icon></span></div><div class="plan-price"><b class="tnum">{{ p.price }}</b><span>{{ p.period }}</span></div><p class="plan-description" *ngIf="p.name === 'Starter'">Para empezar a ordenar tus enlaces.</p><p class="plan-description" *ngIf="p.name === 'Pro'">Para equipos que convierten datos en decisiones.</p><p class="plan-description" *ngIf="p.name === 'Business'">Para operaciones que necesitan gobernanza.</p><a class="button plan-button ripple-control" [class.button-primary]="p.highlight" [class.button-secondary]="!p.highlight" [href]="authHref()" matRipple [matRippleColor]="p.highlight ? 'rgba(255,255,255,.22)' : 'rgba(36,87,245,.14)'"><span>{{ p.cta }}</span><mat-icon>arrow_forward</mat-icon></a><ul><li *ngFor="let f of p.features"><mat-icon>check</mat-icon>{{ f }}</li></ul></article>
+      </div>
+    </section>
+
+    <section class="section faq-section reveal" id="faq">
+      <div class="section-heading centered-heading"><span class="eyebrow"><span class="eyebrow-pulse"></span> Respuestas directas</span><h2>Todo claro antes<br /><em>de dar el primer clic.</em></h2></div>
+      <div class="faq-list"><details *ngFor="let item of faqs" class="faq-item reveal-item"><summary><span>{{ item.q }}</span><span class="faq-plus"><mat-icon>add</mat-icon></span></summary><p>{{ item.a }}</p></details></div>
+    </section>
+
+    <section class="final-cta reveal">
+      <div class="final-cta-glow" aria-hidden="true"></div><div class="final-cta-content"><span class="eyebrow eyebrow-light"><span class="eyebrow-pulse"></span> Tu siguiente enlace empieza aquí</span><h2>Haz que cada clic<br /><em>cuente.</em></h2><p>Únete a UVH y convierte cualquier URL en una herramienta de medición.</p><a class="button button-primary button-large ripple-control" [href]="authHref()" matRipple [matRippleColor]="'rgba(255,255,255,.24)'"><span>Crear cuenta gratis</span><mat-icon>north_east</mat-icon></a><small>No necesitas tarjeta de crédito.</small></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top"><div class="footer-brand"><a class="brand ripple-control" routerLink="/" matRipple [matRippleColor]="'rgba(255,255,255,.12)'"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 64 64" width="28" height="28"><rect width="64" height="64" rx="18" fill="#12233B" /><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00D2C4" stroke-width="5" stroke-linecap="round" /><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#5D7CFF" stroke-width="5" stroke-linecap="round" /></svg></span><span class="brand-name">UVH</span></a><p>Enlaces cortos. Control total.</p></div><div class="footer-cols"><div class="footer-col"><h4>Producto</h4><a [href]="authHref()">Panel</a><a href="#features">Funciones</a><a href="#precios">Precios</a></div><div class="footer-col"><h4>Legal</h4><a href="/legal/privacidad">Privacidad</a><a href="/legal/terminos">Términos</a><a href="/legal/denuncias">Denunciar abuso</a></div><div class="footer-col"><h4>Recursos</h4><a href="/api/v1/health">Estado</a><a href="mailto:soporte@uvh.es">Soporte</a></div></div></div>
+      <div class="footer-bottom"><span>© {{ year }} UVH · uvh.es</span><span class="tnum">Diseñado para cada clic.</span></div>
+    </div>
+  </footer>
+</div>

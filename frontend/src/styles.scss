@@ -18,8 +18,8 @@ $uvh-theme: mat.define-theme((
     tertiary: mat.$cyan-palette,
   ),
   typography: (
-    plain-family: "Manrope, system-ui, -apple-system, sans-serif",
-    brand-family: "Manrope, system-ui, -apple-system, sans-serif",
+    plain-family: "Manrope",
+    brand-family: "Manrope",
   ),
 ));
 
@@ -30,8 +30,8 @@ $uvh-dark-theme: mat.define-theme((
     tertiary: mat.$cyan-palette,
   ),
   typography: (
-    plain-family: "Manrope, system-ui, -apple-system, sans-serif",
-    brand-family: "Manrope, system-ui, -apple-system, sans-serif",
+    plain-family: "Manrope",
+    brand-family: "Manrope",
   ),
 ));
 
@@ -61,7 +61,7 @@ body {
 }
 
 body {
-  font-family: "Manrope", system-ui, -apple-system, sans-serif;
+  font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--uvh-surface);
   color: var(--uvh-ink);
   -webkit-font-smoothing: antialiased;
@@ -71,6 +71,23 @@ body {
 a {
   color: var(--uvh-electric);
   text-decoration: none;
+}
+
+// Material's typography hierarchy emits a `font` shorthand whose family is a
+// single quoted name; without this the body/heading text could fall back to the
+// browser serif default (Times New Roman). Restore a complete sans-serif chain.
+html .mat-typography,
+html .mat-typography h1,
+html .mat-typography h2,
+html .mat-typography h3,
+html .mat-typography h4,
+html .mat-typography h5,
+html .mat-typography h6,
+html .mat-typography p,
+html .mat-typography .mat-body-large,
+html .mat-typography .mat-body-medium,
+html .mat-typography .mat-body-small {
+  font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 // Tabular figures for metrics

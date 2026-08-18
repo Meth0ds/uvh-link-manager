@@ -1,8 +1,9 @@
-import { Component, inject, signal } from "@angular/core";
+import { AfterViewInit, Component, ElementRef, inject, OnDestroy, signal } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
+import { MatRippleModule } from "@angular/material/core";
 import { FormsModule } from "@angular/forms";
 import { ApiService } from "../core/services/api.service";
 
@@ -24,12 +25,15 @@ interface Plan {
 @Component({
   selector: "app-landing",
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule, MatIconModule, FormsModule],
+  imports: [CommonModule, RouterLink, MatButtonModule, MatIconModule, MatRippleModule, FormsModule],
   templateUrl: "./landing.component.html",
   styleUrl: "./landing.component.scss",
 })
-export class LandingComponent {
+export class LandingComponent implements AfterViewInit, OnDestroy {
   private api = inject(ApiService);
+  private hostElement = inject(ElementRef<HTMLElement>);
+  private revealObserver?: IntersectionObserver;
+  private heroSpotlightCleanup?: () => void;
 
   readonly year = new Date().getFullYear();
   readonly demoUrl = signal("");
@@ -42,6 +46,52 @@ export class LandingComponent {
       .get<{ appUrl: string }>("/api/v1/config")
       .then((c) => this.appUrl.set(c.appUrl))
       .catch(() => {});
+  }
+
+  ngAfterViewInit(): void {
+    this.setupHeroSpotlight();
+
+    const revealElements = Array.from(this.hostElement.nativeElement.querySelectorAll(".reveal") as NodeListOf<HTMLElement>);
+    if (!revealElements.length) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      revealElements.forEach((element) => element.classList.add("is-visible"));
+      return;
+    }
+
+    this.revealObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-visible");
+          this.revealObserver?.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
+    );
+
+    revealElements.forEach((element) => this.revealObserver?.observe(element));
+  }
+
+  ngOnDestroy(): void {
+    this.revealObserver?.disconnect();
+    this.heroSpotlightCleanup?.();
+  }
+
+  /** Moves the hero spotlight with the pointer (skipped for reduced motion). */
+  private setupHeroSpotlight(): void {
+    const hero = this.hostElement.nativeElement.querySelector(".hero") as HTMLElement | null;
+    if (!hero) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const onMove = (event: PointerEvent) => {
+      const rect = hero.getBoundingClientRect();
+      hero.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
+      hero.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+    };
+
+    hero.addEventListener("pointermove", onMove, { passive: true });
+    this.heroSpotlightCleanup = () => hero.removeEventListener("pointermove", onMove);
   }
 
   /** Absolute URL to the authenticated panel, honoring the resolved app host. */
