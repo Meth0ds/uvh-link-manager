@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -76,13 +77,25 @@ if (isProduction) {
 
 const appUrl = process.env.APP_URL ?? (isProduction ? "https://app.uvh.es" : "http://localhost:4200");
 
+/**
+ * Outside production, an unset APP_SECRET becomes an ephemeral random value —
+ * never the well-known development constant — so signing keys and at-rest
+ * encryption stay unforgeable in preview environments (sessions simply do not
+ * survive restarts). Production already fails closed above.
+ */
+function resolveAppSecret(provided: string | undefined): string {
+  if (provided) return provided;
+  if (isProduction) return ""; // unreachable: production throws before this point
+  console.warn("[config] APP_SECRET no definido: usando un secreto efímero aleatorio (las sesiones no sobreviven a reinicios)");
+  return randomBytes(32).toString("hex");
+}
+
 export const config = {
   env,
   port: intEnv(["PORT", "BACKEND_PORT"], 3001, { min: 1, max: 65535 }),
   // DB
   dbPath: process.env.DATABASE_PATH ?? path.join(findBackendRoot(here), "data", "uvh.sqlite"),
-  // Secrets
-  appSecret: appSecret ?? "uvh-dev-secret-change-me", // dev/test fallback only
+  appSecret: resolveAppSecret(appSecret),
   // Auth / sessions
   sessionCookieName: process.env.SESSION_COOKIE ?? "uvh_session",
   sessionTtlDays: intEnv("SESSION_TTL_DAYS", 30, { min: 1 }),

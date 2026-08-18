@@ -164,7 +164,8 @@ adminRouter.get("/domains", (req: AuthedRequest, res) => {
 });
 
 adminRouter.get("/audit", (req: AuthedRequest, res) => {
-  const page = Math.max(1, Number(req.query.page ?? 1));
+  const raw = Number(req.query.page ?? 1);
+  const page = Number.isSafeInteger(raw) && raw > 0 ? raw : 1;
   const perPage = 50;
   const rows = db
     .prepare(`SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ? OFFSET ?`)

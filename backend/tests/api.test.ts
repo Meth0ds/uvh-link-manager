@@ -1053,3 +1053,42 @@ describe("Abuse controls", () => {
     expect(ws.status).toBe(403);
   });
 });
+describe("MFA step-up and email cooldown", () => {
+  it("requires the current TOTP code to disable or reconfigure MFA", async () => {
+    const { authenticator } = await import("otplib");
+    const s = await newSession();
+    const email = uniqueEmail("stepup");
+    await registerVerifiedLogin(s, email);
+
+    const setup = await s.agent.post("/api/v1/auth/mfa/setup").set("X-CSRF-Token", s.token).send({ password: PASSWORD });
+    expect(setup.status).toBe(200);
+    const secret = setup.body.secret as string;
+    const code = authenticator.generate(secret);
+    const enable = await s.agent.post("/api/v1/auth/mfa/enable").set("X-CSRF-Token", s.token).send({ code });
+    expect(enable.status).toBe(200);
+
+    // Wrong code cannot disable MFA.
+    const wrong = await s.agent.post("/api/v1/auth/mfa/disable").set("X-CSRF-Token", s.token).send({ password: PASSWORD, code: "000000" });
+    expect(wrong.status).toBe(403);
+
+    // Correct code can.
+    const ok = await s.agent.post("/api/v1/auth/mfa/disable").set("X-CSRF-Token", s.token).send({ password: PASSWORD, code: authenticator.generate(secret) });
+    expect(ok.status).toBe(200);
+  });
+
+  it("limits verification email resends to one per minute", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("cooldown");
+    await s.agent.post("/api/v1/auth/register").set("X-CSRF-Token", s.token).send({ name: "Cooldown", email, password: PASSWORD }).expect(201);
+    await s.agent.post("/api/v1/auth/login").set("X-CSRF-Token", s.token).send({ email, password: PASSWORD }).expect(200);
+    // Registration itself just sent a verification email, so an immediate
+    // resend is throttled…
+    expect((await s.agent.post("/api/v1/auth/resend-verification").set("X-CSRF-Token", s.token).send({})).status).toBe(429);
+    // …once the last email is older than a minute, the resend goes through…
+    const uid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number }).id;
+    db.q.prepare("UPDATE email_tokens SET created_at = ? WHERE user_id = ? AND kind = 'verify'").run(new Date(Date.now() - 120_000).toISOString(), uid);
+    expect((await s.agent.post("/api/v1/auth/resend-verification").set("X-CSRF-Token", s.token).send({})).status).toBe(200);
+    // …and the very next resend is throttled again.
+    expect((await s.agent.post("/api/v1/auth/resend-verification").set("X-CSRF-Token", s.token).send({})).status).toBe(429);
+  });
+});

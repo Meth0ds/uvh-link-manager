@@ -140,7 +140,7 @@ function pruneMfaChallenges(): void {
 }
 
 authRouter.post("/login", authLimiter, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ email: emailSchema, password: z.string().min(1) }).safeParse(req.body);
+  const parsed = z.object({ email: emailSchema, password: z.string().min(1).max(128) }).safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({ error: "Datos inválidos" });
     return;
@@ -274,6 +274,15 @@ authRouter.post("/resend-verification", requireAuth, async (req: AuthedRequest, 
     res.status(400).json({ error: "El email ya está verificado" });
     return;
   }
+  // Cooldown: at most one verification email per minute per user, so this
+  // endpoint cannot be used to flood a mailbox or grow email_tokens unbounded.
+  const last = q.prepare(`SELECT created_at FROM email_tokens WHERE user_id = ? AND kind = 'verify' ORDER BY created_at DESC LIMIT 1`).get(user.id) as
+    | { created_at: string }
+    | undefined;
+  if (last && Date.now() - new Date(last.created_at).getTime() < 60_000) {
+    res.status(429).json({ error: "Espera un minuto antes de reenviar la verificación" });
+    return;
+  }
   const token = randomToken(32);
   q.prepare(`INSERT INTO email_tokens (id, user_id, kind, expires_at) VALUES (?, ?, 'verify', ?)`).run(
     sha256Hex(token), user.id, new Date(Date.now() + 86400_000).toISOString(),
@@ -391,18 +400,28 @@ authRouter.post("/sessions/:id/revoke", requireAuth, (req: AuthedRequest, res) =
 
 // ---------------- MFA setup ----------------
 authRouter.post("/mfa/setup", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ password: z.string().min(1) }).safeParse(req.body);
+  const parsed = z
+    .object({ password: z.string().min(1), code: z.string().regex(/^\d{6}$/).optional() })
+    .safeParse(req.body);
   if (!parsed.success) {
-    res.status(422).json({ error: "Contraseña requerida" });
+    res.status(422).json({ error: "Datos inválidos" });
     return;
   }
-  const user = q.prepare(`SELECT password_hash, mfa_enabled FROM users WHERE id = ?`).get(req.user!.id) as {
-    password_hash: string; mfa_enabled: number;
+  const user = q.prepare(`SELECT password_hash, mfa_enabled, mfa_secret FROM users WHERE id = ?`).get(req.user!.id) as {
+    password_hash: string; mfa_enabled: number; mfa_secret: string | null;
   };
   const ok = await bcrypt.compare(parsed.data.password, user.password_hash);
   if (!ok) {
     res.status(403).json({ error: "Contraseña incorrecta" });
     return;
+  }
+  // Step-up: reconfiguring an ACTIVE MFA requires the current TOTP code, so a
+  // stolen session + password alone cannot silently replace the second factor.
+  if (user.mfa_enabled === 1) {
+    if (!parsed.data.code || !user.mfa_secret || !authenticator.check(parsed.data.code, decryptAtRest(user.mfa_secret))) {
+      res.status(403).json({ error: "Código TOTP actual requerido para reconfigurar MFA" });
+      return;
+    }
   }
   const secret = authenticator.generateSecret();
   q.prepare(`UPDATE users SET mfa_secret = ? WHERE id = ?`).run(encryptAtRest(secret), req.user!.id);
@@ -434,15 +453,24 @@ authRouter.post("/mfa/enable", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 authRouter.post("/mfa/disable", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ password: z.string().min(1) }).safeParse(req.body);
+  const parsed = z
+    .object({ password: z.string().min(1), code: z.string().regex(/^\d{6}$/) })
+    .safeParse(req.body);
   if (!parsed.success) {
-    res.status(422).json({ error: "Contraseña requerida" });
+    res.status(422).json({ error: "Contraseña y código TOTP requeridos" });
     return;
   }
-  const user = q.prepare(`SELECT password_hash FROM users WHERE id = ?`).get(req.user!.id) as { password_hash: string };
+  const user = q.prepare(`SELECT password_hash, mfa_secret FROM users WHERE id = ?`).get(req.user!.id) as {
+    password_hash: string; mfa_secret: string | null;
+  };
   const ok = await bcrypt.compare(parsed.data.password, user.password_hash);
   if (!ok) {
     res.status(403).json({ error: "Contraseña incorrecta" });
+    return;
+  }
+  // Step-up: disabling MFA requires the current TOTP code too.
+  if (!user.mfa_secret || !authenticator.check(parsed.data.code, decryptAtRest(user.mfa_secret))) {
+    res.status(403).json({ error: "Código TOTP incorrecto" });
     return;
   }
   q.prepare(`UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, recovery_codes = NULL, updated_at = ? WHERE id = ?`).run(

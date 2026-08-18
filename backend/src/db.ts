@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
 import { sha256Hex } from "./util/ids.js";
+import { encryptAtRest } from "./util/crypto.js";
 
 // Load via createRequire so Vite/vitest never tries to resolve the very new
 // `node:sqlite` builtin (it is not in Vite's builtin list yet).
@@ -19,6 +20,10 @@ type SQLValue = string | number | bigint | null | Uint8Array;
 function norm(v: unknown): SQLValue {
   if (v === undefined) return null;
   if (v === null) return null;
+  // NaN/Infinity (e.g. Number("abc") on route params) would make node:sqlite
+  // throw and turn typos into 500s; bind NULL instead so queries just match
+  // nothing (404/empty result).
+  if (typeof v === "number" && !Number.isFinite(v)) return null;
   if (typeof v === "string" || typeof v === "number" || typeof v === "bigint") return v;
   if (v instanceof Uint8Array) return v;
   return String(v);
@@ -322,6 +327,20 @@ export function migrate() {
 
   // Data migrations (idempotent).
   migrateLegacyTokens();
+  // Re-encrypt at-rest secrets stored before encryption existed (they lack
+  // the enc:v1: prefix). Once rewritten, a DB leak alone no longer exposes
+  // TOTP secrets or webhook signing secrets.
+  for (const [table, col] of [["users", "mfa_secret"], ["webhooks", "secret"]] as const) {
+    const rows = q
+      .prepare(`SELECT id FROM ${table} WHERE ${col} IS NOT NULL AND ${col} NOT LIKE 'enc:v1:%'`)
+      .all() as Array<{ id: number }>;
+    for (const row of rows) {
+      const rec = q.prepare(`SELECT ${col} AS value FROM ${table} WHERE id = ?`).get(row.id) as { value: string } | undefined;
+      if (rec?.value) {
+        q.prepare(`UPDATE ${table} SET ${col} = ? WHERE id = ?`).run(encryptAtRest(rec.value), row.id);
+      }
+    }
+  }
 }
 
 /**

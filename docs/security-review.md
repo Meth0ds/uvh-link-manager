@@ -100,6 +100,13 @@ Añadido contador de intentos por cuenta (10 intentos / 15 min → 429) sobre `/
 - `/api/v1` sin `Cache-Control: no-store`: cabecera global añadida.
 - `events` de webhook sin `max`: acotado a 10.
 - Log injection vía nombre de workspace en el fallback de email: mitigado con el regex de caracteres de control.
+- **Re-auth débil en MFA**: `/mfa/disable` y `/mfa/setup` solo pedían contraseña. Ahora exigen el código TOTP actual (step-up), también en el frontend (formulario de desactivación con código).
+- **`/resend-verification` sin límite** (flooding de buzón + crecimiento de `email_tokens`): cooldown de 1 minuto por usuario (basado en BD) → 429.
+- **`APP_SECRET` estático en dev/preview** (forjable): ahora se genera un secreto efímero aleatorio al arrancar si no está definido; producción sigue fallando cerrado.
+- **`/login` sin `max` en password**: unificado con el esquema (max 128).
+- **Sesgo de módulo en `randomAlias`**: muestreo por rechazo con `randomInt` (CSPRNG), sin sesgo.
+- **NaN en parámetros numéricos → 500**: `norm()` de db.ts convierte NaN/Infinity en NULL (los queries devuelven 404/empty en vez de 500) y la paginación de admin valida enteros seguros.
+- **Secretos at-rest legacy en claro**: `migrate()` re-cifra en el arranque los valores sin prefijo `enc:v1:` (`users.mfa_secret`, `webhooks.secret`).
 
 ## Documentados (riesgo residual aceptado)
 
