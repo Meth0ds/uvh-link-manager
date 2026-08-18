@@ -83,18 +83,22 @@ export function resolveLink(ctx: ResolveContext): RedirectOutcome {
     return { kind: "unavailable", reason: "expired" };
   }
 
-  // Password gate. The unlock token is bound to the exact host it was issued
-  // for, so a password unlock on one domain can never open the same alias on
-  // another host.
+  // Password gate. The unlock token is bound to the exact host AND link id it
+  // was issued for, so a password unlock on one domain can never open the same
+  // alias on another host, nor a recreated link with the same alias.
   if (link.password_hash) {
     const unlocked = ctx.unlockToken
-      ? verify<{ alias: string; host: string }>(ctx.unlockToken, (p) => JSON.parse(p) as { alias: string; host: string })
+      ? verify<{ alias: string; host: string; link: number }>(
+          ctx.unlockToken,
+          (p) => JSON.parse(p) as { alias: string; host: string; link: number },
+        )
       : null;
     if (
       !unlocked ||
       unlocked.alias !== alias ||
       !unlocked.host ||
-      normalizeHost(unlocked.host) !== normalizeHost(ctx.host)
+      normalizeHost(unlocked.host) !== normalizeHost(ctx.host) ||
+      unlocked.link !== id
     ) {
       return { kind: "password_required", linkId: id };
     }
@@ -111,6 +115,9 @@ export function resolveLink(ctx: ResolveContext): RedirectOutcome {
       campaignFromReferrer = null;
     }
   }
+  // The Referer header is attacker-controlled and unbounded; a cap keeps
+  // distinct values from amplifying the metric_rollups JSON blobs.
+  if (campaignFromReferrer) campaignFromReferrer = campaignFromReferrer.slice(0, 100);
   const lang = ctx.acceptLanguage?.split(",")[0]?.split("-")[0]?.toLowerCase() ?? null;
   const country = ctx.country?.toLowerCase() ?? null;
 
@@ -120,6 +127,26 @@ export function resolveLink(ctx: ResolveContext): RedirectOutcome {
   let outcome: RedirectOutcome = { kind: "not_found" };
   tx(() => {
     const fresh = q.prepare(`SELECT * FROM links WHERE id = ?`).get(id) as Record<string, unknown>;
+    // Re-check lifecycle state on the fresh row: a link paused/blocked/expired
+    // between the first read and this transaction must not redirect (nor
+    // consume a click).
+    const freshState = fresh.state as string;
+    if (freshState === "deleted") {
+      outcome = { kind: "not_found" };
+      return;
+    }
+    if (freshState === "blocked" || freshState === "paused" || freshState === "archived") {
+      outcome = { kind: "unavailable", reason: freshState as "blocked" | "paused" | "archived" };
+      return;
+    }
+    if (freshState === "scheduled" || (fresh.scheduled_at && new Date(fresh.scheduled_at as string).getTime() > now)) {
+      outcome = { kind: "unavailable", reason: "scheduled" };
+      return;
+    }
+    if (freshState === "expired" || (fresh.expires_at && new Date(fresh.expires_at as string).getTime() < now)) {
+      outcome = { kind: "unavailable", reason: "expired" };
+      return;
+    }
     if (fresh.single_use === 1) {
       if (fresh.used_at) {
         outcome = { kind: "gone" };

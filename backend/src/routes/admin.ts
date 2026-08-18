@@ -57,6 +57,18 @@ adminRouter.patch("/users/:id", (req: AuthedRequest, res) => {
     res.status(422).json({ error: "Datos inválidos" });
     return;
   }
+  // Never lock the platform out: at least one active admin must remain.
+  if (
+    (parsed.data.isAdmin === false || parsed.data.blocked === true) &&
+    user.is_admin === 1 &&
+    !user.deleted_at
+  ) {
+    const activeAdmins = (q.prepare(`SELECT COUNT(*) AS c FROM users WHERE is_admin = 1 AND deleted_at IS NULL`).get() as { c: number }).c;
+    if (activeAdmins <= 1) {
+      res.status(403).json({ error: "Debe quedar al menos un administrador activo" });
+      return;
+    }
+  }
   if (parsed.data.isAdmin !== undefined) {
     q.prepare(`UPDATE users SET is_admin = ? WHERE id = ?`).run(parsed.data.isAdmin ? 1 : 0, id);
     audit({ userId: req.user!.id, ip: req.ip }, "admin.user_role", "user", id, { isAdmin: parsed.data.isAdmin });
@@ -68,6 +80,10 @@ adminRouter.patch("/users/:id", (req: AuthedRequest, res) => {
     );
     if (parsed.data.blocked) {
       q.prepare(`UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`).run(new Date().toISOString(), id);
+      // Blocking must also revoke the API tokens the user created: they are
+      // workspace credentials, but a blocked user must not keep a working
+      // credential to the API.
+      q.prepare(`UPDATE api_tokens SET revoked_at = ? WHERE created_by = ? AND revoked_at IS NULL`).run(new Date().toISOString(), id);
     }
     audit({ userId: req.user!.id, ip: req.ip }, "admin.user_block", "user", id, { blocked: parsed.data.blocked });
   }
@@ -148,7 +164,8 @@ adminRouter.get("/domains", (req: AuthedRequest, res) => {
 });
 
 adminRouter.get("/audit", (req: AuthedRequest, res) => {
-  const page = Math.max(1, Number(req.query.page ?? 1));
+  const raw = Number(req.query.page ?? 1);
+  const page = Number.isSafeInteger(raw) && raw > 0 ? raw : 1;
   const perPage = 50;
   const rows = db
     .prepare(`SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ? OFFSET ?`)

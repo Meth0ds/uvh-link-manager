@@ -87,9 +87,13 @@ freebuff-deploy env unset KEY
 
 Claves requeridas en producción: `APP_SECRET` (obligatorio; el proceso **no arranca** si falta o usa el valor de desarrollo), `RESEND_API_KEY` (para email), `APP_URL`/`APP_HOST` (host real del panel, `app.uvh.es`), `PUBLIC_HOST=uvh.es`. Mantener `COOKIE_DOMAIN` vacío. `COOKIE_SECURE` ya es `true` por defecto en producción (solo override para tests).
 
-Opcionales: `TRUST_COUNTRY_HEADER=1` **solo** si hay un proxy de confianza que inyecte `COUNTRY_HEADER` (por defecto `cf-ipcountry`; sin esto la analítica por país ignora la cabecera y no se puede falsear). Retención: `SESSION_PURGE_DAYS`, `TOKEN_PURGE_DAYS`, `DELIVERY_PURGE_DAYS`, `AUDIT_PURGE_DAYS`, `ANALYTICS_RETENTION_DAYS`.
+Opcionales: `TRUST_COUNTRY_HEADER=1` **solo** si hay un proxy de confianza que inyecte `COUNTRY_HEADER` (por defecto `cf-ipcountry`; sin esto la analítica por país ignora la cabecera y no se puede falsear). Retención: `SESSION_PURGE_DAYS` (30), `TOKEN_PURGE_DAYS` (7), `DELIVERY_PURGE_DAYS` (90), `AUDIT_PURGE_DAYS` (365), `ANALYTICS_RETENTION_DAYS` (180). Scheduler: `HOUSEKEEPING_INTERVAL_MINUTES` (60) controla cada cuánto corre la pasada pesada de purga; `API_TOKEN_LIMIT` (600/min) es la capa de rate limit agregada **por token** sobre los endpoints de API token; `LINK_CREATE_LIMIT` (30/min) limita la creación de enlaces por IP. Fuera de producción, si `APP_SECRET` no está definido se genera un secreto efímero aleatorio en cada arranque (las sesiones no sobreviven a reinicios; nunca se usa una constante conocida).
+
+Todas las variables numéricas y booleanas se validan **estrictamente al arrancar**: un valor inválido (p. ej. `AUDIT_PURGE_DAYS=-1` o `COOKIE_SECURE=TRUE`) hace fallar el arranque con un error claro en vez de interpretarse silenciosamente. Booleanos aceptados: `true/false/1/0/yes/no` (cualquier capitalización).
 
 En producción el backend aplica **separación por host** (`backend/src/middleware/host.ts`): `/api/v1`, `/auth` y `/app` solo responden en `APP_HOST`; la landing, legales, sitemap/robots y la resolución de enlaces solo en `PUBLIC_HOST` o dominios personalizados.
+
+> ⚠️ **Trust proxy**: la app usa `trust proxy = 1` y el rate limiting por IP depende de `req.ip`. El backend debe ser alcanzable **solo** a través del proxy esperado (firewall/red privada); si fuera accesible directamente, un cliente podría falsear `X-Forwarded-For` y debilitar el rate limit por IP. La capa por token (`API_TOKEN_LIMIT`) mitiga esto para endpoints de API token.
 
 ## 4. Base de datos (SQLite / Turso)
 
@@ -115,7 +119,10 @@ La base es **compatible SQLite**. Para una base gestionada y persistente en prod
 
 ### Backups y purga
 
-- **Purga programada**: el scheduler elimina `click_events` y `metric_rollups` más antiguos que `ANALYTICS_RETENTION_DAYS` (por defecto 180).
+- **Purga programada** (en `backend/src/housekeeping.ts`): el scheduler elimina `click_events`/`metric_rollups` más antiguos que `ANALYTICS_RETENTION_DAYS`, sesiones revocadas/expiradas, tokens usados/caducados, entregas de webhook correctas y eventos de auditoría según sus días de retención. Las sesiones revocadas se purgan por `revoked_at` (no por `expires_at`).
+- **Por lotes**: cada DELETE borra un máximo de 1000 filas dentro de una transacción corta (`node:sqlite` no soporta `DELETE ... LIMIT`, así que se usa `SELECT id ... LIMIT` + `DELETE ... IN`). La pasada pesada corre cada `HOUSEKEEPING_INTERVAL_MINUTES` (60 por defecto) para no competir con el hot path; los jobs ligeros (activación/caducidad de enlaces, reintentos de webhooks) corren cada minuto.
+- **Índices de purga**: `sessions(expires_at)`, `sessions(revoked_at) WHERE revoked_at IS NOT NULL`, `email_tokens(created_at)`, `click_events(occurred_at)` y `webhook_deliveries(delivered_at) WHERE status='success'` se crean automáticamente en `migrate()`.
+- **Migración de tokens legacy**: en el arranque, `migrate()` convierte en hash (sha256) cualquier token de email/invitación almacenado en claro por versiones anteriores, de modo que los enlaces ya enviados por correo **siguen funcionando** tras desplegar sobre una base de datos existente.
 - **Backups**:
   - Local: `sqlite3 uvh.sqlite ".backup uvh-$(date +%F).sqlite"` o `VACUUM INTO`.
   - Producción (Turso): backups gestionados por el proveedor.

@@ -2,6 +2,8 @@ import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
+import { sha256Hex } from "./util/ids.js";
+import { encryptAtRest } from "./util/crypto.js";
 
 // Load via createRequire so Vite/vitest never tries to resolve the very new
 // `node:sqlite` builtin (it is not in Vite's builtin list yet).
@@ -18,6 +20,10 @@ type SQLValue = string | number | bigint | null | Uint8Array;
 function norm(v: unknown): SQLValue {
   if (v === undefined) return null;
   if (v === null) return null;
+  // NaN/Infinity (e.g. Number("abc") on route params) would make node:sqlite
+  // throw and turn typos into 500s; bind NULL instead so queries just match
+  // nothing (404/empty result).
+  if (typeof v === "number" && !Number.isFinite(v)) return null;
   if (typeof v === "string" || typeof v === "number" || typeof v === "bigint") return v;
   if (v instanceof Uint8Array) return v;
   return String(v);
@@ -301,5 +307,63 @@ export function migrate() {
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   );
   CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_tokens(user_id);
+
+  -- Housekeeping purge indexes: keep the scheduler's DELETE ... WHERE scans
+  -- off the hot path once tables grow. Partial indexes keep them small.
+  CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+  CREATE INDEX IF NOT EXISTS idx_sessions_revoked ON sessions(revoked_at) WHERE revoked_at IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_email_tokens_created ON email_tokens(created_at);
+  CREATE INDEX IF NOT EXISTS idx_click_time ON click_events(occurred_at);
+  CREATE INDEX IF NOT EXISTS idx_deliveries_success_delivered ON webhook_deliveries(delivered_at) WHERE status = 'success';
   `);
+
+  // api_tokens.created_by was added later than the original schema; SQLite
+  // has no ALTER TABLE ... IF NOT EXISTS, so tolerate the duplicate-column error.
+  try {
+    db.exec(`ALTER TABLE api_tokens ADD COLUMN created_by INTEGER NULL REFERENCES users(id) ON DELETE SET NULL`);
+  } catch {
+    /* column already exists */
+  }
+
+  // Data migrations (idempotent).
+  migrateLegacyTokens();
+  // Re-encrypt at-rest secrets stored before encryption existed (they lack
+  // the enc:v1: prefix). Once rewritten, a DB leak alone no longer exposes
+  // TOTP secrets or webhook signing secrets.
+  for (const [table, col] of [["users", "mfa_secret"], ["webhooks", "secret"]] as const) {
+    const rows = q
+      .prepare(`SELECT id FROM ${table} WHERE ${col} IS NOT NULL AND ${col} NOT LIKE 'enc:v1:%'`)
+      .all() as Array<{ id: number }>;
+    for (const row of rows) {
+      const rec = q.prepare(`SELECT ${col} AS value FROM ${table} WHERE id = ?`).get(row.id) as { value: string } | undefined;
+      if (rec?.value) {
+        q.prepare(`UPDATE ${table} SET ${col} = ? WHERE id = ?`).run(encryptAtRest(rec.value), row.id);
+      }
+    }
+  }
+}
+
+/**
+ * One-time upgrade for databases created before the token-hashing hardening
+ * (commit 4963dbc): email and invitation tokens used to be stored in plaintext
+ * (base64url, 43 chars), while the app now stores sha256 hex (64 lowercase hex
+ * chars) and looks tokens up by hash. Hash any legacy row in place so links
+ * that were already emailed keep working after deploying over an existing DB.
+ */
+function migrateLegacyTokens(): void {
+  const legacyTables = [
+    ["email_tokens", "id"],
+    ["invitations", "token"],
+  ] as const;
+  for (const [table, col] of legacyTables) {
+    const legacy = q
+      .prepare(`SELECT ${col} AS value FROM ${table} WHERE length(${col}) <> 64 OR ${col} GLOB '*[^0-9a-f]*'`)
+      .all() as Array<{ value: string }>;
+    if (legacy.length === 0) continue;
+    tx(() => {
+      for (const row of legacy) {
+        q.prepare(`UPDATE ${table} SET ${col} = ? WHERE ${col} = ?`).run(sha256Hex(row.value), row.value);
+      }
+    });
+  }
 }

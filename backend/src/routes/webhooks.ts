@@ -36,7 +36,7 @@ webhooksRouter.post("/", requireVerified, requireWorkspace("editor"), (req: Auth
   const parsed = z
     .object({
       url: z.string().max(2048),
-      events: z.array(z.enum(WEBHOOK_EVENTS)).min(1),
+      events: z.array(z.enum(WEBHOOK_EVENTS)).min(1).max(10),
       secret: z.string().min(16).max(128).optional(),
     })
     .safeParse(req.body);
@@ -69,7 +69,7 @@ webhooksRouter.patch("/:id", requireVerified, requireWorkspace("editor"), (req: 
   const parsed = z
     .object({
       url: z.string().max(2048).optional(),
-      events: z.array(z.enum(WEBHOOK_EVENTS)).min(1).optional(),
+      events: z.array(z.enum(WEBHOOK_EVENTS)).min(1).max(10).optional(),
       active: z.boolean().optional(),
       secret: z.string().min(16).max(128).optional(),
     })

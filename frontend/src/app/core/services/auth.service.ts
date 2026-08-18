@@ -107,15 +107,15 @@ export class AuthService {
     await this.api.post(`/api/v1/auth/sessions/${encodeURIComponent(id)}/revoke`);
   }
 
-  async mfaSetup(password: string): Promise<{ secret: string; uri: string }> {
-    return this.api.post<{ secret: string; uri: string }>("/api/v1/auth/mfa/setup", { password });
+  async mfaSetup(password: string, code?: string): Promise<{ secret: string; uri: string }> {
+    return this.api.post<{ secret: string; uri: string }>("/api/v1/auth/mfa/setup", { password, code });
   }
 
   async mfaEnable(code: string): Promise<{ recoveryCodes: string[] }> {
     return this.api.post<{ recoveryCodes: string[] }>("/api/v1/auth/mfa/enable", { code });
   }
 
-  async mfaDisable(password: string): Promise<void> {
-    await this.api.post("/api/v1/auth/mfa/disable", { password });
+  async mfaDisable(password: string, code: string): Promise<void> {
+    await this.api.post("/api/v1/auth/mfa/disable", { password, code });
   }
 }

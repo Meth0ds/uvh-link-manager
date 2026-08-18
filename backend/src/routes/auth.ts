@@ -104,6 +104,33 @@ authRouter.post("/register", registerLimiter, async (req: AuthedRequest, res) =>
 const mfaChallenges = new Map<string, { userId: number; expiresAt: number }>();
 const MFA_CHALLENGE_TTL = 5 * 60_000;
 
+// Per-account attempt throttling for MFA/recovery codes: the IP limiter is
+// the first line, but a per-user cap also stops distributed attempts against
+// one account.
+const mfaAttempts = new Map<number, { count: number; windowStart: number }>();
+const MFA_MAX_ATTEMPTS = 10;
+const MFA_ATTEMPT_WINDOW_MS = 15 * 60_000;
+
+function mfaTooManyAttempts(userId: number): boolean {
+  const a = mfaAttempts.get(userId);
+  if (!a) return false;
+  if (Date.now() - a.windowStart > MFA_ATTEMPT_WINDOW_MS) {
+    mfaAttempts.delete(userId);
+    return false;
+  }
+  return a.count >= MFA_MAX_ATTEMPTS;
+}
+
+function mfaRecordFailure(userId: number): void {
+  const now = Date.now();
+  const a = mfaAttempts.get(userId);
+  if (!a || now - a.windowStart > MFA_ATTEMPT_WINDOW_MS) {
+    mfaAttempts.set(userId, { count: 1, windowStart: now });
+  } else {
+    a.count += 1;
+  }
+}
+
 /** Bound the in-memory challenge map: drop expired entries on every insert. */
 function pruneMfaChallenges(): void {
   const now = Date.now();
@@ -113,7 +140,7 @@ function pruneMfaChallenges(): void {
 }
 
 authRouter.post("/login", authLimiter, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ email: emailSchema, password: z.string().min(1) }).safeParse(req.body);
+  const parsed = z.object({ email: emailSchema, password: z.string().min(1).max(128) }).safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({ error: "Datos inválidos" });
     return;
@@ -152,18 +179,24 @@ authRouter.post("/mfa/verify", authLimiter, async (req: AuthedRequest, res) => {
     res.status(401).json({ error: "Sesión MFA caducada" });
     return;
   }
-  const user = q.prepare(`SELECT * FROM users WHERE id = ?`).get(ch.userId) as
+  const user = q.prepare(`SELECT * FROM users WHERE id = ? AND deleted_at IS NULL`).get(ch.userId) as
     | { id: number; email: string; name: string; is_admin: number; email_verified_at: string | null; mfa_enabled: number; mfa_secret: string | null }
     | undefined;
   if (!user?.mfa_secret) {
     res.status(401).json({ error: "MFA no configurado" });
     return;
   }
+  if (mfaTooManyAttempts(user.id)) {
+    res.status(429).json({ error: "Demasiados intentos. Espera unos minutos." });
+    return;
+  }
   const valid = authenticator.check(parsed.data.code, decryptAtRest(user.mfa_secret));
   if (!valid) {
+    mfaRecordFailure(user.id);
     res.status(401).json({ error: "Código incorrecto" });
     return;
   }
+  mfaAttempts.delete(user.id);
   mfaChallenges.delete(parsed.data.challenge);
   const session = createSession(user.id, req);
   setSessionCookie(res, session);
@@ -177,16 +210,24 @@ authRouter.post("/mfa/recovery", authLimiter, async (req: AuthedRequest, res) =>
     return;
   }
   const user = findUserByEmail(parsed.data.email);
+  // Uniform response: revealing that the account exists (or has MFA enabled)
+  // would break the anti-enumeration policy used everywhere else.
   if (!user || user.mfa_enabled !== 1 || !user.recovery_codes) {
-    res.status(401).json({ error: "No se puede usar un código de recuperación" });
+    res.status(401).json({ error: "Código de recuperación incorrecto" });
+    return;
+  }
+  if (mfaTooManyAttempts(user.id)) {
+    res.status(429).json({ error: "Demasiados intentos. Espera unos minutos." });
     return;
   }
   const codes = JSON.parse(user.recovery_codes) as string[];
   const idx = codes.indexOf(sha256Hex(parsed.data.code.trim().toUpperCase()));
   if (idx === -1) {
+    mfaRecordFailure(user.id);
     res.status(401).json({ error: "Código de recuperación incorrecto" });
     return;
   }
+  mfaAttempts.delete(user.id);
   codes.splice(idx, 1);
   q.prepare(`UPDATE users SET recovery_codes = ? WHERE id = ?`).run(JSON.stringify(codes), user.id);
   audit({ userId: user.id }, "auth.mfa_recovery", "user", user.id);
@@ -231,6 +272,15 @@ authRouter.post("/resend-verification", requireAuth, async (req: AuthedRequest, 
   const user = req.user!;
   if (user.emailVerified) {
     res.status(400).json({ error: "El email ya está verificado" });
+    return;
+  }
+  // Cooldown: at most one verification email per minute per user, so this
+  // endpoint cannot be used to flood a mailbox or grow email_tokens unbounded.
+  const last = q.prepare(`SELECT created_at FROM email_tokens WHERE user_id = ? AND kind = 'verify' ORDER BY created_at DESC LIMIT 1`).get(user.id) as
+    | { created_at: string }
+    | undefined;
+  if (last && Date.now() - new Date(last.created_at).getTime() < 60_000) {
+    res.status(429).json({ error: "Espera un minuto antes de reenviar la verificación" });
     return;
   }
   const token = randomToken(32);
@@ -350,18 +400,28 @@ authRouter.post("/sessions/:id/revoke", requireAuth, (req: AuthedRequest, res) =
 
 // ---------------- MFA setup ----------------
 authRouter.post("/mfa/setup", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ password: z.string().min(1) }).safeParse(req.body);
+  const parsed = z
+    .object({ password: z.string().min(1), code: z.string().regex(/^\d{6}$/).optional() })
+    .safeParse(req.body);
   if (!parsed.success) {
-    res.status(422).json({ error: "Contraseña requerida" });
+    res.status(422).json({ error: "Datos inválidos" });
     return;
   }
-  const user = q.prepare(`SELECT password_hash, mfa_enabled FROM users WHERE id = ?`).get(req.user!.id) as {
-    password_hash: string; mfa_enabled: number;
+  const user = q.prepare(`SELECT password_hash, mfa_enabled, mfa_secret FROM users WHERE id = ?`).get(req.user!.id) as {
+    password_hash: string; mfa_enabled: number; mfa_secret: string | null;
   };
   const ok = await bcrypt.compare(parsed.data.password, user.password_hash);
   if (!ok) {
     res.status(403).json({ error: "Contraseña incorrecta" });
     return;
+  }
+  // Step-up: reconfiguring an ACTIVE MFA requires the current TOTP code, so a
+  // stolen session + password alone cannot silently replace the second factor.
+  if (user.mfa_enabled === 1) {
+    if (!parsed.data.code || !user.mfa_secret || !authenticator.check(parsed.data.code, decryptAtRest(user.mfa_secret))) {
+      res.status(403).json({ error: "Código TOTP actual requerido para reconfigurar MFA" });
+      return;
+    }
   }
   const secret = authenticator.generateSecret();
   q.prepare(`UPDATE users SET mfa_secret = ? WHERE id = ?`).run(encryptAtRest(secret), req.user!.id);
@@ -381,7 +441,9 @@ authRouter.post("/mfa/enable", requireAuth, async (req: AuthedRequest, res) => {
     res.status(403).json({ error: "Código incorrecto" });
     return;
   }
-  const recoveryCodes = Array.from({ length: 10 }, () => randomToken(5).toUpperCase().slice(0, 10));
+  // 80-bit codes (14 base64url chars): recovery codes are a passwordless
+  // login factor, so they must be too strong for offline/online guessing.
+  const recoveryCodes = Array.from({ length: 10 }, () => randomToken(10));
   // Store only hashes of the one-time recovery codes; the plaintext is shown once.
   q.prepare(`UPDATE users SET mfa_enabled = 1, recovery_codes = ?, updated_at = ? WHERE id = ?`).run(
     JSON.stringify(recoveryCodes.map((c) => sha256Hex(c))), new Date().toISOString(), req.user!.id,
@@ -391,15 +453,24 @@ authRouter.post("/mfa/enable", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 authRouter.post("/mfa/disable", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ password: z.string().min(1) }).safeParse(req.body);
+  const parsed = z
+    .object({ password: z.string().min(1), code: z.string().regex(/^\d{6}$/) })
+    .safeParse(req.body);
   if (!parsed.success) {
-    res.status(422).json({ error: "Contraseña requerida" });
+    res.status(422).json({ error: "Contraseña y código TOTP requeridos" });
     return;
   }
-  const user = q.prepare(`SELECT password_hash FROM users WHERE id = ?`).get(req.user!.id) as { password_hash: string };
+  const user = q.prepare(`SELECT password_hash, mfa_secret FROM users WHERE id = ?`).get(req.user!.id) as {
+    password_hash: string; mfa_secret: string | null;
+  };
   const ok = await bcrypt.compare(parsed.data.password, user.password_hash);
   if (!ok) {
     res.status(403).json({ error: "Contraseña incorrecta" });
+    return;
+  }
+  // Step-up: disabling MFA requires the current TOTP code too.
+  if (!user.mfa_secret || !authenticator.check(parsed.data.code, decryptAtRest(user.mfa_secret))) {
+    res.status(403).json({ error: "Código TOTP incorrecto" });
     return;
   }
   q.prepare(`UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, recovery_codes = NULL, updated_at = ? WHERE id = ?`).run(

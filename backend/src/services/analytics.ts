@@ -2,9 +2,17 @@ import { db, q } from "../db.js";
 import type { ClickMeta } from "../util/analytics.js";
 import { dispatchWebhooks } from "./webhooks.js";
 
+// Bound the JSON blobs: an attacker controls Referer-derived keys (campaign,
+// referrer domain) and could otherwise grow the maps without limit, making
+// every click rewrite an ever larger document.
+const MAX_MAP_KEYS = 200;
+
 function bump(map: Record<string, number> | null, key: string | null): string {
   if (!key) return JSON.stringify(map ?? {});
   const m = map ?? {};
+  if (!(key in m) && Object.keys(m).length >= MAX_MAP_KEYS) {
+    return JSON.stringify(m); // drop new distinct keys beyond the cap
+  }
   m[key] = (m[key] ?? 0) + 1;
   return JSON.stringify(m);
 }

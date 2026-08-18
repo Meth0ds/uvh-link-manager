@@ -13,6 +13,7 @@ process.env.NODE_ENV = "test";
 process.env.REGISTER_LIMIT = "1000";
 process.env.AUTH_LIMIT = "1000";
 process.env.RESOLVE_LIMIT = "100000";
+process.env.LINK_CREATE_LIMIT = "100000";
 
 const { createApp } = await import("../src/app.js");
 const { migrate } = await import("../src/db.js");
@@ -375,6 +376,17 @@ describe("Analytics hardening", () => {
     const good = await s.agent.get("/api/v1/analytics/overview?period=7d");
     expect(good.status).toBe(200);
   });
+
+  it("rejects inverted and oversized from/to ranges", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("range"));
+    const inverted = await s.agent.get("/api/v1/analytics/overview?from=2025-06-01T00:00:00Z&to=2025-05-01T00:00:00Z");
+    expect(inverted.status).toBe(422);
+    const oversized = await s.agent.get("/api/v1/analytics/overview?from=2020-01-01T00:00:00Z&to=2020-12-31T00:00:00Z");
+    expect(oversized.status).toBe(422);
+    const ok = await s.agent.get("/api/v1/analytics/overview?from=2025-06-01T00:00:00Z&to=2025-06-30T00:00:00Z");
+    expect(ok.status).toBe(200);
+  });
 });
 
 describe("API tokens", () => {
@@ -561,5 +573,579 @@ describe("Workspaces", () => {
     const list = await s.agent.get("/api/v1/workspaces");
     expect(list.status).toBe(200);
     expect(list.body.workspaces.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("Legacy token migration (upgrade path)", () => {
+  it("hashes plaintext email tokens so old verification links keep working", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("legacy-mail");
+    await s.agent
+      .post("/api/v1/auth/register")
+      .set("X-CSRF-Token", s.token)
+      .send({ name: "Legacy User", email, password: PASSWORD })
+      .expect(201);
+    const user = db.q.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number };
+    // Simulate a row written by the pre-hashing code: plaintext bearer token.
+    const plain = "legacy-verify-token-" + userSeq + "-" + Date.now();
+    db.q.prepare("INSERT INTO email_tokens (id, user_id, kind, expires_at) VALUES (?, ?, 'verify', ?)").run(
+      plain,
+      user.id,
+      new Date(Date.now() + 3600_000).toISOString(),
+    );
+
+    migrate();
+
+    expect(db.q.prepare("SELECT id FROM email_tokens WHERE id = ?").get(sha256Hex(plain))).toBeDefined();
+    expect(db.q.prepare("SELECT id FROM email_tokens WHERE id = ?").get(plain)).toBeUndefined();
+
+    // The link that was already emailed still verifies end-to-end.
+    const res = await s.agent.post("/api/v1/auth/verify-email").set("X-CSRF-Token", s.token).send({ token: plain });
+    expect(res.status).toBe(200);
+  });
+
+  it("hashes plaintext invitation tokens so old invite links keep working", async () => {
+    const owner = await newSession();
+    await registerVerifiedLogin(owner, uniqueEmail("legacy-owner"));
+    const ws = await owner.agent.post("/api/v1/workspaces").set("X-CSRF-Token", owner.token).send({ name: "Legacy WS" }).expect(201);
+    const wsId = ws.body.workspace.id as number;
+    const inviteEmail = uniqueEmail("legacy-invitee");
+    await owner.agent
+      .post("/api/v1/workspaces/" + wsId + "/invitations")
+      .set("X-CSRF-Token", owner.token)
+      .send({ email: inviteEmail, role: "viewer" })
+      .expect(201);
+
+    const plain = "legacy-invite-token-" + userSeq + "-" + Date.now();
+    db.q.prepare("UPDATE invitations SET token = ? WHERE workspace_id = ?").run(plain, wsId);
+
+    migrate();
+
+    expect(db.q.prepare("SELECT token FROM invitations WHERE token = ?").get(sha256Hex(plain))).toBeDefined();
+    expect(db.q.prepare("SELECT token FROM invitations WHERE token = ?").get(plain)).toBeUndefined();
+
+    // The emailed link still works: the invitee registers and accepts with the
+    // old plaintext token.
+    const invitee = await newSession();
+    await invitee.agent
+      .post("/api/v1/auth/register")
+      .set("X-CSRF-Token", invitee.token)
+      .send({ name: "Invitee", email: inviteEmail, password: PASSWORD })
+      .expect(201);
+    // Registration no longer creates a session (anti-enumeration change), so
+    // the invitee logs in before accepting.
+    await invitee.agent.post("/api/v1/auth/login").set("X-CSRF-Token", invitee.token).send({ email: inviteEmail, password: PASSWORD }).expect(200);
+    const accept = await invitee.agent
+      .post("/api/v1/workspaces/invitations/accept")
+      .set("X-CSRF-Token", invitee.token)
+      .send({ token: plain });
+    expect(accept.status).toBe(200);
+  });
+});
+
+describe("Housekeeping scheduler", () => {
+  const daysAgo = (d: number) => new Date(Date.now() - d * 86400_000).toISOString();
+  const daysAhead = (d: number) => new Date(Date.now() + d * 86400_000).toISOString();
+
+  function insertUser(): number {
+    const info = db.q
+      .prepare("INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)")
+      .run(uniqueEmail("hk"), "HK User", "x");
+    return Number(info.lastInsertRowid);
+  }
+
+  const opts = {
+    analyticsRetentionDays: 180,
+    sessionPurgeDays: 30,
+    tokenPurgeDays: 7,
+    deliveryPurgeDays: 90,
+    auditPurgeDays: 365,
+    purgeBatch: 1000,
+    heavyIntervalMs: 0,
+  };
+
+  it("purges revoked sessions by revoked_at, not expires_at", async () => {
+    const { runPurges } = await import("../src/housekeeping.js");
+    const uid = insertUser();
+    const mk = (id: string, revoked: string | null, expires: string) =>
+      db.q
+        .prepare(
+          "INSERT INTO sessions (id, user_id, expires_at, revoked_at, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .run(id, uid, expires, revoked, daysAgo(40), daysAgo(40));
+    mk("s-revoked-old", daysAgo(31), daysAhead(10)); // old query kept this: expires_at in the future
+    mk("s-expired-old", null, daysAgo(31));
+    mk("s-revoked-recent", daysAgo(5), daysAhead(10));
+    mk("s-active", null, daysAhead(10));
+
+    runPurges(opts);
+
+    const rows = db.q.prepare("SELECT id FROM sessions WHERE user_id = ?").all(uid) as Array<{ id: string }>;
+    expect(new Set(rows.map((r) => r.id))).toEqual(new Set(["s-revoked-recent", "s-active"]));
+  });
+
+  it("purges deliveries and audit events in bounded batches", async () => {
+    const { runPurges } = await import("../src/housekeeping.js");
+    const uid = insertUser();
+    const wsId = Number(
+      db.q.prepare("INSERT INTO workspaces (name, slug, owner_user_id) VALUES ('HK', ?, ?)").run("hk-ws-" + userSeq, uid)
+        .lastInsertRowid,
+    );
+    const whId = Number(
+      db.q
+        .prepare("INSERT INTO webhooks (workspace_id, url, secret, events) VALUES (?, 'https://example.com/h', 'sec', '[]')")
+        .run(wsId).lastInsertRowid,
+    );
+    for (let i = 0; i < 25; i++) {
+      db.q
+        .prepare(
+          "INSERT INTO webhook_deliveries (webhook_id, event, event_id, payload, status, delivered_at) VALUES (?, 'link.created', ?, '{}', 'success', ?)",
+        )
+        .run(whId, "ev-" + i, daysAgo(100));
+      db.q.prepare("INSERT INTO audit_events (user_id, action, created_at) VALUES (?, 'test.action', ?)").run(uid, daysAgo(400));
+    }
+
+    runPurges({ ...opts, purgeBatch: 10 });
+
+    expect((db.q.prepare("SELECT COUNT(*) AS c FROM webhook_deliveries").get() as { c: number }).c).toBe(0);
+    // Only the rows this test inserted (400 days old) must be gone; audit rows
+    // written by earlier tests have recent timestamps and stay.
+    expect((db.q.prepare("SELECT COUNT(*) AS c FROM audit_events WHERE user_id = ?").get(uid) as { c: number }).c).toBe(0);
+  });
+
+  it("runs light jobs on every tick but throttles the heavy purge pass", async () => {
+    const { runHousekeeping, runPurges } = await import("../src/housekeeping.js");
+    const uid = insertUser();
+    const wsId = Number(
+      db.q.prepare("INSERT INTO workspaces (name, slug, owner_user_id) VALUES ('HKS', ?, ?)").run("hks-ws-" + userSeq, uid)
+        .lastInsertRowid,
+    );
+    const linkId = Number(
+      db.q
+        .prepare(
+          "INSERT INTO links (workspace_id, created_by, alias, destination, state, scheduled_at) VALUES (?, ?, ?, 'https://example.com/', 'scheduled', ?)",
+        )
+        .run(wsId, uid, "hk-sched-" + userSeq, daysAgo(1)).lastInsertRowid,
+    );
+    const whId = Number(
+      db.q
+        .prepare("INSERT INTO webhooks (workspace_id, url, secret, events) VALUES (?, 'https://example.com/h', 'sec', '[]')")
+        .run(wsId).lastInsertRowid,
+    );
+
+    const throttled = { ...opts, heavyIntervalMs: 60_000 };
+    runHousekeeping(throttled); // first call: light jobs + one heavy pass
+    expect((db.q.prepare("SELECT state FROM links WHERE id = ?").get(linkId) as { state: string }).state).toBe("active");
+
+    // Rows inserted after the heavy pass must survive the next tick (throttle).
+    for (let i = 0; i < 5; i++) {
+      db.q
+        .prepare(
+          "INSERT INTO webhook_deliveries (webhook_id, event, event_id, payload, status, delivered_at) VALUES (?, 'link.created', ?, '{}', 'success', ?)",
+        )
+        .run(whId, "th-" + i, daysAgo(100));
+    }
+    runHousekeeping(throttled); // heavy pass is throttled
+    expect((db.q.prepare("SELECT COUNT(*) AS c FROM webhook_deliveries WHERE webhook_id = ?").get(whId) as { c: number }).c).toBe(5);
+
+    // A direct purge call still cleans them up.
+    runPurges(opts);
+    expect((db.q.prepare("SELECT COUNT(*) AS c FROM webhook_deliveries WHERE webhook_id = ?").get(whId) as { c: number }).c).toBe(0);
+  });
+});
+
+describe("API token hardening", () => {
+  it("throttles api_tokens.last_used_at to one write per minute", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("tokthr"));
+    const created = await s.agent
+      .post("/api/v1/tokens")
+      .set("X-CSRF-Token", s.token)
+      .send({ name: "Throttle", scopes: ["analytics:read"] })
+      .expect(201);
+    const plain = created.body.plainToken as string;
+    const tokenId = created.body.token.id as number;
+    const lastUsed = () =>
+      (db.q.prepare("SELECT last_used_at FROM api_tokens WHERE id = ?").get(tokenId) as { last_used_at: string | null })
+        .last_used_at;
+
+    const first = await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain);
+    expect(first.status).toBe(200);
+    const t1 = lastUsed();
+    expect(t1).not.toBeNull();
+
+    const second = await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain);
+    expect(second.status).toBe(200);
+    expect(lastUsed()).toBe(t1); // no write on the second request
+
+    db.q.prepare("UPDATE api_tokens SET last_used_at = ? WHERE id = ?").run(
+      new Date(Date.now() - 120_000).toISOString(),
+      tokenId,
+    );
+    await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain).expect(200);
+    expect(lastUsed()).not.toBe(t1);
+  });
+});
+
+describe("Config hardening", () => {
+  it("rejects invalid booleans and integers instead of misinterpreting them", async () => {
+    const { bool, intEnv } = await import("../src/config.js");
+    // Case-insensitive: "TRUE" normalizes to "true" and is valid; a typo is not.
+    expect(bool("TRUE", false)).toBe(true);
+    expect(bool(" 1 ", false)).toBe(true);
+    expect(() => bool("ture", false)).toThrow();
+    expect(() => bool("yes please", false)).toThrow();
+    expect(bool("true", false)).toBe(true);
+    expect(bool("YES", false)).toBe(true);
+    expect(bool("0", true)).toBe(false);
+    expect(bool(undefined, true)).toBe(true);
+
+    process.env.UVH_TEST_INT = "hola";
+    expect(() => intEnv("UVH_TEST_INT", 30)).toThrow();
+    process.env.UVH_TEST_INT = "-1";
+    expect(() => intEnv("UVH_TEST_INT", 30)).toThrow();
+    process.env.UVH_TEST_INT = "99999999999999999999";
+    expect(() => intEnv("UVH_TEST_INT", 30)).toThrow();
+    process.env.UVH_TEST_INT = "0";
+    expect(() => intEnv("UVH_TEST_INT", 30, { min: 1 })).toThrow();
+    process.env.UVH_TEST_INT = "30";
+    expect(intEnv("UVH_TEST_INT", 7)).toBe(30);
+    delete process.env.UVH_TEST_INT;
+    expect(intEnv("UVH_TEST_INT", 30, { min: 1 })).toBe(30);
+  });
+});
+describe("Authorization hardening", () => {
+  it("prevents workspace admins from escalating to owner or managing admins", async () => {
+    const owner = await newSession();
+    await registerVerifiedLogin(owner, uniqueEmail("own"));
+    const ws = await owner.agent.post("/api/v1/workspaces").set("X-CSRF-Token", owner.token).send({ name: "Sec" }).expect(201);
+    const wsId = ws.body.workspace.id as number;
+
+    const adminS = await newSession();
+    const adminEmail = uniqueEmail("adm");
+    await registerVerifiedLogin(adminS, adminEmail);
+    const adminUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(adminEmail) as { id: number }).id;
+
+    const viewerS = await newSession();
+    const viewerEmail = uniqueEmail("vw");
+    await registerVerifiedLogin(viewerS, viewerEmail);
+    const viewerUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(viewerEmail) as { id: number }).id;
+
+    // Owner invites an admin and a viewer via the real invitation flow.
+    const plainA = "inv-admin-" + userSeq + "-" + Date.now();
+    await owner.agent.post("/api/v1/workspaces/" + wsId + "/invitations").set("X-CSRF-Token", owner.token).send({ email: adminEmail, role: "admin" }).expect(201);
+    db.q.prepare("UPDATE invitations SET token = ? WHERE workspace_id = ? AND email = ?").run(sha256Hex(plainA), wsId, adminEmail);
+    await adminS.agent.post("/api/v1/workspaces/invitations/accept").set("X-CSRF-Token", adminS.token).send({ token: plainA }).expect(200);
+
+    const plainV = "inv-viewer-" + userSeq + "-" + Date.now();
+    await owner.agent.post("/api/v1/workspaces/" + wsId + "/invitations").set("X-CSRF-Token", owner.token).send({ email: viewerEmail, role: "viewer" }).expect(201);
+    db.q.prepare("UPDATE invitations SET token = ? WHERE workspace_id = ? AND email = ?").run(sha256Hex(plainV), wsId, viewerEmail);
+    await viewerS.agent.post("/api/v1/workspaces/invitations/accept").set("X-CSRF-Token", viewerS.token).send({ token: plainV }).expect(200);
+
+    const asMember = (session: Session, method: "patch" | "delete", path: string, body?: unknown) =>
+      session.agent[method]("/api/v1/workspaces/" + wsId + path)
+        .set("X-Workspace-Id", String(wsId))
+        .set("X-CSRF-Token", session.token)
+        .send(body as Record<string, unknown>);
+
+    // The admin cannot promote themselves or anyone else to owner…
+    expect((await asMember(adminS, "patch", "/members/" + adminUid, { role: "owner" })).status).toBe(403);
+    expect((await asMember(adminS, "patch", "/members/" + viewerUid, { role: "owner" })).status).toBe(403);
+    // …but can promote a viewer to editor.
+    expect((await asMember(adminS, "patch", "/members/" + viewerUid, { role: "editor" })).status).toBe(200);
+    // The owner can promote the viewer to admin.
+    expect((await asMember(owner, "patch", "/members/" + viewerUid, { role: "admin" })).status).toBe(200);
+    // The admin cannot demote or remove another admin (owner-only power).
+    expect((await asMember(adminS, "patch", "/members/" + viewerUid, { role: "viewer" })).status).toBe(403);
+    expect((await asMember(adminS, "delete", "/members/" + viewerUid)).status).toBe(403);
+    // The owner still can.
+    expect((await asMember(owner, "delete", "/members/" + viewerUid)).status).toBe(200);
+  });
+
+  it("rejects moving a link to another workspace's custom domain", async () => {
+    const a = await newSession();
+    const aEmail = uniqueEmail("dom-a");
+    await registerVerifiedLogin(a, aEmail);
+    const created = await createLink(a, { destination: "https://example.com/a", alias: "dommove" });
+    const linkId = created.body.link.id as number;
+
+    const b = await newSession();
+    const bEmail = uniqueEmail("dom-b");
+    await registerVerifiedLogin(b, bEmail);
+    const bUser = db.q.prepare("SELECT id FROM users WHERE email = ?").get(bEmail) as { id: number };
+    const bWs = db.q.prepare("SELECT workspace_id FROM memberships WHERE user_id = ? ORDER BY id LIMIT 1").get(bUser.id) as { workspace_id: number };
+    const bDom = db.q.prepare("INSERT INTO custom_domains (workspace_id, domain, verification_token, state) VALUES (?, 'b.example.com', 'tok', 'active')").run(bWs.workspace_id);
+
+    const res = await a.agent.patch("/api/v1/links/" + linkId).set("X-CSRF-Token", a.token).send({ domainId: Number(bDom.lastInsertRowid) });
+    expect(res.status).toBe(403);
+    expect((db.q.prepare("SELECT domain_id FROM links WHERE id = ?").get(linkId) as { domain_id: number | null }).domain_id).toBeNull();
+
+    // The user's own workspace domain still works.
+    const aUser = db.q.prepare("SELECT id FROM users WHERE email = ?").get(aEmail) as { id: number };
+    const aWs = db.q.prepare("SELECT workspace_id FROM memberships WHERE user_id = ? ORDER BY id LIMIT 1").get(aUser.id) as { workspace_id: number };
+    const aDom = db.q.prepare("INSERT INTO custom_domains (workspace_id, domain, verification_token, state) VALUES (?, 'a.example.com', 'tok', 'active')").run(aWs.workspace_id);
+    const ok = await a.agent.patch("/api/v1/links/" + linkId).set("X-CSRF-Token", a.token).send({ domainId: Number(aDom.lastInsertRowid) });
+    expect(ok.status).toBe(200);
+  });
+});
+describe("SSRF IP classification", () => {
+  it("classifies IPv4-mapped, NAT64, 6to4 and Teredo addresses as private", async () => {
+    const { isPrivateIp } = await import("../src/util/ssrf.js");
+    const priv = [
+      "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:169.254.169.254", "::ffff:10.0.0.1",
+      "::ffff:192.168.1.1", "0:0:0:0:0:ffff:7f00:1", "::", "::1", "fc00::1", "fe80::1",
+      "64:ff9b::a00:1", "2002:7f00:1::", "2002:a9fe:a9fe::", "2001:0000:0000:0000:0000:0000:f5ff:fffe",
+      "127.0.0.1", "169.254.169.254", "100.64.0.1", "ff02::1", "2001:db8::1",
+    ];
+    for (const ip of priv) expect(isPrivateIp(ip), ip).toBe(true);
+    const pub = ["::ffff:8.8.8.8", "64:ff9b::808:808", "2002:808:808::", "8.8.8.8", "2606:4700:4700::1111", "2001:4860:4860::8888"];
+    for (const ip of pub) expect(isPrivateIp(ip), ip).toBe(false);
+  });
+});
+
+describe("Abuse reporting", () => {
+  it("rejects reports for non-existent links with 404 instead of 500", async () => {
+    const s = await newSession();
+    const res = await s.agent.post("/api/v1/report").set("X-CSRF-Token", s.token).send({ linkId: 999999999, reason: "spam" });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("Blocked accounts", () => {
+  it("existing sessions stop working once the user is blocked (deleted_at)", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("blocked");
+    await registerVerifiedLogin(s, email);
+    expect((await s.agent.get("/api/v1/auth/me")).status).toBe(200);
+    const user = db.q.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number };
+    db.q.prepare("UPDATE users SET deleted_at = ? WHERE id = ?").run(new Date().toISOString(), user.id);
+    expect((await s.agent.get("/api/v1/auth/me")).status).toBe(401);
+  });
+});
+
+describe("Invitation roles", () => {
+  it("only owners can invite new admins", async () => {
+    const owner = await newSession();
+    await registerVerifiedLogin(owner, uniqueEmail("inv-own"));
+    const ws = await owner.agent.post("/api/v1/workspaces").set("X-CSRF-Token", owner.token).send({ name: "InvSec" }).expect(201);
+    const wsId = ws.body.workspace.id as number;
+
+    const adminS = await newSession();
+    const adminEmail = uniqueEmail("inv-adm");
+    await registerVerifiedLogin(adminS, adminEmail);
+    const plain = "inv-admin2-" + userSeq + "-" + Date.now();
+    await owner.agent.post("/api/v1/workspaces/" + wsId + "/invitations").set("X-CSRF-Token", owner.token).send({ email: adminEmail, role: "admin" }).expect(201);
+    db.q.prepare("UPDATE invitations SET token = ? WHERE workspace_id = ? AND email = ?").run(sha256Hex(plain), wsId, adminEmail);
+    await adminS.agent.post("/api/v1/workspaces/invitations/accept").set("X-CSRF-Token", adminS.token).send({ token: plain }).expect(200);
+
+    const denied = await adminS.agent
+      .post("/api/v1/workspaces/" + wsId + "/invitations")
+      .set("X-Workspace-Id", String(wsId))
+      .set("X-CSRF-Token", adminS.token)
+      .send({ email: uniqueEmail("inv-adm2"), role: "admin" });
+    expect(denied.status).toBe(403);
+
+    const allowed = await adminS.agent
+      .post("/api/v1/workspaces/" + wsId + "/invitations")
+      .set("X-Workspace-Id", String(wsId))
+      .set("X-CSRF-Token", adminS.token)
+      .send({ email: uniqueEmail("inv-vw2"), role: "viewer" });
+    expect(allowed.status).toBe(201);
+  });
+});
+describe("Abuse controls", () => {
+  it("editors cannot block or unblock links (platform-admin only)", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("abuse");
+    await registerVerifiedLogin(s, email);
+    const created = await createLink(s, { destination: "https://example.com/ab", alias: "abusetest" });
+    const linkId = created.body.link.id as number;
+
+    // Editors cannot block.
+    const tryBlock = await s.agent.post("/api/v1/links/" + linkId + "/state").set("X-CSRF-Token", s.token).send({ state: "blocked" });
+    expect(tryBlock.status).toBe(403);
+
+    // Simulate an admin block, then the editor cannot unblock either.
+    db.q.prepare("UPDATE links SET state = 'blocked' WHERE id = ?").run(linkId);
+    const tryUnblock = await s.agent.post("/api/v1/links/" + linkId + "/state").set("X-CSRF-Token", s.token).send({ state: "active" });
+    expect(tryUnblock.status).toBe(403);
+
+    // A platform admin can.
+    db.q.prepare("UPDATE users SET is_admin = 1 WHERE id = (SELECT id FROM users WHERE email = ?)").run(email);
+    const ok = await s.agent.post("/api/v1/links/" + linkId + "/state").set("X-CSRF-Token", s.token).send({ state: "active" });
+    expect(ok.status).toBe(200);
+  });
+
+  it("does not leak cross-tenant alias availability via check-alias", async () => {
+    const a = await newSession();
+    await registerVerifiedLogin(a, uniqueEmail("ca-a"));
+    const b = await newSession();
+    const bEmail = uniqueEmail("ca-b");
+    await registerVerifiedLogin(b, bEmail);
+    const bUser = db.q.prepare("SELECT id FROM users WHERE email = ?").get(bEmail) as { id: number };
+    const bWs = db.q.prepare("SELECT workspace_id FROM memberships WHERE user_id = ? ORDER BY id LIMIT 1").get(bUser.id) as { workspace_id: number };
+    const dom = db.q.prepare("INSERT INTO custom_domains (workspace_id, domain, verification_token, state) VALUES (?, 'c.example.com', 'tok', 'active')").run(bWs.workspace_id);
+
+    const res = await a.agent.post("/api/v1/links/check-alias").set("X-CSRF-Token", a.token).send({ alias: "ca-secret", domainId: Number(dom.lastInsertRowid) });
+    expect(res.status).toBe(200);
+    expect(res.body.available).toBe(false);
+  });
+
+  it("rejects domainId = 0 when creating a link", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("domzero"));
+    const res = await createLink(s, { destination: "https://example.com/z", domainId: 0 });
+    expect(res.status).toBe(422);
+  });
+
+  it("revokes the user's API tokens when an admin blocks them", async () => {
+    const adminS = await newSession();
+    const adminEmail = uniqueEmail("padmin");
+    await registerVerifiedLogin(adminS, adminEmail);
+    const adminUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(adminEmail) as { id: number }).id;
+    db.q.prepare("UPDATE users SET is_admin = 1, mfa_enabled = 1 WHERE id = ?").run(adminUid);
+
+    const victim = await newSession();
+    const victimEmail = uniqueEmail("victim");
+    await registerVerifiedLogin(victim, victimEmail);
+    const created = await victim.agent.post("/api/v1/tokens").set("X-CSRF-Token", victim.token).send({ name: "Tok", scopes: ["analytics:read"] }).expect(201);
+    const plain = created.body.plainToken as string;
+    expect((await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain)).status).toBe(200);
+
+    const victimUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(victimEmail) as { id: number }).id;
+    const block = await adminS.agent.patch("/api/v1/admin/users/" + victimUid).set("X-CSRF-Token", adminS.token).send({ blocked: true });
+    expect(block.status).toBe(200);
+
+    expect((await request(app).get("/api/v1/analytics/public/overview").set("Authorization", "Bearer " + plain)).status).toBe(401);
+  });
+
+  it("keeps at least one active platform admin", async () => {
+    const adminS = await newSession();
+    const adminEmail = uniqueEmail("lastadm");
+    await registerVerifiedLogin(adminS, adminEmail);
+    const adminUid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(adminEmail) as { id: number }).id;
+    // Make this the ONLY active admin so the guard has to kick in.
+    db.q.prepare("UPDATE users SET is_admin = 0").run();
+    db.q.prepare("UPDATE users SET is_admin = 1, mfa_enabled = 1 WHERE id = ?").run(adminUid);
+
+    const res = await adminS.agent.patch("/api/v1/admin/users/" + adminUid).set("X-CSRF-Token", adminS.token).send({ isAdmin: false });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns a uniform response from /mfa/recovery (no account enumeration)", async () => {
+    const s = await newSession();
+    const ghost = await s.agent.post("/api/v1/auth/mfa/recovery").set("X-CSRF-Token", s.token).send({ email: "ghost-nonexistent@example.com", code: "AAAA-AAAA" });
+    const real = await newSession();
+    const email = uniqueEmail("nomfa");
+    await registerVerifiedLogin(real, email);
+    const res = await real.agent.post("/api/v1/auth/mfa/recovery").set("X-CSRF-Token", real.token).send({ email, code: "AAAA-AAAA" });
+    expect(ghost.status).toBe(401);
+    expect(res.status).toBe(401);
+    expect(ghost.body).toEqual(res.body);
+  });
+
+  it("requires a verified account to create workspaces and invitations", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("unver");
+    await s.agent.post("/api/v1/auth/register").set("X-CSRF-Token", s.token).send({ name: "Unverified", email, password: PASSWORD }).expect(201);
+    // Login works without verification; the verified-only routes must reject.
+    await s.agent.post("/api/v1/auth/login").set("X-CSRF-Token", s.token).send({ email, password: PASSWORD }).expect(200);
+    const ws = await s.agent.post("/api/v1/workspaces").set("X-CSRF-Token", s.token).send({ name: "NoVer" });
+    expect(ws.status).toBe(403);
+  });
+});
+describe("MFA step-up and email cooldown", () => {
+  it("requires the current TOTP code to disable or reconfigure MFA", async () => {
+    const { authenticator } = await import("otplib");
+    const s = await newSession();
+    const email = uniqueEmail("stepup");
+    await registerVerifiedLogin(s, email);
+
+    const setup = await s.agent.post("/api/v1/auth/mfa/setup").set("X-CSRF-Token", s.token).send({ password: PASSWORD });
+    expect(setup.status).toBe(200);
+    const secret = setup.body.secret as string;
+    const code = authenticator.generate(secret);
+    const enable = await s.agent.post("/api/v1/auth/mfa/enable").set("X-CSRF-Token", s.token).send({ code });
+    expect(enable.status).toBe(200);
+
+    // Wrong code cannot disable MFA.
+    const wrong = await s.agent.post("/api/v1/auth/mfa/disable").set("X-CSRF-Token", s.token).send({ password: PASSWORD, code: "000000" });
+    expect(wrong.status).toBe(403);
+
+    // Correct code can.
+    const ok = await s.agent.post("/api/v1/auth/mfa/disable").set("X-CSRF-Token", s.token).send({ password: PASSWORD, code: authenticator.generate(secret) });
+    expect(ok.status).toBe(200);
+  });
+
+  it("limits verification email resends to one per minute", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("cooldown");
+    await s.agent.post("/api/v1/auth/register").set("X-CSRF-Token", s.token).send({ name: "Cooldown", email, password: PASSWORD }).expect(201);
+    await s.agent.post("/api/v1/auth/login").set("X-CSRF-Token", s.token).send({ email, password: PASSWORD }).expect(200);
+    // Registration itself just sent a verification email, so an immediate
+    // resend is throttled…
+    expect((await s.agent.post("/api/v1/auth/resend-verification").set("X-CSRF-Token", s.token).send({})).status).toBe(429);
+    // …once the last email is older than a minute, the resend goes through…
+    const uid = (db.q.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number }).id;
+    db.q.prepare("UPDATE email_tokens SET created_at = ? WHERE user_id = ? AND kind = 'verify'").run(new Date(Date.now() - 120_000).toISOString(), uid);
+    expect((await s.agent.post("/api/v1/auth/resend-verification").set("X-CSRF-Token", s.token).send({})).status).toBe(200);
+    // …and the very next resend is throttled again.
+    expect((await s.agent.post("/api/v1/auth/resend-verification").set("X-CSRF-Token", s.token).send({})).status).toBe(429);
+  });
+});
+describe("Link lifecycle hardening", () => {
+  it("allows removing a link password via PATCH (null clears it)", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("pwclear"));
+    const created = await createLink(s, { destination: "https://example.com/clear", alias: "pwclear", password: "clave-123456789" });
+    expect(created.status).toBe(201);
+    const linkId = created.body.link.id as number;
+
+    expect((await request(app).get("/r/pwclear").set("Host", "uvh.es")).status).toBe(403);
+
+    const cleared = await s.agent.patch("/api/v1/links/" + linkId).set("X-CSRF-Token", s.token).send({ password: null });
+    expect(cleared.status).toBe(200);
+    expect((db.q.prepare("SELECT password_hash FROM links WHERE id = ?").get(linkId) as { password_hash: string | null }).password_hash).toBeNull();
+
+    expect((await request(app).get("/r/pwclear").set("Host", "uvh.es")).status).toBe(302);
+  });
+
+  it("restores an expired link as expired, not active", async () => {
+    const s = await newSession();
+    const email = uniqueEmail("restexp");
+    await registerVerifiedLogin(s, email);
+    const created = await createLink(s, { destination: "https://example.com/re", alias: "restexp" });
+    expect(created.status).toBe(201);
+    const linkId = created.body.link.id as number;
+
+    db.q.prepare("UPDATE links SET expires_at = ?, state = 'expired' WHERE id = ?").run(new Date(Date.now() - 3600_000).toISOString(), linkId);
+    await s.agent.delete("/api/v1/links/" + linkId).set("X-CSRF-Token", s.token).expect(200);
+    await s.agent.post("/api/v1/links/" + linkId + "/restore").set("X-CSRF-Token", s.token).expect(200);
+
+    expect((db.q.prepare("SELECT state FROM links WHERE id = ?").get(linkId) as { state: string }).state).toBe("expired");
+    expect((await request(app).get("/r/restexp").set("Host", "uvh.es")).status).toBe(404);
+  });
+});
+describe("Unlock token binding", () => {
+  it("does not accept stale unlock tokens for recreated links", async () => {
+    const s = await newSession();
+    await registerVerifiedLogin(s, uniqueEmail("bindtok"));
+    await createLink(s, { destination: "https://example.com/b1", alias: "bindtok", password: "clave-bind-123" });
+
+    const agent = request.agent(app);
+    const page = await agent.get("/r/bindtok").set("Host", "uvh.es");
+    const csrfCookie = (page.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith("uvh_csrf="));
+    const csrf = csrfCookie!.split(";")[0]!.split("=")[1]!;
+    await agent.post("/r/bindtok/unlock").set("Host", "uvh.es").type("form").send({ password: "clave-bind-123", _csrf: csrf }).expect(302);
+
+    // Delete (soft) + hard delete, then recreate the same alias.
+    const row = db.q.prepare("SELECT id FROM links WHERE alias = ? AND domain_id IS NULL").get("bindtok") as { id: number };
+    await s.agent.delete("/api/v1/links/" + row.id).set("X-CSRF-Token", s.token).expect(200);
+    db.q.prepare("DELETE FROM links WHERE id = ?").run(row.id);
+    await createLink(s, { destination: "https://example.com/b2", alias: "bindtok", password: "clave-bind-123" });
+
+    // The stale unlock cookie must NOT open the new link.
+    const after = await agent.get("/r/bindtok").set("Host", "uvh.es");
+    expect(after.status).toBe(403);
   });
 });

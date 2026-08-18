@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { config } from "./config.js";
 
 /**
  * Security headers. HSTS is only enabled when explicitly configured and HTTPS
@@ -23,7 +24,7 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
       "form-action 'self'",
     ].join("; "),
   );
-  if (process.env.HSTS_ENABLED === "1" && req.secure) {
+  if (config.hstsEnabled && req.secure) {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
   next();

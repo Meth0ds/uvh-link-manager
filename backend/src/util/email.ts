@@ -19,8 +19,9 @@ export interface MailMessage {
 
 export async function sendMail(msg: MailMessage): Promise<void> {
   if (!resend) {
-    // Log mailer fallback: keeps flows working in preview without leaking secrets.
-    console.log(`[mail:log] to=${msg.to} subject=${msg.subject}`);
+    // Log mailer fallback: keeps flows working in preview without leaking
+    // secrets. JSON.stringify prevents CR/LF log injection via user content.
+    console.log("[mail:log]", JSON.stringify({ to: msg.to, subject: msg.subject }));
     return;
   }
   try {

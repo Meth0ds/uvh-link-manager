@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -14,9 +15,51 @@ function findBackendRoot(start: string): string {
   return start;
 }
 
-function bool(v: string | undefined, def: boolean): boolean {
-  if (v === undefined) return def;
-  return v === "1" || v === "true" || v === "yes";
+/**
+ * Strict boolean parser: accepts only true/false/1/0/yes/no (any case).
+ * Anything else throws at boot — a typo such as COOKIE_SECURE=TRUE must not
+ * be silently interpreted as "false" for a security option.
+ */
+export function bool(v: string | undefined, def: boolean): boolean {
+  if (v === undefined || v.trim() === "") return def;
+  const n = v.trim().toLowerCase();
+  if (n === "1" || n === "true" || n === "yes") return true;
+  if (n === "0" || n === "false" || n === "no") return false;
+  throw new Error(
+    "Valor booleano inválido en entorno: " + JSON.stringify(v) + " (esperado: true/false/1/0/yes/no)",
+  );
+}
+
+/**
+ * Strict positive-integer parser for env vars. Invalid values (text, negative
+ * numbers, floats, unsafe integers) fail startup instead of producing NaN or a
+ * cutoff in the future that could wipe retention data (e.g. AUDIT_PURGE_DAYS=-1).
+ */
+export function intEnv(
+  name: string | string[],
+  def: number,
+  opts: { min?: number; max?: number } = {},
+): number {
+  const names = Array.isArray(name) ? name : [name];
+  const raw = names.map((n) => process.env[n]).find((v) => v !== undefined && v !== "");
+  if (raw === undefined) return def;
+  const trimmed = raw.trim();
+  if (!/^[0-9]+$/.test(trimmed)) {
+    throw new Error(
+      "Variable de entorno " + names[0] + " inválida: " + JSON.stringify(raw) + " (se esperaba un entero positivo)",
+    );
+  }
+  const n = Number(trimmed);
+  if (!Number.isSafeInteger(n)) {
+    throw new Error("Variable de entorno " + names[0] + " fuera de rango: " + JSON.stringify(raw));
+  }
+  if (opts.min !== undefined && n < opts.min) {
+    throw new Error("Variable de entorno " + names[0] + " debe ser >= " + opts.min + " (recibido " + n + ")");
+  }
+  if (opts.max !== undefined && n > opts.max) {
+    throw new Error("Variable de entorno " + names[0] + " debe ser <= " + opts.max + " (recibido " + n + ")");
+  }
+  return n;
 }
 
 const env = process.env.NODE_ENV ?? "development";
@@ -34,20 +77,35 @@ if (isProduction) {
 
 const appUrl = process.env.APP_URL ?? (isProduction ? "https://app.uvh.es" : "http://localhost:4200");
 
+/**
+ * Outside production, an unset APP_SECRET becomes an ephemeral random value —
+ * never the well-known development constant — so signing keys and at-rest
+ * encryption stay unforgeable in preview environments (sessions simply do not
+ * survive restarts). Production already fails closed above.
+ */
+function resolveAppSecret(provided: string | undefined): string {
+  if (provided) return provided;
+  if (isProduction) return ""; // unreachable: production throws before this point
+  console.warn("[config] APP_SECRET no definido: usando un secreto efímero aleatorio (las sesiones no sobreviven a reinicios)");
+  return randomBytes(32).toString("hex");
+}
+
 export const config = {
   env,
-  port: Number(process.env.PORT ?? process.env.BACKEND_PORT ?? 3001),
+  port: intEnv(["PORT", "BACKEND_PORT"], 3001, { min: 1, max: 65535 }),
   // DB
   dbPath: process.env.DATABASE_PATH ?? path.join(findBackendRoot(here), "data", "uvh.sqlite"),
-  // Secrets
-  appSecret: appSecret ?? "uvh-dev-secret-change-me", // dev/test fallback only
+  appSecret: resolveAppSecret(appSecret),
   // Auth / sessions
   sessionCookieName: process.env.SESSION_COOKIE ?? "uvh_session",
-  sessionTtlDays: Number(process.env.SESSION_TTL_DAYS ?? 30),
+  sessionTtlDays: intEnv("SESSION_TTL_DAYS", 30, { min: 1 }),
   // Secure cookies by default in production (always served over HTTPS there);
   // override with COOKIE_SECURE=false only for testing.
   cookieSecure: bool(process.env.COOKIE_SECURE, isProduction),
   cookieDomain: process.env.COOKIE_DOMAIN ?? undefined, // NEVER ".uvh.es" — panel cookie stays on app host
+  // HSTS is only enabled when explicitly configured AND the request is HTTPS,
+  // so it never breaks a plain-HTTP preview.
+  hstsEnabled: bool(process.env.HSTS_ENABLED, false),
   // Analytics country: only trust a proxy-supplied header when explicitly
   // enabled, otherwise clients could spoof it to poison per-country stats.
   trustCountryHeader: bool(process.env.TRUST_COUNTRY_HEADER, false),

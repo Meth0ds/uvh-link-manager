@@ -67,7 +67,10 @@ export class AuthComponent {
 
   private returnTo(): string {
     const rt = this.route.snapshot.queryParamMap.get("returnTo");
-    return rt && rt.startsWith("/") ? rt : "/app";
+    // Only internal single-slash paths: reject protocol-relative ("//host")
+    // and backslash variants that other consumers could treat as external.
+    if (rt && rt.startsWith("/") && !rt.startsWith("//") && !rt.startsWith("/\\")) return rt;
+    return "/app";
   }
 
   onTabChange(index: number): void {

@@ -178,16 +178,18 @@ export class SettingsComponent {
   }
 
   async disableMfa(): Promise<void> {
-    if (this.mfaPasswordForm.invalid || this.mfaBusy()) return;
+    if (this.mfaPasswordForm.invalid || this.mfaCodeForm.invalid || this.mfaBusy()) return;
     if (!confirm("¿Desactivar la verificación en dos pasos?")) return;
     this.mfaBusy.set(true);
     try {
-      await this.auth.mfaDisable(this.mfaPasswordForm.controls.password.value);
+      // Step-up: the current TOTP code is required to disable MFA.
+      await this.auth.mfaDisable(this.mfaPasswordForm.controls.password.value, this.mfaCodeForm.controls.code.value);
       this.mfaSecret.set(null);
       this.mfaUri.set(null);
       this.mfaQr.set(null);
       this.recoveryCodes.set([]);
       this.mfaPasswordForm.reset();
+      this.mfaCodeForm.reset();
       this.snackbar.open("MFA desactivado", "Cerrar", { duration: 2500 });
     } catch (err) {
       this.toast(err, "");

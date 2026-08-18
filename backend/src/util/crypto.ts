@@ -25,6 +25,14 @@ export function encryptAtRest(plain: string): string {
   return PREFIX + Buffer.concat([iv, tag, enc]).toString("base64url");
 }
 
+/**
+ * Pseudonymous IP hash for audit/session records: HMAC with the app secret
+ * so IPv4 addresses (2^32 space) cannot be reversed with rainbow tables.
+ */
+export function hashIp(ip: string): string {
+  return createHmac("sha256", config.appSecret).update("ip:" + ip).digest("hex").slice(0, 32);
+}
+
 export function decryptAtRest(value: string): string {
   if (!value.startsWith(PREFIX)) return value; // legacy plaintext value
   const buf = Buffer.from(value.slice(PREFIX.length), "base64url");

@@ -43,8 +43,8 @@ tokensRouter.post("/", requireVerified, requireWorkspace("editor"), (req: Authed
   }
   const plain = `uvh_${randomToken(32)}`;
   const info = db
-    .prepare(`INSERT INTO api_tokens (workspace_id, name, token_hash, scopes, expires_at) VALUES (?, ?, ?, ?, ?)`)
-    .run(workspaceId, parsed.data.name, sha256Hex(plain), JSON.stringify(parsed.data.scopes), parsed.data.expiresAt ?? null);
+    .prepare(`INSERT INTO api_tokens (workspace_id, name, token_hash, scopes, expires_at, created_by) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(workspaceId, parsed.data.name, sha256Hex(plain), JSON.stringify(parsed.data.scopes), parsed.data.expiresAt ?? null, req.user!.id);
   audit({ userId: req.user!.id, ip: req.ip }, "api_token.create", "api_token", Number(info.lastInsertRowid), { scopes: parsed.data.scopes });
   res.status(201).json({ token: dto(q.prepare(`SELECT * FROM api_tokens WHERE id = ?`).get(Number(info.lastInsertRowid)) as Record<string, unknown>), plainToken: plain });
 });

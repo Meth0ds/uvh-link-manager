@@ -103,8 +103,13 @@
         <input matInput type="password" formControlName="password" autocomplete="current-password" />
         <mat-icon matPrefix>lock_outline</mat-icon>
       </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Código de 6 dígitos (TOTP)</mat-label>
+        <input matInput [formControl]="mfaCodeForm.controls.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+        <mat-icon matPrefix>verified_user</mat-icon>
+      </mat-form-field>
       <div class="row-actions">
-        <button mat-stroked-button type="submit" class="danger" [disabled]="mfaPasswordForm.invalid || mfaBusy()">Desactivar MFA</button>
+        <button mat-stroked-button type="submit" class="danger" [disabled]="mfaPasswordForm.invalid || mfaCodeForm.invalid || mfaBusy()">Desactivar MFA</button>
       </div>
     </form>
   </ng-template>
