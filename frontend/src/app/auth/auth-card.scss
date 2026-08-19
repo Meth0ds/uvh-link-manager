@@ -1,0 +1,107 @@
+// Shared card styles for the secondary auth pages (forgot/reset/verify/invitation).
+// Used via `styleUrl: "./auth-card.scss"` on each standalone component.
+
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  background: var(--mat-sys-surface-container-lowest, #fff);
+  border: 1px solid var(--uvh-border);
+  border-radius: var(--uvh-radius-lg);
+  box-shadow: var(--uvh-shadow-lg);
+  padding: 32px 30px 28px;
+  overflow: hidden;
+}
+
+h2 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+
+.sub {
+  color: var(--uvh-muted);
+  font-size: 14.5px;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.alert {
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+
+  &.error {
+    background: var(--uvh-danger-soft);
+    border: 1px solid color-mix(in srgb, var(--uvh-danger) 30%, transparent);
+    color: var(--uvh-danger);
+  }
+
+  &.ok {
+    background: var(--uvh-success-soft);
+    border: 1px solid color-mix(in srgb, var(--uvh-success) 30%, transparent);
+    color: var(--uvh-success);
+  }
+}
+
+.submit {
+  width: 100%;
+  height: 46px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 10px;
+  margin-top: 4px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  color: var(--uvh-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.icon {
+  font-size: 54px;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 10px;
+  color: var(--uvh-muted-soft);
+
+  &.ok {
+    color: var(--uvh-teal);
+  }
+
+  &.bad {
+    color: var(--uvh-danger);
+  }
+}
+
+.center {
+  text-align: center;
+
+  h2 {
+    margin-top: 4px;
+  }
+}
+
+.center .sub {
+  max-width: 380px;
+  margin-left: auto;
+  margin-right: auto;
+}

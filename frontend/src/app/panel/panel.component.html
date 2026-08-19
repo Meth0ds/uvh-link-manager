@@ -1,5 +1,6 @@
+<a class="skip-link" href="#panel-content">Saltar al contenido</a>
 <mat-sidenav-container class="shell">
-  <mat-sidenav #sidenav mode="over" [opened]="mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" fixedInViewport>
+  <mat-sidenav #sidenav [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" fixedInViewport aria-label="Navegación principal">
     <div class="side-head">
       <a class="brand" routerLink="/">
         <span class="brand-mark" aria-hidden="true">
@@ -10,44 +11,57 @@
     </div>
 
     <mat-nav-list class="nav-list">
-      <a
-        mat-list-item
-        *ngFor="let item of visibleNav()"
-        [routerLink]="item.path"
-        routerLinkActive="active"
-        (click)="mobileOpen.set(false)"
-        class="nav-item"
-      >
-        <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-        <span matListItemTitle>{{ item.label }}</span>
-      </a>
+      @for (group of visibleNav(); track group.label) {
+        <span class="nav-group">{{ group.label }}</span>
+        @for (item of group.items; track item.path) {
+          <a
+            mat-list-item
+            [routerLink]="item.path"
+            routerLinkActive="active"
+            (click)="mobileOpen.set(false)"
+            class="nav-item"
+            >
+            <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+            <span matListItemTitle>{{ item.label }}</span>
+          </a>
+        }
+      }
     </mat-nav-list>
 
     <div class="side-foot">
-      <button mat-button class="new-link" (click)="newLink()">
+      <button mat-flat-button color="primary" class="new-link" (click)="newLink()">
         <mat-icon>add_link</mat-icon> Nuevo enlace
       </button>
     </div>
   </mat-sidenav>
 
   <mat-sidenav-content class="content">
-    <mat-toolbar class="topbar">
+    <mat-toolbar class="topbar" aria-label="Barra de herramientas">
       <button mat-icon-button class="menu-btn" (click)="mobileOpen.set(!mobileOpen())" aria-label="Abrir menú">
         <mat-icon>menu</mat-icon>
       </button>
 
-      <mat-form-field appearance="outline" class="ws-switch" *ngIf="workspaces.list().length > 1">
-        <mat-select
-          [value]="workspaces.currentId()"
-          (selectionChange)="onWorkspaceChange($event.value)"
-          aria-label="Workspace"
-        >
-          <mat-option *ngFor="let w of workspaces.list()" [value]="w.id">{{ w.name }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <span class="ws-name" *ngIf="workspaces.list().length <= 1">
-        {{ workspaces.list()[0].name }}
-      </span>
+      @if (workspaces.list().length > 1) {
+        <mat-form-field appearance="outline" class="ws-switch">
+          <mat-select
+            [value]="workspaces.currentId()"
+            (selectionChange)="onWorkspaceChange($event.value)"
+            aria-label="Workspace"
+            >
+            @for (w of workspaces.list(); track w.id) {
+              <mat-option [value]="w.id">{{ w.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+      @if (workspaces.list().length <= 1) {
+        <span class="ws-name">
+          {{ workspaces.list()[0]?.name ?? "Sin workspace" }}
+        </span>
+      }
+      <button mat-icon-button matTooltip="Crear workspace" class="workspace-add" (click)="createWorkspace()" aria-label="Crear workspace">
+        <mat-icon>create_new_folder</mat-icon>
+      </button>
 
       <span class="spacer"></span>
 
@@ -65,13 +79,16 @@
         </div>
         <button mat-menu-item routerLink="/app/settings"><mat-icon>settings</mat-icon> Ajustes</button>
         <button mat-menu-item routerLink="/app/team"><mat-icon>group</mat-icon> Equipo</button>
+        <a mat-menu-item routerLink="/"><mat-icon>language</mat-icon> Ir a la web</a>
         <mat-divider></mat-divider>
         <button mat-menu-item (click)="logout()"><mat-icon>logout</mat-icon> Cerrar sesión</button>
       </mat-menu>
     </mat-toolbar>
 
     <main class="main">
-      <router-outlet />
+      <div class="main-inner" id="panel-content" tabindex="-1">
+        <router-outlet />
+      </div>
     </main>
   </mat-sidenav-content>
 </mat-sidenav-container>

@@ -3,85 +3,118 @@
     <h1>Webhooks</h1>
     <p>Recibe eventos de tus enlaces en tu propio servidor, firmados con HMAC.</p>
   </div>
-  <button mat-flat-button color="primary" (click)="startCreate()" *ngIf="!showForm()">
-    <mat-icon>add</mat-icon> Nuevo webhook
-  </button>
-</div>
-
-<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
-<div class="alert error" *ngIf="error()">{{ error() }}</div>
-
-<div class="create-card" *ngIf="showForm()">
-  <h3>{{ editId() ? "Editar webhook" : "Nuevo webhook" }}</h3>
-  <mat-form-field appearance="outline" class="full">
-    <mat-icon matPrefix>http</mat-icon>
-    <input matInput placeholder="https://tu-servidor.com/hooks/uvh" [(ngModel)]="url" />
-  </mat-form-field>
-
-  <div class="events">
-    <mat-checkbox
-      *ngFor="let e of eventOptions"
-      color="primary"
-      [checked]="selectedEvents().includes(e)"
-      (change)="toggleEvent(e)"
-    >
-      <code>{{ e }}</code>
-    </mat-checkbox>
-  </div>
-
-  <mat-form-field appearance="outline" class="full">
-    <mat-label>Secreto (opcional)</mat-label>
-    <input matInput type="password" placeholder="Mínimo 16 caracteres" [(ngModel)]="secret" />
-    <mat-hint>Si se omite, se genera uno automáticamente y se muestra al crear.</mat-hint>
-  </mat-form-field>
-
-  <div class="form-actions">
-    <button mat-button (click)="resetForm()">Cancelar</button>
-    <button mat-flat-button color="primary" (click)="save()" [disabled]="!url().trim() || !selectedEvents().length || saving()">
-      {{ saving() ? "Guardando…" : "Guardar webhook" }}
+  @if (!showForm()) {
+    <button mat-flat-button color="primary" (click)="startCreate()">
+      <mat-icon>add</mat-icon> Nuevo webhook
     </button>
-  </div>
+  }
 </div>
 
-<div class="wh-list" *ngIf="!loading()">
-  <mat-accordion>
-    <mat-expansion-panel *ngFor="let w of webhooks(); trackBy: trackByWebhook" (opened)="loadDeliveries(w)">
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          <span class="wh-url tnum">{{ w.url }}</span>
-          <span class="state-chip" [class.on]="w.active">{{ w.active ? "Activo" : "Pausado" }}</span>
-        </mat-panel-title>
-      </mat-expansion-panel-header>
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando webhooks" />
+}
+@if (error()) {
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+}
 
-      <div class="wh-body">
-        <div class="event-chips">
-          <span class="event-chip" *ngFor="let e of w.events"><code>{{ e }}</code></span>
-        </div>
+@if (showForm()) {
+  <div class="create-card">
+    <h3>{{ editId() ? "Editar webhook" : "Nuevo webhook" }}</h3>
+    <mat-form-field appearance="outline" class="full">
+      <mat-icon matPrefix>http</mat-icon>
+      <input matInput placeholder="https://tu-servidor.com/hooks/uvh" [(ngModel)]="url" />
+    </mat-form-field>
+    <div class="events">
+      @for (e of eventOptions; track e) {
+        <mat-checkbox
+          color="primary"
+          [checked]="selectedEvents().includes(e)"
+          (change)="toggleEvent(e)"
+          >
+          <code>{{ e }}</code>
+        </mat-checkbox>
+      }
+    </div>
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>Secreto (opcional)</mat-label>
+      <input matInput type="password" placeholder="Mínimo 16 caracteres" [(ngModel)]="secret" />
+      <mat-hint>Si se omite, se genera uno automáticamente y se muestra al crear.</mat-hint>
+    </mat-form-field>
+    <div class="form-actions">
+      <button mat-button (click)="resetForm()">Cancelar</button>
+      <button mat-flat-button color="primary" (click)="save()" [disabled]="!url().trim() || !selectedEvents().length || saving()">
+        {{ saving() ? "Guardando…" : "Guardar webhook" }}
+      </button>
+    </div>
+  </div>
+}
 
-        <div class="wh-actions">
-          <button mat-stroked-button (click)="toggleActive(w)">{{ w.active ? "Pausar" : "Activar" }}</button>
-          <button mat-stroked-button (click)="startEdit(w)"><mat-icon>edit</mat-icon> Editar</button>
-          <button mat-stroked-button (click)="test(w)"><mat-icon>send</mat-icon> Enviar ping</button>
-          <button mat-stroked-button class="danger" (click)="remove(w)"><mat-icon>delete</mat-icon> Eliminar</button>
-        </div>
+@if (plainSecret(); as secretValue) {
+  <section class="secret-box" aria-live="polite">
+    <div class="secret-copy">
+      <mat-icon>key</mat-icon>
+      <div><b>Secreto del webhook</b><p>Guárdalo ahora. UVH no puede volver a mostrarlo después de cerrar este aviso.</p></div>
+    </div>
+    <div class="secret-value"><code>{{ secretValue }}</code><button mat-icon-button type="button" (click)="copySecret()" aria-label="Copiar secreto"><mat-icon>content_copy</mat-icon></button></div>
+    <button mat-button type="button" (click)="clearSecret()">Ocultar secreto</button>
+  </section>
+}
 
-        <h4 class="deliveries-title">Entregas recientes</h4>
-        <div class="delivery" *ngFor="let d of deliveries()[w.id] ?? []">
-          <span class="del-status" [class]="'st-' + d.status">{{ d.status }}</span>
-          <span class="del-event"><code>{{ d.event }}</code></span>
-          <span class="del-meta tnum">intento {{ d.attempts }}{{ d.last_error ? " · " + d.last_error : "" }}</span>
-          <button mat-icon-button *ngIf="d.status === 'failed'" (click)="resend(w, d.id)" aria-label="Reenviar">
-            <mat-icon>refresh</mat-icon>
-          </button>
-        </div>
-        <p class="none" *ngIf="!(deliveries()[w.id] ?? []).length">Sin entregas todavía.</p>
+@if (!loading() && (!error() || webhooks().length)) {
+  <div class="wh-list">
+    <mat-accordion>
+      @for (w of webhooks(); track trackByWebhook($index, w)) {
+        <mat-expansion-panel (opened)="loadDeliveries(w)">
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <span class="wh-url tnum">{{ w.url }}</span>
+              <span class="state-chip" [class.on]="w.active">{{ w.active ? "Activo" : "Pausado" }}</span>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <div class="wh-body">
+            <div class="event-chips">
+              @for (e of w.events; track e) {
+                <span class="event-chip"><code>{{ e }}</code></span>
+              }
+            </div>
+            <div class="wh-actions">
+              <button mat-stroked-button (click)="toggleActive(w)" [disabled]="actionId() === w.id">{{ w.active ? "Pausar" : "Activar" }}</button>
+              <button mat-stroked-button (click)="startEdit(w)" [disabled]="actionId() === w.id"><mat-icon>edit</mat-icon> Editar</button>
+              <button mat-stroked-button (click)="test(w)" [disabled]="actionId() === w.id"><mat-icon>send</mat-icon> Enviar ping</button>
+              <button mat-stroked-button class="danger" (click)="remove(w)" [disabled]="actionId() === w.id"><mat-icon>delete</mat-icon> Eliminar</button>
+            </div>
+            <h4 class="deliveries-title">Entregas recientes</h4>
+            @if (deliveriesLoading()[w.id]) {
+              <mat-progress-bar mode="indeterminate" aria-label="Cargando entregas" />
+            }
+            @if (deliveriesError()[w.id]; as message) {
+              <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadDeliveries(w)">Reintentar</button></div>
+            }
+            @for (d of deliveries()[w.id] ?? []; track d) {
+              <div class="delivery">
+                <span class="del-status" [class]="'st-' + d.status">{{ d.status }}</span>
+                <span class="del-event"><code>{{ d.event }}</code></span>
+                <span class="del-meta tnum">intento {{ d.attempts }}{{ d.last_error ? " · " + d.last_error : "" }}</span>
+                @if (d.status === 'failed') {
+                  <button mat-icon-button (click)="resend(w, d.id)" aria-label="Reenviar" [disabled]="actionId() === w.id">
+                    <mat-icon>refresh</mat-icon>
+                  </button>
+                }
+              </div>
+            }
+            @if (!(deliveries()[w.id] ?? []).length && !deliveriesLoading()[w.id] && !deliveriesError()[w.id]) {
+              <p class="none">Sin entregas todavía.</p>
+            }
+          </div>
+        </mat-expansion-panel>
+      }
+    </mat-accordion>
+    @if (!webhooks().length && !error()) {
+      <div class="empty-state">
+        <mat-icon>webhook</mat-icon>
+        <b>Sin webhooks</b>
+        <p>Conecta UVH con tus sistemas para automatizar tu flujo.</p>
       </div>
-    </mat-expansion-panel>
-  </mat-accordion>
-
-  <div class="empty" *ngIf="!webhooks().length">
-    <mat-icon>webhook</mat-icon>
-    <h3>Sin webhooks</h3>
-    <p>Conecta UVH con tus sistemas para automatizar tu flujo.</p>
+    }
   </div>
-</div>
+}

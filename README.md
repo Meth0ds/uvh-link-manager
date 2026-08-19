@@ -11,57 +11,50 @@ Plataforma profesional de acortamiento, administración y analítica de enlaces.
 
 ```
 uvh/
-├── frontend/   # SPA Angular 19 (Angular Material + CDK)
-└── backend/    # API Express + TypeScript + SQLite (node:sqlite)
+├── frontend/        # SPA Angular 22 (Angular Material + CDK)
+├── backend-laravel/ # API Laravel 13 + PostgreSQL 16
+├── docker/          # Dockerfile PHP 8.4 para el stack local
+└── docs/            # arquitectura, despliegue, seguridad, API
 ```
 
 ## Stack
 
 | Capa          | Tecnología                                                                  |
 | ------------- | --------------------------------------------------------------------------- |
-| Frontend      | Angular 19, TypeScript estricto, Angular Material, Angular CDK, Signals, componentes standalone, lazy loading |
-| Backend       | Express 4, TypeScript, Zod, bcryptjs, otplib, express-rate-limit            |
-| Base de datos | SQLite (módulo nativo `node:sqlite`)                                        |
+| Frontend      | Angular 22, TypeScript estricto, Angular Material, Angular CDK, Signals, componentes standalone, lazy loading |
+| Backend       | Laravel 13 (PHP 8.4), Eloquent, cola `database`, scheduler                  |
+| Base de datos | PostgreSQL 16 (local vía Docker Compose)                                    |
 | Email         | Resend                                                                      |
-| Tests         | Vitest + Supertest (backend)                                                |
+| Tests         | PHPUnit (Laravel) + Karma/Jasmine (Angular)                                 |
 
 ## Requisitos
 
-- Node.js **22+** (usa el módulo nativo `node:sqlite`)
-- npm — ver `package.json` de cada paquete
+- Docker Desktop (PostgreSQL + PHP 8.4 en contenedores)
+- Node.js 22+ y npm para el frontend
 
 ## Puesta en marcha
 
-### 1. Variables de entorno
-
-Crea un `.env.local` en la raíz (gitignored) y rellena los valores:
-
-| Variable | Obligatoria | Descripción |
-| --- | --- | --- |
-| `NODE_ENV` | no | `development` / `production` |
-| `PORT` / `BACKEND_PORT` | no | Puerto del backend (por defecto `3001`) |
-| `DATABASE_PATH` | no | Ruta del SQLite (por defecto `backend/data/uvh.sqlite`) |
-| `APP_SECRET` | **sí** | Secreto de firma de sesión (cadena larga y aleatoria) |
-| `SESSION_COOKIE` | no | Nombre de la cookie (por defecto `uvh_session`) |
-| `SESSION_TTL_DAYS` | no | Duración de la sesión en días (por defecto `30`) |
-| `COOKIE_SECURE` | prod | `true` en producción (HTTPS) |
-| `COOKIE_DOMAIN` | no | Mantener **vacío** (nunca `.uvh.es`) |
-| `APP_URL` | no | URL de la SPA (por defecto `http://localhost:4200`) |
-| `APP_HOST` | no | Host del panel/API (por defecto se deriva de `APP_URL`) |
-| `PUBLIC_HOST` | no | Host público de resolución (por defecto `uvh.es`) |
-| `RESEND_API_KEY` | no | Clave de Resend para email transaccional |
-| `MAIL_FROM` | no | Remitente de correo |
-| `VERIFIED_REQUIRED_TO_CREATE` | no | Exigir email verificado para crear enlaces (`true`/`false`) |
-| `BACKEND_URL` | no | Solo frontend dev: destino del proxy (`http://127.0.0.1:3001`) |
-
-### 2. Backend
+### 1. Infraestructura (PostgreSQL + PHP)
 
 ```bash
-cd backend
-npm install
-npm run dev    # tsx watch src/index.ts → http://127.0.0.1:3001
-npm test       # vitest run
+cp .env.docker.local.example .env.docker.local
+docker compose -f docker-compose.local.yml --env-file .env.docker.local up -d postgres
+# App completa (artisan serve + queue + schedule):
+docker compose -f docker-compose.local.yml --env-file .env.docker.local --profile laravel up -d
 ```
+
+### 2. Backend Laravel
+
+```bash
+cd backend-laravel
+composer install
+cp .env.example .env        # y configura DB_* para apuntar a PostgreSQL local
+php artisan key:generate
+php artisan migrate
+php artisan test            # PHPUnit
+```
+
+En local, `php artisan serve` escucha en `http://127.0.0.1:8000` (contenedor `app` del Compose).
 
 ### 3. Frontend
 
@@ -71,30 +64,31 @@ npm install
 npm start      # ng serve → http://localhost:4200
 ```
 
-El proxy de desarrollo (`src/proxy.conf.js`) reenvía `/api` y `/r` al backend (`BACKEND_URL`, por defecto `http://127.0.0.1:3001`).
+El proxy de desarrollo (`src/proxy.conf.js`) reenvía `/api` y `/r` al backend (`BACKEND_URL`, por defecto `http://127.0.0.1:8000`).
 
 ## Scripts
 
-**Backend** (`backend/package.json`)
+**Backend Laravel** (`backend-laravel/`)
 
-- `npm run dev` — desarrollo con recarga
-- `npm run start` — ejecutar el servidor compilado (`node dist/src/index.js`; requiere `npm run build`)
-- `npm run build` — `tsc -p tsconfig.json`
-- `npm run typecheck` — `tsc --noEmit`
-- `npm test` — Vitest
+- `php artisan test` — PHPUnit
+- `php artisan queue:work` — worker de cola (webhooks asíncronos)
+- `php artisan schedule:work` — scheduler local (activación/caducidad de enlaces y purgas)
+- `php artisan uvh:housekeeping` — pasada de mantenimiento manual
 
 **Frontend** (`frontend/package.json`)
 
 - `npm start` — `ng serve`
 - `npm run build` — `ng build`
+- `npm run typecheck` — `tsc --noEmit`
 - `npm test` — `ng test`
 
 ## Seguridad
 
-- `.env.local` y `.env.*.local` están ignorados por git; nunca subas secretos reales.
+- `.env*` y `.env.docker.local` están ignorados por git; nunca subas secretos reales.
 - En producción activa `COOKIE_SECURE=true`.
 - Mantén `COOKIE_DOMAIN` vacío para que la cookie de sesión se restrinja a `app.uvh.es`.
 - En producción, `APP_SECRET` es obligatorio: el backend **no arranca** si falta o usa el valor de desarrollo.
+- Ver `docs/security.md` y `docs/security-audit-2026-08-19.md`.
 
 ## Estado
 

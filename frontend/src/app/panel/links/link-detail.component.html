@@ -1,8 +1,12 @@
-<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
 
-<div class="alert error" *ngIf="error()">{{ error() }}</div>
+@if (error()) {
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+}
 
-<ng-container *ngIf="link() as link">
+@if (link(); as link) {
   <div class="head">
     <a class="back" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> Enlaces</a>
     <div class="title-row">
@@ -13,26 +17,32 @@
       <div class="actions">
         <button mat-stroked-button (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar</button>
         <button mat-stroked-button (click)="showQr()"><mat-icon>qr_code_2</mat-icon> QR</button>
-        <button mat-flat-button color="primary" (click)="edit()"><mat-icon>edit</mat-icon> Editar</button>
-        <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones"><mat-icon>more_vert</mat-icon></button>
-        <mat-menu #menu="matMenu">
-          <button mat-menu-item *ngIf="link.state === 'active'" (click)="setState('paused')"><mat-icon>pause</mat-icon> Pausar</button>
-          <button mat-menu-item *ngIf="link.state === 'paused'" (click)="setState('active')"><mat-icon>play_arrow</mat-icon> Reactivar</button>
-          <button mat-menu-item *ngIf="link.state !== 'archived'" (click)="setState('archived')"><mat-icon>archive</mat-icon> Archivar</button>
-          <mat-divider></mat-divider>
-          <button mat-menu-item class="danger" (click)="remove()"><mat-icon>delete</mat-icon> Eliminar</button>
-        </mat-menu>
+        @if (canWrite()) {
+          <button mat-flat-button color="primary" (click)="edit()" [disabled]="actionBusy()"><mat-icon>edit</mat-icon> Editar</button>
+          <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones" [disabled]="actionBusy()"><mat-icon>more_vert</mat-icon></button>
+          <mat-menu #menu="matMenu">
+            @if (link.state === 'active') {
+              <button mat-menu-item (click)="setState('paused')" [disabled]="actionBusy()"><mat-icon>pause</mat-icon> Pausar</button>
+            }
+            @if (link.state === 'paused') {
+              <button mat-menu-item (click)="setState('active')" [disabled]="actionBusy()"><mat-icon>play_arrow</mat-icon> Reactivar</button>
+            }
+            @if (link.state !== 'archived') {
+              <button mat-menu-item (click)="setState('archived')" [disabled]="actionBusy()"><mat-icon>archive</mat-icon> Archivar</button>
+            }
+            <mat-divider></mat-divider>
+            <button mat-menu-item class="danger" (click)="remove()" [disabled]="actionBusy()"><mat-icon>delete</mat-icon> Eliminar</button>
+          </mat-menu>
+        }
       </div>
     </div>
   </div>
-
   <div class="stat-cards">
     <div class="stat-card"><span>Clics</span><b class="tnum">{{ link.clickCount }}</b></div>
     <div class="stat-card"><span>Máx. clics</span><b class="tnum">{{ link.maxClicks ?? "∞" }}</b></div>
     <div class="stat-card"><span>Estado</span><b>{{ link.state === "active" ? "Activo" : link.state }}</b></div>
     <div class="stat-card"><span>Creado</span><b class="tnum">{{ link.createdAt.slice(0, 10) }}</b></div>
   </div>
-
   <div class="period-row">
     <span class="section-title">Analítica</span>
     <mat-form-field appearance="outline" class="period">
@@ -44,31 +54,47 @@
       </mat-select>
     </mat-form-field>
   </div>
-
-  <app-charts *ngIf="analytics() as a" [overview]="a" />
-
+  @if (analyticsError(); as message) {
+    <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="retryAnalytics()">Reintentar analítica</button></div>
+  }
+  @if (analytics(); as a) {
+    <app-charts [overview]="a" />
+  }
+  @if (!analytics() && !analyticsError() && !loading()) {
+    <div class="empty-state"><mat-icon>query_stats</mat-icon><b>Sin datos de este periodo</b><p>Comparte el enlace para empezar a medir su rendimiento.</p></div>
+  }
   <span class="section-title">Reglas de redirección</span>
   <div class="rules-block">
-    <div class="rule-card" *ngFor="let rule of rules(); let i = index">
-      <span class="rule-prio tnum">#{{ i + 1 }}</span>
-      <div class="rule-info">
-        <b>{{ ruleSummary(rule) }}</b>
-        <span class="rule-dest">{{ rule.destination }}</span>
+    @for (rule of rules(); track rule; let i = $index) {
+      <div class="rule-card">
+        <span class="rule-prio tnum">#{{ i + 1 }}</span>
+        <div class="rule-info">
+          <b>{{ ruleSummary(rule) }}</b>
+          <span class="rule-dest">{{ rule.destination }}</span>
+        </div>
       </div>
-    </div>
-    <p class="none" *ngIf="!rules().length">Sin reglas condicionales. El enlace redirige siempre al destino principal.</p>
+    }
+    @if (!rules().length) {
+      <p class="none">Sin reglas condicionales. El enlace redirige siempre al destino principal.</p>
+    }
   </div>
-
   <span class="section-title">Actividad</span>
+  @if (activityError(); as message) {
+    <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="retryActivity()">Reintentar actividad</button></div>
+  }
   <div class="activity-block">
-    <div class="activity-row" *ngFor="let ev of activity()">
-      <mat-icon>history</mat-icon>
-      <div>
-        <b>{{ actionLabel(ev.action) }}</b>
-        <span>{{ ev.metadata }}</span>
+    @for (ev of activity(); track ev) {
+      <div class="activity-row">
+        <mat-icon>history</mat-icon>
+        <div>
+          <b>{{ actionLabel(ev.action) }}</b>
+          <span>{{ ev.metadata }}</span>
+        </div>
+        <time class="tnum">{{ ev.created_at.slice(0, 16).replace("T", " ") }}</time>
       </div>
-      <time class="tnum">{{ ev.created_at.slice(0, 16).replace("T", " ") }}</time>
-    </div>
-    <p class="none" *ngIf="!activity().length">Sin actividad registrada.</p>
+    }
+    @if (!activity().length) {
+      <p class="none">Sin actividad registrada.</p>
+    }
   </div>
-</ng-container>
+}

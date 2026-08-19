@@ -3,14 +3,19 @@
   <p>Usuarios, denuncias, bloqueos y auditoría de la plataforma.</p>
 </div>
 
-<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando administración" />
+}
 
-<div class="alert error" *ngIf="error()">
-  <mat-icon>lock_outline</mat-icon>
-  <span>{{ error() }}</span>
-</div>
+@if (error()) {
+  <div class="alert error" role="alert">
+    <mat-icon>lock_outline</mat-icon>
+    <span>{{ error() }}</span>
+    <button mat-stroked-button type="button" (click)="loadOverview()">Reintentar</button>
+  </div>
+}
 
-<ng-container *ngIf="!error() && overview() as o">
+@if (!error() && overview(); as o) {
   <div class="stat-cards">
     <div class="stat-card"><span>Usuarios</span><b class="tnum">{{ o.users }}</b></div>
     <div class="stat-card"><span>Workspaces</span><b class="tnum">{{ o.workspaces }}</b></div>
@@ -19,7 +24,6 @@
     <div class="stat-card"><span>Denuncias abiertas</span><b class="tnum">{{ o.openReports }}</b></div>
     <div class="stat-card"><span>Enlaces bloqueados</span><b class="tnum">{{ o.blockedLinks }}</b></div>
   </div>
-
   <mat-tab-group animationDuration="200ms" class="tabs">
     <!-- Users -->
     <mat-tab label="Usuarios">
@@ -28,30 +32,39 @@
           <mat-icon matPrefix>search</mat-icon>
           <input matInput placeholder="Buscar por email o nombre…" [value]="userQuery()" (keyup.enter)="searchUsers(searchInput.value)" #searchInput />
         </mat-form-field>
+        @if (usersLoading()) {
+          <mat-progress-bar mode="indeterminate" aria-label="Cargando usuarios" />
+        }
+        @if (usersError(); as message) {
+          <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadUsers()">Reintentar</button></div>
+        }
         <div class="table">
           <div class="table-row head">
             <span>Usuario</span><span>Rol</span><span>Verificado</span><span>MFA</span><span>Workspaces</span><span>Enlaces</span><span></span>
           </div>
-          <div class="table-row" *ngFor="let u of users()">
-            <span class="cell-main">
-              <b>{{ u.name }}</b>
-              <i>{{ u.email }}</i>
-            </span>
-            <span>{{ u.is_admin === 1 ? 'Admin' : 'Usuario' }}</span>
-            <span>{{ u.email_verified_at ? 'Sí' : 'No' }}</span>
-            <span>{{ u.mfa_enabled === 1 ? 'Sí' : 'No' }}</span>
-            <span class="tnum">{{ u.workspaces }}</span>
-            <span class="tnum">{{ u.links }}</span>
-            <span class="cell-actions">
-              <button mat-stroked-button (click)="toggleAdmin(u)">{{ u.is_admin === 1 ? 'Quitar admin' : 'Hacer admin' }}</button>
-              <button mat-stroked-button [class.danger]="!u.deleted_at" (click)="toggleBlock(u)">{{ u.deleted_at ? 'Desbloquear' : 'Bloquear' }}</button>
-            </span>
-          </div>
+          @for (u of users(); track u) {
+            <div class="table-row">
+              <span class="cell-main">
+                <b>{{ u.name }}</b>
+                <i>{{ u.email }}</i>
+              </span>
+              <span>{{ isAdminUser(u) ? 'Admin' : 'Usuario' }}</span>
+              <span>{{ u.email_verified_at ? 'Sí' : 'No' }}</span>
+              <span>{{ hasMfa(u) ? 'Sí' : 'No' }}</span>
+              <span class="tnum">{{ u.workspaces }}</span>
+              <span class="tnum">{{ u.links }}</span>
+              <span class="cell-actions">
+                <button mat-stroked-button (click)="toggleAdmin(u)" [disabled]="actionKey() !== null">{{ isAdminUser(u) ? 'Quitar admin' : 'Hacer admin' }}</button>
+                <button mat-stroked-button [class.danger]="!u.deleted_at" (click)="toggleBlock(u)" [disabled]="actionKey() !== null">{{ u.deleted_at ? 'Desbloquear' : 'Bloquear' }}</button>
+              </span>
+            </div>
+          }
         </div>
-        <p class="none" *ngIf="!users().length">Sin usuarios.</p>
+        @if (!usersLoading() && !usersError() && !users().length) {
+          <p class="none">Sin usuarios.</p>
+        }
       </div>
     </mat-tab>
-
     <!-- Reports -->
     <mat-tab label="Denuncias">
       <div class="tab-pad">
@@ -64,40 +77,65 @@
             <mat-option value="dismissed">Desestimadas</mat-option>
           </mat-select>
         </mat-form-field>
-        <div class="report" *ngFor="let r of reports()">
-          <div class="report-head">
-            <span class="chip">{{ r.status }}</span>
-            <b class="tnum">{{ r.alias }}</b>
-            <span class="muted">{{ r.destination }}</span>
+        @if (reportsLoading()) {
+          <mat-progress-bar mode="indeterminate" aria-label="Cargando denuncias" />
+        }
+        @if (reportsError(); as message) {
+          <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadReports()">Reintentar</button></div>
+        }
+        @for (r of reports(); track r) {
+          <div class="report">
+            <div class="report-head">
+              <span class="chip">{{ r.status }}</span>
+              <b class="tnum">{{ r.alias }}</b>
+              <span class="muted">{{ r.destination }}</span>
+            </div>
+            <p class="report-reason"><b>Motivo:</b> {{ r.reason }}</p>
+            @if (r.details) {
+              <p class="muted">{{ r.details }}</p>
+            }
+            <p class="muted">Denunciado por {{ r.reporter_email ?? 'anónimo' }} · {{ formatDate(r.created_at) }}</p>
+            <div class="report-actions">
+              <button mat-stroked-button (click)="setReportStatus(r, 'reviewed')" [disabled]="actionKey() !== null">Marcar revisada</button>
+              <button mat-stroked-button (click)="setReportStatus(r, 'actioned')" [disabled]="actionKey() !== null">Marcar actuada</button>
+              <button mat-stroked-button (click)="setReportStatus(r, 'dismissed')" [disabled]="actionKey() !== null">Desestimar</button>
+              @if (r.link_state !== 'blocked') {
+                <button mat-flat-button color="warn" (click)="blockLink(r)" [disabled]="actionKey() !== null">Bloquear enlace</button>
+              }
+              @if (r.link_state === 'blocked') {
+                <button mat-stroked-button (click)="unblockLink(r)" [disabled]="actionKey() !== null">Desbloquear enlace</button>
+              }
+            </div>
           </div>
-          <p class="report-reason"><b>Motivo:</b> {{ r.reason }}</p>
-          <p class="muted" *ngIf="r.details">{{ r.details }}</p>
-          <p class="muted">Denunciado por {{ r.reporter_email ?? 'anónimo' }} · {{ formatDate(r.created_at) }}</p>
-          <div class="report-actions">
-            <button mat-stroked-button (click)="setReportStatus(r, 'reviewed')">Marcar revisada</button>
-            <button mat-stroked-button (click)="setReportStatus(r, 'actioned')">Marcar actuada</button>
-            <button mat-stroked-button (click)="setReportStatus(r, 'dismissed')">Desestimar</button>
-            <button mat-flat-button color="warn" *ngIf="r.link_state !== 'blocked'" (click)="blockLink(r)">Bloquear enlace</button>
-            <button mat-stroked-button *ngIf="r.link_state === 'blocked'" (click)="unblockLink(r)">Desbloquear enlace</button>
-          </div>
-        </div>
-        <p class="none" *ngIf="!reports().length">Sin denuncias.</p>
+        }
+        @if (!reportsLoading() && !reportsError() && !reports().length) {
+          <p class="none">Sin denuncias.</p>
+        }
       </div>
     </mat-tab>
-
     <!-- Audit -->
     <mat-tab label="Auditoría">
       <div class="tab-pad">
-        <div class="audit-row" *ngFor="let ev of events()">
-          <mat-icon>history</mat-icon>
-          <div class="audit-info">
-            <b>{{ auditLabel(ev.action) }}</b>
-            <span>Recurso: {{ ev.resource_type ?? '—' }}/{{ ev.resource_id ?? '—' }} · Usuario {{ ev.user_id ?? '—' }}</span>
+        @if (auditLoading()) {
+          <mat-progress-bar mode="indeterminate" aria-label="Cargando auditoría" />
+        }
+        @if (auditError(); as message) {
+          <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadAudit()">Reintentar</button></div>
+        }
+        @for (ev of events(); track ev) {
+          <div class="audit-row">
+            <mat-icon>history</mat-icon>
+            <div class="audit-info">
+              <b>{{ auditLabel(ev.action) }}</b>
+              <span>Recurso: {{ ev.resource_type ?? '—' }}/{{ ev.resource_id ?? '—' }} · Usuario {{ ev.user_id ?? '—' }}</span>
+            </div>
+            <time class="tnum">{{ formatDate(ev.created_at) }}</time>
           </div>
-          <time class="tnum">{{ formatDate(ev.created_at) }}</time>
-        </div>
-        <p class="none" *ngIf="!events().length">Sin eventos de auditoría.</p>
+        }
+        @if (!auditLoading() && !auditError() && !events().length) {
+          <p class="none">Sin eventos de auditoría.</p>
+        }
       </div>
     </mat-tab>
   </mat-tab-group>
-</ng-container>
+}

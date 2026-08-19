@@ -1,11 +1,14 @@
-import { AfterViewInit, Component, ElementRef, inject, OnDestroy, signal } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { AfterViewInit, Component, ElementRef, inject, OnDestroy, signal, ChangeDetectionStrategy } from "@angular/core";
+
 import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatRippleModule } from "@angular/material/core";
+import { MatExpansionModule } from "@angular/material/expansion";
+import { MatTooltipModule } from "@angular/material/tooltip";
 import { FormsModule } from "@angular/forms";
 import { ApiService } from "../core/services/api.service";
+import { ThemeService } from "../core/services/theme.service";
 
 interface Feature {
   icon: string;
@@ -22,15 +25,24 @@ interface Plan {
   features: string[];
 }
 
+interface Testimonial {
+  quote: string;
+  name: string;
+  role: string;
+  initials: string;
+}
+
 @Component({
   selector: "app-landing",
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule, MatIconModule, MatRippleModule, FormsModule],
+  imports: [RouterLink, MatButtonModule, MatIconModule, MatRippleModule, MatExpansionModule, MatTooltipModule, FormsModule],
   templateUrl: "./landing.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./landing.component.scss",
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
   private api = inject(ApiService);
+  readonly theme = inject(ThemeService);
   private hostElement = inject(ElementRef<HTMLElement>);
   private revealObserver?: IntersectionObserver;
   private heroSpotlightCleanup?: () => void;
@@ -38,13 +50,16 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   readonly year = new Date().getFullYear();
   readonly demoUrl = signal("");
   readonly appUrl = signal("");
+  readonly mobileOpen = signal(false);
+  readonly demoError = signal<string | null>(null);
 
   constructor() {
-    // Resolve the panel origin once so CTAs cross hosts correctly in production
-    // (uvh.es → app.uvh.es). Falls back to same-origin /auth while loading.
+    // Keep local development on the frontend origin. The API proxy may report
+    // its own backend host, which must never become a broken CTA destination.
+    this.appUrl.set(this.currentOrigin());
     this.api
       .get<{ appUrl: string }>("/api/v1/config")
-      .then((c) => this.appUrl.set(c.appUrl))
+      .then((c) => this.appUrl.set(this.resolveAppUrl(c.appUrl)))
       .catch(() => {});
   }
 
@@ -95,8 +110,35 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   /** Absolute URL to the authenticated panel, honoring the resolved app host. */
-  authHref(): string {
-    return `${this.appUrl()}/auth?returnTo=${encodeURIComponent("/app/links")}`;
+  authHref(destination = ""): string {
+    const returnTo = destination
+      ? `/app/links?destination=${encodeURIComponent(destination)}`
+      : "/app/links";
+    return `${this.appUrl() || this.currentOrigin()}/auth?returnTo=${encodeURIComponent(returnTo)}`;
+  }
+
+  toggleTheme(): void {
+    this.theme.set(this.theme.resolved() === "dark" ? "light" : "dark");
+  }
+
+  private currentOrigin(): string {
+    return typeof window === "undefined" ? "" : window.location.origin;
+  }
+
+  private resolveAppUrl(raw: string): string {
+    const fallback = this.currentOrigin();
+    // Dev proxy hosts must remain on the SPA origin; the API origin does not
+    // serve the Angular shell in local development.
+    if (typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
+      return fallback;
+    }
+    try {
+      const url = new URL(raw, fallback);
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.search || url.hash) return fallback;
+      return url.origin;
+    } catch {
+      return fallback;
+    }
   }
 
   readonly features: Feature[] = [
@@ -184,6 +226,50 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     },
   ];
 
+  readonly stats = [
+    { value: "99,99%", label: "disponibilidad objetivo", icon: "verified" },
+    { value: "<50 ms", label: "tiempo de resolución", icon: "bolt" },
+    { value: "24/7", label: "visibilidad de tu tráfico", icon: "monitoring" },
+    { value: "100%", label: "datos de tu propio backend", icon: "storage" },
+  ];
+
+  readonly testimonials: Testimonial[] = [
+    {
+      quote:
+        "Pasamos de enlaces sin control a saber exactamente qué campaña trae tráfico y desde qué país. Las reglas de redirección nos ahorran horas cada semana.",
+      name: "Lucía Fernández",
+      role: "Growth Lead · Northwind",
+      initials: "LF",
+    },
+    {
+      quote:
+        "El enlace se resuelve con una redirección real y la analítica es nuestra. Nada de intermediarios ni píxeles de terceros entre la campaña y el cliente.",
+      name: "Marc Vidal",
+      role: "CTO · Sotano Studio",
+      initials: "MV",
+    },
+    {
+      quote:
+        "Verificar nuestro dominio fue cuestión de minutos y la API nos permitió generar enlaces dinámicos desde el propio producto. Impecable.",
+      name: "Elena Roca",
+      role: "Product Manager · Linq",
+      initials: "ER",
+    },
+  ];
+
+  readonly comparison = {
+    features: [
+      { label: "Redirección HTTP real (302)", uvh: true, other: false },
+      { label: "Analítica sin píxeles de terceros", uvh: true, other: false },
+      { label: "Dominios propios con verificación TXT", uvh: true, other: true },
+      { label: "Reglas por país, idioma y dispositivo", uvh: true, other: false },
+      { label: "Webhooks firmados y API con scopes", uvh: true, other: false },
+      { label: "MFA y auditoría de acciones sensibles", uvh: true, other: false },
+      { label: "Límites de clics y uso único", uvh: true, other: true },
+      { label: "Sin anuncios ni branding ajeno", uvh: true, other: false },
+    ],
+  };
+
   readonly faqs = [
     {
       q: "¿Cómo se resuelven los enlaces?",
@@ -208,8 +294,19 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   ];
 
   submitDemo(): void {
-    // Creating links requires an authenticated, verified account.
-    this.demoUrl.set("");
-    window.location.href = this.authHref();
+    const raw = this.demoUrl().trim();
+    if (raw) {
+      try {
+        const url = new URL(raw);
+        if (!/^https?:$/.test(url.protocol) || url.username || url.password || raw.length > 2048) throw new Error("invalid");
+      } catch {
+        this.demoError.set("Introduce una URL http(s) válida, sin credenciales embebidas.");
+        return;
+      }
+    }
+    this.demoError.set(null);
+    // Link creation requires an authenticated, verified account. Preserve the
+    // destination through login so the dialog can be opened prefilled.
+    window.location.assign(this.authHref(raw));
   }
 }

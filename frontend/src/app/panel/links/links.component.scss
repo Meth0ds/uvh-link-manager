@@ -53,7 +53,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  background: #fff;
+  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
   border: 1px solid var(--uvh-border);
   border-radius: 14px;
   padding: 14px 16px;
@@ -86,32 +86,6 @@
   word-break: break-all;
   &:hover {
     text-decoration: underline;
-  }
-}
-
-.state-chip {
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 999px;
-  padding: 3px 10px;
-  &.st-active {
-    background: rgba(0, 169, 157, 0.12);
-    color: #00796b;
-  }
-  &.st-paused,
-  &.st-expired {
-    background: rgba(251, 191, 36, 0.14);
-    color: #92600a;
-  }
-  &.st-blocked {
-    background: rgba(220, 38, 38, 0.1);
-    color: #b91c1c;
-  }
-  &.st-scheduled,
-  &.st-archived,
-  &.st-deleted {
-    background: rgba(91, 107, 132, 0.12);
-    color: var(--uvh-muted);
   }
 }
 
@@ -164,23 +138,6 @@
 .danger {
   color: #b91c1c;
   --mat-menu-item-icon-color: #b91c1c;
-}
-
-.empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--uvh-muted);
-  mat-icon {
-    font-size: 52px;
-    width: 52px;
-    height: 52px;
-    color: var(--uvh-border);
-  }
-  h3 {
-    font-size: 18px;
-    color: var(--uvh-ink);
-    margin: 12px 0 4px;
-  }
 }
 
 @media (max-width: 640px) {

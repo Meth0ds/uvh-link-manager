@@ -1,5 +1,6 @@
-import { Component, inject, signal } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+
+import { Router } from "@angular/router";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -14,12 +15,12 @@ import { AuthService } from "../../core/services/auth.service";
 import { ThemeService, type ThemePreference } from "../../core/services/theme.service";
 import { ApiRequestError } from "../../core/services/api.service";
 import type { Session } from "../../core/models";
+import { ActionDialogService } from "../action-dialog.service";
 
 @Component({
   selector: "app-settings",
   standalone: true,
   imports: [
-    CommonModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -28,16 +29,19 @@ import type { Session } from "../../core/models";
     MatProgressBarModule,
     MatSnackBarModule,
     MatRadioModule,
-    MatDividerModule,
-  ],
+    MatDividerModule
+],
   templateUrl: "./settings.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./settings.component.scss",
 })
 export class SettingsComponent {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
+  private router = inject(Router);
   private theme = inject(ThemeService);
   private snackbar = inject(MatSnackBar);
+  private actions = inject(ActionDialogService);
 
   readonly user = this.auth.user;
 
@@ -62,6 +66,7 @@ export class SettingsComponent {
   // ---------------- Sessions ----------------
   readonly sessions = signal<Session[]>([]);
   readonly sessionsLoading = signal(true);
+  readonly sessionsError = signal<string | null>(null);
 
   // ---------------- MFA ----------------
   readonly mfaBusy = signal(false);
@@ -128,18 +133,30 @@ export class SettingsComponent {
 
   async loadSessions(): Promise<void> {
     this.sessionsLoading.set(true);
+    this.sessionsError.set(null);
     try {
-      this.sessions.set(await this.auth.listSessions());
-    } catch {
+      const now = Date.now();
+      const sessions = await this.auth.listSessions();
+      this.sessions.set(sessions.filter((session) => !session.revoked_at && new Date(session.expires_at).getTime() > now));
+    } catch (err) {
       this.sessions.set([]);
+      this.sessionsError.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las sesiones");
     } finally {
       this.sessionsLoading.set(false);
     }
   }
 
-  async revokeSession(id: string): Promise<void> {
+  async revokeSession(session: Session): Promise<void> {
+    const request = this.auth.revokeSession(session.id, session.current);
+    if (session.current) {
+      // AuthService clears local access before the request; leave the panel
+      // immediately and let the server revocation finish in the background.
+      await this.router.navigate(["/auth"]);
+      void request.catch(() => undefined);
+      return;
+    }
     try {
-      await this.auth.revokeSession(id);
+      await request;
       this.snackbar.open("Sesión revocada", "Cerrar", { duration: 2500 });
       void this.loadSessions();
     } catch (err) {
@@ -169,6 +186,9 @@ export class SettingsComponent {
     try {
       const { recoveryCodes } = await this.auth.mfaEnable(this.mfaCodeForm.controls.code.value);
       this.recoveryCodes.set(recoveryCodes);
+      await this.auth.refreshUser();
+      this.mfaPasswordForm.reset();
+      this.mfaCodeForm.reset();
       this.snackbar.open("MFA activado", "Cerrar", { duration: 2500 });
     } catch (err) {
       this.toast(err, "");
@@ -179,7 +199,13 @@ export class SettingsComponent {
 
   async disableMfa(): Promise<void> {
     if (this.mfaPasswordForm.invalid || this.mfaCodeForm.invalid || this.mfaBusy()) return;
-    if (!confirm("¿Desactivar la verificación en dos pasos?")) return;
+    const confirmed = await this.actions.confirm({
+      title: "Desactivar MFA",
+      message: "Tu cuenta perderá la verificación en dos pasos. Solo podrás continuar con tu contraseña y el código TOTP actual.",
+      confirmLabel: "Desactivar MFA",
+      destructive: true,
+    });
+    if (!confirmed) return;
     this.mfaBusy.set(true);
     try {
       // Step-up: the current TOTP code is required to disable MFA.
@@ -190,6 +216,7 @@ export class SettingsComponent {
       this.recoveryCodes.set([]);
       this.mfaPasswordForm.reset();
       this.mfaCodeForm.reset();
+      await this.auth.refreshUser();
       this.snackbar.open("MFA desactivado", "Cerrar", { duration: 2500 });
     } catch (err) {
       this.toast(err, "");
@@ -204,6 +231,20 @@ export class SettingsComponent {
     this.mfaQr.set(null);
     this.mfaPasswordForm.reset();
     this.mfaCodeForm.reset();
+  }
+
+  copyRecoveryCodes(): void {
+    const codes = this.recoveryCodes();
+    if (!codes.length) return;
+    const copy = navigator.clipboard?.writeText(codes.join("\n"));
+    if (!copy) {
+      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
+      return;
+    }
+    void copy.then(
+      () => this.snackbar.open("Códigos copiados", "Cerrar", { duration: 2000 }),
+      () => this.snackbar.open("No se pudieron copiar los códigos", "Cerrar", { duration: 2500 }),
+    );
   }
 
   setTheme(pref: ThemePreference): void {

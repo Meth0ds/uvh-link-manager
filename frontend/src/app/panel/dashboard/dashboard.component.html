@@ -1,43 +1,164 @@
-<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando el panel" />
+}
 
-<div class="welcome">
-  <div>
+<div class="hero">
+  <div class="hero-copy">
+    <span class="hero-kicker">
+      <mat-icon>auto_awesome</mat-icon> Panel de control
+    </span>
     <h1>Hola, {{ firstName() }} 👋</h1>
-    <p *ngIf="workspaceName()">Resumen de <b>{{ workspaceName() }}</b> — últimos 30 días.</p>
+    @if (workspaceName()) {
+      <p>Resumen de <b>{{ workspaceName() }}</b> — rendimiento de los últimos 30 días.</p>
+    }
   </div>
-  <button mat-flat-button color="primary" (click)="newLink()">
+  <button mat-flat-button color="primary" class="hero-cta" (click)="newLink()">
     <mat-icon>add_link</mat-icon> Nuevo enlace
   </button>
 </div>
 
-<ng-container *ngIf="overview() as o">
+@if (error(); as message) {
+  <div class="dashboard-alert" role="alert">
+    <mat-icon>error_outline</mat-icon>
+    <div><b>No hemos podido actualizar el panel</b><span>{{ message }}</span></div>
+    <button mat-stroked-button type="button" (click)="retry()">Reintentar</button>
+  </div>
+}
+
+@if (loading()) {
+  <div class="dashboard-skeleton" aria-label="Cargando el panel" role="status">
+    <div class="skeleton-stat-grid">
+      @for (item of [1, 2, 3, 4]; track item) { <div class="skeleton skeleton-stat"></div> }
+    </div>
+    <div class="skeleton skeleton-chart"></div>
+    <div class="skeleton-columns">
+      <div class="skeleton skeleton-list"></div>
+      <div class="skeleton skeleton-list"></div>
+    </div>
+  </div>
+}
+
+@if (!loading() && !overview() && !error()) {
+  <div class="empty-state dashboard-empty">
+    <mat-icon>dashboard_customize</mat-icon>
+    <b>Tu panel está listo</b>
+    <p>Crea un enlace para empezar a ver clics, países y dispositivos.</p>
+    <button mat-flat-button color="primary" (click)="newLink()">Crear mi primer enlace</button>
+  </div>
+}
+
+@if (overview(); as o) {
   <div class="stat-cards">
-    <div class="stat-card"><span>Clics</span><b class="tnum">{{ o.totals.clicks }}</b></div>
-    <div class="stat-card"><span>Visitantes</span><b class="tnum">{{ o.totals.visitors }}</b></div>
-    <div class="stat-card"><span>Enlaces</span><b class="tnum">{{ o.topLinks.length }}</b></div>
-    <div class="stat-card"><span>Países</span><b class="tnum">{{ o.countries.length }}</b></div>
+    <div class="stat-card">
+      <span><mat-icon>touch_app</mat-icon> Clics</span>
+      <b class="tnum">{{ o.totals.clicks }}</b>
+      <small class="tnum">{{ o.topLinks.length }} enlaces rastreados</small>
+    </div>
+    <div class="stat-card">
+      <span><mat-icon>person_pin</mat-icon> Visitantes</span>
+      <b class="tnum">{{ o.totals.visitors }}</b>
+      <small class="tnum">{{ o.devices.length }} tipos de dispositivo</small>
+    </div>
+    <div class="stat-card">
+      <span><mat-icon>public</mat-icon> Países</span>
+      <b class="tnum">{{ o.countries.length }}</b>
+      <small class="tnum">tráfico internacional</small>
+    </div>
+    <div class="stat-card">
+      <span><mat-icon>campaign</mat-icon> Campañas</span>
+      <b class="tnum">{{ o.campaigns.length }}</b>
+      <small class="tnum">con UTM medidas</small>
+    </div>
   </div>
 
-  <app-charts [overview]="o" />
-</ng-container>
-
-<span class="section-title">Enlaces recientes</span>
-<div class="recent">
-  <article class="recent-row" *ngFor="let l of recent()" (click)="router.navigate(['/app/links', l.id])">
-    <div class="recent-main">
-      <b class="tnum">{{ displayUrl(l.shortUrl) }}</b>
-      <span>{{ l.destination }}</span>
-    </div>
-    <div class="recent-side">
-      <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ l.clickCount }}</span>
-      <button mat-icon-button (click)="$event.stopPropagation(); copy(l.shortUrl)" aria-label="Copiar">
-        <mat-icon>content_copy</mat-icon>
-      </button>
-    </div>
-  </article>
-  <div class="empty" *ngIf="!recent().length && !loading()">
-    <p>Aún no tienes enlaces. Crea el primero para empezar a medir.</p>
-    <button mat-stroked-button (click)="newLink()">Crear mi primer enlace</button>
+  <div class="chart-wrap">
+    <app-charts [overview]="o" />
   </div>
-  <a class="see-all" routerLink="/app/links" *ngIf="recent().length">Ver todos los enlaces →</a>
-</div>
+
+  <div class="dash-cols">
+    <section>
+      <span class="section-title"><mat-icon>trending_up</mat-icon> Enlaces con más clics</span>
+      <div class="top-list">
+        @for (l of o.topLinks; track l.id; let i = $index) {
+          <article
+            class="top-row"
+            role="link"
+            tabindex="0"
+            [attr.aria-label]="'Abrir enlace ' + l.alias"
+            (click)="openLink(l.id)"
+            (keydown)="openLinkFromKeyboard($event, l.id)"
+          >
+            <span class="rank tnum">{{ i + 1 }}</span>
+            <div class="top-main">
+              <b class="tnum">{{ l.alias }}</b>
+              <span>{{ l.destination }}</span>
+            </div>
+            <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ l.clicks }}</span>
+          </article>
+        }
+        @if (!o.topLinks.length) {
+          <div class="empty-state">
+            <mat-icon>query_stats</mat-icon>
+            <b>Aún no hay datos</b>
+            <p>Comparte tus enlaces para empezar a medir clics y visitas.</p>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section>
+      <span class="section-title"><mat-icon>public</mat-icon> Origen geográfico</span>
+      <div class="geo-list">
+        @for (c of o.countries.slice(0, 6); track c.key) {
+          <div class="geo-row">
+            <span class="geo-flag">{{ flag(c.key) }}</span>
+            <span class="geo-name">{{ countryName(c.key) }}</span>
+            <div class="geo-bar"><i [style.width.%]="geoPct(c.value, o)"></i></div>
+            <b class="tnum">{{ c.value }}</b>
+          </div>
+        }
+        @if (!o.countries.length) {
+          <p class="none">Sin datos de localización todavía.</p>
+        }
+      </div>
+    </section>
+  </div>
+}
+
+@if (!error() || recent().length) {
+  <span class="section-title"><mat-icon>history</mat-icon> Enlaces recientes</span>
+  <div class="recent">
+  @for (l of recent(); track l.id) {
+    <article
+      class="recent-row"
+      role="link"
+      tabindex="0"
+      [attr.aria-label]="'Abrir enlace ' + displayUrl(l.shortUrl)"
+      (click)="openLink(l.id)"
+      (keydown)="openLinkFromKeyboard($event, l.id)"
+    >
+      <div class="recent-main">
+        <b class="tnum">{{ displayUrl(l.shortUrl) }}</b>
+        <span>{{ l.destination }}</span>
+      </div>
+      <div class="recent-side">
+        <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ l.clickCount }}</span>
+        <button mat-icon-button (click)="$event.stopPropagation(); copy(l.shortUrl)" aria-label="Copiar">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+      </div>
+    </article>
+  }
+  @if (!recent().length && !loading() && !error()) {
+    <div class="empty-state">
+      <mat-icon>link_off</mat-icon>
+      <b>Sin enlaces todavía</b>
+      <p>Crea el primero para empezar a medir.</p>
+      <button mat-flat-button color="primary" (click)="newLink()">Crear mi primer enlace</button>
+    </div>
+  }
+    @if (recent().length) {
+      <a class="see-all" routerLink="/app/links">Ver todos los enlaces →</a>
+    }
+  </div>
+}

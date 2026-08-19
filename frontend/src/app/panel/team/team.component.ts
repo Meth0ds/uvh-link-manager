@@ -1,5 +1,5 @@
-import { Component, computed, inject, signal } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -13,6 +13,7 @@ import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import type { WorkspaceDetail, Member, Invitation, WorkspaceRole } from "../../core/models";
+import { ActionDialogService } from "../action-dialog.service";
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Propietario",
@@ -25,7 +26,6 @@ const ROLE_LABEL: Record<string, string> = {
   selector: "app-team",
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatButtonModule,
     MatIconModule,
@@ -33,9 +33,10 @@ const ROLE_LABEL: Record<string, string> = {
     MatFormFieldModule,
     MatSelectModule,
     MatProgressBarModule,
-    MatSnackBarModule,
-  ],
+    MatSnackBarModule
+],
   templateUrl: "./team.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./team.component.scss",
 })
 export class TeamComponent {
@@ -44,6 +45,7 @@ export class TeamComponent {
   private router = inject(Router);
   private auth = inject(AuthService);
   private workspaces = inject(WorkspaceService);
+  private actions = inject(ActionDialogService);
 
   readonly detail = signal<WorkspaceDetail | null>(null);
   readonly loading = signal(true);
@@ -61,8 +63,20 @@ export class TeamComponent {
     return role === "owner" || role === "admin";
   });
 
+  private loadedWorkspaceId: number | null | undefined;
+
   constructor() {
-    void this.load();
+    effect(() => {
+      const workspaceId = this.workspaces.currentId();
+      if (workspaceId === this.loadedWorkspaceId) return;
+      this.loadedWorkspaceId = workspaceId;
+      this.detail.set(null);
+      if (workspaceId === null) {
+        this.loading.set(false);
+        return;
+      }
+      void this.load();
+    });
   }
 
   async load(): Promise<void> {
@@ -78,6 +92,7 @@ export class TeamComponent {
       this.detail.set(detail);
       this.renameValue.set(detail.workspace.name);
     } catch (err) {
+      this.detail.set(null);
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar el workspace");
     } finally {
       this.loading.set(false);
@@ -121,72 +136,110 @@ export class TeamComponent {
 
   async changeRole(m: Member, role: WorkspaceRole): Promise<void> {
     const wid = this.detail()?.workspace.id;
-    if (!wid) return;
+    if (!wid || this.saving()) return;
+    this.saving.set(true);
     try {
       await this.api.patch(`/api/v1/workspaces/${wid}/members/${m.id}`, { role });
       this.snackbar.open("Rol actualizado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.saving.set(false);
     }
   }
 
   async removeMember(m: Member): Promise<void> {
     const wid = this.detail()?.workspace.id;
-    if (!wid || !confirm(`¿Eliminar a ${m.name} del workspace?`)) return;
+    if (!wid) return;
+    const confirmed = await this.actions.confirm({
+      title: "Eliminar miembro",
+      message: `¿Eliminar a ${m.name} del workspace? Perderá el acceso a sus enlaces y analítica.`,
+      confirmLabel: "Eliminar miembro",
+      destructive: true,
+    });
+    if (!confirmed || this.saving()) return;
+    this.saving.set(true);
     try {
       await this.api.delete(`/api/v1/workspaces/${wid}/members/${m.id}`);
       this.snackbar.open("Miembro eliminado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.saving.set(false);
     }
   }
 
   async cancelInvite(inv: Invitation): Promise<void> {
     const wid = this.detail()?.workspace.id;
-    if (!wid) return;
+    if (!wid || this.saving()) return;
+    this.saving.set(true);
     try {
       await this.api.delete(`/api/v1/workspaces/${wid}/invitations/${inv.id}`);
       void this.load();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.saving.set(false);
     }
   }
 
   async resendInvite(inv: Invitation): Promise<void> {
     const wid = this.detail()?.workspace.id;
-    if (!wid) return;
+    if (!wid || this.saving()) return;
+    this.saving.set(true);
     try {
       await this.api.post(`/api/v1/workspaces/${wid}/invitations/${inv.id}/resend`);
       this.snackbar.open("Invitación reenviada", "Cerrar", { duration: 2500 });
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.saving.set(false);
     }
   }
 
   async leave(): Promise<void> {
     const wid = this.detail()?.workspace.id;
-    if (!wid || !confirm("¿Abandonar este workspace?")) return;
+    if (!wid) return;
+    const confirmed = await this.actions.confirm({
+      title: "Abandonar workspace",
+      message: "Dejarás de tener acceso a este workspace y necesitarás una nueva invitación para volver.",
+      confirmLabel: "Abandonar workspace",
+      destructive: true,
+    });
+    if (!confirmed || this.saving()) return;
+    this.saving.set(true);
     try {
       await this.api.post(`/api/v1/workspaces/${wid}/leave`);
       await this.auth.refreshWorkspaces();
       this.router.navigate(["/app/dashboard"]);
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.saving.set(false);
     }
   }
 
   async deleteWorkspace(): Promise<void> {
     const wid = this.detail()?.workspace.id;
     if (!wid) return;
-    if (!confirm("¿Eliminar definitivamente este workspace y todos sus enlaces? Esta acción no se puede deshacer.")) return;
+    const confirmed = await this.actions.confirm({
+      title: "Eliminar workspace definitivamente",
+      message: "Se eliminarán el workspace, sus enlaces, dominios, tokens y miembros. Esta acción no se puede deshacer.",
+      confirmLabel: "Eliminar definitivamente",
+      destructive: true,
+    });
+    if (!confirmed || this.saving()) return;
+    this.saving.set(true);
     try {
       await this.api.delete(`/api/v1/workspaces/${wid}`);
       await this.auth.refreshWorkspaces();
       this.router.navigate(["/app/dashboard"]);
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.saving.set(false);
     }
   }
 

@@ -1,4 +1,4 @@
-import { Component } from "@angular/core";
+import { Component, ChangeDetectionStrategy } from "@angular/core";
 import { LegalShellComponent } from "./legal-shell.component";
 
 @Component({
@@ -6,6 +6,7 @@ import { LegalShellComponent } from "./legal-shell.component";
   standalone: true,
   imports: [LegalShellComponent],
   templateUrl: "./terms.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./legal-doc.scss",
 })
 export class TermsComponent {}

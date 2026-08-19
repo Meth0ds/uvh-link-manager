@@ -177,6 +177,7 @@ export interface Session {
   last_used_at: string;
   expires_at: string;
   revoked_at: string | null;
+  current: boolean;
 }
 
 export interface AdminOverview {
@@ -193,9 +194,9 @@ export interface AdminUser {
   id: number;
   email: string;
   name: string;
-  is_admin: number;
+  is_admin: boolean | number;
   email_verified_at: string | null;
-  mfa_enabled: number;
+  mfa_enabled: boolean | number;
   created_at: string;
   deleted_at: string | null;
   workspaces: number;

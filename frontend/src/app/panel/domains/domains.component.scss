@@ -41,7 +41,7 @@
 }
 
 .domain-card {
-  background: #fff;
+  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
   border: 1px solid var(--uvh-border);
   border-radius: 14px;
   padding: 16px 18px;
@@ -54,31 +54,6 @@
   b {
     font-size: 16px;
     font-weight: 800;
-  }
-}
-
-.state-chip {
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 999px;
-  padding: 3px 10px;
-  &.st-active,
-  &.st-verified {
-    background: rgba(0, 169, 157, 0.12);
-    color: #00796b;
-  }
-  &.st-pending,
-  &.st-verifying {
-    background: rgba(251, 191, 36, 0.14);
-    color: #92600a;
-  }
-  &.st-error {
-    background: rgba(220, 38, 38, 0.1);
-    color: #b91c1c;
-  }
-  &.st-disabled {
-    background: rgba(91, 107, 132, 0.12);
-    color: var(--uvh-muted);
   }
 }
 
@@ -103,7 +78,7 @@
       font-size: 12.5px;
       padding: 6px 10px;
       border-radius: 8px;
-      background: #fff;
+      background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
       border: 1px solid var(--uvh-border);
       font-family: "SFMono-Regular", Consolas, monospace;
     }
@@ -123,22 +98,5 @@
   .danger {
     color: #b91c1c;
     --mat-icon-color: #b91c1c;
-  }
-}
-
-.empty {
-  text-align: center;
-  padding: 48px 20px;
-  color: var(--uvh-muted);
-  mat-icon {
-    font-size: 48px;
-    width: 48px;
-    height: 48px;
-    color: var(--uvh-border);
-  }
-  h3 {
-    font-size: 17px;
-    color: var(--uvh-ink);
-    margin: 10px 0 4px;
   }
 }

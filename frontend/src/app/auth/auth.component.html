@@ -1,116 +1,299 @@
-<div class="auth-wrap">
-  <a class="brand" routerLink="/">
-    <span class="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 64 64" width="34" height="34"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
-    </span>
-    <span class="brand-name">UVH</span>
-  </a>
+<app-auth-shell>
+  <div class="card auth-card">
+    @if (busy()) {
+      <mat-progress-bar mode="indeterminate" class="top-bar" aria-label="Procesando" />
+    }
 
-  <div class="card">
-    <mat-progress-bar mode="indeterminate" *ngIf="busy()" class="top-bar" />
+    @if (step() === 'login' || step() === 'register') {
+      <div class="auth-card-head">
+        <div class="card-kicker"><span class="kicker-dot"></span> Acceso seguro a tu workspace</div>
+        <span class="secure-badge"><mat-icon aria-hidden="true">shield</mat-icon> Protegido</span>
+      </div>
 
-    <ng-container *ngIf="step() === 'login' || step() === 'register'">
       <mat-tab-group [selectedIndex]="tabIndex()" (selectedIndexChange)="onTabChange($event)" animationDuration="220ms">
         <mat-tab label="Iniciar sesión">
-          <form class="form" [formGroup]="loginForm" (ngSubmit)="onLogin()">
-            <mat-form-field appearance="outline">
-              <mat-label>Email</mat-label>
-              <input matInput type="email" formControlName="email" autocomplete="email" />
-              <mat-icon matPrefix>mail_outline</mat-icon>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Contraseña</mat-label>
-              <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="current-password" />
-              <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())" [attr.aria-label]="hidePassword() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
-                <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
-              </button>
-            </mat-form-field>
-
-            <div class="form-row">
-              <a class="forgot" (click)="goForgot()">¿Olvidaste tu contraseña?</a>
+          <section class="auth-step login-step" aria-labelledby="login-title">
+            <div class="welcome-row">
+              <div>
+                <h2 id="login-title">Bienvenido de nuevo</h2>
+                <p>Continúa donde lo dejaste y sigue haciendo crecer tus enlaces.</p>
+              </div>
+              <span class="step-icon blue"><mat-icon aria-hidden="true">login</mat-icon></span>
             </div>
 
-            <div class="alert error" *ngIf="error()">{{ error() }}</div>
-            <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="loginForm.invalid || busy()">
-              Entrar
-            </button>
-          </form>
+            <form class="form" [formGroup]="loginForm" (ngSubmit)="onLogin()" novalidate>
+              <mat-form-field appearance="outline">
+                <mat-label>Email profesional</mat-label>
+                <input matInput type="email" formControlName="email" autocomplete="email" />
+                <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
+                @if (loginForm.controls.email.hasError('required') && loginForm.controls.email.touched) {
+                  <mat-error>Introduce tu email.</mat-error>
+                }
+                @if (loginForm.controls.email.hasError('email') && loginForm.controls.email.touched) {
+                  <mat-error>Introduce un email válido.</mat-error>
+                }
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Contraseña</mat-label>
+                <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="current-password" />
+                <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
+                <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())" [attr.aria-label]="hidePassword() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
+                  <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+              </mat-form-field>
+              <div class="form-row">
+                <span class="field-hint"><mat-icon aria-hidden="true">key</mat-icon> También compatible con MFA</span>
+                <button class="forgot" type="button" (click)="goForgot()">¿Olvidaste tu contraseña?</button>
+              </div>
+              @if (error()) {
+                <div class="alert error" role="alert">
+                  <mat-icon aria-hidden="true">error_outline</mat-icon>
+                  <span>{{ error() }}</span>
+                  @if (verificationEmail()) {
+                    <button mat-stroked-button type="button" class="resend-button" (click)="resendVerification()" [disabled]="verificationBusy()">
+                      <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
+                      {{ verificationBusy() ? 'Enviando…' : 'Reenviar verificación' }}
+                    </button>
+                  }
+                </div>
+              }
+              @if (info()) {
+                <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
+              }
+              <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="loginForm.invalid || busy()">
+                <span>Entrar en mi panel</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+              </button>
+            </form>
+
+            <div class="auth-proof" aria-label="Garantías de seguridad">
+              <span><mat-icon aria-hidden="true">lock</mat-icon> Sesión cifrada</span>
+              <span><mat-icon aria-hidden="true">speed</mat-icon> Acceso rápido</span>
+            </div>
+          </section>
         </mat-tab>
 
         <mat-tab label="Crear cuenta">
-          <form class="form" [formGroup]="registerForm" (ngSubmit)="onRegister()">
-            <mat-form-field appearance="outline">
-              <mat-label>Nombre</mat-label>
-              <input matInput formControlName="name" autocomplete="name" />
-              <mat-icon matPrefix>person_outline</mat-icon>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Email</mat-label>
-              <input matInput type="email" formControlName="email" autocomplete="email" />
-              <mat-icon matPrefix>mail_outline</mat-icon>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Contraseña</mat-label>
-              <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" />
-              <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())" [attr.aria-label]="hidePassword() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
-                <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
-              </button>
-              <mat-hint>Mínimo 10 caracteres</mat-hint>
-            </mat-form-field>
+          <section class="auth-step register-step" [attr.data-step]="registerStep()" aria-labelledby="register-title">
+            <div class="register-heading">
+              <div>
+                <h2 id="register-title">{{ changeEmailMode() ? 'Corrige tu email' : 'Crea tu espacio de trabajo' }}</h2>
+                <p>{{ changeEmailMode() ? 'Actualiza la dirección y te enviaremos una nueva verificación.' : 'Un minuto para empezar a controlar cada clic.' }}</p>
+              </div>
+              <span class="step-icon teal"><mat-icon aria-hidden="true">rocket_launch</mat-icon></span>
+            </div>
 
-            <div class="alert error" *ngIf="error()">{{ error() }}</div>
-            <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy()">
-              Crear cuenta
-            </button>
-          </form>
+            <ol class="register-progress" [attr.aria-label]="'Paso ' + registerStep() + ' de 2'">
+              <li [class.active]="registerStep() === 1" [class.complete]="registerStep() === 2">
+                <span class="progress-number">@if (registerStep() === 2) { <mat-icon aria-hidden="true">check</mat-icon> } @else { 1 }</span>
+                <span><b>Tus datos</b><small>Identidad</small></span>
+              </li>
+              <span class="progress-line" [class.complete]="registerStep() === 2" aria-hidden="true"></span>
+              <li [class.active]="registerStep() === 2">
+                <span class="progress-number">2</span>
+                <span><b>Protege tu cuenta</b><small>Seguridad</small></span>
+              </li>
+            </ol>
+
+            @if (registerStep() === 1) {
+              <form class="form auth-step-panel" [formGroup]="registerForm" (ngSubmit)="nextRegisterStep()" novalidate>
+                <div class="section-label"><mat-icon aria-hidden="true">person_outline</mat-icon><span>Cuéntanos quién eres</span></div>
+                <mat-form-field appearance="outline">
+                  <mat-label>Nombre completo</mat-label>
+                  <input matInput formControlName="name" autocomplete="name" maxlength="80" />
+                  <mat-icon matPrefix aria-hidden="true">badge</mat-icon>
+                  @if (registerForm.controls.name.hasError('required') && registerForm.controls.name.touched) {
+                    <mat-error>Introduce tu nombre.</mat-error>
+                  }
+                  @if (registerForm.controls.name.hasError('minlength') && registerForm.controls.name.touched) {
+                    <mat-error>Usa al menos 2 caracteres.</mat-error>
+                  }
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Email profesional</mat-label>
+                  <input matInput type="email" formControlName="email" autocomplete="email" maxlength="254" />
+                  <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
+                  @if (registerForm.controls.email.hasError('required') && registerForm.controls.email.touched) {
+                    <mat-error>Introduce tu email.</mat-error>
+                  }
+                  @if (registerForm.controls.email.hasError('email') && registerForm.controls.email.touched) {
+                    <mat-error>Introduce un email válido.</mat-error>
+                  }
+                </mat-form-field>                <div class="workspace-note">
+                  <mat-icon aria-hidden="true">{{ changeEmailMode() ? 'edit_note' : 'workspaces' }}</mat-icon>
+                  <span><b>{{ changeEmailMode() ? 'Solo cambiaremos la dirección pendiente' : 'Tu workspace se crea automáticamente' }}</b><small>{{ changeEmailMode() ? 'Tu contraseña protege este cambio y la cuenta sigue sin sesión hasta verificar.' : 'Podrás invitar a tu equipo cuando verifiques tu email.' }}</small></span>
+                </div>
+
+
+                @if (error()) {
+                  <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
+                }
+                <button mat-flat-button color="primary" type="submit" class="submit">
+                  <span>Continuar</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                </button>
+              </form>
+            }
+
+            @if (registerStep() === 2) {
+              <form class="form auth-step-panel" [formGroup]="registerForm" (ngSubmit)="onRegister()" novalidate>
+                <div class="section-label"><mat-icon aria-hidden="true">security</mat-icon><span>{{ changeEmailMode() ? 'Confirma el cambio de email' : 'Configura una cuenta segura' }}</span></div>
+                <div class="password-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Contraseña</mat-label>
+                    <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="128" />
+                    <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
+                    <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())" [attr.aria-label]="hidePassword() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
+                      <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                    </button>
+                    <mat-hint>Mínimo 10 caracteres</mat-hint>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Repite la contraseña</mat-label>
+                    <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="confirmPassword" autocomplete="new-password" maxlength="128" />
+                    <mat-icon matPrefix aria-hidden="true">check_circle_outline</mat-icon>
+                    @if (!passwordsMatch() && registerForm.controls.confirmPassword.touched) {
+                      <mat-error>Las contraseñas no coinciden.</mat-error>
+                    }
+                  </mat-form-field>
+                </div>
+                <div class="password-strength" [class]="passwordClass()" aria-live="polite">
+                  <div class="strength-head"><span>Fortaleza de la contraseña</span><b>{{ passwordStrength() }}</b></div>
+                  <div class="strength-track"><span [style.width.%]="passwordScore()"></span></div>
+                  <small>Combina mayúsculas, números y un símbolo para reforzarla.</small>
+                </div>
+
+                <div class="captcha-card" [class.loading]="captchaBusy()" aria-labelledby="captcha-title">
+                  <div class="captcha-head">
+                    <div class="captcha-title"><span class="captcha-icon"><mat-icon aria-hidden="true">smart_toy</mat-icon></span><span><b id="captcha-title">Verificación humana</b><small>Ayúdanos a mantener UVH libre de abuso.</small></span></div>
+                    <button mat-icon-button type="button" (click)="refreshCaptcha()" [disabled]="captchaBusy()" aria-label="Generar otra verificación"><mat-icon>refresh</mat-icon></button>
+                  </div>
+                  @if (captchaBusy()) {
+                    <mat-progress-bar mode="indeterminate" aria-label="Cargando verificación" />
+                  } @else if (captcha(); as challenge) {
+                    <div class="captcha-question">
+                      <span class="captcha-prompt">{{ challenge.prompt }}</span>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Respuesta</mat-label>
+                        <input matInput formControlName="captchaAnswer" inputmode="numeric" autocomplete="off" maxlength="4" aria-describedby="captcha-help" />
+                        @if (registerForm.controls.captchaAnswer.hasError('pattern') && registerForm.controls.captchaAnswer.touched) {
+                          <mat-error>Introduce solo la respuesta numérica.</mat-error>
+                        }
+                      </mat-form-field>
+                    </div>
+                    <small id="captcha-help" class="captcha-help">Es una comprobación accesible; puedes generar otra si lo necesitas.</small>
+                  } @else {
+                    <div class="captcha-unavailable"><mat-icon aria-hidden="true">sync_problem</mat-icon><span>No se pudo cargar. <button type="button" (click)="refreshCaptcha()">Reintentar</button></span></div>
+                  }
+                </div>
+
+                <mat-checkbox formControlName="acceptTerms" color="primary" class="terms-check">
+                  Acepto los <a routerLink="/legal/terminos" target="_blank" rel="noopener" (click)="$event.stopPropagation()">Términos de uso</a> y la <a routerLink="/legal/privacidad" target="_blank" rel="noopener" (click)="$event.stopPropagation()">Política de privacidad</a>.
+                </mat-checkbox>
+                @if (registerForm.controls.acceptTerms.hasError('required') && registerForm.controls.acceptTerms.touched) {
+                  <small class="terms-error" role="alert">Debes aceptar los términos para crear tu cuenta.</small>
+                }
+
+                <input class="honeypot" type="text" formControlName="company" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+                @if (error()) {
+                  <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
+                }
+                @if (info()) {
+                  <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
+                }
+                <div class="register-actions">
+                  <button mat-stroked-button type="button" (click)="previousRegisterStep()" [disabled]="busy()"><mat-icon aria-hidden="true">arrow_back</mat-icon> Atrás</button>
+                  <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy() || captchaBusy() || !captcha()">
+                    <span>{{ busy() ? (changeEmailMode() ? 'Actualizando…' : 'Creando cuenta…') : (changeEmailMode() ? 'Actualizar email' : 'Crear cuenta') }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                  </button>
+                </div>
+              </form>
+            }
+
+            <p class="auth-footnote"><mat-icon aria-hidden="true">verified_user</mat-icon> Sin tarjeta · Sin spam · Tus datos son tuyos</p>
+          </section>
         </mat-tab>
       </mat-tab-group>
-    </ng-container>
+    }
 
-    <ng-container *ngIf="step() === 'mfa'">
-      <h2 class="card-title">Verificación en dos pasos</h2>
-      <p class="card-sub">Introduce el código de 6 dígitos de tu aplicación de autenticación.</p>
-      <form class="form" [formGroup]="mfaForm" (ngSubmit)="onMfa()">
-        <mat-form-field appearance="outline">
-          <mat-label>Código</mat-label>
-          <input matInput formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
-          <mat-icon matPrefix>lock_outline</mat-icon>
-        </mat-form-field>
-        <div class="alert error" *ngIf="error()">{{ error() }}</div>
-        <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="mfaForm.invalid || busy()">Verificar</button>
-        <button mat-button type="button" class="ghost" (click)="goRecovery()">¿Perdiste el acceso? Usa un código de recuperación</button>
-      </form>
-    </ng-container>
+    @if (step() === 'mfa') {
+      <section class="auth-step compact-step" aria-labelledby="mfa-title">
+        <span class="mode-illustration"><mat-icon aria-hidden="true">phonelink_lock</mat-icon></span>
+        <span class="mode-kicker">Paso adicional de seguridad</span>
+        <h2 class="card-title" id="mfa-title">Verificación en dos pasos</h2>
+        <p class="card-sub">Introduce el código de 6 dígitos de tu aplicación de autenticación.</p>
+        <form class="form" [formGroup]="mfaForm" (ngSubmit)="onMfa()">
+          <mat-form-field appearance="outline">
+            <mat-label>Código de autenticación</mat-label>
+            <input matInput formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+            <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
+          </mat-form-field>
+          @if (error()) {
+            <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
+          }
+          @if (info()) {
+            <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
+          }
+          <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="mfaForm.invalid || busy()">Verificar y continuar <mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
+          <button mat-button type="button" class="ghost" (click)="goRecovery()">¿Perdiste el acceso? Usa un código de recuperación</button>
+        </form>
+      </section>
+    }
 
-    <ng-container *ngIf="step() === 'recovery'">
-      <h2 class="card-title">Código de recuperación</h2>
-      <p class="card-sub">Introduce tu email y uno de los códigos de recuperación que guardaste al activar MFA.</p>
-      <form class="form" [formGroup]="recoveryForm" (ngSubmit)="onRecovery()">
-        <mat-form-field appearance="outline">
-          <mat-label>Email</mat-label>
-          <input matInput type="email" formControlName="email" />
-          <mat-icon matPrefix>mail_outline</mat-icon>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Código de recuperación</mat-label>
-          <input matInput formControlName="code" />
-          <mat-icon matPrefix>vpn_key</mat-icon>
-        </mat-form-field>
-        <div class="alert error" *ngIf="error()">{{ error() }}</div>
-        <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="recoveryForm.invalid || busy()">Recuperar acceso</button>
-        <button mat-button type="button" class="ghost" (click)="backToLogin()">Volver</button>
-      </form>
-    </ng-container>
+    @if (step() === 'recovery') {
+      <section class="auth-step compact-step" aria-labelledby="recovery-title">
+        <span class="mode-illustration amber"><mat-icon aria-hidden="true">vpn_key</mat-icon></span>
+        <span class="mode-kicker">Recupera tu acceso</span>
+        <h2 class="card-title" id="recovery-title">Código de recuperación</h2>
+        <p class="card-sub">Usa uno de los códigos de recuperación que guardaste al activar MFA.</p>
+        <form class="form" [formGroup]="recoveryForm" (ngSubmit)="onRecovery()">
+          <mat-form-field appearance="outline">
+            <mat-label>Email</mat-label>
+            <input matInput type="email" formControlName="email" autocomplete="email" />
+            <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Código de recuperación</mat-label>
+            <input matInput formControlName="code" autocomplete="one-time-code" />
+            <mat-icon matPrefix aria-hidden="true">vpn_key</mat-icon>
+          </mat-form-field>
+          @if (error()) {
+            <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
+          }
+          @if (info()) {
+            <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
+          }
+          <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="recoveryForm.invalid || busy()">Recuperar acceso <mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
+          <button mat-button type="button" class="ghost" (click)="backToLogin()">Volver a iniciar sesión</button>
+        </form>
+      </section>
+    }
 
-    <ng-container *ngIf="step() === 'verify-pending'">
-      <div class="pending">
-        <mat-icon class="pending-icon">mark_email_read</mat-icon>
-        <h2 class="card-title">Revisa tu email</h2>
-        <p class="card-sub">Enviamos un enlace de verificación a tu bandeja de entrada. Cuando lo confirmes, podrás iniciar sesión.</p>
-        <button mat-stroked-button class="ghost" (click)="backToLogin()">Volver a iniciar sesión</button>
-      </div>
-    </ng-container>
+    @if (step() === 'verify-pending') {
+      <section class="auth-step compact-step pending" aria-labelledby="pending-title">
+        <span class="mode-illustration success"><mat-icon aria-hidden="true">mark_email_read</mat-icon></span>
+        <span class="mode-kicker">Casi lo tienes</span>
+        <h2 class="card-title" id="pending-title">Revisa tu email</h2>
+        <p class="card-sub">Para continuar debes confirmar tu email. Hemos enviado el enlace a:</p>
+        @if (verificationEmail(); as pendingEmail) {
+          <div class="pending-email"><mat-icon aria-hidden="true">mail_outline</mat-icon><b>{{ pendingEmail }}</b></div>
+        }
+        <div class="pending-success" role="status"><mat-icon aria-hidden="true">check_circle</mat-icon><span><b>Cuenta creada correctamente</b><small>Cuando confirmes la dirección podrás iniciar sesión y entrar en tu workspace.</small></span></div>
+        <div class="pending-checklist"><span><mat-icon aria-hidden="true">check_circle</mat-icon> Confirma tu dirección</span><span><mat-icon aria-hidden="true">check_circle</mat-icon> Accede de forma segura</span><span><mat-icon aria-hidden="true">check_circle</mat-icon> Comparte tu primer enlace</span></div>
+        @if (error()) {
+          <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
+        }
+        @if (pendingNotice(); as notice) {
+          <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ notice }}</span></div>
+        }
+        <div class="pending-actions">
+          <button mat-flat-button color="primary" (click)="resendVerification()" [disabled]="verificationBusy()">
+            <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
+            {{ verificationBusy() ? 'Enviando…' : 'Reenviar correo' }}
+          </button>
+          <button mat-stroked-button class="ghost" (click)="changeRegistrationEmail()"><mat-icon aria-hidden="true">edit</mat-icon> Cambiar email</button>
+          <button mat-button class="ghost" (click)="closeRegistration()"><mat-icon aria-hidden="true">logout</mat-icon> Cerrar sesión</button>
+        </div>
+      </section>
+    }
   </div>
-
-  <p class="tagline">Enlaces cortos. Control total.</p>
-</div>
+</app-auth-shell>

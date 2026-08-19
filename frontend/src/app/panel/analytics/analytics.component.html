@@ -13,28 +13,50 @@
   </mat-form-field>
 </div>
 
-<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
-<div class="alert error" *ngIf="error()">{{ error() }}</div>
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando analítica" />
+}
+@if (error()) {
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+}
 
-<ng-container *ngIf="overview() as o">
-  <div class="stat-cards">
-    <div class="stat-card"><span>Clics</span><b class="tnum">{{ o.totals.clicks }}</b></div>
-    <div class="stat-card"><span>Visitantes</span><b class="tnum">{{ o.totals.visitors }}</b></div>
-    <div class="stat-card"><span>Países</span><b class="tnum">{{ o.countries.length }}</b></div>
-    <div class="stat-card"><span>Referentes</span><b class="tnum">{{ o.referrers.length }}</b></div>
+@if (!loading() && !overview() && !error()) {
+  <div class="empty-state">
+    <mat-icon>query_stats</mat-icon>
+    <b>Aún no hay analítica</b>
+    <p>Comparte un enlace para empezar a medir clics, visitantes y campañas.</p>
+    <button mat-flat-button color="primary" routerLink="/app/links">Ver enlaces</button>
   </div>
+}
 
+@if (overview(); as o) {
+  <div class="stat-cards">
+    <div class="stat-card"><span><mat-icon>touch_app</mat-icon> Clics</span><b class="tnum">{{ o.totals.clicks }}</b><small class="tnum">{{ o.series.length }} días de datos</small></div>
+    <div class="stat-card"><span><mat-icon>person_pin</mat-icon> Visitantes</span><b class="tnum">{{ o.totals.visitors }}</b><small class="tnum">usuarios únicos</small></div>
+    <div class="stat-card"><span><mat-icon>public</mat-icon> Países</span><b class="tnum">{{ o.countries.length }}</b><small class="tnum">origen del tráfico</small></div>
+    <div class="stat-card"><span><mat-icon>ads_click</mat-icon> Referentes</span><b class="tnum">{{ o.referrers.length }}</b><small class="tnum">fuentes de entrada</small></div>
+  </div>
   <app-charts [overview]="o" />
-
   <span class="section-title">Enlaces con más clics</span>
   <div class="top-links">
-    <article class="top-link" *ngFor="let l of o.topLinks" (click)="router.navigate(['/app/links', l.id])">
-      <div class="top-main">
-        <b class="tnum">{{ l.alias }}</b>
-        <span>{{ l.destination }}</span>
-      </div>
-      <div class="top-clicks tnum">{{ l.clicks }} clics</div>
-    </article>
-    <p class="none" *ngIf="!o.topLinks.length">Aún no hay datos de clics.</p>
+    @for (l of o.topLinks; track l) {
+      <article
+        class="top-link"
+        role="link"
+        tabindex="0"
+        [attr.aria-label]="'Abrir enlace ' + l.alias"
+        (click)="openLink(l.id)"
+        (keydown)="openLinkFromKeyboard($event, l.id)"
+      >
+        <div class="top-main">
+          <b class="tnum">{{ l.alias }}</b>
+          <span>{{ l.destination }}</span>
+        </div>
+        <div class="top-clicks tnum">{{ l.clicks }} clics</div>
+      </article>
+    }
+    @if (!o.topLinks.length) {
+      <p class="none">Aún no hay datos de clics.</p>
+    }
   </div>
-</ng-container>
+}

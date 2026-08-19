@@ -26,7 +26,7 @@
 }
 
 .card-block {
-  background: #fff;
+  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
   border: 1px solid var(--uvh-border);
   border-radius: 14px;
   padding: 18px 20px;

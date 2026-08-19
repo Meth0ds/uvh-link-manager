@@ -1,5 +1,5 @@
-import { Component, inject, signal } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -32,7 +32,6 @@ function extractAlias(input: string): string {
   selector: "app-report",
   standalone: true,
   imports: [
-    CommonModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -40,9 +39,10 @@ function extractAlias(input: string): string {
     MatSelectModule,
     MatIconModule,
     MatProgressBarModule,
-    LegalShellComponent,
-  ],
+    LegalShellComponent
+],
   templateUrl: "./report.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./report.component.scss",
 })
 export class ReportComponent {

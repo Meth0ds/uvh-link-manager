@@ -57,8 +57,8 @@
 <div class="card-block">
   <span class="section-title">Verificación en dos pasos (MFA)</span>
 
-  <ng-container *ngIf="!user()?.mfaEnabled; else mfaEnabled">
-    <ng-container *ngIf="!mfaSecret(); else mfaSetup">
+  @if (!user()?.mfaEnabled) {
+    @if (!mfaSecret()) {
       <p class="muted">Añade una segunda capa de seguridad a tu cuenta con una aplicación de autenticación.</p>
       <form class="stack" [formGroup]="mfaPasswordForm" (ngSubmit)="startMfaSetup()">
         <mat-form-field appearance="outline">
@@ -70,11 +70,11 @@
           <button mat-flat-button color="primary" type="submit" [disabled]="mfaPasswordForm.invalid || mfaBusy()">Configurar MFA</button>
         </div>
       </form>
-    </ng-container>
-
-    <ng-template #mfaSetup>
+    } @else {
       <div class="mfa-setup">
-        <img *ngIf="mfaQr()" [src]="mfaQr()" alt="Código QR para configurar MFA" class="mfa-qr" />
+        @if (mfaQr()) {
+          <img [src]="mfaQr()" alt="Código QR para configurar MFA" class="mfa-qr" />
+        }
         <div class="mfa-secret">
           <b>Clave secreta</b>
           <code class="tnum">{{ mfaSecret() }}</code>
@@ -92,10 +92,8 @@
           <button mat-flat-button color="primary" type="submit" [disabled]="mfaCodeForm.invalid || mfaBusy()">Activar MFA</button>
         </div>
       </form>
-    </ng-template>
-  </ng-container>
-
-  <ng-template #mfaEnabled>
+    }
+  } @else {
     <p class="muted">La verificación en dos pasos está <b>activada</b>. Las áreas administrativas la requieren.</p>
     <form class="stack" [formGroup]="mfaPasswordForm" (ngSubmit)="disableMfa()">
       <mat-form-field appearance="outline">
@@ -112,38 +110,64 @@
         <button mat-stroked-button type="submit" class="danger" [disabled]="mfaPasswordForm.invalid || mfaCodeForm.invalid || mfaBusy()">Desactivar MFA</button>
       </div>
     </form>
-  </ng-template>
+  }
 
-  <div class="recovery" *ngIf="recoveryCodes().length">
-    <b>Códigos de recuperación</b>
-    <p class="muted">Guárdalos en un lugar seguro. Solo se muestran esta vez.</p>
-    <div class="codes tnum">
-      <code *ngFor="let c of recoveryCodes()">{{ c }}</code>
+
+  @if (recoveryCodes().length) {
+    <div class="recovery">
+      <b>Códigos de recuperación</b>
+      <p class="muted">Guárdalos en un lugar seguro. Solo se muestran esta vez.</p>
+      <div class="codes tnum" aria-label="Códigos de recuperación">
+        @for (c of recoveryCodes(); track c) {
+          <code>{{ c }}</code>
+        }
+      </div>
+      <button mat-stroked-button type="button" (click)="copyRecoveryCodes()"><mat-icon>content_copy</mat-icon> Copiar códigos</button>
     </div>
-  </div>
+  }
 </div>
 
 <!-- Sessions -->
 <div class="card-block">
   <span class="section-title">Sesiones activas</span>
-  <mat-progress-bar mode="indeterminate" *ngIf="sessionsLoading()" />
-  <div class="session-row" *ngFor="let s of sessions()">
-    <div class="session-info">
-      <mat-icon>devices</mat-icon>
-      <div>
-        <b>{{ s.user_agent ?? 'Dispositivo desconocido' }}</b>
-        <span class="tnum">Última actividad {{ formatDate(s.last_used_at) }}</span>
-      </div>
+  @if (sessionsLoading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Cargando sesiones" />
+  }
+  @if (sessionsError(); as message) {
+    <div class="alert error" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ message }}</span>
+      <button mat-stroked-button type="button" (click)="loadSessions()">Reintentar</button>
     </div>
-    <button mat-stroked-button (click)="revokeSession(s.id)">Revocar</button>
-  </div>
-  <p class="muted" *ngIf="!sessionsLoading() && !sessions().length">No hay sesiones activas.</p>
+  }
+  @for (s of sessions(); track s.id) {
+    <div class="session-row" [class.current-session]="s.current">
+      <div class="session-info">
+        <mat-icon>{{ s.current ? 'laptop_mac' : 'devices' }}</mat-icon>
+        <div>
+          <b>{{ s.user_agent ?? 'Dispositivo desconocido' }}</b>
+          <span class="session-meta">
+            <span class="tnum">Última actividad {{ formatDate(s.last_used_at) }}</span>
+            @if (s.current) { <span class="current-badge">Este dispositivo</span> }
+          </span>
+        </div>
+      </div>
+      <button mat-stroked-button [class.danger]="s.current" (click)="revokeSession(s)">
+        {{ s.current ? 'Cerrar esta sesión' : 'Revocar' }}
+      </button>
+    </div>
+  }
+  @if (!sessionsLoading() && !sessionsError() && !sessions().length) {
+    <p class="muted">No hay sesiones activas.</p>
+  }
 </div>
 
 <!-- Appearance -->
 <div class="card-block">
   <span class="section-title">Apariencia</span>
   <mat-radio-group aria-label="Tema" [value]="themePref()" (change)="setTheme($event.value)">
-    <mat-radio-button *ngFor="let o of themeOptions" [value]="o.value">{{ o.label }}</mat-radio-button>
+    @for (o of themeOptions; track o) {
+      <mat-radio-button [value]="o.value">{{ o.label }}</mat-radio-button>
+    }
   </mat-radio-group>
 </div>

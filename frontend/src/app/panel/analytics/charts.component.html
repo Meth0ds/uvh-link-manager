@@ -5,33 +5,45 @@
   </div>
 
   <div class="series-wrap">
-    <svg viewBox="0 0 720 220" preserveAspectRatio="none" class="series" *ngIf="points()" aria-hidden="true">
-      <defs>
-        <linearGradient id="uvhArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#2457F5" stop-opacity="0.28" />
-          <stop offset="100%" stop-color="#2457F5" stop-opacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path [attr.d]="areaPoints()" fill="url(#uvhArea)" />
-      <path [attr.d]="points()" fill="none" stroke="#2457F5" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>
-    <div class="no-data" *ngIf="!points()">Sin clics en este periodo</div>
+    @if (points()) {
+      <svg viewBox="0 0 720 220" preserveAspectRatio="none" class="series" aria-hidden="true">
+        <defs>
+          <linearGradient id="uvhArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2457F5" stop-opacity="0.28" />
+            <stop offset="100%" stop-color="#2457F5" stop-opacity="0.02" />
+          </linearGradient>
+        </defs>
+        <path [attr.d]="areaPoints()" fill="url(#uvhArea)" />
+        <path [attr.d]="points()" fill="none" stroke="#2457F5" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+      </svg>
+    }
+    @if (!points()) {
+      <div class="no-data">Sin clics en este periodo</div>
+    }
     <div class="x-labels">
-      <span *ngFor="let l of labels()" class="x-label" [class.hidden]="!l.show">{{ l.day }}</span>
+      @for (l of labels(); track l) {
+        <span class="x-label" [class.hidden]="!l.show">{{ l.day }}</span>
+      }
     </div>
   </div>
 </div>
 
 <div class="breakdowns">
-  <div class="breakdown" *ngFor="let b of breakdownKeys">
-    <b class="breakdown-title">{{ label(b) }}</b>
-    <div class="bar-row" *ngFor="let item of breakdown(b).items">
-      <span class="bar-label">{{ item.key }}</span>
-      <div class="bar-track">
-        <div class="bar-fill" [style.width.%]="pct(item.value, breakdown(b).max)"></div>
-      </div>
-      <span class="bar-value tnum">{{ item.value }}</span>
+  @for (b of breakdownKeys; track b) {
+    <div class="breakdown">
+      <b class="breakdown-title">{{ label(b) }}</b>
+      @for (item of breakdown(b).items; track item) {
+        <div class="bar-row">
+          <span class="bar-label">{{ item.key }}</span>
+          <div class="bar-track">
+            <div class="bar-fill" [style.width.%]="pct(item.value, breakdown(b).max)"></div>
+          </div>
+          <span class="bar-value tnum">{{ item.value }}</span>
+        </div>
+      }
+      @if (!breakdown(b).items.length) {
+        <div class="bar-empty">—</div>
+      }
     </div>
-    <div class="bar-empty" *ngIf="!breakdown(b).items.length">—</div>
-  </div>
+  }
 </div>

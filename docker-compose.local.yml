@@ -1,0 +1,83 @@
+# Desarrollo local UVH: PostgreSQL + PHP/Composer + Laravel (serve/queue/schedule).
+# PostgreSQL solo se publica en 127.0.0.1 (no se expone fuera de localhost).
+#
+# Uso:
+#   cp .env.docker.local.example .env.docker.local
+#   docker compose -f docker-compose.local.yml --env-file .env.docker.local up -d postgres
+#   docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php composer --version
+#
+# El perfil "laravel" (app/queue/schedule) exige que backend-laravel/ ya exista
+# (creado con `composer create-project laravel/laravel backend-laravel`). Para
+# arrancar la app completa una vez exista el scaffold:
+#   docker compose -f docker-compose.local.yml --env-file .env.docker.local --profile laravel up -d
+
+x-php-service: &php-service
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  image: uvh-php:8.4
+  working_dir: /app
+  volumes:
+    - ./backend-laravel:/app
+  environment:
+    COMPOSER_ALLOW_SUPERUSER: "1"
+    APP_ENV: local
+    APP_URL: http://localhost:8000
+    DB_CONNECTION: pgsql
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_DATABASE: ${POSTGRES_DB:-uvh_local}
+    DB_USERNAME: ${POSTGRES_USER:-uvh_local}
+    DB_PASSWORD: ${POSTGRES_PASSWORD:-uvh_local_dev_only}
+    QUEUE_CONNECTION: database
+    SESSION_COOKIE: uvh_session
+    # Regla de seguridad crítica: sin dominio compartido; nunca ".uvh.es".
+    SESSION_DOMAIN: ""
+    COOKIE_DOMAIN: ""
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.docker.local
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - uvh-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Herramienta puntual: composer / artisan / php one-off.
+  php:
+    <<: *php-service
+    command: ["php", "-v"]
+
+  # Laravel: servidor de desarrollo (php artisan serve) en 127.0.0.1:8000.
+  app:
+    <<: *php-service
+    profiles: ["laravel"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+
+  # Laravel: worker de cola (QUEUE_CONNECTION=database).
+  queue:
+    <<: *php-service
+    profiles: ["laravel"]
+    command: ["php", "artisan", "queue:work"]
+
+  # Laravel: scheduler local (php artisan schedule:work).
+  schedule:
+    <<: *php-service
+    profiles: ["laravel"]
+    command: ["php", "artisan", "schedule:work"]
+
+volumes:
+  uvh-postgres-data:

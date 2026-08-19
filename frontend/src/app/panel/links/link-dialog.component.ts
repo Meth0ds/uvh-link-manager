@@ -1,4 +1,4 @@
-import { Component, inject, signal } from "@angular/core";
+import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import {
   FormArray,
   FormBuilder,
@@ -6,6 +6,8 @@ import {
   FormGroup,
   ReactiveFormsModule,
   Validators,
+  type AbstractControl,
+  type ValidationErrors,
 } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
@@ -18,13 +20,14 @@ import { MatTabsModule } from "@angular/material/tabs";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { CommonModule } from "@angular/common";
+
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import type { DomainDto, LinkDto, RedirectRule } from "../../core/models";
 
 export interface LinkDialogData {
   mode: "create" | "edit";
   link?: LinkDto;
+  initialDestination?: string;
 }
 export interface LinkDialogResult {
   link: LinkDto;
@@ -42,6 +45,18 @@ type RuleGroup = FormGroup<{
   campaign: FormControl<string>;
   destination: FormControl<string>;
 }>;
+
+function httpUrlValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = String(control.value ?? "").trim();
+  if (!raw) return null;
+  if (raw.length > 2048) return { url: true };
+  try {
+    const url = new URL(raw);
+    return /^https?:$/.test(url.protocol) && !url.username && !url.password ? null : { url: true };
+  } catch {
+    return { url: true };
+  }
+}
 
 function toLocalInput(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -61,7 +76,6 @@ function toIso(local: string | null | undefined): string | null {
   selector: "app-link-dialog",
   standalone: true,
   imports: [
-    CommonModule,
     ReactiveFormsModule,
     MatDialogModule,
     MatButtonModule,
@@ -73,9 +87,10 @@ function toIso(local: string | null | undefined): string | null {
     MatTabsModule,
     MatChipsModule,
     MatProgressBarModule,
-    MatTooltipModule,
-  ],
+    MatTooltipModule
+],
   templateUrl: "./link-dialog.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./link-dialog.component.scss",
 })
 export class LinkDialogComponent {
@@ -87,23 +102,26 @@ export class LinkDialogComponent {
   readonly isEdit = this.data.mode === "edit";
   readonly busy = signal(false);
   readonly loading = signal(this.isEdit);
+  readonly editDetailsLoaded = signal(!this.isEdit);
   readonly error = signal<string | null>(null);
   readonly domains = signal<DomainDto[]>([]);
   readonly tags = signal<string[]>([]);
   readonly aliasStatus = signal<"idle" | "checking" | "available" | "taken" | "invalid" | "reserved">("idle");
   readonly aliasStatusText = signal("");
+  private aliasRequest = 0;
 
   form = this.fb.nonNullable.group({
-    destination: ["", [Validators.required]],
-    alias: [""],
+    destination: ["", [Validators.required, Validators.maxLength(2048), httpUrlValidator]],
+    alias: ["", [Validators.maxLength(64)]],
     domainId: [null as number | null],
-    fallbackDestination: [""],
-    password: [""],
-    maxClicks: [null as number | null],
+    fallbackDestination: ["", [Validators.maxLength(2048), httpUrlValidator]],
+    password: ["", [Validators.maxLength(256)]],
+    clearPassword: [false],
+    maxClicks: [null as number | null, [Validators.min(1), Validators.max(10_000_000)]],
     singleUse: [false],
     scheduledAt: [""],
     expiresAt: [""],
-    notes: [""],
+    notes: ["", [Validators.maxLength(1000)]],
     utm: this.fb.nonNullable.group({
       source: [""],
       medium: [""],
@@ -116,12 +134,26 @@ export class LinkDialogComponent {
   rules = this.fb.array<RuleGroup>([]);
 
   constructor() {
-    void this.loadDomains();
-    if (this.isEdit && this.data.link) this.patchFromLink(this.data.link);
-    else this.addRule();
-
     this.form.controls.alias.valueChanges.subscribe(() => this.checkAlias());
     this.form.controls.domainId.valueChanges.subscribe(() => this.checkAlias());
+    void this.load();
+  }
+
+  private async load(): Promise<void> {
+    const requests: Promise<void>[] = [this.loadDomains()];
+    if (this.isEdit && this.data.link) {
+      this.patchFromLink(this.data.link);
+      requests.push(this.loadEditRules(this.data.link.id));
+    } else {
+      this.form.controls.destination.setValue(this.data.initialDestination ?? "");
+      this.addRule();
+    }
+
+    try {
+      await Promise.all(requests);
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   private async loadDomains(): Promise<void> {
@@ -130,8 +162,17 @@ export class LinkDialogComponent {
       this.domains.set(domains.filter((d) => d.state === "verified" || d.state === "active"));
     } catch {
       this.domains.set([]);
-    } finally {
-      this.loading.set(false);
+    }
+  }
+
+  private async loadEditRules(linkId: number): Promise<void> {
+    try {
+      const { rules } = await this.api.get<{ rules: RedirectRule[] }>(`/api/v1/links/${linkId}`);
+      this.rules.clear();
+      rules.forEach((rule) => this.addRule(rule));
+      this.editDetailsLoaded.set(true);
+    } catch (err) {
+      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las reglas del enlace");
     }
   }
 
@@ -158,18 +199,31 @@ export class LinkDialogComponent {
   }
 
   private async checkAlias(): Promise<void> {
+    const requestId = ++this.aliasRequest;
     const alias = this.form.value.alias?.trim() ?? "";
+    const sameAsCurrent = this.isEdit && this.data.link?.alias === alias && this.data.link.domainId === this.form.value.domainId;
     if (!alias) {
       this.aliasStatus.set("idle");
       this.aliasStatusText.set("");
       return;
     }
+    if (sameAsCurrent) {
+      this.aliasStatus.set("available");
+      this.aliasStatusText.set("Alias actual");
+      return;
+    }
+
     this.aliasStatus.set("checking");
+    // Debounce keystrokes locally so the availability endpoint cannot be used
+    // as an accidental request amplifier while typing.
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    if (requestId !== this.aliasRequest) return;
     try {
       const { available, reason } = await this.api.post<{ available: boolean; reason?: string }>("/api/v1/links/check-alias", {
         alias,
         domainId: this.form.value.domainId,
       });
+      if (requestId !== this.aliasRequest) return;
       if (available) {
         this.aliasStatus.set("available");
         this.aliasStatusText.set("Alias disponible");
@@ -180,6 +234,7 @@ export class LinkDialogComponent {
         );
       }
     } catch {
+      if (requestId !== this.aliasRequest) return;
       this.aliasStatus.set("idle");
       this.aliasStatusText.set("");
     }
@@ -203,19 +258,20 @@ export class LinkDialogComponent {
     return this.rules.controls;
   }
 
-  addRule(): void {
+  addRule(initial: Partial<RedirectRule> = {}): void {
+    const raw = initial as RedirectRule & { time_from?: string | null; time_to?: string | null };
     this.rules.push(
       this.fb.nonNullable.group({
-        priority: [this.rules.length],
-        country: [""],
-        language: [""],
-        device: [""],
-        os: [""],
-        timeFrom: [""],
-        timeTo: [""],
-        referrer: [""],
-        campaign: [""],
-        destination: ["", Validators.required],
+        priority: [initial.priority ?? this.rules.length],
+        country: [initial.country ?? ""],
+        language: [initial.language ?? ""],
+        device: [initial.device ?? ""],
+        os: [initial.os ?? ""],
+        timeFrom: [initial.timeFrom ?? raw.time_from ?? ""],
+        timeTo: [initial.timeTo ?? raw.time_to ?? ""],
+        referrer: [initial.referrer ?? ""],
+        campaign: [initial.campaign ?? ""],
+        destination: [initial.destination ?? ""],
       }),
     );
   }
@@ -247,16 +303,20 @@ export class LinkDialogComponent {
   }
 
   async save(): Promise<void> {
-    if (this.form.invalid || this.busy()) return;
+    if (this.form.invalid || this.busy() || (this.isEdit && !this.editDetailsLoaded())) return;
     this.busy.set(true);
     this.error.set(null);
     const v = this.form.value;
+    const passwordValue = v.password ?? "";
+    const password = this.isEdit
+      ? (v.clearPassword ? null : passwordValue !== "" ? passwordValue : undefined)
+      : (passwordValue !== "" ? passwordValue : null);
     const payload = {
-      destination: v.destination,
+      destination: v.destination?.trim(),
       alias: v.alias?.trim() || null,
       domainId: v.domainId,
       fallbackDestination: v.fallbackDestination?.trim() || null,
-      password: v.password || null,
+      password,
       maxClicks: v.maxClicks,
       singleUse: v.singleUse,
       scheduledAt: toIso(v.scheduledAt),

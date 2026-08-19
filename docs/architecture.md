@@ -15,18 +15,16 @@ UVH es una plataforma de acortamiento, administración y analítica de enlaces c
 
 **Regla crítica de seguridad:** la cookie de sesión del panel pertenece **solo** a `app.uvh.es`. No existe cookie compartida sobre `.uvh.es`. `COOKIE_DOMAIN` se mantiene siempre vacío.
 
-## 2. Stack real (decidido tras inspección del entorno)
-
-El plan original proponía Laravel/PHP. **Freebuff Cloud es un entorno de ejecución Node.js-only** (no hay `php` ni `composer` en la imagen de preview ni en la de deploy). Por ello el backend se implementó con el equivalente soportado por el entorno, sin cambiar el modelo de producto ni la arquitectura de hosts:
+## 2. Stack
 
 | Capa          | Tecnología                                                                                              |
 | ------------- | ------------------------------------------------------------------------------------------------------- |
-| Frontend      | Angular 19, TypeScript estricto, Angular Material + CDK, Signals, componentes standalone, lazy loading  |
-| Backend       | Express 4 + TypeScript (estricto), Zod, bcryptjs, otplib, express-rate-limit                            |
-| Base de datos | SQLite (módulo nativo `node:sqlite`), modo WAL, `BEGIN IMMEDIATE` para transacciones atómicas           |
+| Frontend      | Angular 22, TypeScript estricto, Angular Material + CDK, Signals, componentes standalone, lazy loading  |
+| Backend       | Laravel 13 (PHP 8.4), Eloquent/Query Builder, cola `database`, scheduler                                |
+| Base de datos | PostgreSQL 16 (local vía Docker Compose), transacciones con `lockForUpdate` para carreras               |
 | Email         | Resend (transaccional: verificación y recuperación)                                                     |
 | QR            | Generación local con `qrcode` (PNG), sin llamadas externas ni visita al destino                         |
-| Tests         | Vitest + Supertest (backend)                                                                             |
+| Tests         | PHPUnit (Laravel) + Karma/Jasmine (Angular)                                                             |
 
 Prohibidos y no usados: React, Vue, Svelte, Bootstrap, PrimeNG, Tailwind como framework principal, y cualquier BaaS (Convex, Supabase, Firebase, Appwrite, Auth0, Clerk, PocketBase).
 
@@ -41,12 +39,13 @@ uvh/
 │       ├── landing/          # landing pública
 │       ├── legal/            # términos, privacidad y denuncia pública (abuse report)
 │       └── panel/            # dashboard, links, analytics, domains, team, tokens, webhooks, settings, admin
-├── backend/                  # API Express
-│   └── src/
-│       ├── routes/           # auth, links, analytics, workspaces, domains, tokens, webhooks, admin, abuse, public, redirect
-│       ├── services/         # links, redirect, analytics, webhooks
-│       ├── middleware/       # auth (sesión), csrf, ratelimit, apitoken
-│       └── util/             # url, ssrf, audit, email, ids, sign, analytics
+├── backend-laravel/          # API Laravel
+│   └── app/
+│       ├── Http/Controllers/ # auth, links, analytics, workspaces, domains, tokens, webhooks, admin, public
+│       ├── Http/Middleware/  # sesión (uvh.session), auth, csrf, workspace, apitoken, mfa, host, security headers
+│       ├── Support/          # SessionManager, Ssrf, UvhCrypto, Captcha, Totp, Audit, WebhookService…
+│       ├── Jobs/             # WebhookDeliveryJob (cola asíncrona)
+│       └── Console/Commands/ # UvhHousekeeping (purgas y transiciones de estado)
 └── docs/                     # esta documentación
 ```
 
@@ -56,10 +55,10 @@ uvh/
 
 ```
 Angular (form tipado) → POST /api/v1/links (cookie + CSRF + X-Workspace-Id)
-  → middleware requireAuth + authorizeWorkspace(role editor+)
-  → validación Zod del destino, alias, UTM, reglas
+  → middleware uvh.auth:verified + uvh.workspace:editor
+  → validación del destino, alias, UTM, reglas
   → generación de alias criptográficamente seguro (o alias personalizado validado)
-  → INSERT atómico en links + redirect_rules + link_tags
+  → INSERT transaccional en links + redirect_rules + link_tags
   → auditoría append-only
   → respuesta DTO
 ```
@@ -76,11 +75,11 @@ GET uvh.es/{alias} (o dominio personalizado)
   → emitir click_event de forma asíncrona (la respuesta no espera a la analítica pesada)
 ```
 
-La redirección **no visita** el destino. El clic se registra con `UPDATE ... WHERE` atómico para `single_use` y `max_clicks`, de modo que dos peticiones simultáneas solo consumen una (testeado con concurrencia real en `backend/tests/api.test.ts`).
+La redirección **no visita** el destino. El clic se registra con `UPDATE ... WHERE` atómico para `single_use` y `max_clicks`, de modo que dos peticiones simultáneas solo consumen una (testeado con concurrencia real en `backend-laravel/tests/Feature/ApiParityTest.php`).
 
 ## 5. Modelo de datos
 
-Tablas (todas con `foreign_keys=ON`, índices y constraints):
+Tablas (PostgreSQL, con claves foráneas, índices y constraints):
 
 - `users`, `sessions`
 - `workspaces`, `memberships` (roles owner/admin/editor/viewer), `invitations`
@@ -95,25 +94,28 @@ Las fechas se almacenan siempre en UTC (ISO 8601). La zona horaria solo se aplic
 
 ## 6. Autenticación y autorización
 
-- **Sesión SPA (Sanctum-style):** cookie `HttpOnly` + `SameSite` + `Secure` en producción, CSRF de doble envío en mutaciones, regeneración de sesión tras login, reautenticación para operaciones sensibles y MFA (TOTP + códigos de recuperación).
+- **Sesión SPA:** cookie `HttpOnly` + `SameSite` + `Secure` en producción (implementación propia en `SessionManager`, hash SHA-256 del token en BD), CSRF de doble envío en mutaciones, regeneración de sesión tras login, reautenticación para operaciones sensibles y MFA (TOTP + códigos de recuperación).
 - **Nunca** `localStorage`/`sessionStorage` para credenciales o tokens (solo se usa `localStorage` para preferencias no sensibles: workspace seleccionado y tema).
-- **Autorización 100% en backend** con comprobación de pertenencia al workspace y rol (`authorizeWorkspace`). Los guards de Angular son solo UX; nunca son una frontera de seguridad.
+- **Autorización 100% en backend** con comprobación de pertenencia al workspace y rol (`WorkspaceAccess`). Los guards de Angular son solo UX; nunca son una frontera de seguridad.
+- Los endpoints administrativos exigen `is_admin` + MFA activado (`uvh.mfa`).
 
-## 7. Trabajos programados (scheduler in-process)
+## 7. Trabajos programados (scheduler)
 
-El backend ejecuta cada 60 s un job que reemplaza al cron de Laravel:
+El backend ejecuta cada 60 s un job (`UvhHousekeeping`) que:
 
 1. activa enlaces `scheduled` vencidos;
 2. caduca enlaces `expired`;
 3. purga `click_events` y `metric_rollups` según retención;
-4. reintenta `webhook_deliveries` pendientes con backoff.
+4. reintenta `webhook_deliveries` pendientes con backoff;
+5. limpia sesiones/tokens revocados y expirados.
 
-**Limitación (documentada en `deployment.md`):** en Freebuff Cloud no hay workers ni cron persistentes garantizados; el scheduler corre dentro del proceso de la API. Si el proceso se reinicia, el job se reanuda al arrancar.
+En local corre con `php artisan schedule:work` (contenedor `schedule` del Compose). La entrega de webhooks es asíncrona vía cola `database` (`WebhookDeliveryJob`), procesada por el worker `php artisan queue:work`.
 
 ## 8. Decisiones de seguridad destacadas
 
-- Validación de destino con `URL` nativo + lista de schemes permitidos (`http`, `https`), rechazo de `javascript:`, `data:`, `file:`, credenciales embebidas, CR/LF.
-- SSRF en webhooks: bloqueo de loopback, redes privadas, link-local y metadata cloud, con revalidación de DNS/IP tras cada redirect.
-- Hash de tokens de API y secretos de webhook (HMAC con event id + timestamp).
+- Validación de destino: solo `http`/`https`, rechazo de `javascript:`, `data:`, `file:`, credenciales embebidas, CR/LF.
+- SSRF en webhooks (`app/Support/Ssrf.php`): bloqueo de loopback, redes privadas, link-local y metadata cloud, IPs fijadas con `CURLOPT_RESOLVE` y sin redirecciones.
+- Hash de tokens de API, sesiones y tokens de email (SHA-256); secretos de webhook y TOTP cifrados en reposo (AES-256-GCM).
 - Auditoría append-only de acciones sensibles.
 - Rate limiting diferenciado por endpoint (login, registro, recuperación, MFA, creación de enlaces, alias, API, webhooks, denuncias, admin).
+- Ver `docs/security.md` y `docs/security-audit-2026-08-19.md`.

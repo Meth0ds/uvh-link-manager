@@ -5,8 +5,12 @@
   </div>
 </div>
 
-<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
-<div class="alert error" *ngIf="error()">{{ error() }}</div>
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando dominios" />
+}
+@if (error()) {
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+}
 
 <div class="add-bar">
   <mat-form-field appearance="outline" class="grow">
@@ -18,38 +22,49 @@
   </button>
 </div>
 
-<div class="domain-list" *ngIf="!loading()">
-  <article class="domain-card" *ngFor="let d of domains(); trackBy: trackByDomain">
-    <div class="domain-head">
-      <b class="tnum">{{ d.domain }}</b>
-      <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
-    </div>
-
-    <div class="verify-box" *ngIf="d.state === 'pending' || d.state === 'error' || d.state === 'verifying'">
-      <p class="verify-title">1 · Añade este registro TXT en tu proveedor de DNS</p>
-      <div class="txt-row">
-        <code>TXT</code>
-        <code class="txt-value tnum">{{ d.verificationToken }}</code>
-        <button mat-icon-button (click)="copy(d.verificationToken)" aria-label="Copiar registro TXT"><mat-icon>content_copy</mat-icon></button>
+@if (!loading() && (!error() || domains().length)) {
+  <div class="domain-list">
+    @for (d of domains(); track trackByDomain($index, d)) {
+      <article class="domain-card">
+        <div class="domain-head">
+          <b class="tnum">{{ d.domain }}</b>
+          <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
+        </div>
+        @if (d.state === 'pending' || d.state === 'error' || d.state === 'verifying') {
+          <div class="verify-box">
+            <p class="verify-title">1 · Añade este registro TXT en tu proveedor de DNS</p>
+            <div class="txt-row">
+              <code>TXT</code>
+              <code class="txt-value tnum">{{ d.verificationToken }}</code>
+              <button mat-icon-button (click)="copy(d.verificationToken)" aria-label="Copiar registro TXT"><mat-icon>content_copy</mat-icon></button>
+            </div>
+            <p class="verify-title">2 · Cuando el registro propague, verifica el dominio</p>
+            <button mat-stroked-button color="primary" (click)="verify(d)" [disabled]="actionId() === d.id">
+              <mat-icon>verified_user</mat-icon>
+              {{ verifyingId() === d.id ? "Verificando…" : "Verificar dominio" }}
+            </button>
+          </div>
+        }
+        @if (d.state !== 'pending' && d.state !== 'verifying') {
+          <div class="domain-actions">
+            @if (d.state === 'verified') {
+              <button mat-stroked-button (click)="activate(d)" [disabled]="actionId() === d.id"><mat-icon>play_arrow</mat-icon> Activar</button>
+            }
+            @if (d.state === 'active' || d.state === 'verified') {
+              <button mat-stroked-button (click)="disable(d)" [disabled]="actionId() === d.id"><mat-icon>pause</mat-icon> Desactivar</button>
+            }
+            <button mat-stroked-button (click)="verify(d)" [disabled]="actionId() === d.id"><mat-icon>refresh</mat-icon> Revalidar</button>
+            <button mat-stroked-button class="danger" (click)="remove(d)" [disabled]="actionId() === d.id"><mat-icon>delete</mat-icon> Eliminar</button>
+          </div>
+        }
+      </article>
+    }
+    @if (!domains().length && !error()) {
+      <div class="empty-state">
+        <mat-icon>language</mat-icon>
+        <b>Sin dominios todavía</b>
+        <p>Añade un dominio para acortar enlaces con tu propia marca.</p>
       </div>
-      <p class="verify-title">2 · Cuando el registro propague, verifica el dominio</p>
-      <button mat-stroked-button color="primary" (click)="verify(d)" [disabled]="verifyingId() === d.id">
-        <mat-icon>verified_user</mat-icon>
-        {{ verifyingId() === d.id ? "Verificando…" : "Verificar dominio" }}
-      </button>
-    </div>
-
-    <div class="domain-actions" *ngIf="d.state !== 'pending' && d.state !== 'verifying'">
-      <button mat-stroked-button *ngIf="d.state === 'verified'" (click)="activate(d)"><mat-icon>play_arrow</mat-icon> Activar</button>
-      <button mat-stroked-button *ngIf="d.state === 'active' || d.state === 'verified'" (click)="disable(d)"><mat-icon>pause</mat-icon> Desactivar</button>
-      <button mat-stroked-button (click)="verify(d)" [disabled]="verifyingId() === d.id"><mat-icon>refresh</mat-icon> Revalidar</button>
-      <button mat-stroked-button class="danger" (click)="remove(d)"><mat-icon>delete</mat-icon> Eliminar</button>
-    </div>
-  </article>
-
-  <div class="empty" *ngIf="!domains().length">
-    <mat-icon>language</mat-icon>
-    <h3>Sin dominios todavía</h3>
-    <p>Añade un dominio para acortar enlaces con tu propia marca.</p>
+    }
   </div>
-</div>
+}

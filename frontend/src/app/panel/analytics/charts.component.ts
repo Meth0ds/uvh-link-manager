@@ -1,12 +1,13 @@
-import { Component, computed, input } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, computed, input, ChangeDetectionStrategy } from "@angular/core";
+
 import type { AnalyticsOverview } from "../../core/models";
 
 @Component({
   selector: "app-charts",
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: "./charts.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./charts.component.scss",
 })
 export class ChartsComponent {

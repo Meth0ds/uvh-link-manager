@@ -247,6 +247,34 @@
   gap: 14px;
 }
 
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--landing-line);
+  border-radius: 10px;
+  color: var(--landing-muted);
+  background: color-mix(in srgb, var(--landing-paper) 78%, transparent);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+
+  &:hover {
+    color: var(--landing-blue);
+    border-color: var(--landing-blue);
+    background: color-mix(in srgb, var(--landing-blue) 8%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--landing-blue);
+    outline-offset: 3px;
+  }
+
+  mat-icon { width: 18px; height: 18px; font-size: 18px; }
+}
+
 .text-link {
   position: relative;
   overflow: hidden;
@@ -393,6 +421,18 @@
     border-radius: 10px;
     box-shadow: 0 8px 18px rgba(36, 87, 245, 0.24);
   }
+}
+
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: #ff9d9d;
+  font-size: 11px;
+  line-height: 1.4;
+
+  mat-icon { width: 14px; height: 14px; font-size: 14px; }
 }
 
 .form-note {
@@ -2730,5 +2770,379 @@ section[id] {
   .feature-card::before,
   .plan-card::before {
     display: none;
+  }
+}
+
+// ============================================================
+// Redesign 2026: mobile nav, comparison, testimonials, stats, FAQ
+// ============================================================
+
+// ---------- Mobile nav ----------
+.menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--landing-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--landing-ink);
+  cursor: pointer;
+
+  mat-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+  }
+}
+
+.mobile-nav {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 20px 18px;
+  border-top: 1px solid var(--landing-line);
+  background: color-mix(in srgb, var(--landing-paper) 96%, transparent);
+
+  a {
+    padding: 12px 10px;
+    border-radius: 10px;
+    color: var(--landing-muted);
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--landing-ink);
+      background: color-mix(in srgb, var(--landing-blue) 6%, transparent);
+    }
+  }
+
+  .mobile-nav-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--landing-line);
+  }
+}
+
+.button-block {
+  width: 100%;
+}
+
+// ---------- Comparison table ----------
+.comparison-table-wrap {
+  max-width: 780px;
+  margin: 0 auto;
+  overflow-x: auto;
+  border: 1px solid var(--landing-line);
+  border-radius: 18px;
+  background: var(--landing-card);
+  box-shadow: var(--uvh-shadow-md);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+
+  th,
+  td {
+    padding: 14px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--landing-line);
+  }
+
+  thead th {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--landing-muted);
+    background: color-mix(in srgb, var(--landing-blue) 4%, transparent);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  tbody tr:hover td {
+    background: color-mix(in srgb, var(--landing-blue) 3%, transparent);
+  }
+
+  .col-uvh {
+    background: color-mix(in srgb, var(--landing-blue) 5%, transparent);
+  }
+
+  .cmp-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cmp-yes {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+    color: var(--landing-teal);
+
+    &.dim {
+      color: var(--landing-muted-soft);
+    }
+  }
+
+  .cmp-no {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+    color: color-mix(in srgb, var(--landing-muted) 45%, transparent);
+  }
+}
+
+// ---------- Testimonials ----------
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.testimonial-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--landing-line);
+  border-radius: 16px;
+  background: var(--landing-card);
+  box-shadow: var(--uvh-shadow-sm);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+
+  &:hover {
+    box-shadow: var(--uvh-shadow-md);
+    transform: translateY(-3px);
+  }
+}
+
+.testimonial-stars {
+  display: flex;
+  gap: 2px;
+  color: #f5b301;
+
+  mat-icon {
+    width: 17px;
+    height: 17px;
+    font-size: 17px;
+  }
+}
+
+.testimonial-quote {
+  margin: 0;
+  color: var(--landing-ink);
+  font-size: 14.5px;
+  line-height: 1.7;
+  flex: 1;
+}
+
+.testimonial-person {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-top: 14px;
+  border-top: 1px solid var(--landing-line);
+}
+
+.testimonial-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--landing-blue), var(--landing-teal));
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.testimonial-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  b {
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  small {
+    color: var(--landing-muted);
+    font-size: 11.5px;
+  }
+}
+
+// ---------- Stats band ----------
+.stats-band {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  max-width: 1080px;
+  margin: 34px auto 0;
+  padding: 26px 20px;
+  border-radius: 18px;
+  background: var(--landing-night);
+  color: #fff;
+}
+
+.stats-band-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+
+  mat-icon {
+    width: 22px;
+    height: 22px;
+    margin-bottom: 4px;
+    color: #57cfc2;
+    font-size: 22px;
+  }
+
+  b {
+    font-size: 25px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+  }
+
+  span {
+    color: #8fa1ba;
+    font-size: 11px;
+    font-weight: 600;
+  }
+}
+
+// ---------- FAQ accordion ----------
+.faq-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.faq-panel {
+  border: 1px solid var(--landing-line) !important;
+  border-radius: 14px !important;
+  background: var(--landing-card) !important;
+  box-shadow: var(--uvh-shadow-sm) !important;
+
+  mat-expansion-panel-header {
+    padding: 0 20px;
+    height: 60px;
+
+    mat-panel-title {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: var(--landing-ink);
+    }
+  }
+
+  .faq-plus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--landing-blue) 10%, transparent);
+    color: var(--landing-blue);
+
+    mat-icon {
+      width: 16px;
+      height: 16px;
+      font-size: 16px;
+      transition: transform 180ms ease;
+    }
+  }
+
+  &.mat-expanded .faq-plus mat-icon {
+    transform: rotate(45deg);
+  }
+
+  p {
+    margin: 0;
+    padding: 0 20px 20px;
+    color: var(--landing-muted);
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+}
+
+// ---------- Footer social ----------
+.footer-social {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #18c58f;
+    box-shadow: 0 0 0 4px rgba(24, 197, 143, 0.14);
+  }
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--landing-line);
+    color: var(--landing-muted);
+    transition: color 160ms ease, border-color 160ms ease;
+
+    &:hover {
+      color: var(--landing-blue);
+      border-color: var(--landing-blue);
+    }
+
+    mat-icon {
+      width: 17px;
+      height: 17px;
+      font-size: 17px;
+    }
+  }
+}
+
+// ---------- Responsive ----------
+@media (max-width: 900px) {
+  .nav-center {
+    display: none;
+  }
+
+  .menu-btn {
+    display: inline-flex;
+  }
+
+  .mobile-nav {
+    display: flex;
+  }
+
+  .testimonials-grid {
+    grid-template-columns: 1fr;
+    max-width: 560px;
+  }
+
+  .stats-band {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 560px;
   }
 }

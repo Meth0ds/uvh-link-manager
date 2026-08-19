@@ -1,6 +1,6 @@
 # UVH — API
 
-API REST bajo `/api/v1` (panel en `app.uvh.es`). Toda mutación requiere cookie de sesión + `X-CSRF-Token`. Las rutas de workspace requieren la cabecera `X-Workspace-Id` y autorizan por rol en backend.
+API REST bajo `/api/v1` (panel en `app.uvh.es`). Toda mutación requiere `X-CSRF-Token`; las rutas protegidas además requieren cookie de sesión. Las rutas de workspace requieren la cabecera `X-Workspace-Id` y autorizan por rol en backend.
 
 - Roles: `owner` > `admin` > `editor` > `viewer`.
 - `requireVerified` = email verificado.
@@ -10,23 +10,25 @@ API REST bajo `/api/v1` (panel en `app.uvh.es`). Toda mutación requiere cookie 
 
 | Método | Ruta | Auth | Descripción |
 | ------ | ---- | ---- | ----------- |
-| POST | `/register` | — | Registro (crea usuario + workspace + cuota). Envía email de verificación. |
-| POST | `/login` | — | Login. Si MFA: `{ mfaRequired, challenge }`; si no: `{ user }`. |
+| GET | `/captcha` | — | Obtiene un desafío aritmético accesible de un solo uso (IP-bound, 5 min). |
+| POST | `/register` | — | Registro multistep. Requiere `name`, `email`, `password`, `captchaChallenge`, `captchaAnswer`, `acceptTerms: true` y `termsVersion`; el honeypot `website` debe estar vacío. Crea usuario + workspace + cuota, audita el consentimiento y envía email de verificación sin crear sesión. |
+| POST | `/login` | — | Login solo para cuentas con email verificado. Si MFA: `{ mfaRequired, challenge }`; si no: `{ user }`; una cuenta no verificada recibe `403` y no crea sesión. |
+| POST | `/change-registration-email` | — | Corrige una dirección de registro no verificada con `{ currentEmail, newEmail, password, captchaChallenge, captchaAnswer }`; invalida el token anterior y envía uno nuevo, sin crear sesión. |
 | POST | `/mfa/verify` | — | Completa login MFA con `{ challenge, code }` → `{ user }`. |
 | POST | `/mfa/recovery` | — | Login con código de recuperación `{ email, code }`. |
 | POST | `/logout` | sesión | Revoca la sesión actual. |
-| POST | `/verify-email` | — | `{ token }` → verifica el email. |
-| POST | `/resend-verification` | sesión | Reenvía el correo de verificación. |
+| POST | `/verify-email` | — | `{ token }` → verifica el email, consume el bearer token y revoca cualquier sesión legacy/preexistente; el acceso posterior exige un login nuevo. |
+| POST | `/resend-verification` | — / sesión | Reenvía el correo de verificación con `{ email }` cuando no hay sesión. La respuesta pública es genérica (anti-enumeración) y aplica cooldown de 60 s. |
 | POST | `/forgot-password` | — | `{ email }` → envía enlace (respuesta idéntica siempre, anti-enumeración). |
-| POST | `/reset-password` | — | `{ token, password }` → restablece y revoca sesiones. |
+| POST | `/reset-password` | — | `{ token, password }` → restablece y revoca sesiones; el token se consume atómicamente y solo puede funcionar una vez. |
 | GET | `/me` | sesión | `{ user }`. |
 | PATCH | `/profile` | sesión | `{ name }`. |
 | POST | `/change-password` | sesión | `{ current, newPassword }`. |
-| GET | `/sessions` | sesión | `{ sessions[] }`. |
-| POST | `/sessions/:id/revoke` | sesión | Revoca una sesión. |
-| POST | `/mfa/setup` | sesión | `{ password }` → `{ secret, uri }`. |
+| GET | `/sessions` | sesión | `{ sessions[] }`, incluyendo `current` para identificar el navegador actual. |
+| POST | `/sessions/:id/revoke` | sesión | Revoca una sesión; si es la actual devuelve `current: true`, borra la cookie y el panel cierra sesión inmediatamente (también sincroniza otras pestañas). |
+| POST | `/mfa/setup` | sesión | `{ password, code? }` → `{ secret, uri }`; `code` es obligatorio al reconfigurar MFA activo. |
 | POST | `/mfa/enable` | sesión | `{ code }` → `{ recoveryCodes[] }`. |
-| POST | `/mfa/disable` | sesión | `{ password }`. |
+| POST | `/mfa/disable` | sesión | `{ password, code }`; exige contraseña y TOTP actual (step-up). |
 
 ## Enlaces — `/api/v1/links` (workspace)
 
@@ -132,4 +134,9 @@ Eventos: `link.created`, `link.updated`, `link.deleted`, `link.threshold_reached
 | GET | `/robots.txt` / `/sitemap.xml` | SEO básico. |
 | GET | `/:alias` | **Redirección HTTP real** (302). |
 | GET | `/r/:alias` | Redirección bajo el path `/r`. |
+
+> **Comportamiento congelado:** la superficie de redirección (`/:alias` y `/r/:alias`)
+> **no** usa el sobre JSON `{ error }`. Para alias/dominio desconocido o enlace no redirigible
+> devuelve una **página HTML** con status 404 (no `{ error }`); solo `/api/v1/*` usa el sobre JSON.
+> Ver `backend-laravel/tests/Feature/ApiParityTest.php`.
 | POST | `/r/:alias/unlock` | `{ password }` para enlaces protegidos (luego redirige). |

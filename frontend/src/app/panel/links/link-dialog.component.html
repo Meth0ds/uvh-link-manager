@@ -1,157 +1,175 @@
 <h2 mat-dialog-title>
   {{ isEdit ? "Editar enlace" : "Crear enlace" }}
-  <span class="alias-chip tnum" *ngIf="isEdit && data.link">{{ data.link.shortUrl }}</span>
+  @if (isEdit && data.link) {
+    <span class="alias-chip tnum">{{ data.link.shortUrl }}</span>
+  }
 </h2>
 
 <mat-dialog-content class="dlg-body">
-  <mat-progress-bar mode="indeterminate" *ngIf="loading()" />
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
 
-  <form [formGroup]="form" *ngIf="!loading()">
-    <mat-tab-group animationDuration="220ms">
-      <mat-tab label="Destino">
-        <div class="tab-pad">
-          <mat-form-field appearance="outline" class="full">
-            <mat-label>URL de destino</mat-label>
-            <input matInput formControlName="destination" placeholder="https://ejemplo.com/pagina-muy-larga" />
-            <mat-icon matPrefix>launch</mat-icon>
-            <mat-hint>Solo URLs http/https válidas.</mat-hint>
-          </mat-form-field>
-
-          <div class="row">
-            <mat-form-field appearance="outline" class="grow">
-              <mat-label>Alias (opcional)</mat-label>
-              <input matInput formControlName="alias" placeholder="mi-enlace" />
-              <mat-icon matPrefix>edit</mat-icon>
-              <mat-hint *ngIf="aliasStatus() === 'available'" class="ok-hint">✓ {{ aliasStatusText() }}</mat-hint>
-              <mat-hint *ngIf="aliasStatus() === 'checking'">Comprobando…</mat-hint>
-              <mat-hint *ngIf="aliasStatus() === 'taken' || aliasStatus() === 'reserved' || aliasStatus() === 'invalid'" class="err-hint">{{ aliasStatusText() }}</mat-hint>
+  @if (!loading()) {
+    <form [formGroup]="form">
+      <mat-tab-group animationDuration="220ms">
+        <mat-tab label="Destino">
+          <div class="tab-pad">
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>URL de destino</mat-label>
+              <input matInput formControlName="destination" placeholder="https://ejemplo.com/pagina-muy-larga" />
+              <mat-icon matPrefix>launch</mat-icon>
+              <mat-hint>Solo URLs http/https válidas.</mat-hint>
+              @if (form.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
             </mat-form-field>
-            <mat-form-field appearance="outline" class="domain">
-              <mat-label>Dominio</mat-label>
-              <mat-select formControlName="domainId">
-                <mat-option [value]="null">uvh.es</mat-option>
-                <mat-option *ngFor="let d of domains()" [value]="d.id">{{ d.domain }}</mat-option>
-              </mat-select>
-            </mat-form-field>
+            <div class="row">
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>Alias (opcional)</mat-label>
+                <input matInput formControlName="alias" placeholder="mi-enlace" />
+                <mat-icon matPrefix>edit</mat-icon>
+                @if (aliasStatus() === 'available') {
+                  <mat-hint class="ok-hint">✓ {{ aliasStatusText() }}</mat-hint>
+                }
+                @if (aliasStatus() === 'checking') {
+                  <mat-hint>Comprobando…</mat-hint>
+                }
+                @if (aliasStatus() === 'taken' || aliasStatus() === 'reserved' || aliasStatus() === 'invalid') {
+                  <mat-hint class="err-hint">{{ aliasStatusText() }}</mat-hint>
+                }
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="domain">
+                <mat-label>Dominio</mat-label>
+                <mat-select formControlName="domainId">
+                  <mat-option [value]="null">uvh.es</mat-option>
+                  @for (d of domains(); track d) {
+                    <mat-option [value]="d.id">{{ d.domain }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>              <mat-form-field appearance="outline" class="full">
+                <mat-label>Destino alternativo (fallback)</mat-label>
+                <input matInput formControlName="fallbackDestination" placeholder="Si ninguna regla coincide" />
+                @if (form.controls.fallbackDestination.hasError('url')) { <mat-error>Introduce una URL http/https válida.</mat-error> }
+              </mat-form-field>
           </div>
-
-          <mat-form-field appearance="outline" class="full">
-            <mat-label>Destino alternativo (fallback)</mat-label>
-            <input matInput formControlName="fallbackDestination" placeholder="Si ninguna regla coincide" />
-          </mat-form-field>
-        </div>
-      </mat-tab>
-
-      <mat-tab label="Opciones">
-        <div class="tab-pad">
-          <div class="row">
-            <mat-form-field appearance="outline" class="grow">
-              <mat-label>Contraseña (protege el enlace)</mat-label>
-              <input matInput formControlName="password" type="password" />
-              <mat-icon matPrefix>lock_outline</mat-icon>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="clicks">
-              <mat-label>Máx. clics</mat-label>
-              <input matInput formControlName="maxClicks" type="number" min="1" />
-              <mat-icon matPrefix>touch_app</mat-icon>
-            </mat-form-field>
-          </div>
-
-          <mat-checkbox formControlName="singleUse" color="primary">Uso único (se agota tras el primer clic)</mat-checkbox>
-
-          <div class="row">
-            <mat-form-field appearance="outline" class="grow">
-              <mat-label>Activación programada</mat-label>
-              <input matInput formControlName="scheduledAt" type="datetime-local" />
-              <mat-icon matPrefix>event</mat-icon>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="grow">
-              <mat-label>Expiración</mat-label>
-              <input matInput formControlName="expiresAt" type="datetime-local" />
-              <mat-icon matPrefix>event_busy</mat-icon>
-            </mat-form-field>
-          </div>
-
-          <mat-form-field appearance="outline" class="full">
-            <mat-label>Notas internas</mat-label>
-            <textarea matInput formControlName="notes" rows="2" placeholder="Contexto para tu equipo…"></textarea>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="full">
-            <mat-label>Etiquetas</mat-label>
-            <mat-chip-grid #tagGrid aria-label="Etiquetas">
-              <mat-chip-row *ngFor="let tag of tags()" (removed)="removeTag(tag)">
-                {{ tag }}
-                <button matChipRemove [attr.aria-label]="'Quitar ' + tag"><mat-icon>cancel</mat-icon></button>
-              </mat-chip-row>
-              <input [matChipInputFor]="tagGrid" (matChipInputTokenEnd)="addTag($event)" placeholder="Añadir etiqueta…" />
-            </mat-chip-grid>
-          </mat-form-field>
-        </div>
-      </mat-tab>
-
-      <mat-tab label="UTM">
-        <div class="tab-pad">
-          <p class="tab-note">Añade parámetros UTM al destino para medir campañas. Se añaden automáticamente al redirigir.</p>
-          <div formGroupName="utm" class="utm-grid">
-            <mat-form-field appearance="outline"><mat-label>Source</mat-label><input matInput formControlName="source" placeholder="newsletter" /></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Medium</mat-label><input matInput formControlName="medium" placeholder="email" /></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Campaign</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" /></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Term</mat-label><input matInput formControlName="term" /></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Content</mat-label><input matInput formControlName="content" /></mat-form-field>
-          </div>
-        </div>
-      </mat-tab>
-
-      <mat-tab label="Reglas">
-        <div class="tab-pad">
-          <p class="tab-note">Redirección condicional: la primera regla que coincida gana. Deja el destino vacío para borrar la regla.</p>
-          <div class="rules">
-            <div class="rule" *ngFor="let rule of ruleForms; let i = index" [formGroupName]="i">
-              <div class="rule-head">
-                <b>Regla {{ i + 1 }}</b>
-                <button mat-icon-button type="button" (click)="removeRule(i)" aria-label="Eliminar regla" [disabled]="ruleForms.length === 1">
-                  <mat-icon>delete_outline</mat-icon>
-                </button>
-              </div>
-              <div class="rule-grid">
-                <mat-form-field appearance="outline"><mat-label>País (ISO)</mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2" /></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es" maxlength="8" /></mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Dispositivo</mat-label>
-                  <mat-select formControlName="device">
-                    <mat-option value="">Cualquiera</mat-option>
-                    <mat-option value="desktop">Escritorio</mat-option>
-                    <mat-option value="mobile">Móvil</mat-option>
-                    <mat-option value="tablet">Tablet</mat-option>
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>SO (contiene)</mat-label><input matInput formControlName="os" placeholder="Android" /></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Desde (HH:mm UTC)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" /></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Hasta (HH:mm UTC)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" /></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="twitter.com" /></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" /></mat-form-field>
-              </div>
-              <mat-form-field appearance="outline" class="full">
-                <mat-label>Destino de la regla</mat-label>
-                <input matInput formControlName="destination" placeholder="https://ejemplo.com/oferta" />
+        </mat-tab>
+        <mat-tab label="Opciones">
+          <div class="tab-pad">
+            <div class="row">
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>{{ isEdit ? "Nueva contraseña (opcional)" : "Contraseña (protege el enlace)" }}</mat-label>
+                <input matInput formControlName="password" type="password" autocomplete="new-password" />
+                <mat-icon matPrefix>lock_outline</mat-icon>
+                @if (isEdit && data.link?.passwordProtected) {
+                  <mat-hint>Déjala vacía para conservar la protección actual.</mat-hint>
+                }
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="clicks">
+                <mat-label>Máx. clics</mat-label>
+                <input matInput formControlName="maxClicks" type="number" min="1" />
+                <mat-icon matPrefix>touch_app</mat-icon>
               </mat-form-field>
             </div>
+            @if (isEdit && data.link?.passwordProtected) {
+              <mat-checkbox formControlName="clearPassword" color="warn">Quitar la contraseña actual</mat-checkbox>
+            }
+            <mat-checkbox formControlName="singleUse" color="primary">Uso único (se agota tras el primer clic)</mat-checkbox>
+            <div class="row">
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>Activación programada</mat-label>
+                <input matInput formControlName="scheduledAt" type="datetime-local" />
+                <mat-icon matPrefix>event</mat-icon>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>Expiración</mat-label>
+                <input matInput formControlName="expiresAt" type="datetime-local" />
+                <mat-icon matPrefix>event_busy</mat-icon>
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Notas internas</mat-label>
+              <textarea matInput formControlName="notes" rows="2" placeholder="Contexto para tu equipo…"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Etiquetas</mat-label>
+              <mat-chip-grid #tagGrid aria-label="Etiquetas">
+                @for (tag of tags(); track tag) {
+                  <mat-chip-row (removed)="removeTag(tag)">
+                    {{ tag }}
+                    <button matChipRemove [attr.aria-label]="'Quitar ' + tag"><mat-icon>cancel</mat-icon></button>
+                  </mat-chip-row>
+                }
+                <input [matChipInputFor]="tagGrid" (matChipInputTokenEnd)="addTag($event)" placeholder="Añadir etiqueta…" />
+              </mat-chip-grid>
+            </mat-form-field>
           </div>
-          <button mat-stroked-button type="button" class="add-rule" (click)="addRule()">
-            <mat-icon>add</mat-icon> Añadir regla
-          </button>
-        </div>
-      </mat-tab>
-    </mat-tab-group>
-  </form>
+        </mat-tab>
+        <mat-tab label="UTM">
+          <div class="tab-pad">
+            <p class="tab-note">Añade parámetros UTM al destino para medir campañas. Se añaden automáticamente al redirigir.</p>
+            <div formGroupName="utm" class="utm-grid">
+              <mat-form-field appearance="outline"><mat-label>Source</mat-label><input matInput formControlName="source" placeholder="newsletter" /></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>Medium</mat-label><input matInput formControlName="medium" placeholder="email" /></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>Campaign</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" /></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>Term</mat-label><input matInput formControlName="term" /></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>Content</mat-label><input matInput formControlName="content" /></mat-form-field>
+            </div>
+          </div>
+        </mat-tab>
+        <mat-tab label="Reglas">
+          <div class="tab-pad">
+            <p class="tab-note">Redirección condicional: la primera regla que coincida gana. Deja el destino vacío para borrar la regla.</p>
+            <div class="rules">
+              @for (rule of ruleForms; track rule; let i = $index) {
+                <div class="rule" [formGroup]="rule">
+                  <div class="rule-head">
+                    <b>Regla {{ i + 1 }}</b>
+                    <button mat-icon-button type="button" (click)="removeRule(i)" aria-label="Eliminar regla" [disabled]="ruleForms.length === 1">
+                      <mat-icon>delete_outline</mat-icon>
+                    </button>
+                  </div>
+                  <div class="rule-grid">
+                    <mat-form-field appearance="outline"><mat-label>País (ISO)</mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es" maxlength="8" /></mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Dispositivo</mat-label>
+                      <mat-select formControlName="device">
+                        <mat-option value="">Cualquiera</mat-option>
+                        <mat-option value="desktop">Escritorio</mat-option>
+                        <mat-option value="mobile">Móvil</mat-option>
+                        <mat-option value="tablet">Tablet</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>SO (contiene)</mat-label><input matInput formControlName="os" placeholder="Android" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Desde (HH:mm UTC)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Hasta (HH:mm UTC)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="twitter.com" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" /></mat-form-field>
+                  </div>
+                  <mat-form-field appearance="outline" class="full">
+                    <mat-label>Destino de la regla</mat-label>
+                    <input matInput formControlName="destination" placeholder="https://ejemplo.com/oferta" />
+                  </mat-form-field>
+                </div>
+              }
+            </div>
+            <button mat-stroked-button type="button" class="add-rule" (click)="addRule()">
+              <mat-icon>add</mat-icon> Añadir regla
+            </button>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+    </form>
+  }
 
-  <div class="alert error" *ngIf="error()">{{ error() }}</div>
+  @if (error()) {
+    <div class="alert error">{{ error() }}</div>
+  }
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
   <button mat-button mat-dialog-close>Cancelar</button>
-  <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || busy() || loading()">
+  <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || busy() || loading() || (isEdit && !editDetailsLoaded())">
     {{ busy() ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear enlace" }}
   </button>
 </mat-dialog-actions>

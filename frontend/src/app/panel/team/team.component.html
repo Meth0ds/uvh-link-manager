@@ -3,98 +3,125 @@
   <p>Gestiona el workspace, sus miembros y las invitaciones.</p>
 </div>
 
-<mat-progress-bar mode="indeterminate" *ngIf="loading()" />
-<div class="alert error" *ngIf="error()">{{ error() }}</div>
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+@if (error()) {
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+}
 
-<ng-container *ngIf="detail() as d">
+@if (!loading() && !detail() && !error()) {
+  <div class="empty-state">
+    <mat-icon>workspaces</mat-icon>
+    <b>No hay un workspace seleccionado</b>
+    <p>Crea o selecciona un workspace desde la barra superior para gestionar tu equipo.</p>
+  </div>
+}
+
+@if (detail(); as d) {
   <div class="card-block">
     <span class="section-title">Workspace</span>
     <div class="rename-row">
       <mat-form-field appearance="outline" class="grow">
         <mat-label>Nombre del workspace</mat-label>
         <input matInput [(ngModel)]="renameValue" />
-      </mat-form-field>
-      <button mat-flat-button color="primary" (click)="rename()" [disabled]="!isAdmin() || !renameValue().trim() || saving()">
+      </mat-form-field>        <button mat-flat-button color="primary" (click)="rename()" [disabled]="!isAdmin() || !renameValue().trim() || saving()">
         Renombrar
       </button>
     </div>
   </div>
-
   <div class="card-block">
     <span class="section-title">Miembros</span>
-    <div class="member-row" *ngFor="let m of d.members; trackBy: trackByMember">
-      <div class="member-info">
-        <span class="avatar">{{ m.name.slice(0, 1).toUpperCase() }}</span>
-        <div>
-          <b>{{ m.name }}</b>
-          <span>{{ m.email }}</span>
+    @for (m of d.members; track trackByMember($index, m)) {
+      <div class="member-row">
+        <div class="member-info">
+          <span class="avatar">{{ m.name.slice(0, 1).toUpperCase() }}</span>
+          <div>
+            <b>{{ m.name }}</b>
+            <span>{{ m.email }}</span>
+          </div>
+        </div>
+        <div class="member-actions">
+          @if (isAdmin() && m.role !== 'owner') {
+            <mat-form-field appearance="outline">
+              <mat-select [value]="m.role" (selectionChange)="changeRole(m, $event.value)" aria-label="Rol" [disabled]="saving()">
+                <mat-option value="admin">Administrador</mat-option>
+                <mat-option value="editor">Editor</mat-option>
+                <mat-option value="viewer">Visor</mat-option>
+              </mat-select>
+            </mat-form-field>
+          }
+          @if (!isAdmin() || m.role === 'owner') {
+            <span class="role-chip">{{ roleLabel(m.role) }}</span>
+          }
+          @if (isAdmin() && m.role !== 'owner') {
+            <button mat-icon-button (click)="removeMember(m)" aria-label="Eliminar miembro" [disabled]="saving()">
+              <mat-icon>person_remove</mat-icon>
+            </button>
+          }
         </div>
       </div>
-      <div class="member-actions">
-        <mat-form-field appearance="outline" *ngIf="isAdmin() && m.role !== 'owner'">
-          <mat-select [value]="m.role" (selectionChange)="changeRole(m, $event.value)" aria-label="Rol">
+    }
+  </div>
+  @if (isAdmin()) {
+    <div class="card-block">
+      <span class="section-title">Invitar</span>
+      <div class="invite-row">
+        <mat-form-field appearance="outline" class="grow">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" [(ngModel)]="inviteEmail" (keyup.enter)="invite()" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="role">
+          <mat-select [(ngModel)]="inviteRole" aria-label="Rol">
             <mat-option value="admin">Administrador</mat-option>
             <mat-option value="editor">Editor</mat-option>
             <mat-option value="viewer">Visor</mat-option>
           </mat-select>
         </mat-form-field>
-        <span class="role-chip" *ngIf="!isAdmin() || m.role === 'owner'">{{ roleLabel(m.role) }}</span>
-        <button mat-icon-button *ngIf="isAdmin() && m.role !== 'owner'" (click)="removeMember(m)" aria-label="Eliminar miembro">
-          <mat-icon>person_remove</mat-icon>
+        <button mat-flat-button color="primary" (click)="invite()" [disabled]="!inviteEmail().trim() || saving()">
+          <mat-icon>send</mat-icon> Invitar
         </button>
       </div>
-    </div>
-  </div>
-
-  <div class="card-block" *ngIf="isAdmin()">
-    <span class="section-title">Invitar</span>
-    <div class="invite-row">
-      <mat-form-field appearance="outline" class="grow">
-        <mat-label>Email</mat-label>
-        <input matInput type="email" [(ngModel)]="inviteEmail" (keyup.enter)="invite()" />
-      </mat-form-field>
-      <mat-form-field appearance="outline" class="role">
-        <mat-select [(ngModel)]="inviteRole" aria-label="Rol">
-          <mat-option value="admin">Administrador</mat-option>
-          <mat-option value="editor">Editor</mat-option>
-          <mat-option value="viewer">Visor</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <button mat-flat-button color="primary" (click)="invite()" [disabled]="!inviteEmail().trim() || saving()">
-        <mat-icon>send</mat-icon> Invitar
-      </button>
-    </div>
-
-    <div class="invite-row" *ngFor="let inv of d.invitations; trackBy: trackByInvitation">
-      <div class="member-info">
-        <span class="avatar muted">&#64;</span>
-        <div>
-          <b>{{ inv.email }}</b>
-          <span>Invitado como {{ roleLabel(inv.role) }} · {{ inv.status }}</span>
+      @for (inv of d.invitations; track trackByInvitation($index, inv)) {
+        <div class="invite-row">
+          <div class="member-info">
+            <span class="avatar muted">&#64;</span>
+            <div>
+              <b>{{ inv.email }}</b>
+              <span>Invitado como {{ roleLabel(inv.role) }} · {{ inv.status }}</span>
+            </div>
+          </div>
+          @if (inv.status === 'pending') {
+            <div class="member-actions">
+              <button mat-stroked-button (click)="resendInvite(inv)" [disabled]="saving()"><mat-icon>refresh</mat-icon> Reenviar</button>
+              <button mat-icon-button (click)="cancelInvite(inv)" aria-label="Cancelar invitación" [disabled]="saving()"><mat-icon>close</mat-icon></button>
+            </div>
+          }
         </div>
-      </div>
-      <div class="member-actions" *ngIf="inv.status === 'pending'">
-        <button mat-stroked-button (click)="resendInvite(inv)"><mat-icon>refresh</mat-icon> Reenviar</button>
-        <button mat-icon-button (click)="cancelInvite(inv)" aria-label="Cancelar invitación"><mat-icon>close</mat-icon></button>
-      </div>
+      }
     </div>
-  </div>
-
-  <div class="card-block danger-zone" *ngIf="isAdmin()">
-    <span class="section-title">Zona de peligro</span>
-    <div class="danger-row">
-      <div>
-        <b>Abandonar workspace</b>
-        <span>Deja de ser miembro (no aplica al propietario).</span>
+  }
+  @if (isAdmin()) {
+    <div class="card-block danger-zone">
+      <span class="section-title">Zona de peligro</span>
+      <div class="danger-row">
+        <div>
+          <b>Abandonar workspace</b>
+          <span>Deja de ser miembro (no aplica al propietario).</span>
+        </div>
+        @if (!isOwner()) {
+          <button mat-stroked-button (click)="leave()" [disabled]="saving()">Abandonar</button>
+        }
       </div>
-      <button mat-stroked-button (click)="leave()" *ngIf="!isOwner()">Abandonar</button>
+      @if (isOwner()) {
+        <div class="danger-row">
+          <div>
+            <b>Eliminar workspace</b>
+            <span>Borra permanentemente el workspace y todos sus enlaces.</span>
+          </div>
+          <button mat-stroked-button class="danger" (click)="deleteWorkspace()" [disabled]="saving()">Eliminar</button>
+        </div>
+      }
     </div>
-    <div class="danger-row" *ngIf="isOwner()">
-      <div>
-        <b>Eliminar workspace</b>
-        <span>Borra permanentemente el workspace y todos sus enlaces.</span>
-      </div>
-      <button mat-stroked-button class="danger" (click)="deleteWorkspace()">Eliminar</button>
-    </div>
-  </div>
-</ng-container>
+  }
+}

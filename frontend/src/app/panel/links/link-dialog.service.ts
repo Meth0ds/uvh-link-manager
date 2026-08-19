@@ -8,8 +8,8 @@ import type { LinkDto } from "../../core/models";
 export class LinkDialogService {
   private dialog = inject(MatDialog);
 
-  openCreate(): Observable<LinkDto | null> {
-    return this.open({ mode: "create" });
+  openCreate(initialDestination = ""): Observable<LinkDto | null> {
+    return this.open({ mode: "create", initialDestination });
   }
 
   openEdit(link: LinkDto): Observable<LinkDto | null> {

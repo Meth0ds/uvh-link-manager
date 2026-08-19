@@ -3,12 +3,33 @@
   height: 100%;
 }
 
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 100;
+  transform: translateY(-160%);
+  padding: 9px 13px;
+  border-radius: 9px;
+  background: var(--uvh-ink);
+  color: var(--uvh-surface);
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: var(--uvh-shadow-md);
+  transition: transform 160ms ease;
+
+  &:focus {
+    transform: translateY(0);
+  }
+}
+
 .shell {
   height: 100vh;
 }
 
 .side {
   width: 260px;
+  min-width: 260px;
   background: var(--uvh-surface);
   border-right: 1px solid var(--uvh-border);
   display: flex;
@@ -16,7 +37,7 @@
 }
 
 .side-head {
-  padding: 16px 18px 10px;
+  padding: 18px 18px 12px;
   .brand {
     display: inline-flex;
     align-items: center;
@@ -25,16 +46,28 @@
     font-weight: 800;
     color: var(--uvh-ink);
     text-decoration: none;
+    letter-spacing: -0.3px;
     .brand-mark {
       display: inline-flex;
+      filter: drop-shadow(0 4px 10px rgba(36, 87, 245, 0.25));
     }
   }
 }
 
 .nav-list {
   flex: 1;
-  padding: 8px 12px;
+  padding: 4px 12px 12px;
   overflow-y: auto;
+}
+
+.nav-group {
+  display: block;
+  padding: 14px 12px 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--uvh-muted);
 }
 
 .nav-item {
@@ -42,23 +75,33 @@
   margin-bottom: 2px;
   color: var(--uvh-muted);
   --mat-list-list-item-leading-icon-color: var(--uvh-muted);
+  --mat-list-list-item-leading-icon-size: 20px;
+  --mat-list-list-item-leading-icon-space: 34px;
+  transition: background 0.15s ease, color 0.15s ease;
+  &:hover {
+    background: color-mix(in srgb, var(--uvh-ink) 5%, transparent);
+    color: var(--uvh-ink);
+  }
   &.active {
-    background: rgba(36, 87, 245, 0.1);
+    background: linear-gradient(90deg, rgba(36, 87, 245, 0.14), rgba(36, 87, 245, 0.05));
     color: var(--uvh-electric);
     --mat-list-list-item-leading-icon-color: var(--uvh-electric);
     font-weight: 700;
+    box-shadow: inset 3px 0 0 var(--uvh-electric);
   }
 }
 
 .side-foot {
-  padding: 12px;
+  padding: 14px;
   border-top: 1px solid var(--uvh-border);
+  background: color-mix(in srgb, var(--uvh-surface) 96%, transparent);
   .new-link {
     width: 100%;
-    border-radius: 10px;
-    background: var(--uvh-electric);
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--uvh-electric), var(--uvh-teal));
     color: #fff;
     --mat-icon-color: #fff;
+    box-shadow: 0 8px 20px -8px rgba(36, 87, 245, 0.55);
   }
 }
 
@@ -73,13 +116,23 @@
   gap: 12px;
   align-items: center;
   background: color-mix(in srgb, var(--uvh-surface) 82%, transparent);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--uvh-border);
   padding: 0 20px;
   height: 64px;
   position: sticky;
   top: 0;
   z-index: 20;
+}
+
+.topbar-title {
+  display: none;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--uvh-ink);
+  @media (max-width: 720px) {
+    display: inline-flex;
+  }
 }
 
 .menu-btn {
@@ -98,6 +151,19 @@
   font-weight: 700;
   font-size: 15px;
   color: var(--uvh-ink);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-add {
+  color: var(--uvh-muted);
+  transition: color 160ms ease, background-color 160ms ease;
+  &:hover {
+    color: var(--uvh-electric);
+    background: color-mix(in srgb, var(--uvh-electric) 9%, transparent);
+  }
 }
 
 .spacer {
@@ -136,16 +202,44 @@
 
 .main {
   flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 24px;
+  padding: 28px;
+  background:
+    radial-gradient(1200px 500px at 85% -10%, color-mix(in srgb, var(--uvh-electric) 6%, transparent), transparent 60%),
+    var(--uvh-surface);
+}
+
+.main-inner {
+  width: min(100%, 1220px);
+  margin: 0 auto;
+  outline: none;
 }
 
 @media (max-width: 720px) {
+  .topbar {
+    gap: 6px;
+    padding: 0 12px;
+  }
+
+  .ws-switch {
+    width: min(190px, 48vw);
+    margin-top: 18px;
+  }
+
+  .ws-name {
+    max-width: 45vw;
+  }
+
   .menu-btn {
     display: inline-flex;
   }
   .new-link-top {
     display: none;
+  }
+  .workspace-add {
+    margin-right: 2px;
   }
   .main {
     padding: 16px;

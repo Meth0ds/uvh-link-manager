@@ -57,34 +57,6 @@
   --mat-menu-item-icon-color: #b91c1c;
 }
 
-.stat-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin: 20px 0;
-}
-
-.stat-card {
-  background: #fff;
-  border: 1px solid var(--uvh-border);
-  border-radius: 14px;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  span {
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--uvh-muted);
-  }
-  b {
-    font-size: 22px;
-    font-weight: 800;
-  }
-}
-
 .period-row {
   display: flex;
   justify-content: space-between;
@@ -98,7 +70,7 @@
 
 .rules-block,
 .activity-block {
-  background: #fff;
+  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
   border: 1px solid var(--uvh-border);
   border-radius: 14px;
   padding: 16px 18px;
@@ -173,10 +145,4 @@
   color: var(--uvh-muted);
   font-size: 13.5px;
   margin: 6px 0;
-}
-
-@media (max-width: 720px) {
-  .stat-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }

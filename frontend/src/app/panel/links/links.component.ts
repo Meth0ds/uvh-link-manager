@@ -1,6 +1,6 @@
-import { Component, computed, inject, signal } from "@angular/core";
-import { Router } from "@angular/router";
-import { CommonModule } from "@angular/common";
+import { Component, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { ActivatedRoute, Router } from "@angular/router";
+
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -19,6 +19,7 @@ import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { LinkDialogService } from "./link-dialog.service";
 import { QrDialogComponent } from "./qr-dialog.component";
+import { ActionDialogService } from "../action-dialog.service";
 import type { LinksResponse, LinkDto, LinkState } from "../../core/models";
 
 type StateFilter = "" | LinkState;
@@ -37,7 +38,6 @@ const STATE_LABEL: Record<LinkState, string> = {
   selector: "app-links",
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatButtonModule,
     MatIconModule,
@@ -50,23 +50,27 @@ const STATE_LABEL: Record<LinkState, string> = {
     MatChipsModule,
     MatTooltipModule,
     MatSnackBarModule,
-    MatProgressBarModule,
-  ],
+    MatProgressBarModule
+],
   templateUrl: "./links.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./links.component.scss",
 })
 export class LinksComponent {
   private api = inject(ApiService);
+  private route = inject(ActivatedRoute);
   readonly router = inject(Router);
   private dialog = inject(MatDialog);
   private snackbar = inject(MatSnackBar);
   private linkDialog = inject(LinkDialogService);
   private workspaces = inject(WorkspaceService);
+  private actions = inject(ActionDialogService);
 
   readonly links = signal<LinkDto[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly actionId = signal<number | null>(null);
 
   readonly q = signal("");
   readonly state = signal<StateFilter>("");
@@ -74,6 +78,8 @@ export class LinksComponent {
   readonly sort = signal("created_at_desc");
   readonly page = signal(0);
   readonly pageSize = signal(20);
+  private readonly initialDestination = this.route.snapshot.queryParamMap.get("destination")?.trim() ?? "";
+  private initialDialogOpened = false;
 
   readonly canWrite = computed(() => {
     const role = this.workspaces.currentRole();
@@ -82,8 +88,19 @@ export class LinksComponent {
 
   readonly stateLabel = (s: LinkState) => STATE_LABEL[s];
 
+  private loadedWorkspaceId: number | null | undefined;
+
   constructor() {
-    void this.reload();
+    effect(() => {
+      const workspaceId = this.workspaces.currentId();
+      if (workspaceId === this.loadedWorkspaceId) return;
+      this.loadedWorkspaceId = workspaceId;
+      if (workspaceId === null) {
+        this.loading.set(false);
+        return;
+      }
+      void this.reload();
+    });
   }
 
   async reload(): Promise<void> {
@@ -100,6 +117,13 @@ export class LinksComponent {
       });
       this.links.set(res.links);
       this.total.set(res.total);
+      if (this.initialDestination && !this.initialDialogOpened && this.canWrite()) {
+        this.initialDialogOpened = true;
+        this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+        this.linkDialog.openCreate(this.initialDestination).subscribe((created) => {
+          if (created) void this.router.navigate(["/app/links", created.id]);
+        });
+      }
     } catch (err) {
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los enlaces");
     } finally {
@@ -138,7 +162,12 @@ export class LinksComponent {
   }
 
   copy(url: string): void {
-    void navigator.clipboard.writeText(url).then(
+    const write = navigator.clipboard?.writeText(url);
+    if (!write) {
+      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
+      return;
+    }
+    void write.then(
       () => this.snackbar.open("Enlace copiado", "Cerrar", { duration: 2000 }),
       () => this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }),
     );
@@ -161,24 +190,47 @@ export class LinksComponent {
   }
 
   async setState(link: LinkDto, state: "active" | "paused" | "archived"): Promise<void> {
+    if (this.actionId()) return;
+    this.actionId.set(link.id);
     try {
       await this.api.post(`/api/v1/links/${link.id}/state`, { state });
       this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
       void this.reload();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
+    } finally {
+      this.actionId.set(null);
     }
   }
 
   async remove(link: LinkDto): Promise<void> {
-    if (!confirm(`¿Eliminar el enlace ${link.shortUrl}?`)) return;
+    const confirmed = await this.actions.confirm({
+      title: "Eliminar enlace",
+      message: `¿Quieres eliminar ${link.shortUrl}? Podrás restaurarlo desde una integración, pero dejará de estar disponible ahora.`,
+      confirmLabel: "Eliminar enlace",
+      destructive: true,
+    });
+    if (!confirmed || this.actionId()) return;
+    this.actionId.set(link.id);
     try {
       await this.api.delete(`/api/v1/links/${link.id}`);
       this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
       void this.reload();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
+    } finally {
+      this.actionId.set(null);
     }
+  }
+
+  openLink(id: number): void {
+    void this.router.navigate(["/app/links", id]);
+  }
+
+  openLinkFromKeyboard(event: KeyboardEvent, id: number): void {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    this.openLink(id);
   }
 
   trackByLink(_i: number, l: LinkDto): number {

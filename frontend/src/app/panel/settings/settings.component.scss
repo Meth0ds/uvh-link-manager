@@ -14,7 +14,7 @@
 }
 
 .card-block {
-  background: #fff;
+  background: var(--mat-sys-surface-container-lowest, #fff);
   border: 1px solid var(--uvh-border);
   border-radius: 14px;
   padding: 18px 20px;
@@ -65,7 +65,7 @@
     border: 1px solid var(--uvh-border);
     border-radius: 14px;
     padding: 8px;
-    background: #fff;
+    background: var(--mat-sys-surface-container-lowest, #fff);
   }
 
   .mfa-secret {
@@ -113,6 +113,14 @@
   &:last-child {
     border-bottom: 0;
   }
+
+  &.current-session {
+    margin: 0 -10px;
+    padding-right: 10px;
+    padding-left: 10px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--uvh-electric) 5%, transparent);
+  }
 }
 
 .session-info {
@@ -132,11 +140,31 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    span {
+    .session-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
       font-size: 12.5px;
       color: var(--uvh-muted);
     }
   }
+}
+
+.current-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--uvh-success-soft);
+  color: var(--uvh-success);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.row-actions .danger,
+.session-row .danger {
+  color: var(--uvh-danger);
 }
 
 mat-radio-group {

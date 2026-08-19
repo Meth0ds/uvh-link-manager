@@ -1,16 +1,62 @@
 @use "@angular/material" as mat;
 
-// ---------- UVH design tokens (seeds: #07111F ink, #F6F8FC surfaces, #2457F5 electric, #00A99D teal) ----------
+// ============================================================
+// UVH design system
+// Seeds: #07111F ink · #F6F8FC surface · #2457F5 electric · #00A99D teal
+// ============================================================
+
+// ---------- Brand tokens (light) ----------
 :root {
   --uvh-ink: #07111f;
   --uvh-surface: #f6f8fc;
   --uvh-electric: #2457f5;
+  --uvh-electric-strong: #1a43c4;
   --uvh-teal: #00a99d;
+  --uvh-teal-strong: #00897b;
   --uvh-border: #e3e8f0;
+  --uvh-border-strong: #cdd6e3;
   --uvh-muted: #5b6b84;
+  --uvh-muted-soft: #8a98ad;
   --uvh-radius: 14px;
+  --uvh-radius-lg: 20px;
+  --uvh-shadow-sm: 0 1px 2px rgba(7, 17, 31, 0.05), 0 2px 8px rgba(7, 17, 31, 0.05);
+  --uvh-shadow-md: 0 4px 14px rgba(7, 17, 31, 0.08), 0 12px 32px rgba(7, 17, 31, 0.07);
+  --uvh-shadow-lg: 0 24px 70px rgba(7, 17, 31, 0.12);
+  --uvh-danger: #c62828;
+  --uvh-danger-soft: rgba(198, 40, 40, 0.08);
+  --uvh-success: #0f9d6e;
+  --uvh-success-soft: rgba(15, 157, 110, 0.1);
+  --uvh-warn: #b26a00;
+  --uvh-warn-soft: rgba(178, 106, 0, 0.1);
 }
 
+// ---------- Dark tokens ----------
+html.dark {
+  color-scheme: dark;
+  --uvh-ink: #eef2f9;
+  --uvh-surface: #0b1424;
+  --uvh-electric: #6c8cff;
+  --uvh-electric-strong: #4a6cf5;
+  --uvh-teal: #38c9bc;
+  --uvh-teal-strong: #2bb3a7;
+  --uvh-border: #1d2a40;
+  --uvh-border-strong: #2a3a55;
+  --uvh-muted: #93a1b8;
+  --uvh-muted-soft: #74839c;
+  --uvh-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --uvh-shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --uvh-shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.5);
+  --uvh-danger: #ff8a80;
+  --uvh-danger-soft: rgba(255, 138, 128, 0.1);
+  --uvh-success: #5cd6ab;
+  --uvh-success-soft: rgba(92, 214, 171, 0.12);
+  --uvh-warn: #ffc46b;
+  --uvh-warn-soft: rgba(255, 196, 107, 0.12);
+}
+
+// ---------- Material 3 theme ----------
+// Blue/cyan structure + brand overrides so every mat-* component carries the
+// UVH palette (light and dark via light-dark()).
 $uvh-theme: mat.define-theme((
   color: (
     theme-type: light,
@@ -38,18 +84,45 @@ $uvh-dark-theme: mat.define-theme((
 html {
   @include mat.all-component-themes($uvh-theme);
   @include mat.typography-hierarchy($uvh-theme);
+  @include mat.strong-focus-indicators((border-width: 2px, border-radius: 6px));
+
+  // Brand palette → system tokens (light-dark aware)
+  @include mat.theme-overrides((
+    primary: light-dark(#2457f5, #6c8cff),
+    on-primary: light-dark(#ffffff, #07111f),
+    primary-container: light-dark(#dde5ff, #24366b),
+    on-primary-container: light-dark(#10224f, #dde5ff),
+    tertiary: light-dark(#00a99d, #38c9bc),
+    on-tertiary: light-dark(#ffffff, #04302c),
+    tertiary-container: light-dark(#c9f2ec, #0d4d47),
+    on-tertiary-container: light-dark(#003b36, #c9f2ec),
+    error-container: light-dark(#ffdad6, #8c1d18),
+    on-error-container: light-dark(#410002, #ffdad6),
+    surface: light-dark(#f6f8fc, #0b1424),
+    surface-dim: light-dark(#dde3ee, #050c18),
+    surface-bright: light-dark(#f6f8fc, #101a2b),
+    surface-container-lowest: light-dark(#ffffff, #0b1424),
+    surface-container-low: light-dark(#f0f4fa, #0f1929),
+    surface-container: light-dark(#e9eef6, #142033),
+    surface-container-high: light-dark(#e3e9f2, #1e2b40),
+    surface-container-highest: light-dark(#dde3ee, #29364d),
+    on-surface: light-dark(#07111f, #eef2f9),
+    on-surface-variant: light-dark(#45566e, #c2ccdc),
+    outline-variant: light-dark(#e3e8f0, #1d2a40),
+    outline: light-dark(#7d8ba0, #93a1b8),
+  ));
 }
 
 html.dark {
-  color-scheme: dark;
-  --uvh-ink: #eef2f9;
-  --uvh-surface: #0b1424;
-  --uvh-border: #1d2a40;
-  --uvh-muted: #93a1b8;
   @include mat.all-component-colors($uvh-dark-theme);
 }
 
 // ---------- Base ----------
+[role="link"][tabindex="0"]:focus-visible {
+  outline: 2px solid var(--uvh-electric);
+  outline-offset: 3px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -71,6 +144,24 @@ body {
 a {
   color: var(--uvh-electric);
   text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+::selection {
+  background: color-mix(in srgb, var(--uvh-electric) 22%, transparent);
+}
+
+:focus-visible {
+  outline-color: var(--uvh-electric);
+}
+
+// Slim, theme-aware scrollbars
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--uvh-border-strong) transparent;
 }
 
 // Material's typography hierarchy emits a `font` shorthand whose family is a
@@ -96,20 +187,350 @@ html .mat-typography .mat-body-small {
   letter-spacing: -0.01em;
 }
 
-// Utility containers
+// ---------- Shared layout primitives ----------
 .page {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 24px 20px 64px;
+  padding: 28px 20px 72px;
+}
+
+// Page header: title + subtitle + actions
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+
+  h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.15;
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: var(--uvh-muted);
+    font-size: 14px;
+    line-height: 1.55;
+    max-width: 620px;
+  }
+
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
 }
 
 .section-title {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--uvh-muted);
-  margin: 28px 0 12px;
+  margin: 32px 0 14px;
+
+  mat-icon {
+    width: 17px;
+    height: 17px;
+    font-size: 17px;
+    color: var(--uvh-electric);
+  }
+}
+
+// Card block used across panel pages
+.card {
+  background: var(--mat-sys-surface-container-lowest, #fff);
+  border: 1px solid var(--uvh-border);
+  border-radius: var(--uvh-radius);
+  box-shadow: var(--uvh-shadow-sm);
+
+  html.dark & {
+    background: var(--mat-sys-surface-container-lowest, #0b1424);
+  }
+}
+
+.card-block {
+  @extend .card;
+  padding: 22px;
+  margin-bottom: 18px;
+
+  > .section-title:first-child {
+    margin-top: 0;
+  }
+}
+
+// Stat cards row
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.stat-card {
+  @extend .card;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  overflow: hidden;
+  transition: box-shadow 180ms ease, transform 180ms ease;
+
+  &:hover {
+    box-shadow: var(--uvh-shadow-md);
+    transform: translateY(-2px);
+  }
+
+  > span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--uvh-muted);
+    font-size: 12.5px;
+    font-weight: 700;
+
+    mat-icon {
+      width: 15px;
+      height: 15px;
+      font-size: 15px;
+      color: var(--uvh-electric);
+    }
+  }
+
+  > b {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+  }
+
+  small {
+    color: var(--uvh-muted-soft);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    mat-icon {
+      width: 14px;
+      height: 14px;
+      font-size: 14px;
+      color: var(--uvh-success);
+    }
+
+    &.down mat-icon {
+      color: var(--uvh-danger);
+    }
+  }
+}
+
+// Consistent panel feedback: every data view can expose a retry action without
+// shifting the hierarchy or trapping it below the fold.
+.main .alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  > span {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  > button {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+}
+
+// Empty state
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 44px 24px;
+  text-align: center;
+  border: 1px dashed var(--uvh-border-strong);
+  border-radius: var(--uvh-radius);
+
+  mat-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 42px;
+    color: var(--uvh-muted-soft);
+  }
+
+  b {
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  p {
+    margin: 0;
+    color: var(--uvh-muted);
+    font-size: 13.5px;
+    max-width: 420px;
+    line-height: 1.6;
+  }
+
+  .empty-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+  }
+}
+
+// Status pill
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+
+  &::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  &.pill-active,
+  &.pill-verified,
+  &.pill-success,
+  &.pill-open {
+    background: var(--uvh-success-soft);
+    color: var(--uvh-success);
+  }
+
+  &.pill-paused,
+  &.pill-pending,
+  &.pill-review {
+    background: var(--uvh-warn-soft);
+    color: var(--uvh-warn);
+  }
+
+  &.pill-archived,
+  &.pill-expired,
+  &.pill-blocked,
+  &.pill-error,
+  &.pill-failed,
+  &.pill-disabled {
+    background: var(--uvh-danger-soft);
+    color: var(--uvh-danger);
+  }
+
+  &.pill-neutral,
+  &.pill-scheduled {
+    background: color-mix(in srgb, var(--uvh-muted) 12%, transparent);
+    color: var(--uvh-muted);
+  }
+}
+
+// Small state chip (link/domain/webhook states)
+.state-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+
+  &.st-active,
+  &.st-verified,
+  &.on {
+    background: rgba(0, 169, 157, 0.12);
+    color: #00796b;
+  }
+
+  &.st-paused,
+  &.st-expired,
+  &.st-pending,
+  &.st-verifying {
+    background: rgba(251, 191, 36, 0.14);
+    color: #92600a;
+  }
+
+  &.st-blocked,
+  &.st-error,
+  &.st-failed {
+    background: rgba(220, 38, 38, 0.1);
+    color: #b91c1c;
+  }
+
+  &.st-scheduled,
+  &.st-archived,
+  &.st-deleted,
+  &.st-disabled {
+    background: rgba(91, 107, 132, 0.12);
+    color: var(--uvh-muted);
+  }
+}
+
+// Muted text
+.muted {
+  color: var(--uvh-muted);
+}
+
+// Row of buttons
+.btn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+// Skeleton shimmer
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--uvh-muted) 12%, transparent);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    animation: skeleton-shimmer 1.6s infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+// Code / secret blocks
+.code-block {
+  font-family: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+  background: color-mix(in srgb, var(--uvh-muted) 10%, transparent);
+  border: 1px solid var(--uvh-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  word-break: break-all;
 }
 
 // Brand link chip
@@ -126,6 +547,17 @@ html .mat-typography .mat-body-small {
 }
 
 // Motion: respect reduced motion
+@media (max-width: 600px) {
+  .main .alert {
+    align-items: flex-start;
+    flex-wrap: wrap;
+
+    > button {
+      margin-left: 30px;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

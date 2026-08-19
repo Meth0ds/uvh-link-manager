@@ -1,5 +1,5 @@
-import { Component, inject, signal } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -9,12 +9,16 @@ import QRCode from "qrcode";
 @Component({
   selector: "app-qr-dialog",
   standalone: true,
-  imports: [CommonModule, MatDialogModule, MatButtonModule, MatIconModule, MatProgressBarModule],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, MatProgressBarModule],
   template: `
     <h2 mat-dialog-title>QR del enlace</h2>
     <mat-dialog-content class="qr-body">
-      <mat-progress-bar mode="indeterminate" *ngIf="!dataUrl()" />
-      <img *ngIf="dataUrl()" [src]="dataUrl()" alt="Código QR de {{ url }}" class="qr-img" />
+      @if (!dataUrl()) {
+        <mat-progress-bar mode="indeterminate" />
+      }
+      @if (dataUrl()) {
+        <img [src]="dataUrl()" alt="Código QR de {{ url }}" class="qr-img" />
+      }
       <p class="url tnum">{{ url }}</p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -23,11 +27,12 @@ import QRCode from "qrcode";
       </button>
       <button mat-flat-button color="primary" mat-dialog-close>Cerrar</button>
     </mat-dialog-actions>
-  `,
+    `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .qr-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 12px 8px; text-align: center; min-width: 260px; }
-      .qr-img { width: 240px; height: 240px; border: 1px solid var(--uvh-border); border-radius: 14px; padding: 10px; background: #fff; }
+      .qr-img { width: 240px; height: 240px; border: 1px solid var(--uvh-border); border-radius: 14px; padding: 10px; background: var(--mat-sys-surface-container-lowest, var(--uvh-surface)); }
       .url { color: var(--uvh-muted); font-size: 13px; word-break: break-all; margin: 0; }
     `,
   ],

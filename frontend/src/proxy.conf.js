@@ -1,4 +1,4 @@
-const BACKEND = process.env.BACKEND_URL || "http://127.0.0.1:3001";
+const BACKEND = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 
 module.exports = {
   "/api": {
@@ -8,6 +8,12 @@ module.exports = {
     logLevel: "warn",
   },
   "/r": {
+    target: BACKEND,
+    secure: false,
+    changeOrigin: true,
+    logLevel: "warn",
+  },
+  "/health": {
     target: BACKEND,
     secure: false,
     changeOrigin: true,

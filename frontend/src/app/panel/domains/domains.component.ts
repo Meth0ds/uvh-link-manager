@@ -1,5 +1,5 @@
-import { Component, inject, signal } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -9,6 +9,8 @@ import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import type { DomainDto, DomainState } from "../../core/models";
+import { WorkspaceService } from "../../core/services/workspace.service";
+import { ActionDialogService } from "../action-dialog.service";
 
 const STATE_LABEL: Record<DomainState, string> = {
   pending: "Pendiente",
@@ -23,33 +25,47 @@ const STATE_LABEL: Record<DomainState, string> = {
   selector: "app-domains",
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatButtonModule,
     MatIconModule,
     MatInputModule,
     MatFormFieldModule,
     MatProgressBarModule,
-    MatSnackBarModule,
-  ],
+    MatSnackBarModule
+],
   templateUrl: "./domains.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./domains.component.scss",
 })
 export class DomainsComponent {
   private api = inject(ApiService);
+  private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
+  private actions = inject(ActionDialogService);
 
   readonly domains = signal<DomainDto[]>([]);
   readonly loading = signal(true);
   readonly adding = signal(false);
   readonly verifyingId = signal<number | null>(null);
+  readonly actionId = signal<number | null>(null);
   readonly newDomain = signal("");
   readonly error = signal<string | null>(null);
 
   readonly stateLabel = (s: DomainState) => STATE_LABEL[s];
 
+  private loadedWorkspaceId: number | null | undefined;
+
   constructor() {
-    void this.load();
+    effect(() => {
+      const workspaceId = this.workspaces.currentId();
+      if (workspaceId === this.loadedWorkspaceId) return;
+      this.loadedWorkspaceId = workspaceId;
+      if (workspaceId === null) {
+        this.loading.set(false);
+        return;
+      }
+      void this.load();
+    });
   }
 
   async load(): Promise<void> {
@@ -82,6 +98,8 @@ export class DomainsComponent {
   }
 
   async verify(d: DomainDto): Promise<void> {
+    if (this.actionId()) return;
+    this.actionId.set(d.id);
     this.verifyingId.set(d.id);
     try {
       await this.api.post<{ state: string }>(`/api/v1/domains/${d.id}/verify`);
@@ -96,42 +114,65 @@ export class DomainsComponent {
       void this.load();
     } finally {
       this.verifyingId.set(null);
+      this.actionId.set(null);
     }
   }
 
   async activate(d: DomainDto): Promise<void> {
+    if (this.actionId()) return;
+    this.actionId.set(d.id);
     try {
       await this.api.post(`/api/v1/domains/${d.id}/activate`);
       this.snackbar.open("Dominio activado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.actionId.set(null);
     }
   }
 
   async disable(d: DomainDto): Promise<void> {
+    if (this.actionId()) return;
+    this.actionId.set(d.id);
     try {
       await this.api.post(`/api/v1/domains/${d.id}/disable`);
       this.snackbar.open("Dominio desactivado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.actionId.set(null);
     }
   }
 
   async remove(d: DomainDto): Promise<void> {
-    if (!confirm(`¿Eliminar el dominio ${d.domain}?`)) return;
+    const confirmed = await this.actions.confirm({
+      title: "Eliminar dominio",
+      message: `¿Quieres eliminar ${d.domain}? Los enlaces que lo usan dejarán de poder utilizar este dominio.`,
+      confirmLabel: "Eliminar dominio",
+      destructive: true,
+    });
+    if (!confirmed || this.actionId()) return;
+    this.actionId.set(d.id);
     try {
       await this.api.delete(`/api/v1/domains/${d.id}`);
       this.snackbar.open("Dominio eliminado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.actionId.set(null);
     }
   }
 
   copy(value: string): void {
-    void navigator.clipboard.writeText(value).then(
+    const write = navigator.clipboard?.writeText(value);
+    if (!write) {
+      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
+      return;
+    }
+    void write.then(
       () => this.snackbar.open("Registro copiado", "Cerrar", { duration: 2000 }),
       () => this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }),
     );

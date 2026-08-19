@@ -28,7 +28,7 @@
             "production": {
               "budgets": [
                 { "type": "initial", "maximumWarning": "1mb", "maximumError": "3mb" },
-                { "type": "anyComponentStyle", "maximumWarning": "16kb", "maximumError": "32kb" }
+                { "type": "anyComponentStyle", "maximumWarning": "48kb", "maximumError": "96kb" }
               ],
               "outputHashing": "all"
             },
@@ -60,6 +60,32 @@
           }
         }
       }
+    }
+  },
+  "schematics": {
+    "@schematics/angular:component": {
+      "type": "component"
+    },
+    "@schematics/angular:directive": {
+      "type": "directive"
+    },
+    "@schematics/angular:service": {
+      "type": "service"
+    },
+    "@schematics/angular:guard": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:interceptor": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:module": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:pipe": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:resolver": {
+      "typeSeparator": "."
     }
   }
 }
