@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy } from "@angular/core";
 import { RouterLink } from "@angular/router";
-import { MatIconModule } from "@angular/material/icon";
+import { ThemeToggleComponent } from "../core/theme-toggle.component";
 
 /**
  * Split-screen shell for every auth surface (login, register, MFA, recovery,
@@ -10,9 +10,10 @@ import { MatIconModule } from "@angular/material/icon";
 @Component({
   selector: "app-auth-shell",
   standalone: true,
-  imports: [RouterLink, MatIconModule],
+  imports: [RouterLink, ThemeToggleComponent],
   template: `
     <div class="auth-shell">
+      <div class="auth-theme"><app-theme-toggle /></div>
       <aside class="auth-brand">
         <div class="auth-brand-inner">
           <a class="brand" routerLink="/" aria-label="UVH, inicio">
@@ -27,22 +28,13 @@ import { MatIconModule } from "@angular/material/icon";
           </a>
 
           <div class="brand-copy">
-            <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> Link intelligence</span>
-            <h1>Enlaces cortos.<br /><em>Control total.</em></h1>
-            <p>Acorta, administra y mide cada enlace desde un único panel. Sin píxeles de terceros, con la analítica en tus manos.</p>
+            <h1>Una decisión clara<br /><em>por cada enlace.</em></h1>
+            <p>Crea, dirige y mide tus enlaces desde el mismo workspace.</p>
           </div>
 
-          <ul class="brand-points">
-            <li><mat-icon aria-hidden="true">check_circle</mat-icon><span><b>Redirección real</b> HTTP 302, sin JavaScript intermedio.</span></li>
-            <li><mat-icon aria-hidden="true">check_circle</mat-icon><span><b>Analítica propia</b> clics, países, dispositivos y referentes.</span></li>
-            <li><mat-icon aria-hidden="true">check_circle</mat-icon><span><b>Seguridad por diseño</b> MFA, CSRF y auditoría de acciones.</span></li>
-          </ul>
-
-          <blockquote class="brand-quote">
-            <mat-icon aria-hidden="true">format_quote</mat-icon>
-            <p>Pasamos de enlaces sin control a saber exactamente qué campaña trae tráfico y desde qué país.</p>
-            <footer><span class="quote-avatar" aria-hidden="true">LF</span><span><b>Lucía Fernández</b><small>Growth Lead · Northwind</small></span></footer>
-          </blockquote>
+          <div class="brand-sequence" aria-label="Crear, dirigir y medir">
+            <span>Crear</span><i aria-hidden="true"></i><span>Dirigir</span><i aria-hidden="true"></i><span>Medir</span>
+          </div>
         </div>
       </aside>
 
@@ -60,10 +52,25 @@ import { MatIconModule } from "@angular/material/icon";
       }
 
       .auth-shell {
+        position: relative;
         display: grid;
         grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
         min-height: 100vh;
         background: var(--uvh-surface);
+      }
+
+      .auth-theme {
+        position: fixed;
+        z-index: 8;
+        top: 18px;
+        right: 20px;
+        display: flex;
+        padding: 4px;
+        border: 1px solid color-mix(in srgb, var(--uvh-border) 78%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--uvh-surface-raised) 88%, transparent);
+        box-shadow: var(--uvh-shadow-sm);
+        backdrop-filter: blur(14px);
       }
 
       /* ---------- Brand panel ---------- */
@@ -149,110 +156,20 @@ import { MatIconModule } from "@angular/material/icon";
         }
       }
 
-      .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 9px;
-        color: #8fa6ff;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-
-      .eyebrow-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: currentColor;
-        box-shadow: 0 0 0 5px rgba(143, 166, 255, 0.16);
-      }
-
-      .brand-points {
+      .brand-sequence {
         display: flex;
-        flex-direction: column;
-        gap: 14px;
-        margin: 0;
-        padding: 0;
-        list-style: none;
+        align-items: center;
+        gap: 16px;
+        margin: auto 0 24px;
+        color: #edf4ff;
+        font-size: 17px;
+        font-weight: 750;
+        letter-spacing: -0.025em;
 
-        li {
-          display: flex;
-          align-items: flex-start;
-          gap: 11px;
-          color: #c4d0df;
-          font-size: 13px;
-          line-height: 1.55;
-
-          mat-icon {
-            flex: 0 0 auto;
-            width: 19px;
-            height: 19px;
-            margin-top: 1px;
-            color: #57cfc2;
-            font-size: 19px;
-          }
-
-          b {
-            display: block;
-            color: #edf4ff;
-            font-size: 13px;
-            font-weight: 800;
-          }
-        }
-      }
-
-      .brand-quote {
-        margin: auto 0 0;
-        padding: 18px 20px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.04);
-
-        > mat-icon {
-          width: 20px;
-          height: 20px;
-          color: #57cfc2;
-          font-size: 20px;
-        }
-
-        p {
-          margin: 8px 0 14px;
-          color: #c4d0df;
-          font-size: 13px;
-          line-height: 1.65;
-        }
-
-        footer {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-
-          .quote-avatar {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #2457f5, #00a99d);
-            color: #fff;
-            font-size: 10px;
-            font-weight: 800;
-          }
-
-          b {
-            display: block;
-            font-size: 12px;
-            font-weight: 800;
-          }
-
-          small {
-            display: block;
-            color: #8295b0;
-            font-size: 10.5px;
-            margin-top: 2px;
-          }
+        i {
+          width: 34px;
+          height: 1px;
+          background: linear-gradient(90deg, rgba(143, 166, 255, .72), rgba(87, 207, 194, .72));
         }
       }
 
@@ -262,7 +179,9 @@ import { MatIconModule } from "@angular/material/icon";
         align-items: center;
         justify-content: center;
         padding: 40px 24px;
-        background: var(--uvh-surface);
+        background:
+          radial-gradient(620px 420px at 100% 0%, color-mix(in srgb, var(--uvh-electric) 7%, transparent), transparent 72%),
+          var(--uvh-surface);
       }
 
       /* ---------- Responsive ---------- */
@@ -276,27 +195,52 @@ import { MatIconModule } from "@angular/material/icon";
         }
 
         .auth-brand-inner {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr);
+          align-items: center;
           min-height: 0;
-          padding: 28px 24px 22px;
-          gap: 20px;
+          padding: 18px 104px 18px 22px;
+          gap: 18px;
         }
 
         .brand-copy h1 {
-          font-size: 26px;
-          margin: 10px 0;
+          margin: 0;
+          font-size: 22px;
+          line-height: 1.05;
         }
 
-        .brand-copy p {
+        .brand-copy p,
+        .brand-copy br {
           display: none;
         }
 
-        .brand-points {
+        .brand-sequence {
           display: none;
         }
 
-        .brand-quote {
-          display: none;
+        .auth-main {
+          align-items: flex-start;
+          padding: 24px 16px 38px;
         }
+
+        .auth-theme {
+          top: 14px;
+          right: 15px;
+          border-color: rgba(255, 255, 255, .18);
+          background: rgba(9, 25, 45, .82);
+        }
+      }
+
+      @media (max-width: 520px) {
+        .auth-brand-inner {
+          grid-template-columns: 1fr;
+          padding: 15px 96px 15px 18px;
+          gap: 10px;
+        }
+
+        .brand-copy h1 { font-size: 19px; }
+        .brand-copy h1 em { display: inline; }
+        .auth-main { padding: 18px 12px 30px; }
       }
 
       @media (prefers-reduced-motion: reduce) {

@@ -10,6 +10,7 @@ use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
 use App\Support\WorkspaceAccess;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -20,13 +21,23 @@ class LinkController
     {
         $workspaceId = UvhRequest::workspaceId($request);
 
-        $search = (string) $request->query('q', '');
-        $state = (string) $request->query('state', '');
-        $tag = (string) $request->query('tag', '');
-        $domainId = (string) $request->query('domainId', '');
-        $sort = (string) $request->query('sort', 'created_at_desc');
-        $page = max(1, (int) $request->query('page', 1));
-        $perPage = min(100, max(1, (int) $request->query('perPage', 20)));
+        $search = mb_substr(trim(UvhRequest::queryString($request, 'q')), 0, 200);
+        $state = UvhRequest::queryString($request, 'state');
+        $tag = UvhRequest::queryString($request, 'tag');
+        $domainId = UvhRequest::queryString($request, 'domainId');
+        $sort = UvhRequest::queryString($request, 'sort', 'created_at_desc');
+        $page = $this->positiveQueryInteger($request->query('page'), 1, 10_000);
+        $perPage = $this->positiveQueryInteger($request->query('perPage'), 20, 100);
+
+        if ($state !== '' && ! in_array($state, ['scheduled', 'active', 'paused', 'expired', 'archived', 'blocked'], true)) {
+            return response()->json(['error' => 'Filtro de estado inválido'], 422);
+        }
+        if ($tag !== '' && (! mb_check_encoding($tag, 'UTF-8') || mb_strlen($tag) > 40 || preg_match('/[\x00-\x1f\x7f]/', $tag))) {
+            return response()->json(['error' => 'Filtro de etiqueta inválido'], 422);
+        }
+        if ($domainId !== '' && $this->positiveQueryInteger($domainId, 0, PHP_INT_MAX) === 0) {
+            return response()->json(['error' => 'Filtro de dominio inválido'], 422);
+        }
 
         $query = Link::with(['domain', 'tags'])
             ->where('workspace_id', $workspaceId)
@@ -43,7 +54,7 @@ class LinkController
             $query->where('state', $state);
         }
         if ($domainId !== '') {
-            $query->where('domain_id', (int) $domainId);
+            $query->where('domain_id', $this->positiveQueryInteger($domainId, 0, PHP_INT_MAX));
         }
         if ($tag !== '') {
             $query->whereHas('tags', fn ($q) => $q->where('name', $tag));
@@ -72,7 +83,7 @@ class LinkController
     public function checkAlias(Request $request)
     {
         $workspaceId = UvhRequest::workspaceId($request);
-        $alias = (string) $request->input('alias', '');
+        $alias = UvhRequest::inputString($request, 'alias');
         $domainId = $request->input('domainId');
 
         if ($alias === '' || mb_strlen($alias) > 64) {
@@ -87,12 +98,14 @@ class LinkController
             return response()->json(['available' => false, 'reason' => 'invalid']);
         }
 
-        $domainId = $domainId !== null ? (int) $domainId : null;
+        if ($domainId !== null && (! is_int($domainId) || $domainId < 1)) {
+            return response()->json(['error' => 'Dominio inválido'], 422);
+        }
         if ($domainId !== null) {
             $dom = DB::table('custom_domains')
                 ->where('id', $domainId)
                 ->where('workspace_id', $workspaceId)
-                ->whereIn('state', ['verified', 'active'])
+                ->where('state', 'active')
                 ->exists();
             if (! $dom) {
                 return response()->json(['available' => false, 'reason' => 'domain']);
@@ -121,10 +134,10 @@ class LinkController
             $dom = DB::table('custom_domains')
                 ->where('id', $input['domain_id'])
                 ->where('workspace_id', $workspaceId)
-                ->whereIn('state', ['verified', 'active'])
+                ->where('state', 'active')
                 ->exists();
             if (! $dom) {
-                return response()->json(['error' => 'Dominio no verificado o sin acceso'], 403);
+                return response()->json(['error' => 'Dominio no activado o sin acceso'], 403);
             }
         }
 
@@ -138,15 +151,24 @@ class LinkController
         }
 
         try {
-            $created = LinkService::create($workspaceId, $user->id, $input);
+            $created = LinkService::create(
+                $workspaceId,
+                $user->id,
+                $input,
+                UvhRequest::apiToken($request),
+                (int) $user->security_version,
+            );
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
 
-        Audit::write($user->id, 'link.create', 'link', $created['id'], null, UvhRequest::ip($request));
-        WebhookService::dispatch($workspaceId, 'link.created', ['linkId' => $created['id'], 'alias' => $created['alias']]);
+        Audit::write($user->id, 'link.create', 'link', $created['id'], null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
-        $link = Link::with(['domain', 'tags'])->find($created['id']);
+        $link = Link::with(['domain', 'tags'])
+            ->where('id', $created['id'])->where('workspace_id', $workspaceId)->first();
+        if (! $link) {
+            return response()->json(['error' => 'El enlace dejó de estar disponible al finalizar la creación'], 409);
+        }
 
         return response()->json(['link' => LinkService::dto($link)], 201);
     }
@@ -193,31 +215,31 @@ class LinkController
         if (! $this->validLinkBody($request, true)) {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
+        $expectedVersion = $request->input('version');
+        if (! is_int($expectedVersion) || $expectedVersion < 1) {
+            return response()->json(['error' => 'Falta la versión actual del enlace. Recárgalo e inténtalo de nuevo.'], 428);
+        }
         $input = $this->inputFromRequest($request, $current);
-        // A partial PATCH must preserve tags/rules when those fields are not
-        // present. Null means "clear"; absence means "leave unchanged".
-        if (! $request->has('tags')) {
-            unset($input['tags']);
-        }
-        if (! $request->has('rules')) {
-            unset($input['rules']);
-        }
+        // `inputFromRequest` omits collection keys on PATCH unless the client
+        // supplied them. An explicit empty array clears; absence preserves.
+        $input['lifecycle_dates_changed'] = $request->has('scheduledAt') || $request->has('expiresAt');
 
         if ($request->has('domainId') && $request->input('domainId') !== null) {
             $dom = DB::table('custom_domains')
                 ->where('id', (int) $request->input('domainId'))
                 ->where('workspace_id', $workspaceId)
-                ->whereIn('state', ['verified', 'active'])
+                ->where('state', 'active')
                 ->exists();
             if (! $dom) {
-                return response()->json(['error' => 'Dominio no verificado o sin acceso'], 403);
+                return response()->json(['error' => 'Dominio no activado o sin acceso'], 403);
             }
         }
 
         if ($request->has('password')) {
             $input['password_hash'] = $request->input('password') !== null && $request->input('password') !== ''
-                ? Hash::make((string) $request->input('password'))
+                ? Hash::make(UvhRequest::inputString($request, 'password'))
                 : null;
+            $input['password_changed'] = true;
         }
 
         $valid = LinkService::validate($input);
@@ -226,15 +248,26 @@ class LinkController
         }
 
         try {
-            $updated = LinkService::update($id, $workspaceId, $input);
+            $updated = LinkService::update(
+                $id,
+                $workspaceId,
+                $user->id,
+                $input,
+                $expectedVersion,
+                UvhRequest::apiToken($request),
+                (int) $user->security_version,
+            );
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
 
-        Audit::write($user->id, 'link.update', 'link', $id, null, UvhRequest::ip($request));
-        WebhookService::dispatch($workspaceId, 'link.updated', ['linkId' => $id, 'alias' => $updated['alias']]);
+        Audit::write($user->id, 'link.update', 'link', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
-        $link = Link::with(['domain', 'tags'])->find($id);
+        $link = Link::with(['domain', 'tags'])
+            ->where('id', $id)->where('workspace_id', $workspaceId)->first();
+        if (! $link) {
+            return response()->json(['error' => 'El enlace dejó de estar disponible al finalizar la actualización'], 409);
+        }
 
         return response()->json(['link' => LinkService::dto($link)]);
     }
@@ -246,34 +279,66 @@ class LinkController
 
         $state = $request->input('state', '');
         $reason = $request->input('reason');
-        $allowed = ['active', 'paused', 'archived', 'blocked', 'expired'];
+        $allowed = ['active', 'paused', 'archived'];
 
         if (! is_string($state) || ! in_array($state, $allowed, true)) {
             return response()->json(['error' => 'Estado inválido'], 422);
         }
 
-        $link = Link::where('id', $id)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->first();
-        if (! $link) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
-        }
-
-        if ($reason !== null && (! is_string($reason) || mb_strlen($reason) > 500)) {
+        if ($reason !== null && (! is_string($reason) || ! mb_check_encoding($reason, 'UTF-8') || mb_strlen($reason) > 500 || preg_match('/[\x00-\x1f\x7f]/', $reason))) {
             return response()->json(['error' => 'Motivo inválido'], 422);
         }
 
-        if (($state === 'blocked' || $link->state === 'blocked') && ! $user->is_admin) {
-            return response()->json(['error' => 'Solo un administrador de la plataforma puede bloquear o desbloquear enlaces'], 403);
+        try {
+            $apiTokenContext = UvhRequest::apiToken($request);
+            $transition = DB::transaction(function () use ($workspaceId, $user, $id, $state, $apiTokenContext): array {
+                if (! WorkspaceAccess::getMembershipLocked(
+                    $user->id,
+                    $workspaceId,
+                    'editor',
+                    $apiTokenContext,
+                    'links:write',
+                    (int) $user->security_version,
+                )) {
+                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                }
+                $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
+                    ->whereNull('deleted_at')->lockForUpdate()->first();
+                if (! $link) {
+                    throw new LinkException('Enlace no encontrado', 404);
+                }
+                if ($link->state === 'blocked') {
+                    throw new LinkException('El bloqueo de enlaces solo se gestiona desde la administración de la plataforma', 403);
+                }
+                if ($state === 'active' && $link->scheduled_at && $link->scheduled_at->isFuture()) {
+                    throw new LinkException('El enlace sigue programado. Modifica su fecha de activación antes de activarlo.', 409);
+                }
+                if ($state === 'active' && $link->expires_at && $link->expires_at->isPast()) {
+                    throw new LinkException('El enlace ya ha caducado. Amplía su fecha de caducidad antes de activarlo.', 409);
+                }
+                $from = $link->state;
+                if ($from !== $state) {
+                    $link->update(['state' => $state, 'version' => (int) $link->version + 1, 'updated_at' => now()]);
+                    WebhookService::dispatch($workspaceId, 'link.updated', [
+                        'linkId' => $id,
+                        'alias' => (string) $link->alias,
+                        'state' => $state,
+                    ]);
+                }
+
+                return ['from' => $from, 'to' => $state];
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
         }
 
-        $link->update(['state' => $state, 'updated_at' => now()]);
-
         Audit::write($user->id, 'link.state_change', 'link', $id, [
-            'from' => $link->getOriginal('state'),
-            'to' => $state,
+            'from' => $transition['from'],
+            'to' => $transition['to'],
             'reason' => is_string($reason) ? $reason : null,
-        ], UvhRequest::ip($request));
+        ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
-        return response()->json(['ok' => true, 'state' => $state]);
+        return response()->json(['ok' => true, 'state' => $transition['to']]);
     }
 
     public function destroy(Request $request, int $id)
@@ -281,16 +346,41 @@ class LinkController
         $workspaceId = UvhRequest::workspaceId($request);
         $user = UvhRequest::user($request);
 
-        $link = Link::where('id', $id)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->first();
-        if (! $link) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+        try {
+            $apiTokenContext = UvhRequest::apiToken($request);
+            DB::transaction(function () use ($workspaceId, $user, $id, $apiTokenContext): void {
+                if (! WorkspaceAccess::getMembershipLocked(
+                    $user->id,
+                    $workspaceId,
+                    'editor',
+                    $apiTokenContext,
+                    'links:write',
+                    (int) $user->security_version,
+                )) {
+                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                }
+                $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
+                    ->whereNull('deleted_at')->lockForUpdate()->first();
+                if (! $link) {
+                    throw new LinkException('Enlace no encontrado', 404);
+                }
+                if ($link->state === 'blocked' && ! $user->is_admin) {
+                    throw new LinkException('Un enlace bloqueado solo puede eliminarlo un administrador de la plataforma', 403);
+                }
+                $link->update([
+                    'state_before_delete' => $link->state,
+                    'deleted_at' => now(),
+                    'state' => 'deleted',
+                    'version' => (int) $link->version + 1,
+                    'updated_at' => now(),
+                ]);
+                WebhookService::dispatch($workspaceId, 'link.deleted', ['linkId' => $id]);
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
         }
 
-        $link->update(['deleted_at' => now(), 'state' => 'deleted', 'updated_at' => now()]);
-
-        Audit::write($user->id, 'link.delete', 'link', $id, null, UvhRequest::ip($request));
-        WebhookService::dispatch($workspaceId, 'link.deleted', ['linkId' => $id]);
-
+        Audit::write($user->id, 'link.delete', 'link', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
         return response()->json(['ok' => true]);
     }
 
@@ -299,15 +389,62 @@ class LinkController
         $workspaceId = UvhRequest::workspaceId($request);
         $user = UvhRequest::user($request);
 
-        $link = Link::withTrashed()->where('id', $id)->where('workspace_id', $workspaceId)->whereNotNull('deleted_at')->first();
-        if (! $link) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+        try {
+            $apiTokenContext = UvhRequest::apiToken($request);
+            DB::transaction(function () use ($id, $workspaceId, $user, $apiTokenContext): void {
+                if (! WorkspaceAccess::getMembershipLocked(
+                    $user->id,
+                    $workspaceId,
+                    'editor',
+                    $apiTokenContext,
+                    'links:write',
+                    (int) $user->security_version,
+                )) {
+                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                }
+                $link = Link::withTrashed()->where('id', $id)->where('workspace_id', $workspaceId)
+                    ->whereNotNull('deleted_at')->lockForUpdate()->first();
+                if (! $link) {
+                    throw new LinkException('Enlace no encontrado', 404);
+                }
+                if ($link->state_before_delete === 'blocked' && ! $user->is_admin) {
+                    throw new LinkException('Un enlace bloqueado solo puede restaurarlo un administrador de la plataforma', 403);
+                }
+
+                $quota = DB::table('quotas')->where('workspace_id', $workspaceId)->lockForUpdate()->value('links_limit');
+                $used = Link::where('workspace_id', $workspaceId)->whereNull('deleted_at')->count();
+                if ($quota !== null && $used >= (int) $quota) {
+                    throw new LinkException('Cuota de enlaces alcanzada. Elimina otro enlace antes de restaurar este.', 429);
+                }
+
+                $next = $link->state_before_delete === 'blocked'
+                    ? 'blocked'
+                    : (($link->scheduled_at && $link->scheduled_at->isFuture())
+                        ? 'scheduled'
+                        : (($link->expires_at && $link->expires_at->isPast()) ? 'expired' : 'active'));
+                $link->update([
+                    'deleted_at' => null,
+                    'state' => $next,
+                    'state_before_delete' => null,
+                    'version' => (int) $link->version + 1,
+                    'updated_at' => now(),
+                ]);
+                WebhookService::dispatch($workspaceId, 'link.updated', [
+                    'linkId' => $id,
+                    'alias' => (string) $link->alias,
+                    'state' => $next,
+                ]);
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
+        } catch (QueryException $e) {
+            if (($e->errorInfo[0] ?? null) === '23505') {
+                return response()->json(['error' => 'No se puede restaurar: el alias ya está en uso'], 409);
+            }
+            throw $e;
         }
 
-        $next = ($link->expires_at && $link->expires_at->isPast()) ? 'expired' : 'active';
-        $link->update(['deleted_at' => null, 'state' => $next, 'updated_at' => now()]);
-
-        Audit::write($user->id, 'link.restore', 'link', $id, null, UvhRequest::ip($request));
+        Audit::write($user->id, 'link.restore', 'link', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }
@@ -322,6 +459,7 @@ class LinkController
         }
 
         $events = DB::table('audit_events')
+            ->select(['id', 'action', 'metadata', 'created_at'])
             ->where('resource_type', 'link')
             ->where('resource_id', (string) $id)
             ->orderByDesc('created_at')
@@ -356,7 +494,7 @@ class LinkController
             }
         }
         if ($request->has('password') && $request->input('password') !== null
-            && (! is_string($request->input('password')) || strlen($request->input('password')) > 256)) {
+            && (! is_string($request->input('password')) || strlen($request->input('password')) > 72)) {
             return false;
         }
         if ($request->has('domainId') && $request->input('domainId') !== null
@@ -382,7 +520,7 @@ class LinkController
     private function inputFromRequest(Request $request, ?Link $current = null): array
     {
         $input = [
-            'destination' => (string) $request->input('destination', $current->destination ?? ''),
+            'destination' => UvhRequest::inputString($request, 'destination', $current->destination ?? ''),
             'alias' => $request->has('alias') ? $request->input('alias') : ($current->alias ?? null),
             'domain_id' => $request->has('domainId') ? $request->input('domainId') : ($current->domain_id ?? null),
             'fallback_destination' => $request->has('fallbackDestination') ? $request->input('fallbackDestination') : ($current->fallback_destination ?? null),
@@ -400,9 +538,17 @@ class LinkController
                     'term' => $current->utm_term ?? null,
                     'content' => $current->utm_content ?? null,
                 ],
-            'tags' => $request->has('tags') ? $request->input('tags') : null,
-            'rules' => $request->has('rules') ? $request->input('rules') : null,
         ];
+
+        // PATCH semantics: omitting a collection preserves it. Supplying an
+        // explicit empty array clears it. Always adding null here made every
+        // unrelated edit delete all tags and redirect rules downstream.
+        if ($request->has('tags')) {
+            $input['tags'] = $request->input('tags');
+        }
+        if ($request->has('rules')) {
+            $input['rules'] = $request->input('rules');
+        }
 
         // Normalize explicit-null scalars.
         foreach (['alias', 'domain_id', 'fallback_destination', 'max_clicks', 'scheduled_at', 'expires_at', 'notes'] as $k) {
@@ -423,5 +569,18 @@ class LinkController
         return $value instanceof \DateTimeInterface
             ? $value->format('Y-m-d\TH:i:s.v\Z')
             : (string) $value;
+    }
+
+    private function positiveQueryInteger(mixed $value, int $default, int $max): int
+    {
+        if (is_string($value) && preg_match('/^[1-9][0-9]{0,18}$/D', $value)) {
+            $validated = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            $value = $validated === false ? null : $validated;
+        }
+        if (! is_int($value) || $value < 1) {
+            return $default;
+        }
+
+        return min($value, $max);
     }
 }

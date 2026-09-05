@@ -1,10 +1,10 @@
-<div class="page-head">
-  <h1>Equipo</h1>
-  <p>Gestiona el workspace, sus miembros y las invitaciones.</p>
-</div>
+<app-page-header icon="group" eyebrow="Colaboración" title="Equipo" description="Gestiona el workspace, sus miembros, roles e invitaciones pendientes." />
 
-@if (loading()) {
+@if (loading() && detail()) {
   <mat-progress-bar mode="indeterminate" />
+}
+@if (loading() && !detail()) {
+  <app-panel-skeleton variant="cards" label="Cargando equipo" />
 }
 @if (error()) {
   <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
@@ -19,8 +19,8 @@
 }
 
 @if (detail(); as d) {
-  <div class="card-block">
-    <span class="section-title">Workspace</span>
+  <div class="card-block workspace-card">
+    <div class="card-heading"><span class="card-icon"><mat-icon>workspaces</mat-icon></span><div><h2>Workspace</h2><p>Identidad visible para todas las personas del equipo.</p></div></div>
     <div class="rename-row">
       <mat-form-field appearance="outline" class="grow">
         <mat-label>Nombre del workspace</mat-label>
@@ -31,7 +31,7 @@
     </div>
   </div>
   <div class="card-block">
-    <span class="section-title">Miembros</span>
+    <div class="card-heading"><span class="card-icon"><mat-icon>group</mat-icon></span><div><h2>Miembros</h2><p>Acceso y responsabilidades dentro de este workspace.</p></div><span class="count-badge tnum">{{ d.membersPage.total }}</span></div>
     @for (m of d.members; track trackByMember($index, m)) {
       <div class="member-row">
         <div class="member-info">
@@ -62,10 +62,13 @@
         </div>
       </div>
     }
+    @if (d.membersPage.total > d.membersPage.perPage) {
+      <mat-paginator class="team-paginator" [length]="d.membersPage.total" [pageIndex]="memberPageIndex()" [pageSize]="memberPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" aria-label="Paginar miembros" (page)="onMembersPage($event)" />
+    }
   </div>
   @if (isAdmin()) {
     <div class="card-block">
-      <span class="section-title">Invitar</span>
+      <div class="card-heading"><span class="card-icon"><mat-icon>person_add</mat-icon></span><div><h2>Invitaciones</h2><p>Asigna el rol mínimo necesario antes de enviar el acceso.</p></div></div>
       <div class="invite-row">
         <mat-form-field appearance="outline" class="grow">
           <mat-label>Email</mat-label>
@@ -78,10 +81,13 @@
             <mat-option value="viewer">Visor</mat-option>
           </mat-select>
         </mat-form-field>
-        <button mat-flat-button color="primary" (click)="invite()" [disabled]="!inviteEmail().trim() || saving()">
+        <button mat-flat-button color="primary" (click)="invite()" [disabled]="!inviteEmail().trim() || saving() || invitationRetry.remaining(d.workspace.id, inviteEmail()) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inviteEmail()) > 0 ? 'invite-retry-wait' : null">
           <mat-icon>send</mat-icon> Invitar
         </button>
       </div>
+      @if (invitationRetry.remaining(d.workspace.id, inviteEmail()); as seconds) {
+        <p class="retry-wait" id="invite-retry-wait">Espera para este destinatario: <span role="timer" aria-live="off">{{ invitationRetry.label(seconds) }}</span>. No se enviará automáticamente.</p>
+      }
       @for (inv of d.invitations; track trackByInvitation($index, inv)) {
         <div class="invite-row">
           <div class="member-info">
@@ -89,21 +95,29 @@
             <div>
               <b>{{ inv.email }}</b>
               <span>Invitado como {{ roleLabel(inv.role) }} · {{ inv.status }}</span>
+              @if (invitationRetry.remaining(d.workspace.id, inv.email); as seconds) {
+                <span class="retry-wait" [id]="'invite-retry-' + inv.id">Espera: <span role="timer" aria-live="off">{{ invitationRetry.label(seconds) }}</span>. Reenvío manual.</span>
+              }
             </div>
           </div>
-          @if (inv.status === 'pending') {
+          @if (inv.status === 'pending' || inv.status === 'expired') {
             <div class="member-actions">
-              <button mat-stroked-button (click)="resendInvite(inv)" [disabled]="saving()"><mat-icon>refresh</mat-icon> Reenviar</button>
-              <button mat-icon-button (click)="cancelInvite(inv)" aria-label="Cancelar invitación" [disabled]="saving()"><mat-icon>close</mat-icon></button>
+              <button mat-stroked-button (click)="resendInvite(inv)" [disabled]="saving() || invitationRetry.remaining(d.workspace.id, inv.email) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inv.email) > 0 ? 'invite-retry-' + inv.id : null"><mat-icon>refresh</mat-icon> Reenviar</button>
+              @if (inv.status === 'pending') {
+                <button mat-icon-button (click)="cancelInvite(inv)" aria-label="Cancelar invitación" [disabled]="saving()"><mat-icon>close</mat-icon></button>
+              }
             </div>
           }
         </div>
+      }
+      @if (d.invitationsPage.total > d.invitationsPage.perPage) {
+        <mat-paginator class="team-paginator" [length]="d.invitationsPage.total" [pageIndex]="invitationPageIndex()" [pageSize]="invitationPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" aria-label="Paginar invitaciones" (page)="onInvitationsPage($event)" />
       }
     </div>
   }
   @if (isAdmin()) {
     <div class="card-block danger-zone">
-      <span class="section-title">Zona de peligro</span>
+      <div class="card-heading danger-heading"><span class="card-icon"><mat-icon>warning_amber</mat-icon></span><div><h2>Zona de peligro</h2><p>Acciones destructivas o que cambian tu acceso al workspace.</p></div></div>
       <div class="danger-row">
         <div>
           <b>Abandonar workspace</b>
@@ -114,13 +128,44 @@
         }
       </div>
       @if (isOwner()) {
+        <div class="danger-row transfer-row">
+          <div>
+            <b>Transferir propiedad</b>
+            <span>Convierte a otro miembro verificado en propietario y conserva tu acceso como administrador.</span>
+          </div>
+          @if (d.membersPage.total > 1 && !transferOpen()) {
+            <button mat-stroked-button (click)="beginOwnershipTransfer()" [disabled]="saving()">Transferir</button>
+          } @else if (d.membersPage.total <= 1) {
+            <span class="role-chip">Añade otro miembro primero</span>
+          }
+        </div>
+        @if (transferOpen()) {
+          <div class="transfer-form">
+            <div class="transfer-form-copy"><b>Nuevo propietario</b><p>La transferencia requiere tu contraseña{{ user()?.mfaEnabled ? ' y segundo factor' : '' }}.</p></div>
+            <mat-form-field appearance="outline"><mat-label>Miembro de esta página</mat-label><mat-select [(ngModel)]="transferTargetId"><mat-option [value]="null">Selecciona una persona</mat-option>@for (member of d.members; track member.id) { @if (member.role !== 'owner') { <mat-option [value]="member.id">{{ member.name }} · {{ member.email }}</mat-option> } }</mat-select></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" [(ngModel)]="transferPassword" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+            @if (user()?.mfaEnabled) { <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput [(ngModel)]="transferFactorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field> }
+            <div class="transfer-actions"><button mat-stroked-button type="button" (click)="cancelOwnershipTransfer()" [disabled]="saving()">Cancelar</button><button mat-flat-button color="warn" type="button" (click)="transferOwnership()" [disabled]="!transferTargetId() || !transferPassword() || (user()?.mfaEnabled && !transferFactorCode()) || saving()">{{ saving() ? 'Transfiriendo…' : 'Confirmar transferencia' }}</button></div>
+          </div>
+        }
         <div class="danger-row">
           <div>
             <b>Eliminar workspace</b>
             <span>Borra permanentemente el workspace y todos sus enlaces.</span>
           </div>
-          <button mat-stroked-button class="danger" (click)="deleteWorkspace()" [disabled]="saving()">Eliminar</button>
+          @if (!deleteOpen()) {
+            <button mat-stroked-button class="danger" (click)="beginWorkspaceDeletion()" [disabled]="saving()">Eliminar</button>
+          }
         </div>
+        @if (deleteOpen()) {
+          <div class="transfer-form delete-form">
+            <div class="transfer-form-copy"><b>Confirmación irreversible</b><p>Escribe <strong>{{ d.workspace.name }}</strong> exactamente y confirma tus credenciales.</p></div>
+            <mat-form-field appearance="outline"><mat-label>Nombre del workspace</mat-label><input matInput [(ngModel)]="deleteConfirmation" autocomplete="off" maxlength="120" /><mat-icon matPrefix>domain_disabled</mat-icon></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" [(ngModel)]="deletePassword" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+            @if (user()?.mfaEnabled) { <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput [(ngModel)]="deleteFactorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field> }
+            <div class="transfer-actions"><button mat-stroked-button type="button" (click)="cancelWorkspaceDeletion()" [disabled]="saving()">Cancelar</button><button mat-flat-button color="warn" type="button" (click)="deleteWorkspace()" [disabled]="deleteConfirmation() !== d.workspace.name || !deletePassword() || (user()?.mfaEnabled && !deleteFactorCode()) || saving()">{{ saving() ? 'Eliminando…' : 'Eliminar definitivamente' }}</button></div>
+          </div>
+        }
       }
     </div>
   }

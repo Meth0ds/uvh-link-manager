@@ -1,8 +1,7 @@
-import { ApplicationConfig, APP_INITIALIZER, inject } from "@angular/core";
+import { ApplicationConfig } from "@angular/core";
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling, withViewTransitions, type Routes } from "@angular/router";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
-import { AuthService } from "./core/services/auth.service";
 import { apiInterceptor } from "./core/interceptors/api.interceptor";
 
 export const routes: Routes = [
@@ -50,17 +49,12 @@ export const appConfig: ApplicationConfig = {
       routes,
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: "enabled", anchorScrolling: "enabled" }),
-      withViewTransitions(),
+      // The first route must paint immediately.  Applying a document view
+      // transition to initial navigation can leave a blank snapshot visible
+      // while lazy chunks and the session probe are still resolving.
+      withViewTransitions({ skipInitialTransition: true }),
     ),
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),
     provideAnimationsAsync(),
-    {
-      provide: APP_INITIALIZER,
-      useFactory: () => {
-        const auth = inject(AuthService);
-        return () => auth.init();
-      },
-      multi: true,
-    },
   ],
 };

@@ -11,7 +11,7 @@ import QRCode from "qrcode";
   standalone: true,
   imports: [MatDialogModule, MatButtonModule, MatIconModule, MatProgressBarModule],
   template: `
-    <h2 mat-dialog-title>QR del enlace</h2>
+    <h2 mat-dialog-title><span class="title-icon"><mat-icon>qr_code_2</mat-icon></span><span><small>Formato visual</small><b>QR del enlace</b></span></h2>
     <mat-dialog-content class="qr-body">
       @if (!dataUrl()) {
         <mat-progress-bar mode="indeterminate" />
@@ -31,8 +31,14 @@ import QRCode from "qrcode";
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
-      .qr-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 12px 8px; text-align: center; min-width: 260px; }
-      .qr-img { width: 240px; height: 240px; border: 1px solid var(--uvh-border); border-radius: 14px; padding: 10px; background: var(--mat-sys-surface-container-lowest, var(--uvh-surface)); }
+      h2 { display: flex; align-items: center; gap: 11px; }
+      h2 > span:last-child { display: flex; flex-direction: column; }
+      h2 small { color: var(--uvh-muted-soft); font-size: 8.5px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+      h2 b { color: var(--uvh-ink); font-size: 19px; font-weight: 850; letter-spacing: -.035em; }
+      .title-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); }
+      .title-icon mat-icon { width: 20px; height: 20px; font-size: 20px; }
+      .qr-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 18px 8px; text-align: center; min-width: 260px; }
+      .qr-img { width: 240px; height: 240px; border: 1px solid var(--uvh-border); border-radius: 16px; padding: 11px; background: #fff; box-shadow: var(--uvh-shadow-sm); }
       .url { color: var(--uvh-muted); font-size: 13px; word-break: break-all; margin: 0; }
     `,
   ],

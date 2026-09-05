@@ -6,13 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class Webhook extends Model
 {
-    protected $fillable = ['workspace_id', 'url', 'secret', 'events', 'active'];
+    protected $fillable = ['workspace_id', 'created_by', 'url', 'secret', 'events', 'active', 'config_version'];
 
     protected $hidden = ['secret'];
 
     protected function casts(): array
     {
-        return ['events' => 'array', 'active' => 'boolean'];
+        return ['events' => 'array', 'active' => 'boolean', 'config_version' => 'integer'];
     }
 
     public function workspace()

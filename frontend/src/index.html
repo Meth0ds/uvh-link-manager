@@ -2,33 +2,19 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <title>UVH · Enlaces cortos. Control total.</title>
+    <title>UVH · Control operativo para tus enlaces</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <meta
       name="description"
-      content="UVH — Acorta, administra y mide tus enlaces. Enlaces cortos. Control total."
+      content="Pega una URL, continúa con tu cuenta sin perderla y controla sus rutas y actividad desde UVH."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <!-- Material Icons (ligatures used by <mat-icon> across the app). -->
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+    <meta property="og:title" content="UVH · Control operativo para tus enlaces" />
+    <meta property="og:description" content="Pega una URL, controla el recorrido y consulta su actividad después." />
     <meta name="color-scheme" content="light dark" />
-    <script>
-      // Apply persisted theme before Angular boots to avoid a flash of the wrong theme.
-      try {
-        var t = localStorage.getItem("uvh.theme");
-        var dark =
-          t === "dark" ||
-          (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.classList.toggle("dark", dark);
-      } catch (e) {}
-    </script>
+    <!-- External so production can keep script-src 'self' without unsafe-inline. -->
+    <script src="/theme-init.v1.js"></script>
   </head>
   <body class="mat-typography">
     <app-root></app-root>

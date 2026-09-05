@@ -35,7 +35,8 @@ final class Ssrf
         [0xc6120000, 0xc613ffff], // 198.18.0.0/15 (benchmarking, RFC 2544)
         [0xc6336400, 0xc63364ff], // 198.51.100.0/24 (TEST-NET-2)
         [0xcb007100, 0xcb0071ff], // 203.0.113.0/24 (TEST-NET-3)
-        [0xffff0000, 0xffffffff], // 255.255.255.255/32
+        [0xe0000000, 0xefffffff], // 224.0.0.0/4 (multicast)
+        [0xf0000000, 0xffffffff], // 240.0.0.0/4 (reservado/broadcast)
     ];
 
     public static function isPrivateIp(string $ip): bool
@@ -47,6 +48,16 @@ final class Ssrf
         }
 
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            // Let PHP's current reserved/private registry provide a broad
+            // fail-closed baseline, then keep the explicit transition-format
+            // checks below for IPv4 space embedded in otherwise global IPv6.
+            if (filter_var(
+                $ip,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
+            ) === false) {
+                return true;
+            }
             $bin = inet_pton($ip);
             if ($bin === false) {
                 return true;
@@ -76,6 +87,10 @@ final class Ssrf
             }
             // fe80::/10 (link-local)
             if ($b[1] === 0xfe && ($b[2] & 0xc0) === 0x80) {
+                return true;
+            }
+            // fec0::/10 (site-local obsoleto/reservado)
+            if ($b[1] === 0xfe && ($b[2] & 0xc0) === 0xc0) {
                 return true;
             }
             // ff00::/8 (multicast)
@@ -131,6 +146,18 @@ final class Ssrf
         if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
             $host = substr($host, 1, -1);
         }
+        $host = rtrim($host, '.');
+        if (preg_match('/[^\x20-\x7e]/', $host)) {
+            if (! function_exists('idn_to_ascii')) {
+                throw new \RuntimeException('SSRF: host no compatible');
+            }
+            $asciiHost = idn_to_ascii($host, IDNA_DEFAULT);
+            if (! is_string($asciiHost) || $asciiHost === '') {
+                throw new \RuntimeException('SSRF: host no compatible');
+            }
+            $host = $asciiHost;
+        }
+        $host = strtolower($host);
         $path = ($parts['path'] ?? '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
 
         $ips = self::resolveAndValidateHost($host);
@@ -156,6 +183,9 @@ final class Ssrf
         $info = self::assertSafeUrl($url);
 
         $ch = curl_init();
+        if ($ch === false) {
+            throw new \RuntimeException('SSRF: transporte no disponible');
+        }
         // Los literales IPv6 requieren corchetes en la URL.
         $urlHost = str_contains($info['host'], ':') ? '['.$info['host'].']' : $info['host'];
         $opts = [
@@ -165,11 +195,23 @@ final class Ssrf
             CURLOPT_POSTFIELDS => $body,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_MAXREDIRS => 0,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_CONNECTTIMEOUT => (int) ceil($timeoutMs / 1000),
             CURLOPT_TIMEOUT => (int) ceil($timeoutMs / 1000),
             CURLOPT_NOSIGNAL => true,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
+            // Process-level HTTP(S)_PROXY variables must not replace the
+            // pinned destination with a proxy-side DNS lookup.
+            CURLOPT_PROXY => '',
+            CURLOPT_NOPROXY => '*',
+            // Never retain a receiver-controlled response body in PHP memory.
+            // Returning its length keeps curl streaming until the hard timeout.
+            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk): int {
+                return strlen($chunk);
+            },
         ];
 
         // Fijar las IPs ya validadas: curl no vuelve a resolver el host, con lo

@@ -1,11 +1,6 @@
-<div class="page-head">
-  <div>
-    <h1>Tokens de API</h1>
-    <p>Acceso programático a tu workspace mediante scopes.</p>
-  </div>
-</div>
+<app-page-header icon="key" eyebrow="Acceso programático" title="Tokens de API" description="Crea credenciales de alcance mínimo para integrar tu workspace con otros sistemas." />
 
-@if (loading()) {
+@if (loading() && tokens().length) {
   <mat-progress-bar mode="indeterminate" aria-label="Cargando tokens" />
 }
 @if (error()) {
@@ -13,7 +8,10 @@
 }
 
 <div class="create-card">
-  <h3>Crear token</h3>
+  <div class="card-intro">
+    <span class="card-icon" aria-hidden="true"><mat-icon>key</mat-icon></span>
+    <div><h2>Generar una credencial</h2><p>Selecciona únicamente los permisos que necesite la integración.</p></div>
+  </div>
   <div class="create-fields">
     <mat-form-field appearance="outline" class="grow">
       <mat-label>Nombre</mat-label>
@@ -25,25 +23,42 @@
     </mat-form-field>
   </div>
 
-  <div class="scopes">
+  <fieldset class="scopes">
+    <legend>Permisos del token</legend>
     @for (s of scopeOptions; track s) {
       <mat-checkbox
         color="primary"
         [checked]="selectedScopes().includes(s.value)"
         (change)="toggleScope(s.value)"
         >
-        <code>{{ s.value }}</code>
+        <span class="scope-copy"><code>{{ s.value }}</code><small>{{ s.label }}</small></span>
       </mat-checkbox>
+    }
+  </fieldset>
+
+  <div class="credential-fields">
+    <div class="credential-copy"><b>Confirma esta emisión</b><span>Una credencial nueva permite operar fuera de tu sesión. Vuelve a identificarte para crearla.</span></div>
+    <mat-form-field appearance="outline">
+      <mat-label>Contraseña actual</mat-label>
+      <input matInput type="password" [(ngModel)]="password" autocomplete="current-password" maxlength="72" />
+      <mat-icon matPrefix>lock_outline</mat-icon>
+    </mat-form-field>
+    @if (user()?.mfaEnabled) {
+      <mat-form-field appearance="outline">
+        <mat-label>Código de autenticación o recuperación</mat-label>
+        <input matInput [(ngModel)]="factorCode" autocomplete="one-time-code" maxlength="24" />
+        <mat-icon matPrefix>key</mat-icon>
+      </mat-form-field>
     }
   </div>
 
-  <button mat-flat-button color="primary" (click)="create()" [disabled]="!name().trim() || !selectedScopes().length || creating()">
+  <button mat-flat-button color="primary" (click)="create()" [disabled]="!name().trim() || !selectedScopes().length || !password() || (user()?.mfaEnabled && !factorCode().trim()) || creating()">
     <mat-icon>add</mat-icon> Generar token
   </button>
 
   @if (plainToken(); as pt) {
     <div class="plain-box">
-      <p class="warning">⚠ Guarda este token ahora. Solo se muestra una vez y no podrás volver a verlo.</p>
+      <p class="warning"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Guarda este token ahora.</b> Sólo se muestra una vez y no podrás volver a verlo.</span></p>
       <div class="plain-row">
         <code class="tnum">{{ pt }}</code>
         <button mat-icon-button (click)="copyPlain()" aria-label="Copiar token"><mat-icon>content_copy</mat-icon></button>
@@ -52,12 +67,17 @@
   }
 </div>
 
+@if (loading() && !tokens().length) {
+  <app-panel-skeleton variant="list" label="Cargando tokens" />
+}
+
 @if (!loading() && (!error() || tokens().length)) {
   <div class="token-list">
     @for (t of tokens(); track trackByToken($index, t)) {
       <article class="token-row">
+        <span class="token-icon" aria-hidden="true"><mat-icon>{{ t.revokedAt ? 'key_off' : 'key' }}</mat-icon></span>
         <div class="token-main">
-          <b>{{ t.name }}</b>
+          <div class="token-title"><b>{{ t.name }}</b><span class="state-chip" [class.st-disabled]="t.revokedAt" [class.st-active]="!t.revokedAt">{{ t.revokedAt ? "Revocado" : "Activo" }}</span></div>
           <div class="scope-chips">
             @for (s of t.scopes; track s) {
               <span class="scope-chip"><code>{{ s }}</code></span>

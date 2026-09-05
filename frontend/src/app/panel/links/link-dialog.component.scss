@@ -2,6 +2,13 @@
   display: block;
 }
 
+.dialog-title { display: flex; align-items: center; gap: 12px; min-height: 64px; padding-top: 16px !important; padding-bottom: 14px !important; }
+.title-mark { display: grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border: 1px solid color-mix(in srgb, var(--uvh-electric) 22%, var(--uvh-border)); border-radius: 12px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); }
+.title-mark mat-icon { width: 20px; height: 20px; font-size: 20px; }
+.title-copy { display: flex; flex-direction: column; }
+.title-copy small { color: var(--uvh-muted-soft); font-size: 8.5px; font-weight: 850; letter-spacing: .12em; line-height: 1.3; text-transform: uppercase; }
+.title-copy b { color: var(--uvh-ink); font-size: 19px; font-weight: 850; letter-spacing: -.035em; }
+
 .alias-chip {
   display: inline-block;
   margin-left: 10px;
@@ -20,11 +27,17 @@
 }
 
 .tab-pad {
-  padding: 18px 2px 6px;
+  padding: 18px 2px 7px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+
+.tab-intro { display: flex; align-items: flex-start; gap: 11px; margin: 0 0 12px; padding: 11px 12px; border: 1px solid var(--uvh-border); border-radius: 12px; background: color-mix(in srgb, var(--uvh-electric) 4%, var(--uvh-surface-raised)); }
+.tab-intro > span { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--uvh-electric) 9%, transparent); color: var(--uvh-electric); }
+.tab-intro mat-icon { width: 17px; height: 17px; font-size: 17px; }
+.tab-intro b { color: var(--uvh-ink); font-size: 12.5px; font-weight: 850; }
+.tab-intro p { margin: 2px 0 0; color: var(--uvh-muted); font-size: 11.5px; line-height: 1.45; }
 
 .full {
   width: 100%;
@@ -74,7 +87,9 @@
   border: 1px solid var(--uvh-border);
   border-radius: 12px;
   padding: 12px 14px;
-  background: var(--uvh-surface);
+  background: color-mix(in srgb, var(--uvh-surface) 72%, var(--uvh-surface-raised));
+  transition: border-color 170ms ease, box-shadow 170ms ease;
+  &:focus-within { border-color: color-mix(in srgb, var(--uvh-electric) 35%, var(--uvh-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uvh-electric) 7%, transparent); }
 }
 
 .rule-head {
@@ -114,6 +129,9 @@
 }
 
 @media (max-width: 640px) {
+  .dialog-title { gap: 9px; }
+  .title-mark { width: 36px; height: 36px; flex-basis: 36px; }
+  .alias-chip { display: none; }
   .row {
     flex-direction: column;
     .domain,

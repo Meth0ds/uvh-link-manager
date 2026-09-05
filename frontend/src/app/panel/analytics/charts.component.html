@@ -1,7 +1,7 @@
 <div class="chart-block">
   <div class="chart-title">
-    <b>Clics por día</b>
-    <span class="tnum">{{ overview().totals.clicks }} clics · {{ overview().totals.visitors }} visitantes</span>
+    <div><small>Serie temporal</small><b>Clics por día</b></div>
+    <span class="chart-total tnum">{{ overview().totals.clicks }} clics · {{ overview().totals.visitors }} visitantes</span>
   </div>
 
   <div class="series-wrap">
@@ -9,19 +9,19 @@
       <svg viewBox="0 0 720 220" preserveAspectRatio="none" class="series" aria-hidden="true">
         <defs>
           <linearGradient id="uvhArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#2457F5" stop-opacity="0.28" />
-            <stop offset="100%" stop-color="#2457F5" stop-opacity="0.02" />
+            <stop offset="0%" stop-color="var(--uvh-electric)" stop-opacity="0.28" />
+            <stop offset="100%" stop-color="var(--uvh-electric)" stop-opacity="0.02" />
           </linearGradient>
         </defs>
         <path [attr.d]="areaPoints()" fill="url(#uvhArea)" />
-        <path [attr.d]="points()" fill="none" stroke="#2457F5" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+        <path [attr.d]="points()" fill="none" stroke="var(--uvh-electric)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
       </svg>
     }
     @if (!points()) {
       <div class="no-data">Sin clics en este periodo</div>
     }
     <div class="x-labels">
-      @for (l of labels(); track l) {
+      @for (l of labels(); track l.day) {
         <span class="x-label" [class.hidden]="!l.show">{{ l.day }}</span>
       }
     </div>
@@ -32,7 +32,7 @@
   @for (b of breakdownKeys; track b) {
     <div class="breakdown">
       <b class="breakdown-title">{{ label(b) }}</b>
-      @for (item of breakdown(b).items; track item) {
+      @for (item of breakdown(b).items; track item.key) {
         <div class="bar-row">
           <span class="bar-label">{{ item.key }}</span>
           <div class="bar-track">

@@ -63,6 +63,10 @@ Implementación de seguridad y guía de endurecimiento (hardening).
 - Los secretos se inyectan por variables de entorno.
 - `APP_SECRET` **falla cerrado** en producción: el proceso se niega a arrancar si falta, es demasiado corto o usa el valor de desarrollo.
 - En producción los secretos se definen aparte (ver `docs/deployment.md`).
+- La rotación de `APP_SECRET` usa una clave actual de escritura y un keyring
+  temporal de lectura, con deadline de producción y recifrado reanudable. El
+  procedimiento, drenaje y rollback se documentan en
+  [`app-secret-rotation-runbook.md`](app-secret-rotation-runbook.md).
 
 ## 8. Checklist de release
 

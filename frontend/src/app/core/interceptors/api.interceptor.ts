@@ -24,6 +24,13 @@ export const apiInterceptor: HttpInterceptorFn = (req, next) => {
       if (error instanceof HttpErrorResponse && error.status === 401) {
         auth.sessionExpired();
       }
+      if (
+        error instanceof HttpErrorResponse
+        && error.status === 403
+        && error.error?.details?.reason === "mfa_reauthentication_required"
+      ) {
+        auth.requireAdminMfaReauthentication();
+      }
       return throwError(() => error);
     }),
   );

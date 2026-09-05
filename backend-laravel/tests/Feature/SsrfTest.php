@@ -31,7 +31,8 @@ class SsrfTest extends TestCase
             '0.0.0.0', '10.0.0.1', '100.64.0.1', '100.127.255.255',
             '127.0.0.1', '169.254.169.254', '172.16.0.1', '172.31.255.255',
             '192.0.0.1', '192.0.2.1', '192.168.1.1', '198.18.0.1',
-            '203.0.113.5', '255.255.255.255',
+            '203.0.113.5', '224.0.0.1', '239.255.255.255',
+            '240.0.0.1', '254.255.255.255', '255.255.255.255',
         ];
         foreach ($private as $ip) {
             $this->assertTrue(Ssrf::isPrivateIp($ip), "{$ip} debería ser privada");
@@ -46,7 +47,7 @@ class SsrfTest extends TestCase
     public function test_ipv6_private_forms_are_detected(): void
     {
         $private = [
-            '::', '::1', 'fc00::1', 'fd12:3456::1', 'fe80::1', 'ff02::1',
+            '::', '::1', 'fc00::1', 'fd12:3456::1', 'fe80::1', 'fec0::1', 'ff02::1',
             '2001:db8::1',
             // IPv4-mapped / compatible
             '::ffff:127.0.0.1', '::ffff:10.0.0.1', '::127.0.0.1', '::192.168.1.1',
@@ -135,6 +136,7 @@ class SsrfTest extends TestCase
 
         $delivery = WebhookDelivery::where('webhook_id', $webhook->id)->firstOrFail();
         $this->assertSame('pending', $delivery->status);
+        $this->assertSame((int) $webhook->fresh()->config_version, (int) $delivery->config_version);
         $this->assertGreaterThanOrEqual(1, (int) $delivery->attempts);
         $this->assertStringContainsString('SSRF', (string) $delivery->last_error);
         $this->assertNull($delivery->delivered_at);

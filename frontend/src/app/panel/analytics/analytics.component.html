@@ -1,8 +1,4 @@
-<div class="page-head">
-  <div>
-    <h1>Analítica</h1>
-    <p>Métricas agregadas de todos los enlaces del workspace.</p>
-  </div>
+<app-page-header icon="query_stats" eyebrow="Rendimiento" title="Analítica" description="Métricas agregadas de todos los enlaces del workspace.">
   <mat-form-field appearance="outline" class="period">
     <mat-select [value]="period()" (selectionChange)="onPeriod($event.value)" aria-label="Periodo">
       <mat-option value="24h">Últimas 24 horas</mat-option>
@@ -11,13 +7,17 @@
       <mat-option value="90d">90 días</mat-option>
     </mat-select>
   </mat-form-field>
-</div>
+</app-page-header>
 
-@if (loading()) {
+@if (loading() && overview()) {
   <mat-progress-bar mode="indeterminate" aria-label="Cargando analítica" />
 }
 @if (error()) {
   <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+}
+
+@if (loading() && !overview()) {
+  <app-panel-skeleton variant="dashboard" label="Cargando analítica" />
 }
 
 @if (!loading() && !overview() && !error()) {
@@ -37,9 +37,9 @@
     <div class="stat-card"><span><mat-icon>ads_click</mat-icon> Referentes</span><b class="tnum">{{ o.referrers.length }}</b><small class="tnum">fuentes de entrada</small></div>
   </div>
   <app-charts [overview]="o" />
-  <span class="section-title">Enlaces con más clics</span>
+  <div class="section-heading"><div><span>Rendimiento</span><h2>Enlaces con más clics</h2></div><small>{{ period() === '24h' ? 'Últimas 24 horas' : period() === '7d' ? 'Últimos 7 días' : period() === '30d' ? 'Últimos 30 días' : 'Últimos 90 días' }}</small></div>
   <div class="top-links">
-    @for (l of o.topLinks; track l) {
+    @for (l of o.topLinks; track l; let i = $index) {
       <article
         class="top-link"
         role="link"
@@ -48,6 +48,7 @@
         (click)="openLink(l.id)"
         (keydown)="openLinkFromKeyboard($event, l.id)"
       >
+        <span class="rank tnum">{{ i + 1 }}</span>
         <div class="top-main">
           <b class="tnum">{{ l.alias }}</b>
           <span>{{ l.destination }}</span>

@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Link;
 use App\Support\AnalyticsService;
 use App\Support\Ids;
+use App\Support\OperationalMetrics;
 use App\Support\RedirectService;
 use App\Support\SignedToken;
 use App\Support\Ua;
+use App\Support\UvhCrypto;
+use App\Support\UvhRequest;
 use App\Support\UrlUtil;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +38,6 @@ class RedirectController
 
         if ($outcome['kind'] === 'redirect') {
             $this->recordClick($outcome['link_id'], $ctx, $outcome['campaign'] ?? null);
-
             return response('', 302, [
                 'Location' => $outcome['location'],
                 'Cache-Control' => 'no-store',
@@ -82,8 +84,8 @@ class RedirectController
             return response()->json(['error' => 'Token CSRF inválido'], 403);
         }
 
-        $password = (string) $request->input('password', '');
-        if ($password === '' || strlen($password) > 256) {
+        $password = UvhRequest::inputString($request, 'password');
+        if ($password === '' || strlen($password) > 72) {
             return response()->json(['error' => 'Contraseña requerida'], 422);
         }
 
@@ -126,7 +128,12 @@ class RedirectController
 
         // Bind the token to the exact link: a stale unlock token must not open
         // a recreated link with the same alias.
-        $token = SignedToken::sign(json_encode(['alias' => $alias, 'host' => $host, 'link' => $link->id]), 10 * 60_000);
+        $token = SignedToken::sign(json_encode([
+            'alias' => $alias,
+            'host' => $host,
+            'link' => $link->id,
+            'password_version' => (int) $link->password_version,
+        ]), 10 * 60_000);
 
         $cookie = new Cookie(
             RedirectService::UNLOCK_COOKIE,
@@ -170,15 +177,22 @@ class RedirectController
     private function recordClick(int $linkId, array $ctx, ?string $campaign): void
     {
         $ua = Ua::parse($ctx['user_agent'] ?? null);
-        AnalyticsService::recordClick($linkId, [
-            'country' => $ctx['country'] ?? null,
-            'device' => $ua['device'],
-            'browser' => $ua['browser'],
-            'os' => $ua['os'],
-            'referrer_domain' => RedirectService::referrerDomain($ctx['referrer'] ?? null),
-            'campaign' => $campaign,
-            'visitor_hash' => $this->visitorHash($ctx['ip'] ?? null, $ctx['user_agent'] ?? null),
-        ]);
+        try {
+            AnalyticsService::recordClick($linkId, [
+                'country' => $ctx['country'] ?? null,
+                'device' => $ua['device'],
+                'browser' => $ua['browser'],
+                'os' => $ua['os'],
+                'referrer_domain' => RedirectService::referrerDomain($ctx['referrer'] ?? null),
+                'campaign' => $campaign,
+                'visitor_hash' => $this->visitorHash($ctx['ip'] ?? null, $ctx['user_agent'] ?? null),
+            ]);
+        } catch (\Throwable $e) {
+            // Redirect availability takes priority over analytics. The event is
+            // observable by operators without leaking requester identifiers.
+            OperationalMetrics::increment('analytics.record_failed');
+            \Illuminate\Support\Facades\Log::error('[analytics] click recording failed', ['exception' => $e::class]);
+        }
     }
 
     private function visitorHash(?string $ip, ?string $userAgent): ?string
@@ -188,7 +202,7 @@ class RedirectController
         }
         $day = now()->format('Y-m-d');
 
-        return substr(hash('sha256', "{$day}|{$ip}|{$userAgent}"), 0, 32);
+        return UvhCrypto::visitorHash($day, $ip, $userAgent);
     }
 
     private function verifyCsrf(Request $request): bool

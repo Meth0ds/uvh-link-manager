@@ -29,10 +29,6 @@ export interface LinkDialogData {
   link?: LinkDto;
   initialDestination?: string;
 }
-export interface LinkDialogResult {
-  link: LinkDto;
-}
-
 type RuleGroup = FormGroup<{
   priority: FormControl<number>;
   country: FormControl<string>;
@@ -115,7 +111,7 @@ export class LinkDialogComponent {
     alias: ["", [Validators.maxLength(64)]],
     domainId: [null as number | null],
     fallbackDestination: ["", [Validators.maxLength(2048), httpUrlValidator]],
-    password: ["", [Validators.maxLength(256)]],
+    password: ["", [Validators.maxLength(72)]],
     clearPassword: [false],
     maxClicks: [null as number | null, [Validators.min(1), Validators.max(10_000_000)]],
     singleUse: [false],
@@ -159,7 +155,7 @@ export class LinkDialogComponent {
   private async loadDomains(): Promise<void> {
     try {
       const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains");
-      this.domains.set(domains.filter((d) => d.state === "verified" || d.state === "active"));
+      this.domains.set(domains.filter((d) => d.state === "active" && d.edgeEligible && d.tlsReadyAt !== null));
     } catch {
       this.domains.set([]);
     }
@@ -312,6 +308,9 @@ export class LinkDialogComponent {
       ? (v.clearPassword ? null : passwordValue !== "" ? passwordValue : undefined)
       : (passwordValue !== "" ? passwordValue : null);
     const payload = {
+      // The backend rejects stale writes instead of overwriting a newer edit
+      // from another browser. New links intentionally have no version.
+      ...(this.isEdit ? { version: this.data.link!.version } : {}),
       destination: v.destination?.trim(),
       alias: v.alias?.trim() || null,
       domainId: v.domainId,
@@ -341,7 +340,7 @@ export class LinkDialogComponent {
         const res = await this.api.post<{ link: LinkDto }>("/api/v1/links", payload);
         link = res.link;
       }
-      this.dialogRef.close({ link });
+      this.dialogRef.close(link);
     } catch (err) {
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo guardar el enlace");
     } finally {
@@ -349,5 +348,3 @@ export class LinkDialogComponent {
     }
   }
 }
-
-

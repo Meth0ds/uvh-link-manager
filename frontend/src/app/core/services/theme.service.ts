@@ -1,5 +1,5 @@
-import { Injectable, effect, inject, signal, DOCUMENT } from "@angular/core";
-
+import { DOCUMENT } from "@angular/common";
+import { DestroyRef, Injectable, effect, inject, signal } from "@angular/core";
 
 export type ThemePreference = "light" | "dark" | "system";
 
@@ -8,18 +8,34 @@ const DARK_CLASS = "dark";
 
 @Injectable({ providedIn: "root" })
 export class ThemeService {
-  private document = inject(DOCUMENT);
+  private readonly document = inject(DOCUMENT);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly systemDark = signal(false);
+  private mediaQuery?: MediaQueryList;
+  private transitionTimer?: number;
 
   readonly preference = signal<ThemePreference>(this.readStored());
 
   constructor() {
-    // Apply the preference whenever it (or the OS scheme) changes.
+    const view = this.document.defaultView;
+    this.mediaQuery = view?.matchMedia("(prefers-color-scheme: dark)");
+    this.systemDark.set(this.mediaQuery?.matches === true);
+
+    const onSystemThemeChange = (event: MediaQueryListEvent): void => this.systemDark.set(event.matches);
+    this.mediaQuery?.addEventListener?.("change", onSystemThemeChange);
+
+    // Apply both the explicit preference and live operating-system changes.
     effect(() => {
       const pref = this.preference();
-      const dark =
-        pref === "dark" ||
-        (pref === "system" && this.document.defaultView?.matchMedia("(prefers-color-scheme: dark)").matches === true);
-      this.document.documentElement.classList.toggle(DARK_CLASS, dark);
+      const dark = pref === "dark" || (pref === "system" && this.systemDark());
+      const root = this.document.documentElement;
+      root.classList.toggle(DARK_CLASS, dark);
+      root.dataset["theme"] = dark ? "dark" : "light";
+    });
+
+    this.destroyRef.onDestroy(() => {
+      this.mediaQuery?.removeEventListener?.("change", onSystemThemeChange);
+      if (this.transitionTimer !== undefined) view?.clearTimeout(this.transitionTimer);
     });
   }
 
@@ -33,7 +49,8 @@ export class ThemeService {
     return "system";
   }
 
-  set(pref: ThemePreference): void {
+  set(pref: ThemePreference, origin?: { x: number; y: number }): void {
+    this.beginTransition(origin);
     this.preference.set(pref);
     try {
       localStorage.setItem(STORAGE_KEY, pref);
@@ -46,6 +63,27 @@ export class ThemeService {
   resolved(): "light" | "dark" {
     const pref = this.preference();
     if (pref !== "system") return pref;
-    return this.document.defaultView?.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return this.systemDark() ? "dark" : "light";
+  }
+
+  toggle(origin?: { x: number; y: number }): void {
+    this.set(this.resolved() === "dark" ? "light" : "dark", origin);
+  }
+
+  private beginTransition(origin?: { x: number; y: number }): void {
+    const root = this.document.documentElement;
+    const view = this.document.defaultView;
+    if (!view || view.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    if (origin) {
+      root.style.setProperty("--uvh-theme-origin-x", `${origin.x}px`);
+      root.style.setProperty("--uvh-theme-origin-y", `${origin.y}px`);
+    }
+    root.classList.remove("theme-changing");
+    // Re-arm the short transition even when users toggle twice quickly.
+    void root.offsetWidth;
+    root.classList.add("theme-changing");
+    if (this.transitionTimer !== undefined) view.clearTimeout(this.transitionTimer);
+    this.transitionTimer = view.setTimeout(() => root.classList.remove("theme-changing"), 320);
   }
 }

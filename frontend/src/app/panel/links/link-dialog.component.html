@@ -1,5 +1,6 @@
-<h2 mat-dialog-title>
-  {{ isEdit ? "Editar enlace" : "Crear enlace" }}
+<h2 mat-dialog-title class="dialog-title">
+  <span class="title-mark" aria-hidden="true"><mat-icon>{{ isEdit ? "edit" : "add_link" }}</mat-icon></span>
+  <span class="title-copy"><small>{{ isEdit ? "Configuración" : "Nuevo recurso" }}</small><b>{{ isEdit ? "Editar enlace" : "Crear enlace" }}</b></span>
   @if (isEdit && data.link) {
     <span class="alias-chip tnum">{{ data.link.shortUrl }}</span>
   }
@@ -15,6 +16,7 @@
       <mat-tab-group animationDuration="220ms">
         <mat-tab label="Destino">
           <div class="tab-pad">
+            <div class="tab-intro"><span><mat-icon>near_me</mat-icon></span><div><b>Destino y URL corta</b><p>Define adónde redirige y cómo se presenta el enlace.</p></div></div>
             <mat-form-field appearance="outline" class="full">
               <mat-label>URL de destino</mat-label>
               <input matInput formControlName="destination" placeholder="https://ejemplo.com/pagina-muy-larga" />
@@ -55,10 +57,11 @@
         </mat-tab>
         <mat-tab label="Opciones">
           <div class="tab-pad">
+            <div class="tab-intro"><span><mat-icon>tune</mat-icon></span><div><b>Controles de acceso y vigencia</b><p>Limita el uso, programa fechas y añade contexto interno.</p></div></div>
             <div class="row">
               <mat-form-field appearance="outline" class="grow">
                 <mat-label>{{ isEdit ? "Nueva contraseña (opcional)" : "Contraseña (protege el enlace)" }}</mat-label>
-                <input matInput formControlName="password" type="password" autocomplete="new-password" />
+                <input matInput formControlName="password" type="password" autocomplete="new-password" maxlength="72" />
                 <mat-icon matPrefix>lock_outline</mat-icon>
                 @if (isEdit && data.link?.passwordProtected) {
                   <mat-hint>Déjala vacía para conservar la protección actual.</mat-hint>
@@ -106,7 +109,7 @@
         </mat-tab>
         <mat-tab label="UTM">
           <div class="tab-pad">
-            <p class="tab-note">Añade parámetros UTM al destino para medir campañas. Se añaden automáticamente al redirigir.</p>
+            <div class="tab-intro"><span><mat-icon>campaign</mat-icon></span><div><b>Parámetros de campaña</b><p>Añade UTM al destino para medir campañas; se aplican al redirigir.</p></div></div>
             <div formGroupName="utm" class="utm-grid">
               <mat-form-field appearance="outline"><mat-label>Source</mat-label><input matInput formControlName="source" placeholder="newsletter" /></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>Medium</mat-label><input matInput formControlName="medium" placeholder="email" /></mat-form-field>
@@ -118,7 +121,7 @@
         </mat-tab>
         <mat-tab label="Reglas">
           <div class="tab-pad">
-            <p class="tab-note">Redirección condicional: la primera regla que coincida gana. Deja el destino vacío para borrar la regla.</p>
+            <div class="tab-intro"><span><mat-icon>account_tree</mat-icon></span><div><b>Redirección condicional</b><p>La primera regla que coincida gana. Deja el destino vacío para borrar la regla.</p></div></div>
             <div class="rules">
               @for (rule of ruleForms; track rule; let i = $index) {
                 <div class="rule" [formGroup]="rule">

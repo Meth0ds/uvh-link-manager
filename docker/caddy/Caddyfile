@@ -1,0 +1,80 @@
+{
+	email {$ACME_EMAIL}
+	admin 127.0.0.1:2019
+	grace_period 10s
+	shutdown_delay 3s
+
+	# Required security gate for On-Demand TLS. The endpoint performs only an
+	# indexed database lookup and returns 2xx exclusively for approved hosts.
+	on_demand_tls {
+		ask http://nginx:8081/internal/caddy/ask
+	}
+}
+
+(uvh_upstream) {
+	header -Server
+	reverse_proxy nginx:8080 {
+		# Caddy ignores untrusted inbound X-Forwarded-* values by default. Keep
+		# the original hostname so Laravel can enforce tenant/domain isolation.
+		header_up Host {host}
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
+
+		health_uri /health
+		health_interval 30s
+		health_timeout 5s
+		health_headers {
+			Host {$APP_HOST}
+		}
+
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 70s
+			keepalive 30s
+		}
+	}
+}
+
+# Keep one canonical origin for cookies, hCaptcha hostname binding, CSRF and
+# browser storage. The www hosts still receive eager certificates so the
+# redirect itself is authenticated before the browser follows it.
+www.{$APP_HOST} {
+	redir https://{$APP_HOST}{uri} 308
+}
+
+www.{$PUBLIC_HOST} {
+	redir https://{$PUBLIC_HOST}{uri} 308
+}
+
+# First-party certificates are managed eagerly at config load.
+{$APP_HOST}, {$PUBLIC_HOST} {
+	import uvh_upstream
+}
+
+# Customer hostnames are admitted only by the indexed ask endpoint.
+https:// {
+	tls {
+		on_demand
+	}
+	# The ACME ask endpoint runs only when obtaining a certificate. Repeat the
+	# indexed authorization on every custom-host request so a disabled/deleted
+	# domain stops routing even while Caddy still has a cached certificate.
+	route {
+		forward_auth nginx:8081 {
+			uri /internal/caddy/ask?domain={host}
+		}
+		import uvh_upstream
+	}
+}
+
+http:// {
+	# Do not reflect an arbitrary Host into Location. The same indexed,
+	# secret-protected allowlist used for On-Demand TLS must authorize a
+	# customer hostname before its plaintext request is redirected.
+	route {
+		forward_auth nginx:8081 {
+			uri /internal/caddy/ask?domain={host}
+		}
+		redir https://{host}{uri} 308
+	}
+}

@@ -9,10 +9,13 @@ import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatExpansionModule } from "@angular/material/expansion";
+import { MatTooltipModule } from "@angular/material/tooltip";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import type { WebhookDto, WebhookDelivery } from "../../core/models";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ActionDialogService } from "../action-dialog.service";
+import { PageHeaderComponent } from "../page-header.component";
+import { PanelSkeletonComponent } from "../panel-skeleton.component";
 
 const EVENTS = [
   "link.created",
@@ -34,8 +37,11 @@ const EVENTS = [
     MatCheckboxModule,
     MatProgressBarModule,
     MatSnackBarModule,
-    MatExpansionModule
-],
+    MatExpansionModule,
+    MatTooltipModule,
+    PageHeaderComponent,
+    PanelSkeletonComponent,
+  ],
   templateUrl: "./webhooks.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./webhooks.component.scss",
@@ -119,12 +125,17 @@ export class WebhooksComponent {
   }
 
   async save(): Promise<void> {
+    const secret = this.secret();
     if (!this.url().trim() || !this.selectedEvents().length || this.saving()) return;
+    if (secret && (secret.length < 16 || secret.length > 128)) {
+      this.snackbar.open("El secreto debe tener entre 16 y 128 caracteres", "Cerrar", { duration: 3500 });
+      return;
+    }
     this.saving.set(true);
     const payload = {
       url: this.url().trim(),
       events: this.selectedEvents(),
-      secret: this.secret() || undefined,
+      secret: secret || undefined,
     };
     let createdSecret: string | null = null;
     try {
@@ -194,7 +205,7 @@ export class WebhooksComponent {
   async remove(w: WebhookDto): Promise<void> {
     const confirmed = await this.actions.confirm({
       title: "Eliminar webhook",
-      message: `¿Eliminar el webhook ${w.url}? Dejarás de recibir sus eventos inmediatamente.`,
+      message: `¿Eliminar el webhook ${w.url}? Se cancelarán las entregas pendientes. Si hay una entrega en curso, tendrás que reintentarlo al terminar.`,
       confirmLabel: "Eliminar webhook",
       destructive: true,
     });

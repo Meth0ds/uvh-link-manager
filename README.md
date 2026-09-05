@@ -39,9 +39,14 @@ uvh/
 ```bash
 cp .env.docker.local.example .env.docker.local
 docker compose -f docker-compose.local.yml --env-file .env.docker.local up -d postgres
-# App completa (artisan serve + queue + schedule):
+# App completa (servidor PHP local + queue + schedule):
 docker compose -f docker-compose.local.yml --env-file .env.docker.local --profile laravel up -d
 ```
+
+En Windows también puedes usar [`UVH Control.cmd`](UVH%20Control.cmd), que
+inicia y supervisa Docker y Angular sin bloquear su interfaz. Consulta
+[`docs/local-control.md`](docs/local-control.md) para los controles, límites y
+recuperación tras reinicios.
 
 ### 2. Backend Laravel
 
@@ -51,10 +56,10 @@ composer install
 cp .env.example .env        # y configura DB_* para apuntar a PostgreSQL local
 php artisan key:generate
 php artisan migrate
-php artisan test            # PHPUnit
+DB_DATABASE=uvh_test php artisan test  # usa siempre una base aislada *_test
 ```
 
-En local, `php artisan serve` escucha en `http://127.0.0.1:8000` (contenedor `app` del Compose).
+En local, el contenedor `app` sirve Laravel en `http://127.0.0.1:8000` con el servidor PHP integrado.
 
 ### 3. Frontend
 

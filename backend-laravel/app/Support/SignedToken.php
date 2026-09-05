@@ -32,7 +32,14 @@ class SignedToken
             return null;
         }
 
-        if (! hash_equals(self::mac($body, $exp), $mac)) {
+        $validMac = false;
+        foreach (UvhCrypto::secrets() as $secret) {
+            // Evaluate the complete configured keyring. Besides keeping the
+            // verification path simple, this avoids making the matching key
+            // observable through an avoidable early exit.
+            $validMac = hash_equals(self::mac($body, $exp, $secret), $mac) || $validMac;
+        }
+        if (! $validMac) {
             return null;
         }
 
@@ -51,8 +58,8 @@ class SignedToken
         return $payload;
     }
 
-    private static function mac(string $body, string $exp): string
+    private static function mac(string $body, string $exp, ?string $secret = null): string
     {
-        return Ids::base64urlEncode(hash_hmac('sha256', "{$body}.{$exp}", UvhCrypto::secret(), true));
+        return Ids::base64urlEncode(hash_hmac('sha256', "{$body}.{$exp}", $secret ?? UvhCrypto::secret(), true));
     }
 }

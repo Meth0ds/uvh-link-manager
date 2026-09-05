@@ -9,10 +9,14 @@ use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
+use App\Support\WorkspaceAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class WebhookController
 {
+    private const MAX_WEBHOOKS_PER_WORKSPACE = \App\Support\WorkspaceLimits::WEBHOOKS;
+
     public function index(Request $request)
     {
         $workspaceId = UvhRequest::workspaceId($request);
@@ -50,15 +54,36 @@ class WebhookController
 
         $plainSecret = is_string($secret) && $secret !== '' ? $secret : Ids::randomToken(32);
 
-        $webhook = Webhook::create([
-            'workspace_id' => $workspaceId,
-            'url' => $url,
-            'secret' => UvhCrypto::encryptAtRest($plainSecret),
-            'events' => array_values($events),
-            'active' => true,
-        ]);
+        $result = DB::transaction(function () use ($workspaceId, $user, $url, $plainSecret, $events): array {
+            // The shared guard enforces account -> workspace lock order and
+            // rechecks both the session-era security version and live role.
+            if (! $this->hasWriteAccessLocked($workspaceId, $user->id, (int) $user->security_version)) {
+                return ['status' => 'forbidden'];
+            }
+            if (Webhook::where('workspace_id', $workspaceId)->count() >= self::MAX_WEBHOOKS_PER_WORKSPACE) {
+                return ['status' => 'limit'];
+            }
 
-        Audit::write($user->id, 'webhook.create', 'webhook', $webhook->id, ['url' => $url], UvhRequest::ip($request));
+            return ['status' => 'created', 'webhook' => Webhook::create([
+                'workspace_id' => $workspaceId,
+                'created_by' => $user->id,
+                'url' => $url,
+                'secret' => UvhCrypto::encryptAtRest($plainSecret),
+                'events' => array_values($events),
+                'active' => true,
+                'config_version' => 1,
+            ])];
+        });
+        if ($result['status'] === 'forbidden') {
+            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de crear un webhook.'], 403);
+        }
+        if ($result['status'] !== 'created') {
+            return response()->json(['error' => 'Límite de webhooks alcanzado'], 429);
+        }
+        /** @var Webhook $webhook */
+        $webhook = $result['webhook'];
+
+        Audit::write($user->id, 'webhook.create', 'webhook', $webhook->id, ['events' => count($events)], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['webhook' => $this->dto($webhook), 'secret' => $plainSecret], 201);
     }
@@ -101,15 +126,45 @@ class WebhookController
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
 
-        $webhook->update([
-            'url' => $url !== null ? (string) $url : $webhook->url,
-            'events' => $events !== null ? array_values((array) $events) : $webhook->events,
-            'active' => $active !== null ? (bool) $active : $webhook->active,
-            'secret' => is_string($secret) && $secret !== '' ? UvhCrypto::encryptAtRest($secret) : $webhook->secret,
-            'updated_at' => now(),
-        ]);
+        [$lockAcquired, $updated] = WebhookService::mutateConfiguration($id, function () use ($id, $workspaceId, $user, $url, $events, $active, $secret): string {
+            return DB::transaction(function () use ($id, $workspaceId, $user, $url, $events, $active, $secret): string {
+                if (! $this->hasWriteAccessLocked($workspaceId, $user->id, (int) $user->security_version)) {
+                    return 'forbidden';
+                }
+                $locked = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
+                if (! $locked) {
+                    return 'not_found';
+                }
+                $changed = $url !== null || $events !== null || $active !== null || (is_string($secret) && $secret !== '');
+                $locked->update([
+                    'url' => $url !== null ? (string) $url : $locked->url,
+                    'events' => $events !== null ? array_values((array) $events) : $locked->events,
+                    'active' => $active !== null ? (bool) $active : $locked->active,
+                    'secret' => is_string($secret) && $secret !== '' ? UvhCrypto::encryptAtRest($secret) : $locked->secret,
+                    'config_version' => $changed ? (int) $locked->config_version + 1 : $locked->config_version,
+                    'updated_at' => now(),
+                ]);
+                if ($changed) {
+                    $locked->deliveries()->where('status', 'pending')->update([
+                        'status' => 'failed',
+                        'last_error' => 'Configuración de webhook modificada antes de la entrega',
+                    ]);
+                }
 
-        Audit::write($user->id, 'webhook.update', 'webhook', $id, null, UvhRequest::ip($request));
+                return 'ok';
+            });
+        });
+        if (! $lockAcquired) {
+            return response()->json(['error' => 'Hay una entrega en curso para este webhook. Espera unos segundos antes de modificarlo.'], 409);
+        }
+        if ($updated === 'forbidden') {
+            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de modificar el webhook.'], 403);
+        }
+        if ($updated !== 'ok') {
+            return response()->json(['error' => 'Webhook no encontrado'], 404);
+        }
+
+        Audit::write($user->id, 'webhook.update', 'webhook', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }
@@ -124,8 +179,30 @@ class WebhookController
             return response()->json(['error' => 'Webhook no encontrado'], 404);
         }
 
-        $webhook->delete();
-        Audit::write($user->id, 'webhook.delete', 'webhook', $id, null, UvhRequest::ip($request));
+        [$lockAcquired, $deleted] = WebhookService::mutateConfiguration($id, function () use ($id, $workspaceId, $user): string {
+            return DB::transaction(function () use ($id, $workspaceId, $user): string {
+                if (! $this->hasWriteAccessLocked($workspaceId, $user->id, (int) $user->security_version)) {
+                    return 'forbidden';
+                }
+                $locked = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
+                if (! $locked) {
+                    return 'not_found';
+                }
+                $locked->delete();
+
+                return 'ok';
+            });
+        });
+        if (! $lockAcquired) {
+            return response()->json(['error' => 'Hay una entrega en curso para este webhook. Espera unos segundos antes de eliminarlo.'], 409);
+        }
+        if ($deleted === 'forbidden') {
+            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de eliminar el webhook.'], 403);
+        }
+        if ($deleted !== 'ok') {
+            return response()->json(['error' => 'Webhook no encontrado'], 404);
+        }
+        Audit::write($user->id, 'webhook.delete', 'webhook', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }
@@ -144,7 +221,6 @@ class WebhookController
             'webhook_id' => $d->webhook_id,
             'event' => $d->event,
             'event_id' => $d->event_id,
-            'payload' => json_encode($d->payload, JSON_UNESCAPED_UNICODE),
             'status' => $d->status,
             'attempts' => (int) $d->attempts,
             'last_error' => $d->last_error,
@@ -161,18 +237,60 @@ class WebhookController
         $workspaceId = UvhRequest::workspaceId($request);
         $user = UvhRequest::user($request);
 
-        $webhook = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->first();
-        if (! $webhook) {
+        // Hold the same configuration lock used by the worker. Rewinding a
+        // processing row while its HTTP request is in flight loses the result
+        // and can create an avoidable duplicate delivery.
+        [$lockAcquired, $result] = WebhookService::mutateConfiguration($id, function () use ($workspaceId, $user, $id, $deliveryId): string {
+            return DB::transaction(function () use ($workspaceId, $user, $id, $deliveryId): string {
+                if (! $this->hasWriteAccessLocked($workspaceId, $user->id, (int) $user->security_version)) {
+                    return 'forbidden';
+                }
+                $webhook = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
+                if (! $webhook) {
+                    return 'webhook_not_found';
+                }
+                $delivery = $webhook->deliveries()->where('id', $deliveryId)->lockForUpdate()->first();
+                if (! $delivery) {
+                    return 'delivery_not_found';
+                }
+                if ($delivery->status === 'processing') {
+                    return 'processing';
+                }
+                // A pending row already consumes one backlog slot. Reserving
+                // capacity again would reject an idempotent nudge when the
+                // workspace is exactly at its limit.
+                if ($delivery->status !== 'pending' && ! WebhookService::canRequeue($workspaceId)) {
+                    return 'full';
+                }
+                $delivery->update([
+                    'status' => 'pending',
+                    'attempts' => 0,
+                    'last_error' => null,
+                    'locked_at' => null,
+                    'next_attempt_at' => now(),
+                ]);
+
+                return 'ok';
+            });
+        });
+        if (! $lockAcquired || $result === 'processing') {
+            return response()->json(['error' => 'La entrega está en curso. Espera a que termine antes de reenviarla.'], 409);
+        }
+        if ($result === 'forbidden') {
+            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de reenviar.'], 403);
+        }
+        if ($result === 'webhook_not_found') {
             return response()->json(['error' => 'Webhook no encontrado'], 404);
         }
-
-        $delivery = $webhook->deliveries()->where('id', $deliveryId)->first();
-        if (! $delivery) {
+        if ($result === 'full') {
+            return response()->json(['error' => 'La cola de entregas del workspace está llena. Espera antes de reenviar.'], 429);
+        }
+        if ($result !== 'ok') {
             return response()->json(['error' => 'Entrega no encontrada'], 404);
         }
 
-        WebhookService::resend($deliveryId);
-        Audit::write($user->id, 'webhook.resend', 'webhook', $id, ['deliveryId' => $deliveryId], UvhRequest::ip($request));
+        WebhookService::enqueueExisting($deliveryId);
+        Audit::write($user->id, 'webhook.resend', 'webhook', $id, ['deliveryId' => $deliveryId], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }
@@ -182,23 +300,54 @@ class WebhookController
         $workspaceId = UvhRequest::workspaceId($request);
         $user = UvhRequest::user($request);
 
-        $webhook = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->first();
-        if (! $webhook) {
+        $eventId = Ids::randomToken(16);
+        $result = DB::transaction(function () use ($workspaceId, $user, $id, $eventId): string {
+            // Keep the workspace lock until the durable delivery is admitted.
+            // Member removal and webhook changes take this same parent lock.
+            if (! $this->hasWriteAccessLocked($workspaceId, $user->id, (int) $user->security_version)) {
+                return 'forbidden';
+            }
+            $webhook = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->first();
+            if (! $webhook) {
+                return 'not_found';
+            }
+            if (! $webhook->active) {
+                return 'inactive';
+            }
+            $queued = WebhookService::dispatchTest($webhook, [
+                'event' => 'ping',
+                'event_id' => $eventId,
+                'timestamp' => now()->toIso8601String(),
+                'data' => ['message' => 'UVH webhook test'],
+            ]);
+
+            return $queued ? 'ok' : 'full';
+        });
+        if ($result === 'forbidden') {
+            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de probar el webhook.'], 403);
+        }
+        if ($result === 'not_found') {
             return response()->json(['error' => 'Webhook no encontrado'], 404);
         }
-
-        $eventId = Ids::randomToken(16);
-        $delivery = $webhook->deliveries()->create([
-            'event' => 'ping',
-            'event_id' => $eventId,
-            'payload' => ['event' => 'ping', 'event_id' => $eventId, 'timestamp' => now()->toIso8601String(), 'data' => ['message' => 'UVH webhook test']],
-            'status' => 'pending',
-            'next_attempt_at' => now(),
-        ]);
-
-        WebhookService::resend($delivery->id);
+        if ($result === 'inactive') {
+            return response()->json(['error' => 'Activa el webhook antes de enviar una prueba'], 409);
+        }
+        if ($result !== 'ok') {
+            return response()->json(['error' => 'La cola de entregas del workspace está llena. Espera a que terminen las entregas pendientes.'], 429);
+        }
 
         return response()->json(['ok' => true]);
+    }
+
+    /** Must be called inside a database transaction. */
+    private function hasWriteAccessLocked(int $workspaceId, int $userId, int $expectedSecurityVersion): bool
+    {
+        return WorkspaceAccess::getMembershipLocked(
+            $userId,
+            $workspaceId,
+            'editor',
+            expectedSecurityVersion: $expectedSecurityVersion,
+        ) !== null;
     }
 
     private function dto(Webhook $w): array

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\IsoDate;
 use App\Support\UvhRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,23 +11,27 @@ class AnalyticsController
 {
     private const PERIODS = ['24h', '7d', '30d', '90d'];
 
-    private const MAX_RANGE_DAYS = 180;
+    private const MAX_RANGE_DAYS = \App\Support\WorkspaceLimits::ANALYTICS_RANGE_DAYS;
 
     public function overview(Request $request)
     {
         $workspaceId = UvhRequest::workspaceId($request);
-        $linkId = $request->query('linkId') !== null ? (int) $request->query('linkId') : null;
+        $linkIdResult = $this->parseLinkId($request->query('linkId'));
+        if (! $linkIdResult['ok']) {
+            return response()->json(['error' => 'linkId debe ser un entero positivo'], 422);
+        }
+        $linkId = $linkIdResult['value'];
 
         $range = $this->parseRange(
-            (string) $request->query('period', '7d'),
-            $request->query('from') !== null ? (string) $request->query('from') : null,
-            $request->query('to') !== null ? (string) $request->query('to') : null,
+            UvhRequest::queryString($request, 'period', '7d'),
+            $request->query('from') !== null ? UvhRequest::queryString($request, 'from') : null,
+            $request->query('to') !== null ? UvhRequest::queryString($request, 'to') : null,
         );
         if (! $range['ok']) {
             return response()->json(['error' => $range['error']], 422);
         }
 
-        if ($linkId) {
+        if ($linkId !== null) {
             $exists = DB::table('links')->where('id', $linkId)->where('workspace_id', $workspaceId)->exists();
             if (! $exists) {
                 return response()->json(['error' => 'Enlace no encontrado'], 404);
@@ -40,18 +45,22 @@ class AnalyticsController
     {
         $apiToken = UvhRequest::apiToken($request);
         $workspaceId = $apiToken['workspace_id'];
-        $linkId = $request->query('linkId') !== null ? (int) $request->query('linkId') : null;
+        $linkIdResult = $this->parseLinkId($request->query('linkId'));
+        if (! $linkIdResult['ok']) {
+            return response()->json(['error' => 'linkId debe ser un entero positivo'], 422);
+        }
+        $linkId = $linkIdResult['value'];
 
         $range = $this->parseRange(
-            (string) $request->query('period', '7d'),
-            $request->query('from') !== null ? (string) $request->query('from') : null,
-            $request->query('to') !== null ? (string) $request->query('to') : null,
+            UvhRequest::queryString($request, 'period', '7d'),
+            $request->query('from') !== null ? UvhRequest::queryString($request, 'from') : null,
+            $request->query('to') !== null ? UvhRequest::queryString($request, 'to') : null,
         );
         if (! $range['ok']) {
             return response()->json(['error' => $range['error']], 422);
         }
 
-        if ($linkId) {
+        if ($linkId !== null) {
             $exists = DB::table('links')->where('id', $linkId)->where('workspace_id', $workspaceId)->exists();
             if (! $exists) {
                 return response()->json(['error' => 'Enlace no encontrado'], 404);
@@ -69,16 +78,18 @@ class AnalyticsController
         if (! in_array($period, self::PERIODS, true)) {
             return ['ok' => false, 'error' => 'period inválido (24h|7d|30d|90d)'];
         }
-        if ($from !== null && ! $this->isIsoDate($from)) {
+        $parsedFrom = $from !== null ? IsoDate::parse($from) : null;
+        if ($from !== null && $parsedFrom === null) {
             return ['ok' => false, 'error' => 'from debe ser una fecha ISO válida'];
         }
-        if ($to !== null && ! $this->isIsoDate($to)) {
+        $parsedTo = $to !== null ? IsoDate::parse($to) : null;
+        if ($to !== null && $parsedTo === null) {
             return ['ok' => false, 'error' => 'to debe ser una fecha ISO válida'];
         }
 
         $days = ['24h' => 1, '7d' => 7, '30d' => 30, '90d' => 90][$period];
-        $end = $to !== null ? \Illuminate\Support\Carbon::parse($to) : now();
-        $start = $from !== null ? \Illuminate\Support\Carbon::parse($from) : $end->copy()->subDays($days);
+        $end = $parsedTo ?? now();
+        $start = $parsedFrom ?? $end->copy()->subDays($days);
 
         if ($start->gt($end)) {
             return ['ok' => false, 'error' => 'from debe ser anterior o igual a to'];
@@ -92,30 +103,25 @@ class AnalyticsController
 
     private function buildOverview(int $workspaceId, ?int $linkId, string $start, string $end): array
     {
-        $startDay = substr($start, 0, 10);
-        $endDay = substr($end, 0, 10);
-
-        $rollupQuery = DB::table('metric_rollups')->whereBetween('day', [$startDay, $endDay]);
+        // Event rows are the source of truth for arbitrary time ranges. Daily
+        // rollups remain a bounded acceleration structure for retention/jobs,
+        // but summing daily visitors would double-count the same person across
+        // days and can include hours outside a 24-hour range.
+        $events = DB::table('click_events as e')
+            ->join('links as l', 'l.id', '=', 'e.link_id')
+            ->where('l.workspace_id', $workspaceId)
+            ->where('e.occurred_at', '>=', $start)
+            ->where('e.occurred_at', '<=', $end);
         if ($linkId !== null) {
-            $rollupQuery->where('link_id', $linkId);
-        } else {
-            $rollupQuery->whereIn('link_id', fn ($q) => $q->select('id')->from('links')->where('workspace_id', $workspaceId));
+            $events->where('e.link_id', $linkId);
         }
-        $rollups = $rollupQuery->get();
+        $totalClicks = (int) (clone $events)->count();
+        $totalVisitors = (int) (clone $events)->whereNotNull('e.visitor_hash')->distinct()->count('e.visitor_hash');
 
-        $totalClicks = (int) $rollups->sum('clicks');
-        $totalVisitors = (int) $rollups->sum('visitors');
-
-        $seriesQuery = DB::table('click_events')
-            ->selectRaw("occurred_at::date AS day, COUNT(*) AS clicks, COUNT(DISTINCT visitor_hash) AS visitors")
-            ->where('occurred_at', '>=', $start)
-            ->where('occurred_at', '<=', $end);
-        if ($linkId !== null) {
-            $seriesQuery->where('link_id', $linkId);
-        } else {
-            $seriesQuery->whereIn('link_id', fn ($q) => $q->select('id')->from('links')->where('workspace_id', $workspaceId));
-        }
-        $series = $seriesQuery->groupBy('day')->orderBy('day')->get()->map(fn ($r) => [
+        $seriesQuery = (clone $events)
+            ->selectRaw("e.occurred_at::date AS day, COUNT(*) AS clicks, COUNT(DISTINCT e.visitor_hash) AS visitors")
+            ->groupBy('day')->orderBy('day');
+        $series = $seriesQuery->get()->map(fn ($r) => [
             'day' => $r->day,
             'clicks' => (int) $r->clicks,
             'visitors' => (int) $r->visitors,
@@ -123,15 +129,12 @@ class AnalyticsController
 
         $topLinks = [];
         if ($linkId === null) {
-            $topLinks = DB::table(DB::raw('('
-                .'SELECT link_id, SUM(clicks)::int AS clicks, SUM(visitors)::int AS visitors '
-                .'FROM metric_rollups WHERE day >= ? AND day <= ? GROUP BY link_id ORDER BY clicks DESC LIMIT 8'
-                .') m'))
-                ->join('links as l', 'l.id', '=', 'm.link_id')
-                ->where('l.workspace_id', $workspaceId)
-                ->addBinding($startDay, 'select')
-                ->addBinding($endDay, 'select')
-                ->get(['l.id', 'l.alias', 'l.destination', 'm.clicks', 'm.visitors'])
+            $topLinks = (clone $events)
+                ->selectRaw('l.id, l.alias, l.destination, COUNT(*)::int AS clicks, COUNT(DISTINCT e.visitor_hash)::int AS visitors')
+                ->groupBy('l.id', 'l.alias', 'l.destination')
+                ->orderByDesc('clicks')
+                ->limit(8)
+                ->get()
                 ->map(fn ($r) => [
                     'id' => $r->id,
                     'alias' => $r->alias,
@@ -146,13 +149,33 @@ class AnalyticsController
             'totals' => ['clicks' => $totalClicks, 'visitors' => $totalVisitors],
             'series' => $series,
             'topLinks' => $topLinks,
-            'countries' => $this->top($this->mergeMaps($rollups->pluck('countries')->all())),
-            'devices' => $this->top($this->mergeMaps($rollups->pluck('devices')->all())),
-            'browsers' => $this->top($this->mergeMaps($rollups->pluck('browsers')->all())),
-            'os' => $this->top($this->mergeMaps($rollups->pluck('os')->all())),
-            'referrers' => $this->top($this->mergeMaps($rollups->pluck('referrers')->all())),
-            'campaigns' => $this->top($this->mergeMaps($rollups->pluck('campaigns')->all())),
+            'countries' => $this->dimension($events, 'country'),
+            'devices' => $this->dimension($events, 'device'),
+            'browsers' => $this->dimension($events, 'browser'),
+            'os' => $this->dimension($events, 'os'),
+            'referrers' => $this->dimension($events, 'referrer_domain'),
+            'campaigns' => $this->dimension($events, 'campaign'),
         ];
+    }
+
+    private function dimension($events, string $column): array
+    {
+        $allowed = ['country', 'device', 'browser', 'os', 'referrer_domain', 'campaign'];
+        if (! in_array($column, $allowed, true)) {
+            return [];
+        }
+
+        return (clone $events)
+            ->whereNotNull('e.'.$column)
+            ->where('e.'.$column, '!=', '')
+            ->selectRaw('e.'.$column.' AS key, COUNT(*)::int AS value')
+            ->groupBy('e.'.$column)
+            ->orderByDesc('value')
+            ->limit(8)
+            ->get()
+            ->map(fn ($row) => ['key' => $row->key, 'value' => (int) $row->value])
+            ->values()
+            ->all();
     }
 
     private function mergeMaps(array $list): array
@@ -189,14 +212,23 @@ class AnalyticsController
         return $out;
     }
 
-    private function isIsoDate(string $value): bool
+    /** @return array{ok: bool, value: ?int} */
+    private function parseLinkId(mixed $value): array
     {
-        try {
-            \Illuminate\Support\Carbon::parse($value);
-
-            return true;
-        } catch (\Throwable) {
-            return false;
+        if ($value === null) {
+            return ['ok' => true, 'value' => null];
         }
+        if (is_int($value)) {
+            return ['ok' => $value > 0, 'value' => $value > 0 ? $value : null];
+        }
+        if (! is_string($value) || ! preg_match('/^[1-9][0-9]{0,18}$/D', $value)) {
+            return ['ok' => false, 'value' => null];
+        }
+        $validated = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        return $validated === false
+            ? ['ok' => false, 'value' => null]
+            : ['ok' => true, 'value' => $validated];
     }
+
 }

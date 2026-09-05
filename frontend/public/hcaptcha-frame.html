@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' https://hcaptcha.com https://*.hcaptcha.com; style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com; img-src https://hcaptcha.com https://*.hcaptcha.com data:; connect-src https://hcaptcha.com https://*.hcaptcha.com; frame-src https://hcaptcha.com https://*.hcaptcha.com; media-src https://hcaptcha.com https://*.hcaptcha.com; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Verificación hCaptcha</title>
+    <style>
+      :root { color-scheme: light dark; }
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+      body { display: flex; align-items: flex-start; justify-content: center; }
+      #uvh-hcaptcha { min-width: 1px; min-height: 1px; }
+    </style>
+    <script src="/hcaptcha-frame.v1.js"></script>
+    <script
+      src="https://js.hcaptcha.com/1/api.js?onload=uvhHcaptchaSdkReady&amp;render=explicit&amp;hl=es&amp;recaptchacompat=off"
+      async
+      defer
+    ></script>
+  </head>
+  <body>
+    <div id="uvh-hcaptcha"></div>
+  </body>
+</html>

@@ -10,7 +10,17 @@ import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { LinkDialogService } from "../links/link-dialog.service";
 import { ChartsComponent } from "../analytics/charts.component";
+import { PageHeaderComponent } from "../page-header.component";
+import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { GettingStartedComponent } from "../getting-started/getting-started.component";
 import type { AnalyticsOverview, LinksResponse, LinkDto } from "../../core/models";
+
+type DashboardPeriod = "24h" | "7d" | "30d" | "90d";
+
+interface DashboardPeriodOption {
+  value: DashboardPeriod;
+  label: string;
+}
 
 @Component({
   selector: "app-dashboard",
@@ -21,8 +31,11 @@ import type { AnalyticsOverview, LinksResponse, LinkDto } from "../../core/model
     MatIconModule,
     MatProgressBarModule,
     MatSnackBarModule,
-    ChartsComponent
-],
+    ChartsComponent,
+    PageHeaderComponent,
+    PanelSkeletonComponent,
+    GettingStartedComponent,
+  ],
   templateUrl: "./dashboard.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./dashboard.component.scss",
@@ -41,10 +54,19 @@ export class DashboardComponent {
   readonly recent = signal<LinkDto[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly period = signal<DashboardPeriod>("30d");
+  readonly periods: readonly DashboardPeriodOption[] = [
+    { value: "24h", label: "24 h" },
+    { value: "7d", label: "7 días" },
+    { value: "30d", label: "30 días" },
+    { value: "90d", label: "90 días" },
+  ];
+  readonly periodLabel = computed(() => this.periods.find((option) => option.value === this.period())?.label ?? "30 días");
 
   readonly firstName = computed(() => (this.user()?.name ?? "").split(/\s+/)[0] ?? "");
 
   private loadedWorkspaceId: number | null | undefined;
+  private loadRequest = 0;
 
   constructor() {
     effect(() => {
@@ -52,6 +74,7 @@ export class DashboardComponent {
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
       if (workspaceId === null) {
+        this.loadRequest += 1;
         this.loading.set(false);
         return;
       }
@@ -60,22 +83,32 @@ export class DashboardComponent {
   }
 
   async load(): Promise<void> {
+    const request = ++this.loadRequest;
+    const period = this.period();
     this.loading.set(true);
     this.error.set(null);
     try {
       const [a, links] = await Promise.all([
-        this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period: "30d" }),
+        this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period }),
         this.api.get<LinksResponse>("/api/v1/links", { sort: "created_at_desc", perPage: 5 }),
       ]);
+      if (request !== this.loadRequest) return;
       this.overview.set(a);
       this.recent.set(links.links);
     } catch (err) {
+      if (request !== this.loadRequest) return;
       const message = err instanceof ApiRequestError ? err.message : "No se pudieron cargar los datos";
       this.error.set(message);
       this.snackbar.open(message, "Cerrar", { duration: 3500 });
     } finally {
-      this.loading.set(false);
+      if (request === this.loadRequest) this.loading.set(false);
     }
+  }
+
+  setPeriod(period: DashboardPeriod): void {
+    if (this.period() === period) return;
+    this.period.set(period);
+    void this.load();
   }
 
   retry(): void {

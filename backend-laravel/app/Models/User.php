@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class User extends Authenticatable
 {
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'email',
         'name',
@@ -14,11 +18,14 @@ class User extends Authenticatable
         'is_admin',
         'mfa_enabled',
         'mfa_secret',
+        'mfa_pending_secret',
+        'mfa_pending_expires_at',
         'recovery_codes',
+        'security_version',
         'deleted_at',
     ];
 
-    protected $hidden = ['password_hash', 'mfa_secret', 'recovery_codes'];
+    protected $hidden = ['password_hash', 'mfa_secret', 'mfa_pending_secret', 'recovery_codes'];
 
     protected function casts(): array
     {
@@ -26,7 +33,9 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'is_admin' => 'boolean',
             'mfa_enabled' => 'boolean',
+            'mfa_pending_expires_at' => 'datetime',
             'recovery_codes' => 'array',
+            'security_version' => 'integer',
             'deleted_at' => 'datetime',
         ];
     }
@@ -39,6 +48,11 @@ class User extends Authenticatable
     public function sessions()
     {
         return $this->hasMany(UvhSession::class);
+    }
+
+    public function emailChangeRequest()
+    {
+        return $this->hasOne(EmailChangeRequest::class);
     }
 
     public function memberships()

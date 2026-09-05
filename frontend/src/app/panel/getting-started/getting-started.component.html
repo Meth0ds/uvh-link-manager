@@ -1,0 +1,56 @@
+@if (!compact()) {
+  <app-page-header icon="checklist" eyebrow="Guía opcional" title="Primeros pasos"
+    [description]="context() ? context()!.name + ' · Estado actual, sin progreso duplicado.' : 'Selecciona un workspace para consultar su guía.'">
+    <a mat-stroked-button routerLink="/app/dashboard">Volver al panel</a>
+  </app-page-header>
+}
+
+@if (context(); as workspace) {
+  @if (!compact() || (!hidden() && !complete())) {
+    <section class="guide" [attr.aria-label]="'Primeros pasos de ' + workspace.name" [attr.aria-busy]="loading() && !hidden()">
+      @if (hidden()) {
+        <h2>Has omitido esta guía</h2>
+        <p>No se han cambiado tus recursos ni tu configuración de seguridad. Puedes retomarla cuando quieras.</p>
+        <button mat-flat-button type="button" (click)="resume()">Reanudar guía</button>
+      } @else if (loading()) {
+        <p role="status">Comprobando el estado real de {{ workspace.name }}…</p>
+        <mat-progress-bar mode="indeterminate" aria-label="Cargando primeros pasos" />
+        <button mat-button type="button" (click)="dismiss()">Omitir por ahora</button>
+      } @else if (error(); as message) {
+        <div class="guide-message" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><p>{{ message }}</p></div>
+        <button mat-stroked-button type="button" (click)="reload()">Reintentar comprobación</button>
+        <button mat-button type="button" (click)="dismiss()">Omitir por ahora</button>
+      } @else if (complete() && !reviewing()) {
+        <div class="guide-message"><mat-icon aria-hidden="true">check_circle</mat-icon><h2>Las tres señales iniciales están presentes</h2></div>
+        <p>La sugerencia deja de aparecer en el panel. Esto no certifica la llegada al destino ni la preparación para producción.</p>
+        <button mat-stroked-button type="button" (click)="resume()">Revisar guía y opciones</button>
+      } @else if (data()) {
+        <div class="guide-heading">
+          <div><span class="eyebrow">A tu ritmo</span><h2>Primeros pasos de {{ workspace.name }}</h2><p>{{ observed() }} de 3 señales iniciales observadas. Dominio y equipo son opcionales.</p></div>
+          <span class="progress-count" aria-hidden="true">{{ observed() }}/3</span>
+        </div>
+        @if (compact()) {
+          <p>Consulta qué falta, cómo comprobar tus enlaces y dónde proteger tu cuenta.</p>
+          <div class="guide-actions"><a mat-flat-button routerLink="/app/getting-started">Abrir guía</a><button mat-button type="button" (click)="dismiss()">Omitir por ahora</button></div>
+        } @else {
+          <ol class="steps">
+            @for (step of steps(); track step.id) {
+              <li [class.observed]="step.observed" [attr.data-step]="step.id">
+                <mat-icon aria-hidden="true">{{ step.observed ? 'check_circle' : step.icon }}</mat-icon>
+                <div class="step-copy"><h3>{{ step.title }}</h3><span class="step-state">{{ step.observed ? 'Señal observada' : 'Sin señal todavía' }}{{ step.optional ? ' · Opcional' : '' }}</span><p>{{ step.description }}</p></div>
+                <a mat-stroked-button [routerLink]="step.route" [fragment]="step.fragment">{{ step.action }}</a>
+              </li>
+            }
+          </ol>
+          <div class="guide-actions"><button mat-flat-button type="button" (click)="reload()">Actualizar estado</button><button mat-button type="button" (click)="dismiss()">Omitir por ahora</button></div>
+          <p class="guide-note">Sólo abrimos pantallas internas. Ningún enlace se visita ni se envía correo automáticamente. Puedes reanudar la guía desde «Primeros pasos» en el menú.</p>
+        }
+      }
+      @if (storageWarning()) {
+        <p class="guide-note" role="status">El navegador no permite guardar esta preferencia; al volver podría mostrarse la guía de nuevo.</p>
+      }
+    </section>
+  }
+} @else if (!compact()) {
+  <div class="guide empty-state"><mat-icon aria-hidden="true">workspaces</mat-icon><h2>Sin workspace seleccionado</h2><p>Selecciona o crea uno desde la barra superior. No necesitas invitar a nadie para usarlo.</p></div>
+}

@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { DatePipe } from "@angular/common";
 import { ActivatedRoute, Router } from "@angular/router";
 
 import { FormsModule } from "@angular/forms";
@@ -20,7 +21,10 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { LinkDialogService } from "./link-dialog.service";
 import { QrDialogComponent } from "./qr-dialog.component";
 import { ActionDialogService } from "../action-dialog.service";
+import { PendingLinkIntentService } from "../../core/services/pending-link-intent.service";
 import type { LinksResponse, LinkDto, LinkState } from "../../core/models";
+import { PageHeaderComponent } from "../page-header.component";
+import { PanelSkeletonComponent } from "../panel-skeleton.component";
 
 type StateFilter = "" | LinkState;
 
@@ -50,8 +54,11 @@ const STATE_LABEL: Record<LinkState, string> = {
     MatChipsModule,
     MatTooltipModule,
     MatSnackBarModule,
-    MatProgressBarModule
-],
+    MatProgressBarModule,
+    DatePipe,
+    PageHeaderComponent,
+    PanelSkeletonComponent,
+  ],
   templateUrl: "./links.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./links.component.scss",
@@ -65,6 +72,7 @@ export class LinksComponent {
   private linkDialog = inject(LinkDialogService);
   private workspaces = inject(WorkspaceService);
   private actions = inject(ActionDialogService);
+  private intents = inject(PendingLinkIntentService);
 
   readonly links = signal<LinkDto[]>([]);
   readonly total = signal(0);
@@ -78,19 +86,31 @@ export class LinksComponent {
   readonly sort = signal("created_at_desc");
   readonly page = signal(0);
   readonly pageSize = signal(20);
-  private readonly initialDestination = this.route.snapshot.queryParamMap.get("destination")?.trim() ?? "";
-  private initialDialogOpened = false;
+  private readonly legacyDestination = this.route.snapshot.queryParamMap.get("destination")?.trim() ?? "";
+  private pendingClaimInFlight = false;
+  private pendingDialogOpen = false;
+  private pendingAutoHandled = false;
 
   readonly canWrite = computed(() => {
     const role = this.workspaces.currentRole();
     return role === "owner" || role === "admin" || role === "editor";
   });
+  readonly pendingLink = this.intents.pending;
 
   readonly stateLabel = (s: LinkState) => STATE_LABEL[s];
 
   private loadedWorkspaceId: number | null | undefined;
 
   constructor() {
+    if (this.legacyDestination) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { destination: null },
+        queryParamsHandling: "merge",
+        replaceUrl: true,
+      });
+      void this.captureLegacyDestination(this.legacyDestination);
+    }
     effect(() => {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
@@ -117,13 +137,7 @@ export class LinksComponent {
       });
       this.links.set(res.links);
       this.total.set(res.total);
-      if (this.initialDestination && !this.initialDialogOpened && this.canWrite()) {
-        this.initialDialogOpened = true;
-        this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
-        this.linkDialog.openCreate(this.initialDestination).subscribe((created) => {
-          if (created) void this.router.navigate(["/app/links", created.id]);
-        });
-      }
+      void this.openPendingLink();
     } catch (err) {
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los enlaces");
     } finally {
@@ -183,6 +197,22 @@ export class LinksComponent {
     });
   }
 
+  resumePendingLink(): void {
+    void this.openPendingLink(true);
+  }
+
+  async discardPendingLink(): Promise<void> {
+    const confirmed = await this.actions.confirm({
+      title: "Descartar URL guardada",
+      message: "La URL dejará de estar disponible para crear un enlace más tarde.",
+      confirmLabel: "Descartar URL",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    this.intents.complete();
+    this.snackbar.open("URL guardada descartada", "Cerrar", { duration: 2500 });
+  }
+
   edit(link: LinkDto): void {
     this.linkDialog.openEdit(link).subscribe((updated) => {
       if (updated) void this.reload();
@@ -240,5 +270,46 @@ export class LinksComponent {
   /** Short URL without the scheme, for display. */
   displayUrl(url: string): string {
     return url.replace(/^https?:\/\//, "");
+  }
+
+  private async captureLegacyDestination(destination: string): Promise<void> {
+    try {
+      const receipt = await this.intents.create(destination);
+      this.intents.capture(receipt.intent, receipt.expiresAt);
+      await this.openPendingLink();
+    } catch (err) {
+      this.snackbar.open(
+        err instanceof ApiRequestError ? err.message : "No se pudo guardar la URL para continuar",
+        "Cerrar",
+        { duration: 3500 },
+      );
+    }
+  }
+
+  private async openPendingLink(force = false): Promise<void> {
+    if (!this.canWrite() || this.pendingClaimInFlight || this.pendingDialogOpen || (!force && this.pendingAutoHandled)) return;
+    if (!this.pendingLink()) return;
+
+    this.pendingAutoHandled = true;
+    this.pendingClaimInFlight = true;
+    try {
+      const pending = await this.intents.claim();
+      if (!pending) return;
+      this.pendingDialogOpen = true;
+      this.linkDialog.openCreate(pending.destination).subscribe((created) => {
+        this.pendingDialogOpen = false;
+        if (!created) return;
+        this.intents.complete();
+        void this.router.navigate(["/app/links", created.id]);
+      });
+    } catch (err) {
+      this.snackbar.open(
+        err instanceof ApiRequestError ? err.message : "No se pudo recuperar la URL guardada",
+        "Cerrar",
+        { duration: 3500 },
+      );
+    } finally {
+      this.pendingClaimInFlight = false;
+    }
   }
 }

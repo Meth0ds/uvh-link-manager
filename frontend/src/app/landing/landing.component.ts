@@ -1,124 +1,262 @@
-import { AfterViewInit, Component, ElementRef, inject, OnDestroy, signal, ChangeDetectionStrategy } from "@angular/core";
-
+import { DOCUMENT } from "@angular/common";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
-import { MatButtonModule } from "@angular/material/button";
-import { MatIconModule } from "@angular/material/icon";
-import { MatRippleModule } from "@angular/material/core";
-import { MatExpansionModule } from "@angular/material/expansion";
-import { MatTooltipModule } from "@angular/material/tooltip";
 import { FormsModule } from "@angular/forms";
-import { ApiService } from "../core/services/api.service";
-import { ThemeService } from "../core/services/theme.service";
+import { MatButtonModule } from "@angular/material/button";
+import { MatExpansionModule } from "@angular/material/expansion";
+import { MatIconModule } from "@angular/material/icon";
+import { ApiRequestError, ApiService } from "../core/services/api.service";
+import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
+import { ThemeToggleComponent } from "../core/theme-toggle.component";
 
-interface Feature {
+type ProductViewId = "publish" | "route" | "measure";
+
+interface ProductView {
+  id: ProductViewId;
   icon: string;
+  label: string;
   title: string;
-  text: string;
-}
-
-interface Plan {
-  name: string;
-  price: string;
-  period: string;
-  highlight: boolean;
-  cta: string;
-  features: string[];
-}
-
-interface Testimonial {
-  quote: string;
-  name: string;
-  role: string;
-  initials: string;
+  description: string;
+  bullets: string[];
 }
 
 @Component({
   selector: "app-landing",
   standalone: true,
-  imports: [RouterLink, MatButtonModule, MatIconModule, MatRippleModule, MatExpansionModule, MatTooltipModule, FormsModule],
+  imports: [
+    RouterLink,
+    FormsModule,
+    MatButtonModule,
+    MatExpansionModule,
+    MatIconModule,
+    ThemeToggleComponent,
+  ],
   templateUrl: "./landing.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./landing.component.scss",
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class LandingComponent implements AfterViewInit, OnDestroy {
-  private api = inject(ApiService);
-  readonly theme = inject(ThemeService);
-  private hostElement = inject(ElementRef<HTMLElement>);
-  private revealObserver?: IntersectionObserver;
-  private heroSpotlightCleanup?: () => void;
+export class LandingComponent {
+  private readonly api = inject(ApiService);
+  private readonly intents = inject(PendingLinkIntentService);
+  private readonly document = inject(DOCUMENT);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly year = new Date().getFullYear();
-  readonly demoUrl = signal("");
+  @ViewChild("menuButton") private menuButton?: ElementRef<HTMLButtonElement>;
+
   readonly appUrl = signal("");
-  readonly mobileOpen = signal(false);
+  readonly demoUrl = signal("");
   readonly demoError = signal<string | null>(null);
+  readonly submitting = signal(false);
+  readonly mobileOpen = signal(false);
+  readonly scrolled = signal(false);
+  readonly year = new Date().getFullYear();
+  readonly destinationPreview = computed(() => this.previewDestination(this.demoUrl()));
+  readonly destinationReady = computed(() => this.destinationPreview()?.valid === true);
+
+  readonly activeProductViewId = signal<ProductViewId>("publish");
+  readonly activeProductView = computed(() => this.productViews.find((view) => view.id === this.activeProductViewId())!);
+
+  readonly productViews: ProductView[] = [
+    {
+      id: "publish",
+      label: "Crear",
+      icon: "add_link",
+      title: "Publica con una configuración preparada para cambiar.",
+      description: "El enlace nace dentro de tu workspace con el alias, dominio y ciclo de vida que necesita; no como una URL desechable.",
+      bullets: ["Alias y dominio personalizado", "UTM, etiquetas y notas", "Programación, caducidad y límite de clics"],
+    },
+    {
+      id: "route",
+      label: "Dirigir",
+      icon: "route",
+      title: "Decide el destino en el momento de cada redirección.",
+      description: "Ordena reglas por prioridad y conserva un destino principal como fallback cuando ninguna condición coincide.",
+      bullets: ["País, idioma y dispositivo", "Sistema, horario y referente", "Campaña y destino alternativo"],
+    },
+    {
+      id: "measure",
+      label: "Medir",
+      icon: "query_stats",
+      title: "Lee la actividad desde el mismo lugar donde operas el enlace.",
+      description: "Cambia el periodo y recorre la serie temporal, los enlaces destacados y las dimensiones que ya entrega la API.",
+      bullets: ["Clics y visitantes únicos", "Países, dispositivos y navegadores", "Referentes, campañas y sistemas"],
+    },
+  ];
+
+  readonly capabilities = [
+    { icon: "link", number: "01", title: "Crear", text: "Destino, alias, dominio, UTM y etiquetas en una sola configuración." },
+    { icon: "alt_route", number: "02", title: "Dirigir", text: "Reglas priorizadas y fallback para adaptar el recorrido de cada clic." },
+    { icon: "shield_lock", number: "03", title: "Proteger", text: "Contraseña, un solo uso, límites, calendario y estados operativos." },
+    { icon: "monitoring", number: "04", title: "Medir", text: "Serie temporal y procedencia sin separar analítica y operación." },
+  ];
+
+  readonly operations = [
+    { icon: "language", title: "Dominios propios", text: "Verificación DNS, activación y control del estado desde el workspace." },
+    { icon: "groups", title: "Equipo y roles", text: "Owner, admin, editor y viewer con permisos coherentes en cada acción." },
+    { icon: "key", title: "API tokens", text: "Scopes de lectura y escritura, caducidad y revocación explícita." },
+    { icon: "webhook", title: "Webhooks", text: "Eventos firmados, historial de entregas, reintentos y reenvío manual." },
+  ];
+
+  readonly faqs = [
+    {
+      q: "¿Qué pasa cuando pego una URL?",
+      a: "La guardamos de forma temporal durante 24 horas. Si necesitas crear una cuenta o iniciar sesión, la recuperaremos para abrir el formulario de creación ya rellenado.",
+    },
+    {
+      q: "¿La URL aparece en la dirección del navegador?",
+      a: "No. UVH usa un token temporal opaco entre la página pública y el panel. El destino sólo se recupera cuando tienes una sesión verificada.",
+    },
+    {
+      q: "¿Cómo se resuelven los enlaces?",
+      a: "Cada enlace responde con una redirección HTTP real desde el backend. No hay scripts intermedios entre quien hace clic y el destino.",
+    },
+    {
+      q: "¿Puedo usar mi propio dominio?",
+      a: "Sí. Puedes conectar dominios personalizados y verificarlos mediante DNS para que cada enlace salga con tu propia marca.",
+    },
+    {
+      q: "¿Puedo cambiar el destino después de publicar?",
+      a: "Sí. El enlace mantiene su alias mientras actualizas el destino, las reglas, los límites o su estado desde el panel, siempre que tu rol tenga permiso de edición.",
+    },
+    {
+      q: "¿Qué puede medir UVH?",
+      a: "El panel trabaja con clics, visitantes, serie temporal, enlaces destacados, países, dispositivos, navegadores, sistemas, referentes y campañas para el periodo seleccionado.",
+    },
+    {
+      q: "¿Necesito una cuenta para empezar?",
+      a: "Puedes pegar y comprobar una URL sin cuenta. Para guardar el enlace tendrás que entrar o registrarte; después retomaremos el borrador donde lo dejaste.",
+    },
+  ];
 
   constructor() {
-    // Keep local development on the frontend origin. The API proxy may report
-    // its own backend host, which must never become a broken CTA destination.
     this.appUrl.set(this.currentOrigin());
     this.api
       .get<{ appUrl: string }>("/api/v1/config")
-      .then((c) => this.appUrl.set(this.resolveAppUrl(c.appUrl)))
-      .catch(() => {});
+      .then((config) => this.appUrl.set(this.resolveAppUrl(config.appUrl)))
+      .catch(() => undefined);
+    this.destroyRef.onDestroy(() => this.document.body.classList.remove("uvh-menu-open"));
   }
 
-  ngAfterViewInit(): void {
-    this.setupHeroSpotlight();
+  @HostListener("window:scroll")
+  onWindowScroll(): void {
+    this.scrolled.set((this.document.defaultView?.scrollY ?? 0) > 18);
+  }
 
-    const revealElements = Array.from(this.hostElement.nativeElement.querySelectorAll(".reveal") as NodeListOf<HTMLElement>);
-    if (!revealElements.length) return;
+  @HostListener("window:resize")
+  onWindowResize(): void {
+    if ((this.document.defaultView?.innerWidth ?? 0) > 940 && this.mobileOpen()) this.closeMobileMenu();
+  }
 
-    if (typeof IntersectionObserver === "undefined") {
-      revealElements.forEach((element) => element.classList.add("is-visible"));
-      return;
+  @HostListener("document:keydown.escape")
+  onEscape(): void {
+    if (this.mobileOpen()) this.closeMobileMenu(true);
+  }
+
+  loginHref(): string {
+    return `${this.appUrl() || this.currentOrigin()}/auth`;
+  }
+
+  registerHref(): string {
+    const returnTo = encodeURIComponent("/app/links");
+    return `${this.appUrl() || this.currentOrigin()}/auth?mode=register&returnTo=${returnTo}`;
+  }
+
+  onUrlChange(value: string): void {
+    this.demoUrl.set(value);
+    if (this.demoError()) this.demoError.set(null);
+  }
+
+  toggleMobileMenu(): void {
+    this.mobileOpen() ? this.closeMobileMenu(true) : this.openMobileMenu();
+  }
+
+  openMobileMenu(): void {
+    this.mobileOpen.set(true);
+    this.document.body.classList.add("uvh-menu-open");
+  }
+
+  closeMobileMenu(restoreFocus = false): void {
+    this.mobileOpen.set(false);
+    this.document.body.classList.remove("uvh-menu-open");
+    if (restoreFocus) this.document.defaultView?.requestAnimationFrame(() => this.menuButton?.nativeElement.focus());
+  }
+
+  async submitDemo(): Promise<void> {
+    const destination = this.demoUrl().trim();
+    if (!this.validDestination(destination)) return;
+
+    this.submitting.set(true);
+    this.demoError.set(null);
+    try {
+      const receipt = await this.intents.create(destination);
+      const app = this.appUrl() || this.currentOrigin();
+      const params = new URLSearchParams({
+        mode: "register",
+        returnTo: "/app/links",
+        intent: receipt.intent,
+      });
+      this.handoffToAuth(`${app}/auth?${params.toString()}`);
+    } catch (error) {
+      this.demoError.set(error instanceof ApiRequestError ? error.message : "No se pudo preparar tu enlace. Inténtalo de nuevo.");
+      this.submitting.set(false);
     }
-
-    this.revealObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          entry.target.classList.add("is-visible");
-          this.revealObserver?.unobserve(entry.target);
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" },
-    );
-
-    revealElements.forEach((element) => this.revealObserver?.observe(element));
   }
 
-  ngOnDestroy(): void {
-    this.revealObserver?.disconnect();
-    this.heroSpotlightCleanup?.();
+  focusHero(): void {
+    this.closeMobileMenu();
+    this.document.defaultView?.requestAnimationFrame(() => {
+      const input = this.document.getElementById("hero-url") as HTMLInputElement | null;
+      input?.focus({ preventScroll: true });
+      input?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   }
 
-  /** Moves the hero spotlight with the pointer (skipped for reduced motion). */
-  private setupHeroSpotlight(): void {
-    const hero = this.hostElement.nativeElement.querySelector(".hero") as HTMLElement | null;
-    if (!hero) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const onMove = (event: PointerEvent) => {
-      const rect = hero.getBoundingClientRect();
-      hero.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
-      hero.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
-    };
-
-    hero.addEventListener("pointermove", onMove, { passive: true });
-    this.heroSpotlightCleanup = () => hero.removeEventListener("pointermove", onMove);
+  selectProductView(view: ProductViewId): void {
+    this.activeProductViewId.set(view);
   }
 
-  /** Absolute URL to the authenticated panel, honoring the resolved app host. */
-  authHref(destination = ""): string {
-    const returnTo = destination
-      ? `/app/links?destination=${encodeURIComponent(destination)}`
-      : "/app/links";
-    return `${this.appUrl() || this.currentOrigin()}/auth?returnTo=${encodeURIComponent(returnTo)}`;
+  onProductTabKeydown(event: KeyboardEvent, index: number): void {
+    const lastIndex = this.productViews.length - 1;
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight") nextIndex = index === lastIndex ? 0 : index + 1;
+    if (event.key === "ArrowLeft") nextIndex = index === 0 ? lastIndex : index - 1;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = lastIndex;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    this.selectProductView(this.productViews[nextIndex].id);
+    const tabs = (event.currentTarget as HTMLElement | null)?.parentElement?.querySelectorAll<HTMLButtonElement>("[role='tab']");
+    this.document.defaultView?.requestAnimationFrame(() => tabs?.item(nextIndex!)?.focus());
   }
 
-  toggleTheme(): void {
-    this.theme.set(this.theme.resolved() === "dark" ? "light" : "dark");
+  /** Small seam for testing the public-to-app handoff without navigating the test runner. */
+  protected handoffToAuth(target: string): void {
+    window.location.assign(target);
+  }
+
+  private validDestination(raw: string): boolean {
+    if (!this.previewDestination(raw)?.valid) {
+      this.demoError.set("Introduce una URL http(s) válida, sin credenciales embebidas.");
+      return false;
+    }
+    return true;
+  }
+
+  private previewDestination(raw: string): { valid: true; host: string; destination: string; alias: string } | null {
+    const value = raw.trim();
+    if (!value || value.length > 2048) return null;
+    try {
+      const url = new URL(value);
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password) return null;
+      const host = url.hostname.replace(/^www\./i, "");
+      const candidate = url.pathname.split("/").filter(Boolean).at(-1) || host.split(".")[0] || "enlace";
+      const alias = candidate.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 28) || "mi-enlace";
+      return { valid: true, host, destination: `${host}${url.pathname === "/" ? "" : url.pathname}`, alias };
+    } catch {
+      return null;
+    }
   }
 
   private currentOrigin(): string {
@@ -127,11 +265,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   private resolveAppUrl(raw: string): string {
     const fallback = this.currentOrigin();
-    // Dev proxy hosts must remain on the SPA origin; the API origin does not
-    // serve the Angular shell in local development.
-    if (typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
-      return fallback;
-    }
+    if (typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) return fallback;
     try {
       const url = new URL(raw, fallback);
       if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.search || url.hash) return fallback;
@@ -139,174 +273,5 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     } catch {
       return fallback;
     }
-  }
-
-  readonly features: Feature[] = [
-    {
-      icon: "bolt",
-      title: "Enlaces al instante",
-      text: "Acorta cualquier URL en un clic. Alias personalizados o aleatorios, con copia inmediata y QR listo para compartir.",
-    },
-    {
-      icon: "query_stats",
-      title: "Analítica real",
-      text: "Clics, visitantes únicos, países, dispositivos, navegadores y referentes. Sin píxeles fantasma: métricas de tu propio backend.",
-    },
-    {
-      icon: "call_split",
-      title: "Redirección inteligente",
-      text: "Reglas por país, idioma, dispositivo, sistema operativo, horario, referente o campaña con destino de respaldo.",
-    },
-    {
-      icon: "shield",
-      title: "Seguridad por diseño",
-      text: "Sesiones con cookies HttpOnly, CSRF doble envío, rate limiting, hash de tokens y auditoría inmutable de cada acción.",
-    },
-    {
-      icon: "language",
-      title: "Tu propio dominio",
-      text: "Conecta dominios personalizados con verificación real por registro DNS TXT y usa tu marca en cada enlace corto.",
-    },
-    {
-      icon: "webhook",
-      title: "Automatización",
-      text: "Webhooks firmados con HMAC para cada evento de enlace y API tokens con scopes para integrar tus propios sistemas.",
-    },
-  ];
-
-  readonly steps: Feature[] = [
-    {
-      icon: "edit_note",
-      title: "Pega tu URL",
-      text: "Introduce el destino y elige un alias o deja que UVH genere uno corto y seguro.",
-    },
-    {
-      icon: "tune",
-      title: "Configura el control",
-      text: "Añade contraseña, límite de clics, uso único, programación, UTM o reglas de redirección.",
-    },
-    {
-      icon: "monitoring",
-      title: "Mide y optimiza",
-      text: "Comparte el enlace y sigue cada clic en tiempo real desde tu panel.",
-    },
-  ];
-
-  readonly plans: Plan[] = [
-    {
-      name: "Starter",
-      price: "0 €",
-      period: "para siempre",
-      highlight: false,
-      cta: "Crear cuenta gratis",
-      features: ["500 enlaces", "1 dominio personalizado", "Analítica de 7 días", "QR incluidos", "1 workspace"],
-    },
-    {
-      name: "Pro",
-      price: "9 €",
-      period: "/mes",
-      highlight: true,
-      cta: "Empezar con Pro",
-      features: [
-        "Enlaces ilimitados",
-        "Dominios personalizados ilimitados",
-        "Analítica de 90 días",
-        "Reglas de redirección",
-        "API tokens y webhooks",
-        "Miembros de equipo",
-      ],
-    },
-    {
-      name: "Business",
-      price: "29 €",
-      period: "/mes",
-      highlight: false,
-      cta: "Hablar con ventas",
-      features: ["Todo lo de Pro", "Roles y permisos avanzados", "Auditoría completa", "Soporte prioritario", "SLA de disponibilidad"],
-    },
-  ];
-
-  readonly stats = [
-    { value: "99,99%", label: "disponibilidad objetivo", icon: "verified" },
-    { value: "<50 ms", label: "tiempo de resolución", icon: "bolt" },
-    { value: "24/7", label: "visibilidad de tu tráfico", icon: "monitoring" },
-    { value: "100%", label: "datos de tu propio backend", icon: "storage" },
-  ];
-
-  readonly testimonials: Testimonial[] = [
-    {
-      quote:
-        "Pasamos de enlaces sin control a saber exactamente qué campaña trae tráfico y desde qué país. Las reglas de redirección nos ahorran horas cada semana.",
-      name: "Lucía Fernández",
-      role: "Growth Lead · Northwind",
-      initials: "LF",
-    },
-    {
-      quote:
-        "El enlace se resuelve con una redirección real y la analítica es nuestra. Nada de intermediarios ni píxeles de terceros entre la campaña y el cliente.",
-      name: "Marc Vidal",
-      role: "CTO · Sotano Studio",
-      initials: "MV",
-    },
-    {
-      quote:
-        "Verificar nuestro dominio fue cuestión de minutos y la API nos permitió generar enlaces dinámicos desde el propio producto. Impecable.",
-      name: "Elena Roca",
-      role: "Product Manager · Linq",
-      initials: "ER",
-    },
-  ];
-
-  readonly comparison = {
-    features: [
-      { label: "Redirección HTTP real (302)", uvh: true, other: false },
-      { label: "Analítica sin píxeles de terceros", uvh: true, other: false },
-      { label: "Dominios propios con verificación TXT", uvh: true, other: true },
-      { label: "Reglas por país, idioma y dispositivo", uvh: true, other: false },
-      { label: "Webhooks firmados y API con scopes", uvh: true, other: false },
-      { label: "MFA y auditoría de acciones sensibles", uvh: true, other: false },
-      { label: "Límites de clics y uso único", uvh: true, other: true },
-      { label: "Sin anuncios ni branding ajeno", uvh: true, other: false },
-    ],
-  };
-
-  readonly faqs = [
-    {
-      q: "¿Cómo se resuelven los enlaces?",
-      a: "Cada enlace se resuelve con una redirección HTTP real (302) desde el backend. No hay JavaScript que intermedie: funciona en cualquier cliente, correo o aplicación.",
-    },
-    {
-      q: "¿Qué ocurre con la privacidad de mis clics?",
-      a: "No almacenamos IPs en claro. Los visitantes se identifican con un hash salado de IP + user-agent que rota diariamente, y puedes configurar el periodo de retención de la analítica.",
-    },
-    {
-      q: "¿Puedo proteger un enlace con contraseña?",
-      a: "Sí. Marca la opción de contraseña al crear el enlace y quien lo abra deberá introducirla antes de ser redirigido. También puedes limitar clics o hacerlo de uso único.",
-    },
-    {
-      q: "¿Cómo verifico un dominio propio?",
-      a: "Añades el dominio en el panel y UVH te da un registro DNS TXT. Cuando el registro propague, pulsas verificar y el dominio queda activo para tus enlaces.",
-    },
-    {
-      q: "¿Puedo integrar UVH con mis sistemas?",
-      a: "Sí. Dispones de API tokens con scopes (links, analytics, domains) y webhooks firmados con HMAC que recibes en tu propio endpoint.",
-    },
-  ];
-
-  submitDemo(): void {
-    const raw = this.demoUrl().trim();
-    if (raw) {
-      try {
-        const url = new URL(raw);
-        if (!/^https?:$/.test(url.protocol) || url.username || url.password || raw.length > 2048) throw new Error("invalid");
-      } catch {
-        this.demoError.set("Introduce una URL http(s) válida, sin credenciales embebidas.");
-        return;
-      }
-    }
-    this.demoError.set(null);
-    // Link creation requires an authenticated, verified account. Preserve the
-    // destination through login so the dialog can be opened prefilled.
-    window.location.assign(this.authHref(raw));
   }
 }

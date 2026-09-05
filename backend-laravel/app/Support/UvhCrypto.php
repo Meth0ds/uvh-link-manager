@@ -3,8 +3,12 @@
 namespace App\Support;
 
 /**
- * Cifrado at-rest con el formato `enc:v1:` (heredado): clave derivada por
- * HMAC del APP_SECRET con separación de dominio.
+ * Cifrado at-rest con clave derivada por HMAC y separación de dominio.
+ *
+ * APP_SECRET es siempre la clave de escritura. APP_SECRET_PREVIOUS forma un
+ * keyring acotado de sólo lectura durante rotaciones; permite desplegar la
+ * nueva clave, recifrar de forma reanudable y retirar después las antiguas sin
+ * pérdida de datos ni un corte brusco de tokens firmados en vuelo.
  */
 class UvhCrypto
 {
@@ -29,7 +33,7 @@ class UvhCrypto
             throw new \RuntimeException('APP_SECRET es obligatorio en producción');
         }
 
-        $appKey = (string) env('APP_KEY');
+        $appKey = (string) config('app.key');
         if ($appKey === '') {
             throw new \RuntimeException('APP_KEY es obligatorio para cifrar datos');
         }
@@ -37,9 +41,29 @@ class UvhCrypto
         return hash('sha256', $appKey);
     }
 
+    /** @return non-empty-list<string> */
+    public static function secrets(): array
+    {
+        $current = self::secret();
+        $configured = config('uvh.secret_previous', []);
+        if (! is_array($configured)) {
+            $configured = [];
+        }
+
+        $secrets = [$current];
+        foreach ($configured as $candidate) {
+            if (! is_string($candidate) || $candidate === '' || in_array($candidate, $secrets, true)) {
+                continue;
+            }
+            $secrets[] = $candidate;
+        }
+
+        return $secrets;
+    }
+
     public static function atRestKey(): string
     {
-        return hash_hmac('sha256', 'uvh:at-rest:v1', self::secret(), true);
+        return self::atRestKeyFor(self::secret());
     }
 
     public static function encryptAtRest(string $plain): string
@@ -61,19 +85,64 @@ class UvhCrypto
         }
 
         $buf = Ids::base64urlDecode(substr($value, strlen(self::PREFIX)));
+        if (strlen($buf) < 28) {
+            throw new \RuntimeException('At-rest ciphertext is malformed');
+        }
         $iv = substr($buf, 0, 12);
         $tag = substr($buf, 12, 16);
         $enc = substr($buf, 28);
-        $plain = openssl_decrypt($enc, 'aes-256-gcm', self::atRestKey(), OPENSSL_RAW_DATA, $iv, $tag);
-        if ($plain === false) {
-            throw new \RuntimeException('At-rest decryption failed');
+
+        foreach (self::secrets() as $secret) {
+            $plain = openssl_decrypt(
+                $enc,
+                'aes-256-gcm',
+                self::atRestKeyFor($secret),
+                OPENSSL_RAW_DATA,
+                $iv,
+                $tag,
+            );
+            if ($plain !== false) {
+                return $plain;
+            }
         }
 
-        return $plain;
+        throw new \RuntimeException('At-rest decryption failed');
+    }
+
+    public static function encryptedWithCurrentKey(string $value): bool
+    {
+        if (! str_starts_with($value, self::PREFIX)) {
+            return false;
+        }
+
+        $buf = Ids::base64urlDecode(substr($value, strlen(self::PREFIX)));
+        if (strlen($buf) < 28) {
+            return false;
+        }
+
+        return openssl_decrypt(
+            substr($buf, 28),
+            'aes-256-gcm',
+            self::atRestKey(),
+            OPENSSL_RAW_DATA,
+            substr($buf, 0, 12),
+            substr($buf, 12, 16),
+        ) !== false;
     }
 
     public static function hashIp(string $ip): string
     {
         return substr(hash_hmac('sha256', 'ip:'.$ip, self::secret()), 0, 32);
+    }
+
+    /** Daily keyed pseudonym: uncorrelatable across days or deployments. */
+    public static function visitorHash(string $day, string $ip, string $userAgent): string
+    {
+        return hash_hmac('sha256', 'visitor:'.$day.'|'.$ip.'|'.$userAgent, self::secret());
+    }
+
+    private static function atRestKeyFor(string $secret): string
+    {
+        return hash_hmac('sha256', 'uvh:at-rest:v1', $secret, true);
     }
 }

@@ -1,5 +1,9 @@
-@if (loading()) {
+@if (loading() && link()) {
   <mat-progress-bar mode="indeterminate" />
+}
+
+@if (loading() && !link()) {
+  <app-panel-skeleton variant="detail" label="Cargando detalle del enlace" />
 }
 
 @if (error()) {
@@ -7,12 +11,19 @@
 }
 
 @if (link(); as link) {
-  <div class="head">
+  <section class="link-hero">
     <a class="back" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> Enlaces</a>
     <div class="title-row">
-      <div>
-        <h1 class="tnum">{{ displayUrl(link.shortUrl) }}</h1>
-        <p class="dest" [title]="link.destination">{{ link.destination }}</p>
+      <div class="link-identity">
+        <span class="link-icon" aria-hidden="true"><mat-icon>link</mat-icon></span>
+        <div>
+          <span class="link-eyebrow">Detalle operativo</span>
+          <div class="link-title-line">
+            <h1 class="tnum">{{ displayUrl(link.shortUrl) }}</h1>
+            <span class="state-chip" [class]="'st-' + link.state">{{ link.state === "active" ? "Activo" : link.state }}</span>
+          </div>
+          <p class="dest" [title]="link.destination">{{ link.destination }}</p>
+        </div>
       </div>
       <div class="actions">
         <button mat-stroked-button (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar</button>
@@ -36,12 +47,12 @@
         }
       </div>
     </div>
-  </div>
+  </section>
   <div class="stat-cards">
-    <div class="stat-card"><span>Clics</span><b class="tnum">{{ link.clickCount }}</b></div>
-    <div class="stat-card"><span>Máx. clics</span><b class="tnum">{{ link.maxClicks ?? "∞" }}</b></div>
-    <div class="stat-card"><span>Estado</span><b>{{ link.state === "active" ? "Activo" : link.state }}</b></div>
-    <div class="stat-card"><span>Creado</span><b class="tnum">{{ link.createdAt.slice(0, 10) }}</b></div>
+    <div class="stat-card"><span><mat-icon>touch_app</mat-icon> Clics</span><b class="tnum">{{ link.clickCount }}</b><small>Actividad acumulada</small></div>
+    <div class="stat-card"><span><mat-icon>speed</mat-icon> Límite</span><b class="tnum">{{ link.maxClicks ?? "∞" }}</b><small>Máximo configurado</small></div>
+    <div class="stat-card"><span><mat-icon>toggle_on</mat-icon> Estado</span><b>{{ link.state === "active" ? "Activo" : link.state }}</b><small>Situación actual</small></div>
+    <div class="stat-card"><span><mat-icon>event</mat-icon> Creado</span><b class="tnum">{{ link.createdAt.slice(0, 10) }}</b><small>Fecha de alta</small></div>
   </div>
   <div class="period-row">
     <span class="section-title">Analítica</span>

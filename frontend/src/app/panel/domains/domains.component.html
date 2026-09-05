@@ -1,59 +1,110 @@
-<div class="page-head">
-  <div>
-    <h1>Dominios personalizados</h1>
-    <p>Usa tu propia marca en cada enlace corto.</p>
-  </div>
-</div>
+<app-page-header icon="language" eyebrow="Marca y entrega" title="Dominios personalizados" description="Usa tu propia marca en cada enlace corto y controla su verificación DNS." />
 
-@if (loading()) {
+@if (loading() && domains().length) {
   <mat-progress-bar mode="indeterminate" aria-label="Cargando dominios" />
+}
+@if (loading() && !domains().length) {
+  <app-panel-skeleton variant="cards" label="Cargando dominios" />
 }
 @if (error()) {
   <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
 }
 
-<div class="add-bar">
-  <mat-form-field appearance="outline" class="grow">
-    <mat-icon matPrefix>language</mat-icon>
-    <input matInput placeholder="tu-dominio.com" [(ngModel)]="newDomain" (keyup.enter)="add()" />
-  </mat-form-field>
-  <button mat-flat-button color="primary" (click)="add()" [disabled]="!newDomain().trim() || adding()">
-    <mat-icon>add</mat-icon> Añadir dominio
-  </button>
-</div>
+@if (canEdit()) {
+<section class="command-card" aria-labelledby="connect-domain-title">
+  <div class="command-heading">
+    <span class="command-icon" aria-hidden="true"><mat-icon>add_circle</mat-icon></span>
+    <div><h2 id="connect-domain-title">Conectar un dominio</h2><p>Introduce sólo el hostname. Te guiaremos durante la verificación DNS.</p></div>
+  </div>
+  <div class="add-bar">
+    <mat-form-field appearance="outline" class="grow">
+      <mat-label>Dominio</mat-label>
+      <mat-icon matPrefix>language</mat-icon>
+      <input matInput placeholder="go.tu-dominio.com" autocomplete="url" [(ngModel)]="newDomain" (keyup.enter)="add()" />
+    </mat-form-field>
+    <button mat-flat-button color="primary" (click)="add()" [disabled]="!newDomain().trim() || adding()">
+      <mat-icon>add</mat-icon> {{ adding() ? "Añadiendo…" : "Añadir dominio" }}
+    </button>
+  </div>
+</section>
+} @else {
+  <div class="alert permission" role="status">
+    Puedes consultar los dominios conectados. Un editor o administrador debe realizar cambios en DNS y activación.
+  </div>
+}
 
 @if (!loading() && (!error() || domains().length)) {
   <div class="domain-list">
     @for (d of domains(); track trackByDomain($index, d)) {
       <article class="domain-card">
         <div class="domain-head">
-          <b class="tnum">{{ d.domain }}</b>
-          <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
+          <span class="domain-icon" aria-hidden="true"><mat-icon>language</mat-icon></span>
+          <div><span>Dominio personalizado</span><b class="tnum">{{ d.domain }}</b></div>
+          <span class="state-chip" [class]="'st-' + d.state" [class.needs-attention]="d.state === 'active' && !d.edgeEligible">{{ stateLabel(d) }}</span>
         </div>
-        @if (d.state === 'pending' || d.state === 'error' || d.state === 'verifying') {
+        @if (dnsErrorLabel(d.dnsError); as dnsMessage) {
+          <p class="dns-message" [class.degraded]="d.state === 'active'" role="status">{{ dnsMessage }}</p>
+        }
+        @if (tlsErrorLabel(d.tlsError); as tlsMessage) {
+          <p class="dns-message" role="status">{{ tlsMessage }}</p>
+        }
+        @if (canEdit() && d.verificationToken && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying' || d.state === 'disabled')) {
           <div class="verify-box">
-            <p class="verify-title">1 · Añade este registro TXT en tu proveedor de DNS</p>
+            <p class="verify-title">1 · Confirma la propiedad con un registro TXT</p>
             <div class="txt-row">
-              <code>TXT</code>
-              <code class="txt-value tnum">{{ d.verificationToken }}</code>
-              <button mat-icon-button (click)="copy(d.verificationToken)" aria-label="Copiar registro TXT"><mat-icon>content_copy</mat-icon></button>
+              <code>Nombre</code>
+              <code class="txt-value tnum">{{ d.verificationHost }}</code>
+              <button mat-icon-button (click)="copy(d.verificationHost, 'Nombre')" aria-label="Copiar nombre del registro TXT"><mat-icon>content_copy</mat-icon></button>
             </div>
-            <p class="verify-title">2 · Cuando el registro propague, verifica el dominio</p>
-            <button mat-stroked-button color="primary" (click)="verify(d)" [disabled]="actionId() === d.id">
-              <mat-icon>verified_user</mat-icon>
-              {{ verifyingId() === d.id ? "Verificando…" : "Verificar dominio" }}
-            </button>
+            <div class="txt-row">
+              <code>Valor</code>
+              <code class="txt-value tnum">{{ d.verificationToken }}</code>
+              <button mat-icon-button (click)="copy(d.verificationToken, 'Valor')" aria-label="Copiar valor del registro TXT"><mat-icon>content_copy</mat-icon></button>
+            </div>
+            <p class="verify-title step-title">2 · Dirige el tráfico con un registro CNAME</p>
+            <div class="txt-row">
+              <code>Nombre</code>
+              <code class="txt-value tnum">{{ d.domain }}</code>
+              <button mat-icon-button (click)="copy(d.domain, 'Nombre')" aria-label="Copiar nombre del CNAME"><mat-icon>content_copy</mat-icon></button>
+            </div>
+            @if (d.cnameTarget) {
+              <div class="txt-row">
+                <code>Destino</code>
+                <code class="txt-value tnum">{{ d.cnameTarget }}</code>
+                <button mat-icon-button (click)="copy(d.cnameTarget, 'Destino')" aria-label="Copiar destino del CNAME"><mat-icon>content_copy</mat-icon></button>
+              </div>
+            } @else {
+              <p class="dns-message">El destino CNAME todavía no está configurado en este entorno.</p>
+            }
+            @if (isChecking(d)) {
+              <p class="verify-title step-title" role="status">Comprobando propiedad y ruta DNS…</p>
+            } @else {
+              <p class="verify-title step-title">3 · Cuando ambos registros propaguen, compruébalos</p>
+              <button mat-stroked-button color="primary" (click)="verify(d)" [disabled]="actionId() === d.id">
+                <mat-icon>verified_user</mat-icon>
+                {{ verifyingId() === d.id ? "Iniciando…" : "Verificar dominio" }}
+              </button>
+            }
           </div>
         }
-        @if (d.state !== 'pending' && d.state !== 'verifying') {
+        @if (d.state === 'verified' || d.state === 'provisioning' || d.state === 'active') {
+          <div class="readiness" aria-label="Estado de conexión del dominio">
+            <span [class.ready]="d.ownershipVerifiedAt"><mat-icon>{{ d.ownershipVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> Propiedad</span>
+            <span [class.ready]="d.routingVerifiedAt"><mat-icon>{{ d.routingVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> Ruta DNS</span>
+            <span [class.ready]="d.tlsReadyAt"><mat-icon>{{ d.tlsReadyAt ? 'check_circle' : 'schedule' }}</mat-icon> Certificado HTTPS</span>
+          </div>
+        }
+        @if (canEdit() && (d.state === 'verified' || d.state === 'provisioning' || d.state === 'active' || d.state === 'disabled')) {
           <div class="domain-actions">
             @if (d.state === 'verified') {
-              <button mat-stroked-button (click)="activate(d)" [disabled]="actionId() === d.id"><mat-icon>play_arrow</mat-icon> Activar</button>
+              <button mat-stroked-button (click)="activate(d)" [disabled]="actionId() === d.id || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>play_arrow</mat-icon> Activar</button>
             }
-            @if (d.state === 'active' || d.state === 'verified') {
+            @if (d.state === 'active' || d.state === 'verified' || d.state === 'provisioning') {
               <button mat-stroked-button (click)="disable(d)" [disabled]="actionId() === d.id"><mat-icon>pause</mat-icon> Desactivar</button>
             }
-            <button mat-stroked-button (click)="verify(d)" [disabled]="actionId() === d.id"><mat-icon>refresh</mat-icon> Revalidar</button>
+            @if (d.state === 'verified' || d.state === 'active' || d.state === 'disabled') {
+              <button mat-stroked-button (click)="verify(d)" [disabled]="actionId() === d.id"><mat-icon>refresh</mat-icon> Revalidar</button>
+            }
             <button mat-stroked-button class="danger" (click)="remove(d)" [disabled]="actionId() === d.id"><mat-icon>delete</mat-icon> Eliminar</button>
           </div>
         }

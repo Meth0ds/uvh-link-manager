@@ -21,7 +21,10 @@ class UrlUtil
         if ($raw === '' || strlen($raw) > 2048) {
             return ['ok' => false, 'error' => 'URL inválida'];
         }
-        if (preg_match('/[\x00-\x1f\x7f]/', $raw)) {
+        if (! mb_check_encoding($raw, 'UTF-8')) {
+            return ['ok' => false, 'error' => 'La URL no usa una codificación válida'];
+        }
+        if (preg_match('/[\x00-\x1f\x7f]/', $raw) || str_contains($raw, '\\')) {
             return ['ok' => false, 'error' => 'La URL contiene caracteres de control'];
         }
 
@@ -45,7 +48,30 @@ class UrlUtil
         if (preg_match('/[\s\x00-\x1f]/', $host)) {
             return ['ok' => false, 'error' => 'Host inválido'];
         }
-        if (! str_contains($host, '.') && strtolower($host) !== 'localhost') {
+
+        $host = trim($host, '[]');
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return ['ok' => true];
+        }
+
+        $asciiHost = $host;
+        if (preg_match('/[^\x20-\x7e]/', $host)) {
+            if (! function_exists('idn_to_ascii')) {
+                return ['ok' => false, 'error' => 'Host inválido'];
+            }
+            $converted = idn_to_ascii($host, IDNA_DEFAULT);
+            if (! is_string($converted) || $converted === '') {
+                return ['ok' => false, 'error' => 'Host inválido'];
+            }
+            $asciiHost = $converted;
+        }
+
+        $asciiHost = strtolower(rtrim($asciiHost, '.'));
+        if ($asciiHost === 'localhost') {
+            return ['ok' => true];
+        }
+        if (strlen($asciiHost) > 253
+            || ! preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $asciiHost)) {
             return ['ok' => false, 'error' => 'Host inválido'];
         }
 

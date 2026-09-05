@@ -1,16 +1,21 @@
-<header class="legal-nav">
-  <a class="brand" routerLink="/" aria-label="Volver a la página principal de UVH">
-    <span class="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 64 64" width="28" height="28"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
-    </span>
-    <span class="brand-name">UVH</span>
-  </a>
+<header class="legal-header">
+  <div class="legal-header-inner">
+    <a class="brand" routerLink="/" aria-label="UVH, volver a la página principal">
+      <span class="brand-mark" aria-hidden="true"><mat-icon>link</mat-icon></span>
+      <span class="brand-copy"><b>UVH</b><small>Legal y soporte</small></span>
+    </a>
 
-  <nav class="legal-nav-links" aria-label="Documentos legales">
-    <a routerLink="/legal/terminos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Términos</a>
-    <a routerLink="/legal/privacidad" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Privacidad</a>
-    <a routerLink="/legal/denuncias" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Denunciar abuso</a>
-  </nav>
+    <nav class="legal-nav-links" aria-label="Documentos legales y soporte">
+      <a routerLink="/legal/terminos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Términos</a>
+      <a routerLink="/legal/privacidad" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Privacidad</a>
+      <a routerLink="/legal/denuncias" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><span>Denunciar abuso</span><i aria-hidden="true"></i></a>
+    </nav>
+
+    <div class="legal-actions">
+      <app-theme-toggle />
+      <a class="back-product" routerLink="/"><span>Volver a UVH</span><mat-icon aria-hidden="true">arrow_outward</mat-icon></a>
+    </div>
+  </div>
 </header>
 
 <main class="legal-main">
@@ -21,7 +26,8 @@
 
 <footer class="legal-footer">
   <div class="legal-footer-inner">
-    <span>© {{ year }} UVH · uvh.es</span>
-    <span class="tnum">Enlaces cortos. Control total.</span>
+    <div><span class="footer-mark"><mat-icon aria-hidden="true">link</mat-icon></span><span><b>UVH</b><small>Operación responsable de enlaces</small></span></div>
+    <nav aria-label="Enlaces del pie legal"><a routerLink="/legal/terminos">Términos</a><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/denuncias">Abuso</a></nav>
+    <span class="copyright">© {{ year }} UVH · uvh.es</span>
   </div>
 </footer>

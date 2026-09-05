@@ -4,14 +4,17 @@ namespace App\Support;
 
 use App\Exceptions\LinkException;
 use App\Models\Link;
+use App\Models\CustomDomain;
 use App\Models\Tag;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
 
 class LinkService
 {
     /**
      * @return array{ok: bool, error?: string}
-     */    public static function validate(array $input): array
+     */
+    public static function validate(array $input): array
     {
         if (! is_string($input['destination'] ?? null)) {
             return ['ok' => false, 'error' => 'URL de destino inválida'];
@@ -66,17 +69,18 @@ class LinkService
             if ($value !== null && (! is_string($value) || strlen($value) > 64)) {
                 return ['ok' => false, 'error' => 'Fecha inválida'];
             }
-            if (is_string($value)) {
-                try {
-                    \Illuminate\Support\Carbon::parse($value);
-                } catch (\Throwable) {
-                    return ['ok' => false, 'error' => 'Fecha inválida'];
-                }
+            if (is_string($value) && IsoDate::parse($value) === null) {
+                return ['ok' => false, 'error' => 'Fecha inválida'];
             }
+        }
+        $scheduledAt = self::toDateTime($input['scheduled_at'] ?? null);
+        $expiresAt = self::toDateTime($input['expires_at'] ?? null);
+        if ($scheduledAt !== null && $expiresAt !== null && $scheduledAt->gte($expiresAt)) {
+            return ['ok' => false, 'error' => 'La caducidad debe ser posterior a la fecha de activación'];
         }
 
         $notes = $input['notes'] ?? null;
-        if ($notes !== null && (! is_string($notes) || mb_strlen($notes) > 1000 || preg_match('/[\\x00-\\x1f\\x7f]/', $notes))) {
+        if ($notes !== null && (! is_string($notes) || ! mb_check_encoding($notes, 'UTF-8') || mb_strlen($notes) > 1000 || preg_match('/[\\x00-\\x1f\\x7f]/', $notes))) {
             return ['ok' => false, 'error' => 'Notas inválidas'];
         }
 
@@ -86,7 +90,7 @@ class LinkService
         }
         foreach (['source', 'medium', 'campaign', 'term', 'content'] as $key) {
             $value = is_array($utm) ? ($utm[$key] ?? null) : null;
-            if ($value !== null && (! is_string($value) || mb_strlen($value) > 100 || preg_match('/[\\x00-\\x1f\\x7f]/', $value))) {
+            if ($value !== null && (! is_string($value) || ! mb_check_encoding($value, 'UTF-8') || mb_strlen($value) > 100 || preg_match('/[\\x00-\\x1f\\x7f]/', $value))) {
                 return ['ok' => false, 'error' => 'UTM inválido'];
             }
         }
@@ -97,7 +101,7 @@ class LinkService
                 return ['ok' => false, 'error' => 'Etiquetas inválidas'];
             }
             foreach ($tags as $tag) {
-                if (! is_string($tag) || mb_strlen($tag) > 40 || preg_match('/[\\x00-\\x1f\\x7f]/', $tag)) {
+                if (! is_string($tag) || ! mb_check_encoding($tag, 'UTF-8') || mb_strlen($tag) > 40 || preg_match('/[\\x00-\\x1f\\x7f]/', $tag)) {
                     return ['ok' => false, 'error' => 'Etiquetas inválidas'];
                 }
             }
@@ -126,7 +130,13 @@ class LinkService
     /**
      * @return array{id: int, alias: string, state: string}
      */
-    public static function create(int $workspaceId, int $userId, array $input): array
+    public static function create(
+        int $workspaceId,
+        int $userId,
+        array $input,
+        ?array $apiTokenContext = null,
+        ?int $actorSecurityVersion = null,
+    ): array
     {
         $domainId = $input['domain_id'] ?? null;
 
@@ -142,7 +152,23 @@ class LinkService
         $state = self::deriveState($input);
         $utm = $input['utm'] ?? [];
 
-        return DB::transaction(function () use ($workspaceId, $userId, $domainId, $alias, $state, $utm, $input) {
+        return DB::transaction(function () use ($workspaceId, $userId, $domainId, $alias, $state, $utm, $input, $apiTokenContext, $actorSecurityVersion) {
+            if (! WorkspaceAccess::getMembershipLocked(
+                $userId,
+                $workspaceId,
+                'editor',
+                $apiTokenContext,
+                'links:write',
+                $actorSecurityVersion,
+            )) {
+                throw new LinkException('Tu acceso al workspace cambió. Recarga antes de crear el enlace.', 403);
+            }
+            if ($domainId !== null && ! CustomDomain::where('id', $domainId)
+                ->where('workspace_id', $workspaceId)->where('state', 'active')
+                ->where('edge_eligible', true)->whereNotNull('tls_ready_at')->lockForUpdate()->first(['id'])) {
+                throw new LinkException('Dominio no activado o sin acceso', 403);
+            }
+
             // Quota enforcement inside the transaction (no TOCTOU window). The
             // quota row is locked so concurrent creates serialize per workspace
             // (PostgreSQL read-committed would otherwise allow a race between
@@ -153,29 +179,41 @@ class LinkService
                 throw new LinkException('Cuota de enlaces alcanzada', 429);
             }
 
-            $link = Link::create([
-                'workspace_id' => $workspaceId,
-                'created_by' => $userId,
-                'domain_id' => $domainId,
-                'alias' => $alias,
-                'destination' => $input['destination'],
-                'fallback_destination' => $input['fallback_destination'] ?? null,
-                'state' => $state,
-                'password_hash' => $input['password_hash'] ?? null,
-                'max_clicks' => $input['max_clicks'] ?? null,
-                'single_use' => ! empty($input['single_use']),
-                'scheduled_at' => self::toDateTime($input['scheduled_at'] ?? null),
-                'expires_at' => self::toDateTime($input['expires_at'] ?? null),
-                'notes' => $input['notes'] ?? null,
-                'utm_source' => $utm['source'] ?? null,
-                'utm_medium' => $utm['medium'] ?? null,
-                'utm_campaign' => $utm['campaign'] ?? null,
-                'utm_term' => $utm['term'] ?? null,
-                'utm_content' => $utm['content'] ?? null,
-            ]);
+            try {
+                $link = Link::create([
+                    'workspace_id' => $workspaceId,
+                    'created_by' => $userId,
+                    'domain_id' => $domainId,
+                    'alias' => $alias,
+                    'destination' => $input['destination'],
+                    'fallback_destination' => $input['fallback_destination'] ?? null,
+                    'state' => $state,
+                    'password_hash' => $input['password_hash'] ?? null,
+                    'password_version' => ! empty($input['password_hash']) ? 1 : 0,
+                    'max_clicks' => $input['max_clicks'] ?? null,
+                    'single_use' => ! empty($input['single_use']),
+                    'scheduled_at' => self::toDateTime($input['scheduled_at'] ?? null),
+                    'expires_at' => self::toDateTime($input['expires_at'] ?? null),
+                    'notes' => $input['notes'] ?? null,
+                    'utm_source' => $utm['source'] ?? null,
+                    'utm_medium' => $utm['medium'] ?? null,
+                    'utm_campaign' => $utm['campaign'] ?? null,
+                    'utm_term' => $utm['term'] ?? null,
+                    'utm_content' => $utm['content'] ?? null,
+                ]);
+            } catch (QueryException $e) {
+                if (self::isUniqueViolation($e)) {
+                    throw new LinkException('Este alias ya está en uso', 409);
+                }
+                throw $e;
+            }
 
             self::applyTags($link, $workspaceId, $input['tags'] ?? []);
             self::applyRules($link, $input['rules'] ?? []);
+            WebhookService::dispatch($workspaceId, 'link.created', [
+                'linkId' => (int) $link->id,
+                'alias' => $alias,
+            ]);
 
             return ['id' => $link->id, 'alias' => $alias, 'state' => $state];
         });
@@ -184,50 +222,88 @@ class LinkService
     /**
      * @return array{id: int, alias: string, state: string}
      */
-    public static function update(int $linkId, int $workspaceId, array $input): array
+    public static function update(
+        int $linkId,
+        int $workspaceId,
+        int $userId,
+        array $input,
+        int $expectedVersion,
+        ?array $apiTokenContext = null,
+        ?int $actorSecurityVersion = null,
+    ): array
     {
-        $link = Link::where('id', $linkId)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->first();
-        if (! $link) {
-            throw new LinkException('Enlace no encontrado', 404);
-        }
-
-        $domainId = array_key_exists('domain_id', $input) ? $input['domain_id'] : $link->domain_id;
-        $alias = ! empty($input['alias']) ? UrlUtil::normalizeAlias($input['alias']) : $link->alias;
-
-        if (! empty($input['alias'])) {
-            if (UrlUtil::isReservedAlias($alias)) {
-                throw new LinkException('Este alias está reservado', 422);
+        return DB::transaction(function () use ($linkId, $workspaceId, $userId, $input, $expectedVersion, $apiTokenContext, $actorSecurityVersion): array {
+            if (! WorkspaceAccess::getMembershipLocked(
+                $userId,
+                $workspaceId,
+                'editor',
+                $apiTokenContext,
+                'links:write',
+                $actorSecurityVersion,
+            )) {
+                throw new LinkException('Tu acceso al workspace cambió. Recarga antes de guardar.', 403);
             }
-            if (! UrlUtil::isValidCustomAlias($alias)) {
-                throw new LinkException('Alias inválido', 422);
+            $link = Link::where('id', $linkId)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->lockForUpdate()->first();
+            if (! $link) {
+                throw new LinkException('Enlace no encontrado', 404);
             }
-            if (self::aliasExists($domainId, $alias, $linkId)) {
-                throw new LinkException('Este alias ya está en uso', 409);
+            if ((int) $link->version !== $expectedVersion) {
+                throw new LinkException('Este enlace cambió en otro lugar. Recárgalo antes de guardar.', 409);
             }
-        }
 
-        // Editing never changes lifecycle state.
-        $state = $link->state ?? 'active';
-        $utm = $input['utm'] ?? [];
+            $domainId = array_key_exists('domain_id', $input) ? $input['domain_id'] : $link->domain_id;
+            if ($domainId !== null && ! CustomDomain::where('id', $domainId)
+                ->where('workspace_id', $workspaceId)->where('state', 'active')
+                ->where('edge_eligible', true)->whereNotNull('tls_ready_at')->lockForUpdate()->first(['id'])) {
+                throw new LinkException('Dominio no activado o sin acceso', 403);
+            }
+            $alias = ! empty($input['alias']) ? UrlUtil::normalizeAlias($input['alias']) : $link->alias;
+            if (! empty($input['alias'])) {
+                if (UrlUtil::isReservedAlias($alias)) {
+                    throw new LinkException('Este alias está reservado', 422);
+                }
+                if (! UrlUtil::isValidCustomAlias($alias)) {
+                    throw new LinkException('Alias inválido', 422);
+                }
+                if (self::aliasExists($domainId, $alias, $linkId)) {
+                    throw new LinkException('Este alias ya está en uso', 409);
+                }
+            }
 
-        DB::transaction(function () use ($link, $domainId, $alias, $input, $utm, $workspaceId) {
-            $link->update([
-                'domain_id' => $domainId,
-                'alias' => $alias,
-                'destination' => $input['destination'],
-                'fallback_destination' => $input['fallback_destination'] ?? null,
-                'password_hash' => array_key_exists('password_hash', $input) ? $input['password_hash'] : $link->password_hash,
-                'max_clicks' => $input['max_clicks'] ?? null,
-                'single_use' => ! empty($input['single_use']),
-                'scheduled_at' => self::toDateTime($input['scheduled_at'] ?? null),
-                'expires_at' => self::toDateTime($input['expires_at'] ?? null),
-                'notes' => $input['notes'] ?? null,
-                'utm_source' => $utm['source'] ?? null,
-                'utm_medium' => $utm['medium'] ?? null,
-                'utm_campaign' => $utm['campaign'] ?? null,
-                'utm_term' => $utm['term'] ?? null,
-                'utm_content' => $utm['content'] ?? null,
-            ]);
+            $utm = $input['utm'] ?? [];
+            $nextState = $link->state;
+            if (! empty($input['lifecycle_dates_changed']) && in_array($link->state, ['active', 'scheduled', 'expired'], true)) {
+                $nextState = self::deriveState($input);
+            }
+            try {
+                $link->update([
+                    'domain_id' => $domainId,
+                    'alias' => $alias,
+                    'destination' => $input['destination'],
+                    'fallback_destination' => $input['fallback_destination'] ?? null,
+                    'password_hash' => array_key_exists('password_hash', $input) ? $input['password_hash'] : $link->password_hash,
+                    'password_version' => ! empty($input['password_changed'])
+                        ? (int) $link->password_version + 1
+                        : (int) $link->password_version,
+                    'version' => (int) $link->version + 1,
+                    'max_clicks' => $input['max_clicks'] ?? null,
+                    'single_use' => ! empty($input['single_use']),
+                    'scheduled_at' => self::toDateTime($input['scheduled_at'] ?? null),
+                    'expires_at' => self::toDateTime($input['expires_at'] ?? null),
+                    'notes' => $input['notes'] ?? null,
+                    'state' => $nextState,
+                    'utm_source' => $utm['source'] ?? null,
+                    'utm_medium' => $utm['medium'] ?? null,
+                    'utm_campaign' => $utm['campaign'] ?? null,
+                    'utm_term' => $utm['term'] ?? null,
+                    'utm_content' => $utm['content'] ?? null,
+                ]);
+            } catch (QueryException $e) {
+                if (self::isUniqueViolation($e)) {
+                    throw new LinkException('Este alias ya está en uso', 409);
+                }
+                throw $e;
+            }
 
             if (array_key_exists('tags', $input)) {
                 self::applyTags($link, $workspaceId, $input['tags'] ?? []);
@@ -235,22 +311,12 @@ class LinkService
             if (array_key_exists('rules', $input)) {
                 self::applyRules($link, $input['rules'] ?? []);
             }
-        });
+            WebhookService::dispatch($workspaceId, 'link.updated', [
+                'linkId' => $linkId,
+                'alias' => $alias,
+            ]);
 
-        return ['id' => $linkId, 'alias' => $alias, 'state' => $state];
-    }
-
-    public static function setState(int $linkId, int $workspaceId, string $next): void
-    {
-        DB::transaction(function () use ($linkId, $workspaceId, $next) {
-            $link = Link::where('id', $linkId)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->first();
-            if (! $link) {
-                throw new LinkException('Enlace no encontrado', 404);
-            }
-            if ($link->state === $next) {
-                return;
-            }
-            $link->update(['state' => $next]);
+            return ['id' => $linkId, 'alias' => $alias, 'state' => $nextState];
         });
     }
 
@@ -287,6 +353,7 @@ class LinkService
             'tags' => $link->tags->pluck('name')->values()->all(),
             'createdAt' => self::iso($link->created_at),
             'updatedAt' => self::iso($link->updated_at),
+            'version' => (int) $link->version,
             'shortUrl' => self::shortUrl($link->domain?->domain, $link->alias),
         ];
     }
@@ -345,7 +412,7 @@ class LinkService
     {
         $ids = [];
         foreach ($tags as $raw) {
-            $name = substr(trim((string) $raw), 0, 40);
+            $name = mb_substr(trim((string) $raw), 0, 40);
             if ($name === '') {
                 continue;
             }
@@ -353,11 +420,20 @@ class LinkService
                 ->whereRaw('lower(name) = lower(?)', [$name])
                 ->first();
             if (! $tag) {
-                $tag = Tag::create(['workspace_id' => $workspaceId, 'name' => $name]);
+                try {
+                    $tag = Tag::create(['workspace_id' => $workspaceId, 'name' => $name]);
+                } catch (QueryException $e) {
+                    if (! self::isUniqueViolation($e)) {
+                        throw $e;
+                    }
+                    $tag = Tag::where('workspace_id', $workspaceId)
+                        ->whereRaw('lower(name) = lower(?)', [$name])
+                        ->firstOrFail();
+                }
             }
             $ids[] = $tag->id;
         }
-        $link->tags()->sync($ids);
+        $link->tags()->sync(array_values(array_unique($ids)));
     }
 
     private static function applyRules(Link $link, array $rules): void
@@ -403,7 +479,7 @@ class LinkService
         if ($device !== null && ! in_array($device, ['desktop', 'mobile', 'tablet'], true)) {
             return null;
         }
-        if ($os !== null && (! is_string($os) || strlen($os) > 40 || preg_match('/[\\x00-\\x1f\\x7f]/', $os))) {
+        if ($os !== null && (! is_string($os) || ! mb_check_encoding($os, 'UTF-8') || strlen($os) > 40 || preg_match('/[\\x00-\\x1f\\x7f]/', $os))) {
             return null;
         }
         foreach ([$timeFrom, $timeTo] as $time) {
@@ -411,10 +487,10 @@ class LinkService
                 return null;
             }
         }
-        if ($referrer !== null && (! is_string($referrer) || strlen($referrer) > 200 || preg_match('/[\\x00-\\x1f\\x7f]/', $referrer))) {
+        if ($referrer !== null && (! is_string($referrer) || ! mb_check_encoding($referrer, 'UTF-8') || strlen($referrer) > 200 || preg_match('/[\\x00-\\x1f\\x7f]/', $referrer))) {
             return null;
         }
-        if ($campaign !== null && (! is_string($campaign) || strlen($campaign) > 100 || preg_match('/[\\x00-\\x1f\\x7f]/', $campaign))) {
+        if ($campaign !== null && (! is_string($campaign) || ! mb_check_encoding($campaign, 'UTF-8') || strlen($campaign) > 100 || preg_match('/[\\x00-\\x1f\\x7f]/', $campaign))) {
             return null;
         }
 
@@ -438,7 +514,12 @@ class LinkService
             return null;
         }
 
-        return \Illuminate\Support\Carbon::parse($iso);
+        $parsed = IsoDate::parse($iso);
+        if ($parsed === null) {
+            throw new \InvalidArgumentException('Fecha ISO inválida');
+        }
+
+        return $parsed;
     }
 
     private static function iso(mixed $value): ?string
@@ -451,5 +532,11 @@ class LinkService
         }
 
         return (string) $value;
+    }
+
+
+    private static function isUniqueViolation(QueryException $e): bool
+    {
+        return ($e->errorInfo[0] ?? null) === '23505';
     }
 }

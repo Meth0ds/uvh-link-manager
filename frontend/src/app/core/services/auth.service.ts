@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from "@angular/core";
 import { ApiService } from "./api.service";
 import { WorkspaceService } from "./workspace.service";
-import type { AuthUser, Session, Workspace } from "../models";
+import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, Workspace } from "../models";
 
 const AUTH_INVALIDATION_KEY = "uvh.auth.invalidated";
 
@@ -12,8 +12,16 @@ export interface LoginResponse {
 export interface MfaRequiredResponse {
   mfaRequired: true;
   challenge: string;
+  recoveryAvailable: boolean;
 }
 export type LoginOutcome = LoginResponse | MfaRequiredResponse;
+
+export interface MfaSessionStatus {
+  enabled: boolean;
+  fresh: boolean;
+  verifiedAt: string | null;
+  expiresAt: string | null;
+}
 
 @Injectable({ providedIn: "root" })
 export class AuthService {
@@ -25,6 +33,7 @@ export class AuthService {
   readonly authenticated = computed(() => this.user() !== null);
   /** True when the server rejected the session and the panel must close. */
   readonly sessionInvalidated = signal(false);
+  readonly adminMfaReauthenticationRequired = signal(false);
   private initPromise?: Promise<void>;
 
   /**
@@ -46,6 +55,7 @@ export class AuthService {
   /** Clear the local identity before waiting on the network. */
   private clearLocalAuth(): void {
     this.user.set(null);
+    this.adminMfaReauthenticationRequired.set(false);
     this.workspaces.setList([]);
     this.workspaces.select(null);
   }
@@ -80,15 +90,16 @@ export class AuthService {
     }
   }
 
-  async login(email: string, password: string): Promise<LoginOutcome> {
+  async login(email: string, password: string, captchaToken: string): Promise<LoginOutcome> {
     // A login attempt must never leave an older local identity visible while
     // the server is deciding whether this account is allowed to sign in.
     this.sessionInvalidated.set(false);
     this.clearLocalAuth();
     try {
-      const res = await this.api.post<LoginOutcome>("/api/v1/auth/login", { email, password });
+      const res = await this.api.post<LoginOutcome>("/api/v1/auth/login", { email, password, captchaToken });
       if (res.mfaRequired) return res;
       this.user.set(res.user);
+      this.adminMfaReauthenticationRequired.set(false);
       await this.refreshWorkspaces();
       return res;
     } catch (err) {
@@ -100,12 +111,14 @@ export class AuthService {
   async verifyMfa(challenge: string, code: string): Promise<void> {
     const res = await this.api.post<LoginResponse>("/api/v1/auth/mfa/verify", { challenge, code });
     this.user.set(res.user);
+    this.adminMfaReauthenticationRequired.set(false);
     await this.refreshWorkspaces();
   }
 
-  async recoverMfa(email: string, code: string): Promise<void> {
-    const res = await this.api.post<LoginResponse>("/api/v1/auth/mfa/recovery", { email, code });
+  async recoverMfa(challenge: string, code: string): Promise<void> {
+    const res = await this.api.post<LoginResponse>("/api/v1/auth/mfa/recovery", { challenge, code });
     this.user.set(res.user);
+    this.adminMfaReauthenticationRequired.set(false);
     await this.refreshWorkspaces();
   }
 
@@ -118,11 +131,11 @@ export class AuthService {
     email: string,
     password: string,
     antiBot: {
-      captchaChallenge: string;
-      captchaAnswer: string;
+      captchaToken: string;
       website?: string;
       acceptTerms: boolean;
       termsVersion: string;
+      privacyVersion: string;
     },
   ): Promise<void> {
     await this.api.post<{ user: null }>("/api/v1/auth/register", {
@@ -133,15 +146,15 @@ export class AuthService {
     });
   }
 
-  async resendVerification(email?: string): Promise<void> {
-    await this.api.post<{ ok: true }>("/api/v1/auth/resend-verification", email ? { email } : {});
+  async resendVerification(email: string | undefined, captchaToken: string): Promise<void> {
+    await this.api.post<{ ok: true }>("/api/v1/auth/resend-verification", { email, captchaToken });
   }
 
   async changeRegistrationEmail(
     currentEmail: string,
     newEmail: string,
     password: string,
-    antiBot: { captchaChallenge: string; captchaAnswer: string; website?: string },
+    antiBot: { captchaToken: string; website?: string },
   ): Promise<void> {
     await this.api.post<{ ok: true }>("/api/v1/auth/change-registration-email", {
       currentEmail,
@@ -151,29 +164,24 @@ export class AuthService {
     });
   }
 
-  /**
-   * Start the server-side logout and clear local access immediately. The
-   * request still carries the current httpOnly cookie; a transient network
-   * error cannot leave the SPA showing a live authenticated panel.
-   */
+  /** Confirm server-side revocation before representing the session as closed. */
   async logout(): Promise<void> {
-    // This is an intentional local logout, so the root shell must not treat it
-    // as an unexpected remote session invalidation and redirect twice.
     this.sessionInvalidated.set(false);
-    const request = this.api.post("/api/v1/auth/logout");
+    await this.api.post("/api/v1/auth/logout");
     this.clearLocalAuth();
     this.announceInvalidation();
-    try {
-      await request;
-    } catch {
-      // Local logout is already complete; the next authenticated request will
-      // fail closed if the server was unreachable during revocation.
-    }
   }
 
   /** Called by the HTTP interceptor when a previously live session is revoked. */
   sessionExpired(): void {
     this.invalidateLocalSession(true);
+  }
+
+  /** A confirmed account change revoked every server session intentionally. */
+  accountSignedOut(): void {
+    this.sessionInvalidated.set(false);
+    this.clearLocalAuth();
+    this.announceInvalidation();
   }
 
   private invalidateLocalSession(announce: boolean): void {
@@ -203,14 +211,89 @@ export class AuthService {
     await this.me();
   }
 
+  async mfaSessionStatus(): Promise<MfaSessionStatus> {
+    const status = await this.api.get<MfaSessionStatus>("/api/v1/auth/mfa/session");
+    if (status.fresh) this.adminMfaReauthenticationRequired.set(false);
+    return status;
+  }
+
+  async reauthenticateMfa(password: string, factorCode: string): Promise<{ verifiedAt: string; expiresAt: string }> {
+    const result = await this.api.post<{ ok: true; verifiedAt: string; expiresAt: string }>(
+      "/api/v1/auth/mfa/reauthenticate",
+      { password, factorCode },
+    );
+    this.adminMfaReauthenticationRequired.set(false);
+    return { verifiedAt: result.verifiedAt, expiresAt: result.expiresAt };
+  }
+
+  requireAdminMfaReauthentication(): void {
+    if (this.authenticated()) this.adminMfaReauthenticationRequired.set(true);
+  }
+
+  clearAdminMfaReauthentication(): void {
+    this.adminMfaReauthenticationRequired.set(false);
+  }
+
   async updateProfile(name: string): Promise<AuthUser> {
     const { user } = await this.api.patch<{ user: AuthUser }>("/api/v1/auth/profile", { name });
     this.user.set(user);
     return user;
   }
 
-  async changePassword(current: string, newPassword: string): Promise<void> {
-    await this.api.post("/api/v1/auth/change-password", { current, newPassword });
+  async changePassword(current: string, newPassword: string, factorCode?: string): Promise<void> {
+    await this.api.post("/api/v1/auth/change-password", {
+      current,
+      newPassword,
+      ...(factorCode ? { factorCode } : {}),
+    });
+  }
+
+  async requestEmailChange(newEmail: string, password: string, factorCode?: string): Promise<AuthUser> {
+    const { user } = await this.api.post<{ user: AuthUser }>("/api/v1/auth/change-email", {
+      newEmail,
+      password,
+      ...(factorCode ? { factorCode } : {}),
+    });
+    this.user.set(user);
+    return user;
+  }
+
+  async cancelEmailChange(password: string, factorCode?: string): Promise<AuthUser> {
+    const { user } = await this.api.post<{ user: AuthUser }>("/api/v1/auth/change-email/cancel", {
+      password,
+      ...(factorCode ? { factorCode } : {}),
+    });
+    this.user.set(user);
+    return user;
+  }
+
+  async dataExportStatus(): Promise<DataExportStatus | null> {
+    const { export: status } = await this.api.get<{ export: DataExportStatus | null }>("/api/v1/auth/data-export");
+    return status;
+  }
+
+  async requestDataExport(password: string, factorCode?: string): Promise<DataExportStatus> {
+    const { export: status } = await this.api.post<{ export: DataExportStatus }>("/api/v1/auth/data-export", {
+      password,
+      ...(factorCode ? { factorCode } : {}),
+    });
+    return status;
+  }
+
+  async cancelDataExport(): Promise<void> {
+    await this.api.post("/api/v1/auth/data-export/cancel");
+  }
+
+  async accountDeletionImpact(): Promise<AccountDeletionImpact> {
+    return this.api.get<AccountDeletionImpact>("/api/v1/auth/account-deletion");
+  }
+
+  async requestAccountDeletion(password: string, confirmation: string, factorCode?: string): Promise<{ status: "requested"; confirmationExpiresAt: string }> {
+    return this.api.post("/api/v1/auth/account-deletion", {
+      password,
+      confirmation,
+      ...(factorCode ? { factorCode } : {}),
+    });
   }
 
   async listSessions(): Promise<Session[]> {
@@ -219,15 +302,10 @@ export class AuthService {
   }
 
   async revokeSession(id: string, current = false): Promise<boolean> {
-    // The session list already tells us whether this is the current browser.
-    // Clear the local identity before awaiting the response for an immediate
-    // UI lockout; the backend also revokes the hashed cookie session atomically.
-    const request = this.api.post<{ ok: true; current?: boolean }>(
+    const result = await this.api.post<{ ok: true; current?: boolean }>(
       `/api/v1/auth/sessions/${encodeURIComponent(id)}/revoke`,
     );
-    if (current) this.sessionExpired();
-    const result = await request;
-    if (result.current && !current) this.sessionExpired();
+    if (current || result.current) this.sessionExpired();
     return result.current === true || current;
   }
 
@@ -237,6 +315,17 @@ export class AuthService {
 
   async mfaEnable(code: string): Promise<{ recoveryCodes: string[] }> {
     return this.api.post<{ recoveryCodes: string[] }>("/api/v1/auth/mfa/enable", { code });
+  }
+
+  async mfaCancelSetup(): Promise<void> {
+    await this.api.post("/api/v1/auth/mfa/cancel-setup");
+  }
+
+  async mfaRegenerateRecoveryCodes(password: string, factorCode: string): Promise<{ recoveryCodes: string[] }> {
+    return this.api.post<{ recoveryCodes: string[] }>("/api/v1/auth/mfa/recovery-codes/regenerate", {
+      password,
+      factorCode,
+    });
   }
 
   async mfaDisable(password: string, code: string): Promise<void> {

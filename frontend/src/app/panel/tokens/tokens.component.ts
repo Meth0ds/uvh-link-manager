@@ -12,14 +12,17 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import type { ApiTokenDto } from "../../core/models";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { AuthService } from "../../core/services/auth.service";
 import { ActionDialogService } from "../action-dialog.service";
+import { PageHeaderComponent } from "../page-header.component";
+import { PanelSkeletonComponent } from "../panel-skeleton.component";
 
 const SCOPES = [
-  { value: "links:read", label: "links:read — Leer enlaces" },
-  { value: "links:write", label: "links:write — Crear y editar enlaces" },
-  { value: "analytics:read", label: "analytics:read — Leer analítica" },
-  { value: "domains:read", label: "domains:read — Leer dominios" },
-  { value: "domains:write", label: "domains:write — Gestionar dominios" },
+  { value: "links:read", label: "Consultar enlaces" },
+  { value: "links:write", label: "Crear y editar enlaces" },
+  { value: "analytics:read", label: "Consultar analítica" },
+  { value: "domains:read", label: "Consultar dominios" },
+  { value: "domains:write", label: "Gestionar dominios" },
 ] as const;
 
 @Component({
@@ -34,8 +37,10 @@ const SCOPES = [
     MatSelectModule,
     MatCheckboxModule,
     MatProgressBarModule,
-    MatSnackBarModule
-],
+    MatSnackBarModule,
+    PageHeaderComponent,
+    PanelSkeletonComponent,
+  ],
   templateUrl: "./tokens.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./tokens.component.scss",
@@ -45,6 +50,7 @@ export class TokensComponent {
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
   private actions = inject(ActionDialogService);
+  private auth = inject(AuthService);
 
   readonly tokens = signal<ApiTokenDto[]>([]);
   readonly loading = signal(true);
@@ -55,6 +61,9 @@ export class TokensComponent {
   readonly name = signal("");
   readonly expiresAt = signal("");
   readonly selectedScopes = signal<string[]>([]);
+  readonly password = signal("");
+  readonly factorCode = signal("");
+  readonly user = this.auth.user;
   readonly scopeOptions = SCOPES;
 
   private loadedWorkspaceId: number | null | undefined;
@@ -90,19 +99,29 @@ export class TokensComponent {
   }
 
   async create(): Promise<void> {
-    if (!this.name().trim() || !this.selectedScopes().length || this.creating()) return;
+    if (!this.name().trim() || !this.selectedScopes().length || !this.password()
+      || (this.user()?.mfaEnabled && !this.factorCode().trim()) || this.creating()) return;
     this.creating.set(true);
     try {
       const { token, plainToken } = await this.api.post<{ token: ApiTokenDto; plainToken: string }>("/api/v1/tokens", {
         name: this.name().trim(),
         scopes: this.selectedScopes(),
         expiresAt: this.expiresAt() ? new Date(this.expiresAt()).toISOString() : null,
+        password: this.password(),
+        ...(this.factorCode().trim() ? { factorCode: this.factorCode().trim() } : {}),
       });
       this.tokens.update((t) => [token, ...t]);
       this.plainToken.set(plainToken);
       this.name.set("");
       this.expiresAt.set("");
       this.selectedScopes.set([]);
+      this.password.set("");
+      this.factorCode.set("");
+      try {
+        await this.auth.refreshUser();
+      } catch {
+        this.snackbar.open("Token creado. Recarga Ajustes para actualizar el estado de recuperación.", "Cerrar", { duration: 4000 });
+      }
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo crear el token", "Cerrar", { duration: 4000 });
     } finally {

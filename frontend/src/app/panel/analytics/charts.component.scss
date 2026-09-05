@@ -1,26 +1,30 @@
 .chart-block {
-  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
+  position: relative;
+  overflow: hidden;
+  background: var(--uvh-surface-raised);
   border: 1px solid var(--uvh-border);
-  border-radius: 14px;
-  padding: 18px 20px;
+  border-radius: 17px;
+  padding: 20px;
+  box-shadow: var(--uvh-shadow-sm);
 }
 
 .chart-title {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 12px;
-  b {
-    font-size: 15px;
-  }
-  span {
-    font-size: 12.5px;
-    color: var(--uvh-muted);
-  }
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 14px;
+  > div { display: flex; flex-direction: column; }
+  small { margin-bottom: 2px; color: var(--uvh-electric); font-size: 8.5px; font-weight: 850; letter-spacing: .11em; text-transform: uppercase; }
+  b { font-size: 15px; font-weight: 850; }
+  .chart-total { padding: 5px 9px; border-radius: 8px; background: color-mix(in srgb, var(--uvh-electric) 8%, transparent); color: var(--uvh-muted); font-size: 11px; font-weight: 750; }
 }
 
 .series-wrap {
   position: relative;
+  border-radius: 11px;
+  background-image: linear-gradient(color-mix(in srgb, var(--uvh-border) 58%, transparent) 1px, transparent 1px);
+  background-size: 100% 55px;
 }
 
 .series {
@@ -57,10 +61,13 @@
 }
 
 .breakdown {
-  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
+  background: var(--uvh-surface-raised);
   border: 1px solid var(--uvh-border);
-  border-radius: 14px;
-  padding: 16px 18px;
+  border-radius: 16px;
+  padding: 17px 18px;
+  box-shadow: var(--uvh-shadow-sm);
+  transition: border-color 170ms ease, box-shadow 170ms ease, transform 180ms cubic-bezier(.22,1,.36,1);
+  &:hover { border-color: color-mix(in srgb, var(--uvh-electric) 26%, var(--uvh-border)); box-shadow: var(--uvh-shadow-md); transform: translateY(-1px); }
 }
 
 .breakdown-title {
@@ -117,4 +124,5 @@
   .breakdowns {
     grid-template-columns: 1fr;
   }
+  .chart-title { align-items: flex-start; flex-direction: column; gap: 7px; }
 }

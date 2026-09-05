@@ -16,6 +16,8 @@ class UvhSession
         if ($session !== null) {
             $request->attributes->set(UvhRequest::USER, $session['user']);
             $request->attributes->set(UvhRequest::SESSION_ID, $session['session_id']);
+            $request->attributes->set(UvhRequest::MFA_VERIFIED, $session['mfa_verified']);
+            $request->attributes->set(UvhRequest::MFA_VERIFIED_AT, $session['mfa_verified_at']);
         }
 
         return $next($request);

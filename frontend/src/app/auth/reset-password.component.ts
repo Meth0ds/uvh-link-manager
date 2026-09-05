@@ -1,4 +1,5 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Location } from "@angular/common";
 
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -8,6 +9,9 @@ import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { AuthShellComponent } from "./auth-shell.component";
 import { ApiService, ApiRequestError } from "../core/services/api.service";
+import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
+import { PendingInvitationService } from "../core/services/pending-invitation.service";
+import { authBearer } from "./auth-bearer";
 
 @Component({
   selector: "app-reset-password",
@@ -18,11 +22,16 @@ import { ApiService, ApiRequestError } from "../core/services/api.service";
       <div class="card">
         <h2>Nueva contraseña</h2>
         <p class="sub">Elige una contraseña nueva para tu cuenta.</p>
+        @if (pendingLink()) {
+          <p class="sub">Tu URL seguirá guardada cuando vuelvas a iniciar sesión.</p>
+        } @else if (pendingInvitation) {
+          <p class="sub">Tu invitación seguirá preparada cuando vuelvas a iniciar sesión.</p>
+        }
 
         <form class="form" [formGroup]="form" (ngSubmit)="submit()">
           <mat-form-field appearance="outline">
             <mat-label>Nueva contraseña</mat-label>
-            <input matInput [type]="hide() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" />
+            <input matInput [type]="hide() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="72" />
             <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? 'Mostrar' : 'Ocultar'">
               <mat-icon>{{ hide() ? 'visibility_off' : 'visibility' }}</mat-icon>
             </button>
@@ -30,7 +39,7 @@ import { ApiService, ApiRequestError } from "../core/services/api.service";
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Confirmar contraseña</mat-label>
-            <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" />
+            <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
           </mat-form-field>
 
           @if (error()) {
@@ -46,7 +55,7 @@ import { ApiService, ApiRequestError } from "../core/services/api.service";
         </form>
 
         @if (done()) {
-          <a class="back" routerLink="/auth">Ir a iniciar sesión</a>
+          <a class="back" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">Ir a iniciar sesión</a>
         }
       </div>
     </app-auth-shell>
@@ -58,27 +67,40 @@ export class ResetPasswordComponent {
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
+  private intents = inject(PendingLinkIntentService);
+  private invitations = inject(PendingInvitationService);
+  private location = inject(Location);
+  private readonly token: string;
 
   readonly busy = signal(false);
   readonly done = signal(false);
   readonly error = signal<string | null>(null);
   readonly hide = signal(true);
+  readonly pendingLink = this.intents.pending;
+  readonly pendingInvitation = this.invitations.hasPending();
+  readonly loginQueryParams = computed(() => this.pendingLink()
+    ? { returnTo: "/app/links" }
+    : (this.pendingInvitation ? { returnTo: "/invitations/accept" } : {}));
 
   form = this.fb.nonNullable.group(
     {
-      password: ["", [Validators.required, Validators.minLength(10), Validators.maxLength(128)]],
+      password: ["", [Validators.required, Validators.minLength(10), Validators.maxLength(72)]],
       confirm: ["", [Validators.required]],
     },
     { validators: (g) => (g.get("password")?.value === g.get("confirm")?.value ? null : { mismatch: true }) },
   );
+
+  constructor() {
+    this.token = authBearer(this.route);
+    this.location.replaceState("/auth/reset-password");
+  }
 
   async submit(): Promise<void> {
     if (this.form.invalid || this.busy()) return;
     this.busy.set(true);
     this.error.set(null);
     try {
-      const token = this.route.snapshot.queryParamMap.get("token") ?? "";
-      await this.api.post("/api/v1/auth/reset-password", { token, password: this.form.value.password });
+      await this.api.post("/api/v1/auth/reset-password", { token: this.token, password: this.form.value.password });
       this.done.set(true);
     } catch (err) {
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo restablecer la contraseña");

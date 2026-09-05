@@ -12,6 +12,7 @@ class UvhHostGuard
         '/api/v1/report',
         '/api/v1/status',
         '/api/v1/create',
+        '/api/v1/link-intents',
         '/api/v1/csrf',
         '/api/v1/config',
     ];
@@ -27,6 +28,14 @@ class UvhHostGuard
 
         if ($path === '/health') {
             return $next($request);
+        }
+
+        // Abuse reports use a dedicated hCaptcha sitekey bound to the public
+        // origin. Keeping this mutation off APP_HOST prevents accidental use
+        // of a token solved for a different origin and reduces the app host's
+        // unauthenticated surface.
+        if ($path === '/api/v1/report') {
+            return $this->isPublicHost($host) ? $next($request) : response('', 404);
         }
 
         if (in_array($path, self::PUBLIC_API_PATHS, true)) {

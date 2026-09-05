@@ -97,6 +97,10 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Optional explicit CA bundle for managed PostgreSQL. With
+            // verify-full libpq otherwise falls back to its system/user trust
+            // location, which may not exist in a minimal container.
+            'sslrootcert' => env('DB_SSLROOTCERT'),
         ],
 
         'sqlsrv' => [

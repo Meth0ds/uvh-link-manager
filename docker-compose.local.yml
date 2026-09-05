@@ -30,6 +30,10 @@ x-php-service: &php-service
     DB_USERNAME: ${POSTGRES_USER:-uvh_local}
     DB_PASSWORD: ${POSTGRES_PASSWORD:-uvh_local_dev_only}
     QUEUE_CONNECTION: database
+    # The PHP development server runs inside Linux but serves files from a
+    # Windows bind mount. A small worker pool prevents one cold request from
+    # making every local health/API request appear hung.
+    PHP_CLI_SERVER_WORKERS: "4"
     SESSION_COOKIE: uvh_session
     # Regla de seguridad crítica: sin dominio compartido; nunca ".uvh.es".
     SESSION_DOMAIN: ""
@@ -59,13 +63,16 @@ services:
     <<: *php-service
     command: ["php", "-v"]
 
-  # Laravel: servidor de desarrollo (php artisan serve) en 127.0.0.1:8000.
+  # Laravel: servidor PHP de desarrollo en 127.0.0.1:8000. Se lanza
+  # directamente para conservar las variables del contenedor; `artisan serve`
+  # vuelve a exportar el `.env` cargado por el proceso padre y puede pisar un
+  # override como DB_DATABASE=uvh_test.
   app:
     <<: *php-service
     profiles: ["laravel"]
     ports:
       - "127.0.0.1:8000:8000"
-    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+    command: ["php", "-d", "opcache.enable_cli=1", "-d", "opcache.validate_timestamps=1", "-S", "0.0.0.0:8000", "-t", "public", "public/index.php"]
 
   # Laravel: worker de cola (QUEUE_CONNECTION=database).
   queue:

@@ -26,7 +26,9 @@ class RedirectService
             return null;
         }
         $row = CustomDomain::where('domain', $h)
-            ->whereIn('state', ['verified', 'active'])
+            ->where('state', 'active')
+            ->where('edge_eligible', true)
+            ->whereNotNull('tls_ready_at')
             ->value('id');
 
         return $row ?? -1;
@@ -83,22 +85,15 @@ class RedirectService
             return ['kind' => 'unavailable', 'reason' => 'expired'];
         }
 
-        // Password gate: unlock token bound to the exact host AND link id.
-        if ($link->password_hash) {
-            $unlock = null;
-            if (! empty($ctx['unlock_token'])) {
-                $unlock = SignedToken::verify((string) $ctx['unlock_token'], function ($payload) {
-                    return json_decode($payload, true);
-                });
-            }
-            $host = self::normalizeHost((string) ($ctx['host'] ?? ''));
-            if (! is_array($unlock)
-                || ($unlock['alias'] ?? null) !== $alias
-                || empty($unlock['host'])
-                || self::normalizeHost((string) $unlock['host']) !== $host
-                || (int) ($unlock['link'] ?? 0) !== $id) {
-                return ['kind' => 'password_required', 'link_id' => $id];
-            }
+        // Parse once, but repeat the authorization decision after locking the
+        // link. Password, alias and domain can all change between this lookup
+        // and the click transaction.
+        $unlock = ! empty($ctx['unlock_token'])
+            ? SignedToken::verify((string) $ctx['unlock_token'], fn ($payload) => json_decode($payload, true))
+            : null;
+        $host = self::normalizeHost((string) ($ctx['host'] ?? ''));
+        if ($link->password_hash && ! self::unlockMatches($unlock, $alias, $host, $id, (int) $link->password_version)) {
+            return ['kind' => 'password_required', 'link_id' => $id];
         }
 
         $ua = Ua::parse($ctx['user_agent'] ?? null);
@@ -110,7 +105,10 @@ class RedirectService
             if (is_string($q)) {
                 parse_str($q, $params);
                 if (isset($params['utm_campaign']) && is_string($params['utm_campaign'])) {
-                    $campaignFromReferrer = substr($params['utm_campaign'], 0, 100);
+                    $candidate = mb_substr($params['utm_campaign'], 0, 100);
+                    if (mb_check_encoding($candidate, 'UTF-8') && ! preg_match('/[\x00-\x1f\x7f]/', $candidate)) {
+                        $campaignFromReferrer = $candidate;
+                    }
                 }
             }
         }
@@ -121,10 +119,29 @@ class RedirectService
 
         $outcome = ['kind' => 'not_found'];
 
-        DB::transaction(function () use ($id, $now, $link, $ua, $referrer, $country, $lang, $campaignFromReferrer, &$outcome) {
+        DB::transaction(function () use ($id, $domainId, $alias, $host, $unlock, $now, $ua, $referrer, $country, $lang, $campaignFromReferrer, &$outcome) {
             $fresh = Link::lockForUpdate()->find($id);
             if (! $fresh || $fresh->workspace_id === null) {
                 $outcome = ['kind' => 'not_found'];
+
+                return;
+            }
+
+            $freshDomainId = $fresh->domain_id !== null ? (int) $fresh->domain_id : null;
+            if ($fresh->alias !== $alias || $freshDomainId !== $domainId) {
+                $outcome = ['kind' => 'not_found'];
+
+                return;
+            }
+            if ($freshDomainId !== null && ! CustomDomain::where('id', $freshDomainId)
+                ->where('state', 'active')->where('edge_eligible', true)
+                ->whereNotNull('tls_ready_at')->lockForUpdate()->first()) {
+                $outcome = ['kind' => 'unavailable', 'reason' => 'domain'];
+
+                return;
+            }
+            if ($fresh->password_hash && ! self::unlockMatches($unlock, $alias, $host, $id, (int) $fresh->password_version)) {
+                $outcome = ['kind' => 'password_required', 'link_id' => $id];
 
                 return;
             }
@@ -149,39 +166,6 @@ class RedirectService
                 $outcome = ['kind' => 'unavailable', 'reason' => 'expired'];
 
                 return;
-            }
-
-            if ($fresh->single_use) {
-                if ($fresh->used_at) {
-                    $outcome = ['kind' => 'gone'];
-
-                    return;
-                }
-                $updated = Link::where('id', $id)->whereNull('used_at')->update([
-                    'used_at' => now(),
-                    'click_count' => DB::raw('click_count + 1'),
-                    'updated_at' => now(),
-                ]);
-                if ($updated === 0) {
-                    $outcome = ['kind' => 'gone'];
-
-                    return;
-                }
-            } elseif ($fresh->max_clicks !== null) {
-                $updated = Link::where('id', $id)->whereRaw('click_count < max_clicks')->update([
-                    'click_count' => DB::raw('click_count + 1'),
-                    'updated_at' => now(),
-                ]);
-                if ($updated === 0) {
-                    $outcome = ['kind' => 'gone'];
-
-                    return;
-                }
-            } else {
-                Link::where('id', $id)->update([
-                    'click_count' => DB::raw('click_count + 1'),
-                    'updated_at' => now(),
-                ]);
             }
 
             // Rules: deterministic order by priority then id; first match wins.
@@ -216,15 +200,78 @@ class RedirectService
                 $location = $fresh->fallback_destination;
             }
 
+            $destination = $location ?? $fresh->destination;
+            $validDestination = is_string($destination) ? UrlUtil::validateDestination($destination) : ['ok' => false];
+            if (! $validDestination['ok']) {
+                $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
+
+                return;
+            }
+
+            // Do not consume a single-use link or its click quota until the
+            // final rule/fallback destination is known to be safe. The row
+            // lock keeps the selection and consumption one atomic decision.
+            if ($fresh->single_use) {
+                if ($fresh->used_at) {
+                    $outcome = ['kind' => 'gone'];
+
+                    return;
+                }
+                $updated = Link::where('id', $id)->whereNull('used_at')->update([
+                    'used_at' => now(),
+                    'click_count' => DB::raw('click_count + 1'),
+                    'updated_at' => now(),
+                ]);
+                if ($updated === 0) {
+                    $outcome = ['kind' => 'gone'];
+
+                    return;
+                }
+            } elseif ($fresh->max_clicks !== null) {
+                $updated = Link::where('id', $id)->whereRaw('click_count < max_clicks')->update([
+                    'click_count' => DB::raw('click_count + 1'),
+                    'updated_at' => now(),
+                ]);
+                if ($updated === 0) {
+                    $outcome = ['kind' => 'gone'];
+
+                    return;
+                }
+            } else {
+                Link::where('id', $id)->update([
+                    'click_count' => DB::raw('click_count + 1'),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $thresholdReached = $fresh->max_clicks !== null
+                && (int) $fresh->click_count + 1 === (int) $fresh->max_clicks;
+            if ($thresholdReached) {
+                WebhookService::dispatch((int) $fresh->workspace_id, 'link.threshold_reached', [
+                    'linkId' => $id,
+                    'threshold' => (int) $fresh->max_clicks,
+                ]);
+            }
+
             $outcome = [
                 'kind' => 'redirect',
-                'location' => $location ?? $fresh->destination,
+                'location' => $destination,
                 'link_id' => $id,
                 'campaign' => $fresh->utm_campaign ?? $campaignFromReferrer,
             ];
         });
 
         return $outcome;
+    }
+
+    private static function unlockMatches(mixed $unlock, string $alias, string $host, int $linkId, int $passwordVersion): bool
+    {
+        return is_array($unlock)
+            && ($unlock['alias'] ?? null) === $alias
+            && ! empty($unlock['host'])
+            && self::normalizeHost((string) $unlock['host']) === $host
+            && (int) ($unlock['link'] ?? 0) === $linkId
+            && (int) ($unlock['password_version'] ?? -1) === $passwordVersion;
     }
 
     public static function referrerDomain(?string $referrer): ?string
@@ -237,7 +284,12 @@ class RedirectService
             return null;
         }
 
-        return preg_replace('/^www\./', '', $host) ?: $host;
+        $normalized = strtolower(preg_replace('/^www\./i', '', $host) ?: $host);
+        if (strlen($normalized) > 253 || ! preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $normalized)) {
+            return null;
+        }
+
+        return $normalized;
     }
 
     private static function inTimeRange(?string $from, ?string $to, \Illuminate\Support\Carbon $now): bool

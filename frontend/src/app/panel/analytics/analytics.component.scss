@@ -40,21 +40,31 @@
   gap: 10px;
 }
 
+.period { width: 190px; margin-bottom: -20px; }
+
+.section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin: 28px 0 12px; }
+.section-heading > div > span { display: block; margin-bottom: 3px; color: var(--uvh-electric); font-size: 9px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+.section-heading h2 { margin: 0; color: var(--uvh-ink); font-size: 17px; font-weight: 850; letter-spacing: -.035em; }
+.section-heading small { color: var(--uvh-muted-soft); font-size: 11px; font-weight: 700; }
+
 .top-link {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 14px;
-  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
+  background: var(--uvh-surface-raised);
   border: 1px solid var(--uvh-border);
   border-radius: 14px;
   padding: 14px 16px;
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--uvh-ink) 4%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms cubic-bezier(.22,1,.36,1);
   &:hover {
-    border-color: color-mix(in srgb, var(--uvh-electric) 45%, var(--uvh-border));
-    box-shadow: 0 10px 28px rgba(7, 17, 31, 0.07);
+    border-color: color-mix(in srgb, var(--uvh-electric) 34%, var(--uvh-border));
+    box-shadow: var(--uvh-shadow-md);
+    transform: translateY(-2px);
   }
+  &:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 2px; }
   .top-main {
     display: flex;
     flex-direction: column;
@@ -80,8 +90,17 @@
   }
 }
 
+.rank { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; border-radius: 8px; background: color-mix(in srgb, var(--uvh-electric) 11%, transparent); color: var(--uvh-electric); font-size: 11px; font-weight: 850; }
+
 .none {
   color: var(--uvh-muted);
   font-size: 14px;
   margin: 6px 0;
+}
+
+@media (max-width: 620px) {
+  .period { width: 100%; margin-bottom: -18px; }
+  .section-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .top-link { align-items: flex-start; }
+  .top-link .top-clicks { margin-left: auto; }
 }

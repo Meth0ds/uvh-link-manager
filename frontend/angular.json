@@ -28,7 +28,7 @@
             "production": {
               "budgets": [
                 { "type": "initial", "maximumWarning": "1mb", "maximumError": "3mb" },
-                { "type": "anyComponentStyle", "maximumWarning": "48kb", "maximumError": "96kb" }
+                { "type": "anyComponentStyle", "maximumWarning": "52kb", "maximumError": "72kb" }
               ],
               "outputHashing": "all"
             },
@@ -87,5 +87,8 @@
     "@schematics/angular:resolver": {
       "typeSeparator": "."
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }

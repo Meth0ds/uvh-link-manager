@@ -1,0 +1,42 @@
+<app-page-header icon="history" title="Actividad" eyebrow="Workspace" description="Cambios recientes con el mínimo detalle necesario." />
+@if (context(); as workspace) {
+  <section class="activity" aria-labelledby="activity-title" [attr.aria-busy]="loading()">
+    <div class="heading">
+      <h2 id="activity-title">{{ workspace.name }}</h2>
+      <button mat-stroked-button type="button" (click)="reload()" [disabled]="loading()">Actualizar desde el inicio</button>
+    </div>
+    <p class="coverage">Solo se muestran eventos atribuidos a este workspace. El historial puede ser incompleto y no sustituye una auditoría íntegra.</p>
+    <p class="coverage">«Solicitud admitida» no confirma recepción de correos, entregas de webhooks ni emisión de certificados. Fechas en UTC.</p>
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Cargando actividad" />
+      <p role="status">Cargando actividad…</p>
+    }
+    @if (error(); as message) {
+      <p class="error" role="alert">{{ message }}</p>
+    } @else if (!loading() && events().length === 0) {
+      <p role="status">No hay actividad disponible para mostrar. Esto no implica que no hayan ocurrido cambios.</p>
+    }
+    @if (events().length > 0) {
+      <ol class="events" aria-label="Eventos, del más reciente al más antiguo">
+        @for (event of events(); track event.id) {
+          <li data-activity-event>
+            <div class="event-heading"><h3>{{ event.label }}</h3><span class="outcome" [attr.data-outcome]="event.outcome">{{ outcomeLabels[event.outcome] }}</span></div>
+            <p>{{ event.actor.label }} · {{ resourceLabels[event.resource.type] }}@if (event.resource.id !== null) { <span> #{{ event.resource.id }}</span> }</p>
+            <time [attr.datetime]="event.createdAt">{{ event.createdAt | date:'dd/MM/yyyy HH:mm:ss':'UTC' }} UTC</time>
+          </li>
+        }
+      </ol>
+      <div class="pagination">
+        <p role="status">{{ events().length }} eventos cargados.</p>
+        @if (hasMore()) {
+          <button mat-stroked-button type="button" (click)="loadMore()" [disabled]="loading()">Cargar más</button>
+        }
+      </div>
+      @if (capped()) {
+        <p>Has llegado al límite de {{ maximumEvents }} eventos de esta vista. Actualizar inicia una consulta nueva; no es una exportación completa.</p>
+      }
+    }
+  </section>
+} @else {
+  <section class="activity"><h2>Actividad no disponible</h2><p>Selecciona un workspace donde seas propietario o administrador y usa una cuenta verificada.</p></section>
+}

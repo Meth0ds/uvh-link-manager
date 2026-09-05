@@ -18,6 +18,7 @@ import { ActionDialogService } from "../action-dialog.service";
 import { MatDialog } from "@angular/material/dialog";
 import { ChartsComponent } from "../analytics/charts.component";
 import type { LinkDetailResponse, AnalyticsOverview, AuditEvent, LinkDto, RedirectRule } from "../../core/models";
+import { PanelSkeletonComponent } from "../panel-skeleton.component";
 
 @Component({
   selector: "app-link-detail",
@@ -33,8 +34,9 @@ import type { LinkDetailResponse, AnalyticsOverview, AuditEvent, LinkDto, Redire
     MatFormFieldModule,
     MatProgressBarModule,
     MatSnackBarModule,
-    ChartsComponent
-],
+    ChartsComponent,
+    PanelSkeletonComponent,
+  ],
   templateUrl: "./link-detail.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./link-detail.component.scss",

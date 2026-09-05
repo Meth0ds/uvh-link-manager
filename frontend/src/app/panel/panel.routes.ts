@@ -9,6 +9,10 @@ export const panelRoutes: Routes = [
     children: [
       { path: "", pathMatch: "full", redirectTo: "dashboard" },
       {
+        path: "getting-started",
+        loadComponent: () => import("./getting-started/getting-started.component").then((m) => m.GettingStartedComponent),
+      },
+      {
         path: "dashboard",
         loadComponent: () => import("./dashboard/dashboard.component").then((m) => m.DashboardComponent),
       },
@@ -19,6 +23,10 @@ export const panelRoutes: Routes = [
       {
         path: "links/:id",
         loadComponent: () => import("./links/link-detail.component").then((m) => m.LinkDetailComponent),
+      },
+      {
+        path: "activity",
+        loadComponent: () => import("./activity/activity.component").then((m) => m.ActivityComponent),
       },
       {
         path: "analytics",

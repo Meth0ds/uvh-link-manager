@@ -1,0 +1,167 @@
+<?php
+
+namespace App\Support;
+
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Server-side hCaptcha verification.
+ *
+ * The browser only receives the public sitekey. The account secret and the
+ * call to siteverify remain on the API, and tokens are never written to logs.
+ */
+final class HCaptcha
+{
+    public const VALID = 'valid';
+
+    public const INVALID = 'invalid';
+
+    public const UNAVAILABLE = 'unavailable';
+
+    private const VERIFY_URL = 'https://api.hcaptcha.com/siteverify';
+
+    private const MAX_TOKEN_BYTES = 8192;
+
+    public static function configured(string $surface = 'app'): bool
+    {
+        [$siteKey, $secret] = self::credentials($surface);
+
+        return $siteKey !== '' && $secret !== '';
+    }
+
+    /** @return self::VALID|self::INVALID|self::UNAVAILABLE */
+    public static function verify(Request $request, string $token, string $surface = 'app'): string
+    {
+        $token = trim($token);
+        if ($token === '' || strlen($token) > self::MAX_TOKEN_BYTES || preg_match('/[\x00-\x1f\x7f]/', $token)) {
+            return self::result(self::INVALID);
+        }
+
+        [$siteKey, $secret] = self::credentials($surface);
+        if ($secret === '' || $siteKey === '') {
+            self::logUnavailable('missing_configuration');
+
+            return self::result(self::UNAVAILABLE);
+        }
+
+        $payload = [
+            'secret' => $secret,
+            'response' => $token,
+            // Sending the expected sitekey prevents a token solved for a
+            // different, easier sitekey from being redeemed here.
+            'sitekey' => $siteKey,
+        ];
+        $ip = (string) ($request->ip() ?? '');
+        if (filter_var($ip, FILTER_VALIDATE_IP) !== false) {
+            $payload['remoteip'] = $ip;
+        }
+
+        try {
+            // A verification token is single-use. Automatic retries after an
+            // ambiguous network failure could turn a valid token into an
+            // already-seen response, so this request is deliberately not
+            // retried.
+            $response = Http::asForm()
+                ->acceptJson()
+                ->connectTimeout((int) config('uvh.hcaptcha.connect_timeout_seconds', 2))
+                ->timeout((int) config('uvh.hcaptcha.timeout_seconds', 5))
+                ->post(self::VERIFY_URL, $payload);
+        } catch (ConnectionException|RequestException $e) {
+            self::logUnavailable('transport_error', $e);
+
+            return self::result(self::UNAVAILABLE);
+        } catch (\Throwable $e) {
+            self::logUnavailable('unexpected_transport_error', $e);
+
+            return self::result(self::UNAVAILABLE);
+        }
+
+        if (! $response->successful()) {
+            self::logUnavailable('upstream_http_'.$response->status());
+
+            return self::result(self::UNAVAILABLE);
+        }
+
+        $body = $response->json();
+        if (! is_array($body) || ! array_key_exists('success', $body)) {
+            self::logUnavailable('invalid_upstream_response');
+
+            return self::result(self::UNAVAILABLE);
+        }
+        if ($body['success'] === true) {
+            $hostname = is_string($body['hostname'] ?? null)
+                ? strtolower(rtrim(trim($body['hostname']), '.'))
+                : '';
+            if ($hostname === '') {
+                self::logUnavailable('missing_response_hostname');
+
+                return self::result(self::UNAVAILABLE);
+            }
+
+            // In production the host guard has already established a trusted
+            // application host. Binding the provider result to that exact host
+            // prevents a token solved for the same public sitekey elsewhere
+            // from being redeemed on the authentication origin.
+            $expected = app()->environment('production')
+                ? strtolower(rtrim($request->getHost(), '.'))
+                : strtolower(rtrim((string) config(
+                    $surface === 'public' ? 'uvh.public_host' : 'uvh.app_host'
+                ), '.'));
+            if ($expected === '' || ! hash_equals($expected, $hostname)) {
+                return self::result(self::INVALID);
+            }
+
+            return self::result(self::VALID);
+        }
+
+        $codes = is_array($body['error-codes'] ?? null)
+            ? array_values(array_filter($body['error-codes'], 'is_string'))
+            : [];
+        $configurationErrors = ['missing-input-secret', 'invalid-input-secret', 'sitekey-secret-mismatch'];
+        if (array_intersect($configurationErrors, $codes) !== []) {
+            self::logUnavailable('provider_configuration_rejected', null, $codes);
+
+            return self::result(self::UNAVAILABLE);
+        }
+
+        return self::result(self::INVALID);
+    }
+
+    /** @return self::VALID|self::INVALID|self::UNAVAILABLE */
+    private static function result(string $result): string
+    {
+        OperationalMetrics::increment('hcaptcha.'.$result);
+
+        return $result;
+    }
+
+    /** @return array{0: string, 1: string} */
+    private static function credentials(string $surface): array
+    {
+        if ($surface === 'public') {
+            return [
+                trim((string) config('uvh.hcaptcha.public_site_key')),
+                trim((string) config('uvh.hcaptcha.public_secret')),
+            ];
+        }
+
+        return [
+            trim((string) config('uvh.hcaptcha.site_key')),
+            trim((string) config('uvh.hcaptcha.secret')),
+        ];
+    }
+
+    /** @param list<string> $codes */
+    private static function logUnavailable(string $reason, ?\Throwable $error = null, array $codes = []): void
+    {
+        Log::warning('hCaptcha verification unavailable', array_filter([
+            'reason' => $reason,
+            'provider_codes' => $codes === [] ? null : $codes,
+            'exception' => $error ? $error::class : null,
+        ]));
+    }
+}

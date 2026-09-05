@@ -17,10 +17,23 @@
   }
 }
 
+.filter-card {
+  margin-bottom: 18px;
+  padding: 15px 16px 2px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 16px;
+  background: var(--uvh-surface-raised);
+  box-shadow: var(--uvh-shadow-sm);
+}
+
+.filter-meta { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 0 2px 11px; }
+.filter-meta span { display: inline-flex; align-items: center; gap: 7px; color: var(--uvh-muted); font-size: 10px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.filter-meta mat-icon { width: 16px; height: 16px; color: var(--uvh-electric); font-size: 16px; }
+.filter-meta b { color: var(--uvh-muted-soft); font-size: 10.5px; font-weight: 800; }
+
 .filters {
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
   flex-wrap: wrap;
   .search {
     flex: 1;
@@ -43,6 +56,55 @@
   }
 }
 
+.pending-link {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 0 0 16px;
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--uvh-teal) 34%, var(--uvh-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--uvh-teal) 8%, var(--uvh-surface));
+
+  > div:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  strong {
+    color: var(--uvh-ink);
+    font-size: 13px;
+  }
+
+  p,
+  .pending-link-note {
+    display: block;
+    margin: 3px 0 0;
+    color: var(--uvh-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+}
+
+.pending-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--uvh-teal) 16%, transparent);
+  color: var(--uvh-teal-strong);
+}
+
+.pending-link-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
 .link-list {
   display: flex;
   flex-direction: column;
@@ -53,18 +115,24 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
+  background: var(--uvh-surface-raised);
   border: 1px solid var(--uvh-border);
-  border-radius: 14px;
-  padding: 14px 16px;
+  border-radius: 16px;
+  padding: 15px 16px;
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--uvh-ink) 4%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 190ms cubic-bezier(.22,1,.36,1);
   &:hover {
-    border-color: color-mix(in srgb, var(--uvh-electric) 45%, var(--uvh-border));
-    box-shadow: 0 10px 28px rgba(7, 17, 31, 0.07);
-    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--uvh-electric) 34%, var(--uvh-border));
+    box-shadow: var(--uvh-shadow-md);
+    transform: translateY(-2px);
   }
+  &:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 2px; }
 }
+
+.link-leading { display: grid; width: 39px; height: 39px; flex: 0 0 39px; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--uvh-electric) 9%, transparent); color: var(--uvh-electric); transition: background-color 180ms ease, transform 210ms cubic-bezier(.22,1,.36,1); }
+.link-leading mat-icon { width: 19px; height: 19px; font-size: 19px; }
+.link-row:hover .link-leading { background: color-mix(in srgb, var(--uvh-electric) 15%, transparent); transform: rotate(-5deg) scale(1.04); }
 
 .link-main {
   flex: 1;
@@ -133,7 +201,10 @@
   gap: 2px;
   align-items: center;
   flex-shrink: 0;
+  opacity: .72;
+  transition: opacity 160ms ease;
 }
+.link-row:hover .link-actions, .link-row:focus-within .link-actions { opacity: 1; }
 
 .danger {
   color: #b91c1c;
@@ -141,7 +212,23 @@
 }
 
 @media (max-width: 640px) {
-  .link-row {
+  .filter-card { padding: 14px 13px 1px; }
+  .filters { flex-direction: column; gap: 0; }
+  .filters .search, .filters .filter { width: 100%; min-width: 0; }
+  .pending-link {
+    align-items: flex-start;
     flex-wrap: wrap;
   }
+
+  .pending-link-actions {
+    width: 100%;
+    padding-left: 51px;
+  }
+
+  .link-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .link-main { max-width: calc(100% - 53px); }
+  .link-actions { width: 100%; justify-content: flex-end; padding-left: 50px; opacity: 1; }
 }

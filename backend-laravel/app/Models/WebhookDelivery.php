@@ -10,6 +10,7 @@ class WebhookDelivery extends Model
 
     protected $fillable = [
         'webhook_id',
+        'config_version',
         'event',
         'event_id',
         'payload',
@@ -17,6 +18,7 @@ class WebhookDelivery extends Model
         'attempts',
         'last_error',
         'next_attempt_at',
+        'locked_at',
         'delivered_at',
     ];
 
@@ -25,7 +27,9 @@ class WebhookDelivery extends Model
         return [
             'payload' => 'array',
             'attempts' => 'integer',
+            'config_version' => 'integer',
             'next_attempt_at' => 'datetime',
+            'locked_at' => 'datetime',
             'delivered_at' => 'datetime',
             'created_at' => 'datetime',
         ];

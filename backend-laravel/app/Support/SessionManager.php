@@ -14,16 +14,25 @@ use Symfony\Component\HttpFoundation\Cookie;
  */
 class SessionManager
 {
-    public static function create(int $userId, Request $request): string
+    public static function create(int $userId, Request $request, int $securityVersion, bool $mfaVerified = false): string
     {
+        if ($securityVersion < 1) {
+            throw new \InvalidArgumentException('Versión de seguridad inválida');
+        }
         $token = Ids::randomToken(32);
         $expiresAt = now()->addDays((int) config('uvh.session_ttl_days'));
+        $userAgent = $request->header('user-agent');
+        if (is_string($userAgent)) {
+            $userAgent = mb_strcut($userAgent, 0, 255, 'UTF-8');
+        }
 
         UvhSession::create([
             'id' => Ids::sha256Hex($token),
             'user_id' => $userId,
-            'user_agent' => $request->header('user-agent'),
+            'user_agent' => $userAgent,
             'ip_hash' => $request->ip() ? UvhCrypto::hashIp($request->ip()) : null,
+            'security_version' => $securityVersion,
+            'mfa_verified_at' => $mfaVerified ? now() : null,
             'expires_at' => $expiresAt,
             'created_at' => now(),
             'last_used_at' => now(),
@@ -45,7 +54,7 @@ class SessionManager
     /**
      * Populate the request attributes from the session cookie. Never rejects.
      *
-     * @return array{user: User, session_id: string}|null
+     * @return array{user: User, session_id: string, mfa_verified: bool, mfa_verified_at: ?\DateTimeInterface}|null
      */
     public static function hydrate(Request $request): ?array
     {
@@ -66,6 +75,15 @@ class SessionManager
             return null;
         }
 
+        // Revocation alone is not sufficient for a request that started just
+        // before a password/MFA change. Security versioning makes that stale
+        // cookie unusable on its next request.
+        if ((int) $session->security_version !== (int) $session->user->security_version) {
+            self::revoke($session->id);
+
+            return null;
+        }
+
         // Sessions from before the verified-login policy are revoked on first
         // use. This closes the migration window for stale cookies without
         // preventing the public verification endpoint from working.
@@ -75,11 +93,16 @@ class SessionManager
         }
 
         // Throttle the last_used_at write to at most once a minute per session.
-        if ($session->last_used_at === null || now()->diffInSeconds($session->last_used_at) > 60) {
+        if ($session->last_used_at === null || $session->last_used_at->isFuture() || $session->last_used_at->lt(now()->subMinute())) {
             $session->forceFill(['last_used_at' => now()])->save();
         }
 
-        return ['user' => $session->user, 'session_id' => $session->id];
+        return [
+            'user' => $session->user,
+            'session_id' => $session->id,
+            'mfa_verified' => $session->mfa_verified_at !== null,
+            'mfa_verified_at' => $session->mfa_verified_at,
+        ];
     }
 
     public static function revoke(string $sessionId): void

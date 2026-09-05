@@ -6,6 +6,8 @@ class Ids
 {
     public const ALIAS_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
+    private const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
     public static function randomToken(int $bytes = 32): string
     {
         return self::base64urlEncode(random_bytes($bytes));
@@ -28,6 +30,17 @@ class Ids
         $max = strlen($alphabet) - 1;
         for ($i = 0; $i < $length; $i++) {
             $out .= $alphabet[random_int(0, $max)];
+        }
+
+        return $out;
+    }
+
+    public static function randomRecoveryCode(int $length = 16): string
+    {
+        $out = '';
+        $max = strlen(self::RECOVERY_ALPHABET) - 1;
+        for ($i = 0; $i < $length; $i++) {
+            $out .= self::RECOVERY_ALPHABET[random_int(0, $max)];
         }
 
         return $out;

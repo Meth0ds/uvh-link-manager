@@ -1,0 +1,28 @@
+# Temporary overlay used only while rotating APP_SECRET. All PHP processes
+# must see the same previous-key file until uvh:crypto:rotate reports zero
+# pending ciphertexts and every pre-rotation job/token has drained.
+services:
+  app:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+  queue:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+  scheduler:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+  migrate:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+
+secrets:
+  uvh_app_secret_previous:
+    file: ${UVH_APP_SECRET_PREVIOUS_FILE:?Define UVH_APP_SECRET_PREVIOUS_FILE while rotating APP_SECRET}

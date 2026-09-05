@@ -1,0 +1,188 @@
+upstream uvh_php {
+    server app:9000;
+    keepalive 16;
+}
+
+map $http_x_forwarded_proto $uvh_forwarded_proto {
+    default $http_x_forwarded_proto;
+    ""      $scheme;
+}
+
+server_tokens off;
+
+server {
+    listen 8080;
+    server_name ${APP_HOST} www.${APP_HOST};
+    root /usr/share/nginx/html;
+    index index.html;
+    client_max_body_size 2m;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Cross-Origin-Opener-Policy same-origin always;
+    add_header Cross-Origin-Resource-Policy same-origin always;
+    add_header Origin-Agent-Cluster "?1" always;
+    add_header X-Permitted-Cross-Domain-Policies none always;
+    add_header Permissions-Policy "accelerometer=(), autoplay=(), browsing-topics=(), camera=(), clipboard-read=(), clipboard-write=(self), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), usb=()" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # The SPA may frame only its own isolated hCaptcha wrapper. The wrapper's
+    # separate CSP is the sole document allowed to contact/frame hCaptcha.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types angular angular#bundler" always;
+
+    location ^~ /internal/ { return 404; }
+    location = /health { try_files "" @laravel; }
+    location ^~ /api/ { try_files "" @laravel; }
+    location ^~ /r/ { try_files "" @laravel; }
+
+    # hCaptcha runs in an isolated, sandboxed same-site wrapper so the vendor
+    # script cannot inspect Angular's credential fields. This one document has
+    # its own narrow CSP; the main SPA keeps Trusted Types and script-src self.
+    location = /hcaptcha-frame.html {
+        try_files /hcaptcha-frame.html =404;
+        expires -1;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options SAMEORIGIN always;
+        add_header Referrer-Policy no-referrer always;
+        add_header Cross-Origin-Resource-Policy same-origin always;
+        add_header Permissions-Policy "accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), usb=()" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self' https://hcaptcha.com https://*.hcaptcha.com; style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com; img-src https://hcaptcha.com https://*.hcaptcha.com data:; connect-src https://hcaptcha.com https://*.hcaptcha.com; frame-src https://hcaptcha.com https://*.hcaptcha.com; media-src https://hcaptcha.com https://*.hcaptcha.com; object-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'" always;
+    }
+
+    location ~* \.(?:css|js|woff2?|png|jpe?g|gif|svg|ico|webp)$ {
+        try_files $uri =404;
+        expires 1y;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+        expires -1;
+    }
+
+    location @laravel {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param HTTP_HOST $host;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $uvh_forwarded_proto;
+        fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
+        fastcgi_pass uvh_php;
+        fastcgi_read_timeout 65s;
+    }
+}
+
+server {
+    listen 8080;
+    server_name ${PUBLIC_HOST} www.${PUBLIC_HOST};
+    root /usr/share/nginx/html;
+    index index.html;
+    client_max_body_size 2m;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Cross-Origin-Opener-Policy same-origin always;
+    add_header Cross-Origin-Resource-Policy same-origin always;
+    add_header Origin-Agent-Cluster "?1" always;
+    add_header X-Permitted-Cross-Domain-Policies none always;
+    add_header Permissions-Policy "accelerometer=(), autoplay=(), browsing-topics=(), camera=(), clipboard-read=(), clipboard-write=(self), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), usb=()" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # Legal/report pages may frame only the isolated same-site hCaptcha
+    # wrapper. Vendor code never runs in the Angular document itself.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types angular angular#bundler" always;
+
+    location ^~ /internal/ { return 404; }
+    location = / { try_files /index.html =404; expires -1; }
+    location ^~ /legal/ { try_files $uri /index.html; expires -1; }
+    location = /legal { try_files /index.html =404; expires -1; }
+    location = /health { try_files "" @laravel_public; }
+    location = /robots.txt { try_files "" @laravel_public; }
+    location = /sitemap.xml { try_files "" @laravel_public; }
+    location ^~ /api/ { try_files "" @laravel_public; }
+    location ^~ /r/ { try_files "" @laravel_public; }
+
+    location = /hcaptcha-frame.html {
+        try_files /hcaptcha-frame.html =404;
+        expires -1;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options SAMEORIGIN always;
+        add_header Referrer-Policy no-referrer always;
+        add_header Cross-Origin-Resource-Policy same-origin always;
+        add_header Permissions-Policy "accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), usb=()" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self' https://hcaptcha.com https://*.hcaptcha.com; style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com; img-src https://hcaptcha.com https://*.hcaptcha.com data:; connect-src https://hcaptcha.com https://*.hcaptcha.com; frame-src https://hcaptcha.com https://*.hcaptcha.com; media-src https://hcaptcha.com https://*.hcaptcha.com; object-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'" always;
+    }
+
+    location ~* \.(?:css|js|woff2?|png|jpe?g|gif|svg|ico|webp)$ {
+        try_files $uri =404;
+        expires 1y;
+    }
+
+    location / { try_files $uri @laravel_public; }
+
+    location @laravel_public {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param HTTP_HOST $host;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $uvh_forwarded_proto;
+        fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
+        fastcgi_pass uvh_php;
+        fastcgi_read_timeout 65s;
+    }
+}
+
+server {
+    listen 8080 default_server;
+    server_name _;
+    client_max_body_size 64k;
+
+    location ^~ /internal/ { return 404; }
+    location / {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param HTTP_HOST $host;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $uvh_forwarded_proto;
+        fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
+        fastcgi_pass uvh_php;
+        fastcgi_read_timeout 65s;
+    }
+}
+
+# Private listener used only by Caddy's On-Demand TLS permission check. It is
+# not published by Compose and injects a shared secret unavailable to clients.
+server {
+    listen 8081;
+    server_name _;
+    client_max_body_size 1k;
+
+    location = /internal/caddy/ask {
+        limit_except GET { deny all; }
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param HTTP_HOST internal.uvh;
+        fastcgi_param HTTP_X_UVH_EDGE_SECRET "${EDGE_ASK_SECRET}";
+        fastcgi_param HTTP_X_FORWARDED_PROTO http;
+        fastcgi_param HTTP_X_FORWARDED_FOR "";
+        fastcgi_pass uvh_php;
+        fastcgi_read_timeout 5s;
+    }
+
+    location = /internal/metrics {
+        limit_except GET { deny all; }
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param HTTP_HOST internal.uvh;
+        fastcgi_param HTTP_AUTHORIZATION "Bearer ${METRICS_BEARER_TOKEN}";
+        fastcgi_param HTTP_X_FORWARDED_PROTO http;
+        fastcgi_param HTTP_X_FORWARDED_FOR "";
+        fastcgi_pass uvh_php;
+        fastcgi_read_timeout 5s;
+    }
+
+    location / { return 404; }
+}

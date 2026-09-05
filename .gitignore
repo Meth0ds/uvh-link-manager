@@ -45,6 +45,7 @@ coverage/
 # ── Agent tooling (local) ───────────────────────────────────
 .agents/
 skills-lock.json
+.uvh-runtime/
 
 # ── Editors / OS ─────────────────────────────────────────────
 .vscode/*

@@ -1,6 +1,6 @@
 <a class="skip-link" href="#panel-content">Saltar al contenido</a>
 <mat-sidenav-container class="shell">
-  <mat-sidenav #sidenav [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" fixedInViewport aria-label="Navegación principal">
+  <mat-sidenav #sidenav id="panel-navigation" [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" fixedInViewport aria-label="Navegación principal">
     <div class="side-head">
       <a class="brand" routerLink="/">
         <span class="brand-mark" aria-hidden="true">
@@ -8,6 +8,11 @@
         </span>
         <span class="brand-name">UVH</span>
       </a>
+      <button mat-icon-button class="side-close" type="button" (click)="mobileOpen.set(false)" aria-label="Cerrar menú"><mat-icon>close</mat-icon></button>
+      <div class="workspace-summary">
+        <mat-icon aria-hidden="true">workspaces</mat-icon>
+        <span>{{ workspaceName() }}</span>
+      </div>
     </div>
 
     <mat-nav-list class="nav-list">
@@ -37,28 +42,37 @@
 
   <mat-sidenav-content class="content">
     <mat-toolbar class="topbar" aria-label="Barra de herramientas">
-      <button mat-icon-button class="menu-btn" (click)="mobileOpen.set(!mobileOpen())" aria-label="Abrir menú">
-        <mat-icon>menu</mat-icon>
+      <button
+        mat-icon-button
+        class="menu-btn"
+        [class.open]="mobileOpen()"
+        (click)="mobileOpen.set(!mobileOpen())"
+        [attr.aria-label]="mobileOpen() ? 'Cerrar menú' : 'Abrir menú'"
+        [attr.aria-expanded]="mobileOpen()"
+        aria-controls="panel-navigation"
+      >
+        <span class="menu-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
       </button>
 
-      @if (workspaces.list().length > 1) {
-        <mat-form-field appearance="outline" class="ws-switch">
-          <mat-select
-            [value]="workspaces.currentId()"
-            (selectionChange)="onWorkspaceChange($event.value)"
-            aria-label="Workspace"
-            >
-            @for (w of workspaces.list(); track w.id) {
-              <mat-option [value]="w.id">{{ w.name }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-      }
-      @if (workspaces.list().length <= 1) {
-        <span class="ws-name">
-          {{ workspaces.list()[0]?.name ?? "Sin workspace" }}
-        </span>
-      }
+      <div class="topbar-context">
+        <span class="topbar-label">Workspace actual</span>
+        @if (workspaces.list().length > 1) {
+          <mat-form-field appearance="outline" class="ws-switch">
+            <mat-select
+              [value]="workspaces.currentId()"
+              (selectionChange)="onWorkspaceChange($event.value)"
+              aria-label="Workspace"
+              >
+              @for (w of workspaces.list(); track w.id) {
+                <mat-option [value]="w.id">{{ w.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+        @if (workspaces.list().length <= 1) {
+          <span class="ws-name">{{ workspaceName() }}</span>
+        }
+      </div>
       <button mat-icon-button matTooltip="Crear workspace" class="workspace-add" (click)="createWorkspace()" aria-label="Crear workspace">
         <mat-icon>create_new_folder</mat-icon>
       </button>
@@ -66,11 +80,13 @@
       <span class="spacer"></span>
 
       <button mat-flat-button color="primary" class="new-link-top" (click)="newLink()">
-        <mat-icon>add</mat-icon> Nuevo enlace
+        <mat-icon>add_link</mat-icon> Crear enlace
       </button>
 
+      <app-theme-toggle [compact]="true" class="panel-theme" />
+
       <button mat-icon-button [matMenuTriggerFor]="userMenu" class="avatar-btn" aria-label="Menú de usuario">
-        <span class="avatar">{{ initials() }}</span>
+        <span class="avatar"><span>{{ initials() }}</span><i aria-hidden="true"></i></span>
       </button>
       <mat-menu #userMenu="matMenu" xPosition="before">
         <div class="user-head">
@@ -81,7 +97,7 @@
         <button mat-menu-item routerLink="/app/team"><mat-icon>group</mat-icon> Equipo</button>
         <a mat-menu-item routerLink="/"><mat-icon>language</mat-icon> Ir a la web</a>
         <mat-divider></mat-divider>
-        <button mat-menu-item (click)="logout()"><mat-icon>logout</mat-icon> Cerrar sesión</button>
+        <button mat-menu-item (click)="logout()" [disabled]="logoutBusy()"><mat-icon>logout</mat-icon> {{ logoutBusy() ? 'Cerrando sesión…' : 'Cerrar sesión' }}</button>
       </mat-menu>
     </mat-toolbar>
 

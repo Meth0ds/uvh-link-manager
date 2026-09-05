@@ -1,43 +1,65 @@
-<div class="page-head">
-  <div>
-    <h1>Enlaces</h1>
-    <p>Administra, edita y mide todos tus enlaces cortos.</p>
-  </div>
+<app-page-header icon="link" eyebrow="Biblioteca" title="Enlaces" description="Administra, edita y mide todos tus enlaces cortos desde un único lugar.">
   @if (canWrite()) {
     <button mat-flat-button color="primary" (click)="create()">
       <mat-icon>add</mat-icon> Nuevo enlace
     </button>
   }
-</div>
+</app-page-header>
 
-<div class="filters">
-  <mat-form-field appearance="outline" class="search">
-    <mat-icon matPrefix>search</mat-icon>
-    <input matInput aria-label="Buscar enlaces" placeholder="Buscar por alias, destino o notas…" [value]="q()" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
-  </mat-form-field>
-  <mat-form-field appearance="outline" class="filter">
-    <mat-select [value]="state()" (selectionChange)="onState($event.value)" aria-label="Estado">
-      <mat-option value="">Todos los estados</mat-option>
-      <mat-option value="active">Activos</mat-option>
-      <mat-option value="paused">En pausa</mat-option>
-      <mat-option value="scheduled">Programados</mat-option>
-      <mat-option value="expired">Caducados</mat-option>
-      <mat-option value="archived">Archivados</mat-option>
-      <mat-option value="blocked">Bloqueados</mat-option>
-    </mat-select>
-  </mat-form-field>
-  <mat-form-field appearance="outline" class="filter">
-    <mat-select [value]="sort()" (selectionChange)="onSort($event.value)" aria-label="Ordenar">
-      <mat-option value="created_at_desc">Más recientes</mat-option>
-      <mat-option value="created_at_asc">Más antiguos</mat-option>
-      <mat-option value="clicks_desc">Más clics</mat-option>
-      <mat-option value="alias_asc">Alias A–Z</mat-option>
-    </mat-select>
-  </mat-form-field>
-</div>
+@if (pendingLink(); as pending) {
+  <section class="pending-link" role="status" aria-label="URL guardada para crear un enlace">
+    <span class="pending-link-icon"><mat-icon aria-hidden="true">bookmark_added</mat-icon></span>
+    <div>
+      <strong>Tu URL está lista para convertirse en enlace.</strong>
+      <p>La guardamos hasta {{ pending.expiresAt | date:'shortTime' }}. Puedes retomarla ahora o descartarla.</p>
+    </div>
+    @if (canWrite()) {
+      <div class="pending-link-actions">
+        <button mat-flat-button color="primary" type="button" (click)="resumePendingLink()"><mat-icon>arrow_forward</mat-icon> Retomar</button>
+        <button mat-button type="button" (click)="discardPendingLink()">Descartar</button>
+      </div>
+    } @else {
+      <span class="pending-link-note">Necesitas permisos de edición para crearla.</span>
+    }
+  </section>
+}
 
-@if (loading()) {
+<section class="filter-card" aria-label="Buscar y filtrar enlaces">
+  <div class="filter-meta"><span><mat-icon aria-hidden="true">filter_list</mat-icon> Explorar enlaces</span><b class="tnum">{{ total() }} resultados</b></div>
+  <div class="filters">
+    <mat-form-field appearance="outline" class="search">
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput aria-label="Buscar enlaces" placeholder="Buscar por alias, destino o notas…" [value]="q()" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
+      <button mat-icon-button matSuffix type="button" (click)="onSearch(searchInput.value)" aria-label="Ejecutar búsqueda"><mat-icon>arrow_forward</mat-icon></button>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="filter">
+      <mat-select [value]="state()" (selectionChange)="onState($event.value)" aria-label="Estado">
+        <mat-option value="">Todos los estados</mat-option>
+        <mat-option value="active">Activos</mat-option>
+        <mat-option value="paused">En pausa</mat-option>
+        <mat-option value="scheduled">Programados</mat-option>
+        <mat-option value="expired">Caducados</mat-option>
+        <mat-option value="archived">Archivados</mat-option>
+        <mat-option value="blocked">Bloqueados</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="filter">
+      <mat-select [value]="sort()" (selectionChange)="onSort($event.value)" aria-label="Ordenar">
+        <mat-option value="created_at_desc">Más recientes</mat-option>
+        <mat-option value="created_at_asc">Más antiguos</mat-option>
+        <mat-option value="clicks_desc">Más clics</mat-option>
+        <mat-option value="alias_asc">Alias A–Z</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+</section>
+
+@if (loading() && links().length) {
   <mat-progress-bar mode="indeterminate" aria-label="Cargando enlaces" />
+}
+
+@if (loading() && !links().length) {
+  <app-panel-skeleton variant="list" label="Cargando enlaces" />
 }
 
 @if (error()) {
@@ -55,6 +77,7 @@
         (click)="openLink(link.id)"
         (keydown)="openLinkFromKeyboard($event, link.id)"
       >
+        <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span>
         <div class="link-main">
           <div class="link-top">
             <a class="short tnum" (click)="$event.stopPropagation(); router.navigate(['/app/links', link.id])">{{ displayUrl(link.shortUrl) }}</a>

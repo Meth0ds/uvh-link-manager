@@ -1,11 +1,42 @@
-<div class="page-head">
-  <h1>Ajustes</h1>
-  <p>Tu perfil, seguridad, sesiones y apariencia.</p>
-</div>
+<app-page-header icon="settings" eyebrow="Preferencias de cuenta" title="Ajustes" description="Gestiona tu identidad, acceso, preferencias y derechos sobre tus datos desde un único lugar." />
 
-<!-- Profile -->
-<div class="card-block">
-  <span class="section-title">Perfil</span>
+<section class="security-strip" [class.protected]="user()?.mfaEnabled" aria-label="Estado de seguridad de la cuenta">
+  <span class="security-icon" aria-hidden="true"><mat-icon>{{ user()?.mfaEnabled ? 'verified_user' : 'shield' }}</mat-icon></span>
+  <div><b>{{ user()?.mfaEnabled ? 'Verificación en dos pasos activa' : 'Añade un segundo factor de acceso' }}</b><p>{{ user()?.mfaEnabled ? 'Las operaciones sensibles requieren una comprobación adicional.' : 'Configura una aplicación autenticadora y guarda los códigos de recuperación.' }}</p></div>
+  <a class="security-state" href="#security">{{ user()?.mfaEnabled ? 'Gestionar MFA' : 'Configurar MFA' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
+</section>
+
+<!-- La navegación local mantiene una página extensa predecible sin duplicar rutas ni estado. -->
+<div class="settings-layout">
+  <aside class="settings-sidebar" aria-label="Resumen y navegación de ajustes">
+    <div class="account-summary">
+      <span class="account-avatar" aria-hidden="true">{{ userInitials() }}</span>
+      <div>
+        <strong>{{ user()?.name || 'Tu cuenta' }}</strong>
+        <span>{{ user()?.email }}</span>
+      </div>
+    </div>
+    <nav class="settings-nav" aria-label="Secciones de ajustes">
+      <a href="#account"><mat-icon aria-hidden="true">person_outline</mat-icon><span><b>Cuenta</b><small>Perfil y apariencia</small></span></a>
+      <a href="#security"><mat-icon aria-hidden="true">lock_outline</mat-icon><span><b>Acceso</b><small>Contraseña y MFA</small></span></a>
+      <a href="#privacy"><mat-icon aria-hidden="true">policy</mat-icon><span><b>Datos y privacidad</b><small>Descarga y derechos</small></span></a>
+      <a href="#danger"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Zona crítica</b><small>Eliminación de cuenta</small></span></a>
+    </nav>
+    <div class="privacy-note">
+      <mat-icon aria-hidden="true">contact_support</mat-icon>
+      <p><b>¿Necesitas ayuda?</b><span>Las solicitudes sobre tus datos se tramitan y se siguen desde esta misma página.</span></p>
+    </div>
+  </aside>
+
+  <div class="settings-content">
+    <section id="account" class="settings-section account-section" aria-labelledby="account-title">
+      <header class="settings-section-head">
+        <span aria-hidden="true">01</span>
+        <div><h2 id="account-title">Cuenta</h2><p>Tu identidad visible y cómo quieres ver el panel.</p></div>
+      </header>
+
+<div class="card-block profile-card">
+  <div class="card-heading"><span class="card-icon"><mat-icon>person</mat-icon></span><div><h2>Perfil</h2><p>Información que identifica tu cuenta dentro de UVH.</p></div></div>
   <form class="stack" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
     <mat-form-field appearance="outline">
       <mat-label>Email</mat-label>
@@ -21,117 +52,192 @@
       <button mat-flat-button color="primary" type="submit" [disabled]="profileForm.invalid || profileBusy()">Guardar</button>
     </div>
   </form>
+
+  <div class="email-management">
+    <div class="email-management-heading">
+      <div><b>Email de acceso</b><p>Un cambio sólo se aplica después de confirmar el nuevo buzón.</p></div>
+      @if (!emailChangeOpen()) {
+        <button mat-stroked-button type="button" (click)="beginEmailChange()" [disabled]="emailBusy()">
+          <mat-icon>alternate_email</mat-icon>{{ user()?.pendingEmail ? 'Usar otro email' : 'Cambiar email' }}
+        </button>
+      }
+    </div>
+
+    @if (user()?.pendingEmail; as pendingEmail) {
+      <section class="pending-email" aria-live="polite">
+        <span class="pending-email-icon"><mat-icon>mark_email_unread</mat-icon></span>
+        <div>
+          <b>Confirmación pendiente</b>
+          <p>Hemos enviado un enlace a <strong>{{ pendingEmail }}</strong>. Caduca {{ formatDate(user()?.pendingEmailExpiresAt ?? '') }}.</p>
+        </div>
+      </section>
+      <details class="email-cancel">
+        <summary>Cancelar la solicitud pendiente</summary>
+        <form class="stack inset-form" [formGroup]="emailCancelForm" (ngSubmit)="cancelEmailChange()">
+          <p>Confirma tu identidad para invalidar el enlace enviado.</p>
+          <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+          @if (user()?.mfaEnabled) {
+            <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon>@if (emailCancelForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> }</mat-form-field>
+          }
+          <div class="row-actions"><button mat-stroked-button class="danger" type="submit" [disabled]="emailBusy()">{{ emailBusy() ? 'Cancelando…' : 'Invalidar enlace' }}</button></div>
+        </form>
+      </details>
+    }
+
+    @if (emailChangeOpen()) {
+      <form class="stack inset-form email-change-form" [formGroup]="emailChangeForm" (ngSubmit)="requestEmailChange()">
+        <div><b>{{ user()?.pendingEmail ? 'Sustituir email pendiente' : 'Cambiar email de acceso' }}</b><p>Enviaremos una confirmación al nuevo buzón y un aviso al actual. Al confirmar se cerrarán todas tus sesiones.</p></div>
+        <mat-form-field appearance="outline"><mat-label>Nuevo email</mat-label><input matInput type="email" formControlName="newEmail" autocomplete="email" maxlength="254" /><mat-icon matPrefix>mail_outline</mat-icon>@if (emailChangeForm.controls.newEmail.invalid && emailChangeForm.controls.newEmail.touched) { <mat-error>Introduce un email válido.</mat-error> }</mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+        @if (user()?.mfaEnabled) {
+          <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon>@if (emailChangeForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> } @if (emailChangeForm.controls.factorCode.hasError('pattern')) { <mat-error>El código no tiene un formato válido.</mat-error> }</mat-form-field>
+        }
+        <div class="row-actions"><button mat-stroked-button type="button" (click)="closeEmailChange()" [disabled]="emailBusy()">Volver</button><button mat-flat-button color="primary" type="submit" [disabled]="emailChangeForm.invalid || emailBusy()">{{ emailBusy() ? 'Enviando…' : 'Enviar confirmación' }}</button></div>
+      </form>
+    }
+  </div>
 </div>
 
+<div class="card-block appearance-card">
+  <div class="card-heading"><span class="card-icon"><mat-icon>palette</mat-icon></span><div><h2>Apariencia</h2><p>Elige el tema del panel o sigue el sistema.</p></div></div>
+  <mat-radio-group aria-label="Tema" [value]="themePref()" (change)="setTheme($event.value)">
+    @for (o of themeOptions; track o) {
+      <mat-radio-button [value]="o.value">{{ o.label }}</mat-radio-button>
+    }
+  </mat-radio-group>
+</div>
+    </section>
+
+    <section id="security" class="settings-section security-section" aria-labelledby="security-title">
+      <header class="settings-section-head">
+        <span aria-hidden="true">02</span>
+        <div><h2 id="security-title">Acceso y seguridad</h2><p>Credenciales, segundo factor y dispositivos con sesión abierta.</p></div>
+      </header>
+
 <!-- Password -->
-<div class="card-block">
-  <span class="section-title">Contraseña</span>
+<div class="card-block password-card">
+  <div class="card-heading"><span class="card-icon"><mat-icon>password</mat-icon></span><div><h2>Contraseña</h2><p>Actualiza tu credencial y mantén una combinación única.</p></div></div>
   <form class="stack" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
     <mat-form-field appearance="outline">
       <mat-label>Contraseña actual</mat-label>
-      <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="current" autocomplete="current-password" />
+      <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="current" autocomplete="current-password" maxlength="72" />
       <mat-icon matPrefix>lock_outline</mat-icon>
     </mat-form-field>
     <div class="grid-2">
       <mat-form-field appearance="outline">
         <mat-label>Nueva contraseña</mat-label>
-        <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="next" autocomplete="new-password" />
+        <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="next" autocomplete="new-password" maxlength="72" />
         <mat-hint>Mínimo 10 caracteres</mat-hint>
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Confirmar contraseña</mat-label>
-        <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" />
+        <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
       </mat-form-field>
     </div>
+    @if (user()?.mfaEnabled) {
+      <mat-form-field appearance="outline">
+        <mat-label>Código de autenticación o recuperación</mat-label>
+        <input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" aria-describedby="password-factor-hint" />
+        <mat-icon matPrefix>key</mat-icon>
+        <mat-hint id="password-factor-hint">Esta operación requiere un código actual de tu aplicación o un código de recuperación.</mat-hint>
+        @if (passwordForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> }
+        @if (passwordForm.controls.factorCode.hasError('pattern')) { <mat-error>El código no tiene un formato válido.</mat-error> }
+      </mat-form-field>
+    }
     <div class="row-actions">
       <button mat-stroked-button type="button" (click)="hidePassword.set(!hidePassword())">
         <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
         {{ hidePassword() ? 'Mostrar' : 'Ocultar' }}
       </button>
-      <button mat-flat-button color="primary" type="submit" [disabled]="passwordForm.invalid || passwordBusy()">Actualizar contraseña</button>
+      <button mat-flat-button color="primary" type="submit" [disabled]="passwordForm.invalid || passwordBusy()">{{ passwordBusy() ? 'Actualizando…' : 'Actualizar contraseña' }}</button>
     </div>
   </form>
 </div>
 
 <!-- MFA -->
-<div class="card-block">
-  <span class="section-title">Verificación en dos pasos (MFA)</span>
+<div class="card-block mfa-card">
+  <div class="card-heading"><span class="card-icon"><mat-icon>verified_user</mat-icon></span><div><h2>Verificación en dos pasos</h2><p>Configura una aplicación autenticadora y tus métodos de recuperación.</p></div><span class="mini-state" [class.on]="user()?.mfaEnabled">{{ user()?.mfaEnabled ? 'Activo' : 'Inactivo' }}</span></div>
 
-  @if (!user()?.mfaEnabled) {
-    @if (!mfaSecret()) {
-      <p class="muted">Añade una segunda capa de seguridad a tu cuenta con una aplicación de autenticación.</p>
-      <form class="stack" [formGroup]="mfaPasswordForm" (ngSubmit)="startMfaSetup()">
-        <mat-form-field appearance="outline">
-          <mat-label>Confirma tu contraseña</mat-label>
-          <input matInput type="password" formControlName="password" autocomplete="current-password" />
-          <mat-icon matPrefix>lock_outline</mat-icon>
-        </mat-form-field>
-        <div class="row-actions">
-          <button mat-flat-button color="primary" type="submit" [disabled]="mfaPasswordForm.invalid || mfaBusy()">Configurar MFA</button>
-        </div>
-      </form>
-    } @else {
-      <div class="mfa-setup">
-        @if (mfaQr()) {
-          <img [src]="mfaQr()" alt="Código QR para configurar MFA" class="mfa-qr" />
-        }
-        <div class="mfa-secret">
-          <b>Clave secreta</b>
-          <code class="tnum">{{ mfaSecret() }}</code>
-          <p class="muted">Escanea el QR o introduce la clave en tu aplicación de autenticación.</p>
-        </div>
-      </div>
-      <form class="stack" [formGroup]="mfaCodeForm" (ngSubmit)="enableMfa()">
-        <mat-form-field appearance="outline">
-          <mat-label>Código de 6 dígitos</mat-label>
-          <input matInput formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
-          <mat-icon matPrefix>verified_user</mat-icon>
-        </mat-form-field>
-        <div class="row-actions">
-          <button mat-stroked-button type="button" (click)="cancelMfaSetup()">Cancelar</button>
-          <button mat-flat-button color="primary" type="submit" [disabled]="mfaCodeForm.invalid || mfaBusy()">Activar MFA</button>
-        </div>
-      </form>
-    }
-  } @else {
-    <p class="muted">La verificación en dos pasos está <b>activada</b>. Las áreas administrativas la requieren.</p>
-    <form class="stack" [formGroup]="mfaPasswordForm" (ngSubmit)="disableMfa()">
-      <mat-form-field appearance="outline">
-        <mat-label>Contraseña para desactivar</mat-label>
-        <input matInput type="password" formControlName="password" autocomplete="current-password" />
-        <mat-icon matPrefix>lock_outline</mat-icon>
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Código de 6 dígitos (TOTP)</mat-label>
-        <input matInput [formControl]="mfaCodeForm.controls.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
-        <mat-icon matPrefix>verified_user</mat-icon>
-      </mat-form-field>
-      <div class="row-actions">
-        <button mat-stroked-button type="submit" class="danger" [disabled]="mfaPasswordForm.invalid || mfaCodeForm.invalid || mfaBusy()">Desactivar MFA</button>
-      </div>
-    </form>
+  @if (recoveryCodes().length || mfaSecret() || !user()?.mfaEnabled || mfaReconfiguring()) {
+    <ol class="mfa-progress" [attr.aria-label]="'Paso ' + mfaSetupStep() + ' de 3'">
+      <li [class.active]="mfaSetupStep() === 1" [class.complete]="mfaSetupStep() > 1"><span>@if (mfaSetupStep() > 1) { <mat-icon>check</mat-icon> } @else { 1 }</span><b>Confirmar</b></li>
+      <li [class.active]="mfaSetupStep() === 2" [class.complete]="mfaSetupStep() > 2"><span>@if (mfaSetupStep() > 2) { <mat-icon>check</mat-icon> } @else { 2 }</span><b>Vincular</b></li>
+      <li [class.active]="mfaSetupStep() === 3"><span>3</span><b>Guardar</b></li>
+    </ol>
   }
 
-
   @if (recoveryCodes().length) {
-    <div class="recovery">
-      <b>Códigos de recuperación</b>
-      <p class="muted">Guárdalos en un lugar seguro. Solo se muestran esta vez.</p>
+    <section class="recovery recovery-reveal" aria-labelledby="recovery-codes-title">
+      <span class="setup-kicker"><mat-icon>inventory_2</mat-icon>Paso final</span>
+      <h3 id="recovery-codes-title">Guarda tus códigos de recuperación</h3>
+      <p>Son la vía de acceso si pierdes la aplicación. Cada código funciona una vez y no volverán a mostrarse.</p>
       <div class="codes tnum" aria-label="Códigos de recuperación">
-        @for (c of recoveryCodes(); track c) {
-          <code>{{ c }}</code>
-        }
+        @for (c of recoveryCodes(); track c) { <code>{{ c }}</code> }
       </div>
-      <button mat-stroked-button type="button" (click)="copyRecoveryCodes()"><mat-icon>content_copy</mat-icon> Copiar códigos</button>
+      <div class="recovery-actions">
+        <button mat-stroked-button type="button" (click)="copyRecoveryCodes()"><mat-icon>content_copy</mat-icon>Copiar</button>
+        <button mat-stroked-button type="button" (click)="downloadRecoveryCodes()"><mat-icon>download</mat-icon>Descargar .txt</button>
+      </div>
+      <mat-checkbox color="primary" [checked]="recoveryCodesAcknowledged()" (change)="recoveryCodesAcknowledged.set($event.checked)">He guardado los códigos en un lugar accesible fuera de UVH.</mat-checkbox>
+      <button mat-flat-button color="primary" type="button" class="finish-mfa" (click)="finishRecoveryCodes()" [disabled]="!recoveryCodesAcknowledged()">Finalizar configuración</button>
+    </section>
+  } @else if (mfaSecret()) {
+    <section class="mfa-enrol" aria-labelledby="mfa-link-title">
+      <div class="enrol-copy"><span class="setup-kicker"><mat-icon>qr_code_2</mat-icon>Paso 2</span><h3 id="mfa-link-title">Vincula tu aplicación</h3><p>Escanea el QR con tu aplicación autenticadora. Si no puedes escanearlo, introduce la clave manual.</p></div>
+      <div class="mfa-setup">
+        @if (mfaQr()) { <img [src]="mfaQr()" alt="Código QR para añadir UVH a la aplicación autenticadora" class="mfa-qr" /> }
+        <div class="mfa-secret"><b>Clave manual</b><code class="tnum">{{ mfaSecret() }}</code><small>Cuenta: {{ user()?.email }}</small></div>
+      </div>
+      @if (user()?.mfaEnabled) { <div class="inline-note"><mat-icon>info</mat-icon>La aplicación actual seguirá funcionando hasta confirmar la nueva.</div> }
+      <form class="stack" [formGroup]="mfaCodeForm" (ngSubmit)="enableMfa()">
+        <mat-form-field appearance="outline" class="setup-code"><mat-label>Código de la nueva aplicación</mat-label><input matInput formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /><mat-icon matPrefix>pin</mat-icon><mat-hint>Introduce los 6 dígitos para comprobar la vinculación.</mat-hint></mat-form-field>
+        <div class="row-actions"><button mat-stroked-button type="button" (click)="cancelMfaSetup()" [disabled]="mfaBusy()">Cancelar</button><button mat-flat-button color="primary" type="submit" [disabled]="mfaCodeForm.invalid || mfaBusy()">{{ mfaBusy() ? 'Comprobando…' : 'Verificar y continuar' }}</button></div>
+      </form>
+    </section>
+  } @else if (!user()?.mfaEnabled) {
+    <section class="mfa-intro">
+      <span class="setup-kicker"><mat-icon>lock</mat-icon>Paso 1</span>
+      <h3>Confirma tu identidad</h3>
+      <p>Necesitarás una aplicación compatible con códigos TOTP, como Google Authenticator, Microsoft Authenticator, 1Password o Authy.</p>
+      <form class="stack" [formGroup]="mfaPasswordForm" (ngSubmit)="startMfaSetup()">
+        <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+        <div class="row-actions"><button mat-flat-button color="primary" type="submit" [disabled]="mfaPasswordForm.invalid || mfaBusy()">{{ mfaBusy() ? 'Preparando…' : 'Empezar configuración' }}</button></div>
+      </form>
+    </section>
+  } @else if (mfaReconfiguring()) {
+    <section class="mfa-intro">
+      <span class="setup-kicker"><mat-icon>sync_lock</mat-icon>Paso 1</span><h3>Cambia la aplicación vinculada</h3><p>Confirma tu contraseña y un código de la aplicación actual antes de generar la nueva vinculación.</p>
+      <form class="stack" [formGroup]="mfaReconfigureForm" (ngSubmit)="startMfaReconfiguration()">
+        <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field>
+        <div class="row-actions"><button mat-stroked-button type="button" (click)="cancelMfaReconfiguration()" [disabled]="mfaBusy()">Cancelar</button><button mat-flat-button color="primary" type="submit" [disabled]="mfaReconfigureForm.invalid || mfaBusy()">Continuar</button></div>
+      </form>
+    </section>
+  } @else {
+    <div class="mfa-summary">
+      <div><span class="summary-icon"><mat-icon>phonelink_lock</mat-icon></span><span><b>Aplicación autenticadora</b><small>Vinculada y activa</small></span><mat-icon class="summary-check">check_circle</mat-icon></div>
+      <div [class.attention]="(user()?.recoveryCodesRemaining ?? 0) <= 2"><span class="summary-icon"><mat-icon>key</mat-icon></span><span><b>Códigos de recuperación</b><small>{{ user()?.recoveryCodesRemaining ?? 0 }} disponibles</small></span><strong>{{ user()?.recoveryCodesRemaining ?? 0 }}</strong></div>
     </div>
+    <div class="mfa-manage-actions"><button mat-stroked-button type="button" (click)="beginMfaReconfiguration()" [disabled]="mfaBusy()"><mat-icon>sync</mat-icon>Cambiar aplicación</button><button mat-stroked-button type="button" (click)="beginRecoveryRegeneration()" [disabled]="mfaBusy()"><mat-icon>autorenew</mat-icon>Regenerar códigos</button></div>
+
+    @if (recoveryRegenerating()) {
+      <form class="stack inset-form" [formGroup]="recoveryRegenerateForm" (ngSubmit)="regenerateRecoveryCodes()">
+        <div><b>Regenerar códigos</b><p>Confirma la contraseña y usa un TOTP actual o uno de tus códigos de recuperación.</p></div>
+        <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field>
+        <div class="row-actions"><button mat-stroked-button type="button" (click)="cancelRecoveryRegeneration()" [disabled]="mfaBusy()">Cancelar</button><button mat-flat-button color="primary" type="submit" [disabled]="recoveryRegenerateForm.invalid || mfaBusy()">Regenerar</button></div>
+      </form>
+    }
+
+    <details class="mfa-danger"><summary>Desactivar la verificación en dos pasos</summary><p>Esta acción elimina la aplicación y todos los códigos de recuperación.</p><form class="stack" [formGroup]="mfaDisableForm" (ngSubmit)="disableMfa()"><mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /></mat-form-field><mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /></mat-form-field><button mat-stroked-button type="submit" class="danger" [disabled]="mfaDisableForm.invalid || mfaBusy()">Desactivar MFA</button></form></details>
   }
 </div>
 
 <!-- Sessions -->
-<div class="card-block">
-  <span class="section-title">Sesiones activas</span>
+<div class="card-block sessions-card">
+  <div class="card-heading"><span class="card-icon"><mat-icon>devices</mat-icon></span><div><h2>Sesiones activas</h2><p>Revisa y revoca accesos que ya no reconozcas.</p></div>@if (!sessionsLoading()) { <span class="count-badge tnum">{{ sessions().length }}</span> }</div>
   @if (sessionsLoading()) {
-    <mat-progress-bar mode="indeterminate" aria-label="Cargando sesiones" />
+    <app-panel-skeleton variant="list" label="Cargando sesiones" />
   }
   @if (sessionsError(); as message) {
     <div class="alert error" role="alert">
@@ -146,9 +252,10 @@
         <mat-icon>{{ s.current ? 'laptop_mac' : 'devices' }}</mat-icon>
         <div>
           <b>{{ s.user_agent ?? 'Dispositivo desconocido' }}</b>
-          <span class="session-meta">
+            <span class="session-meta">
             <span class="tnum">Última actividad {{ formatDate(s.last_used_at) }}</span>
             @if (s.current) { <span class="current-badge">Este dispositivo</span> }
+            @if (s.mfa_verified_at) { <span class="current-badge">MFA verificado</span> }
           </span>
         </div>
       </div>
@@ -162,12 +269,145 @@
   }
 </div>
 
-<!-- Appearance -->
-<div class="card-block">
-  <span class="section-title">Apariencia</span>
-  <mat-radio-group aria-label="Tema" [value]="themePref()" (change)="setTheme($event.value)">
-    @for (o of themeOptions; track o) {
-      <mat-radio-button [value]="o.value">{{ o.label }}</mat-radio-button>
+    </section>
+
+    <section id="privacy" class="settings-section privacy-section" aria-labelledby="privacy-title">
+      <header class="settings-section-head">
+        <span aria-hidden="true">03</span>
+        <div><h2 id="privacy-title">Datos y privacidad</h2><p>Descarga tu información y gestiona tus derechos desde un expediente trazable.</p></div>
+      </header>
+
+<!-- Data portability -->
+<div class="card-block data-card">
+  <div class="card-heading"><span class="card-icon"><mat-icon>download_for_offline</mat-icon></span><div><h2>Descarga de datos</h2><p>Solicita una copia estructurada de la información asociada a tu cuenta.</p></div></div>
+  @if (exportLoading()) {
+    <app-panel-skeleton variant="form" label="Consultando exportaciones" />
+  } @else {
+    @if (exportStatus(); as currentExport) {
+      <section class="export-state" [class.ready]="currentExport.status === 'ready'" [class.failed]="currentExport.status === 'failed'" aria-live="polite">
+        <mat-icon>{{ currentExport.status === 'requested' ? 'mark_email_unread' : currentExport.status === 'processing' ? 'hourglass_top' : currentExport.status === 'ready' ? 'task_alt' : currentExport.status === 'downloaded' ? 'download_done' : currentExport.status === 'failed' ? 'error_outline' : 'history' }}</mat-icon>
+        <div>
+          @switch (currentExport.status) {
+            @case ('requested') { <b>Esperando confirmación</b><p>Revisa tu email. El enlace de confirmación caduca {{ formatDate(currentExport.confirmationExpiresAt ?? '') }}.</p> }
+            @case ('processing') { <b>Preparando el archivo</b><p>La generación continúa en segundo plano. Te avisaremos por email cuando termine.</p> }
+            @case ('ready') { <b>Archivo listo</b><p>El enlace de descarga de un solo uso se ha enviado por email y caduca {{ formatDate(currentExport.downloadExpiresAt ?? '') }}.</p> }
+            @case ('downloaded') { <b>Exportación descargada</b><p>El archivo y su enlace ya quedaron invalidados.</p> }
+            @case ('failed') { <b>No se pudo generar</b><p>Puedes solicitar otra exportación. Si el volumen excede el proceso automático, contacta con soporte para tramitar el acceso.</p> }
+            @case ('expired') { <b>Solicitud caducada</b><p>El archivo o la confirmación ya no están disponibles.</p> }
+            @default { <b>Solicitud cancelada</b><p>Puedes iniciar una nueva cuando lo necesites.</p> }
+          }
+        </div>
+      </section>
     }
-  </mat-radio-group>
+
+    @if (exportIsActive()) {
+      <div class="row-actions"><button mat-stroked-button class="danger" type="button" (click)="cancelDataExport()" [disabled]="exportBusy()">{{ exportBusy() ? 'Cancelando…' : 'Cancelar exportación' }}</button><button mat-stroked-button type="button" (click)="loadExportStatus()" [disabled]="exportBusy()"><mat-icon>refresh</mat-icon>Actualizar estado</button></div>
+    } @else {
+      <form class="stack export-form" [formGroup]="exportForm" (ngSubmit)="requestDataExport()">
+        <p class="muted compact">Por seguridad, confirmaremos la solicitud por email. El archivo se cifra en almacenamiento privado y el enlace final sólo funciona una vez.</p>
+        <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+        @if (user()?.mfaEnabled) {
+          <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon>@if (exportForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> } @if (exportForm.controls.factorCode.hasError('pattern')) { <mat-error>El código no tiene un formato válido.</mat-error> }</mat-form-field>
+        }
+        <div class="row-actions"><button mat-flat-button color="primary" type="submit" [disabled]="exportForm.invalid || exportBusy()">{{ exportBusy() ? 'Solicitando…' : 'Solicitar mi archivo' }}</button></div>
+      </form>
+    }
+  }
+</div>
+
+<!-- Account lifecycle -->
+<div class="card-block privacy-card">
+  <div class="card-heading"><span class="card-icon"><mat-icon>policy</mat-icon></span><div><h2>Derechos sobre tus datos</h2><p>Registra y sigue solicitudes de acceso, rectificación, supresión, oposición, limitación o portabilidad.</p></div></div>
+  <ol class="rights-process" aria-label="Proceso de una solicitud sobre datos personales">
+    <li><span aria-hidden="true">1</span><div><b>Define el alcance</b><p>Selecciona el derecho y concreta qué información o tratamiento quieres revisar.</p></div></li>
+    <li><span aria-hidden="true">2</span><div><b>Recibe tu expediente</b><p>La solicitud queda registrada con su estado y fecha límite de respuesta.</p></div></li>
+    <li><span aria-hidden="true">3</span><div><b>Sigue la conversación</b><p>Consulta las respuestas y aporta información adicional cuando se solicite.</p></div></li>
+  </ol>
+  <div class="privacy-layout">
+    <form class="stack privacy-form" [formGroup]="privacyForm" (ngSubmit)="submitPrivacyRequest()">
+      <h3>Nueva solicitud</h3>
+      <p>El plazo ordinario empieza al registrarla. No incluyas contraseñas, códigos MFA ni documentos de identidad en el texto.</p>
+      <mat-form-field appearance="outline"><mat-label>Derecho que quieres ejercer</mat-label><mat-select formControlName="type"><mat-option value="access">Acceso</mat-option><mat-option value="rectification">Rectificación</mat-option><mat-option value="erasure">Supresión</mat-option><mat-option value="objection">Oposición</mat-option><mat-option value="restriction">Limitación del tratamiento</mat-option><mat-option value="portability">Portabilidad</mat-option></mat-select><mat-icon matPrefix>rule</mat-icon></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Alcance o datos concretos</mat-label><textarea matInput formControlName="details" rows="4" maxlength="2000"></textarea><mat-hint align="end">{{ privacyForm.controls.details.value.length }}/2000</mat-hint>@if (privacyForm.controls.details.hasError('detailRequired')) { <mat-error>Describe el alcance en al menos 10 caracteres.</mat-error> }</mat-form-field>
+      <div class="row-actions"><button mat-flat-button color="primary" type="submit" [disabled]="privacyBusy()">{{ privacyBusy() ? 'Registrando…' : 'Registrar solicitud' }}</button></div>
+    </form>
+
+    <section class="privacy-history" aria-labelledby="privacy-history-title">
+      <div class="privacy-history-heading"><div><h3 id="privacy-history-title">Seguimiento</h3><p>{{ privacyTotal() }} solicitudes registradas</p></div><button mat-icon-button type="button" (click)="loadPrivacyRequests()" [disabled]="privacyLoading()" aria-label="Actualizar solicitudes"><mat-icon>refresh</mat-icon></button></div>
+      @if (privacyLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando solicitudes de privacidad" /> }
+      @if (privacyError(); as message) { <div class="alert error" role="alert"><mat-icon>error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadPrivacyRequests()">Reintentar</button></div> }
+      <div class="privacy-cases">
+        @for (request of privacyRequests(); track request.id) {
+          <article class="privacy-case" [class.overdue]="request.overdue">
+            <header><div><b>{{ privacyTypeLabel(request.type) }}</b><span>Expediente #{{ request.id }}</span></div><span class="privacy-status" [class.waiting]="request.status === 'waiting_user'" [class.done]="request.status === 'completed'" [class.overdue]="request.overdue">{{ request.overdue ? 'Plazo vencido' : privacyStatusLabel(request.status) }}</span></header>
+            <dl><div><dt>Registrada</dt><dd>{{ formatDate(request.createdAt) }}</dd></div><div><dt>Fecha límite</dt><dd>{{ formatDate(request.extendedUntil ?? request.dueAt) }}</dd></div></dl>
+            @if (request.extendedUntil) { <div class="privacy-extension"><mat-icon>event_repeat</mat-icon>Plazo ampliado por {{ request.extensionReasonCode === 'request_volume' ? 'volumen de solicitudes' : 'complejidad' }}.</div> }
+            @if (request.messages.length) {
+              <div class="privacy-messages">
+                @for (message of request.messages; track message.id) {
+                  <div [class.operator]="message.authorRole === 'admin'"><span>{{ message.authorRole === 'admin' ? 'Equipo de privacidad' : 'Tú' }} · {{ formatDate(message.createdAt) }}</span><p>{{ message.body ?? 'Este mensaje no se puede descifrar. Contacta con soporte.' }}</p></div>
+                }
+              </div>
+            }
+            @if (request.status === 'waiting_user') {
+              @if (privacyResponseId() === request.id) {
+                <form class="stack privacy-response" [formGroup]="privacyResponseForm" (ngSubmit)="respondPrivacy(request)"><mat-form-field appearance="outline"><mat-label>Tu respuesta</mat-label><textarea matInput formControlName="message" rows="3" maxlength="2000"></textarea><mat-hint align="end">{{ privacyResponseForm.controls.message.value.length }}/2000</mat-hint></mat-form-field><div class="row-actions"><button mat-stroked-button type="button" (click)="privacyResponseId.set(null)">Cancelar</button><button mat-flat-button color="primary" type="submit" [disabled]="privacyResponseForm.invalid || privacyBusy()">Enviar respuesta</button></div></form>
+              } @else { <button mat-flat-button color="primary" type="button" (click)="beginPrivacyResponse(request.id)"><mat-icon>reply</mat-icon>Responder</button> }
+            }
+            @if (privacyIsActive(request.status)) { <footer><button mat-button type="button" class="danger" (click)="cancelPrivacy(request)" [disabled]="privacyBusy()">Cancelar solicitud</button></footer> }
+          </article>
+        }
+      </div>
+      @if (!privacyLoading() && !privacyError() && !privacyRequests().length) { <div class="privacy-empty"><mat-icon>fact_check</mat-icon><b>Aún no hay solicitudes</b><span>Cuando registres una, podrás seguir aquí su plazo y respuesta.</span></div> }
+      <mat-paginator [length]="privacyTotal()" [pageIndex]="privacyPage()" [pageSize]="privacyPageSize()" [pageSizeOptions]="[5, 10, 20]" showFirstLastButtons (page)="onPrivacyPage($event)" aria-label="Paginación de solicitudes de privacidad" />
+    </section>
+  </div>
+</div>
+
+    </section>
+
+    <section id="danger" class="settings-section danger-section" aria-labelledby="danger-title">
+      <header class="settings-section-head danger-section-head">
+        <span aria-hidden="true">04</span>
+        <div><h2 id="danger-title">Zona crítica</h2><p>Acciones con impacto permanente sobre el acceso y los datos de la cuenta.</p></div>
+      </header>
+
+<!-- Account lifecycle -->
+<div class="card-block deletion-card">
+  <div class="card-heading"><span class="card-icon danger-icon"><mat-icon>person_remove</mat-icon></span><div><h2>Eliminación de cuenta</h2><p>Cierra el acceso y programa la anonimización de tus datos personales.</p></div></div>
+  @if (deletionLoading()) {
+    <app-panel-skeleton variant="form" label="Comprobando requisitos de eliminación" />
+  } @else if (deletionImpact(); as impact) {
+    @if (impact.isPlatformAdmin) {
+      <div class="deletion-blocker" role="status"><mat-icon>admin_panel_settings</mat-icon><div><b>Rol de plataforma activo</b><p>Otro administrador debe retirar este rol antes de poder eliminar la cuenta.</p></div></div>
+    } @else if (impact.ownedWorkspaces.length) {
+      <div class="deletion-blocker" role="status"><mat-icon>workspaces</mat-icon><div><b>Resuelve primero la propiedad de tus workspaces</b><p>La cuenta no puede desaparecer dejando recursos y miembros sin propietario. Transfiere o elimina cada workspace desde Equipo.</p></div></div>
+      <div class="owned-workspaces">
+        @for (workspace of impact.ownedWorkspaces; track workspace.id) {
+          <button mat-stroked-button type="button" (click)="openOwnedWorkspace(workspace.id)"><mat-icon>open_in_new</mat-icon><span>{{ workspace.name }}</span></button>
+        }
+      </div>
+    } @else if (impact.blockingPrivacyRequests.length) {
+      <div class="deletion-blocker" role="status"><mat-icon>policy</mat-icon><div><b>Hay solicitudes de privacidad en curso</b><p>Para no destruir información necesaria para responderlas, resuélvelas o cancélalas antes de programar la anonimización.</p></div></div>
+      <div class="owned-workspaces">@for (privacy of impact.blockingPrivacyRequests; track privacy.id) { <a mat-stroked-button href="#privacy"><mat-icon>fact_check</mat-icon><span>{{ privacyTypeLabel(privacy.type) }} #{{ privacy.id }}</span></a> }</div>
+    } @else if (impact.request) {
+      <div class="deletion-pending" aria-live="polite"><mat-icon>mark_email_unread</mat-icon><div><b>Confirmación pendiente</b><p>Revisa tu email antes de {{ formatDate(impact.request.confirmationExpiresAt) }}. La cuenta seguirá activa hasta que confirmes.</p></div></div>
+    } @else if (impact.canDelete) {
+      <details class="account-danger">
+        <summary>Solicitar la eliminación</summary>
+        <div class="deletion-consequences"><p>Después de confirmar por email:</p><ul><li>se cerrarán todas las sesiones y se revocarán los tokens API;</li><li>tendrás 7 días para cancelar desde el enlace enviado;</li><li>al terminar el plazo se anonimizará la cuenta y se retirarán sus membresías;</li><li>los enlaces creados dentro de workspaces ajenos permanecen como contenido de esos workspaces, con el autor anonimizado.</li></ul></div>
+        <form class="stack deletion-form" [formGroup]="deletionForm" (ngSubmit)="requestAccountDeletion()">
+          <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+          @if (user()?.mfaEnabled) {
+            <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon>@if (deletionForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> } @if (deletionForm.controls.factorCode.hasError('pattern')) { <mat-error>El código no tiene un formato válido.</mat-error> }</mat-form-field>
+          }
+          <mat-form-field appearance="outline"><mat-label>Escribe ELIMINAR MI CUENTA</mat-label><input matInput formControlName="confirmation" autocomplete="off" maxlength="18" spellcheck="false" /><mat-icon matPrefix>warning</mat-icon>@if (deletionForm.controls.confirmation.invalid && deletionForm.controls.confirmation.touched) { <mat-error>Escribe exactamente ELIMINAR MI CUENTA.</mat-error> }</mat-form-field>
+          <div class="row-actions"><button mat-flat-button type="submit" class="destructive-button" [disabled]="deletionForm.invalid || deletionBusy()">{{ deletionBusy() ? 'Enviando…' : 'Enviar confirmación de eliminación' }}</button></div>
+        </form>
+      </details>
+    }
+  }
+</div>
+    </section>
+  </div>
 </div>

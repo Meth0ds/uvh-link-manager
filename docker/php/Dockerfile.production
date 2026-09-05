@@ -1,0 +1,43 @@
+FROM composer:2 AS vendor
+
+WORKDIR /build
+COPY backend-laravel/composer.json backend-laravel/composer.lock ./
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts
+COPY backend-laravel ./
+RUN APP_ENV=local \
+    APP_DEBUG=false \
+    APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+    composer dump-autoload --no-dev --classmap-authoritative --no-interaction
+
+FROM php:8.4-fpm-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libcurl4-openssl-dev \
+        libicu-dev \
+        libonig-dev \
+        libpq-dev \
+        libzip-dev \
+    && docker-php-ext-install -j"$(nproc)" \
+        bcmath \
+        curl \
+        intl \
+        mbstring \
+        opcache \
+        pcntl \
+        pdo_pgsql \
+        pgsql \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/www/html
+COPY --from=vendor --chown=www-data:www-data /build ./
+COPY --chmod=755 docker/php/production-entrypoint.sh /usr/local/bin/uvh-production-entrypoint
+COPY docker/php/uvh-production.ini /usr/local/etc/php/conf.d/zz-uvh-production.ini
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+ENV APP_CONFIG_CACHE=/tmp/uvh-config.php
+
+USER www-data
+ENTRYPOINT ["/usr/local/bin/uvh-production-entrypoint"]
+CMD ["php-fpm", "-F"]

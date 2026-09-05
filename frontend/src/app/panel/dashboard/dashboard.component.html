@@ -1,83 +1,72 @@
-@if (loading()) {
-  <mat-progress-bar mode="indeterminate" aria-label="Cargando el panel" />
+@if (loading() && overview()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Actualizando el panel" />
 }
 
-<div class="hero">
-  <div class="hero-copy">
-    <span class="hero-kicker">
-      <mat-icon>auto_awesome</mat-icon> Panel de control
-    </span>
-    <h1>Hola, {{ firstName() }} 👋</h1>
-    @if (workspaceName()) {
-      <p>Resumen de <b>{{ workspaceName() }}</b> — rendimiento de los últimos 30 días.</p>
-    }
+<app-page-header
+  icon="space_dashboard"
+  eyebrow="Vista operativa"
+  title="Actividad del workspace"
+  [description]="(workspaceName() ? workspaceName() + ' · ' : '') + 'Datos disponibles para los últimos ' + periodLabel() + '.'"
+>
+  <div class="dashboard-actions">
+    <div class="period-switch" role="group" aria-label="Periodo de análisis">
+      @for (option of periods; track option.value) {
+        <button
+          type="button"
+          [class.active]="period() === option.value"
+          [attr.aria-pressed]="period() === option.value"
+          (click)="setPeriod(option.value)"
+        >{{ option.label }}</button>
+      }
+    </div>
+    <button mat-flat-button color="primary" class="hero-cta" (click)="newLink()">
+      <mat-icon aria-hidden="true">add_link</mat-icon> Crear enlace
+    </button>
   </div>
-  <button mat-flat-button color="primary" class="hero-cta" (click)="newLink()">
-    <mat-icon>add_link</mat-icon> Nuevo enlace
-  </button>
-</div>
+</app-page-header>
+
+<app-getting-started [compact]="true" />
 
 @if (error(); as message) {
   <div class="dashboard-alert" role="alert">
-    <mat-icon>error_outline</mat-icon>
+    <mat-icon aria-hidden="true">error_outline</mat-icon>
     <div><b>No hemos podido actualizar el panel</b><span>{{ message }}</span></div>
     <button mat-stroked-button type="button" (click)="retry()">Reintentar</button>
   </div>
 }
 
-@if (loading()) {
-  <div class="dashboard-skeleton" aria-label="Cargando el panel" role="status">
-    <div class="skeleton-stat-grid">
-      @for (item of [1, 2, 3, 4]; track item) { <div class="skeleton skeleton-stat"></div> }
-    </div>
-    <div class="skeleton skeleton-chart"></div>
-    <div class="skeleton-columns">
-      <div class="skeleton skeleton-list"></div>
-      <div class="skeleton skeleton-list"></div>
-    </div>
-  </div>
+@if (loading() && !overview()) {
+  <app-panel-skeleton variant="dashboard" label="Cargando el panel" />
 }
 
 @if (!loading() && !overview() && !error()) {
   <div class="empty-state dashboard-empty">
-    <mat-icon>dashboard_customize</mat-icon>
+    <mat-icon aria-hidden="true">dashboard_customize</mat-icon>
     <b>Tu panel está listo</b>
-    <p>Crea un enlace para empezar a ver clics, países y dispositivos.</p>
+    <p>Crea un enlace para empezar a ver clics, visitantes y procedencia.</p>
     <button mat-flat-button color="primary" (click)="newLink()">Crear mi primer enlace</button>
   </div>
 }
 
 @if (overview(); as o) {
-  <div class="stat-cards">
-    <div class="stat-card">
-      <span><mat-icon>touch_app</mat-icon> Clics</span>
-      <b class="tnum">{{ o.totals.clicks }}</b>
-      <small class="tnum">{{ o.topLinks.length }} enlaces rastreados</small>
-    </div>
-    <div class="stat-card">
-      <span><mat-icon>person_pin</mat-icon> Visitantes</span>
-      <b class="tnum">{{ o.totals.visitors }}</b>
-      <small class="tnum">{{ o.devices.length }} tipos de dispositivo</small>
-    </div>
-    <div class="stat-card">
-      <span><mat-icon>public</mat-icon> Países</span>
-      <b class="tnum">{{ o.countries.length }}</b>
-      <small class="tnum">tráfico internacional</small>
-    </div>
-    <div class="stat-card">
-      <span><mat-icon>campaign</mat-icon> Campañas</span>
-      <b class="tnum">{{ o.campaigns.length }}</b>
-      <small class="tnum">con UTM medidas</small>
-    </div>
-  </div>
+  <section class="stat-cards" aria-label="Resumen del periodo seleccionado">
+    <article class="stat-card"><span><mat-icon aria-hidden="true">touch_app</mat-icon> Clics</span><b class="tnum">{{ o.totals.clicks }}</b><small>En los últimos {{ periodLabel() }}</small></article>
+    <article class="stat-card"><span><mat-icon aria-hidden="true">person_pin</mat-icon> Visitantes</span><b class="tnum">{{ o.totals.visitors }}</b><small>Identificados por la analítica</small></article>
+    <article class="stat-card"><span><mat-icon aria-hidden="true">link</mat-icon> Enlaces destacados</span><b class="tnum">{{ o.topLinks.length }}</b><small>Con actividad en este periodo</small></article>
+    <article class="stat-card"><span><mat-icon aria-hidden="true">travel_explore</mat-icon> Referentes</span><b class="tnum">{{ o.referrers.length }}</b><small>Fuentes de procedencia</small></article>
+  </section>
 
-  <div class="chart-wrap">
+  <section class="activity-section" aria-labelledby="activity-title">
+    <div class="section-header">
+      <div><span class="section-eyebrow">Serie temporal</span><h2 id="activity-title">Actividad diaria</h2></div>
+      <span class="section-note">Clics y visitantes · {{ periodLabel() }}</span>
+    </div>
     <app-charts [overview]="o" />
-  </div>
+  </section>
 
   <div class="dash-cols">
-    <section>
-      <span class="section-title"><mat-icon>trending_up</mat-icon> Enlaces con más clics</span>
+    <section class="data-section" aria-labelledby="top-links-title">
+      <div class="section-header compact"><div><span class="section-eyebrow">Rendimiento</span><h2 id="top-links-title">Enlaces destacados</h2></div></div>
       <div class="top-list">
         @for (l of o.topLinks; track l.id; let i = $index) {
           <article
@@ -89,76 +78,48 @@
             (keydown)="openLinkFromKeyboard($event, l.id)"
           >
             <span class="rank tnum">{{ i + 1 }}</span>
-            <div class="top-main">
-              <b class="tnum">{{ l.alias }}</b>
-              <span>{{ l.destination }}</span>
-            </div>
-            <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ l.clicks }}</span>
+            <div class="top-main"><b class="tnum">{{ l.alias }}</b><span>{{ l.destination }}</span></div>
+            <span class="clicks tnum"><mat-icon aria-hidden="true">touch_app</mat-icon> {{ l.clicks }}</span>
           </article>
         }
         @if (!o.topLinks.length) {
-          <div class="empty-state">
-            <mat-icon>query_stats</mat-icon>
-            <b>Aún no hay datos</b>
-            <p>Comparte tus enlaces para empezar a medir clics y visitas.</p>
-          </div>
+          <div class="empty-state small-empty"><mat-icon aria-hidden="true">query_stats</mat-icon><b>Aún no hay datos</b><p>Comparte enlaces para empezar a medir actividad.</p></div>
         }
       </div>
     </section>
 
-    <section>
-      <span class="section-title"><mat-icon>public</mat-icon> Origen geográfico</span>
+    <section class="data-section" aria-labelledby="origins-title">
+      <div class="section-header compact"><div><span class="section-eyebrow">Procedencia</span><h2 id="origins-title">Origen geográfico</h2></div></div>
       <div class="geo-list">
         @for (c of o.countries.slice(0, 6); track c.key) {
-          <div class="geo-row">
-            <span class="geo-flag">{{ flag(c.key) }}</span>
-            <span class="geo-name">{{ countryName(c.key) }}</span>
-            <div class="geo-bar"><i [style.width.%]="geoPct(c.value, o)"></i></div>
-            <b class="tnum">{{ c.value }}</b>
-          </div>
+          <div class="geo-row"><span class="geo-flag">{{ flag(c.key) }}</span><span class="geo-name">{{ countryName(c.key) }}</span><div class="geo-bar"><i [style.width.%]="geoPct(c.value, o)"></i></div><b class="tnum">{{ c.value }}</b></div>
         }
-        @if (!o.countries.length) {
-          <p class="none">Sin datos de localización todavía.</p>
-        }
+        @if (!o.countries.length) { <p class="none">Sin datos de localización todavía.</p> }
       </div>
     </section>
   </div>
 }
 
 @if (!error() || recent().length) {
-  <span class="section-title"><mat-icon>history</mat-icon> Enlaces recientes</span>
-  <div class="recent">
-  @for (l of recent(); track l.id) {
-    <article
-      class="recent-row"
-      role="link"
-      tabindex="0"
-      [attr.aria-label]="'Abrir enlace ' + displayUrl(l.shortUrl)"
-      (click)="openLink(l.id)"
-      (keydown)="openLinkFromKeyboard($event, l.id)"
-    >
-      <div class="recent-main">
-        <b class="tnum">{{ displayUrl(l.shortUrl) }}</b>
-        <span>{{ l.destination }}</span>
-      </div>
-      <div class="recent-side">
-        <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ l.clickCount }}</span>
-        <button mat-icon-button (click)="$event.stopPropagation(); copy(l.shortUrl)" aria-label="Copiar">
-          <mat-icon>content_copy</mat-icon>
-        </button>
-      </div>
-    </article>
-  }
-  @if (!recent().length && !loading() && !error()) {
-    <div class="empty-state">
-      <mat-icon>link_off</mat-icon>
-      <b>Sin enlaces todavía</b>
-      <p>Crea el primero para empezar a medir.</p>
-      <button mat-flat-button color="primary" (click)="newLink()">Crear mi primer enlace</button>
+  <section class="recent-section" aria-labelledby="recent-title">
+    <div class="section-header"><div><span class="section-eyebrow">Seguimiento</span><h2 id="recent-title">Enlaces recientes</h2></div>@if (recent().length) { <a class="see-all" routerLink="/app/links">Ver todos <mat-icon aria-hidden="true">arrow_forward</mat-icon></a> }</div>
+    <div class="recent">
+      @for (l of recent(); track l.id) {
+        <article
+          class="recent-row"
+          role="link"
+          tabindex="0"
+          [attr.aria-label]="'Abrir enlace ' + displayUrl(l.shortUrl)"
+          (click)="openLink(l.id)"
+          (keydown)="openLinkFromKeyboard($event, l.id)"
+        >
+          <div class="recent-main"><b class="tnum">{{ displayUrl(l.shortUrl) }}</b><span>{{ l.destination }}</span></div>
+          <div class="recent-side"><span class="clicks tnum"><mat-icon aria-hidden="true">touch_app</mat-icon> {{ l.clickCount }}</span><button mat-icon-button (click)="$event.stopPropagation(); copy(l.shortUrl)" aria-label="Copiar enlace"><mat-icon aria-hidden="true">content_copy</mat-icon></button></div>
+        </article>
+      }
+      @if (!recent().length && !loading() && !error()) {
+        <div class="empty-state"><mat-icon aria-hidden="true">link_off</mat-icon><b>Sin enlaces todavía</b><p>Crea el primero para empezar a medir.</p><button mat-flat-button color="primary" (click)="newLink()">Crear mi primer enlace</button></div>
+      }
     </div>
-  }
-    @if (recent().length) {
-      <a class="see-all" routerLink="/app/links">Ver todos los enlaces →</a>
-    }
-  </div>
+  </section>
 }

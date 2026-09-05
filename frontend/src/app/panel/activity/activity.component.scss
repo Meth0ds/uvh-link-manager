@@ -1,0 +1,15 @@
+:host { display: block; }
+.activity { padding: 24px; border: 1px solid var(--uvh-border); border-radius: 18px; background: var(--uvh-surface-raised); color: var(--uvh-ink); }
+.heading, .event-heading, .pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+h2, h3 { margin: 0; overflow-wrap: anywhere; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+p { line-height: 1.6; overflow-wrap: anywhere; }
+.coverage, time, .events p { color: var(--uvh-muted); font-size: 14px; }
+.events { list-style: none; padding: 0; margin: 24px 0 0; }
+.events li { border-top: 1px solid var(--uvh-border); padding: 20px 0; }
+.events p { margin: 8px 0; }
+.outcome { font-size: 12px; font-weight: 700; border: 1px solid var(--uvh-border); border-radius: 8px; padding: 5px 9px; }
+.error { border-left: 3px solid currentColor; padding-left: 12px; }
+button { white-space: normal; min-height: 44px; }
+@media (max-width: 600px) { .activity { padding: 16px; } .heading { align-items: stretch; flex-direction: column; } }

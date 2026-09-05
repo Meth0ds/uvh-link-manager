@@ -10,6 +10,8 @@ import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { ChartsComponent } from "./charts.component";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import type { AnalyticsOverview } from "../../core/models";
+import { PageHeaderComponent } from "../page-header.component";
+import { PanelSkeletonComponent } from "../panel-skeleton.component";
 
 @Component({
   selector: "app-analytics",
@@ -21,8 +23,10 @@ import type { AnalyticsOverview } from "../../core/models";
     MatFormFieldModule,
     MatProgressBarModule,
     RouterLink,
-    ChartsComponent
-],
+    ChartsComponent,
+    PageHeaderComponent,
+    PanelSkeletonComponent,
+  ],
   templateUrl: "./analytics.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./analytics.component.scss",

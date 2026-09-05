@@ -2,18 +2,21 @@ import { Injectable, inject } from "@angular/core";
 import { HttpClient, HttpErrorResponse, HttpParams } from "@angular/common/http";
 import { catchError, firstValueFrom, throwError, type Observable } from "rxjs";
 import type { ApiError } from "../models";
+import { retryAfterSeconds } from "./retry-after";
 
-const CSRF_COOKIE = "uvh_csrf";
+const CSRF_COOKIES = ["__Host-uvh_csrf", "uvh_csrf"] as const;
 
 export class ApiRequestError extends Error {
   status: number;
   details?: unknown;
+  readonly retryAfterSeconds?: number;
 
-  constructor(message: string, status: number, details?: unknown) {
+  constructor(message: string, status: number, details?: unknown, retryAfterSeconds?: number) {
     super(message);
     this.name = "ApiRequestError";
     this.status = status;
     this.details = details;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -34,7 +37,11 @@ export class ApiService {
   private csrfRequest?: Promise<void>;
 
   private csrfToken(): string | null {
-    return readCookie(CSRF_COOKIE);
+    for (const name of CSRF_COOKIES) {
+      const token = readCookie(name);
+      if (token) return token;
+    }
+    return null;
   }
 
   /** Ensure the CSRF cookie exists before a mutation, coalescing concurrent calls. */
@@ -77,7 +84,7 @@ export class ApiService {
       : err.status === 0
         ? "No se pudo conectar con el servidor"
         : "Error del servidor";
-    return new ApiRequestError(message, err.status, body?.details);
+    return new ApiRequestError(message, err.status, body?.details, retryAfterSeconds(err.headers.get("Retry-After")));
   }
 
   private request<T>(source: Observable<T>): Promise<T> {
@@ -105,6 +112,33 @@ export class ApiService {
     return this.request(this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }));
   }
 
+  /** POST returning a private binary artifact while preserving JSON errors. */
+  async postBlob(path: string, body?: unknown): Promise<Blob> {
+    this.assertApiPath(path);
+    await this.ensureCsrf();
+    try {
+      return await firstValueFrom(this.http.post(path, body ?? {}, {
+        headers: this.headers(true),
+        responseType: "blob",
+      }));
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.error instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await error.error.text()) as ApiError;
+          throw new ApiRequestError(
+            typeof parsed.error === "string" ? parsed.error : "Error del servidor",
+            error.status,
+            parsed.details,
+            retryAfterSeconds(error.headers.get("Retry-After")),
+          );
+        } catch (parsedError) {
+          if (parsedError instanceof ApiRequestError) throw parsedError;
+        }
+      }
+      throw error instanceof HttpErrorResponse ? this.errorOf(error) : error;
+    }
+  }
+
   /** PATCH (mutation — requires CSRF). */
   async patch<T>(path: string, body?: unknown): Promise<T> {
     this.assertApiPath(path);
@@ -113,10 +147,10 @@ export class ApiService {
   }
 
   /** DELETE (mutation — requires CSRF). */
-  async delete<T>(path: string): Promise<T> {
+  async delete<T>(path: string, body?: unknown): Promise<T> {
     this.assertApiPath(path);
     await this.ensureCsrf();
-    return this.request(this.http.delete<T>(path, { headers: this.headers(true) }));
+    return this.request(this.http.delete<T>(path, { headers: this.headers(true), body }));
   }
 
   /** Raw observable for callers that need streaming/loading states. */

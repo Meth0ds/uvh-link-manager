@@ -31,16 +31,12 @@
 }
 
 .create-card {
-  background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
+  background: var(--uvh-surface-raised);
   border: 1px solid var(--uvh-border);
-  border-radius: 14px;
-  padding: 18px 20px;
+  border-radius: 17px;
+  padding: 20px;
   margin-bottom: 18px;
-  h3 {
-    font-size: 15px;
-    font-weight: 800;
-    margin: 0 0 12px;
-  }
+  box-shadow: var(--uvh-shadow-sm);
   .full {
     width: 100%;
   }
@@ -61,6 +57,12 @@
     margin-top: 10px;
   }
 }
+
+.card-intro { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 17px; }
+.card-intro h2 { margin: 0; color: var(--uvh-ink); font-size: 15px; font-weight: 850; letter-spacing: -.02em; }
+.card-intro p { margin: 3px 0 0; color: var(--uvh-muted); font-size: 12.5px; line-height: 1.5; }
+.card-icon, .wh-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); }
+.card-icon mat-icon, .wh-icon mat-icon { width: 19px; height: 19px; font-size: 19px; }
 
 .secret-box {
   margin: 16px 0;
@@ -97,6 +99,12 @@
   flex-direction: column;
   gap: 10px;
 }
+
+.wh-list mat-expansion-panel { overflow: hidden; transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms cubic-bezier(.22,1,.36,1); }
+.wh-list mat-expansion-panel:hover { border-color: color-mix(in srgb, var(--uvh-electric) 27%, var(--uvh-border)); box-shadow: var(--uvh-shadow-md); transform: translateY(-1px); }
+.wh-list mat-panel-title { min-width: 0; align-items: center; gap: 11px; }
+.wh-title { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.wh-title small { color: var(--uvh-muted-soft); font-size: 9px; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
 
 .wh-url {
   font-weight: 700;
@@ -169,6 +177,10 @@
       background: rgba(251, 191, 36, 0.14);
       color: #92600a;
     }
+    &.st-processing {
+      background: rgba(36, 87, 245, 0.12);
+      color: var(--uvh-electric);
+    }
     &.st-failed {
       background: rgba(220, 38, 38, 0.1);
       color: #b91c1c;
@@ -186,6 +198,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
+
+@media (max-width: 640px) {
+  .wh-icon { display: none; }
+  .wh-actions button { flex: 1 1 calc(50% - 8px); }
+  .delivery { align-items: flex-start; flex-wrap: wrap; }
+  .delivery .del-meta { flex-basis: 100%; order: 3; }
 }
 
 .none {

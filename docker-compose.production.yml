@@ -1,0 +1,186 @@
+name: uvh-production
+
+x-php-service: &php-service
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile.production
+  image: uvh-api:production
+  env_file:
+    - ${UVH_ENV_FILE:-./backend-laravel/.env.production}
+  environment:
+    APP_KEY_FILE: /run/secrets/uvh_app_key
+    APP_SECRET_FILE: /run/secrets/uvh_app_secret
+    DB_PASSWORD_FILE: /run/secrets/uvh_db_password
+    DB_SSLROOTCERT: /run/secrets/uvh_db_ca
+    HCAPTCHA_SECRET_FILE: /run/secrets/uvh_hcaptcha_secret
+    HCAPTCHA_PUBLIC_SECRET_FILE: /run/secrets/uvh_hcaptcha_public_secret
+    RESEND_API_KEY_FILE: /run/secrets/uvh_resend_api_key
+    EDGE_ASK_SECRET_FILE: /run/secrets/uvh_edge_ask_secret
+    METRICS_BEARER_TOKEN_FILE: /run/secrets/uvh_metrics_token
+    EDGE_INTERNAL_CIDRS: ${UVH_INTERNAL_SUBNET:-172.29.0.0/24}
+  secrets:
+    - uvh_app_key
+    - uvh_app_secret
+    - uvh_db_password
+    - uvh_db_ca
+    - uvh_hcaptcha_secret
+    - uvh_hcaptcha_public_secret
+    - uvh_resend_api_key
+    - uvh_edge_ask_secret
+    - uvh_metrics_token
+  restart: unless-stopped
+  init: true
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  volumes:
+    - uvh-storage:/var/www/html/storage
+  tmpfs:
+    - /tmp:size=32m,noexec,nosuid,nodev,mode=1777
+  networks:
+    - uvh-internal
+
+services:
+  app:
+    <<: *php-service
+    expose:
+      - "9000"
+    healthcheck:
+      test: ["CMD", "php", "artisan", "uvh:healthcheck", "app"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  queue:
+    <<: *php-service
+    command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--timeout=180", "--max-time=3600"]
+    stop_grace_period: 190s
+    healthcheck:
+      test: ["CMD", "php", "artisan", "uvh:healthcheck", "queue"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  scheduler:
+    <<: *php-service
+    command: ["php", "artisan", "schedule:work"]
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "php", "artisan", "uvh:healthcheck", "scheduler"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile.production
+    image: uvh-web:production
+    env_file:
+      - ${UVH_ENV_FILE:-./backend-laravel/.env.production}
+    environment:
+      NGINX_ENVSUBST_FILTER: "^(APP_HOST|PUBLIC_HOST|EDGE_ASK_SECRET|METRICS_BEARER_TOKEN)$"
+      EDGE_ASK_SECRET_FILE: /run/secrets/uvh_edge_ask_secret
+      METRICS_BEARER_TOKEN_FILE: /run/secrets/uvh_metrics_token
+    secrets:
+      - uvh_edge_ask_secret
+      - uvh_metrics_token
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      app:
+        condition: service_healthy
+    expose:
+      - "8080"
+      - "8081"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null --header='Host: '$${APP_HOST} http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev,mode=1777
+      - /etc/nginx/conf.d:size=1m,noexec,nosuid,nodev,mode=1777
+      - /var/cache/nginx:size=16m,noexec,nosuid,nodev,mode=1777
+      - /var/run:size=1m,noexec,nosuid,nodev,mode=1777
+    networks:
+      - uvh-internal
+
+  edge:
+    image: caddy:2.11.4-alpine
+    env_file:
+      - ${UVH_ENV_FILE:-./backend-laravel/.env.production}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    depends_on:
+      nginx:
+        condition: service_healthy
+    ports:
+      - "${UVH_EDGE_HTTP_PORT:-80}:80"
+      - "${UVH_EDGE_HTTPS_PORT:-443}:443"
+      - "${UVH_EDGE_HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - uvh-caddy-data:/data
+      - uvh-caddy-config:/config
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - uvh-internal
+
+  migrate:
+    <<: *php-service
+    profiles: ["tools"]
+    restart: "no"
+    command: ["php", "artisan", "migrate", "--force", "--no-interaction"]
+
+volumes:
+  uvh-storage:
+  uvh-caddy-data:
+  uvh-caddy-config:
+
+secrets:
+  uvh_app_key:
+    file: ${UVH_APP_KEY_FILE:?Define UVH_APP_KEY_FILE}
+  uvh_app_secret:
+    file: ${UVH_APP_SECRET_FILE:?Define UVH_APP_SECRET_FILE}
+  uvh_db_password:
+    file: ${UVH_DB_PASSWORD_FILE:?Define UVH_DB_PASSWORD_FILE}
+  uvh_db_ca:
+    file: ${UVH_DB_CA_FILE:?Define UVH_DB_CA_FILE}
+  uvh_hcaptcha_secret:
+    file: ${UVH_HCAPTCHA_SECRET_FILE:?Define UVH_HCAPTCHA_SECRET_FILE}
+  uvh_hcaptcha_public_secret:
+    file: ${UVH_HCAPTCHA_PUBLIC_SECRET_FILE:?Define UVH_HCAPTCHA_PUBLIC_SECRET_FILE}
+  uvh_resend_api_key:
+    file: ${UVH_RESEND_API_KEY_FILE:?Define UVH_RESEND_API_KEY_FILE}
+  uvh_edge_ask_secret:
+    file: ${UVH_EDGE_ASK_SECRET_FILE:?Define UVH_EDGE_ASK_SECRET_FILE}
+  uvh_metrics_token:
+    file: ${UVH_METRICS_TOKEN_FILE:?Define UVH_METRICS_TOKEN_FILE}
+
+networks:
+  uvh-internal:
+    ipam:
+      config:
+        - subnet: ${UVH_INTERNAL_SUBNET:-172.29.0.0/24}

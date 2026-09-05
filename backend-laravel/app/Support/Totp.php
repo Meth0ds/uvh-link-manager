@@ -34,20 +34,33 @@ class Totp
 
     public static function verify(string $code, string $secret, int $window = 1): bool
     {
+        return self::matchingCounter($code, $secret, $window) !== null;
+    }
+
+    /** Return the accepted RFC 6238 counter so callers can prevent replay. */
+    public static function matchingCounter(string $code, string $secret, int $window = 1): ?int
+    {
+        if (! preg_match('/^\d{6}$/D', $code)
+            || ! preg_match('/^[A-Z2-7]{16,128}$/D', strtoupper($secret))
+            || $window < 0 || $window > 5) {
+            return null;
+        }
         $key = self::base32Decode($secret);
         $counter = intdiv((int) floor(microtime(true)), 30);
         for ($i = -$window; $i <= $window; $i++) {
             if (hash_equals(self::hotp($key, $counter + $i), $code)) {
-                return true;
+                return $counter + $i;
             }
         }
 
-        return false;
+        return null;
     }
 
     public static function provisioningUri(string $account, string $issuer, string $secret): string
     {
-        $label = $issuer.':'.$account;
+        // The label is one URI path segment. Valid email addresses can contain
+        // reserved characters, so encode it before generating the QR payload.
+        $label = rawurlencode($issuer.':'.$account);
         $query = http_build_query([
             'secret' => $secret,
             'issuer' => $issuer,

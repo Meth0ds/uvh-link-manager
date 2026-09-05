@@ -14,17 +14,20 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatDividerModule } from "@angular/material/divider";
 import { MatDialog } from "@angular/material/dialog";
+import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 
 import { AuthService } from "../core/services/auth.service";
 import { WorkspaceService } from "../core/services/workspace.service";
 import { LinkDialogService } from "./links/link-dialog.service";
 import { WorkspaceDialogComponent, type WorkspaceDialogResult } from "./workspace-dialog.component";
+import { ThemeToggleComponent } from "../core/theme-toggle.component";
 
 interface NavItem {
   path: string;
   label: string;
   icon: string;
   adminOnly?: boolean;
+  workspaceAdminOnly?: boolean;
 }
 
 interface NavGroup {
@@ -48,8 +51,10 @@ interface NavGroup {
     MatSelectModule,
     MatFormFieldModule,
     MatTooltipModule,
-    MatDividerModule
-],
+    MatDividerModule,
+    MatSnackBarModule,
+    ThemeToggleComponent,
+  ],
   templateUrl: "./panel.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./panel.component.scss",
@@ -60,11 +65,14 @@ export class PanelComponent {
   private dialog = inject(LinkDialogService);
   private materialDialog = inject(MatDialog);
   private breakpoint = inject(BreakpointObserver);
+  private snackbar = inject(MatSnackBar);
 
   readonly workspaces = inject(WorkspaceService);
   readonly user = this.auth.user;
   readonly isAdmin = computed(() => this.user()?.isAdmin === true);
+  readonly workspaceName = computed(() => this.workspaces.list().find((workspace) => workspace.id === this.workspaces.currentId())?.name ?? "Sin workspace");
   readonly mobileOpen = signal(false);
+  readonly logoutBusy = signal(false);
   readonly isMobile = toSignal(this.breakpoint.observe("(max-width: 720px)").pipe(map((state) => state.matches)), { initialValue: false });
 
   readonly initials = computed(() => {
@@ -81,8 +89,10 @@ export class PanelComponent {
       label: "Trabajo",
       items: [
         { path: "/app/dashboard", label: "Panel", icon: "space_dashboard" },
+        { path: "/app/getting-started", label: "Primeros pasos", icon: "checklist" },
         { path: "/app/links", label: "Enlaces", icon: "link" },
         { path: "/app/analytics", label: "Analítica", icon: "query_stats" },
+        { path: "/app/activity", label: "Actividad", icon: "history", workspaceAdminOnly: true },
         { path: "/app/domains", label: "Dominios", icon: "language" },
       ],
     },
@@ -106,11 +116,15 @@ export class PanelComponent {
     },
   ];
 
-  readonly visibleNav = computed(() =>
-    this.nav
-      .map((g) => ({ ...g, items: g.items.filter((n) => !n.adminOnly || this.isAdmin()) }))
-      .filter((g) => g.items.length > 0),
-  );
+  readonly visibleNav = computed(() => {
+    // Platform administration does not grant another tenant's activity.
+    const role = this.workspaces.list().find((w) => w.id === this.workspaces.currentId())?.role;
+    const workspaceAdmin = this.user()?.emailVerified === true && (role === "owner" || role === "admin");
+    return this.nav
+      .map((g) => ({ ...g, items: g.items.filter((n) => (!n.adminOnly || this.isAdmin())
+        && (!n.workspaceAdminOnly || workspaceAdmin)) }))
+      .filter((g) => g.items.length > 0);
+  });
 
   onWorkspaceChange(id: number): void {
     this.workspaces.select(id);
@@ -135,11 +149,16 @@ export class PanelComponent {
     });
   }
 
-  logout(): void {
-    // AuthService clears the local identity synchronously and finishes the
-    // server revocation in the background; navigation must not wait on a
-    // potentially slow network request.
-    void this.auth.logout();
-    void this.router.navigate(["/"]);
+  async logout(): Promise<void> {
+    if (this.logoutBusy()) return;
+    this.logoutBusy.set(true);
+    try {
+      await this.auth.logout();
+      await this.router.navigate(["/"]);
+    } catch {
+      this.snackbar.open("No se pudo confirmar el cierre de sesión. Tu acceso sigue abierto; vuelve a intentarlo.", "Cerrar", { duration: 6000 });
+    } finally {
+      this.logoutBusy.set(false);
+    }
   }
 }

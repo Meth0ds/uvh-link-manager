@@ -83,7 +83,9 @@ return [
             'transport' => 'failover',
             'mailers' => [
                 'smtp',
-                'log',
+                // Add only another configured delivery provider here. A log
+                // fallback exposes message content and falsely acknowledges
+                // failed sends; the durable outbox already provides retries.
             ],
             'retry_after' => 60,
         ],
