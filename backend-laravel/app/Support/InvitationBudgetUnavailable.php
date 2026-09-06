@@ -2,6 +2,4 @@
 
 namespace App\Support;
 
-final class InvitationBudgetUnavailable extends \RuntimeException
-{
-}
+final class InvitationBudgetUnavailable extends \RuntimeException {}

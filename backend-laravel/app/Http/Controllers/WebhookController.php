@@ -10,12 +10,13 @@ use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
 use App\Support\WorkspaceAccess;
+use App\Support\WorkspaceLimits;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class WebhookController
 {
-    private const MAX_WEBHOOKS_PER_WORKSPACE = \App\Support\WorkspaceLimits::WEBHOOKS;
+    private const MAX_WEBHOOKS_PER_WORKSPACE = WorkspaceLimits::WEBHOOKS;
 
     public function index(Request $request)
     {

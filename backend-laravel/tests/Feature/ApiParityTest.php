@@ -335,7 +335,7 @@ class ApiParityTest extends TestCase
 
     public function test_hcaptcha_is_verified_server_side_and_honeypot_is_rejected_before_provider_call(): void
     {
-        Http::swap(new HttpFactory());
+        Http::swap(new HttpFactory);
         Http::fake([
             'https://api.hcaptcha.com/siteverify' => Http::response(['success' => true, 'hostname' => 'app.uvh.test']),
         ]);
@@ -350,7 +350,7 @@ class ApiParityTest extends TestCase
             ->assertJson(['error' => 'Datos inválidos']);
         Http::assertNothingSent();
 
-        Http::swap(new HttpFactory());
+        Http::swap(new HttpFactory);
         Http::fake([
             'https://api.hcaptcha.com/siteverify' => Http::sequence()
                 ->push(['success' => true, 'hostname' => 'app.uvh.test'], 200)
@@ -378,7 +378,7 @@ class ApiParityTest extends TestCase
 
     public function test_hcaptcha_provider_outage_fails_closed_without_becoming_a_500(): void
     {
-        Http::swap(new HttpFactory());
+        Http::swap(new HttpFactory);
         Http::fake([
             'https://api.hcaptcha.com/siteverify' => Http::response('upstream unavailable', 503),
         ]);
@@ -398,7 +398,7 @@ class ApiParityTest extends TestCase
         // Exercise the global response observer directly so this contract does
         // not depend on a particular named limiter or consume another test's
         // shared cache budget. Only the fixed metric name reaches storage.
-        $middleware = new RecordOperationalResponse();
+        $middleware = new RecordOperationalResponse;
         $response = $middleware->handle(
             Request::create('/synthetic-rate-limit', 'GET'),
             static fn () => response('', 429),
@@ -413,7 +413,7 @@ class ApiParityTest extends TestCase
 
     public function test_hcaptcha_token_for_another_hostname_is_rejected(): void
     {
-        Http::swap(new HttpFactory());
+        Http::swap(new HttpFactory);
         Http::fake([
             'https://api.hcaptcha.com/siteverify' => Http::response([
                 'success' => true,
@@ -432,7 +432,7 @@ class ApiParityTest extends TestCase
 
     public function test_official_hcaptcha_test_hostname_is_accepted_only_with_the_official_test_sitekey(): void
     {
-        Http::swap(new HttpFactory());
+        Http::swap(new HttpFactory);
         Http::fake([
             'https://api.hcaptcha.com/siteverify' => Http::response([
                 'success' => true,
@@ -969,13 +969,13 @@ class ApiParityTest extends TestCase
             $bits += 5;
             if ($bits >= 8) {
                 $bits -= 8;
-                $key .= chr(($buffer >> $bits) & 0xff);
+                $key .= chr(($buffer >> $bits) & 0xFF);
             }
         }
         $counter = intdiv(time(), 30);
         $hash = hash_hmac('sha1', pack('N', 0).pack('N', $counter), $key, true);
-        $offset = ord($hash[strlen($hash) - 1]) & 0x0f;
-        $binary = ((ord($hash[$offset]) & 0x7f) << 24)
+        $offset = ord($hash[strlen($hash) - 1]) & 0x0F;
+        $binary = ((ord($hash[$offset]) & 0x7F) << 24)
             | (ord($hash[$offset + 1]) << 16)
             | (ord($hash[$offset + 2]) << 8)
             | ord($hash[$offset + 3]);

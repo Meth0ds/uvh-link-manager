@@ -8,13 +8,21 @@ use Illuminate\Http\Request;
 final class UvhRequest
 {
     public const USER = 'uvh.user';
+
     public const SESSION_ID = 'uvh.session_id';
+
     public const WORKSPACE_ID = 'uvh.workspace_id';
+
     public const ROLE = 'uvh.role';
+
     public const API_TOKEN = 'uvh.api_token';
+
     public const CSRF_TOKEN = 'uvh.csrf_token';
+
     public const CSRF_ISSUED = 'uvh.csrf_issued';
+
     public const MFA_VERIFIED = 'uvh.mfa_verified';
+
     public const MFA_VERIFIED_AT = 'uvh.mfa_verified_at';
 
     public static function user(Request $request): ?User

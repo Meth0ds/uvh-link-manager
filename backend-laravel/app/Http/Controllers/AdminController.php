@@ -13,14 +13,14 @@ use App\Support\MailDeliveryEligibility;
 use App\Support\MailOutboxDispatcher;
 use App\Support\MailTransportPolicy;
 use App\Support\OperationalMetrics;
-use App\Support\ProductionSecurity;
 use App\Support\PrivateArtifactCleanup;
+use App\Support\ProductionSecurity;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class AdminController
 {
@@ -577,6 +577,7 @@ class AdminController
                         'completion_token_hash' => null,
                         'updated_at' => now(),
                     ]);
+
                     return ['status' => 'stale'];
                 }
                 if ((int) $target->id === (int) $lockedActor->id) {
@@ -598,6 +599,7 @@ class AdminController
                     if (! UvhMail::accountRecoveryRejected($target->email)) {
                         throw new MailAdmissionException('Account recovery rejection outbox admission failed');
                     }
+
                     return ['status' => 'rejected', 'user_id' => (int) $target->id];
                 }
 
@@ -618,6 +620,7 @@ class AdminController
                     ->count('a.admin_user_id');
                 if ($approvalCount < 2) {
                     $row->update(['status' => 'in_review', 'updated_at' => now()]);
+
                     return ['status' => 'in_review', 'user_id' => (int) $target->id, 'approvals' => $approvalCount];
                 }
 
@@ -813,22 +816,22 @@ class AdminController
                 'La configuración de correo contiene un transporte que no garantiza entrega real.',
                 $production,
             ),
-              $this->operationCheck(
-                  'hcaptcha',
+            $this->operationCheck(
+                'hcaptcha',
                 'hCaptcha',
                 trim((string) config('uvh.hcaptcha.site_key')) !== '' && trim((string) config('uvh.hcaptcha.secret')) !== '',
                 'hCaptcha no está configurado.',
-                  $production,
-              ),
-              $this->operationCheck(
-                  'custom_domain_edge',
-                  'Edge de dominios',
-                  ProductionSecurity::validHostname(strtolower(trim((string) config('uvh.custom_domains.cname_target'), '.')))
-                      && strlen((string) config('uvh.custom_domains.edge_ask_secret')) >= 43,
-                  'El destino CNAME o la autorización privada del edge no están configurados.',
-                  $production,
-              ),
-          ];
+                $production,
+            ),
+            $this->operationCheck(
+                'custom_domain_edge',
+                'Edge de dominios',
+                ProductionSecurity::validHostname(strtolower(trim((string) config('uvh.custom_domains.cname_target'), '.')))
+                    && strlen((string) config('uvh.custom_domains.edge_ask_secret')) >= 43,
+                'El destino CNAME o la autorización privada del edge no están configurados.',
+                $production,
+            ),
+        ];
 
         $jobCount = DB::table('jobs')->count();
         $oldestJob = DB::table('jobs')->min('created_at');
@@ -1056,6 +1059,7 @@ class AdminController
                         'last_error' => 'lifecycle_obsolete',
                         'updated_at' => now(),
                     ]);
+
                     return 'obsolete';
                 }
                 DB::table('mail_outbox')->where('id', $id)->update([
@@ -1092,6 +1096,7 @@ class AdminController
         }
         if ($result === 'obsolete') {
             OperationalMetrics::increment('mail.obsolete');
+
             return response()->json(['error' => 'El enlace o evento de este correo ya no es válido'], 409);
         }
 

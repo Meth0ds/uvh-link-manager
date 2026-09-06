@@ -416,6 +416,7 @@ class LinkController
         }
 
         Audit::write($user->id, 'link.delete', 'link', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
+
         return response()->json(['ok' => true]);
     }
 

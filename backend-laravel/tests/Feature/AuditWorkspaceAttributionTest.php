@@ -90,6 +90,7 @@ final class AuditWorkspaceAttributionTest extends TestCase
     {
         $workspace = $owner->ownedWorkspaces()->create(['name' => 'Audit scope', 'slug' => 'audit-'.Ids::randomToken(8)]);
         $workspace->memberships()->create(['user_id' => $owner->id, 'role' => 'owner']);
+
         return $workspace;
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\ClickEvent;
-use App\Models\Link;
 use App\Models\MetricRollup;
 use Illuminate\Support\Facades\DB;
 

@@ -117,6 +117,7 @@ final class WorkspaceOnboardingTest extends TestCase
     {
         $workspace = $owner->ownedWorkspaces()->create(['name' => 'Onboarding', 'slug' => 'onboarding-'.Ids::randomToken(8)]);
         $workspace->memberships()->create(['user_id' => $owner->id, 'role' => 'owner']);
+
         return $workspace;
     }
 

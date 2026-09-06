@@ -36,8 +36,7 @@ class SendUvhMailJob implements ShouldQueue
         public readonly ?string $resourceType = null,
         public readonly int|string|null $resourceId = null,
         public readonly ?string $resourceGeneration = null,
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {
@@ -96,5 +95,4 @@ class SendUvhMailJob implements ShouldQueue
         }
         Log::error('[mail] delivery exhausted retries', ['kind' => $this->kind]);
     }
-
 }

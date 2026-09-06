@@ -2,8 +2,8 @@
 
 namespace App\Support;
 
-use App\Models\Membership;
 use App\Models\ApiToken;
+use App\Models\Membership;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -43,8 +43,7 @@ class WorkspaceAccess
         ?array $apiTokenContext = null,
         ?string $requiredScope = null,
         ?int $expectedSecurityVersion = null,
-    ): ?Membership
-    {
+    ): ?Membership {
         $account = User::where('id', $userId)->lockForUpdate()->first();
         if (! $account || $account->deleted_at || ! $account->email_verified_at
             || ($expectedSecurityVersion !== null

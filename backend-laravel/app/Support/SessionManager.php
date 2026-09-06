@@ -89,6 +89,7 @@ class SessionManager
         // preventing the public verification endpoint from working.
         if (! $session->user->email_verified_at) {
             self::revoke($session->id);
+
             return null;
         }
 

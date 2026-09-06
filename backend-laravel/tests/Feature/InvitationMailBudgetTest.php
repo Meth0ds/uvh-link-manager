@@ -18,6 +18,7 @@ use Tests\TestCase;
 final class InvitationMailBudgetTest extends TestCase
 {
     private bool $breakBudgetSql = false;
+
     private bool $breakOutbox = false;
 
     protected function setUp(): void
@@ -188,6 +189,7 @@ final class InvitationMailBudgetTest extends TestCase
         $workspace = $owner->ownedWorkspaces()->create(['name' => 'Mail budget fixture', 'slug' => 'budget-'.$owner->id]);
         $workspace->memberships()->create(['user_id' => $owner->id, 'role' => 'owner']);
         $this->withCookie('uvh_session', SessionManager::create($owner->id, Request::create('/'), 1));
+
         return [$owner, $workspace];
     }
 }

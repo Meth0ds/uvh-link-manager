@@ -14,10 +14,11 @@ use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\LinkIntentRegistry;
 use App\Support\MailAdmissionException;
-use App\Support\MfaStepUp;
 use App\Support\MfaInfrastructureUnavailable;
+use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifactCleanup;
+use App\Support\SessionManager;
 use App\Support\UvhCrypto;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
@@ -128,6 +129,7 @@ class AccountController
             throw $e;
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'data_export_confirmation']);
+
             return response()->json(['error' => 'No se pudo enviar la confirmación. Inténtalo de nuevo más tarde'], 503);
         }
 
@@ -136,11 +138,13 @@ class AccountController
         }
         if ($result['status'] === 'password') {
             Audit::write($user->id, 'account.data_export_request_failed', 'user', $user->id, ['reason' => 'password']);
+
             return response()->json(['error' => 'Contraseña incorrecta'], 403);
         }
         if ($result['status'] === 'factor') {
             $this->recordSensitiveFailure($attemptKey);
             Audit::write($user->id, 'account.data_export_request_failed', 'user', $user->id, ['reason' => 'factor']);
+
             return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
         }
         if ($result['status'] === 'active') {
@@ -189,11 +193,13 @@ class AccountController
                 }
                 if (! $row->confirmation_expires_at || $row->confirmation_expires_at->isPast()) {
                     $row->update(['status' => 'expired', 'confirmation_token_hash' => null]);
+
                     return ['status' => 'expired'];
                 }
                 if (! $user || $user->deleted_at
                     || (int) $user->security_version !== (int) $row->security_version) {
                     $row->update(['status' => 'cancelled', 'confirmation_token_hash' => null]);
+
                     return ['status' => 'invalid'];
                 }
 
@@ -264,6 +270,7 @@ class AccountController
                 'confirmation_token_hash' => null,
                 'download_token_hash' => null,
             ]);
+
             return [
                 'status' => 'cancelled',
                 'id' => (int) $row->id,
@@ -293,63 +300,70 @@ class AccountController
             ->where('status', 'ready')->first(['id', 'user_id']);
         try {
             $result = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): array {
-            $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-            $row = DataExportRequest::where('id', $snapshot->id)
-                ->where('user_id', $snapshot->user_id)
-                ->where('download_token_hash', $tokenHash)
-                ->where('status', 'ready')->lockForUpdate()->first();
-            if (! $row) {
-                return ['status' => 'invalid'];
-            }
-            if (! $row->download_expires_at || $row->download_expires_at->isPast()) {
-                $path = $row->artifact_path;
-                $row->update([
-                    'status' => 'expired',
-                    'download_token_hash' => null,
-                ]);
-                return ['status' => 'expired', 'path' => $path, 'request_id' => (int) $row->id];
-            }
-            if (! $user || $user->deleted_at
-                || (int) $user->security_version !== (int) $row->security_version) {
-                $path = $row->artifact_path;
-                $row->update([
-                    'status' => 'cancelled',
-                    'download_token_hash' => null,
-                ]);
-                return ['status' => 'invalid', 'path' => $path, 'request_id' => (int) $row->id];
-            }
-            $path = $row->artifact_path;
-            if (! is_string($path) || $path === '') {
-                $row->update(['status' => 'failed', 'download_token_hash' => null, 'artifact_path' => null]);
-                return ['status' => 'missing'];
-            }
-            if (! PrivateArtifactCleanup::isManagedPath($path)) {
-                $row->update(['status' => 'failed', 'download_token_hash' => null]);
-                return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
-            }
-            if (! Storage::disk('local')->exists($path)) {
-                $row->update(['status' => 'failed', 'download_token_hash' => null, 'artifact_path' => null]);
-                return ['status' => 'missing'];
-            }
-            $encrypted = Storage::disk('local')->get($path);
-            if (! is_string($encrypted)) {
-                $row->update(['status' => 'failed', 'download_token_hash' => null]);
-                return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
-            }
-            try {
-                $json = UvhCrypto::decryptAtRest($encrypted);
-            } catch (\Throwable) {
-                $row->update(['status' => 'failed', 'download_token_hash' => null]);
-                return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
-            }
+                $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
+                $row = DataExportRequest::where('id', $snapshot->id)
+                    ->where('user_id', $snapshot->user_id)
+                    ->where('download_token_hash', $tokenHash)
+                    ->where('status', 'ready')->lockForUpdate()->first();
+                if (! $row) {
+                    return ['status' => 'invalid'];
+                }
+                if (! $row->download_expires_at || $row->download_expires_at->isPast()) {
+                    $path = $row->artifact_path;
+                    $row->update([
+                        'status' => 'expired',
+                        'download_token_hash' => null,
+                    ]);
 
-            $row->update([
-                'status' => 'downloaded',
-                'download_token_hash' => null,
-                'downloaded_at' => now(),
-            ]);
+                    return ['status' => 'expired', 'path' => $path, 'request_id' => (int) $row->id];
+                }
+                if (! $user || $user->deleted_at
+                    || (int) $user->security_version !== (int) $row->security_version) {
+                    $path = $row->artifact_path;
+                    $row->update([
+                        'status' => 'cancelled',
+                        'download_token_hash' => null,
+                    ]);
 
-            return ['status' => 'ok', 'json' => $json, 'path' => $path, 'user_id' => (int) $user->id, 'request_id' => (int) $row->id];
+                    return ['status' => 'invalid', 'path' => $path, 'request_id' => (int) $row->id];
+                }
+                $path = $row->artifact_path;
+                if (! is_string($path) || $path === '') {
+                    $row->update(['status' => 'failed', 'download_token_hash' => null, 'artifact_path' => null]);
+
+                    return ['status' => 'missing'];
+                }
+                if (! PrivateArtifactCleanup::isManagedPath($path)) {
+                    $row->update(['status' => 'failed', 'download_token_hash' => null]);
+
+                    return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
+                }
+                if (! Storage::disk('local')->exists($path)) {
+                    $row->update(['status' => 'failed', 'download_token_hash' => null, 'artifact_path' => null]);
+
+                    return ['status' => 'missing'];
+                }
+                $encrypted = Storage::disk('local')->get($path);
+                if (! is_string($encrypted)) {
+                    $row->update(['status' => 'failed', 'download_token_hash' => null]);
+
+                    return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
+                }
+                try {
+                    $json = UvhCrypto::decryptAtRest($encrypted);
+                } catch (\Throwable) {
+                    $row->update(['status' => 'failed', 'download_token_hash' => null]);
+
+                    return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
+                }
+
+                $row->update([
+                    'status' => 'downloaded',
+                    'download_token_hash' => null,
+                    'downloaded_at' => now(),
+                ]);
+
+                return ['status' => 'ok', 'json' => $json, 'path' => $path, 'user_id' => (int) $user->id, 'request_id' => (int) $row->id];
             }) : ['status' => 'invalid'];
         } catch (\Throwable) {
             // Keep the one-use bearer and request state untouched when the
@@ -502,6 +516,7 @@ class AccountController
             });
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'account_deletion_confirmation']);
+
             return response()->json(['error' => 'No se pudo enviar la confirmación. Inténtalo de nuevo más tarde'], 503);
         }
 
@@ -531,11 +546,13 @@ class AccountController
         }
         if ($result['status'] === 'password') {
             Audit::write($user->id, 'account.deletion_request_failed', 'user', $user->id, ['reason' => 'password']);
+
             return response()->json(['error' => 'Contraseña incorrecta'], 403);
         }
         if ($result['status'] === 'factor') {
             $this->recordSensitiveFailure($attemptKey);
             Audit::write($user->id, 'account.deletion_request_failed', 'user', $user->id, ['reason' => 'factor']);
+
             return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
         }
 
@@ -572,21 +589,25 @@ class AccountController
                 }
                 if (! $row->confirmation_expires_at || $row->confirmation_expires_at->isPast()) {
                     $row->update(['status' => 'expired', 'confirmation_token_hash' => null]);
+
                     return ['status' => 'expired'];
                 }
                 if (! $user || $user->deleted_at
                     || (int) $user->security_version !== (int) $row->security_version || $user->is_admin) {
                     $row->update(['status' => 'blocked', 'confirmation_token_hash' => null]);
+
                     return ['status' => 'blocked'];
                 }
                 if (DB::table('workspaces')->where('owner_user_id', $user->id)->exists()) {
                     $row->update(['status' => 'blocked', 'confirmation_token_hash' => null]);
+
                     return ['status' => 'owned'];
                 }
                 if (DB::table('privacy_rights_requests')->where('user_id', $user->id)
                     ->whereIn('status', ['submitted', 'in_progress', 'waiting_user'])
                     ->where('type', '!=', 'erasure')->lockForUpdate()->exists()) {
                     $row->update(['status' => 'blocked', 'confirmation_token_hash' => null]);
+
                     return ['status' => 'privacy'];
                 }
 
@@ -691,7 +712,7 @@ class AccountController
         return response()->json([
             'ok' => true,
             'executeAfter' => $result['execute_after']->toIso8601String(),
-        ])->withCookie(\App\Support\SessionManager::clearCookie());
+        ])->withCookie(SessionManager::clearCookie());
     }
 
     public function cancelDeletion(Request $request)
@@ -737,6 +758,7 @@ class AccountController
                     if (! UvhMail::accountDeletionCancelled($user->email)) {
                         throw new MailAdmissionException('Deletion cancellation notice outbox admission failed');
                     }
+
                     return true;
                 });
             } catch (\Throwable) {

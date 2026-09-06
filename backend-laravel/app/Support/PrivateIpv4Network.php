@@ -23,7 +23,6 @@ final class PrivateIpv4Network
         return false;
     }
 
-    /** @param mixed $cidrs */
     public static function validConfiguredCidrs(mixed $cidrs): bool
     {
         if (! is_array($cidrs) || $cidrs === [] || count($cidrs) > 4) {
@@ -58,11 +57,11 @@ final class PrivateIpv4Network
         if ($network === null || $prefix < 24 || $prefix > 32) {
             return null;
         }
-        $mask = (0xffffffff << (32 - $prefix)) & 0xffffffff;
+        $mask = (0xFFFFFFFF << (32 - $prefix)) & 0xFFFFFFFF;
         if (($network & $mask) !== $network) {
             return null;
         }
-        $last = $network | ((~$mask) & 0xffffffff);
+        $last = $network | ((~$mask) & 0xFFFFFFFF);
         if (! self::insideRfc1918($network) || ! self::insideRfc1918($last)) {
             return null;
         }
@@ -83,8 +82,8 @@ final class PrivateIpv4Network
 
     private static function insideRfc1918(int $ip): bool
     {
-        return ($ip >= 0x0a000000 && $ip <= 0x0affffff)
-            || ($ip >= 0xac100000 && $ip <= 0xac1fffff)
-            || ($ip >= 0xc0a80000 && $ip <= 0xc0a8ffff);
+        return ($ip >= 0x0A000000 && $ip <= 0x0AFFFFFF)
+            || ($ip >= 0xAC100000 && $ip <= 0xAC1FFFFF)
+            || ($ip >= 0xC0A80000 && $ip <= 0xC0A8FFFF);
     }
 }

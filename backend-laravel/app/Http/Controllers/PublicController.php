@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\UrlUtil;
 use App\Support\HCaptcha;
+use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
 use Illuminate\Http\Request;

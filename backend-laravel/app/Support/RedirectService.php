@@ -2,8 +2,9 @@
 
 namespace App\Support;
 
-use App\Models\Link;
 use App\Models\CustomDomain;
+use App\Models\Link;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class RedirectService
@@ -292,7 +293,7 @@ class RedirectService
         return $normalized;
     }
 
-    private static function inTimeRange(?string $from, ?string $to, \Illuminate\Support\Carbon $now): bool
+    private static function inTimeRange(?string $from, ?string $to, Carbon $now): bool
     {
         if (! $from && ! $to) {
             return true;

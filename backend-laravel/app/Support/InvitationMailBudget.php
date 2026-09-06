@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 final class InvitationMailBudget
 {
     private const DAY = 86400;
+
     private const DEFAULT_LIMITS = [
         'actor_day' => 100, 'workspace_day' => 200, 'recipient_day' => 5,
         'ip_day' => 200, 'global_day' => 2000, 'recipient_cooldown' => 1,
@@ -24,6 +25,7 @@ final class InvitationMailBudget
             }
             $limits[$scope] = $limit;
         }
+
         return $limits;
     }
 
@@ -116,6 +118,7 @@ final class InvitationMailBudget
     public static function purgeExpired(): int
     {
         $cutoff = self::databaseEpoch() - self::DAY;
+
         return DB::delete(
             'DELETE FROM invitation_mail_budgets WHERE budget_key IN ('
             .'SELECT budget_key FROM invitation_mail_budgets WHERE expires_at_epoch < ? '

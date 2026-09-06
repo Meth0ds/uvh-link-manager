@@ -144,6 +144,7 @@ final class InvitationBudgetTest extends TestCase
         $owner = User::factory()->create();
         $workspace = $this->workspace($owner);
         $this->signIn($owner);
+
         return [$owner, $workspace];
     }
 
@@ -151,6 +152,7 @@ final class InvitationBudgetTest extends TestCase
     {
         $workspace = $owner->ownedWorkspaces()->create(['name' => 'Budget fixture', 'slug' => 'budget-'.strtolower(Ids::randomToken(8))]);
         $workspace->memberships()->create(['user_id' => $owner->id, 'role' => 'owner']);
+
         return $workspace;
     }
 

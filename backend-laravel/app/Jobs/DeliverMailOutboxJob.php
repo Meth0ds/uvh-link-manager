@@ -4,8 +4,8 @@ namespace App\Jobs;
 
 use App\Support\Audit;
 use App\Support\Ids;
-use App\Support\MailLifecycleCompensator;
 use App\Support\MailDeliveryEligibility;
+use App\Support\MailLifecycleCompensator;
 use App\Support\MailOutboxCompensation;
 use App\Support\OperationalMetrics;
 use App\Support\UvhCrypto;
@@ -35,9 +35,7 @@ final class DeliverMailOutboxJob implements ShouldQueue
 
     public int $timeout = 90;
 
-    public function __construct(public readonly int $outboxId)
-    {
-    }
+    public function __construct(public readonly int $outboxId) {}
 
     public function handle(): void
     {
@@ -61,6 +59,7 @@ final class DeliverMailOutboxJob implements ShouldQueue
                 'updated_at' => now(),
             ]);
             $candidate->attempts = $attempts;
+
             return $candidate;
         });
 
@@ -89,6 +88,7 @@ final class DeliverMailOutboxJob implements ShouldQueue
             if ($updated === 1) {
                 OperationalMetrics::increment('mail.obsolete');
             }
+
             return;
         }
 
@@ -133,6 +133,7 @@ final class DeliverMailOutboxJob implements ShouldQueue
             if ($updated === 1) {
                 OperationalMetrics::increment('mail.sent');
             }
+
             return;
         }
 

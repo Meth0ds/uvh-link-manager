@@ -24,10 +24,13 @@ use Tests\TestCase;
 final class WorkspaceNoticeAtomicityTest extends TestCase
 {
     private const PASSWORD = 'tiovivo-cobrizo-astilla-42';
+
     private const RECOVERY = 'ABCD2345EFGH6789';
 
     private int $failAtInsert = 0;
+
     private bool $poisonTransaction = false;
+
     private array $insertLevels = [];
 
     protected function setUp(): void

@@ -17,8 +17,7 @@ class MfaStepUp
         string $password,
         string $factorCode,
         bool $requirePreviouslyVerified = true,
-    ): array
-    {
+    ): array {
         if (! Hash::check($password, $user->password_hash)) {
             return ['status' => 'password'];
         }

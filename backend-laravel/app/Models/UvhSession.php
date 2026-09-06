@@ -13,6 +13,7 @@ class UvhSession extends Model
     protected $keyType = 'string';
 
     const CREATED_AT = 'created_at';
+
     const UPDATED_AT = null;
 
     protected $fillable = [

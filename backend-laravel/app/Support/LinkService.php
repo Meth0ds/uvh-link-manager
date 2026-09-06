@@ -3,11 +3,12 @@
 namespace App\Support;
 
 use App\Exceptions\LinkException;
-use App\Models\Link;
 use App\Models\CustomDomain;
+use App\Models\Link;
 use App\Models\Tag;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class LinkService
 {
@@ -119,7 +120,7 @@ class LinkService
                 }
                 $result = UrlUtil::validateDestination($normalized['destination']);
                 if (! $result['ok']) {
-                    return ['ok' => false, 'error' => "Regla inválida: {$result['error']}" ];
+                    return ['ok' => false, 'error' => "Regla inválida: {$result['error']}"];
                 }
             }
         }
@@ -136,8 +137,7 @@ class LinkService
         array $input,
         ?array $apiTokenContext = null,
         ?int $actorSecurityVersion = null,
-    ): array
-    {
+    ): array {
         $domainId = $input['domain_id'] ?? null;
 
         if (! empty($input['alias'])) {
@@ -230,8 +230,7 @@ class LinkService
         int $expectedVersion,
         ?array $apiTokenContext = null,
         ?int $actorSecurityVersion = null,
-    ): array
-    {
+    ): array {
         return DB::transaction(function () use ($linkId, $workspaceId, $userId, $input, $expectedVersion, $apiTokenContext, $actorSecurityVersion): array {
             if (! WorkspaceAccess::getMembershipLocked(
                 $userId,
@@ -508,7 +507,7 @@ class LinkService
         ];
     }
 
-    private static function toDateTime(?string $iso): ?\Illuminate\Support\Carbon
+    private static function toDateTime(?string $iso): ?Carbon
     {
         if ($iso === null || $iso === '') {
             return null;
@@ -533,7 +532,6 @@ class LinkService
 
         return (string) $value;
     }
-
 
     private static function isUniqueViolation(QueryException $e): bool
     {

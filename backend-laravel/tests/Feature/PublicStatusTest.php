@@ -17,7 +17,7 @@ final class PublicStatusTest extends TestCase
         parent::setUp();
         // TestCase installs a default hCaptcha fake. Use an isolated HTTP
         // factory so its catch-all callback cannot satisfy monitor requests.
-        Http::swap(new HttpFactory());
+        Http::swap(new HttpFactory);
     }
 
     public function test_external_feed_is_minimized_and_overall_is_recalculated(): void

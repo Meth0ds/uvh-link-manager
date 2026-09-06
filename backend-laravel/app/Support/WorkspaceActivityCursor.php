@@ -22,7 +22,9 @@ final class WorkspaceActivityCursor
     /** @return array{createdAt: string, id: string, expiresAt: int} */
     public static function read(string $cursor, int $workspaceId, int $userId, int $version): array
     {
-        if (strlen($cursor) > 2048 || $cursor === '') throw new \InvalidArgumentException('Invalid activity cursor');
+        if (strlen($cursor) > 2048 || $cursor === '') {
+            throw new \InvalidArgumentException('Invalid activity cursor');
+        }
         $decoded = base64_decode($cursor, true);
         if ($decoded === false || base64_encode($decoded) !== $cursor) {
             // Do not accept alternate encodings/trailing junk that a permissive
@@ -49,6 +51,7 @@ final class WorkspaceActivityCursor
         if (! $date || $date->format('Y-m-d\TH:i:s.uP') !== $data['createdAt']) {
             throw new \InvalidArgumentException('Invalid activity cursor');
         }
+
         // Keep the original expiry across pages; pagination cannot renew a
         // stolen cursor indefinitely. Account rotations also invalidate it.
         return ['createdAt' => $data['createdAt'], 'id' => $data['id'], 'expiresAt' => $data['expiresAt']];
