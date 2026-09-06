@@ -47,7 +47,7 @@ Los fallos conservan captura, vídeo y trace bajo `frontend/test-results`; esos
 artefactos están ignorados por Git. CI los adjunta durante siete días sólo si
 el job falla.
 
-## Cobertura actual: 15 recorridos
+## Cobertura actual: 18 recorridos
 
 1. Registro, verificación por email e inicio de sesión.
 2. Bloqueo de sesión para una cuenta no verificada.
@@ -64,6 +64,9 @@ el job falla.
 13. Solicitud y cancelación de exportación con invalidación del enlace.
 14. Creación, uso y revocación efectiva de un token Bearer de alcance mínimo.
 15. Invitación y aceptación por el destinatario verificado con rol `viewer`.
+16. Uso y límites con snapshot real ligado al workspace y redacción prudente.
+17. Centro de seguridad minimizado y revocación de la sesión actual.
+18. Purga irreversible de un enlace con frase y contraseña obligatorias.
 
 ## Qué no acredita
 

@@ -310,6 +310,15 @@ de secretos/proxy/TLS y validación jurídica.
   `docs/product-surfaces-completion-2026-09-06.md`. Permanecen abiertos los gates
   PRODUCT-VALID-006/007/008/009/011; código verde no acredita DNS/TLS, receptor,
   concurrencia, accesibilidad ni monitor externo reales.
+- La base Playwright aislada ejecutó 18/18 recorridos en 16,3 minutos sobre
+  `uvh_e2e_test`: a los quince ciclos críticos se añadieron Uso y límites, Centro
+  de seguridad con revocación de sesión actual y purga irreversible con doble
+  confirmación. La pila efímera se eliminó al terminar y `uvh_local` no se tocó.
+  PRODUCT-VALID-003/008/009 avanzaron, pero siguen abiertos por roles, sesión
+  remota, MFA de purga, accesibilidad, rendimiento y carreras multiproceso.
+- La PR #17 conserva estos cambios en `test/playwright-e2e`. GitHub Actions y
+  CodeQL no iniciaron ningún step porque GitHub informó que la cuenta estaba
+  bloqueada por facturación; esa señal externa no sustituye la validación local.
 - BAF-116/118/120 añadieron señales de antigüedad e incidentes; BAF-119 minimizó
   el listado webhook. BAF-121 documentó la rotación existente de `APP_SECRET` y
   añadió contratos pendientes. Los contratos operativos de API se actualizaron.
@@ -330,11 +339,12 @@ de secretos/proxy/TLS y validación jurídica.
 ## Próximo punto exacto de continuación
 
 1. Mantener pausadas nuevas funciones mientras se completan los gates de estabilidad
-   que no cubren las suites: E2E autenticado, revisión visual/accesible, migración
-   limpia, concurrencia multiproceso y fault injection, siempre en entornos aislados.
+   que no cubre la suite actual: revisión visual/accesible, roles y sesiones remotas,
+   concurrencia multiproceso, fault injection y dependencias externas, siempre en
+   entornos aislados. Migración limpia y 18 E2E autenticados ya tienen evidencia.
 2. PRODUCT-001/002/003/006/007/008/009/011 están implementados, pero continúan
-   abiertos sus gates `PRODUCT-VALID-*`. La siguiente prioridad segura es validar
-   las superficies en navegador y dependencias reales, no ampliar el roadmap.
+   abiertos sus gates `PRODUCT-VALID-*`. La siguiente prioridad segura es ampliar
+   roles/accesibilidad/concurrencia y validar dependencias reales, no el roadmap.
 3. Para estado público, provisionar primero el monitor realmente externo y ejecutar
    el ensayo de independencia de `docs/public-status-feed.md`; sin configuración
    `/status` debe seguir mostrando `unknown`.
