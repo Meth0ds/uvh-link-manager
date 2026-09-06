@@ -120,6 +120,13 @@ jobs:
         working-directory: backend-laravel
         run: composer audit --locked --no-dev
 
+      # TestCase::setUp() trunca contadores globales antes de cada caso. La
+      # base efímera debe contener por ello el esquema completo desde el inicio,
+      # incluida invitation_mail_budgets, y no sólo existir vacía.
+      - name: Prepare isolated test schema
+        working-directory: backend-laravel
+        run: php artisan migrate:fresh --force --no-interaction
+
       - name: Run test suite against uvh_test
         working-directory: backend-laravel
         run: composer test
