@@ -16,8 +16,8 @@ use App\Support\HCaptcha;
 use App\Support\Ids;
 use App\Support\LinkIntentRegistry;
 use App\Support\MailAdmissionException;
-use App\Support\MfaStepUp;
 use App\Support\MfaInfrastructureUnavailable;
+use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
 use App\Support\PasswordStrength;
 use App\Support\PrivateArtifactCleanup;
@@ -26,6 +26,7 @@ use App\Support\Totp;
 use App\Support\UvhCrypto;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -242,6 +243,7 @@ class AuthController
                 if (! UvhMail::verification($newEmail, $verificationUrl, $tokenHash)) {
                     throw new MailAdmissionException('Registration email correction outbox admission failed');
                 }
+
                 return 'ok';
             });
         } catch (MailAdmissionException) {
@@ -644,6 +646,7 @@ class AuthController
                 ? response()->json(['error' => 'El email ya está verificado o la cuenta no está disponible'], 400)
                 : response()->json(['ok' => true]);
         }
+
         return response()->json(['ok' => true]);
     }
 
@@ -804,6 +807,7 @@ class AuthController
             if ($user->deleted_at && (! $deletion || $deletion->status !== 'scheduled')) {
                 // Never let an old email undo an administrative block.
                 EmailToken::where('user_id', $user->id)->where('kind', 'security_revoke')->whereNull('used_at')->update(['used_at' => now()]);
+
                 return ['user_id' => (int) $user->id, 'artifacts' => [], 'blocked' => true];
             }
 
@@ -981,11 +985,13 @@ class AuthController
                 if ($row) {
                     $row->update(['status' => 'expired', 'confirmation_token_hash' => null, 'updated_at' => now()]);
                 }
+
                 return null;
             }
             if (! $user || $user->deleted_at || ! $user->email_verified_at || ! $user->mfa_enabled
                 || (int) $user->security_version !== (int) $row->security_version) {
                 $row->update(['status' => 'expired', 'confirmation_token_hash' => null, 'updated_at' => now()]);
+
                 return null;
             }
             $row->update([
@@ -995,6 +1001,7 @@ class AuthController
                 'email_confirmed_at' => now(),
                 'updated_at' => now(),
             ]);
+
             return ['user_id' => (int) $user->id, 'request_id' => (int) $row->id];
         }) : null;
         if (! $result) {
@@ -1063,6 +1070,7 @@ class AuthController
                     if ($row) {
                         $row->update(['status' => 'expired', 'completion_token_hash' => null, 'updated_at' => now()]);
                     }
+
                     return ['status' => 'invalid'];
                 }
 
@@ -1089,6 +1097,7 @@ class AuthController
                 if (! $user || ! $user->email_verified_at || ! $user->mfa_enabled
                     || (int) $user->security_version !== (int) $row->security_version) {
                     $row->update(['status' => 'expired', 'completion_token_hash' => null, 'updated_at' => now()]);
+
                     return ['status' => 'invalid'];
                 }
                 $validApprovers = collect($approverIds)
@@ -1227,7 +1236,7 @@ class AuthController
             'fresh' => $fresh,
             'verifiedAt' => $this->iso($verifiedAt),
             'expiresAt' => $verifiedAt
-                ? $this->iso(\Carbon\CarbonImmutable::instance($verifiedAt)->addMinutes($freshMinutes))
+                ? $this->iso(CarbonImmutable::instance($verifiedAt)->addMinutes($freshMinutes))
                 : null,
         ]);
     }
@@ -1303,7 +1312,7 @@ class AuthController
         return response()->json([
             'ok' => true,
             'verifiedAt' => $this->iso($verifiedAt),
-            'expiresAt' => $this->iso(\Carbon\CarbonImmutable::instance($verifiedAt)->addMinutes($this->adminMfaFreshMinutes())),
+            'expiresAt' => $this->iso(CarbonImmutable::instance($verifiedAt)->addMinutes($this->adminMfaFreshMinutes())),
         ]);
     }
 
@@ -1570,6 +1579,7 @@ class AuthController
         }
         if ($result === 'factor') {
             $this->mfaRecordFailure($user->id, 'email-change');
+
             return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
         }
 
@@ -1598,17 +1608,20 @@ class AuthController
                 }
                 if ($row->expires_at->isPast()) {
                     $row->delete();
+
                     return ['status' => 'expired'];
                 }
 
                 if (! $user || $user->deleted_at || ! $user->email_verified_at
                     || (int) $user->security_version !== (int) $row->security_version) {
                     $row->delete();
+
                     return ['status' => 'invalid'];
                 }
                 $this->lockEmailAddress(strtolower($row->new_email));
                 if (User::where('id', '!=', $user->id)->whereRaw('lower(email) = ?', [strtolower($row->new_email)])->exists()) {
                     $row->delete();
+
                     return ['status' => 'conflict'];
                 }
 

@@ -24,8 +24,11 @@ use Tests\TestCase;
 final class InvitationAuthorityLifecycleTest extends TestCase
 {
     private const PASSWORD = 'tiovivo-cobrizo-astilla-42';
+
     private int $failMailInsert = 0;
+
     private int $mailInserts = 0;
+
     private bool $failIssuedRevocation = false;
 
     protected function setUp(): void
@@ -194,6 +197,7 @@ final class InvitationAuthorityLifecycleTest extends TestCase
     {
         $workspace = $owner->ownedWorkspaces()->create(['name' => 'Authority fixture', 'slug' => 'authority-'.strtolower(Ids::randomToken(8))]);
         $workspace->memberships()->create(['user_id' => $owner->id, 'role' => 'owner']);
+
         return $workspace;
     }
 
@@ -205,6 +209,7 @@ final class InvitationAuthorityLifecycleTest extends TestCase
             'workspace_id' => $workspace->id, 'invited_by' => $issuer->id, 'email' => $target->email,
             'role' => $role, 'status' => 'pending', 'token' => Ids::sha256Hex($token), 'expires_at' => now()->addDay(),
         ]);
+
         return [$invitation, $token, $target];
     }
 

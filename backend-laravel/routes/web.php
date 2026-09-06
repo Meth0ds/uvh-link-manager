@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\EdgeController;
-use App\Http\Controllers\PublicController;
 use App\Http\Controllers\OperationsController;
+use App\Http\Controllers\PublicController;
 use App\Http\Controllers\RedirectController;
 use Illuminate\Support\Facades\Route;
 

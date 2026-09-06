@@ -27,10 +27,12 @@ final class MailOutboxDispatcher
                     'queued_at' => now(),
                     'updated_at' => now(),
                 ]);
+
                 return true;
             });
         } catch (\Throwable $error) {
             Log::error('[mail] outbox claim failed', ['outbox_id' => $outboxId, 'exception' => $error::class]);
+
             return false;
         }
 
@@ -40,6 +42,7 @@ final class MailOutboxDispatcher
 
         try {
             DeliverMailOutboxJob::dispatch($outboxId);
+
             return true;
         } catch (\Throwable $error) {
             try {
@@ -54,6 +57,7 @@ final class MailOutboxDispatcher
                 // A stale queued row is reclaimed by housekeeping.
             }
             Log::error('[mail] outbox queue dispatch failed', ['outbox_id' => $outboxId, 'exception' => $error::class]);
+
             return false;
         }
     }

@@ -9,12 +9,12 @@ use App\Support\OperationalMetrics;
 use App\Support\RedirectService;
 use App\Support\SignedToken;
 use App\Support\Ua;
+use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
-use App\Support\UrlUtil;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Cookie;
 
 class RedirectController
@@ -38,6 +38,7 @@ class RedirectController
 
         if ($outcome['kind'] === 'redirect') {
             $this->recordClick($outcome['link_id'], $ctx, $outcome['campaign'] ?? null);
+
             return response('', 302, [
                 'Location' => $outcome['location'],
                 'Cache-Control' => 'no-store',
@@ -191,7 +192,7 @@ class RedirectController
             // Redirect availability takes priority over analytics. The event is
             // observable by operators without leaking requester identifiers.
             OperationalMetrics::increment('analytics.record_failed');
-            \Illuminate\Support\Facades\Log::error('[analytics] click recording failed', ['exception' => $e::class]);
+            Log::error('[analytics] click recording failed', ['exception' => $e::class]);
         }
     }
 

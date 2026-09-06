@@ -21,7 +21,9 @@ use Tests\TestCase;
 final class PasswordNoticeAtomicityTest extends TestCase
 {
     private const CURRENT_PASSWORD = 'tiovivo-cobrizo-astilla-42';
+
     private const NEW_PASSWORD = 'brujula-limonero-zafiro-93';
+
     private const RECOVERY_CODE = 'ABCD2345EFGH6789';
 
     private bool $failNoticeInsert = false;

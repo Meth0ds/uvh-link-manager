@@ -4,8 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Support\OperationalMetrics;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 final class OperationsController
@@ -43,7 +44,7 @@ final class OperationsController
         $this->appendGauge(
             $lines,
             'uvh_mail_outbox_oldest_pending_age_seconds',
-            $oldestPendingMail === null ? 0 : max(0, time() - \Illuminate\Support\Carbon::parse($oldestPendingMail)->getTimestamp()),
+            $oldestPendingMail === null ? 0 : max(0, time() - Carbon::parse($oldestPendingMail)->getTimestamp()),
         );
         foreach (['pending', 'processing', 'success', 'failed'] as $status) {
             $this->appendGauge($lines, 'uvh_webhook_deliveries_'.$status, DB::table('webhook_deliveries')->where('status', $status)->count());
@@ -57,7 +58,7 @@ final class OperationsController
         $this->appendGauge(
             $lines,
             'uvh_webhook_oldest_pending_age_seconds',
-            $oldestPendingWebhook === null ? 0 : max(0, time() - \Illuminate\Support\Carbon::parse($oldestPendingWebhook)->getTimestamp()),
+            $oldestPendingWebhook === null ? 0 : max(0, time() - Carbon::parse($oldestPendingWebhook)->getTimestamp()),
         );
         foreach (['pending', 'verifying', 'verified', 'provisioning', 'active', 'error', 'disabled'] as $state) {
             $this->appendGauge($lines, 'uvh_domains_'.$state, DB::table('custom_domains')->where('state', $state)->count());
@@ -82,7 +83,7 @@ final class OperationsController
         $this->appendGauge(
             $lines,
             'uvh_dns_oldest_in_progress_age_seconds',
-            $oldestDnsCheck === null ? 0 : max(0, time() - \Illuminate\Support\Carbon::parse($oldestDnsCheck)->getTimestamp()),
+            $oldestDnsCheck === null ? 0 : max(0, time() - Carbon::parse($oldestDnsCheck)->getTimestamp()),
         );
         // Provisioning has no separate claim timestamp. updated_at is written
         // when the generation enters provisioning and is not refreshed while
@@ -91,7 +92,7 @@ final class OperationsController
         $this->appendGauge(
             $lines,
             'uvh_tls_oldest_provisioning_age_seconds',
-            $oldestTlsProvisioning === null ? 0 : max(0, time() - \Illuminate\Support\Carbon::parse($oldestTlsProvisioning)->getTimestamp()),
+            $oldestTlsProvisioning === null ? 0 : max(0, time() - Carbon::parse($oldestTlsProvisioning)->getTimestamp()),
         );
         $activePrivacy = DB::table('privacy_rights_requests')->whereIn('status', ['submitted', 'in_progress', 'waiting_user']);
         $this->appendGauge($lines, 'uvh_privacy_requests_active', (clone $activePrivacy)->count());

@@ -526,15 +526,18 @@ export class AuthComponent {
         );
       }
     } finally {
-      if (this.destroyRef.destroyed || revision !== this.verificationRevision) return;
-      if (pendingStep) {
-        this.resendCaptchaToken.set("");
-        this.resendCaptchaWidget?.reset();
-      } else {
-        this.loginCaptchaToken.set("");
-        this.loginCaptchaWidget?.reset();
+      // A return inside finally would suppress a thrown error or an earlier
+      // return value. Stale views simply skip their cleanup instead.
+      if (!this.destroyRef.destroyed && revision === this.verificationRevision) {
+        if (pendingStep) {
+          this.resendCaptchaToken.set("");
+          this.resendCaptchaWidget?.reset();
+        } else {
+          this.loginCaptchaToken.set("");
+          this.loginCaptchaWidget?.reset();
+        }
+        this.verificationBusy.set(false);
       }
-      this.verificationBusy.set(false);
     }
   }
 

@@ -174,6 +174,7 @@ class AppServiceProvider extends ServiceProvider
             // One account allowance across workspaces and rotating sessions;
             // the existing independent IP limiter also applies to this route.
             $actor = UvhRequest::user($request);
+
             return Limit::perMinute(60)->by($actor ? 'user:'.$actor->id : 'ip:'.$request->ip())
                 ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de actividad.'], 429)->withHeaders($headers));
         });
@@ -181,6 +182,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('uvh-usage', function (Request $request) {
             // Bound repeated aggregate scans across workspaces and sessions.
             $actor = UvhRequest::user($request);
+
             return Limit::perMinute(30)->by($actor ? 'user:'.$actor->id : 'ip:'.$request->ip())
                 ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de uso.'], 429)->withHeaders($headers));
         });

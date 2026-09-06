@@ -62,7 +62,9 @@ final class WorkspaceActivityTest extends TestCase
     {
         [$owner, $workspace] = $this->fixture();
         $ids = [];
-        for ($i = 0; $i < 5; $i++) $ids[] = $this->event($workspace->id, $owner->id);
+        for ($i = 0; $i < 5; $i++) {
+            $ids[] = $this->event($workspace->id, $owner->id);
+        }
         $first = $this->getJson($this->path($workspace, ['limit' => 2]))->assertOk();
         $this->assertSame([(string) $ids[4], (string) $ids[3]], array_column($first->json('events'), 'id'));
         $this->event($workspace->id, $owner->id);
@@ -153,7 +155,9 @@ final class WorkspaceActivityTest extends TestCase
             Schema::table('audit_events', fn ($table) => $table->renameColumn('workspace_id', 'activity_test_hidden_workspace'));
             $this->getJson($this->path($workspace))->assertStatus(503)
                 ->assertExactJson(['error' => 'No se pudo consultar la actividad. Inténtalo más tarde.']);
-        } finally { DB::rollBack(); }
+        } finally {
+            DB::rollBack();
+        }
     }
 
     public function test_account_budget_is_shared_across_workspaces_and_new_sessions(): void
@@ -172,6 +176,7 @@ final class WorkspaceActivityTest extends TestCase
         $owner = User::factory()->create();
         $workspace = $this->workspace($owner);
         $this->signIn($owner);
+
         return [$owner, $workspace];
     }
 
@@ -179,6 +184,7 @@ final class WorkspaceActivityTest extends TestCase
     {
         $workspace = $owner->ownedWorkspaces()->create(['name' => 'Activity', 'slug' => 'activity-'.Ids::randomToken(8)]);
         $workspace->memberships()->create(['user_id' => $owner->id, 'role' => 'owner']);
+
         return $workspace;
     }
 

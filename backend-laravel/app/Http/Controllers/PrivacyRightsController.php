@@ -11,6 +11,7 @@ use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 final class PrivacyRightsController
@@ -143,10 +144,18 @@ final class PrivacyRightsController
             return 'ok';
         });
 
-        if ($result === 'not_found') return response()->json(['error' => 'Solicitud no encontrada'], 404);
-        if ($result === 'stale') return response()->json(['error' => 'La cuenta o sesión ya no está disponible'], 409);
-        if ($result === 'state') return response()->json(['error' => 'La solicitud no está esperando información'], 409);
-        if ($result === 'limit') return response()->json(['error' => 'El expediente alcanzó su límite de mensajes. Contacta con soporte'], 409);
+        if ($result === 'not_found') {
+            return response()->json(['error' => 'Solicitud no encontrada'], 404);
+        }
+        if ($result === 'stale') {
+            return response()->json(['error' => 'La cuenta o sesión ya no está disponible'], 409);
+        }
+        if ($result === 'state') {
+            return response()->json(['error' => 'La solicitud no está esperando información'], 409);
+        }
+        if ($result === 'limit') {
+            return response()->json(['error' => 'El expediente alcanzó su límite de mensajes. Contacta con soporte'], 409);
+        }
 
         Audit::write($user->id, 'privacy.user_responded', 'privacy_right', $id, null, UvhRequest::ip($request));
 
@@ -160,11 +169,17 @@ final class PrivacyRightsController
             $result = DB::transaction(function () use ($user, $id): string {
                 $lockedUser = DB::table('users')->where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
                 if (! $lockedUser || $lockedUser->email_verified_at === null
-                    || (int) $lockedUser->security_version !== (int) $user->security_version) return 'stale';
+                    || (int) $lockedUser->security_version !== (int) $user->security_version) {
+                    return 'stale';
+                }
                 $row = DB::table('privacy_rights_requests')->where('id', $id)->where('user_id', $user->id)
                     ->lockForUpdate()->first();
-                if (! $row) return 'not_found';
-                if (! in_array($row->status, self::ACTIVE, true)) return 'state';
+                if (! $row) {
+                    return 'not_found';
+                }
+                if (! in_array($row->status, self::ACTIVE, true)) {
+                    return 'state';
+                }
                 $generation = Ids::sha256Hex(Ids::randomToken(32));
                 DB::table('privacy_rights_requests')->where('id', $id)->update([
                     'status' => 'cancelled',
@@ -181,9 +196,15 @@ final class PrivacyRightsController
         } catch (MailAdmissionException) {
             return response()->json(['error' => 'No se pudo registrar la cancelación de forma verificable'], 503);
         }
-        if ($result === 'not_found') return response()->json(['error' => 'Solicitud no encontrada'], 404);
-        if ($result === 'stale') return response()->json(['error' => 'La cuenta o sesión ya no está disponible'], 409);
-        if ($result === 'state') return response()->json(['error' => 'La solicitud ya no se puede cancelar'], 409);
+        if ($result === 'not_found') {
+            return response()->json(['error' => 'Solicitud no encontrada'], 404);
+        }
+        if ($result === 'stale') {
+            return response()->json(['error' => 'La cuenta o sesión ya no está disponible'], 409);
+        }
+        if ($result === 'state') {
+            return response()->json(['error' => 'La solicitud ya no se puede cancelar'], 409);
+        }
 
         Audit::write($user->id, 'privacy.request_cancelled', 'privacy_right', $id, null, UvhRequest::ip($request));
 
@@ -260,9 +281,15 @@ final class PrivacyRightsController
                     return ['status' => 'actor_changed'];
                 }
                 $row = DB::table('privacy_rights_requests')->where('id', $id)->lockForUpdate()->first();
-                if (! $row) return ['status' => 'not_found'];
-                if (($row->user_id !== null ? (int) $row->user_id : null) !== $targetUserId) return ['status' => 'state'];
-                if (! in_array($row->status, self::ACTIVE, true)) return ['status' => 'state'];
+                if (! $row) {
+                    return ['status' => 'not_found'];
+                }
+                if (($row->user_id !== null ? (int) $row->user_id : null) !== $targetUserId) {
+                    return ['status' => 'state'];
+                }
+                if (! in_array($row->status, self::ACTIVE, true)) {
+                    return ['status' => 'state'];
+                }
                 if (($action === 'start_review' && $row->status !== 'submitted')
                     || ($action === 'request_information' && ! in_array($row->status, ['submitted', 'in_progress'], true))) {
                     return ['status' => 'action_unavailable'];
@@ -291,8 +318,10 @@ final class PrivacyRightsController
                     $updates['status'] = $nextStatus;
                     $updates['completed_at'] = now();
                 } else {
-                    if ($row->extended_until !== null || now()->gt($row->due_at)) return ['status' => 'extension_unavailable'];
-                    $updates['extended_until'] = \Illuminate\Support\Carbon::parse($row->due_at)->addMonthsNoOverflow(2);
+                    if ($row->extended_until !== null || now()->gt($row->due_at)) {
+                        return ['status' => 'extension_unavailable'];
+                    }
+                    $updates['extended_until'] = Carbon::parse($row->due_at)->addMonthsNoOverflow(2);
                     $updates['extension_reason_code'] = $reasonCode;
                 }
                 DB::table('privacy_rights_requests')->where('id', $id)->update($updates);
@@ -312,12 +341,24 @@ final class PrivacyRightsController
             return response()->json(['error' => 'No se pudo registrar y notificar la decisión de forma atómica'], 503);
         }
 
-        if ($result['status'] === 'not_found') return response()->json(['error' => 'Solicitud no encontrada'], 404);
-        if ($result['status'] === 'actor_changed') return response()->json(['error' => 'Tu rol o MFA cambió. Vuelve a autenticarte'], 409);
-        if ($result['status'] === 'state') return response()->json(['error' => 'La solicitud ya está cerrada'], 409);
-        if ($result['status'] === 'action_unavailable') return response()->json(['error' => 'La acción no es válida para el estado actual'], 409);
-        if ($result['status'] === 'limit') return response()->json(['error' => 'El expediente alcanzó su límite de mensajes'], 409);
-        if ($result['status'] === 'extension_unavailable') return response()->json(['error' => 'La ampliación ya se usó o el plazo ordinario venció'], 409);
+        if ($result['status'] === 'not_found') {
+            return response()->json(['error' => 'Solicitud no encontrada'], 404);
+        }
+        if ($result['status'] === 'actor_changed') {
+            return response()->json(['error' => 'Tu rol o MFA cambió. Vuelve a autenticarte'], 409);
+        }
+        if ($result['status'] === 'state') {
+            return response()->json(['error' => 'La solicitud ya está cerrada'], 409);
+        }
+        if ($result['status'] === 'action_unavailable') {
+            return response()->json(['error' => 'La acción no es válida para el estado actual'], 409);
+        }
+        if ($result['status'] === 'limit') {
+            return response()->json(['error' => 'El expediente alcanzó su límite de mensajes'], 409);
+        }
+        if ($result['status'] === 'extension_unavailable') {
+            return response()->json(['error' => 'La ampliación ya se usó o el plazo ordinario venció'], 409);
+        }
 
         Audit::write($actor->id, 'admin.privacy_action', 'privacy_right', $id, ['action' => $action], UvhRequest::ip($request));
 
@@ -362,7 +403,7 @@ final class PrivacyRightsController
      * Load all messages for one response page in one bounded query. A case has
      * at most 20 messages, so the largest admin page hydrates at most 1,000.
      *
-     * @param array<int, int|string> $requestIds
+     * @param  array<int, int|string>  $requestIds
      * @return array<int, array<int, array{id:int,authorRole:string,body:?string,createdAt:mixed}>>
      */
     private function publicMessagesFor(array $requestIds): array
@@ -411,6 +452,7 @@ final class PrivacyRightsController
             // Corrupt ciphertext must not turn the whole case list into a 500,
             // but operations still need a PII-free signal to investigate it.
             OperationalMetrics::increment('privacy.decrypt_failed');
+
             return null;
         }
     }
@@ -425,12 +467,12 @@ final class PrivacyRightsController
         $session = DB::table('sessions')->where('id', $sessionId)->where('user_id', $actor->id)
             ->whereNull('revoked_at')->lockForUpdate()->first();
         if (! $session || (int) $session->security_version !== (int) $actor->security_version
-            || \Illuminate\Support\Carbon::parse($session->expires_at)->isPast() || $session->mfa_verified_at === null) {
+            || Carbon::parse($session->expires_at)->isPast() || $session->mfa_verified_at === null) {
             return false;
         }
         $freshMinutes = max(1, min(60, (int) config('uvh.admin_mfa_fresh_minutes', 15)));
 
-        return \Illuminate\Support\Carbon::parse($session->mfa_verified_at)->gte(now()->subMinutes($freshMinutes));
+        return Carbon::parse($session->mfa_verified_at)->gte(now()->subMinutes($freshMinutes));
     }
 
     private function validBody(string $body, bool $required): string|false

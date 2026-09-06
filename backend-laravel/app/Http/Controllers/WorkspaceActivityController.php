@@ -78,6 +78,7 @@ final class WorkspaceActivityController
                     // URLs and free-form moderation reasons are intentionally absent.
                     $resourceId = is_string($row->resource_id) && preg_match('/^[1-9][0-9]{0,18}$/D', $row->resource_id)
                         ? $row->resource_id : null;
+
                     return [
                         'id' => (string) $row->id, 'action' => $row->action, 'label' => $label,
                         'outcome' => $outcome === 'dns' ? $row->dns_outcome : $outcome,
@@ -90,6 +91,7 @@ final class WorkspaceActivityController
                 $last = $page->last();
                 $nextCursor = $hasMore && $last ? WorkspaceActivityCursor::issue($id, $user->id, (int) $user->security_version,
                     Carbon::parse($last->created_at)->utc()->format('Y-m-d\TH:i:s.uP'), (string) $last->id, $expiresAt) : null;
+
                 return response()->json(['workspaceId' => $id, 'events' => $events, 'nextCursor' => $nextCursor,
                     'coverage' => 'attributed_events_only']);
             });

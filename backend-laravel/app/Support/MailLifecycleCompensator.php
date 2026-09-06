@@ -55,6 +55,7 @@ final class MailLifecycleCompensator
                 }
                 $row->update(['status' => 'cancelled']);
             });
+
             return;
         }
 
@@ -88,6 +89,7 @@ final class MailLifecycleCompensator
                     'artifact_path' => null,
                 ]);
             });
+
             return;
         }
 
@@ -107,6 +109,7 @@ final class MailLifecycleCompensator
                         'confirmation_token_hash' => null,
                         'confirmation_expires_at' => null,
                     ]);
+
                     return;
                 }
                 if ($kind === 'account_recovery_approved'
@@ -122,6 +125,7 @@ final class MailLifecycleCompensator
                     ]);
                 }
             });
+
             return;
         }
 
@@ -147,6 +151,7 @@ final class MailLifecycleCompensator
                 && is_string($row->confirmation_token_hash)
                 && hash_equals($row->confirmation_token_hash, $resourceGeneration)) {
                 $row->update(['status' => 'cancelled', 'confirmation_token_hash' => null, 'cancelled_at' => now()]);
+
                 return null;
             }
             if ($kind !== 'account_deletion_scheduled' || $row->status !== 'scheduled'
@@ -168,6 +173,7 @@ final class MailLifecycleCompensator
                 'cancel_token_hash' => null,
                 'cancelled_at' => $now,
             ]);
+
             return (int) $user->id;
         });
         if ($restoredUserId !== null) {
@@ -182,6 +188,7 @@ final class MailLifecycleCompensator
         }
         if (is_string($value) && preg_match('/^[1-9][0-9]*$/D', $value)) {
             $number = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
             return is_int($number) ? $number : null;
         }
 

@@ -2,6 +2,4 @@
 
 namespace App\Support;
 
-class MailAdmissionException extends \RuntimeException
-{
-}
+class MailAdmissionException extends \RuntimeException {}

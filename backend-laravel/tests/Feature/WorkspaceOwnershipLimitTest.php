@@ -19,6 +19,7 @@ use Tests\TestCase;
 final class WorkspaceOwnershipLimitTest extends TestCase
 {
     private const PASSWORD = 'tiovivo-cobrizo-astilla-42';
+
     private const RECOVERY = 'ABCD2345EFGH6789';
 
     protected function setUp(): void

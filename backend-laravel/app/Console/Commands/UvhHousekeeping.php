@@ -12,12 +12,13 @@ use App\Support\DomainRevalidationSchedule;
 use App\Support\Ids;
 use App\Support\InvitationMailBudget;
 use App\Support\LinkIntentRegistry;
-use App\Support\MailOutboxDispatcher;
 use App\Support\MailOutboxCompensation;
+use App\Support\MailOutboxDispatcher;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifactCleanup;
-use App\Support\WebhookService;
 use App\Support\UvhCrypto;
+use App\Support\WebhookService;
+use App\Support\WorkspaceLimits;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -473,7 +474,7 @@ class UvhHousekeeping extends Command
         });
 
         $run('analytics', function () use ($batch, $cutoff): void {
-            $retentionCutoff = $cutoff(\App\Support\WorkspaceLimits::analyticsRetentionDays());
+            $retentionCutoff = $cutoff(WorkspaceLimits::analyticsRetentionDays());
             $this->purgeInBatches('click_events', 'id', 'occurred_at < ?', [$retentionCutoff], $batch);
             $this->purgeInBatches('metric_rollups', 'id', 'day < ?', [$retentionCutoff], $batch);
             DB::delete('DELETE FROM metric_unique_visitors WHERE day < ?', [substr($retentionCutoff, 0, 10)]);
@@ -564,6 +565,7 @@ class UvhHousekeeping extends Command
                     DB::table('account_deletion_requests')->where('id', $id)->update([
                         'status' => 'blocked', 'cancel_token_hash' => null, 'updated_at' => now(),
                     ]);
+
                     return null;
                 }
                 $mailConfirmed = is_string($request->cancel_token_hash)
@@ -603,6 +605,7 @@ class UvhHousekeeping extends Command
                         'cancelled_at' => $now,
                         'updated_at' => $now,
                     ]);
+
                     return ['blocked' => true, 'mail_unconfirmed' => false, 'user_id' => (int) $user->id, 'artifacts' => []];
                 }
 

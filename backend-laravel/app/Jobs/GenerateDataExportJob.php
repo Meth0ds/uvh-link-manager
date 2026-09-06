@@ -33,9 +33,7 @@ class GenerateDataExportJob implements ShouldQueue
     /** Keep the automated export bounded before hydrating large collections. */
     private const MAX_EXPORT_ROWS = 25_000;
 
-    public function __construct(public readonly int $requestId)
-    {
-    }
+    public function __construct(public readonly int $requestId) {}
 
     public function handle(): void
     {
@@ -61,8 +59,10 @@ class GenerateDataExportJob implements ShouldQueue
             if (! $user || $user->deleted_at
                 || (int) $user->security_version !== (int) $request->security_version) {
                 $request->update(['status' => 'cancelled']);
+
                 return ['status' => 'cancelled', 'path' => $oldPath];
             }
+
             return [
                 'status' => 'ok',
                 'path' => $oldPath,
@@ -165,10 +165,12 @@ class GenerateDataExportJob implements ShouldQueue
                     || ! hash_equals($artifactPath, $lockedRequest->artifact_path)) {
                     return false;
                 }
+
                 return true;
             });
             if (! $eligible) {
                 PrivateArtifactCleanup::attempt($requestId, $artifactPath);
+
                 return;
             }
 
@@ -208,6 +210,7 @@ class GenerateDataExportJob implements ShouldQueue
             });
             if (! $madeReady) {
                 PrivateArtifactCleanup::attempt($requestId, $artifactPath);
+
                 return;
             }
 
@@ -353,6 +356,7 @@ class GenerateDataExportJob implements ShouldQueue
                     ? $parts['scheme'].'://'.$host.(isset($parts['port']) ? ':'.$parts['port'] : '').($parts['path'] ?? '/')
                     : null;
                 $webhook->urlCredentialsOrQueryRedacted = $hadSensitiveUrlParts;
+
                 return $webhook;
             });
         $audit = DB::table('audit_events')->where('user_id', $userId)->orderBy('id')

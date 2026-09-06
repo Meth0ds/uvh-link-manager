@@ -22,11 +22,11 @@ class Totp
             $bits += 8;
             while ($bits >= 5) {
                 $bits -= 5;
-                $out .= self::BASE32_ALPHABET[($buffer >> $bits) & 0x1f];
+                $out .= self::BASE32_ALPHABET[($buffer >> $bits) & 0x1F];
             }
         }
         if ($bits > 0) {
-            $out .= self::BASE32_ALPHABET[($buffer << (5 - $bits)) & 0x1f];
+            $out .= self::BASE32_ALPHABET[($buffer << (5 - $bits)) & 0x1F];
         }
 
         return $out;
@@ -76,8 +76,8 @@ class Totp
     {
         $msg = pack('N', 0).pack('N', $counter);
         $hash = hash_hmac('sha1', $msg, $key, true);
-        $offset = ord($hash[strlen($hash) - 1]) & 0x0f;
-        $bin = ((ord($hash[$offset]) & 0x7f) << 24)
+        $offset = ord($hash[strlen($hash) - 1]) & 0x0F;
+        $bin = ((ord($hash[$offset]) & 0x7F) << 24)
             | (ord($hash[$offset + 1]) << 16)
             | (ord($hash[$offset + 2]) << 8)
             | ord($hash[$offset + 3]);
@@ -100,7 +100,7 @@ class Totp
             $bits += 5;
             if ($bits >= 8) {
                 $bits -= 8;
-                $out .= chr(($buffer >> $bits) & 0xff);
+                $out .= chr(($buffer >> $bits) & 0xFF);
             }
         }
 

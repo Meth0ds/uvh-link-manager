@@ -50,6 +50,7 @@ final class ReleaseReadiness
         } catch (\Throwable) {
             $errors[] = 'No se pudo comprobar el esquema del release.';
         }
+
         return $errors;
     }
 }

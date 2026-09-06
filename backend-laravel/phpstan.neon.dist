@@ -1,0 +1,21 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    # Existing findings stay visible and countable while CI rejects every new
+    # finding. Removing a fixed entry is enforced below.
+    - phpstan-baseline.neon
+
+parameters:
+    # Level 6 catches unknown and insufficiently specified types. The committed
+    # baseline contains only the debt that existed when this gate was enabled.
+    level: 6
+    paths:
+        - app
+
+    # Runtime and generated artifacts are never application source.
+    excludePaths:
+        analyse:
+            - bootstrap/cache/*
+            - storage/*
+
+    tmpDir: storage/framework/cache/phpstan
+    reportUnmatchedIgnoredErrors: true

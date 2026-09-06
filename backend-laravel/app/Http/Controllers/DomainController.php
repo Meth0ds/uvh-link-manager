@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\VerifyDomainDnsJob;
 use App\Jobs\ProvisionDomainTlsJob;
+use App\Jobs\VerifyDomainDnsJob;
 use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Support\Audit;
@@ -12,6 +12,7 @@ use App\Support\Ids;
 use App\Support\OperationalMetrics;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceAccess;
+use App\Support\WorkspaceLimits;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -19,7 +20,7 @@ use Illuminate\Support\Facades\DB;
 
 class DomainController
 {
-    private const MAX_DOMAINS_PER_WORKSPACE = \App\Support\WorkspaceLimits::DOMAINS;
+    private const MAX_DOMAINS_PER_WORKSPACE = WorkspaceLimits::DOMAINS;
 
     private const VERIFICATION_LOCK_SECONDS = 600;
 
@@ -375,6 +376,7 @@ class DomainController
         }
         if (! $lockAcquired) {
             OperationalMetrics::increment('lock.unavailable');
+
             return response()->json(['error' => 'Ya hay una verificación en curso para este dominio'], 409);
         }
 

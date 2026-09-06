@@ -13,6 +13,7 @@ use App\Support\MfaStepUp;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceAccess;
+use App\Support\WorkspaceLimits;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +21,7 @@ class TokenController
 {
     private const SCOPES = ['links:read', 'links:write', 'analytics:read', 'domains:read', 'domains:write'];
 
-    private const MAX_ACTIVE_TOKENS = \App\Support\WorkspaceLimits::ACTIVE_TOKENS;
+    private const MAX_ACTIVE_TOKENS = WorkspaceLimits::ACTIVE_TOKENS;
 
     public function index(Request $request)
     {

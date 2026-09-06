@@ -1,19 +1,19 @@
 <?php
 
-use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkIntentController;
-use App\Http\Controllers\PublicController;
 use App\Http\Controllers\PrivacyRightsController;
+use App\Http\Controllers\PublicController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\WorkspaceActivityController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Controllers\WorkspaceOnboardingController;
-use App\Http\Controllers\WorkspaceActivityController;
 use App\Http\Controllers\WorkspaceUsageController;
 use Illuminate\Support\Facades\Route;
 

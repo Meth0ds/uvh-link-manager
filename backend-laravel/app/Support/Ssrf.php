@@ -20,23 +20,23 @@ final class Ssrf
 
     /** @var array<int, array{0: int, 1: int}> */
     private const PRIVATE_IPV4_RANGES = [
-        [0x00000000, 0x00ffffff], // 0.0.0.0/8
-        [0x0a000000, 0x0affffff], // 10.0.0.0/8
-        [0x64400000, 0x647fffff], // 100.64.0.0/10 (CGNAT, RFC 6598)
-        [0x7f000000, 0x7fffffff], // 127.0.0.0/8 (loopback)
-        [0xa9fe0000, 0xa9feffff], // 169.254.0.0/16 (link-local)
-        [0xac100000, 0xac1fffff], // 172.16.0.0/12
-        [0xc0000000, 0xc00000ff], // 192.0.0.0/24 (IETF protocol assignments)
-        [0xc0000200, 0xc00002ff], // 192.0.2.0/24 (TEST-NET)
-        [0xc0a80000, 0xc0a8ffff], // 192.168.0.0/16
+        [0x00000000, 0x00FFFFFF], // 0.0.0.0/8
+        [0x0A000000, 0x0AFFFFFF], // 10.0.0.0/8
+        [0x64400000, 0x647FFFFF], // 100.64.0.0/10 (CGNAT, RFC 6598)
+        [0x7F000000, 0x7FFFFFFF], // 127.0.0.0/8 (loopback)
+        [0xA9FE0000, 0xA9FEFFFF], // 169.254.0.0/16 (link-local)
+        [0xAC100000, 0xAC1FFFFF], // 172.16.0.0/12
+        [0xC0000000, 0xC00000FF], // 192.0.0.0/24 (IETF protocol assignments)
+        [0xC0000200, 0xC00002FF], // 192.0.2.0/24 (TEST-NET)
+        [0xC0A80000, 0xC0A8FFFF], // 192.168.0.0/16
         // TEST-NET-2 (198.51.100.0/24) y el rango de benchmarking
         // 198.18.0.0/15 (RFC 2544) se cubren ambos para no dejar nada
         // sin proteger.
-        [0xc6120000, 0xc613ffff], // 198.18.0.0/15 (benchmarking, RFC 2544)
-        [0xc6336400, 0xc63364ff], // 198.51.100.0/24 (TEST-NET-2)
-        [0xcb007100, 0xcb0071ff], // 203.0.113.0/24 (TEST-NET-3)
-        [0xe0000000, 0xefffffff], // 224.0.0.0/4 (multicast)
-        [0xf0000000, 0xffffffff], // 240.0.0.0/4 (reservado/broadcast)
+        [0xC6120000, 0xC613FFFF], // 198.18.0.0/15 (benchmarking, RFC 2544)
+        [0xC6336400, 0xC63364FF], // 198.51.100.0/24 (TEST-NET-2)
+        [0xCB007100, 0xCB0071FF], // 203.0.113.0/24 (TEST-NET-3)
+        [0xE0000000, 0xEFFFFFFF], // 224.0.0.0/4 (multicast)
+        [0xF0000000, 0xFFFFFFFF], // 240.0.0.0/4 (reservado/broadcast)
     ];
 
     public static function isPrivateIp(string $ip): bool
@@ -82,23 +82,23 @@ final class Ssrf
                 return true;
             }
             // fc00::/7 (ULA)
-            if (($b[1] & 0xfe) === 0xfc) {
+            if (($b[1] & 0xFE) === 0xFC) {
                 return true;
             }
             // fe80::/10 (link-local)
-            if ($b[1] === 0xfe && ($b[2] & 0xc0) === 0x80) {
+            if ($b[1] === 0xFE && ($b[2] & 0xC0) === 0x80) {
                 return true;
             }
             // fec0::/10 (site-local obsoleto/reservado)
-            if ($b[1] === 0xfe && ($b[2] & 0xc0) === 0xc0) {
+            if ($b[1] === 0xFE && ($b[2] & 0xC0) === 0xC0) {
                 return true;
             }
             // ff00::/8 (multicast)
-            if ($b[1] === 0xff) {
+            if ($b[1] === 0xFF) {
                 return true;
             }
             // 2001:db8::/32 (documentación)
-            if ($b[1] === 0x20 && $b[2] === 0x01 && $b[3] === 0x0d && $b[4] === 0xb8) {
+            if ($b[1] === 0x20 && $b[2] === 0x01 && $b[3] === 0x0D && $b[4] === 0xB8) {
                 return true;
             }
 
@@ -302,7 +302,7 @@ final class Ssrf
     {
         $n = 0;
         foreach (explode('.', $ip) as $oct) {
-            $n = (($n << 8) + (int) $oct) & 0xffffffff;
+            $n = (($n << 8) + (int) $oct) & 0xFFFFFFFF;
         }
 
         return $n;
@@ -328,7 +328,7 @@ final class Ssrf
         }
         if ($firstTenZero) {
             $v = ($b[11] << 8) | $b[12];
-            if ($v === 0xffff || $v === 0x0000) {
+            if ($v === 0xFFFF || $v === 0x0000) {
                 return self::ipv4FromBytes($b[13], $b[14], $b[15], $b[16]);
             }
 
@@ -337,7 +337,7 @@ final class Ssrf
 
         // NAT64 well-known prefix 64:ff9b::/96: grupos 0x0064 y 0xff9b, que
         // en bytes son 00 64 ff 9b (cada grupo IPv6 ocupa 2 bytes).
-        if ($b[1] === 0x00 && $b[2] === 0x64 && $b[3] === 0xff && $b[4] === 0x9b
+        if ($b[1] === 0x00 && $b[2] === 0x64 && $b[3] === 0xFF && $b[4] === 0x9B
             && $b[5] === 0 && $b[6] === 0 && $b[7] === 0 && $b[8] === 0
             && $b[9] === 0 && $b[10] === 0 && $b[11] === 0 && $b[12] === 0) {
             return self::ipv4FromBytes($b[13], $b[14], $b[15], $b[16]);
@@ -353,7 +353,7 @@ final class Ssrf
         if ($b[1] === 0x20 && $b[2] === 0x01 && $b[3] === 0 && $b[4] === 0) {
             $n = self::ipv4FromBytes($b[13], $b[14], $b[15], $b[16]);
 
-            return $n !== null ? ($n ^ 0xffffffff) : null;
+            return $n !== null ? ($n ^ 0xFFFFFFFF) : null;
         }
 
         return null;
@@ -365,6 +365,6 @@ final class Ssrf
             return null;
         }
 
-        return (($a << 24) | ($b << 16) | ($c << 8) | $d) & 0xffffffff;
+        return (($a << 24) | ($b << 16) | ($c << 8) | $d) & 0xFFFFFFFF;
     }
 }

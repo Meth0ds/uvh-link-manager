@@ -19,13 +19,16 @@ use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
 use App\Support\WorkspaceAccess;
+use App\Support\WorkspaceLimits;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class WorkspaceController
 {
     private const MAX_OWNED_WORKSPACES = 20;
-    private const MAX_ACTIVE_INVITATIONS = \App\Support\WorkspaceLimits::ACTIVE_INVITATIONS;
+
+    private const MAX_ACTIVE_INVITATIONS = WorkspaceLimits::ACTIVE_INVITATIONS;
 
     public function index(Request $request)
     {
@@ -685,10 +688,12 @@ class WorkspaceController
             return response()->json(['error' => 'No se pudo poner en cola la invitación. Inténtalo de nuevo.'], 503);
         } catch (InvitationBudgetExceeded $error) {
             OperationalMetrics::increment('invitation.budget_rejected');
+
             return response()->json(['error' => 'Límite temporal de correo de invitaciones alcanzado. Inténtalo más tarde.'], 429)
                 ->header('Retry-After', (string) $error->retryAfter);
         } catch (InvitationBudgetUnavailable) {
             OperationalMetrics::increment('invitation.budget_unavailable');
+
             return response()->json(['error' => 'No se pudo comprobar el presupuesto de correo. No se ha enviado la invitación.'], 503);
         }
         if ($result['status'] === 'forbidden') {
@@ -698,6 +703,7 @@ class WorkspaceController
             if ($result['status'] === 'limit') {
                 return response()->json(['error' => 'Límite de invitaciones activas alcanzado en este workspace'], 429);
             }
+
             return response()->json(['error' => 'Este usuario ya es miembro o ya tiene una invitación pendiente'], 409);
         }
         Audit::write($user->id, 'workspace.invite', 'workspace', $id, ['role' => $role], UvhRequest::ip($request));
@@ -749,6 +755,7 @@ class WorkspaceController
                     : WorkspaceAccess::roleAtLeast($issuerMembership->role, 'admin'));
             if (! $issuerCanInvite) {
                 $locked->update(['status' => 'cancelled']);
+
                 return null;
             }
             if (Membership::where('workspace_id', $workspaceId)->where('user_id', $target->id)->exists()) {
@@ -756,6 +763,7 @@ class WorkspaceController
             }
             $locked->update(['status' => 'accepted']);
             Membership::create(['workspace_id' => $locked->workspace_id, 'user_id' => $target->id, 'role' => $locked->role]);
+
             return $locked->fresh();
         }) : null;
         if (! $inv) {
@@ -795,6 +803,7 @@ class WorkspaceController
                 return null;
             }
             $locked->update(['status' => 'rejected']);
+
             return $locked;
         }) : null;
         if (! $inv) {
@@ -830,6 +839,7 @@ class WorkspaceController
                 return 'forbidden';
             }
             $invitation->update(['status' => 'cancelled']);
+
             return 'ok';
         });
         if ($changed === 'access_changed') {
@@ -920,10 +930,12 @@ class WorkspaceController
             return response()->json(['error' => 'No se pudo poner en cola el reenvío. Se conservan el enlace y la caducidad anteriores.'], 503);
         } catch (InvitationBudgetExceeded $error) {
             OperationalMetrics::increment('invitation.budget_rejected');
+
             return response()->json(['error' => 'Límite temporal de correo de invitaciones alcanzado. Inténtalo más tarde.'], 429)
                 ->header('Retry-After', (string) $error->retryAfter);
         } catch (InvitationBudgetUnavailable) {
             OperationalMetrics::increment('invitation.budget_unavailable');
+
             return response()->json(['error' => 'No se pudo comprobar el presupuesto de correo. Se conserva la invitación anterior.'], 503);
         }
         if ($result['status'] === 'forbidden') {
@@ -936,6 +948,7 @@ class WorkspaceController
             if ($result['status'] === 'conflict') {
                 return response()->json(['error' => 'Este usuario ya es miembro o tiene otra invitación pendiente'], 409);
             }
+
             return response()->json(['error' => 'Invitación no encontrada, no renovable o sin permisos'], 404);
         }
         Audit::write($user->id, 'workspace.invitation_resent', 'workspace', $id, null, UvhRequest::ip($request));
@@ -945,7 +958,7 @@ class WorkspaceController
 
     // ---------------- helpers ----------------
 
-    /** @return array{items: \Illuminate\Support\Collection, total: int} */
+    /** @return array{items: Collection, total: int} */
     private function membersOf(int $workspaceId, int $page, int $perPage): array
     {
         $query = DB::table('memberships as m')
@@ -970,7 +983,7 @@ class WorkspaceController
         return ['items' => $items, 'total' => $total];
     }
 
-    /** @return array{items: \Illuminate\Support\Collection, total: int} */
+    /** @return array{items: Collection, total: int} */
     private function invitationsOf(int $workspaceId, int $page, int $perPage): array
     {
         // Present effective expiry without writing during GET. A worker need

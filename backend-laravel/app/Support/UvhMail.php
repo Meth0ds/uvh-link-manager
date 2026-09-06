@@ -25,8 +25,7 @@ class UvhMail
         ?string $resourceType = null,
         int|string|null $resourceId = null,
         ?string $resourceGeneration = null,
-    ): bool
-    {
+    ): bool {
         try {
             $envelope = UvhCrypto::encryptAtRest(json_encode([
                 'to' => $to,
@@ -81,6 +80,7 @@ class UvhMail
             // Development transports intentionally report success without
             // recording recipients, subjects or bearer URLs in application logs.
             Log::info('[mail] development transport accepted message');
+
             return true;
         }
 
@@ -89,6 +89,7 @@ class UvhMail
         // successful send during an outage; reject it before any transport runs.
         if (MailTransportPolicy::deliveryLeaves($mailConfig) === null) {
             Log::error('[mail] delivery transport configuration rejected');
+
             return false;
         }
 
@@ -103,13 +104,16 @@ class UvhMail
             // its envelope and retry instead of treating that as acceptance.
             if (! $sent instanceof SentMessage) {
                 Log::warning('[mail] transport did not confirm acceptance');
+
                 return false;
             }
+
             return true;
         } catch (\Throwable $e) {
             // A delivery outage must be visible to monitoring, but email
             // addresses, message subjects and token-bearing URLs are PII/secrets.
             Log::error('[mail] send failed', ['exception' => $e::class]);
+
             return false;
         }
     }
@@ -117,6 +121,7 @@ class UvhMail
     public static function verification(string $to, string $url, string $tokenHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Verificar email</a>';
+
         return self::send(
             'verification',
             $to,
@@ -132,6 +137,7 @@ class UvhMail
     public static function resetPassword(string $to, string $url, string $tokenHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Restablecer contraseña</a>';
+
         return self::send(
             'password_reset',
             $to,
@@ -147,6 +153,7 @@ class UvhMail
     public static function passwordChanged(string $to, string $incidentUrl, string $tokenHash): bool
     {
         $link = '<a href="'.self::esc($incidentUrl).'" style="display:inline-block;background:#B42318;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Cerrar accesos de emergencia</a>';
+
         return self::send(
             'password_changed',
             $to,
@@ -162,6 +169,7 @@ class UvhMail
     public static function accountRecoveryConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Confirmar solicitud</a>';
+
         return self::send(
             'account_recovery_confirmation',
             $to,
@@ -177,6 +185,7 @@ class UvhMail
     public static function accountRecoveryApproved(string $to, string $url, int $requestId, string $generationHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Finalizar recuperación</a>';
+
         return self::send(
             'account_recovery_approved',
             $to,
@@ -203,6 +212,7 @@ class UvhMail
     public static function emailChangeVerification(string $to, string $url, string $tokenHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Confirmar nuevo email</a>';
+
         return self::send(
             'email_change_verification',
             $to,
@@ -240,6 +250,7 @@ class UvhMail
     public static function dataExportConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Confirmar exportación</a>';
+
         return self::send(
             'data_export_confirmation',
             $to,
@@ -255,6 +266,7 @@ class UvhMail
     public static function dataExportReady(string $to, string $url, int $requestId, string $generationHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#00A99D;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Descargar mis datos</a>';
+
         return self::send(
             'data_export_ready',
             $to,
@@ -270,6 +282,7 @@ class UvhMail
     public static function accountDeletionConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#B42318;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Revisar eliminación</a>';
+
         return self::send(
             'account_deletion_confirmation',
             $to,
@@ -285,6 +298,7 @@ class UvhMail
     public static function accountDeletionScheduled(string $to, string $cancelUrl, string $executeAt, int $requestId, string $generationHash): bool
     {
         $link = '<a href="'.self::esc($cancelUrl).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Cancelar eliminación</a>';
+
         return self::send(
             'account_deletion_scheduled',
             $to,
@@ -426,9 +440,9 @@ class UvhMail
         string $role,
         int $invitationId,
         string $generationHash,
-    ): bool
-    {
+    ): bool {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#00A99D;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Aceptar invitación</a>';
+
         return self::send(
             'invitation',
             $to,

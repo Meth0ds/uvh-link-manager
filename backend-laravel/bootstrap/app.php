@@ -1,9 +1,9 @@
 <?php
 
+use App\Http\Middleware\RecordOperationalResponse;
 use App\Http\Middleware\RequireApiToken;
 use App\Http\Middleware\RequireMfa;
 use App\Http\Middleware\RequireWorkspace;
-use App\Http\Middleware\RecordOperationalResponse;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\UvhAuth;
 use App\Http\Middleware\UvhCsrf;

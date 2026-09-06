@@ -24,11 +24,14 @@ use Tests\TestCase;
 final class SecurityNoticeAtomicityTest extends TestCase
 {
     private const PASSWORD = 'tiovivo-cobrizo-astilla-42';
+
     private const RECOVERY_CODE = 'ABCD2345EFGH6789';
+
     // RFC 6238 fixture: Base32 encoding of the ASCII key used by pendingCode().
     private const PENDING_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
     private int $failAtInsert = 0;
+
     private array $insertLevels = [];
 
     protected function setUp(): void
@@ -60,6 +63,7 @@ final class SecurityNoticeAtomicityTest extends TestCase
             $cases[$action.' succeeds'] = [$action, false];
             $cases[$action.' rolls back'] = [$action, true];
         }
+
         return $cases;
     }
 
@@ -105,6 +109,7 @@ final class SecurityNoticeAtomicityTest extends TestCase
                 $factor = substr(hash('sha256', self::PENDING_SECRET), 0, 24);
                 $this->assertTrue(Cache::has('uvh:mfa:totp-used:'.$user->id.':'.$factor.':'.$counter));
             }
+
             return;
         }
 
@@ -202,6 +207,7 @@ final class SecurityNoticeAtomicityTest extends TestCase
     private function securityState(User $user): array
     {
         $user->refresh();
+
         return array_map(fn (string $field) => $user->getRawOriginal($field), [
             'email', 'security_version', 'mfa_enabled', 'mfa_secret', 'mfa_pending_secret', 'mfa_pending_expires_at', 'recovery_codes',
         ]);
@@ -240,8 +246,9 @@ final class SecurityNoticeAtomicityTest extends TestCase
         // the RFC fixture's current step without sleeps or changing system time.
         $counter = intdiv(time(), 30);
         $digest = hash_hmac('sha1', pack('N2', 0, $counter), '12345678901234567890', true);
-        $offset = ord($digest[19]) & 0x0f;
-        $binary = unpack('N', substr($digest, $offset, 4))[1] & 0x7fffffff;
+        $offset = ord($digest[19]) & 0x0F;
+        $binary = unpack('N', substr($digest, $offset, 4))[1] & 0x7FFFFFFF;
+
         return str_pad((string) ($binary % 1000000), 6, '0', STR_PAD_LEFT);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Support\IsoDate;
 use App\Support\UvhRequest;
+use App\Support\WorkspaceLimits;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -11,7 +12,7 @@ class AnalyticsController
 {
     private const PERIODS = ['24h', '7d', '30d', '90d'];
 
-    private const MAX_RANGE_DAYS = \App\Support\WorkspaceLimits::ANALYTICS_RANGE_DAYS;
+    private const MAX_RANGE_DAYS = WorkspaceLimits::ANALYTICS_RANGE_DAYS;
 
     public function overview(Request $request)
     {
@@ -119,7 +120,7 @@ class AnalyticsController
         $totalVisitors = (int) (clone $events)->whereNotNull('e.visitor_hash')->distinct()->count('e.visitor_hash');
 
         $seriesQuery = (clone $events)
-            ->selectRaw("e.occurred_at::date AS day, COUNT(*) AS clicks, COUNT(DISTINCT e.visitor_hash) AS visitors")
+            ->selectRaw('e.occurred_at::date AS day, COUNT(*) AS clicks, COUNT(DISTINCT e.visitor_hash) AS visitors')
             ->groupBy('day')->orderBy('day');
         $series = $seriesQuery->get()->map(fn ($r) => [
             'day' => $r->day,
@@ -230,5 +231,4 @@ class AnalyticsController
             ? ['ok' => false, 'value' => null]
             : ['ok' => true, 'value' => $validated];
     }
-
 }

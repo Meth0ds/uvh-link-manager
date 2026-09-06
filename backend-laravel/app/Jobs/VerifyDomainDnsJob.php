@@ -38,89 +38,88 @@ class VerifyDomainDnsJob implements ShouldQueue
         public int $verificationVersion,
         public string $dedupeKey,
         public string $dedupeOwner,
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {
         $dns = $this->checkDns();
         $result = DB::transaction(function () use ($dns): ?array {
-                $membership = $this->requestedBy === null
-                    ? true
-                    : WorkspaceAccess::getMembershipLocked($this->requestedBy, $this->workspaceId, 'editor') !== null;
-                $domain = CustomDomain::where('id', $this->domainId)
-                    ->where('workspace_id', $this->workspaceId)->lockForUpdate()->first();
-                if (! $domain || $domain->domain !== $this->domain || $domain->verification_token !== $this->verificationToken) {
-                    return null;
-                }
-                if ((int) $domain->verification_version !== $this->verificationVersion) {
-                    return null;
-                }
-                $expectedState = $this->previousState === 'pending' || $this->previousState === 'error'
-                    ? 'verifying'
-                    : $this->previousState;
-                if ($domain->state !== $expectedState) {
-                    return null;
-                }
-                if (! $membership) {
-                    $cancelled = [
-                        'dns_check_completed_at' => now(),
-                        'dns_error' => 'verification_cancelled',
-                        'updated_at' => now(),
-                    ];
-                    if ($domain->state === 'verifying') {
-                        $cancelled['state'] = $this->previousState;
-                    }
-                    $domain->update($cancelled);
-
-                    return null;
-                }
-
-                $now = now();
-                $found = $dns['ownership'] && $dns['routing'];
-                $failureCount = $found ? 0 : (int) $domain->dns_failure_count + 1;
-                $firstFailedAt = $found ? null : ($domain->dns_first_failed_at ?? $now);
-                $graceHours = max(1, min(24, (int) config('uvh.custom_domains.failure_grace_hours', 2)));
-                $maxFailures = max(2, min(10, (int) config('uvh.custom_domains.max_failures', 3)));
-                $wasEdgeEligible = (bool) $domain->edge_eligible;
-                $withinActiveGrace = $this->previousState === 'active'
-                    && $wasEdgeEligible
-                    && ($failureCount < $maxFailures
-                        || $firstFailedAt->gt($now->copy()->subHours($graceHours)));
-                $nextState = $found
-                    ? ($this->previousState === 'active' && $wasEdgeEligible ? 'active' : 'verified')
-                    : ($withinActiveGrace ? 'active' : 'error');
-                $nextEdgeEligibility = $found
-                    ? $this->previousState === 'active' && $wasEdgeEligible
-                    : ($withinActiveGrace && (bool) $domain->edge_eligible);
-                $domain->update([
-                    'state' => $nextState,
-                    'verified_at' => $found ? $now : ($withinActiveGrace ? $domain->verified_at : null),
-                    'ownership_verified_at' => $dns['ownership'] ? $now : null,
-                    'routing_verified_at' => $dns['routing'] ? $now : null,
-                    'dns_check_completed_at' => $now,
-                    'dns_error' => $found ? null : $dns['error'],
-                    'dns_failure_count' => $failureCount,
-                    'dns_first_failed_at' => $firstFailedAt,
-                    'edge_eligible' => $nextEdgeEligibility,
-                    'tls_ready_at' => $nextEdgeEligibility || $withinActiveGrace ? $domain->tls_ready_at : null,
-                    'updated_at' => $now,
-                ]);
-                if ($found && in_array($this->previousState, ['pending', 'error'], true)) {
-                    WebhookService::dispatch($this->workspaceId, 'domain.verified', [
-                        'domainId' => $this->domainId,
-                        'domain' => $this->domain,
-                    ]);
-                }
-
-                return [
-                    'found' => $found,
-                    'state' => $nextState,
-                    'dnsError' => $found ? null : $dns['error'],
-                    'failureCount' => $failureCount,
-                    'withinGrace' => $withinActiveGrace,
-                    'firstVerification' => in_array($this->previousState, ['pending', 'error'], true),
+            $membership = $this->requestedBy === null
+                ? true
+                : WorkspaceAccess::getMembershipLocked($this->requestedBy, $this->workspaceId, 'editor') !== null;
+            $domain = CustomDomain::where('id', $this->domainId)
+                ->where('workspace_id', $this->workspaceId)->lockForUpdate()->first();
+            if (! $domain || $domain->domain !== $this->domain || $domain->verification_token !== $this->verificationToken) {
+                return null;
+            }
+            if ((int) $domain->verification_version !== $this->verificationVersion) {
+                return null;
+            }
+            $expectedState = $this->previousState === 'pending' || $this->previousState === 'error'
+                ? 'verifying'
+                : $this->previousState;
+            if ($domain->state !== $expectedState) {
+                return null;
+            }
+            if (! $membership) {
+                $cancelled = [
+                    'dns_check_completed_at' => now(),
+                    'dns_error' => 'verification_cancelled',
+                    'updated_at' => now(),
                 ];
+                if ($domain->state === 'verifying') {
+                    $cancelled['state'] = $this->previousState;
+                }
+                $domain->update($cancelled);
+
+                return null;
+            }
+
+            $now = now();
+            $found = $dns['ownership'] && $dns['routing'];
+            $failureCount = $found ? 0 : (int) $domain->dns_failure_count + 1;
+            $firstFailedAt = $found ? null : ($domain->dns_first_failed_at ?? $now);
+            $graceHours = max(1, min(24, (int) config('uvh.custom_domains.failure_grace_hours', 2)));
+            $maxFailures = max(2, min(10, (int) config('uvh.custom_domains.max_failures', 3)));
+            $wasEdgeEligible = (bool) $domain->edge_eligible;
+            $withinActiveGrace = $this->previousState === 'active'
+                && $wasEdgeEligible
+                && ($failureCount < $maxFailures
+                    || $firstFailedAt->gt($now->copy()->subHours($graceHours)));
+            $nextState = $found
+                ? ($this->previousState === 'active' && $wasEdgeEligible ? 'active' : 'verified')
+                : ($withinActiveGrace ? 'active' : 'error');
+            $nextEdgeEligibility = $found
+                ? $this->previousState === 'active' && $wasEdgeEligible
+                : ($withinActiveGrace && (bool) $domain->edge_eligible);
+            $domain->update([
+                'state' => $nextState,
+                'verified_at' => $found ? $now : ($withinActiveGrace ? $domain->verified_at : null),
+                'ownership_verified_at' => $dns['ownership'] ? $now : null,
+                'routing_verified_at' => $dns['routing'] ? $now : null,
+                'dns_check_completed_at' => $now,
+                'dns_error' => $found ? null : $dns['error'],
+                'dns_failure_count' => $failureCount,
+                'dns_first_failed_at' => $firstFailedAt,
+                'edge_eligible' => $nextEdgeEligibility,
+                'tls_ready_at' => $nextEdgeEligibility || $withinActiveGrace ? $domain->tls_ready_at : null,
+                'updated_at' => $now,
+            ]);
+            if ($found && in_array($this->previousState, ['pending', 'error'], true)) {
+                WebhookService::dispatch($this->workspaceId, 'domain.verified', [
+                    'domainId' => $this->domainId,
+                    'domain' => $this->domain,
+                ]);
+            }
+
+            return [
+                'found' => $found,
+                'state' => $nextState,
+                'dnsError' => $found ? null : $dns['error'],
+                'failureCount' => $failureCount,
+                'withinGrace' => $withinActiveGrace,
+                'firstVerification' => in_array($this->previousState, ['pending', 'error'], true),
+            ];
         });
         if (! $result) {
             $this->releaseDedupeLock();

@@ -2,6 +2,4 @@
 
 namespace App\Support;
 
-final class WebhookAdmissionUnavailable extends \RuntimeException
-{
-}
+final class WebhookAdmissionUnavailable extends \RuntimeException {}

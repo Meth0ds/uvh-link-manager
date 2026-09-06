@@ -81,7 +81,7 @@
         <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span>
         <div class="link-main">
           <div class="link-top">
-            <a class="short tnum" (click)="$event.stopPropagation(); router.navigate(['/app/links', link.id])">{{ displayUrl(link.shortUrl) }}</a>
+            <a class="short tnum" [routerLink]="['/app/links', link.id]" (click)="$event.stopPropagation()">{{ displayUrl(link.shortUrl) }}</a>
             <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
             @if (link.clickCount > 0) {
               <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ link.clickCount }}</span>
@@ -96,19 +96,19 @@
             </div>
           }
         </div>
-        <div class="link-actions" (click)="$event.stopPropagation()">
-          <button mat-icon-button matTooltip="Copiar" (click)="copy(link.shortUrl)" aria-label="Copiar enlace">
+        <div class="link-actions">
+          <button mat-icon-button matTooltip="Copiar" (click)="$event.stopPropagation(); copy(link.shortUrl)" aria-label="Copiar enlace">
             <mat-icon>content_copy</mat-icon>
           </button>
-          <button mat-icon-button matTooltip="QR" (click)="showQr(link.shortUrl)" aria-label="Generar QR">
+          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr(link.shortUrl)" aria-label="Generar QR">
             <mat-icon>qr_code_2</mat-icon>
           </button>
           @if (canWrite()) {
-            <button mat-icon-button matTooltip="Editar" (click)="edit(link)" aria-label="Editar enlace" [disabled]="actionId() === link.id">
+            <button mat-icon-button matTooltip="Editar" (click)="$event.stopPropagation(); edit(link)" aria-label="Editar enlace" [disabled]="actionId() === link.id">
               <mat-icon>edit</mat-icon>
             </button>
           }
-          <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones" [disabled]="actionId() === link.id">
+          <button mat-icon-button [matMenuTriggerFor]="menu" (click)="$event.stopPropagation()" aria-label="Más acciones" [disabled]="actionId() === link.id">
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">
