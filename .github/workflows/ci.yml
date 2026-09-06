@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+
+      - name: Production build
+        run: npm run build
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare isolated test environment
+        shell: bash
+        run: |
+          cp .env.docker.local.example .env.docker.local
+          sed -i 's/^POSTGRES_DB=.*/POSTGRES_DB=uvh_test/' .env.docker.local
+
+          cp backend-laravel/.env.example backend-laravel/.env
+          sed -i '1{/^\[TEMPLATE\]$/d;}' backend-laravel/.env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=uvh_test/' backend-laravel/.env
+
+          APP_KEY="base64:$(openssl rand -base64 32 | tr -d '\n')"
+          APP_SECRET="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
+          sed -i "s|^APP_KEY=$|APP_KEY=${APP_KEY}|" backend-laravel/.env
+          sed -i "s|^APP_SECRET=$|APP_SECRET=${APP_SECRET}|" backend-laravel/.env
+
+      - name: Start PostgreSQL
+        run: docker compose -f docker-compose.local.yml --env-file .env.docker.local up -d --wait postgres
+
+      - name: Build PHP test image
+        run: docker compose -f docker-compose.local.yml --env-file .env.docker.local build php
+
+      - name: Install Composer dependencies
+        run: docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Apply test database migrations
+        run: docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php php artisan migrate:fresh --force --no-interaction
+
+      - name: PHPUnit
+        run: docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php composer test
+
+      - name: Dependency audit
+        run: docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php composer audit --no-interaction
+
+      - name: Docker diagnostics on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.local.yml --env-file .env.docker.local ps
+          docker compose -f docker-compose.local.yml --env-file .env.docker.local logs --no-color --tail=200 postgres || true
+
+      - name: Stop test services
+        if: always()
+        run: docker compose -f docker-compose.local.yml --env-file .env.docker.local down -v --remove-orphans
