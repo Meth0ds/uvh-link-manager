@@ -209,6 +209,12 @@ sensible o integridad; `P2`, fallo funcional relevante; `P3`, robustez/UX.
 | BUG-099 · V | P1 | `docs/production-readiness.md:58-71,101-114` | Falta la matriz E2E real de identidad, MFA, permisos/IDOR, dominios, webhooks, export y eliminación. | E2E aislado con dos usuarios/workspaces, proveedor de correo y hCaptcha reales. |
 | BUG-100 · V | P2 | `docs/production-readiness.md:122-126` | No se ha cerrado revisión visual, móvil, teclado, foco, contraste, lector de pantalla ni estados de red/error. | Matriz manual/automatizada con evidencias por navegador y viewport. |
 
+## Hallazgos posteriores al corte inicial
+
+| ID | Prio. | Evidencia | Diagnóstico | Estado / corrección |
+|---|---:|---|---|---|
+| BUG-101 · C | P1 | `backend-laravel/app/Support/HCaptcha.php`; `frontend/src/app/auth/hcaptcha-widget.component.ts`; `frontend/public/hcaptcha-frame.v1.js`; `frontend/src/app/auth/auth.component.ts` | Confirmado: siteverify respondía `success=true` y `hostname=dummy-key-pass` con las claves oficiales de prueba, pero el backend local comparaba contra `localhost` y devolvía el 422 genérico. Además, el widget visible preparaba el token antes del submit, ampliando la ventana de caducidad/replay. | Corregido: sentinel admitido sólo fuera de producción + sitekey oficial exacta; widget invisible ejecutado al submit, token fresco, doble submit deduplicado y fallos/cierre/caducidad descartados. 234/234 frontend y 4 pruebas hCaptcha/18 aserciones backend en `uvh_test`. |
+
 ## Orden de depuración propuesto
 
 1. **Bloque A — sesión y autenticación:** BUG-002–014. Introducir una generación

@@ -7,6 +7,8 @@ describe("application routes", () => {
       "",
       "auth",
       "legal",
+      "help",
+      "status",
       "invitations/accept",
       "forbidden",
       "not-found",

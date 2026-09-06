@@ -1,6 +1,6 @@
 import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { DatePipe } from "@angular/common";
-import { ActivatedRoute, Router } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -44,6 +44,7 @@ const STATE_LABEL: Record<LinkState, string> = {
   selector: "app-links",
   standalone: true,
   imports: [
+    RouterLink,
     FormsModule,
     MatButtonModule,
     MatIconModule,

@@ -1,0 +1,33 @@
+.back-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; color: var(--uvh-electric); font-size: 13px; font-weight: 800; text-decoration: none; }
+.back-link mat-icon { width: 18px; height: 18px; font-size: 18px; }
+.alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0; padding: 12px 14px; border: 1px solid var(--uvh-border); border-radius: 12px; font-size: 13px; }
+.alert.error { color: var(--uvh-danger); background: var(--uvh-danger-soft); }
+.alert.permission { color: var(--uvh-muted); background: color-mix(in srgb, var(--uvh-electric) 6%, var(--uvh-surface-raised)); }
+.summary-card, .schedule-card, .diagnostic-card { border: 1px solid var(--uvh-border); border-radius: 16px; background: var(--uvh-surface-raised); box-shadow: var(--uvh-shadow-sm); }
+.summary-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
+.summary-card > div { min-width: 0; flex: 1; }
+.summary-card h2, .schedule-card h2, .diagnostic-card h2 { margin: 2px 0; color: var(--uvh-ink); font-size: 17px; }
+.summary-card p, .diagnostic-card p { margin: 4px 0 0; color: var(--uvh-muted); font-size: 12.5px; }
+.eyebrow { color: var(--uvh-muted-soft); font-size: 9px; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+.diagnostic-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.diagnostic-card { min-width: 0; padding: 17px; }
+.diagnostic-card header { display: flex; align-items: center; gap: 10px; }
+.diagnostic-card header > div { flex: 1; }
+.diagnostic-card header p { margin: 0; }
+.diagnostic-card header > mat-icon { color: var(--uvh-muted-soft); }
+.diagnostic-card header > mat-icon.ready { color: var(--uvh-success); }
+.step { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); font-weight: 900; }
+.observed { margin: 14px 0 !important; font-weight: 750; }
+.record { display: grid; grid-template-columns: 52px minmax(0, 1fr) 40px; align-items: center; gap: 8px; margin-top: 8px; }
+.record span { color: var(--uvh-muted-soft); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.record code { overflow-wrap: anywhere; padding: 7px 8px; border: 1px solid var(--uvh-border); border-radius: 8px; color: var(--uvh-electric); background: var(--uvh-surface); font-size: 11px; }
+.warning { margin-top: 12px !important; padding: 10px; border-radius: 9px; background: var(--uvh-warn-soft); color: var(--uvh-warn) !important; font-weight: 700; line-height: 1.45; }
+.schedule-card { margin-top: 14px; padding: 20px; }
+.schedule-card dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.schedule-card dl > div { padding: 12px; border-radius: 11px; background: var(--uvh-surface); }
+.schedule-card dt { color: var(--uvh-muted-soft); font-size: 10px; font-weight: 850; text-transform: uppercase; }
+.schedule-card dd { margin: 5px 0 0; color: var(--uvh-ink); font-size: 12.5px; font-weight: 750; }
+.actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.scheduler-note { margin: 14px 0 0; color: var(--uvh-muted-soft); font-size: 11px; line-height: 1.5; }
+@media (max-width: 950px) { .diagnostic-grid { grid-template-columns: 1fr; } .schedule-card dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .summary-card { align-items: flex-start; flex-wrap: wrap; } .summary-card > div { flex-basis: 100%; } .schedule-card dl { grid-template-columns: 1fr; } }

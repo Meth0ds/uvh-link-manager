@@ -43,6 +43,15 @@ return [
     'trust_country_header' => filter_var(env('TRUST_COUNTRY_HEADER', 'false'), FILTER_VALIDATE_BOOLEAN),
     'country_header' => env('COUNTRY_HEADER', 'cf-ipcountry'),
     'reputation_provider_url' => env('REPUTATION_PROVIDER_URL'),
+    'public_status' => [
+        // This must point to a monitor outside the UVH deployment. The API
+        // never derives public health from its own /health endpoint.
+        'feed_url' => env('PUBLIC_STATUS_FEED_URL'),
+        'feed_bearer' => env('PUBLIC_STATUS_FEED_BEARER'),
+        'connect_timeout_seconds' => (int) env('PUBLIC_STATUS_CONNECT_TIMEOUT_SECONDS', 2),
+        'timeout_seconds' => (int) env('PUBLIC_STATUS_TIMEOUT_SECONDS', 4),
+        'max_age_seconds' => (int) env('PUBLIC_STATUS_MAX_AGE_SECONDS', 300),
+    ],
     'custom_domains' => [
         'cname_target' => env('CUSTOM_DOMAIN_CNAME_TARGET'),
         'edge_ask_secret' => env('EDGE_ASK_SECRET'),
@@ -63,6 +72,7 @@ return [
     'housekeeping' => [
         'interval_minutes' => (int) env('HOUSEKEEPING_INTERVAL_MINUTES', 60),
         'session_purge_days' => (int) env('SESSION_PURGE_DAYS', 30),
+        'link_trash_days' => (int) env('LINK_TRASH_DAYS', 30),
         'token_purge_days' => (int) env('TOKEN_PURGE_DAYS', 7),
         'api_token_purge_days' => (int) env('API_TOKEN_PURGE_DAYS', 30),
         'delivery_purge_days' => (int) env('DELIVERY_PURGE_DAYS', 90),

@@ -7,6 +7,7 @@ use App\Jobs\ProvisionDomainTlsJob;
 use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Support\Audit;
+use App\Support\DomainRevalidationSchedule;
 use App\Support\Ids;
 use App\Support\OperationalMetrics;
 use App\Support\UvhRequest;
@@ -32,6 +33,26 @@ class DomainController
             ->map(fn ($d) => $this->dto($d, $includeVerificationToken));
 
         return response()->json(['domains' => $domains]);
+    }
+
+    /**
+     * Return one workspace-scoped diagnostic snapshot.
+     *
+     * The ownership challenge is projected only for roles allowed to change
+     * DNS configuration. Viewers still receive operational health data.
+     */
+    public function show(Request $request, int $id)
+    {
+        $domain = CustomDomain::where('workspace_id', UvhRequest::workspaceId($request))
+            ->where('id', $id)
+            ->first();
+        if (! $domain) {
+            return response()->json(['error' => 'Dominio no encontrado'], 404);
+        }
+
+        return response()->json([
+            'domain' => $this->dto($domain, $this->canEdit(UvhRequest::role($request))),
+        ]);
     }
 
     public function store(Request $request)
@@ -456,11 +477,14 @@ class DomainController
 
     private function dto(CustomDomain $d, bool $includeVerificationToken): array
     {
+        $automaticRetry = $d->state === 'active';
+        $nextDnsCheckAt = DomainRevalidationSchedule::nextAt($d);
+
         return [
             'id' => $d->id,
             'domain' => $d->domain,
             'state' => $d->state,
-            'verificationHost' => $this->verificationHost($d->domain),
+            'verificationHost' => $includeVerificationToken ? $this->verificationHost($d->domain) : null,
             'verificationToken' => $includeVerificationToken ? $d->verification_token : null,
             'cnameTarget' => $this->cnameTarget(),
             'verifiedAt' => $this->iso($d->verified_at),
@@ -469,6 +493,11 @@ class DomainController
             'dnsCheckStartedAt' => $this->iso($d->dns_check_started_at),
             'dnsCheckCompletedAt' => $this->iso($d->dns_check_completed_at),
             'dnsError' => $d->dns_error,
+            'dnsCheckInProgress' => DomainRevalidationSchedule::isInProgress($d),
+            'automaticDnsRetry' => $automaticRetry,
+            'dnsRetryIntervalHours' => $automaticRetry ? DomainRevalidationSchedule::intervalHours($d) : null,
+            'nextDnsCheckAt' => $this->iso($nextDnsCheckAt),
+            'dnsCheckDue' => DomainRevalidationSchedule::isDue($d),
             'edgeEligible' => (bool) $d->edge_eligible,
             'tlsReadyAt' => $this->iso($d->tls_ready_at),
             'tlsError' => $d->tls_error,

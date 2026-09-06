@@ -82,6 +82,7 @@
               }
             </div>
             <div class="wh-actions">
+              <a mat-stroked-button [routerLink]="['/app/webhooks', w.id]"><mat-icon>manage_search</mat-icon> Abrir inspector</a>
               <button mat-stroked-button (click)="toggleActive(w)" [disabled]="actionId() === w.id">{{ w.active ? "Pausar" : "Activar" }}</button>
               <button mat-stroked-button (click)="startEdit(w)" [disabled]="actionId() === w.id"><mat-icon>edit</mat-icon> Editar</button>
               <button mat-stroked-button (click)="test(w)" [disabled]="actionId() === w.id || !w.active" [matTooltip]="w.active ? 'Envía una entrega de prueba' : 'Activa el webhook antes de probarlo'"><mat-icon>send</mat-icon> Enviar ping</button>
@@ -98,7 +99,7 @@
               <div class="delivery">
                 <span class="del-status" [class]="'st-' + d.status">{{ d.status === 'processing' ? 'enviando' : d.status }}</span>
                 <span class="del-event"><code>{{ d.event }}</code></span>
-                <span class="del-meta tnum">intento {{ d.attempts }}{{ d.last_error ? " · " + d.last_error : "" }}</span>
+                <span class="del-meta tnum">intento {{ d.attempts }}{{ d.error ? " · " + d.error.message : "" }}</span>
                 @if (d.status === 'failed') {
                   <button mat-icon-button (click)="resend(w, d.id)" aria-label="Reenviar" [disabled]="actionId() === w.id">
                     <mat-icon>refresh</mat-icon>

@@ -8,6 +8,7 @@ use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 class PublicController
 {
@@ -26,7 +27,7 @@ class PublicController
 
     public function sitemap()
     {
-        $pages = ['/', '/legal/terminos', '/legal/privacidad', '/legal/denuncias'];
+        $pages = ['/', '/help', '/status', '/legal/terminos', '/legal/privacidad', '/legal/denuncias'];
         $urls = implode("\n", array_map(
             fn ($p) => '  <url><loc>https://'.config('uvh.public_host').$p.'</loc></url>',
             $pages,
@@ -91,6 +92,155 @@ class PublicController
                 'provider' => $captchaConfigured ? 'hcaptcha' : null,
             ],
         ]);
+    }
+
+    /**
+     * Read a monitor-owned status feed. No local liveness signal is consulted:
+     * this process is deliberately unable to pronounce itself healthy.
+     */
+    public function publicStatus()
+    {
+        $url = trim((string) config('uvh.public_status.feed_url'));
+        if (! $this->safeExternalStatusUrl($url)) {
+            return response()->json($this->unknownPublicStatus(), 503);
+        }
+
+        try {
+            $request = Http::acceptJson()
+                ->connectTimeout(max(1, min(5, (int) config('uvh.public_status.connect_timeout_seconds', 2))))
+                ->timeout(max(2, min(10, (int) config('uvh.public_status.timeout_seconds', 4))))
+                ->withoutRedirecting();
+            $bearer = trim((string) config('uvh.public_status.feed_bearer'));
+            if ($bearer !== '') {
+                $request = $request->withToken($bearer);
+            }
+            $response = $request->get($url);
+            if (! $response->successful()) {
+                return response()->json($this->unknownPublicStatus(), 503);
+            }
+            // Bound the body before decoding it. The monitor is independent
+            // infrastructure and therefore remains an untrusted input.
+            $contentLength = (int) ($response->header('Content-Length') ?? 0);
+            $contentType = strtolower(trim(explode(';', (string) $response->header('Content-Type'))[0]));
+            $body = $response->body();
+            if (($contentLength > 0 && $contentLength > 131072) || strlen($body) > 131072
+                || $contentType !== 'application/json') {
+                return response()->json($this->unknownPublicStatus(), 503);
+            }
+            $snapshot = $this->normalizePublicStatus(json_decode($body, true, 32, JSON_THROW_ON_ERROR));
+            if ($snapshot === null) {
+                return response()->json($this->unknownPublicStatus(), 503);
+            }
+
+            $maxAge = max(30, min(3600, (int) config('uvh.public_status.max_age_seconds', 300)));
+            $age = now()->timestamp - strtotime($snapshot['generatedAt']);
+            // A future timestamp could artificially extend a healthy result.
+            // Permit only a small amount of ordinary clock skew.
+            if ($age < -60) {
+                return response()->json($this->unknownPublicStatus(), 503);
+            }
+            $stale = $age > $maxAge;
+            $snapshot['stale'] = $stale;
+            if ($stale) {
+                $snapshot['overall'] = 'unknown';
+            }
+
+            return response()->json($snapshot, $stale ? 503 : 200)
+                ->header('Cache-Control', 'public, max-age=30, stale-if-error=120');
+        } catch (\Throwable $error) {
+            report($error);
+
+            return response()->json($this->unknownPublicStatus(), 503);
+        }
+    }
+
+    private function safeExternalStatusUrl(string $url): bool
+    {
+        if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+        $parts = parse_url($url);
+        $host = strtolower(rtrim((string) ($parts['host'] ?? ''), '.'));
+
+        // The feed is a configuration value, but rejecting local addressing,
+        // embedded credentials and non-TLS ports prevents accidental SSRF
+        // during deployment or secret rotation.
+        return ($parts['scheme'] ?? null) === 'https' && $host !== ''
+            && ! isset($parts['user']) && ! isset($parts['pass']) && ! isset($parts['fragment'])
+            && (! isset($parts['port']) || (int) $parts['port'] === 443)
+            && filter_var($host, FILTER_VALIDATE_IP) === false
+            && $host !== 'localhost' && ! str_ends_with($host, '.localhost')
+            && ! str_ends_with($host, '.local') && ! str_ends_with($host, '.internal');
+    }
+
+    private function normalizePublicStatus(mixed $input): ?array
+    {
+        if (! is_array($input) || ! is_string($input['generatedAt'] ?? null)
+            || strlen($input['generatedAt']) > 64 || strtotime($input['generatedAt']) === false
+            || ! is_array($input['components'] ?? null) || ! is_array($input['incidents'] ?? null)) {
+            return null;
+        }
+        $statuses = ['operational', 'degraded', 'major_outage', 'maintenance'];
+        // Fixed public names prevent an external feed from exposing topology.
+        $componentLabels = [
+            'links' => 'Enlaces y redirecciones',
+            'panel' => 'Panel y API',
+            'webhooks' => 'Entrega de webhooks',
+        ];
+        $components = [];
+        foreach ($componentLabels as $id => $label) {
+            $status = $input['components'][$id] ?? null;
+            if (! is_string($status) || ! in_array($status, $statuses, true)) {
+                return null;
+            }
+            $components[] = ['id' => $id, 'label' => $label, 'status' => $status];
+        }
+        $rank = ['operational' => 0, 'maintenance' => 1, 'degraded' => 2, 'major_outage' => 3];
+        $overall = collect($components)->sortByDesc(fn ($item) => $rank[$item['status']])->first()['status'];
+
+        $incidents = [];
+        foreach (array_slice($input['incidents'], 0, 20) as $incident) {
+            if (! is_array($incident)) {
+                return null;
+            }
+            $id = $incident['id'] ?? null;
+            $title = $incident['title'] ?? null;
+            $message = $incident['message'] ?? null;
+            $status = $incident['status'] ?? null;
+            $startedAt = $incident['startedAt'] ?? null;
+            $updatedAt = $incident['updatedAt'] ?? null;
+            if (! is_string($id) || preg_match('/^[A-Za-z0-9_-]{1,80}$/D', $id) !== 1
+                || ! $this->safePublicText($title, 160) || ! $this->safePublicText($message, 1000)
+                || ! is_string($status) || ! in_array($status, ['investigating', 'identified', 'monitoring', 'resolved'], true)
+                || ! is_string($startedAt) || strlen($startedAt) > 64 || strtotime($startedAt) === false
+                || ! is_string($updatedAt) || strlen($updatedAt) > 64 || strtotime($updatedAt) === false) {
+                return null;
+            }
+            $incidents[] = compact('id', 'title', 'message', 'status', 'startedAt', 'updatedAt');
+        }
+
+        return [
+            'overall' => $overall,
+            'generatedAt' => $input['generatedAt'],
+            'stale' => false,
+            'source' => 'external_monitor',
+            'components' => $components,
+            'incidents' => $incidents,
+        ];
+    }
+
+    private function safePublicText(mixed $value, int $maximum): bool
+    {
+        return is_string($value) && $value !== '' && mb_check_encoding($value, 'UTF-8')
+            && mb_strlen($value) <= $maximum && preg_match('/[\x00-\x1F\x7F]/u', $value) !== 1;
+    }
+
+    private function unknownPublicStatus(): array
+    {
+        return [
+            'overall' => 'unknown', 'generatedAt' => null, 'stale' => true,
+            'source' => 'external_monitor_unavailable', 'components' => [], 'incidents' => [],
+        ];
     }
 
     public function report(Request $request)

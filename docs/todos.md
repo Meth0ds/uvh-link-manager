@@ -176,6 +176,14 @@ implementación parcial.
   de publicarse. Diecisiete regresiones nuevas elevan la suite a 231; las 36
   pruebas específicas de decoders, typecheck, build y suite completa pasaron.
   BUG-083 queda confirmado y corregido. No se tocaron backend ni bases de datos.
+- [x] **AUTH-HCAPTCHA-001 — hCaptcha invisible y compatibilidad local segura.**
+  Login, registro y reenvío ejecutan el widget invisible al enviar, consumen un
+  token fresco por intento, deduplican dobles clics y descartan cierres,
+  caducidad y errores. El backend acepta el hostname sintético de hCaptcha sólo
+  fuera de producción y sólo con su sitekey oficial de prueba; cualquier otra
+  combinación mantiene el binding estricto. Typecheck, build, 234/234 pruebas
+  frontend y 4 pruebas hCaptcha/18 aserciones backend pasaron; backend usó
+  exclusivamente `uvh_test` y no se migró ni probó `uvh_local`.
 - [ ] **MAIL-002 — Operación y privacidad del outbox (implementación amplia;
   cierre pendiente).** Ya existen reintento administrativo acotado, antigüedad
   de cola, métricas sin contenido, purga configurable y compensación por
@@ -678,15 +686,25 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
     persistir cursores ni reintentar solos. Los 29 casos frontend, typecheck y
     build pasaron. `PRODUCT-VALID-002` sigue abierto; esto no acredita producción.
     Plan, garantías y despliegue en `docs/workspace-activity-roadmap.md`.
-- [ ] **PRODUCT-003 — Uso y límites (`/app/usage`).** Exponer consumo frente a
+- [x] **PRODUCT-003 — Uso y límites (`/app/usage`).** Exponer consumo frente a
   cuotas reales de enlaces, dominios, miembros, tokens, webhooks y retención de
   analítica. Indicar qué operación alcanzó un límite y cómo liberar capacidad,
   sin presentar precios, upgrades o capacidades que todavía no existen.
-  - Base backend implementada antes de pausar nuevas funciones: constantes de
+  - Backend: constantes de
     política compartidas, GET agregado y minimizado por rol, throttle por cuenta,
     índices 000034 y fallo cerrado ante cuota/esquema ausentes. Sus doce casos
-    pasaron en `uvh_test`; 000034 no se aplicó a `uvh_local`. Falta la UI y la
-    validación E2E/operativa, por lo que PRODUCT-003 permanece abierto.
+    pasaron en `uvh_test`; 000034 no se aplicó a `uvh_local`.
+  - UI finalizada el 6 de septiembre: ruta y navegación para todos los roles,
+    contrato runtime ligado a workspace/rol, seis tarjetas con redacción por
+    permisos, estados alcanzado/no configurado/no disponible, acciones para
+    liberar capacidad, política de retención y manejo de `Retry-After`. Diez
+    regresiones elevan la suite frontend a 245/245; typecheck, build y los doce
+    casos backend/116 aserciones pasaron, estos últimos sólo en `uvh_test`.
+    Diseño y garantías en `docs/workspace-usage-roadmap.md`.
+- [ ] **PRODUCT-VALID-003 — Validación E2E/operativa de Uso y límites.** Recorrer
+  la pantalla autenticada con owner/admin/editor/viewer sobre una copia aislada,
+  verificar teclado, lector, móvil y contraste, y medir el endpoint con volumen
+  representativo. No aplicar 000034 a `uvh_local` para cerrar este gate.
 - [ ] **PRODUCT-004 — Centro de notificaciones (`/app/notifications`).** Crear
   una bandeja durable, paginada y deduplicada para dominios/DNS/TLS, webhooks
   agotados, enlaces próximos a expirar o agotar clics, tokens próximos a caducar,
@@ -697,43 +715,57 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
   registrar cambios y ofrecer frecuencia inmediata o resumen cuando proceda.
   Un usuario no puede desactivar avisos críticos de credenciales, MFA, email,
   exportación o eliminación de cuenta.
-- [ ] **PRODUCT-006 — Diagnóstico de dominio (`/app/domains/:id`).** Convertir
-  cada dominio en un asistente con pasos TXT, CNAME, TLS y activación, estado
-  observado, última comprobación, siguiente reintento y errores recuperables.
-  Los viewers no deben recibir el challenge de propiedad y ningún texto debe
-  sugerir que la propagación DNS o la emisión de certificado son instantáneas.
-  Base actual: la lista ya guía TXT/CNAME/TLS, muestra errores y oculta el token
-  a viewers; faltan la ruta de detalle y el calendario de reintentos.
-- [ ] **PRODUCT-007 — Inspector de webhook (`/app/webhooks/:id`).** Mostrar
-  entregas paginadas, `event_id`, estado, intentos, tiempos y error normalizado;
-  permitir prueba y reenvío idempotente según rol. El payload mostrado debe
-  redactarse con una allowlist y nunca revelar firma, secreto, URL resuelta,
-  direcciones IP ni respuesta remota sin acotar. Base actual: la lista ofrece
-  prueba, 50 entregas recientes y reenvío por rol; el endpoint ya no devuelve el
-  payload almacenado hasta que exista una vista redactada y contractual.
-- [ ] **PRODUCT-008 — Centro de seguridad (`/app/security`).** Extraer de la
-  página general sesiones, contraseña, MFA, recovery codes, cambios de email y
-  actividad sensible reciente. Añadir un resumen accionable y reautenticación
-  por operación; la existencia del panel nunca debe sustituir controles backend.
-  Base actual: Ajustes contiene contraseña, MFA, recovery codes y revocación de
-  sesiones, pero no hay ruta dedicada ni actividad sensible agregada.
-- [ ] **PRODUCT-009 — Papelera de enlaces (`/app/links/trash`).** Hacer visible
-  el ciclo de soft delete con fecha de purga, restauración y eliminación
-  definitiva limitada a roles autorizados, confirmación reforzada y protección
-  frente a carreras con dominios, reglas, analítica y webhooks. Base actual: el
-  backend restaura por ID, pero el listado excluye borrados y la interfaz no
-  permite descubrirlos; la papelera todavía no es utilizable.
+- [x] **PRODUCT-006 — Diagnóstico de dominio (`/app/domains/:id`).** Asistente
+  implementado con pasos TXT/CNAME/TLS/activación, estado observado, errores,
+  comprobación en curso y calendario calculado por una política compartida con
+  housekeeping. Viewers no reciben host ni token de propiedad. Cuatro casos
+  backend/21 aserciones y los contratos frontend pasaron.
+- [ ] **PRODUCT-VALID-006 — Validación operativa de dominios.** Completar un
+  ciclo DNS/TLS real en proveedor aislado, ensayar propagación lenta y pérdida de
+  job, y revisar teclado, lector, contraste y móvil.
+- [x] **PRODUCT-007 — Inspector de webhook (`/app/webhooks/:id`).** Historial
+  paginado y estable, error normalizado, prueba 202 y reenvío idempotente por rol.
+  La preview se reconstruye con allowlist; nunca devuelve payload almacenado,
+  firma, secreto, URL resuelta, IP ni cuerpo remoto. Cuatro casos backend/31
+  aserciones y los contratos runtime frontend pasaron.
+- [ ] **PRODUCT-VALID-007 — Validación operativa de webhooks.** Ensayar receptor
+  real aislado, timeouts, DNS cambiante, cola caída y carreras entre entrega,
+  configuración y reenvío; revisar teclado, lector y móvil.
+- [x] **PRODUCT-008 — Centro de seguridad (`/app/security`).** Resumen de postura,
+  sesiones, accesos a contraseña/MFA/recovery/email y actividad personal de
+  catálogo cerrado. El endpoint no entrega metadata, IP ni actividad ajena; las
+  mutaciones conservan reautenticación backend. Tres casos backend/17 aserciones
+  y cobertura del decoder pasaron.
+- [ ] **PRODUCT-VALID-008 — Validación E2E del centro de seguridad.** Recorrer
+  reautenticación, MFA, recovery, email y revocación de sesión actual/remota en
+  navegador real; revisar foco, lector, móvil y expiración.
+- [x] **PRODUCT-009 — Papelera de enlaces (`/app/links/trash`).** Listado,
+  búsqueda y paginación; fecha de purga del servidor; restore editor+ y borrado
+  owner/admin con frase exacta, contraseña y MFA. Usa locks ordenados, cascada
+  FK y purga housekeeping a 30 días configurables. Cuatro casos backend/23
+  aserciones, decoder y regresión de retención pasaron.
+- [ ] **PRODUCT-VALID-009 — Validación E2E/concurrente de papelera.** Revisar
+  diálogo/foco/lector/móvil y carreras multiproceso entre clic, restore, purge y
+  housekeeping sobre datos desechables; confirmar la retención aprobada.
 - [ ] **PRODUCT-010 — Páginas públicas de resolución.** Rediseñar y unificar la
   introducción de contraseña y los estados desconocido, pausado, caducado,
   bloqueado y límite agotado. Deben ser accesibles, `no-store`, resistentes a
   enumeración, sin destino ni datos del propietario, y ofrecer denuncia sólo
   cuando exista una referencia pública válida.
-- [ ] **PRODUCT-011 — Ayuda técnica (`/help`) y estado público (`/status`).**
+- [x] **PRODUCT-011 — Ayuda técnica (`/help`) y estado público (`/status`).**
   Publicar guías versionadas de enlaces, dominios, API y firma de webhooks, más
   una página de estado alimentada por monitorización externa. El propio proceso
   afectado no puede declararse sano a sí mismo ni exponer topología o versiones.
   El `/api/v1/status` existente sólo informa configuración antiabuso/análisis;
-  no es una página ni una fuente válida de estado operativo público.
+  no se reutiliza como salud. Implementados ayuda versionada, rutas/footer/sitemap
+  y `/api/v1/public-status`: acepta sólo feed HTTPS externo acotado, recalcula el
+  agregado, no sigue redirects y rechaza destinos locales, cuerpos grandes,
+  fechas futuras/caducadas y campos inválidos sin exponer URL, bearer, topología
+  o versión. Cinco casos backend/28 aserciones y tres de decoder pasaron.
+- [ ] **PRODUCT-VALID-011 — Activación del monitor público externo.** Provisionar
+  el monitor fuera de UVH, guardar su bearer en secretos, configurar el feed y
+  ensayar caída de UVH y del monitor. Hasta entonces `/status` muestra de forma
+  segura “desconocido”. Runbook: `docs/public-status-feed.md`.
 
 ## 4 — Roadmap opcional — Productividad y escalado
 

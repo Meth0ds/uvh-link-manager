@@ -61,13 +61,22 @@ describe("credential response decoders", () => {
       event_id: "event-1",
       status: "pending",
       attempts: 0,
-      last_error: null,
+      error: null,
+      payloadPreview: {
+        event: "link.created",
+        eventId: "event-1",
+        timestamp: "2026-09-06T10:00:00.000Z",
+        data: { linkId: 4, alias: "campaign" },
+        redacted: true,
+      },
       next_attempt_at: "2026-09-06T10:01:00.000Z",
       created_at: "2026-09-06T10:00:00.000Z",
       delivered_at: null,
     } satisfies WebhookDelivery;
-    expect(decodeWebhookDeliveriesResponse({ deliveries: [delivery] })).toEqual({ deliveries: [delivery] });
-    expect(() => decodeWebhookDeliveriesResponse({ deliveries: [{ ...delivery, status: "unknown" }] })).toThrow();
-    expect(() => decodeWebhookDeliveriesResponse({ deliveries: [{ ...delivery, attempts: -1 }] })).toThrow();
+    const page = { deliveries: [delivery], total: 1, page: 1, perPage: 20 };
+    expect(decodeWebhookDeliveriesResponse(page)).toEqual(page);
+    expect(() => decodeWebhookDeliveriesResponse({ ...page, deliveries: [{ ...delivery, status: "unknown" }] })).toThrow();
+    expect(() => decodeWebhookDeliveriesResponse({ ...page, deliveries: [{ ...delivery, attempts: -1 }] })).toThrow();
+    expect(() => decodeWebhookDeliveriesResponse({ ...page, deliveries: [{ ...delivery, payloadPreview: { ...delivery.payloadPreview, data: { secret: "must-not-pass", a: 1, b: 2, c: 3, d: 4 } } }] })).toThrow();
   });
 });

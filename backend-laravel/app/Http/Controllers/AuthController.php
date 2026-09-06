@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AccountDeletionRequest;
 use App\Models\AccountRecoveryRequest;
+use App\Models\AuditEvent;
 use App\Models\DataExportRequest;
 use App\Models\EmailChangeRequest;
 use App\Models\EmailToken;
@@ -1826,6 +1827,47 @@ class AuthController
         ]);
 
         return response()->json(['sessions' => $rows, 'truncated' => $total > 100]);
+    }
+
+    /**
+     * Account-scoped security posture without credential or network details.
+     * Activity uses an explicit action allowlist and omits metadata/IP hashes.
+     */
+    public function securityCenter(Request $request)
+    {
+        $user = UvhRequest::user($request)->refresh();
+        $activeSessions = $user->sessions()->whereNull('revoked_at')->where('expires_at', '>', now())->count();
+        $publicUser = UvhRequest::publicUser($user);
+        $passwordActions = ['auth.password_change', 'auth.password_reset', 'auth.account_recovery_completed'];
+        $lastPasswordEvent = AuditEvent::where('user_id', $user->id)->whereIn('action', $passwordActions)
+            ->orderByDesc('created_at')->orderByDesc('id')->first(['created_at']);
+        $visibleActions = [
+            'auth.login', 'auth.logout', 'auth.password_change', 'auth.password_reset',
+            'auth.session_revoke', 'auth.mfa_enable', 'auth.mfa_disable', 'auth.mfa_reconfigured',
+            'auth.mfa_recovery', 'auth.mfa_recovery_regenerate', 'auth.mfa_reauthenticated',
+            'auth.email_change_requested', 'auth.email_change_cancelled', 'auth.email_change_confirmed',
+            'auth.emergency_access_revoked', 'auth.account_recovery_completed',
+        ];
+        $activity = AuditEvent::where('user_id', $user->id)->whereIn('action', $visibleActions)
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(20)->get(['id', 'action', 'created_at'])
+            ->map(fn (AuditEvent $event) => [
+                'id' => (int) $event->id,
+                'action' => $event->action,
+                'createdAt' => $this->iso($event->created_at),
+            ]);
+
+        return response()->json([
+            'summary' => [
+                'mfaEnabled' => (bool) $user->mfa_enabled,
+                'recoveryCodesRemaining' => is_array($user->recovery_codes) ? count($user->recovery_codes) : 0,
+                'activeSessions' => $activeSessions,
+                'currentSessionMfaVerifiedAt' => $this->iso(UvhRequest::mfaVerifiedAt($request)),
+                'pendingEmail' => $publicUser['pendingEmail'],
+                'pendingEmailExpiresAt' => $publicUser['pendingEmailExpiresAt'],
+                'lastPasswordEventAt' => $this->iso($lastPasswordEvent?->created_at),
+            ],
+            'activity' => $activity,
+        ]);
     }
 
     public function revokeSession(Request $request, string $id)

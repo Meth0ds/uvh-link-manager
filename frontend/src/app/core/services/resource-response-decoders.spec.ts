@@ -1,11 +1,12 @@
-import type { AnalyticsOverview, DomainDto, LinkDto } from "../models";
-import { decodeCreatedDomainResponse, decodeDomainsResponse, decodeDomainStateResponse } from "./domain-response-decoders";
+import type { AnalyticsOverview, DomainDto, LinkDto, LinkTrashResponse } from "../models";
+import { decodeCreatedDomainResponse, decodeDomainDetailResponse, decodeDomainsResponse, decodeDomainStateResponse } from "./domain-response-decoders";
 import {
   decodeAliasAvailability,
   decodeAnalyticsOverview,
   decodeLinkActivityResponse,
   decodeLinkDetailResponse,
   decodeLinkResponse,
+  decodeLinkTrashResponse,
   decodeLinksResponse,
   decodeRulesResponse,
 } from "./link-response-decoders";
@@ -47,6 +48,11 @@ const domain: DomainDto = {
   dnsCheckStartedAt: null,
   dnsCheckCompletedAt: null,
   dnsError: null,
+  dnsCheckInProgress: false,
+  automaticDnsRetry: false,
+  dnsRetryIntervalHours: null,
+  nextDnsCheckAt: null,
+  dnsCheckDue: false,
   edgeEligible: false,
   tlsReadyAt: null,
   tlsError: null,
@@ -121,5 +127,22 @@ describe("resource response decoders", () => {
   it("rejects malformed domain booleans and oversized collections", () => {
     expect(() => decodeDomainsResponse({ domains: [{ ...domain, edgeEligible: 1 }] })).toThrow();
     expect(() => decodeDomainsResponse({ domains: Array.from({ length: 21 }, () => domain) })).toThrow();
+  });
+
+  it("binds domain detail identity and enforces viewer challenge redaction", () => {
+    expect(decodeDomainDetailResponse({ domain }, domain.id, true)).toEqual({ domain });
+    const viewerDomain = { ...domain, verificationHost: null, verificationToken: null };
+    expect(decodeDomainDetailResponse({ domain: viewerDomain }, domain.id, false)).toEqual({ domain: viewerDomain });
+    expect(() => decodeDomainDetailResponse({ domain }, domain.id, false)).toThrow();
+    expect(() => decodeDomainDetailResponse({ domain }, domain.id + 1, true)).toThrow();
+  });
+
+  it("accepts only context-bound trash rows with ordered ISO purge dates", () => {
+    const trashed = { ...link, state: "deleted" as const };
+    const page: LinkTrashResponse = { links: [{ link: trashed, previousState: "active", deletedAt: "2026-09-01T10:00:00Z", purgeAt: "2026-10-01T10:00:00Z" }], total: 1, page: 1, perPage: 20, retentionDays: 30 };
+    expect(decodeLinkTrashResponse(page, { page: 1, perPage: 20 })).toEqual(page);
+    expect(() => decodeLinkTrashResponse({ ...page, page: 2 }, { page: 1, perPage: 20 })).toThrow();
+    expect(() => decodeLinkTrashResponse({ ...page, links: [{ ...page.links[0], purgeAt: "not-a-date" }] }, { page: 1, perPage: 20 })).toThrow();
+    expect(() => decodeLinkTrashResponse({ ...page, links: [{ ...page.links[0], purgeAt: page.links[0].deletedAt }] }, { page: 1, perPage: 20 })).toThrow();
   });
 });

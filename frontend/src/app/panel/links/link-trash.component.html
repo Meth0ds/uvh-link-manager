@@ -1,0 +1,29 @@
+<a class="back-link" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> Volver a enlaces</a>
+<app-page-header icon="delete_sweep" eyebrow="Retención recuperable" title="Papelera de enlaces" description="Restaura enlaces eliminados antes de que venza su política de conservación." />
+@if (retentionDays(); as days) { <div class="retention-note" role="note"><mat-icon>schedule</mat-icon>Los enlaces se purgan automáticamente {{ days }} días después de eliminarlos.</div> }
+<section class="search-card"><mat-form-field appearance="outline"><mat-icon matPrefix>search</mat-icon><input matInput #query [value]="q()" placeholder="Buscar por alias o destino" (keyup.enter)="search(query.value)" /><button mat-icon-button matSuffix type="button" (click)="search(query.value)" aria-label="Buscar en la papelera"><mat-icon>arrow_forward</mat-icon></button></mat-form-field><b>{{ total() }} eliminados</b></section>
+@if (loading() && !rows().length) { <app-panel-skeleton variant="list" label="Cargando papelera" /> }
+@if (loading() && rows().length) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando papelera" /> }
+@if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div> }
+@if (!canRestore()) { <div class="alert permission" role="status">Vista de solo lectura. Restaurar requiere rol editor; borrar definitivamente requiere propietario o administrador.</div> }
+
+<div class="trash-list">
+  @for (row of rows(); track row.link.id) {
+    <article class="trash-row">
+      <div class="trash-main"><span class="alias tnum">{{ row.link.shortUrl }}</span><p>{{ row.link.destination }}</p><small>Eliminado: {{ formatDate(row.deletedAt) }} · Purga prevista: {{ formatDate(row.purgeAt) }}</small></div>
+      <div class="actions">
+        @if (canRestore()) { <button mat-stroked-button type="button" (click)="restore(row)" [disabled]="actionId() !== null"><mat-icon>restore</mat-icon> Restaurar</button> }
+        @if (canPurge()) { <button mat-stroked-button class="danger" type="button" (click)="purgeId() === row.link.id ? closePurge() : openPurge(row)" [disabled]="actionId() !== null"><mat-icon>delete_forever</mat-icon> Borrar definitivamente</button> }
+      </div>
+      @if (purgeId() === row.link.id) {
+        <section class="purge-confirm" aria-label="Confirmación de borrado definitivo">
+          <p>Escribe <code>ELIMINAR {{ row.link.alias }}</code>, introduce tu contraseña y, si procede, un factor actual.</p>
+          <div class="fields"><mat-form-field appearance="outline"><mat-label>Frase exacta</mat-label><input matInput [(ngModel)]="confirmation" autocomplete="off" maxlength="100" /></mat-form-field><mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" [(ngModel)]="password" autocomplete="current-password" maxlength="72" /></mat-form-field>@if (mfaEnabled()) { <mat-form-field appearance="outline"><mat-label>Código MFA o recuperación</mat-label><input matInput [(ngModel)]="factorCode" autocomplete="one-time-code" maxlength="24" /></mat-form-field> }</div>
+          <button mat-flat-button color="warn" type="button" (click)="purge(row)" [disabled]="actionId() !== null || !password() || confirmation() !== 'ELIMINAR ' + row.link.alias || (mfaEnabled() && !factorCode().trim())">Confirmar borrado irreversible</button>
+        </section>
+      }
+    </article>
+  }
+  @if (!loading() && !rows().length && !error()) { <div class="empty-state"><mat-icon>recycling</mat-icon><b>La papelera está vacía</b><p>No hay enlaces pendientes de purga.</p></div> }
+</div>
+@if (total() > pageSize()) { <mat-paginator [length]="total()" [pageIndex]="page()" [pageSize]="pageSize()" [pageSizeOptions]="[20, 50, 100]" (page)="paginate($event)" showFirstLastButtons aria-label="Paginación de la papelera" /> }

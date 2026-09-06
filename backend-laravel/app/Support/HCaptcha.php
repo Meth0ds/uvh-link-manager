@@ -26,6 +26,11 @@ final class HCaptcha
 
     private const MAX_TOKEN_BYTES = 8192;
 
+    /** Official hCaptcha test credentials return this synthetic host. */
+    private const TEST_SITE_KEY = '10000000-ffff-ffff-ffff-000000000001';
+
+    private const TEST_RESPONSE_HOSTNAME = 'dummy-key-pass';
+
     public static function configured(string $surface = 'app'): bool
     {
         [$siteKey, $secret] = self::credentials($surface);
@@ -111,7 +116,7 @@ final class HCaptcha
                 : strtolower(rtrim((string) config(
                     $surface === 'public' ? 'uvh.public_host' : 'uvh.app_host'
                 ), '.'));
-            if ($expected === '' || ! hash_equals($expected, $hostname)) {
+            if ($expected === '' || ! self::hostnameMatches($expected, $hostname, $siteKey)) {
                 return self::result(self::INVALID);
             }
 
@@ -129,6 +134,22 @@ final class HCaptcha
         }
 
         return self::result(self::INVALID);
+    }
+
+    private static function hostnameMatches(string $expected, string $actual, string $siteKey): bool
+    {
+        if (hash_equals($expected, $actual)) {
+            return true;
+        }
+
+        // hCaptcha does not bind its official pass-through test key to the
+        // browser hostname: siteverify deliberately returns "dummy-key-pass".
+        // Permit that documented sentinel only outside production and only
+        // for the exact official test sitekey. Real keys keep strict origin
+        // binding, and production can never enter this exception.
+        return ! app()->environment('production')
+            && hash_equals(self::TEST_SITE_KEY, $siteKey)
+            && hash_equals(self::TEST_RESPONSE_HOSTNAME, $actual);
     }
 
     /** @return self::VALID|self::INVALID|self::UNAVAILABLE */

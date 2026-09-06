@@ -1,4 +1,4 @@
-import type { AnalyticsOverview, AuditEvent, LinkDetailResponse, LinkDto, LinksResponse, LinkState, RedirectRule } from "../models";
+import type { AnalyticsOverview, AuditEvent, LinkDetailResponse, LinkDto, LinksResponse, LinkState, LinkTrashResponse, RedirectRule } from "../models";
 import {
   boolean,
   boundedArray,
@@ -14,6 +14,12 @@ import {
 
 const LINK_STATES = new Set<LinkState>(["scheduled", "active", "paused", "expired", "blocked", "archived", "deleted"]);
 const DEVICES = new Set<NonNullable<RedirectRule["device"]>>(["desktop", "mobile", "tablet"]);
+
+function isoTimestamp(value: unknown, contract: string): string {
+  const decoded = text(value, contract, 64);
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(decoded) || !Number.isFinite(Date.parse(decoded))) invalid(contract);
+  return decoded;
+}
 
 function link(value: unknown): LinkDto {
   const source = record(value, "link");
@@ -94,6 +100,33 @@ export function decodeLinksResponse(value: unknown, expected?: LinksPageContext)
   const links = boundedArray(source["links"], "links page", perPage).map(link);
   if (links.length > total || (expected && (page !== expected.page || perPage !== expected.perPage))) invalid("links page context");
   return { links, total, page, perPage };
+}
+
+/** Deleted rows have their own envelope so purge policy can never be inferred in the browser. */
+export function decodeLinkTrashResponse(value: unknown, expected: LinksPageContext): LinkTrashResponse {
+  const source = record(value, "link trash");
+  const page = integer(source["page"], "link trash", 1, 10_000);
+  const perPage = integer(source["perPage"], "link trash", 1, 100);
+  const total = integer(source["total"], "link trash");
+  const retentionDays = integer(source["retentionDays"], "link trash retention", 1, 3650);
+  if (page !== expected.page || perPage !== expected.perPage) invalid("link trash context");
+  const links = boundedArray(source["links"], "link trash", perPage).map((value) => {
+    const row = record(value, "trashed link");
+    const decoded = link(row["link"]);
+    const previous = row["previousState"] === null ? null : literal(row["previousState"], LINK_STATES, "trashed link previous state");
+    if (decoded.state !== "deleted" || previous === "deleted") invalid("trashed link state");
+    const deletedAt = isoTimestamp(row["deletedAt"], "trashed link deletion");
+    const purgeAt = isoTimestamp(row["purgeAt"], "trashed link purge");
+    if (Date.parse(purgeAt) <= Date.parse(deletedAt)) invalid("trashed link purge order");
+    return {
+      link: decoded,
+      previousState: previous,
+      deletedAt,
+      purgeAt,
+    };
+  });
+  if (links.length > total) invalid("link trash total");
+  return { links, total, page, perPage, retentionDays };
 }
 
 export function decodeLinkResponse(value: unknown, expectedLinkId?: number): { link: LinkDto } {

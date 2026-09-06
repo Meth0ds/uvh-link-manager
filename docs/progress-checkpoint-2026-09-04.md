@@ -245,6 +245,17 @@ de secretos/proxy/TLS y validación jurídica.
   aserciones y la suite backend completa con 250 pruebas/2078 aserciones,
   exclusivamente en `uvh_test`; no se aplicaron migraciones ni se tocó
   `uvh_local`.
+  El hallazgo posterior BUG-101 queda confirmado y corregido: las claves
+  oficiales de prueba devolvían `dummy-key-pass`, pero el backend local exigía
+  `localhost`, por lo que una verificación válida terminaba en 422. La excepción
+  queda limitada a no producción + sitekey oficial. Login, registro y reenvío
+  usan ahora hCaptcha invisible ejecutado al submit con token nuevo, espera del
+  iframe, deduplicación y descarte de resultados fallidos. Pasaron typecheck,
+  build, 234/234 pruebas frontend y el grupo hCaptcha backend (4 pruebas/18
+  aserciones) sólo sobre `uvh_test`; `uvh_local` no se migró ni se probó.
+  La revisión final serializa login y reenvío, que comparten widget, para impedir
+  dos peticiones con un mismo token. La suite dirigida de Auth pasó 20/20 tras
+  incorporar esa regresión; el total anterior 234/234 corresponde al corte previo.
 - PRODUCT-001 iniciado por nueva prioridad: `WorkspaceOnboardingController`, GET
   `/api/v1/workspaces/:id/getting-started` verificado y limitado, consulta única con
   autorización/correlación y hechos minimizados. Tipo `WorkspaceGettingStarted`
@@ -277,6 +288,28 @@ de secretos/proxy/TLS y validación jurídica.
   Cursor sólo en memoria; proyección de campos acotados sin HTML dinámico.
   Sus 29 casos frontend (18 componente, 5 DTO y 6 navegación) pasaron.
   PRODUCT-002 marcado implementado, PRODUCT-VALID-002 abierto; runbook actualizado.
+- PRODUCT-003 implementado: `/app/usage` consume el agregado backend existente
+  con decodificación runtime ligada a workspace y rol. Muestra enlaces, dominios,
+  miembros, tokens, webhooks, invitaciones y retención según la proyección real;
+  no inventa cuotas, precios ni capacidad cuando falta configuración. La vista
+  descarta respuestas obsoletas, oculta categorías redactadas y respeta
+  `Retry-After`. Diez regresiones nuevas, 245/245 frontend, typecheck y build
+  pasaron; `WorkspaceUsageTest` pasó 12 casos/116 aserciones sólo en `uvh_test`.
+  PRODUCT-VALID-003 permanece abierto para navegador/accesibilidad/rendimiento.
+- PRODUCT-006/007/008/009/011 implementados el 6 de septiembre. Ya existen el
+  diagnóstico de dominio con calendario compartido, inspector de webhook
+  paginado/redactado, centro de seguridad minimizado, papelera con restore/purge
+  reforzado y ayuda/estado públicos. `/api/v1/public-status` sólo consume un
+  monitor externo HTTPS y falla a `unknown`; su despliegue externo se documenta
+  en `docs/public-status-feed.md`.
+- La validación integral posterior pasó **271 pruebas backend/2.204 aserciones**
+  exclusivamente sobre `uvh_test`, y **253/253 pruebas frontend**, incluidas las
+  regresiones de dominio/papelera/seguridad/estado público. Typecheck y build de
+  producción pasaron. No se migró ni se probó `uvh_local`.
+- Resumen técnico, garantías y límites en
+  `docs/product-surfaces-completion-2026-09-06.md`. Permanecen abiertos los gates
+  PRODUCT-VALID-006/007/008/009/011; código verde no acredita DNS/TLS, receptor,
+  concurrencia, accesibilidad ni monitor externo reales.
 - BAF-116/118/120 añadieron señales de antigüedad e incidentes; BAF-119 minimizó
   el listado webhook. BAF-121 documentó la rotación existente de `APP_SECRET` y
   añadió contratos pendientes. Los contratos operativos de API se actualizaron.
@@ -299,13 +332,15 @@ de secretos/proxy/TLS y validación jurídica.
 1. Mantener pausadas nuevas funciones mientras se completan los gates de estabilidad
    que no cubren las suites: E2E autenticado, revisión visual/accesible, migración
    limpia, concurrencia multiproceso y fault injection, siempre en entornos aislados.
-2. PRODUCT-003 tiene ya la base backend (API, políticas, índice 000034 y doce casos
-   verdes), pero no UI. Reanudarla sólo después de esta estabilización, sin inventar
-   capacidades o planes. PRODUCT-001/002 ya pasaron sus suites, pero continúan
-   abiertos sus gates E2E, rendimiento, infraestructura y despliegue.
-3. Mantener abiertos `MAIL-002` y los gates de validación/producción: alertas,
+2. PRODUCT-001/002/003/006/007/008/009/011 están implementados, pero continúan
+   abiertos sus gates `PRODUCT-VALID-*`. La siguiente prioridad segura es validar
+   las superficies en navegador y dependencias reales, no ampliar el roadmap.
+3. Para estado público, provisionar primero el monitor realmente externo y ejecutar
+   el ensayo de independencia de `docs/public-status-feed.md`; sin configuración
+   `/status` debe seguir mostrando `unknown`.
+4. Mantener abiertos `MAIL-002` y los gates de validación/producción: alertas,
    retención aprobada, fault injection y proveedor real no se han acreditado.
-4. Las suites están autorizadas únicamente con el guard `*_test`. No aplicar
+5. Las suites están autorizadas únicamente con el guard `*_test`. No aplicar
    migraciones a `uvh_local`; PHP sigue sin estar en PATH y las verificaciones se
    ejecutaron dentro del contenedor reproducible.
 

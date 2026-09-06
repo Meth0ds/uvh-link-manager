@@ -65,7 +65,7 @@
               @if (captchaConfigBusy()) {
                 <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
               } @else if (hcaptchaSiteKey(); as siteKey) {
-                <app-hcaptcha-widget #loginCaptcha [siteKey]="siteKey" (tokenChange)="onLoginCaptchaToken($event)" />
+                <app-hcaptcha-widget #loginCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onLoginCaptchaToken($event)" />
               } @else {
                 <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
               }
@@ -75,7 +75,7 @@
                   <mat-icon aria-hidden="true">error_outline</mat-icon>
                   <span>{{ error() }}</span>
                   @if (verificationEmail()) {
-                    <button mat-stroked-button type="button" class="resend-button" (click)="resendVerification()" [disabled]="verificationBusy() || !loginCaptchaToken()">
+                    <button mat-stroked-button type="button" class="resend-button" (click)="resendVerification()" [disabled]="busy() || verificationBusy() || captchaConfigBusy() || !hcaptchaSiteKey()">
                       <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
                       {{ verificationBusy() ? 'Enviando…' : 'Reenviar verificación' }}
                     </button>
@@ -85,7 +85,7 @@
               @if (info()) {
                 <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
               }
-              <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="loginForm.invalid || busy() || !loginCaptchaToken()">
+              <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="loginForm.invalid || busy() || verificationBusy() || captchaConfigBusy() || !hcaptchaSiteKey()">
                 <span>{{ busy() ? 'Verificando acceso…' : (pendingLink() ? 'Entrar y retomar enlace' : 'Entrar en mi panel') }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
               </button>
             </form>
@@ -190,7 +190,7 @@
                 @if (captchaConfigBusy()) {
                   <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
                 } @else if (hcaptchaSiteKey(); as siteKey) {
-                  <app-hcaptcha-widget #registerCaptcha [siteKey]="siteKey" (tokenChange)="onRegisterCaptchaToken($event)" />
+                  <app-hcaptcha-widget #registerCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onRegisterCaptchaToken($event)" />
                 } @else {
                   <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
                 }
@@ -212,7 +212,7 @@
                 }
                 <div class="register-actions">
                   <button mat-stroked-button type="button" (click)="previousRegisterStep()" [disabled]="busy()"><mat-icon aria-hidden="true">arrow_back</mat-icon> Atrás</button>
-                  <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy() || !registerCaptchaToken()">
+                  <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy() || captchaConfigBusy() || !hcaptchaSiteKey()">
                     <span>{{ busy() ? (changeEmailMode() ? 'Actualizando…' : 'Creando cuenta…') : (changeEmailMode() ? 'Actualizar email' : 'Crear cuenta') }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
                   </button>
                 </div>
@@ -310,12 +310,12 @@
         @if (captchaConfigBusy()) {
           <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
         } @else if (hcaptchaSiteKey(); as siteKey) {
-          <app-hcaptcha-widget #resendCaptcha [siteKey]="siteKey" (tokenChange)="onResendCaptchaToken($event)" />
+          <app-hcaptcha-widget #resendCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onResendCaptchaToken($event)" />
         } @else {
           <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
         }
         <div class="pending-actions">
-          <button mat-flat-button color="primary" (click)="resendVerification()" [disabled]="verificationBusy() || !resendCaptchaToken()">
+          <button mat-flat-button color="primary" (click)="resendVerification()" [disabled]="verificationBusy() || captchaConfigBusy() || !hcaptchaSiteKey()">
             <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
             {{ verificationBusy() ? 'Enviando…' : 'Reenviar correo' }}
           </button>

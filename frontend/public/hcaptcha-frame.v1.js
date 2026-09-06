@@ -55,7 +55,7 @@
       settings = {
         siteKey: data.siteKey,
         theme: data.theme === "dark" ? "dark" : "light",
-        size: data.size === "compact" ? "compact" : "normal",
+        size: data.size === "invisible" ? "invisible" : (data.size === "compact" ? "compact" : "normal"),
       };
       renderWidget();
       return;
@@ -66,6 +66,19 @@
       try {
         window.hcaptcha.reset(widgetId);
         post("ready");
+      } catch (_) {
+        post("error");
+      }
+      return;
+    }
+
+    if (data.type === "execute" && widgetId !== null && window.hcaptcha) {
+      try {
+        // Every protected request gets a newly executed token. Resetting here
+        // prevents an earlier, expired or already redeemed token from leaking
+        // into a later login/registration attempt.
+        window.hcaptcha.reset(widgetId);
+        window.hcaptcha.execute(widgetId);
       } catch (_) {
         post("error");
       }

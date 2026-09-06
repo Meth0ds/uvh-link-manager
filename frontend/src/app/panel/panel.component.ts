@@ -92,6 +92,7 @@ export class PanelComponent {
         { path: "/app/getting-started", label: "Primeros pasos", icon: "checklist" },
         { path: "/app/links", label: "Enlaces", icon: "link" },
         { path: "/app/analytics", label: "Analítica", icon: "query_stats" },
+        { path: "/app/usage", label: "Uso y límites", icon: "data_usage" },
         { path: "/app/activity", label: "Actividad", icon: "history", workspaceAdminOnly: true },
         { path: "/app/domains", label: "Dominios", icon: "language" },
       ],
@@ -107,6 +108,7 @@ export class PanelComponent {
       label: "Cuenta",
       items: [
         { path: "/app/team", label: "Equipo", icon: "group" },
+        { path: "/app/security", label: "Centro de seguridad", icon: "security" },
         { path: "/app/settings", label: "Ajustes", icon: "settings" },
       ],
     },

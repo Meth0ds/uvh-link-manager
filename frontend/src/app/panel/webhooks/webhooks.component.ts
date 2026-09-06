@@ -1,4 +1,5 @@
 import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { RouterLink } from "@angular/router";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -35,6 +36,7 @@ const EVENTS = [
   selector: "app-webhooks",
   standalone: true,
   imports: [
+    RouterLink,
     FormsModule,
     MatButtonModule,
     MatIconModule,
@@ -278,10 +280,10 @@ export class WebhooksComponent {
     this.deliveriesLoading.update((state) => ({ ...state, [w.id]: true }));
     this.deliveriesError.update((state) => ({ ...state, [w.id]: null }));
     try {
-      const { deliveries } = await this.api.get<{ deliveries: WebhookDelivery[] }>(
+      const { deliveries } = await this.api.get<import("../../core/models").WebhookDeliveryPage>(
         `/api/v1/webhooks/${w.id}/deliveries`,
-        undefined,
-        decodeWebhookDeliveriesResponse,
+        { page: 1, perPage: 20 },
+        (value) => decodeWebhookDeliveriesResponse(value, { webhookId: w.id, page: 1, perPage: 20 }),
       );
       if (!guard.isCurrent(request, this.workspaces.currentId())) return;
       this.deliveries.update((d) => ({ ...d, [w.id]: deliveries }));

@@ -1,0 +1,80 @@
+<a class="back-link" routerLink="/app/domains"><mat-icon>arrow_back</mat-icon> Volver a dominios</a>
+<app-page-header icon="monitor_heart" eyebrow="Diagnóstico individual" title="Salud del dominio" description="Comprueba propiedad, ruta DNS, HTTPS y el calendario real de revalidación." />
+
+@if (loading() && !domain()) {
+  <app-panel-skeleton variant="cards" label="Cargando diagnóstico del dominio" />
+}
+@if (loading() && domain()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Actualizando diagnóstico" />
+}
+@if (error()) {
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+}
+
+@if (domain(); as d) {
+  <section class="summary-card" aria-labelledby="domain-name">
+    <div>
+      <span class="eyebrow">Dominio observado</span>
+      <h2 id="domain-name" class="tnum">{{ d.domain }}</h2>
+      <p>Estado guardado: <strong>{{ stateLabel(d.state) }}</strong></p>
+    </div>
+    <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
+    <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || actionBusy()"><mat-icon>refresh</mat-icon> Actualizar estado</button>
+  </section>
+
+  @if (!canEdit()) {
+    <div class="alert permission" role="status">Vista de solo lectura. El desafío TXT de propiedad se oculta por seguridad.</div>
+  }
+
+  <div class="diagnostic-grid">
+    <section class="diagnostic-card" aria-labelledby="ownership-title">
+      <header><span class="step">1</span><div><h2 id="ownership-title">Propiedad</h2><p>Registro TXT</p></div><mat-icon [class.ready]="!!d.ownershipVerifiedAt">{{ d.ownershipVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon></header>
+      <p class="observed">{{ d.ownershipVerifiedAt ? 'Confirmada el ' + formatDate(d.ownershipVerifiedAt) : 'Aún no confirmada' }}</p>
+      @if (canEdit() && d.verificationHost && d.verificationToken) {
+        <div class="record"><span>Nombre</span><code>{{ d.verificationHost }}</code><button mat-icon-button type="button" (click)="copy(d.verificationHost, 'Nombre TXT')" aria-label="Copiar nombre TXT"><mat-icon>content_copy</mat-icon></button></div>
+        <div class="record"><span>Valor</span><code>{{ d.verificationToken }}</code><button mat-icon-button type="button" (click)="copy(d.verificationToken, 'Valor TXT')" aria-label="Copiar valor TXT"><mat-icon>content_copy</mat-icon></button></div>
+      }
+    </section>
+
+    <section class="diagnostic-card" aria-labelledby="routing-title">
+      <header><span class="step">2</span><div><h2 id="routing-title">Ruta DNS</h2><p>Registro CNAME</p></div><mat-icon [class.ready]="!!d.routingVerifiedAt">{{ d.routingVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon></header>
+      <p class="observed">{{ d.routingVerifiedAt ? 'Confirmada el ' + formatDate(d.routingVerifiedAt) : 'Aún no confirmada' }}</p>
+      <div class="record"><span>Nombre</span><code>{{ d.domain }}</code><button mat-icon-button type="button" (click)="copy(d.domain, 'Nombre CNAME')" aria-label="Copiar nombre CNAME"><mat-icon>content_copy</mat-icon></button></div>
+      @if (d.cnameTarget) {
+        <div class="record"><span>Destino</span><code>{{ d.cnameTarget }}</code><button mat-icon-button type="button" (click)="copy(d.cnameTarget, 'Destino CNAME')" aria-label="Copiar destino CNAME"><mat-icon>content_copy</mat-icon></button></div>
+      } @else {
+        <p class="warning">El destino CNAME no está configurado en este entorno.</p>
+      }
+    </section>
+
+    <section class="diagnostic-card" aria-labelledby="tls-title">
+      <header><span class="step">3</span><div><h2 id="tls-title">HTTPS</h2><p>Certificado TLS</p></div><mat-icon [class.ready]="!!d.tlsReadyAt">{{ d.tlsReadyAt ? 'verified_user' : 'schedule' }}</mat-icon></header>
+      <p class="observed">{{ d.tlsReadyAt ? 'Preparado el ' + formatDate(d.tlsReadyAt) : d.state === 'provisioning' ? 'Emisión en curso' : 'Todavía no preparado' }}</p>
+      <p>Entrada pública en edge: <strong>{{ d.edgeEligible ? 'habilitada' : 'deshabilitada' }}</strong></p>
+      @if (tlsErrorLabel(d.tlsError); as tlsMessage) { <p class="warning" role="status">{{ tlsMessage }}</p> }
+    </section>
+  </div>
+
+  <section class="schedule-card" aria-labelledby="schedule-title">
+    <div>
+      <span class="eyebrow">Calendario de comprobación</span>
+      <h2 id="schedule-title">Revalidación DNS</h2>
+    </div>
+    <dl>
+      <div><dt>Último inicio</dt><dd>{{ formatDate(d.dnsCheckStartedAt) }}</dd></div>
+      <div><dt>Último resultado</dt><dd>{{ formatDate(d.dnsCheckCompletedAt) }}</dd></div>
+      <div><dt>Próximo intento automático</dt><dd>{{ d.dnsCheckInProgress ? 'En curso' : d.automaticDnsRetry ? (d.dnsCheckDue ? 'Pendiente de ejecución' : formatDate(d.nextDnsCheckAt)) : 'Sólo tras activarlo' }}</dd></div>
+      <div><dt>Política actual</dt><dd>{{ d.automaticDnsRetry ? 'Cada ' + d.dnsRetryIntervalHours + ' h según el último resultado' : 'Sin reintento automático' }}</dd></div>
+    </dl>
+    @if (dnsErrorLabel(d.dnsError); as dnsMessage) { <p class="warning" role="status">{{ dnsMessage }}</p> }
+    @if (canEdit()) {
+      <div class="actions">
+        <button mat-flat-button color="primary" type="button" (click)="startDnsCheck()" [disabled]="actionBusy() || d.dnsCheckInProgress || d.state === 'provisioning'"><mat-icon>dns</mat-icon> {{ d.dnsCheckInProgress ? 'Comprobación en curso' : 'Comprobar ahora' }}</button>
+        @if (d.state === 'verified') {
+          <button mat-stroked-button type="button" (click)="activate()" [disabled]="actionBusy() || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>https</mat-icon> Preparar HTTPS</button>
+        }
+      </div>
+    }
+    <p class="scheduler-note">La fecha indica cuándo el planificador puede admitir el trabajo. La ejecución puede demorarse por cola; esta pantalla no realiza sondeos automáticos.</p>
+  </section>
+}

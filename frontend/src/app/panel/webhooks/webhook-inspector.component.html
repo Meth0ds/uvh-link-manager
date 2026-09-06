@@ -1,0 +1,39 @@
+<a class="back-link" routerLink="/app/webhooks"><mat-icon>arrow_back</mat-icon> Volver a webhooks</a>
+<app-page-header icon="manage_search" eyebrow="Entrega y depuración" title="Inspector de webhooks" description="Revisa intentos y un payload reconstruido mediante allowlist segura." />
+
+@if (loading() && !webhook()) { <app-panel-skeleton variant="list" label="Cargando inspector" /> }
+@if (loading() && webhook()) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando inspector" /> }
+@if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div> }
+
+@if (webhook(); as w) {
+  <section class="endpoint-card" aria-labelledby="endpoint-title">
+    <div><span class="eyebrow">Endpoint configurado</span><h2 id="endpoint-title" class="tnum">{{ w.url }}</h2><p>{{ w.active ? 'Activo' : 'Pausado' }} · {{ w.events.length }} eventos suscritos · firma configurada: {{ w.hasSecret ? 'sí' : 'no' }}</p></div>
+    @if (canEdit()) { <button mat-flat-button color="primary" type="button" (click)="sendTest()" [disabled]="actionId() !== null || !w.active"><mat-icon>send</mat-icon> Enviar ping</button> }
+  </section>
+  <div class="safety-note" role="note"><mat-icon>shield</mat-icon><span>El payload mostrado no es el registro bruto: sólo incluye campos documentados. Se omiten secreto, firma, URL/IP resuelta y cualquier cuerpo de respuesta remoto.</span></div>
+  @if (!canEdit()) { <div class="alert permission" role="status">Vista de solo lectura. Los reenvíos y pruebas requieren rol editor o superior.</div> }
+
+  <section class="deliveries-card" aria-labelledby="deliveries-title">
+    <header><div><span class="eyebrow">Historial paginado</span><h2 id="deliveries-title">Entregas</h2></div><span>{{ total() }} en total</span></header>
+    @for (d of deliveries(); track d.id) {
+      <article class="delivery" [class.failed]="d.status === 'failed'">
+        <div class="delivery-head">
+          <span class="status" [class]="'status ' + d.status">{{ d.status === 'processing' ? 'enviando' : d.status }}</span>
+          <code>{{ d.event }}</code>
+          <span class="event-id tnum">{{ d.event_id }}</span>
+          <span>Intentos: {{ d.attempts }}</span>
+        </div>
+        <dl><div><dt>Creada</dt><dd>{{ formatDate(d.created_at) }}</dd></div><div><dt>Siguiente intento</dt><dd>{{ formatDate(d.next_attempt_at) }}</dd></div><div><dt>Entregada</dt><dd>{{ formatDate(d.delivered_at) }}</dd></div></dl>
+        @if (d.error; as deliveryError) { <p class="delivery-error" role="status"><strong>{{ deliveryError.code }}</strong> · {{ deliveryError.message }}</p> }
+        <details><summary>Ver payload redactado</summary><pre>{{ payload(d) }}</pre></details>
+        @if (canEdit() && (d.status === 'failed' || d.status === 'pending')) {
+          <button mat-stroked-button type="button" (click)="resend(d)" [disabled]="actionId() !== null"><mat-icon>refresh</mat-icon> {{ d.status === 'pending' ? 'Priorizar pendiente' : 'Reenviar' }}</button>
+        }
+      </article>
+    }
+    @if (!deliveries().length && !loading()) { <div class="empty-state"><mat-icon>inbox</mat-icon><b>Sin entregas</b><p>Envía un ping para verificar la integración.</p></div> }
+    @if (total() > perPage) {
+      <nav class="pagination" aria-label="Páginas de entregas"><button mat-stroked-button type="button" (click)="load(page() - 1)" [disabled]="loading() || page() <= 1">Anterior</button><span>Página {{ page() }} de {{ pages() }}</span><button mat-stroked-button type="button" (click)="load(page() + 1)" [disabled]="loading() || page() >= pages()">Siguiente</button></nav>
+    }
+  </section>
+}

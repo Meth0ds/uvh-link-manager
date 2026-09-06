@@ -19,6 +19,7 @@ describe("Panel activity navigation", () => {
   let selected = signal<number | null>(1);
   let panel: PanelComponent;
   const visible = () => panel.visibleNav().flatMap((group) => group.items).some((item) => item.path === "/app/activity");
+  const usageVisible = () => panel.visibleNav().flatMap((group) => group.items).some((item) => item.path === "/app/usage");
 
   beforeEach(() => {
     identity = signal<AuthUser | null>({ ...user });
@@ -40,6 +41,7 @@ describe("Panel activity navigation", () => {
     it(`projects activity visibility for workspace ${role}`, () => {
       list.set([{ ...workspace, role }]);
       expect(visible()).toBe(role === "owner" || role === "admin");
+      expect(usageVisible()).toBeTrue();
     });
   }
 

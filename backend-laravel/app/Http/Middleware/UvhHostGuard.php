@@ -11,6 +11,7 @@ class UvhHostGuard
     private const PUBLIC_API_PATHS = [
         '/api/v1/report',
         '/api/v1/status',
+        '/api/v1/public-status',
         '/api/v1/create',
         '/api/v1/link-intents',
         '/api/v1/csrf',
@@ -99,6 +100,8 @@ class UvhHostGuard
     private function isPublicPath(string $path): bool
     {
         return $path === '/'
+            || $path === '/help'
+            || $path === '/status'
             || $path === '/legal'
             || str_starts_with($path, '/legal/')
             || $path === '/robots.txt'

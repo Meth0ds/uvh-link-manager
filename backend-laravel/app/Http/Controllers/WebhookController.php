@@ -211,25 +211,41 @@ class WebhookController
     {
         $workspaceId = UvhRequest::workspaceId($request);
 
+        $page = filter_var($request->query('page', 1), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100000]]);
+        $perPage = filter_var($request->query('perPage', 20), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 50]]);
+        if ($page === false || $perPage === false) {
+            return response()->json(['error' => 'Paginación inválida'], 422);
+        }
+
         $webhook = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $webhook) {
             return response()->json(['error' => 'Webhook no encontrado'], 404);
         }
 
-        $deliveries = $webhook->deliveries()->orderByDesc('created_at')->limit(50)->get()->map(fn ($d) => [
+        $query = $webhook->deliveries()->orderByDesc('created_at')->orderByDesc('id');
+        $total = (clone $query)->count();
+        $deliveries = $query->forPage($page, $perPage)->get()->map(fn ($d) => [
             'id' => $d->id,
             'webhook_id' => $d->webhook_id,
             'event' => $d->event,
             'event_id' => $d->event_id,
             'status' => $d->status,
             'attempts' => (int) $d->attempts,
-            'last_error' => $d->last_error,
+            // Never expose the persisted raw error: future transports could
+            // otherwise leak a resolved host, IP address or remote body.
+            'error' => $this->normalizedDeliveryError($d->last_error),
+            'payloadPreview' => $this->redactedPayload($d->payload, (string) $d->event, (string) $d->event_id),
             'next_attempt_at' => $this->iso($d->next_attempt_at),
             'created_at' => $this->iso($d->created_at),
             'delivered_at' => $this->iso($d->delivered_at),
         ]);
 
-        return response()->json(['deliveries' => $deliveries]);
+        return response()->json([
+            'deliveries' => $deliveries,
+            'total' => $total,
+            'page' => $page,
+            'perPage' => $perPage,
+        ]);
     }
 
     public function resend(Request $request, int $id, int $deliveryId)
@@ -262,6 +278,11 @@ class WebhookController
                 if ($delivery->status !== 'pending' && ! WebhookService::canRequeue($workspaceId)) {
                     return 'full';
                 }
+                if ($delivery->status === 'pending') {
+                    $delivery->update(['next_attempt_at' => now(), 'locked_at' => null]);
+
+                    return 'already_pending';
+                }
                 $delivery->update([
                     'status' => 'pending',
                     'attempts' => 0,
@@ -285,14 +306,14 @@ class WebhookController
         if ($result === 'full') {
             return response()->json(['error' => 'La cola de entregas del workspace está llena. Espera antes de reenviar.'], 429);
         }
-        if ($result !== 'ok') {
+        if (! in_array($result, ['ok', 'already_pending'], true)) {
             return response()->json(['error' => 'Entrega no encontrada'], 404);
         }
 
         WebhookService::enqueueExisting($deliveryId);
         Audit::write($user->id, 'webhook.resend', 'webhook', $id, ['deliveryId' => $deliveryId], UvhRequest::ip($request), workspaceId: $workspaceId);
 
-        return response()->json(['ok' => true]);
+        return response()->json(['ok' => true, 'state' => 'pending']);
     }
 
     public function test(Request $request, int $id)
@@ -336,7 +357,71 @@ class WebhookController
             return response()->json(['error' => 'La cola de entregas del workspace está llena. Espera a que terminen las entregas pendientes.'], 429);
         }
 
-        return response()->json(['ok' => true]);
+        return response()->json(['ok' => true, 'eventId' => $eventId], 202);
+    }
+
+    /**
+     * Rebuild a bounded, documented preview instead of returning stored JSON.
+     * Unknown keys and invalid values are dropped, so a future producer cannot
+     * accidentally turn the inspector into a secret-exfiltration surface.
+     */
+    private function redactedPayload(mixed $payload, string $event, string $eventId): array
+    {
+        $source = is_array($payload) ? $payload : [];
+        $data = is_array($source['data'] ?? null) ? $source['data'] : [];
+        $allowed = match ($event) {
+            'link.created' => ['linkId' => 'integer', 'alias' => 'text'],
+            'link.updated' => ['linkId' => 'integer', 'alias' => 'text', 'state' => 'text'],
+            'link.deleted' => ['linkId' => 'integer'],
+            'link.threshold_reached' => ['linkId' => 'integer', 'threshold' => 'integer'],
+            'domain.verified' => ['domainId' => 'integer', 'domain' => 'text'],
+            'ping' => ['message' => 'text'],
+            default => [],
+        };
+        $safeData = [];
+        foreach ($allowed as $key => $type) {
+            $value = $data[$key] ?? null;
+            if ($type === 'integer' && is_int($value) && $value >= 0) {
+                $safeData[$key] = $value;
+            } elseif ($type === 'text' && is_string($value) && mb_strlen($value) <= 255
+                && ! preg_match('/[\x00-\x1F\x7F]/u', $value)) {
+                $safeData[$key] = $value;
+            }
+        }
+
+        $timestamp = $source['timestamp'] ?? null;
+        if (! is_string($timestamp) || strlen($timestamp) > 64 || strtotime($timestamp) === false) {
+            $timestamp = null;
+        }
+
+        return [
+            'event' => in_array($event, array_merge(WebhookService::EVENTS, ['ping']), true) ? $event : 'unknown',
+            'eventId' => mb_substr($eventId, 0, 255),
+            'timestamp' => $timestamp,
+            'data' => $safeData,
+            'redacted' => true,
+        ];
+    }
+
+    /** @return array{code: string, message: string}|null */
+    private function normalizedDeliveryError(?string $error): ?array
+    {
+        if ($error === null || $error === '') {
+            return null;
+        }
+        [$code, $message] = match (true) {
+            preg_match('/^HTTP [1-5][0-9]{2}$/', $error) === 1 => ['receiver_http', 'El receptor devolvió una respuesta no satisfactoria.'],
+            str_contains($error, 'política de red') => ['network_policy', 'El destino fue bloqueado por la política de red.'],
+            str_contains($error, 'resolver') => ['dns_resolution', 'No se pudo resolver el destino.'],
+            str_contains($error, 'serializar') => ['serialization', 'No se pudo preparar el evento.'],
+            str_contains($error, 'Configuración de webhook modificada') => ['configuration_changed', 'La configuración cambió antes de la entrega.'],
+            str_contains($error, 'creador ya no conserva') => ['creator_permission_revoked', 'El creador ya no conserva permiso de edición.'],
+            str_contains($error, 'infraestructura de entrega') => ['delivery_infrastructure', 'La infraestructura de entrega no estuvo disponible.'],
+            str_contains($error, 'conectar con el destino') => ['connection_failed', 'No se pudo conectar con el receptor.'],
+            default => ['unknown_failure', 'La entrega no se completó.'],
+        };
+
+        return ['code' => $code, 'message' => $message];
     }
 
     /** Must be called inside a database transaction. */

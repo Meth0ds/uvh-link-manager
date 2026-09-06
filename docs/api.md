@@ -109,7 +109,14 @@ MFA reciente y aplica transiciones de estado en backend. Los mensajes libres se
 cifran en reposo; los listados nunca devuelven ciphertext ni generaciones de
 idempotencia.
 
-La configuración pública de hCaptcha se obtiene de `GET /api/v1/config`. El `captchaToken` se verifica siempre en backend y el secreto nunca forma parte de la respuesta pública.
+La configuración pública de hCaptcha se obtiene de `GET /api/v1/config`. El
+`captchaToken` se verifica siempre en backend y el secreto nunca forma parte de
+la respuesta pública. Login, registro y reenvío usan el modo invisible: cada
+submit ejecuta un reto nuevo y no conserva tokens para intentos posteriores. El
+proveedor aún puede mostrar un desafío cuando su evaluación de riesgo lo exige.
+En desarrollo/test se reconoce `dummy-key-pass` únicamente para la sitekey
+oficial de prueba; las claves reales y producción conservan la comparación
+estricta con el hostname esperado.
 
 ## Intenciones de enlace — `/api/v1/link-intents`
 

@@ -1,4 +1,5 @@
 <app-page-header icon="link" eyebrow="Biblioteca" title="Enlaces" description="Administra, edita y mide todos tus enlaces cortos desde un único lugar.">
+  <a mat-stroked-button routerLink="/app/links/trash"><mat-icon>delete_sweep</mat-icon> Papelera</a>
   @if (canWrite()) {
     <button mat-flat-button color="primary" (click)="create()">
       <mat-icon>add</mat-icon> Nuevo enlace

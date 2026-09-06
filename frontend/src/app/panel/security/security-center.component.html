@@ -1,0 +1,38 @@
+<app-page-header icon="security" eyebrow="Protección de cuenta" title="Centro de seguridad" description="Estado, credenciales, recuperación, sesiones y actividad sensible en un único lugar." />
+@if (loading() && !snapshot()) { <app-panel-skeleton variant="cards" label="Cargando centro de seguridad" /> }
+@if (loading() && snapshot()) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando seguridad" /> }
+@if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div> }
+
+@if (snapshot(); as data) {
+  <section class="posture" [class.protected]="data.summary.mfaEnabled" aria-labelledby="posture-title">
+    <mat-icon>{{ data.summary.mfaEnabled ? 'verified_user' : 'gpp_maybe' }}</mat-icon>
+    <div><span class="eyebrow">Resumen de postura</span><h2 id="posture-title">{{ data.summary.mfaEnabled ? 'Segundo factor activo' : 'Protección adicional pendiente' }}</h2><p>{{ data.summary.activeSessions }} sesiones activas · {{ data.summary.recoveryCodesRemaining }} códigos de recuperación disponibles</p></div>
+    <button mat-stroked-button type="button" (click)="load()" [disabled]="loading()"><mat-icon>refresh</mat-icon> Actualizar</button>
+  </section>
+
+  <div class="control-grid">
+    <a class="control-card" routerLink="/app/settings" fragment="security"><mat-icon>password</mat-icon><div><h2>Contraseña</h2><p>Último cambio registrado: {{ formatDate(data.summary.lastPasswordEventAt) }}</p><small>Requiere contraseña actual y, con MFA activo, un factor actual.</small></div><mat-icon>arrow_forward</mat-icon></a>
+    <a class="control-card" routerLink="/app/settings" fragment="security"><mat-icon>phonelink_lock</mat-icon><div><h2>MFA y recuperación</h2><p>{{ data.summary.mfaEnabled ? 'Activo' : 'Inactivo' }} · {{ data.summary.recoveryCodesRemaining }} códigos restantes</p><small>Alta, sustitución, regeneración y baja reautentican cada operación.</small></div><mat-icon>arrow_forward</mat-icon></a>
+    <a class="control-card" routerLink="/app/settings" fragment="account"><mat-icon>alternate_email</mat-icon><div><h2>Email de acceso</h2><p>{{ data.summary.pendingEmail ? 'Pendiente: ' + data.summary.pendingEmail : 'Sin cambio pendiente' }}</p><small>Confirmación por el nuevo buzón y cierre de sesiones al completar.</small></div><mat-icon>arrow_forward</mat-icon></a>
+    <a class="control-card" routerLink="/auth/account-recovery"><mat-icon>support_agent</mat-icon><div><h2>Recuperación de cuenta</h2><p>Flujo revisado por soporte si pierdes el segundo factor.</p><small>No concede acceso por sí solo y revoca credenciales al completarse.</small></div><mat-icon>arrow_forward</mat-icon></a>
+  </div>
+
+  <div class="security-columns">
+    <section class="panel" aria-labelledby="sessions-title">
+      <header><div><span class="eyebrow">Accesos actuales</span><h2 id="sessions-title">Sesiones activas</h2></div><span class="count">{{ sessions().length }}</span></header>
+      @for (session of sessions(); track session.id) {
+        <article class="session"><mat-icon>devices</mat-icon><div><b>{{ agent(session.user_agent) }}</b><span>Último uso: {{ formatDate(session.last_used_at) }}</span><small>{{ session.current ? 'Esta sesión' : 'Otra sesión' }}{{ session.mfa_verified_at ? ' · MFA verificado' : '' }}</small></div><button mat-stroked-button type="button" (click)="revoke(session)" [disabled]="revokingId() !== null">{{ session.current ? 'Cerrar' : 'Revocar' }}</button></article>
+      }
+      @if (!sessions().length) { <p class="empty">No hay sesiones activas visibles.</p> }
+    </section>
+
+    <section class="panel" aria-labelledby="activity-title">
+      <header><div><span class="eyebrow">Auditoría personal</span><h2 id="activity-title">Actividad sensible reciente</h2></div></header>
+      @for (event of data.activity; track event.id) {
+        <article class="activity"><span class="dot"></span><div><b>{{ actionLabel(event.action) }}</b><span>{{ formatDate(event.createdAt) }}</span></div></article>
+      }
+      @if (!data.activity.length) { <p class="empty">Todavía no hay actividad sensible registrada.</p> }
+      <p class="privacy-note">Esta vista omite metadatos internos, hashes de IP y material de credenciales.</p>
+    </section>
+  </div>
+}

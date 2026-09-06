@@ -4,8 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\LinkException;
 use App\Models\Link;
+use App\Models\User;
+use App\Models\UvhSession;
 use App\Support\Audit;
 use App\Support\LinkService;
+use App\Support\MfaInfrastructureUnavailable;
+use App\Support\MfaStepUp;
 use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
@@ -17,6 +21,37 @@ use Illuminate\Support\Facades\Hash;
 
 class LinkController
 {
+    public function trash(Request $request)
+    {
+        $workspaceId = UvhRequest::workspaceId($request);
+        $search = mb_substr(trim(UvhRequest::queryString($request, 'q')), 0, 200);
+        $page = $this->positiveQueryInteger($request->query('page'), 1, 10_000);
+        $perPage = $this->positiveQueryInteger($request->query('perPage'), 20, 100);
+        $retentionDays = max(1, (int) config('uvh.housekeeping.link_trash_days', 30));
+
+        $query = Link::withTrashed()->with(['domain', 'tags'])
+            ->where('workspace_id', $workspaceId)->whereNotNull('deleted_at');
+        if ($search !== '') {
+            $like = "%{$search}%";
+            $query->where(fn ($q) => $q->where('alias', 'ilike', $like)->orWhere('destination', 'ilike', $like));
+        }
+        $query->orderByDesc('deleted_at')->orderByDesc('id');
+        $total = (clone $query)->count();
+        $rows = $query->forPage($page, $perPage)->get()->map(function (Link $link) use ($retentionDays): array {
+            return [
+                'link' => LinkService::dto($link),
+                'previousState' => $link->state_before_delete,
+                'deletedAt' => $this->iso($link->deleted_at),
+                'purgeAt' => $this->iso($link->deleted_at?->copy()->addDays($retentionDays)),
+            ];
+        });
+
+        return response()->json([
+            'links' => $rows, 'total' => $total, 'page' => $page, 'perPage' => $perPage,
+            'retentionDays' => $retentionDays,
+        ]);
+    }
+
     public function index(Request $request)
     {
         $workspaceId = UvhRequest::workspaceId($request);
@@ -445,6 +480,79 @@ class LinkController
         }
 
         Audit::write($user->id, 'link.restore', 'link', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Permanently remove one trashed link after role and credential step-up. */
+    public function purge(Request $request, int $id)
+    {
+        $workspaceId = UvhRequest::workspaceId($request);
+        $actor = UvhRequest::user($request);
+        $sessionId = UvhRequest::sessionId($request);
+        $password = UvhRequest::inputString($request, 'password');
+        $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
+        $confirmation = UvhRequest::inputString($request, 'confirmation');
+        if ($password === '' || strlen($password) > 72 || strlen($factorCode) > 24 || mb_strlen($confirmation) > 100) {
+            return response()->json(['error' => 'Datos de confirmación inválidos'], 422);
+        }
+
+        try {
+            $result = DB::transaction(function () use ($workspaceId, $actor, $sessionId, $password, $factorCode, $confirmation, $id): array {
+                // Global order: account -> session -> workspace -> link.
+                $lockedUser = User::where('id', $actor->id)->whereNull('deleted_at')->lockForUpdate()->first();
+                $session = UvhSession::where('id', $sessionId)->where('user_id', $actor->id)
+                    ->whereNull('revoked_at')->lockForUpdate()->first();
+                if (! $lockedUser || ! $session
+                    || (int) $session->security_version !== (int) $lockedUser->security_version) {
+                    return ['status' => 'stale'];
+                }
+                if (! WorkspaceAccess::getMembershipLocked(
+                    $actor->id, $workspaceId, 'admin', expectedSecurityVersion: (int) $actor->security_version,
+                )) {
+                    return ['status' => 'forbidden'];
+                }
+                $link = Link::withTrashed()->where('id', $id)->where('workspace_id', $workspaceId)
+                    ->whereNotNull('deleted_at')->lockForUpdate()->first();
+                if (! $link) {
+                    return ['status' => 'not_found'];
+                }
+                if (! hash_equals('ELIMINAR '.$link->alias, $confirmation)) {
+                    return ['status' => 'confirmation'];
+                }
+                $stepUp = MfaStepUp::verify($lockedUser, $session, $password, $factorCode);
+                if ($stepUp['status'] !== 'ok') {
+                    return ['status' => $stepUp['status']];
+                }
+                if (isset($stepUp['recovery_codes'])) {
+                    $lockedUser->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => now()]);
+                }
+                $alias = (string) $link->alias;
+                $link->forceDelete();
+
+                return ['status' => 'deleted', 'alias' => $alias, 'factor' => $stepUp['factor']];
+            });
+        } catch (MfaInfrastructureUnavailable $error) {
+            report($error);
+
+            return response()->json(['error' => 'La verificación MFA no está disponible. No se eliminó el enlace.'], 503);
+        }
+
+        $error = match ($result['status']) {
+            'stale' => ['La sesión cambió. Vuelve a iniciar sesión.', 409],
+            'forbidden' => ['Sólo propietarios y administradores pueden borrar definitivamente.', 403],
+            'not_found' => ['Enlace no encontrado en la papelera', 404],
+            'confirmation' => ['La frase de confirmación no coincide con el alias actual', 422],
+            'password' => ['Contraseña incorrecta', 403],
+            'factor' => ['El código de autenticación o recuperación es incorrecto', 403],
+            default => null,
+        };
+        if ($error !== null) {
+            return response()->json(['error' => $error[0]], $error[1]);
+        }
+        Audit::write($actor->id, 'link.purge', 'link', $id, [
+            'alias' => $result['alias'], 'factor' => $result['factor'],
+        ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }

@@ -51,6 +51,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::get('csrf', [PublicController::class, 'csrf']);
     Route::get('config', [PublicController::class, 'config']);
     Route::get('status', [PublicController::class, 'status'])->middleware('throttle:uvh-status');
+    Route::get('public-status', [PublicController::class, 'publicStatus'])->middleware('throttle:uvh-status');
     Route::post('report', [PublicController::class, 'report'])->middleware('throttle:uvh-report');
     Route::post('create', [PublicController::class, 'create'])->middleware('throttle:uvh-link-create');
     Route::post('link-intents', [LinkIntentController::class, 'issue'])->middleware('throttle:uvh-link-create');
@@ -98,6 +99,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('link-intents/complete', [LinkIntentController::class, 'complete'])->middleware('uvh.auth:verified');
     Route::post('auth/change-password', [AuthController::class, 'changePassword'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
     Route::get('auth/sessions', [AuthController::class, 'sessions'])->middleware('uvh.auth');
+    Route::get('auth/security-center', [AuthController::class, 'securityCenter'])->middleware('uvh.auth');
     Route::post('auth/sessions/{id}/revoke', [AuthController::class, 'revokeSession'])->middleware('uvh.auth');
     Route::post('auth/mfa/setup', [AuthController::class, 'mfaSetup'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
     Route::post('auth/mfa/enable', [AuthController::class, 'mfaEnable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
@@ -109,6 +111,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     // Links.
     Route::prefix('links')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
         Route::get('meta/role', [LinkController::class, 'role'])->middleware('uvh.workspace:viewer');
+        Route::get('trash', [LinkController::class, 'trash'])->middleware('uvh.workspace:viewer');
         Route::get('/', [LinkController::class, 'index'])->middleware('uvh.workspace:viewer');
         Route::post('check-alias', [LinkController::class, 'checkAlias'])->middleware(['uvh.workspace:viewer', 'throttle:uvh-link-create']);
         Route::post('/', [LinkController::class, 'store'])->middleware(['uvh.workspace:editor', 'throttle:uvh-link-create']);
@@ -118,6 +121,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::post('{id}/state', [LinkController::class, 'state'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
         Route::delete('{id}', [LinkController::class, 'destroy'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
         Route::post('{id}/restore', [LinkController::class, 'restore'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
+        Route::post('{id}/purge', [LinkController::class, 'purge'])->middleware(['uvh.workspace:admin', 'throttle:uvh-credential'])->where('id', '[0-9]+');
     });
 
     // Analytics.
@@ -152,6 +156,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     // Domains.
     Route::prefix('domains')->middleware('uvh.auth')->group(function () {
         Route::get('/', [DomainController::class, 'index'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer']);
+        Route::get('{id}', [DomainController::class, 'show'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->where('id', '[0-9]+');
         Route::post('/', [DomainController::class, 'store'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor']);
         Route::post('{id}/verify', [DomainController::class, 'verify'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor', 'throttle:uvh-domain-dns'])->where('id', '[0-9]+');
         Route::post('{id}/activate', [DomainController::class, 'activate'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor'])->where('id', '[0-9]+');

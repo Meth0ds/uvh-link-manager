@@ -108,6 +108,9 @@
             <button mat-stroked-button class="danger" (click)="remove(d)" [disabled]="actionId() === d.id"><mat-icon>delete</mat-icon> Eliminar</button>
           </div>
         }
+        <div class="domain-actions details-action">
+          <a mat-stroked-button [routerLink]="['/app/domains', d.id]"><mat-icon>monitor_heart</mat-icon> Ver diagnóstico</a>
+        </div>
       </article>
     }
     @if (!domains().length && !error()) {

@@ -1,4 +1,4 @@
-import type { ApiTokenDto, WebhookDelivery, WebhookDto } from "../models";
+import type { ApiTokenDto, WebhookDelivery, WebhookDeliveryPage, WebhookDto } from "../models";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -17,6 +17,8 @@ const WEBHOOK_EVENTS = new Set([
   "domain.verified",
 ]);
 const DELIVERY_STATUSES = new Set<WebhookDelivery["status"]>(["pending", "processing", "success", "failed"]);
+const INSPECTOR_EVENTS = new Set([...WEBHOOK_EVENTS, "ping", "unknown"]);
+const ERROR_CODES = new Set(["receiver_http", "network_policy", "dns_resolution", "serialization", "configuration_changed", "creator_permission_revoked", "delivery_infrastructure", "connection_failed", "unknown_failure"]);
 
 function invalid(contract: string): never {
   throw new Error(`Invalid ${contract} response`);
@@ -92,6 +94,20 @@ function delivery(value: unknown): WebhookDelivery {
   if (typeof status !== "string" || !DELIVERY_STATUSES.has(status as WebhookDelivery["status"])) {
     invalid("webhook delivery");
   }
+  const errorSource = source["error"] === null ? null : record(source["error"], "webhook delivery error");
+  const payload = record(source["payloadPreview"], "webhook payload preview");
+  const payloadData = record(payload["data"], "webhook payload data");
+  if (Object.keys(payloadData).length > 4 || payload["redacted"] !== true) invalid("webhook payload preview");
+  const data: Record<string, string | number> = {};
+  for (const [key, item] of Object.entries(payloadData)) {
+    const safeKey = safeText(key, "webhook payload key", 32);
+    if ((typeof item !== "string" && typeof item !== "number")
+      || (typeof item === "number" && (!Number.isSafeInteger(item) || item < 0))
+      || (typeof item === "string" && (item.length > 255 || /[\u0000-\u001f\u007f]/.test(item)))) invalid("webhook payload data");
+    data[safeKey] = item;
+  }
+  const payloadEvent = safeText(payload["event"], "webhook payload event", 64);
+  if (!INSPECTOR_EVENTS.has(payloadEvent)) invalid("webhook payload event");
   return {
     id: integer(source["id"], "webhook delivery", 1),
     webhook_id: integer(source["webhook_id"], "webhook delivery", 1),
@@ -99,7 +115,17 @@ function delivery(value: unknown): WebhookDelivery {
     event_id: safeText(source["event_id"], "webhook delivery", 255),
     status: status as WebhookDelivery["status"],
     attempts: integer(source["attempts"], "webhook delivery"),
-    last_error: nullableText(source["last_error"], "webhook delivery", 2048, true),
+    error: errorSource === null ? null : {
+      code: (() => { const code = safeText(errorSource["code"], "webhook delivery error", 64); if (!ERROR_CODES.has(code)) invalid("webhook delivery error"); return code; })(),
+      message: safeText(errorSource["message"], "webhook delivery error", 255),
+    },
+    payloadPreview: {
+      event: payloadEvent,
+      eventId: safeText(payload["eventId"], "webhook payload event id", 255),
+      timestamp: nullableText(payload["timestamp"], "webhook payload timestamp", 64),
+      data,
+      redacted: true,
+    },
     next_attempt_at: nullableText(source["next_attempt_at"], "webhook delivery", 64),
     created_at: safeText(source["created_at"], "webhook delivery", 64),
     delivered_at: nullableText(source["delivered_at"], "webhook delivery", 64),
@@ -140,8 +166,15 @@ export function decodeCreatedWebhookResponse(value: unknown): { webhook: Webhook
   return { webhook: webhook(source["webhook"]), secret };
 }
 
-export function decodeWebhookDeliveriesResponse(value: unknown): { deliveries: WebhookDelivery[] } {
+export function decodeWebhookDeliveriesResponse(value: unknown, expected?: { webhookId: number; page: number; perPage: number }): WebhookDeliveryPage {
   const source = record(value, "webhook deliveries");
   if (!Array.isArray(source["deliveries"]) || source["deliveries"].length > 50) invalid("webhook deliveries");
-  return { deliveries: source["deliveries"].map(delivery) };
+  const page = integer(source["page"], "webhook delivery page", 1);
+  const perPage = integer(source["perPage"], "webhook delivery page", 1);
+  const total = integer(source["total"], "webhook delivery page");
+  if (perPage > 50 || source["deliveries"].length > perPage || total < source["deliveries"].length
+    || (expected && (page !== expected.page || perPage !== expected.perPage))) invalid("webhook delivery page");
+  const deliveries = source["deliveries"].map(delivery);
+  if (expected && deliveries.some((item) => item.webhook_id !== expected.webhookId)) invalid("webhook delivery page");
+  return { deliveries, total, page, perPage };
 }

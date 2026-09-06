@@ -1,4 +1,5 @@
 import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { RouterLink } from "@angular/router";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -51,6 +52,7 @@ const DNS_ERROR_LABEL: Record<string, string> = {
   selector: "app-domains",
   standalone: true,
   imports: [
+    RouterLink,
     FormsModule,
     MatButtonModule,
     MatIconModule,
@@ -139,7 +141,7 @@ export class DomainsComponent {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+      const { domains } = await this.api.get<{ domains: DomainDto[]}>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()));
       if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.domains.set(domains);
     } catch (err) {
@@ -209,7 +211,7 @@ export class DomainsComponent {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
       if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
       try {
-        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()));
         if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
         this.domains.set(domains);
         const current = domains.find((domain) => domain.id === id);
@@ -259,7 +261,7 @@ export class DomainsComponent {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
       if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
       try {
-        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()));
         if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
         this.domains.set(domains);
         const current = domains.find((domain) => domain.id === id);

@@ -18,6 +18,14 @@ export const routes: Routes = [
     loadChildren: () => import("./legal/legal.routes").then((m) => m.legalRoutes),
   },
   {
+    path: "help",
+    loadComponent: () => import("./help/help.component").then((m) => m.HelpComponent),
+  },
+  {
+    path: "status",
+    loadComponent: () => import("./public-status/public-status.component").then((m) => m.PublicStatusComponent),
+  },
+  {
     // Canonical invitation URL used by email links. Keep the legacy root alias
     // so invitations already delivered before the cutover remain valid.
     path: "invitations/accept",

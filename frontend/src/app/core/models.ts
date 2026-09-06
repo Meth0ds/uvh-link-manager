@@ -104,6 +104,21 @@ export interface LinksResponse {
   perPage: number;
 }
 
+export interface TrashLinkDto {
+  link: LinkDto;
+  previousState: LinkState | null;
+  deletedAt: string;
+  purgeAt: string;
+}
+
+export interface LinkTrashResponse {
+  links: TrashLinkDto[];
+  total: number;
+  page: number;
+  perPage: number;
+  retentionDays: number;
+}
+
 export interface LinkDetailResponse {
   link: LinkDto;
   rules: RedirectRule[];
@@ -122,7 +137,7 @@ export interface DomainDto {
   id: number;
   domain: string;
   state: DomainState;
-  verificationHost: string;
+  verificationHost: string | null;
   verificationToken: string | null;
   cnameTarget: string | null;
   verifiedAt: string | null;
@@ -131,10 +146,19 @@ export interface DomainDto {
   dnsCheckStartedAt: string | null;
   dnsCheckCompletedAt: string | null;
   dnsError: string | null;
+  dnsCheckInProgress: boolean;
+  automaticDnsRetry: boolean;
+  dnsRetryIntervalHours: number | null;
+  nextDnsCheckAt: string | null;
+  dnsCheckDue: boolean;
   edgeEligible: boolean;
   tlsReadyAt: string | null;
   tlsError: string | null;
   createdAt: string;
+}
+
+export interface DomainDetailResponse {
+  domain: DomainDto;
 }
 
 export interface ApiTokenDto {
@@ -164,10 +188,24 @@ export interface WebhookDelivery {
   event_id: string;
   status: "pending" | "processing" | "success" | "failed";
   attempts: number;
-  last_error: string | null;
+  error: { code: string; message: string } | null;
+  payloadPreview: {
+    event: string;
+    eventId: string;
+    timestamp: string | null;
+    data: Record<string, string | number>;
+    redacted: true;
+  };
   next_attempt_at: string | null;
   created_at: string;
   delivered_at: string | null;
+}
+
+export interface WebhookDeliveryPage {
+  deliveries: WebhookDelivery[];
+  total: number;
+  page: number;
+  perPage: number;
 }
 
 export interface AnalyticsOverview {
@@ -225,6 +263,41 @@ export interface WorkspaceGettingStarted {
   capabilities: { createLink: boolean; addDomain: boolean; inviteTeam: boolean };
 }
 
+export type WorkspaceUsagePolicy = "enforced" | "not_configured" | "unavailable";
+
+/** Aggregate quota projection. It contains no resource names, URLs or secrets. */
+export interface WorkspaceUsageQuota {
+  used: number;
+  limit: number | null;
+  remaining: number | null;
+  policy: WorkspaceUsagePolicy;
+  reached: boolean | null;
+  canManage: boolean;
+}
+
+export interface WorkspaceUsage {
+  workspaceId: number;
+  role: WorkspaceRole;
+  measuredAt: string;
+  resources: {
+    links: WorkspaceUsageQuota;
+    domains: WorkspaceUsageQuota;
+    members: WorkspaceUsageQuota;
+    /** Redacted by the API for viewers. */
+    tokens: WorkspaceUsageQuota | null;
+    webhooks: WorkspaceUsageQuota;
+    /** Redacted by the API below workspace admin. */
+    invitations: WorkspaceUsageQuota | null;
+  };
+  analytics: {
+    retentionDays: number;
+    maximumQueryRangeDays: number;
+    basis: "configured_policy";
+    purgeVerified: boolean;
+  };
+  basis: "snapshot_not_reservation";
+}
+
 export interface Session {
   id: string;
   user_agent: string | null;
@@ -235,6 +308,30 @@ export interface Session {
   /** Present only after this exact browser session passed MFA. */
   mfa_verified_at: string | null;
   current: boolean;
+}
+
+export interface SecurityCenterSnapshot {
+  summary: {
+    mfaEnabled: boolean;
+    recoveryCodesRemaining: number;
+    activeSessions: number;
+    currentSessionMfaVerifiedAt: string | null;
+    pendingEmail: string | null;
+    pendingEmailExpiresAt: string | null;
+    lastPasswordEventAt: string | null;
+  };
+  activity: Array<{ id: number; action: string; createdAt: string }>;
+}
+
+export type PublicServiceStatus = "operational" | "degraded" | "major_outage" | "maintenance" | "unknown";
+
+export interface PublicStatusSnapshot {
+  overall: PublicServiceStatus;
+  generatedAt: string | null;
+  stale: boolean;
+  source: "external_monitor" | "external_monitor_unavailable";
+  components: Array<{ id: "links" | "panel" | "webhooks"; label: string; status: Exclude<PublicServiceStatus, "unknown"> }>;
+  incidents: Array<{ id: string; title: string; message: string; status: "investigating" | "identified" | "monitoring" | "resolved"; startedAt: string; updatedAt: string }>;
 }
 
 export interface AdminOverview {

@@ -8,6 +8,7 @@ use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\DomainRevalidationSchedule;
 use App\Support\Ids;
 use App\Support\InvitationMailBudget;
 use App\Support\LinkIntentRegistry;
@@ -445,6 +446,14 @@ class UvhHousekeeping extends Command
             );
         });
 
+        $run('link_trash', function () use ($batch, $cutoff): void {
+            // Only rows already hidden from redirect and normal workspace
+            // queries are eligible. Foreign-key cascades remove child rules,
+            // tags and analytics in the same database statement.
+            $trashCutoff = $cutoff($this->days('link_trash_days', 30));
+            $this->purgeInBatches('links', 'id', 'deleted_at IS NOT NULL AND deleted_at < ?', [$trashCutoff], $batch);
+        });
+
         $run('governance_records', function () use ($batch, $cutoff): void {
             $auditCutoff = $cutoff($this->days('audit_purge_days', 365));
             $this->purgeInBatches('audit_events', 'id', 'created_at < ?', [$auditCutoff], $batch);
@@ -797,19 +806,12 @@ class UvhHousekeeping extends Command
 
     private function dnsCheckInProgress(CustomDomain $domain): bool
     {
-        return $domain->dns_check_started_at !== null
-            && ($domain->dns_check_completed_at === null
-                || $domain->dns_check_started_at->gt($domain->dns_check_completed_at));
+        return DomainRevalidationSchedule::isInProgress($domain);
     }
 
     private function dnsCheckDue(CustomDomain $domain): bool
     {
-        $hours = $domain->dns_error === null
-            ? max(1, (int) config('uvh.custom_domains.revalidation_hours', 24))
-            : max(1, (int) config('uvh.custom_domains.failure_retry_hours', 1));
-
-        return $domain->dns_check_completed_at === null
-            || $domain->dns_check_completed_at->lte(now()->subHours($hours));
+        return DomainRevalidationSchedule::isDue($domain);
     }
 
     private function purgeInBatches(string $table, string $idColumn, string $where, array $params, int $batch): int

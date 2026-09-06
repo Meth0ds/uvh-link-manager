@@ -430,6 +430,37 @@ class ApiParityTest extends TestCase
         ]);
     }
 
+    public function test_official_hcaptcha_test_hostname_is_accepted_only_with_the_official_test_sitekey(): void
+    {
+        Http::swap(new HttpFactory());
+        Http::fake([
+            'https://api.hcaptcha.com/siteverify' => Http::response([
+                'success' => true,
+                'hostname' => 'dummy-key-pass',
+            ]),
+        ]);
+
+        // Official pass-through credentials intentionally return the
+        // synthetic hostname instead of the local browser host. Reaching the
+        // generic credentials response proves CAPTCHA verification passed.
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'unknown-test-key@example.com',
+            'password' => self::PASSWORD,
+            'captchaToken' => 'official-test-passcode',
+        ])->assertStatus(401)->assertExactJson(['error' => 'Credenciales incorrectas']);
+
+        // The sentinel must not become a general hostname bypass for custom
+        // or production sitekeys.
+        config(['uvh.hcaptcha.site_key' => 'custom-site-key-that-is-not-the-official-test-key']);
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'unknown-custom-key@example.com',
+            'password' => self::PASSWORD,
+            'captchaToken' => 'custom-key-passcode',
+        ])->assertStatus(422)->assertJson([
+            'error' => 'Completa de nuevo la verificación antiabuso.',
+        ]);
+    }
+
     public function test_unknown_login_uses_a_valid_dummy_hash_and_returns_generic_credentials_error(): void
     {
         $this->postJson('/api/v1/auth/login', [
@@ -818,6 +849,18 @@ class ApiParityTest extends TestCase
         $this->registerVerifiedLogin($email);
         $user = User::where('email', $email)->firstOrFail();
         $workspaceId = (int) DB::table('memberships')->where('user_id', $user->id)->value('workspace_id');
+        $oldTrashId = DB::table('links')->insertGetId([
+            'workspace_id' => $workspaceId, 'created_by' => $user->id,
+            'alias' => 'expired-trash', 'destination' => 'https://example.com/expired-trash',
+            'state' => 'deleted', 'state_before_delete' => 'active', 'version' => 2,
+            'deleted_at' => now()->subDays(31), 'created_at' => now()->subDays(40), 'updated_at' => now()->subDays(31),
+        ]);
+        $freshTrashId = DB::table('links')->insertGetId([
+            'workspace_id' => $workspaceId, 'created_by' => $user->id,
+            'alias' => 'fresh-trash', 'destination' => 'https://example.com/fresh-trash',
+            'state' => 'deleted', 'state_before_delete' => 'active', 'version' => 2,
+            'deleted_at' => now()->subDays(29), 'created_at' => now()->subDays(40), 'updated_at' => now()->subDays(29),
+        ]);
         $webhook = Webhook::create([
             'workspace_id' => $workspaceId,
             'created_by' => $user->id,
@@ -863,6 +906,8 @@ class ApiParityTest extends TestCase
         $this->assertDatabaseMissing('webhook_deliveries', ['event_id' => 'old-success']);
         $this->assertDatabaseMissing('failed_jobs', ['uuid' => '00000000-0000-4000-8000-000000000001']);
         $this->assertDatabaseHas('custom_domains', ['id' => $staleDomainId, 'state' => 'error']);
+        $this->assertDatabaseMissing('links', ['id' => $oldTrashId]);
+        $this->assertDatabaseHas('links', ['id' => $freshTrashId, 'state' => 'deleted']);
     }
 
     public function test_unauthorized_endpoints_return_error_envelope(): void

@@ -1,0 +1,65 @@
+<div class="public-shell">
+  <header class="public-header">
+    <a class="brand" routerLink="/" aria-label="UVH, inicio"><span aria-hidden="true">↗</span><b>UVH</b></a>
+    <nav aria-label="Navegación pública"><a routerLink="/status">Estado del servicio</a><a routerLink="/auth/login">Iniciar sesión</a></nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="help-title">
+      <p class="eyebrow">Documentación operativa</p>
+      <h1 id="help-title">Ayuda técnica de UVH</h1>
+      <p>Guías concisas para publicar enlaces, verificar dominios e integrar la API y los webhooks sin rebajar las garantías de seguridad.</p>
+      <span class="version">Versión {{ guideVersion }}</span>
+    </section>
+
+    <nav class="contents" aria-label="Contenido de la ayuda">
+      <a href="#links">Enlaces</a><a href="#domains">Dominios</a><a href="#api">API</a><a href="#webhooks">Firmas de webhook</a>
+    </nav>
+
+    <div class="guide-grid">
+      <article id="links">
+        <p class="number">01</p><h2>Publicar un enlace</h2>
+        <ol>
+          <li>Crea el enlace como borrador y revisa el destino, el dominio y el alias.</li>
+          <li>Define las reglas en orden de prioridad; el destino principal actúa como salida segura.</li>
+          <li>Publica solo después de comprobar el estado, la caducidad y los límites de uso.</li>
+        </ol>
+        <p>Las ediciones posteriores quedan asociadas al workspace y a su registro de actividad.</p>
+      </article>
+
+      <article id="domains">
+        <p class="number">02</p><h2>Verificar un dominio</h2>
+        <ol>
+          <li>Añade en tu proveedor DNS el registro exacto que muestra el panel.</li>
+          <li>Usa <strong>Comprobar ahora</strong> para una verificación manual o consulta la próxima revisión automática.</li>
+          <li>No publiques hasta que DNS y TLS aparezcan saludables.</li>
+        </ol>
+        <p>La propagación DNS y la emisión TLS no son instantáneas. El diagnóstico indica qué falta y cuándo se volverá a comprobar.</p>
+      </article>
+
+      <article id="api">
+        <p class="number">03</p><h2>Consumir la API</h2>
+        <p>Envía el token como <code>Authorization: Bearer &lt;token&gt;</code> y concede únicamente los ámbitos necesarios. Guarda el secreto fuera del código y rótalo si pudiera haberse expuesto.</p>
+        <ul>
+          <li>Usa rutas bajo <code>/api/v1</code>.</li>
+          <li>Respeta <code>Retry-After</code> y aplica espera exponencial.</li>
+          <li>Trata cada respuesta como no confiable hasta validarla contra tu contrato.</li>
+        </ul>
+      </article>
+
+      <article id="webhooks">
+        <p class="number">04</p><h2>Validar firmas de webhook</h2>
+        <p>Lee el cuerpo HTTP sin modificar y calcula HMAC-SHA256 sobre <code>&lt;timestamp&gt;.&lt;rawBody&gt;</code>. Compara en tiempo constante el hexadecimal obtenido con <code>v1</code>.</p>
+        <pre><code>UVH-Signature: t=&lt;milisegundos&gt;,v1=&lt;hmac-hex&gt;</code></pre>
+        <ul>
+          <li>Rechaza marcas de tiempo fuera de tu ventana de tolerancia.</li>
+          <li>Deduplica por identificador de evento: la entrega es al menos una vez.</li>
+          <li>Responde con éxito solo cuando el evento se haya persistido de forma duradera.</li>
+          <li>No registres el secreto, la cabecera completa ni cuerpos con datos sensibles.</li>
+        </ul>
+      </article>
+    </div>
+  </main>
+
+  <footer><span>© {{ year }} UVH</span><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/status">Estado</a></footer>
+</div>

@@ -1,0 +1,19 @@
+<div class="status-shell">
+  <header><a class="brand" routerLink="/" aria-label="UVH, inicio"><span aria-hidden="true">↗</span><b>UVH</b></a><nav aria-label="Navegación pública"><a routerLink="/help">Ayuda técnica</a><a routerLink="/auth/login">Iniciar sesión</a></nav></header>
+  <main aria-labelledby="status-title">
+    <p class="eyebrow">Medición independiente</p>
+    <div class="title-row"><div><h1 id="status-title">Estado del servicio</h1><p>La señal procede de un monitor externo. La aplicación no se declara saludable a sí misma.</p></div><button type="button" (click)="refresh()" [disabled]="loading()">{{ loading() ? "Consultando…" : "Actualizar" }}</button></div>
+
+    @if (loading() && !snapshot()) {
+      <section class="state-card loading" aria-live="polite"><span></span><p>Consultando el último estado externo…</p></section>
+    } @else if (unavailable() || !snapshot()) {
+      <section class="state-card unknown" role="status"><i aria-hidden="true"></i><div><h2>Estado desconocido</h2><p>No hay una medición externa reciente y válida. No asumimos que el servicio esté operativo.</p></div></section>
+    } @else {
+      <section class="state-card" [attr.data-status]="snapshot()!.overall" aria-live="polite"><i aria-hidden="true"></i><div><h2>{{ statusLabel(snapshot()!.overall) }}</h2><p>Medición externa generada el {{ snapshot()!.generatedAt | date:'medium' }}.</p></div></section>
+      <section class="components" aria-labelledby="components-title"><h2 id="components-title">Componentes públicos</h2><div class="component-grid">@for (component of snapshot()!.components; track component.id) { <article [attr.data-status]="component.status"><span><i aria-hidden="true"></i>{{ component.label }}</span><b>{{ statusLabel(component.status) }}</b></article> }</div></section>
+      <section class="incidents" aria-labelledby="incidents-title"><h2 id="incidents-title">Incidentes recientes</h2>@if (snapshot()!.incidents.length === 0) { <p class="empty">El monitor no comunica incidentes recientes.</p> } @else { @for (incident of snapshot()!.incidents; track incident.id) { <article><div><h3>{{ incident.title }}</h3><span>{{ incident.updatedAt | date:'medium' }}</span></div><p>{{ incident.message }}</p><b>{{ incident.status }}</b></article> } }</section>
+    }
+    <aside><strong>Diseñado para fallar de forma segura.</strong> Si el feed externo falta, está caducado o no cumple el contrato, esta página muestra estado desconocido. No publica versiones, direcciones internas ni topología.</aside>
+  </main>
+  <footer><span>© {{ year }} UVH</span><a routerLink="/help">Ayuda</a><a routerLink="/legal/privacidad">Privacidad</a></footer>
+</div>

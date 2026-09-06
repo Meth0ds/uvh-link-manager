@@ -14,7 +14,7 @@ import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { decodePublicConfig } from "../core/services/public-response-decoders";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
-import { HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
+import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 
 type Step = "login" | "register" | "mfa" | "recovery" | "verify-pending";
 type RegisterStep = 1 | 2;
@@ -290,9 +290,12 @@ export class AuthComponent {
   }
 
   async onLogin(): Promise<void> {
-    if (this.loginForm.invalid || this.busy() || !this.loginCaptchaToken()) {
+    if (this.loginForm.invalid || this.busy() || this.verificationBusy()) {
       this.loginForm.markAllAsTouched();
-      if (!this.loginCaptchaToken()) this.error.set("Completa hCaptcha para continuar.");
+      return;
+    }
+    if (!this.loginCaptchaWidget || !this.hcaptchaSiteKey()) {
+      this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
       return;
     }
     const revision = ++this.flowRevision;
@@ -302,10 +305,16 @@ export class AuthComponent {
     this.error.set(null);
     this.verificationEmail.set(null);
     try {
+      // Invisible hCaptcha is executed at submit time. Keeping this token local
+      // to the attempt prevents an expired or previously redeemed value from
+      // being reused by a later click.
+      const captchaToken = await this.loginCaptchaWidget.execute();
+      if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
+      this.loginCaptchaToken.set("");
       const outcome = await this.auth.login(
         this.loginForm.controls.email.value.toLowerCase(),
         this.loginForm.controls.password.value,
-        this.loginCaptchaToken(),
+        captchaToken,
       );
       if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
       if (outcome.mfaRequired) {
@@ -331,7 +340,11 @@ export class AuthComponent {
         // address locally only to offer the safe public resend action.
         this.verificationEmail.set(this.loginForm.controls.email.value.trim().toLowerCase());
       }
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo iniciar sesión");
+      this.error.set(
+        err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
+          ? err.message
+          : "No se pudo iniciar sesión",
+      );
       this.loginCaptchaToken.set("");
       this.loginCaptchaWidget?.reset();
     } finally {
@@ -399,12 +412,13 @@ export class AuthComponent {
 
   async onRegister(): Promise<void> {
     this.registerForm.markAllAsTouched();
-    if (this.registerStep() !== 2 || this.registerForm.invalid || this.busy() || !this.registerCaptchaToken()) {
-      if (!this.registerCaptchaToken()) this.error.set("Completa hCaptcha para continuar.");
-      return;
-    }
+    if (this.registerStep() !== 2 || this.registerForm.invalid || this.busy()) return;
     if (this.registerForm.controls.company.value.trim() !== "") {
       this.error.set("No se pudo crear la cuenta");
+      return;
+    }
+    if (!this.registerCaptchaWidget || !this.hcaptchaSiteKey()) {
+      this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
       return;
     }
 
@@ -421,8 +435,11 @@ export class AuthComponent {
       && this.changeEmailMode() === changeEmail
       && this.registerForm.controls.email.value.trim().toLowerCase() === email;
     try {
+      const captchaToken = await this.registerCaptchaWidget.execute();
+      if (!stillCurrent()) return;
+      this.registerCaptchaToken.set("");
       const antiBot = {
-        captchaToken: this.registerCaptchaToken(),
+        captchaToken,
         website: this.registerForm.controls.company.value,
       };
       if (changeEmail) {
@@ -466,7 +483,11 @@ export class AuthComponent {
       this.registerCaptchaToken.set("");
     } catch (err) {
       if (!stillCurrent()) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo crear la cuenta");
+      this.error.set(
+        err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
+          ? err.message
+          : "No se pudo crear la cuenta",
+      );
       // hCaptcha tokens are short-lived and single-use. Never reuse one after
       // the server has attempted verification, even when credentials fail.
       this.registerCaptchaToken.set("");
@@ -479,21 +500,30 @@ export class AuthComponent {
   async resendVerification(): Promise<void> {
     const email = this.verificationEmail() ?? this.loginForm.controls.email.value.trim().toLowerCase();
     const pendingStep = this.step() === "verify-pending";
-    const captchaToken = pendingStep ? this.resendCaptchaToken() : this.loginCaptchaToken();
-    if (!email || !captchaToken || this.verificationBusy()) {
-      if (!captchaToken) this.error.set("Completa hCaptcha para reenviar el correo.");
+    const captchaWidget = pendingStep ? this.resendCaptchaWidget : this.loginCaptchaWidget;
+    // Login and resend share the login widget: serialize both operations so
+    // its single-use result cannot be redeemed by two requests.
+    if (!email || this.verificationBusy() || this.busy()) return;
+    if (!captchaWidget || !this.hcaptchaSiteKey()) {
+      this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
       return;
     }
     const revision = ++this.verificationRevision;
     this.verificationBusy.set(true);
     this.error.set(null);
     try {
+      const captchaToken = await captchaWidget.execute();
+      if (!this.isVerificationCurrent(revision, pendingStep, email)) return;
       await this.auth.resendVerification(email, captchaToken);
       if (!this.isVerificationCurrent(revision, pendingStep, email)) return;
       this.info.set("Si la cuenta necesita verificación, recibirás un nuevo correo en breve. Revisa también spam.");
     } catch (err) {
       if (this.isVerificationCurrent(revision, pendingStep, email)) {
-        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo reenviar el correo");
+        this.error.set(
+          err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
+            ? err.message
+            : "No se pudo reenviar el correo",
+        );
       }
     } finally {
       if (this.destroyRef.destroyed || revision !== this.verificationRevision) return;

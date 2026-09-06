@@ -3,11 +3,12 @@ import { provideRouter, Router } from "@angular/router";
 import { ActivatedRoute } from "@angular/router";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { Component, EventEmitter, Input, Output, signal, type WritableSignal } from "@angular/core";
+import { By } from "@angular/platform-browser";
 import { AuthComponent } from "./auth.component";
 import { AuthService } from "../core/services/auth.service";
 import { ApiService } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
-import { HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
+import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -23,7 +24,9 @@ function deferred<T>(): Deferred<T> {
 @Component({ selector: "app-hcaptcha-widget", standalone: true, template: "" })
 class FakeHCaptchaWidgetComponent {
   @Input() siteKey = "";
+  @Input() invisible = false;
   @Output() readonly tokenChange = new EventEmitter<string>();
+  readonly execute = jasmine.createSpy("execute").and.resolveTo("fresh-passcode");
   reset(): void { this.tokenChange.emit(""); }
 }
 
@@ -34,6 +37,17 @@ describe("AuthComponent registration flow", () => {
   let auth: jasmine.SpyObj<AuthService>;
   let router: jasmine.SpyObj<Router>;
   let authenticated: WritableSignal<boolean>;
+
+  function captchaWidget(selector: string): FakeHCaptchaWidgetComponent {
+    return fixture.debugElement.query(By.css(selector)).componentInstance as FakeHCaptchaWidgetComponent;
+  }
+
+  function showRegistrationStep(): void {
+    component.tabIndex.set(1);
+    component.step.set("register");
+    component.registerStep.set(2);
+    fixture.detectChanges();
+  }
 
   beforeEach(async () => {
     api = jasmine.createSpyObj<ApiService>("ApiService", ["get"]);
@@ -117,8 +131,7 @@ describe("AuthComponent registration flow", () => {
   });
 
   it("requires consent and matching passwords before submitting", async () => {
-    component.registerStep.set(2);
-    component.onRegisterCaptchaToken("registration-passcode");
+    showRegistrationStep();
     component.registerForm.patchValue({
       name: "Ana García",
       email: "ana@example.com",
@@ -134,8 +147,7 @@ describe("AuthComponent registration flow", () => {
   });
 
   it("submits the CAPTCHA and consent, then shows email verification state", async () => {
-    component.registerStep.set(2);
-    component.onRegisterCaptchaToken("registration-passcode");
+    showRegistrationStep();
     component.registerForm.patchValue({
       name: "Ana García",
       email: "ana@example.com",
@@ -152,7 +164,7 @@ describe("AuthComponent registration flow", () => {
       "ana@example.com",
       "Strong-password-123!",
       {
-        captchaToken: "registration-passcode",
+        captchaToken: "fresh-passcode",
         website: "",
         acceptTerms: true,
         termsVersion: "2026-08-30",
@@ -185,8 +197,7 @@ describe("AuthComponent registration flow", () => {
   });
 
   it("does not submit when the honeypot contains a value", async () => {
-    component.registerStep.set(2);
-    component.onRegisterCaptchaToken("registration-passcode");
+    showRegistrationStep();
     component.registerForm.patchValue({
       name: "Bot",
       email: "bot@example.com",
@@ -227,18 +238,41 @@ describe("AuthComponent registration flow", () => {
     expect(component.passwordsMatch()).toBeTrue();
   });
 
-  it("requires an hCaptcha passcode and sends it with login", async () => {
+  it("executes invisible hCaptcha at submit time and sends its fresh login token", async () => {
     component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
+    const captcha = captchaWidget("app-hcaptcha-widget");
 
     await component.onLogin();
-    expect(auth.login).not.toHaveBeenCalled();
-    expect(component.error()).toContain("Completa hCaptcha");
 
-    component.onLoginCaptchaToken("login-passcode");
-    await component.onLogin();
-
-    expect(auth.login).toHaveBeenCalledWith("ana@example.com", "correct-password", "login-passcode");
+    expect(captcha.invisible).toBeTrue();
+    expect(captcha.execute).toHaveBeenCalledTimes(1);
+    expect(auth.login).toHaveBeenCalledWith("ana@example.com", "correct-password", "fresh-passcode");
     expect(component.step()).toBe("mfa");
+  });
+
+  it("serializes login and resend while their shared challenge is pending", async () => {
+    component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
+    const pending = deferred<string>();
+    const captcha = captchaWidget("app-hcaptcha-widget");
+    captcha.execute.and.returnValue(pending.promise);
+    const resend = component.resendVerification();
+    await component.onLogin();
+    expect(captcha.execute).toHaveBeenCalledTimes(1);
+    expect(auth.login).not.toHaveBeenCalled();
+    pending.resolve("fresh-resend-token");
+    await resend;
+    expect(auth.resendVerification).toHaveBeenCalledWith("ana@example.com", "fresh-resend-token");
+  });
+
+  it("does not call login when the invisible challenge is closed", async () => {
+    component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
+    const captcha = captchaWidget("app-hcaptcha-widget");
+    captcha.execute.and.rejectWith(new HCaptchaExecutionError("Completa la protección antiabuso para continuar."));
+
+    await component.onLogin();
+
+    expect(auth.login).not.toHaveBeenCalled();
+    expect(component.error()).toBe("Completa la protección antiabuso para continuar.");
   });
 
   it("keeps the newest hCaptcha configuration when an older retry finishes last", async () => {
@@ -262,7 +296,6 @@ describe("AuthComponent registration flow", () => {
     const response = deferred<{ mfaRequired: false }>();
     auth.login.and.returnValue(response.promise as ReturnType<AuthService["login"]>);
     component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
-    component.onLoginCaptchaToken("login-passcode");
 
     const login = component.onLogin();
     fixture.destroy();
@@ -284,7 +317,6 @@ describe("AuthComponent registration flow", () => {
       };
     });
     component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
-    component.onLoginCaptchaToken("login-passcode");
 
     await component.onLogin();
     fixture.detectChanges();
@@ -327,8 +359,7 @@ describe("AuthComponent registration flow", () => {
   it("does not restore a registration screen after its request was locally closed", async () => {
     const response = deferred<void>();
     auth.register.and.returnValue(response.promise);
-    component.registerStep.set(2);
-    component.onRegisterCaptchaToken("registration-passcode");
+    showRegistrationStep();
     component.registerForm.setValue({
       name: "Ana García", email: "ana@example.com", password: "Strong-password-123!",
       confirmPassword: "Strong-password-123!", acceptTerms: true, company: "",
@@ -349,7 +380,7 @@ describe("AuthComponent registration flow", () => {
     auth.resendVerification.and.returnValue(response.promise);
     component.step.set("verify-pending");
     component.verificationEmail.set("ana@example.com");
-    component.onResendCaptchaToken("resend-passcode");
+    fixture.detectChanges();
 
     const resend = component.resendVerification();
     component.closeRegistration();
