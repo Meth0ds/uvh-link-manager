@@ -74,7 +74,7 @@ export class UsageComponent {
       if (quota === null) return [];
       const copy = RESOURCE_COPY[key];
       const percent = quota.limit === null ? null : Math.min(100, quota.limit === 0 ? 100 : Math.round((quota.used / quota.limit) * 100));
-      let guidance = quota.policy === "unavailable"
+      const guidance = quota.policy === "unavailable"
         ? "La configuración de esta cuota no está disponible. No se asume capacidad libre."
         : quota.policy === "not_configured"
           ? "No existe un límite configurado; este recuento es informativo."

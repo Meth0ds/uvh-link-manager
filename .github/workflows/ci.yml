@@ -40,9 +40,13 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Audit production dependencies
+      - name: Audit locked dependency tree
         working-directory: frontend
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=moderate
+
+      - name: Lint TypeScript and Angular templates
+        working-directory: frontend
+        run: npm run lint
 
       - name: Typecheck
         working-directory: frontend
@@ -116,9 +120,17 @@ jobs:
         working-directory: backend-laravel
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Audit production dependencies
+      - name: Audit locked dependency tree
         working-directory: backend-laravel
-        run: composer audit --locked --no-dev
+        run: composer audit --locked
+
+      - name: Check PHP formatting
+        working-directory: backend-laravel
+        run: composer lint
+
+      - name: Analyze PHP with Larastan
+        working-directory: backend-laravel
+        run: composer analyse
 
       # TestCase::setUp() trunca contadores globales antes de cada caso. La
       # base efímera debe contener por ello el esquema completo desde el inicio,

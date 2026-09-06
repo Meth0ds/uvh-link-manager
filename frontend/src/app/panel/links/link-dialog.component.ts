@@ -1,7 +1,6 @@
 import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
-  FormArray,
   FormBuilder,
   FormControl,
   FormGroup,

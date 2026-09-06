@@ -1,0 +1,1759 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Cannot call method lt\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Console/Commands/UvhHousekeeping.php
+
+		-
+			message: '#^Method App\\Console\\Commands\\UvhHousekeeping\:\:purgeInBatches\(\) has parameter \$params with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Console/Commands/UvhHousekeeping.php
+
+		-
+			message: '#^Offset ''artifacts'' on array\{blocked\: bool, mail_unconfirmed\: bool, user_id\: int, artifacts\: array\<int, array\{id\: int, path\: mixed\}\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Console/Commands/UvhHousekeeping.php
+
+		-
+			message: '#^Cannot call method isFuture\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 6
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 7
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:cancelDeletion\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:cancelExport\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:confirmDeletion\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:confirmExport\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:deletionImpact\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:downloadExport\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:exportStatus\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:requestDeletion\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AccountController\:\:requestExport\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AccountController.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:accountRecoveries\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:audit\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:blockLink\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:decideAccountRecovery\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:domains\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:mailOutbox\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:moderateReport\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:operations\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:overview\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:reports\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:retryMailOutbox\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:unblockLink\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:updateReport\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:updateUser\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AdminController\:\:users\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AdminController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:buildOverview\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:dimension\(\) has parameter \$events with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:dimension\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:mergeMaps\(\) has parameter \$list with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:mergeMaps\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:mergeMaps\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:overview\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:publicOverview\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:top\(\) has parameter \$map with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:top\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:top\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/AnalyticsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\AccountRecoveryRequest\:\:\$user\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 9
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 11
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Comparison operation "\>" between \*NEVER\* and 0 results in an error\.$#'
+			identifier: greater.invalid
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:cancelEmailChange\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:changePassword\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:changeRegistrationEmail\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:completeAccountRecovery\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:confirmAccountRecovery\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:confirmEmailChange\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:forgotPassword\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:login\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:logout\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:me\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaCancelSetup\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaDisable\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaEnable\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaReauthenticate\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaRecovery\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaRegenerateRecoveryCodes\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaSessionStatus\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaSetup\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:mfaVerify\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:profile\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:recoveryCodeIndex\(\) has parameter \$hashes with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:register\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:requestAccountRecovery\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:requestEmailChange\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:resendVerification\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:resetPassword\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:revokeCompromisedAccess\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:revokeSession\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:securityCenter\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:sessions\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:verifyEmail\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Offset ''artifacts'' on array\{user_id\: int, artifacts\: array\<int, array\{id\: int, path\: mixed\}\>, blocked\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Offset ''security_version'' on array\{user_id\: int, security_version\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_splice expects array, string\|null given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Relation ''user'' is not found in App\\Models\\AccountRecoveryRequest model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 2
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Right side of && is always false\.$#'
+			identifier: booleanAnd.rightAlwaysFalse
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between ''invalid'' and ''ok'' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 4
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''invalid'' and ''challenge'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between null and null will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 3
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 4
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>password_hash" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Cannot call method lt\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:activate\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:disable\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:dto\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:queueVerification\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:revalidate\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:transition\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DomainController\:\:verify\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''invalid_state''\|''ok''\|''unchanged'' and ''not_ready'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''invalid_state''\|''ok''\|''unchanged'' and ''not_verified'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''invalid_state''\|''ok''\|''unchanged'' and ''stale_verification'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/DomainController.php
+
+		-
+			message: '#^Cannot call method isFuture\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:activity\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:checkAlias\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:inputFromRequest\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:purge\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:restore\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:role\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:state\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:trash\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkController\:\:update\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Relation ''domain'' is not found in App\\Models\\Link model\.$#'
+			identifier: larastan.relationExistence
+			count: 5
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Relation ''tags'' is not found in App\\Models\\Link model\.$#'
+			identifier: larastan.relationExistence
+			count: 6
+			path: app/Http/Controllers/LinkController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkIntentController\:\:claim\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkIntentController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkIntentController\:\:complete\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkIntentController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkIntentController\:\:issue\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkIntentController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkIntentController\:\:temporarilyUnavailable\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkIntentController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LinkIntentController\:\:unavailable\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/LinkIntentController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PrivacyRightsController\:\:adminAction\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PrivacyRightsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PrivacyRightsController\:\:adminIndex\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PrivacyRightsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PrivacyRightsController\:\:cancel\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PrivacyRightsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PrivacyRightsController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PrivacyRightsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PrivacyRightsController\:\:publicRequest\(\) has parameter \$messagesByRequest with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/PrivacyRightsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PrivacyRightsController\:\:publicRequest\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/PrivacyRightsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PrivacyRightsController\:\:respond\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PrivacyRightsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PrivacyRightsController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PrivacyRightsController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:config\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:create\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:csrf\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:health\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:normalizePublicStatus\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:publicStatus\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:report\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:robots\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:sitemap\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:status\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\PublicController\:\:unknownPublicStatus\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-empty\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/PublicController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\RedirectController\:\:passwordPage\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/RedirectController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\RedirectController\:\:recordClick\(\) has parameter \$ctx with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/RedirectController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\RedirectController\:\:resolve\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/RedirectController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\RedirectController\:\:unlock\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/RedirectController.php
+
+		-
+			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Http/Controllers/TokenController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\TokenController\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/TokenController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\TokenController\:\:dto\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/TokenController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\TokenController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/TokenController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\TokenController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/TokenController.php
+
+		-
+			message: '#^Parameter \#1 \$array \(non\-empty\-list\<mixed\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Http/Controllers/TokenController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:deliveries\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:dto\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:redactedPayload\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:resend\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:test\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WebhookController\:\:update\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-falsy\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 3
+			path: app/Http/Controllers/WebhookController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceActivityController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceActivityController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Workspace\:\:\$memberships\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Cannot call method lte\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 4
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:acceptInvitation\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:cancelInvitation\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:changeRole\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:invitationsOf\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:invite\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:leave\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:membersOf\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:rejectInvitation\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:removeMember\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:rename\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:resendInvitation\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:transferOwnership\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Relation ''memberships'' is not found in App\\Models\\Workspace model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Http/Controllers/WorkspaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceOnboardingController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceOnboardingController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceUsageController\:\:quota\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/WorkspaceUsageController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\WorkspaceUsageController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/WorkspaceUsageController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ApiToken\:\:\$creator\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Middleware/RequireApiToken.php
+
+		-
+			message: '#^Call to function in_array\(\) with arguments string, array\{\} and true will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Http/Middleware/RequireApiToken.php
+
+		-
+			message: '#^Cannot call method isFuture\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Middleware/RequireApiToken.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Middleware/RequireApiToken.php
+
+		-
+			message: '#^Cannot call method lt\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Middleware/RequireApiToken.php
+
+		-
+			message: '#^Relation ''creator'' is not found in App\\Models\\ApiToken model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Http/Middleware/RequireApiToken.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Http/Middleware/RequireApiToken.php
+
+		-
+			message: '#^Called ''count'' on Laravel collection, but could have been retrieved as a query\.$#'
+			identifier: larastan.noUnnecessaryCollectionCall
+			count: 1
+			path: app/Jobs/GenerateDataExportJob.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-empty\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: app/Jobs/GenerateDataExportJob.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 1
+			path: app/Jobs/VerifyDomainDnsJob.php
+
+		-
+			message: '#^Method App\\Models\\AbuseReport\:\:link\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/AbuseReport.php
+
+		-
+			message: '#^Method App\\Models\\AccountDeletionRequest\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/AccountDeletionRequest.php
+
+		-
+			message: '#^Method App\\Models\\AccountRecoveryRequest\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/AccountRecoveryRequest.php
+
+		-
+			message: '#^Method App\\Models\\ApiToken\:\:creator\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/ApiToken.php
+
+		-
+			message: '#^Method App\\Models\\ApiToken\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/ApiToken.php
+
+		-
+			message: '#^Method App\\Models\\AuditEvent\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/AuditEvent.php
+
+		-
+			message: '#^Method App\\Models\\ClickEvent\:\:link\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/ClickEvent.php
+
+		-
+			message: '#^Method App\\Models\\CustomDomain\:\:links\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/CustomDomain.php
+
+		-
+			message: '#^Method App\\Models\\CustomDomain\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/CustomDomain.php
+
+		-
+			message: '#^Method App\\Models\\DataExportRequest\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/DataExportRequest.php
+
+		-
+			message: '#^Method App\\Models\\EmailChangeRequest\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/EmailChangeRequest.php
+
+		-
+			message: '#^Method App\\Models\\EmailToken\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/EmailToken.php
+
+		-
+			message: '#^Method App\\Models\\Invitation\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Invitation.php
+
+		-
+			message: '#^Method App\\Models\\Link\:\:clickEvents\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Link.php
+
+		-
+			message: '#^Method App\\Models\\Link\:\:creator\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Link.php
+
+		-
+			message: '#^Method App\\Models\\Link\:\:domain\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Link.php
+
+		-
+			message: '#^Method App\\Models\\Link\:\:rules\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Link.php
+
+		-
+			message: '#^Method App\\Models\\Link\:\:tags\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Link.php
+
+		-
+			message: '#^Method App\\Models\\Link\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Link.php
+
+		-
+			message: '#^Method App\\Models\\Membership\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Membership.php
+
+		-
+			message: '#^Method App\\Models\\Membership\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Membership.php
+
+		-
+			message: '#^Method App\\Models\\MetricRollup\:\:link\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/MetricRollup.php
+
+		-
+			message: '#^Method App\\Models\\Quota\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Quota.php
+
+		-
+			message: '#^Method App\\Models\\RedirectRule\:\:link\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/RedirectRule.php
+
+		-
+			message: '#^Method App\\Models\\Tag\:\:links\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Tag.php
+
+		-
+			message: '#^Method App\\Models\\Tag\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Tag.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:apiTokens\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:auditEvents\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:emailChangeRequest\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:memberships\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:ownedWorkspaces\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:sessions\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\UvhSession\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/UvhSession.php
+
+		-
+			message: '#^Method App\\Models\\Webhook\:\:deliveries\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Webhook.php
+
+		-
+			message: '#^Method App\\Models\\Webhook\:\:workspace\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Webhook.php
+
+		-
+			message: '#^Method App\\Models\\WebhookDelivery\:\:webhook\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/WebhookDelivery.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:apiTokens\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:customDomains\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:links\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:memberships\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:owner\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:quota\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Method App\\Models\\Workspace\:\:webhooks\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Workspace.php
+
+		-
+			message: '#^Parameter \#1 \$map of static method App\\Support\\AnalyticsService\:\:bump\(\) expects array\<string, int\>\|null, string\|null given\.$#'
+			identifier: argument.type
+			count: 6
+			path: app/Support/AnalyticsService.php
+
+		-
+			message: '#^Method App\\Support\\Audit\:\:write\(\) has parameter \$metadata with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/Audit.php
+
+		-
+			message: '#^Cannot call method copy\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/DomainRevalidationSchedule.php
+
+		-
+			message: '#^Cannot call method gt\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/DomainRevalidationSchedule.php
+
+		-
+			message: '#^Method App\\Support\\InvitationMailBudget\:\:limits\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/InvitationMailBudget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Link\:\:\$domain\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Link\:\:\$tags\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<mixed, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Method App\\Support\\LinkService\:\:applyRules\(\) has parameter \$rules with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Method App\\Support\\LinkService\:\:applyTags\(\) has parameter \$tags with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Method App\\Support\\LinkService\:\:create\(\) has parameter \$apiTokenContext with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Method App\\Support\\LinkService\:\:create\(\) has parameter \$input with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Method App\\Support\\LinkService\:\:deriveState\(\) has parameter \$input with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Method App\\Support\\LinkService\:\:update\(\) has parameter \$apiTokenContext with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Method App\\Support\\LinkService\:\:update\(\) has parameter \$input with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Method App\\Support\\LinkService\:\:validate\(\) has parameter \$input with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between mixed and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Support/LinkService.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Support/MailLifecycleCompensator.php
+
+		-
+			message: '#^Method App\\Support\\MailTransportPolicy\:\:resolve\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/MailTransportPolicy.php
+
+		-
+			message: '#^Method App\\Support\\MailTransportPolicy\:\:visit\(\) has parameter \$path with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/MailTransportPolicy.php
+
+		-
+			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Support/MfaStepUp.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 1
+			path: app/Support/MfaStepUp.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Support/MfaStepUp.php
+
+		-
+			message: '#^Method App\\Support\\PasswordStrength\:\:containsAny\(\) has parameter \$needles with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/PasswordStrength.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Support/PasswordStrength.php
+
+		-
+			message: '#^Cannot call method isFuture\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Support/RedirectService.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Support/RedirectService.php
+
+		-
+			message: '#^Offset ''alias'' on array\{host\: string, alias\: string, user_agent\?\: string\|null, accept_language\?\: string\|null, referrer\?\: string\|null, ip\?\: string\|null, country\?\: string\|null, unlock_token\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Support/RedirectService.php
+
+		-
+			message: '#^Offset ''host'' on array\{host\: string, alias\: string, user_agent\?\: string\|null, accept_language\?\: string\|null, referrer\?\: string\|null, ip\?\: string\|null, country\?\: string\|null, unlock_token\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Support/RedirectService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between int\<0, max\> and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Support/RedirectService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\UvhSession\:\:\$user\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/SessionManager.php
+
+		-
+			message: '#^Cannot call method isFuture\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/SessionManager.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/SessionManager.php
+
+		-
+			message: '#^Cannot call method lt\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/SessionManager.php
+
+		-
+			message: '#^Method App\\Support\\SessionManager\:\:hydrate\(\) should return array\{user\: App\\Models\\User, session_id\: string, mfa_verified\: bool, mfa_verified_at\: DateTimeInterface\|null\}\|null but returns array\{user\: mixed, session_id\: string, mfa_verified\: bool, mfa_verified_at\: string\|null\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/SessionManager.php
+
+		-
+			message: '#^Relation ''user'' is not found in App\\Models\\UvhSession model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Support/SessionManager.php
+
+		-
+			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Support/UvhRequest.php
+
+		-
+			message: '#^Method App\\Support\\UvhRequest\:\:apiToken\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/UvhRequest.php
+
+		-
+			message: '#^Method App\\Support\\WebhookService\:\:dispatchTest\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/WebhookService.php
+
+		-
+			message: '#^Offset ''event'' on string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Support/WebhookService.php
+
+		-
+			message: '#^Offset ''event_id'' on string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Support/WebhookService.php
+
+		-
+			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Support/WorkspaceAccess.php
+
+		-
+			message: '#^Call to function is_string\(\) with non\-empty\-string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Support/WorkspaceAccess.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/WorkspaceAccess.php
+
+		-
+			message: '#^Method App\\Support\\WorkspaceAccess\:\:getMembershipLocked\(\) has parameter \$apiTokenContext with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/WorkspaceAccess.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 2
+			path: app/Support/WorkspaceAccess.php

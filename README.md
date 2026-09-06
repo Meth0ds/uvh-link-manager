@@ -66,6 +66,7 @@ La descripción completa está en [docs/architecture.md](docs/architecture.md).
 - **Backend:** Laravel 13 sobre PHP 8.4, jobs asíncronos y scheduler.
 - **Datos:** PostgreSQL 16, transacciones y bloqueos pesimistas para operaciones
   con carreras.
+- **Calidad:** Pint, Larastan/PHPStan, ESLint y TypeScript estricto.
 - **Pruebas:** PHPUnit y Karma/Jasmine.
 - **Despliegue:** Docker Compose con imágenes separadas para desarrollo y
   producción.
@@ -121,17 +122,22 @@ guard de pruebas exige un nombre terminado en `_test`; no uses `uvh_local`.
 ```powershell
 # Backend: la base uvh_test debe existir y estar aislada.
 docker compose -f docker-compose.local.yml --env-file .env.docker.local `
+  run --rm php composer quality
+docker compose -f docker-compose.local.yml --env-file .env.docker.local `
   run --rm -e DB_DATABASE=uvh_test php composer test
 
 # Frontend.
 Set-Location frontend
+npm run lint
 npm run typecheck
 npm test -- --watch=false --browsers=ChromeHeadless
 npm run build
 ```
 
 CI ejecuta estas comprobaciones desde lockfiles, con permisos de repositorio de
-solo lectura y una base PostgreSQL efímera llamada `uvh_test`.
+solo lectura y una base PostgreSQL efímera llamada `uvh_test`. Consulta la
+[política de análisis estático](docs/static-analysis.md) antes de modificar el
+baseline de Larastan.
 
 ## Seguridad
 

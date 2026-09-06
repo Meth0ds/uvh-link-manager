@@ -168,7 +168,11 @@ export class LandingComponent {
   }
 
   toggleMobileMenu(): void {
-    this.mobileOpen() ? this.closeMobileMenu(true) : this.openMobileMenu();
+    if (this.mobileOpen()) {
+      this.closeMobileMenu(true);
+    } else {
+      this.openMobileMenu();
+    }
   }
 
   openMobileMenu(): void {

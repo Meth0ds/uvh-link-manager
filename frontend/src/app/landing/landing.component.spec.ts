@@ -49,7 +49,10 @@ describe("LandingComponent URL console", () => {
   it("hands off only an opaque intent and a short return path", async () => {
     const destination = "https://example.com/campaign?source=landing";
     intents.create.and.resolveTo({ intent: "a".repeat(43), expiresAt: new Date(Date.now() + 86_400_000).toISOString() });
-    const handoff = spyOn(component as any, "handoffToAuth");
+    const handoff = spyOn(
+      component as unknown as { handoffToAuth(target: string): void },
+      "handoffToAuth",
+    );
     component.onUrlChange(destination);
 
     await component.submitDemo();
