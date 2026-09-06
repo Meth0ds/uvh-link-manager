@@ -239,6 +239,14 @@ implementación parcial.
 
 ### 2. Validación manual, E2E y resiliencia
 
+- [x] **BROWSER-E2E-001 — Base Playwright aislada.** Quince recorridos reales
+  sobre Chromium, Angular, Laravel y PostgreSQL pasaron juntos el 6 de septiembre
+  en 16,7 minutos. Incluyen identidad, MFA/recovery, cambio de email, exportación,
+  workspace/enlace/papelera, invitación y token Bearer. hCaptcha y la entrega de
+  correo usan adaptadores locales deterministas, pero la verificación antiabuso
+  continúa siendo servidor a servidor. La base `uvh_e2e_test`, los contenedores y
+  la red se eliminaron al terminar; `uvh_local` no se tocó. Alcance y límites en
+  `docs/e2e-testing.md`.
 - [ ] **PRODUCT-VALID-001 — Primeros pasos.** Los cinco casos backend y trece
   frontend pasaron el 5 de septiembre dentro de las suites completas; typecheck
   y build también pasaron. Faltan E2E con cambios de cuenta/workspace/rol,
@@ -271,9 +279,11 @@ implementación parcial.
   exceso histórico y rollback; y los trece de `InvitationMailBudgetTest` cubrieron
   dimensiones compartidas, destinatario real, fallos SQL/outbox,
   autoridad/configuración, rotación y limpieza. Todo se ejecutó en `uvh_test`.
-  Falta concurrencia real de varios administradores.
-  Faltan E2E del panel, carreras de aceptar/cancelar/reenviar, cambios de autoridad
-  del invitador y eliminación de cuentas. No ejecutar contra `uvh_local`.
+  Falta concurrencia real de varios administradores. Playwright ya cubre crear
+  una invitación, verificar al destinatario, aceptarla y seleccionar el workspace
+  concedido como `viewer`; siguen pendientes carreras de aceptar/cancelar/reenviar,
+  cambios de autoridad del invitador y eliminación de cuentas. No ejecutar contra
+  `uvh_local`.
   Revisar el estado heredado de transiciones anteriores al parche antes de
   afirmar saneamiento histórico; no se ha aplicado ninguna reparación de datos.
 - [ ] **WORKSPACE-VALID-001 — Límites y concurrencia de propiedad.** Los seis
@@ -300,6 +310,9 @@ implementación parcial.
 - [ ] **AUTH-001 — Matriz E2E de identidad.** Verificar en procesos distintos
   registro, scanner de enlaces, verificación, login, MFA/TOTP, recovery de un
   uso, frescura administrativa, reset, cambio de email y revocación simultánea.
+  Playwright ya acredita registro/verificación/login, bloqueo de no verificados,
+  reset, cambio de email, TOTP, recovery de un uso y logout en un navegador; aún
+  faltan scanner, frescura administrativa y revocación simultánea multiproceso.
 - [ ] **CACHE-001 — Fault injection distribuido.** Interrumpir el store
   compartido entre lecturas/escrituras de challenges MFA e intenciones y demostrar
   rollback, `503` genérico, ausencia de consumo parcial y convergencia por TTL.
@@ -746,7 +759,8 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
   aserciones, decoder y regresión de retención pasaron.
 - [ ] **PRODUCT-VALID-009 — Validación E2E/concurrente de papelera.** Revisar
   diálogo/foco/lector/móvil y carreras multiproceso entre clic, restore, purge y
-  housekeeping sobre datos desechables; confirmar la retención aprobada.
+  housekeeping sobre datos desechables; confirmar la retención aprobada. El ciclo
+  Playwright ya cubre eliminar y restaurar un enlace; no cubre purge ni carreras.
 - [ ] **PRODUCT-010 — Páginas públicas de resolución.** Rediseñar y unificar la
   introducción de contraseña y los estados desconocido, pausado, caducado,
   bloqueado y límite agotado. Deben ser accesibles, `no-store`, resistentes a
@@ -856,12 +870,14 @@ validan la seguridad, el modelo legal ni el alcance de UVH:
 - [x] Actualizar documentación de API para challenges MFA, recovery codes,
   dominios, errores `409/429/503`, truncado de listados y semántica webhook al
   menos una vez con deduplicación por `event_id`.
-- [x] Ejecutar typecheck, build, suite Angular y PHPUnit sobre `uvh_test`: pasaron
-  el 5 de septiembre (101 frontend; 244 backend/2038 aserciones). Lint PHP,
-  Composer audit y release check también pasaron. npm quedó sin críticos/altos y
-  con cinco moderados de desarrollo mitigados/documentados en `DEPENDENCY-001`.
-  000034 se aplicó sólo a `uvh_test`; `uvh_local` no se migró.
+- [x] Ejecutar typecheck, build, suite Angular y PHPUnit sobre `uvh_test`: la
+  validación más reciente pasó el 6 de septiembre (253 frontend; 272 backend/2210
+  aserciones). Pint, Larastan, ESLint, typecheck, build, Composer audit y npm audit
+  también pasaron; ambos gestores informaron cero vulnerabilidades. La base
+  `uvh_test` fue efímera y se eliminó; `uvh_local` no se migró.
 - [x] Ejecutar migración limpia desde cero en base aislada: las 36 migraciones,
   release check y 12 casos/290 aserciones pasaron; la base temporal se eliminó.
-- [ ] Ejecutar concurrencia multiproceso y E2E. No usar nunca migraciones
-  destructivas de pruebas contra `uvh_local`.
+- [x] Ejecutar la base E2E aislada: 15/15 recorridos Playwright pasaron sobre
+  `uvh_e2e_test` y la infraestructura efímera se eliminó al terminar.
+- [ ] Ejecutar concurrencia multiproceso y ampliar E2E a los gates operativos que
+  siguen abiertos. No usar nunca migraciones destructivas contra `uvh_local`.
