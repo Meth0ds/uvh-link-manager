@@ -1,0 +1,87 @@
+# Isolated browser-test stack. It has no persistent volume and every database
+# name is guarded by the `_test` suffix before Laravel may reset its schema.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: uvh_e2e_test
+      POSTGRES_USER: uvh_e2e
+      POSTGRES_PASSWORD: uvh_e2e_only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uvh_e2e -d uvh_e2e_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  hcaptcha:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app:ro
+    environment:
+      HCAPTCHA_E2E_SECRET: uvh-e2e-hcaptcha-secret
+    command: ["php", "-S", "0.0.0.0:8080", "tests/E2E/hcaptcha-stub.php"]
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app
+    ports:
+      - "127.0.0.1:${UVH_E2E_BACKEND_PORT:-8010}:8000"
+    environment:
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_SECRET: uvh-e2e-only-secret-never-use-outside-tests
+      APP_URL: http://127.0.0.1:4201
+      APP_HOST: 127.0.0.1
+      PUBLIC_HOST: 127.0.0.1
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: uvh_e2e_test
+      DB_USERNAME: uvh_e2e
+      DB_PASSWORD: uvh_e2e_only
+      BCRYPT_ROUNDS: "4"
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      SESSION_COOKIE: uvh_e2e_session
+      SESSION_DOMAIN: ""
+      COOKIE_DOMAIN: ""
+      COOKIE_SECURE: "false"
+      QUEUE_CONNECTION: database
+      MAIL_MAILER: array
+      HCAPTCHA_SITE_KEY: 10000000-ffff-ffff-ffff-000000000001
+      HCAPTCHA_SECRET: uvh-e2e-hcaptcha-secret
+      HCAPTCHA_VERIFY_URL: http://hcaptcha:8080/siteverify
+      # One isolated run creates more than ten unique users from the same
+      # container IP. Raise only the E2E ceiling; production keeps its strict
+      # default and the anti-enumeration/rate-limit cases remain explicit.
+      REGISTER_LIMIT: "100"
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: warning
+      # The panel loads independent resources concurrently. Multiple workers
+      # prevent the PHP development server from serializing those requests.
+      PHP_CLI_SERVER_WORKERS: "4"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      hcaptcha:
+        condition: service_started
+    command:
+      - sh
+      - -lc
+      - |
+        case "$$DB_DATABASE" in
+          *_test) ;;
+          *) echo "Refusing E2E schema reset outside a _test database" >&2; exit 64 ;;
+        esac
+        php artisan migrate:fresh --force --no-interaction
+        exec php -d opcache.enable_cli=1 -S 0.0.0.0:8000 -t public public/index.php

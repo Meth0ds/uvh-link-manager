@@ -76,7 +76,7 @@
   }
   <span class="section-title">Reglas de redirección</span>
   <div class="rules-block">
-    @for (rule of rules(); track rule; let i = $index) {
+    @for (rule of rules(); track rule.id ?? $index; let i = $index) {
       <div class="rule-card">
         <span class="rule-prio tnum">#{{ i + 1 }}</span>
         <div class="rule-info">
@@ -94,7 +94,7 @@
     <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="retryActivity()">Reintentar actividad</button></div>
   }
   <div class="activity-block">
-    @for (ev of activity(); track ev) {
+    @for (ev of activity(); track ev.id) {
       <div class="activity-row">
         <mat-icon>history</mat-icon>
         <div>

@@ -142,3 +142,48 @@ jobs:
       - name: Run test suite against uvh_test
         working-directory: backend-laravel
         run: composer test
+
+  e2e:
+    name: Browser / critical Playwright journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # The browser binary is version-coupled to @playwright/test in the
+      # lockfile. --with-deps installs only the OS libraries Chromium needs.
+      - name: Install locked Chromium runtime
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # docker-compose.e2e.yml creates an ephemeral uvh_e2e_test database and
+      # refuses migrations when the name does not end in _test.
+      - name: Run isolated browser journeys
+        working-directory: frontend
+        run: npm run e2e
+
+      - name: Preserve failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          if-no-files-found: ignore
+          retention-days: 7

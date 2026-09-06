@@ -74,7 +74,7 @@ final class HCaptcha
                 ->acceptJson()
                 ->connectTimeout((int) config('uvh.hcaptcha.connect_timeout_seconds', 2))
                 ->timeout((int) config('uvh.hcaptcha.timeout_seconds', 5))
-                ->post(self::VERIFY_URL, $payload);
+                ->post(self::verificationUrl(), $payload);
         } catch (ConnectionException|RequestException $e) {
             self::logUnavailable('transport_error', $e);
 
@@ -150,6 +150,31 @@ final class HCaptcha
         return ! app()->environment('production')
             && hash_equals(self::TEST_SITE_KEY, $siteKey)
             && hash_equals(self::TEST_RESPONSE_HOSTNAME, $actual);
+    }
+
+    private static function verificationUrl(): string
+    {
+        $url = trim((string) config('uvh.hcaptcha.verify_url', self::VERIFY_URL));
+        $parts = parse_url($url);
+        $valid = is_array($parts)
+            && in_array($parts['scheme'] ?? null, ['http', 'https'], true)
+            && is_string($parts['host'] ?? null)
+            && $parts['host'] !== ''
+            && ($parts['path'] ?? '') === '/siteverify'
+            && ! isset($parts['user'])
+            && ! isset($parts['pass'])
+            && ! isset($parts['query'])
+            && ! isset($parts['fragment']);
+        $official = hash_equals(self::VERIFY_URL, $url);
+
+        // Overrides exist solely for the isolated E2E verifier. Every other
+        // environment is immutable so a compromised variable cannot redirect
+        // credentials or CAPTCHA responses to an attacker-controlled service.
+        if (! $valid || (! $official && ! app()->environment('testing'))) {
+            throw new \RuntimeException('Invalid hCaptcha verification endpoint');
+        }
+
+        return $url;
     }
 
     /** @return self::VALID|self::INVALID|self::UNAVAILABLE */

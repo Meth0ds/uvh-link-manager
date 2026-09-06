@@ -27,6 +27,9 @@ return [
     'hcaptcha' => [
         'site_key' => env('HCAPTCHA_SITE_KEY'),
         'secret' => env('HCAPTCHA_SECRET'),
+        // Tests may point at an isolated deterministic verifier. HCaptcha
+        // rejects every override outside APP_ENV=testing before requesting it.
+        'verify_url' => env('HCAPTCHA_VERIFY_URL', 'https://api.hcaptcha.com/siteverify'),
         // Sitekey independiente para formularios antiabuso del host público.
         'public_site_key' => env('HCAPTCHA_PUBLIC_SITE_KEY'),
         'public_secret' => env('HCAPTCHA_PUBLIC_SECRET'),

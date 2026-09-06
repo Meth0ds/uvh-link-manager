@@ -67,7 +67,7 @@ La descripción completa está en [docs/architecture.md](docs/architecture.md).
 - **Datos:** PostgreSQL 16, transacciones y bloqueos pesimistas para operaciones
   con carreras.
 - **Calidad:** Pint, Larastan/PHPStan, ESLint y TypeScript estricto.
-- **Pruebas:** PHPUnit y Karma/Jasmine.
+- **Pruebas:** PHPUnit, Karma/Jasmine y Playwright sobre Chromium.
 - **Despliegue:** Docker Compose con imágenes separadas para desarrollo y
   producción.
 
@@ -132,12 +132,15 @@ npm run lint
 npm run typecheck
 npm test -- --watch=false --browsers=ChromeHeadless
 npm run build
+npm run e2e:install
+npm run e2e
 ```
 
 CI ejecuta estas comprobaciones desde lockfiles, con permisos de repositorio de
 solo lectura y una base PostgreSQL efímera llamada `uvh_test`. Consulta la
 [política de análisis estático](docs/static-analysis.md) antes de modificar el
-baseline de Larastan.
+baseline de Larastan. Los recorridos de navegador usan otra pila efímera y se
+describen en [pruebas E2E](docs/e2e-testing.md).
 
 ## Seguridad
 
@@ -168,6 +171,7 @@ el [modelo de amenazas](docs/threat-model.md) para conocer el diseño actual.
 | [Seguridad](docs/security.md) | Controles de aplicación y checklist de release. |
 | [Modelo de amenazas](docs/threat-model.md) | Activos, actores, amenazas y riesgos pendientes. |
 | [Preparación para producción](docs/production-readiness.md) | Evidencias obligatorias antes del lanzamiento. |
+| [Pruebas E2E](docs/e2e-testing.md) | Aislamiento, ejecución, cobertura y límites de Playwright. |
 | [TODOs](docs/todos.md) | Trabajo implementado, validado y pendiente. |
 
 ## Contribuciones

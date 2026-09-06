@@ -41,6 +41,9 @@ pnpm-debug.log*
 coverage/
 .nyc_output/
 *.lcov
+playwright-report/
+test-results/
+blob-report/
 
 # ── Agent tooling (local) ───────────────────────────────────
 .agents/
