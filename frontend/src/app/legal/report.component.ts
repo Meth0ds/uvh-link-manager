@@ -1,4 +1,4 @@
-import { Component, inject, signal, ChangeDetectionStrategy, ViewChild } from "@angular/core";
+import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy, ViewChild } from "@angular/core";
 
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -10,6 +10,8 @@ import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { LegalShellComponent } from "./legal-shell.component";
 import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { HCaptchaWidgetComponent } from "../auth/hcaptcha-widget.component";
+import { LatestRequest } from "../core/services/latest-request";
+import { decodePublicConfig } from "../core/services/public-response-decoders";
 
 interface PublicConfigResponse {
   hcaptcha?: {
@@ -75,6 +77,8 @@ export class ReportComponent {
 
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
+  private readonly configRequests = new LatestRequest(inject(DestroyRef));
+  private readonly submitRequests = new LatestRequest(inject(DestroyRef));
 
   readonly reasons = REASONS;
   readonly reportTypes = [
@@ -109,21 +113,25 @@ export class ReportComponent {
 
   async loadCaptchaConfiguration(): Promise<void> {
     if (this.captchaConfigBusy() && this.hcaptchaSiteKey()) return;
+    const request = this.configRequests.begin(null);
     this.captchaConfigBusy.set(true);
     this.captchaConfigError.set(null);
     this.captchaToken.set("");
     try {
-      const response = await this.api.get<PublicConfigResponse>("/api/v1/config");
+      const response = await this.api.get<PublicConfigResponse>("/api/v1/config", undefined, decodePublicConfig);
+      if (!this.configRequests.isCurrent(request, null)) return;
       const siteKey = response.hcaptcha?.enabled && typeof response.hcaptcha.siteKey === "string"
         ? response.hcaptcha.siteKey.trim()
         : "";
-      if (!siteKey) throw new Error("missing hCaptcha public configuration");
+      if (!/^[A-Za-z0-9_-]{20,200}$/.test(siteKey)) throw new Error("missing hCaptcha public configuration");
       this.hcaptchaSiteKey.set(siteKey);
     } catch {
-      this.hcaptchaSiteKey.set("");
-      this.captchaConfigError.set("No se pudo cargar la comprobación antiabuso.");
+      if (this.configRequests.isCurrent(request, null)) {
+        this.hcaptchaSiteKey.set("");
+        this.captchaConfigError.set("No se pudo cargar la comprobación antiabuso.");
+      }
     } finally {
-      this.captchaConfigBusy.set(false);
+      if (this.configRequests.isCurrent(request, null)) this.captchaConfigBusy.set(false);
     }
   }
 
@@ -142,24 +150,31 @@ export class ReportComponent {
     this.done.set(false);
 
     const v = this.form.getRawValue();
+    const context = normalizeReportReference(v.link);
+    const request = this.submitRequests.begin(context);
     try {
       await this.api.post("/api/v1/report", {
-        reportedUrl: normalizeReportReference(v.link),
+        reportedUrl: context,
         reason: v.reason,
         details: v.details?.trim() || undefined,
         email: v.email?.trim() || "",
         captchaToken: this.captchaToken(),
       });
+      if (!this.submitRequests.isCurrent(request, context)) return;
       this.done.set(true);
       this.form.reset();
     } catch (err) {
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo enviar la denuncia");
+      if (this.submitRequests.isCurrent(request, context)) {
+        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo enviar la denuncia");
+      }
     } finally {
       // hCaptcha tokens are single-use even when the API rejects another
       // field, so never retain a token after an attempted submission.
-      this.captchaToken.set("");
-      this.captchaWidget?.reset();
-      this.busy.set(false);
+      if (this.submitRequests.isCurrent(request, context)) {
+        this.captchaToken.set("");
+        this.captchaWidget?.reset();
+        this.busy.set(false);
+      }
     }
   }
 }

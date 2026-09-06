@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -10,6 +10,7 @@ import { AuthShellComponent } from "./auth-shell.component";
 import { safeReturnTo } from "../core/guards/auth.guard";
 import { ApiRequestError } from "../core/services/api.service";
 import { AuthService } from "../core/services/auth.service";
+import { LatestRequest } from "../core/services/latest-request";
 
 @Component({
   selector: "app-mfa-reauthenticate",
@@ -70,6 +71,9 @@ export class MfaReauthenticateComponent {
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly initializeRequests = new LatestRequest(inject(DestroyRef));
+  private readonly submitRequests = new LatestRequest(inject(DestroyRef));
+  private terminalNavigation = false;
 
   readonly initializing = signal(true);
   readonly busy = signal(false);
@@ -90,6 +94,7 @@ export class MfaReauthenticateComponent {
       this.form.markAllAsTouched();
       return;
     }
+    const request = this.submitRequests.begin(this.returnTo);
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -97,40 +102,61 @@ export class MfaReauthenticateComponent {
         this.form.controls.password.value,
         this.form.controls.factorCode.value,
       );
+      if (!this.submitRequests.isCurrent(request, this.returnTo)) return;
       this.form.reset();
-      await this.router.navigateByUrl(this.returnTo);
+      await this.navigateOnce(
+        () => this.router.navigateByUrl(this.returnTo),
+        () => this.submitRequests.isCurrent(request, this.returnTo),
+      );
     } catch (error) {
+      if (!this.submitRequests.isCurrent(request, this.returnTo)) return;
       this.form.controls.factorCode.reset();
       this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar tu identidad");
     } finally {
-      this.busy.set(false);
+      if (this.submitRequests.isCurrent(request, this.returnTo)) this.busy.set(false);
     }
   }
 
   private async initialize(): Promise<void> {
+    const request = this.initializeRequests.begin(this.returnTo);
+    const current = () => this.initializeRequests.isCurrent(request, this.returnTo);
     try {
       if (!this.auth.loaded()) await this.auth.init();
+      if (!current()) return;
       if (!this.auth.authenticated()) {
-        await this.router.navigate(["/auth"], { queryParams: { returnTo: this.returnTo } });
+        await this.navigateOnce(
+          () => this.router.navigate(["/auth"], { queryParams: { returnTo: this.returnTo } }),
+          current,
+        );
         return;
       }
       if (this.auth.user()?.isAdmin !== true) {
-        await this.router.navigate(["/forbidden"]);
+        await this.navigateOnce(() => this.router.navigate(["/forbidden"]), current);
         return;
       }
       const status = await this.auth.mfaSessionStatus();
+      if (!current()) return;
       if (!status.enabled) {
-        await this.router.navigate(["/forbidden"]);
+        await this.navigateOnce(() => this.router.navigate(["/forbidden"]), current);
         return;
       }
       if (status.fresh) {
         this.auth.clearAdminMfaReauthentication();
-        await this.router.navigateByUrl(this.returnTo);
+        await this.navigateOnce(() => this.router.navigateByUrl(this.returnTo), current);
       }
     } catch (error) {
-      this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo comprobar el estado de la sesión");
+      if (current()) {
+        this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo comprobar el estado de la sesión");
+      }
     } finally {
-      this.initializing.set(false);
+      if (current()) this.initializing.set(false);
     }
+  }
+
+  /** Only one authorization outcome may own navigation from this view. */
+  private async navigateOnce(navigate: () => Promise<boolean>, current: () => boolean): Promise<void> {
+    if (this.terminalNavigation || !current()) return;
+    this.terminalNavigation = true;
+    await navigate();
   }
 }

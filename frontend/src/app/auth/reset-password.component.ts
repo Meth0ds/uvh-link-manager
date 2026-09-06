@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { Location } from "@angular/common";
 
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
@@ -12,6 +12,7 @@ import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { authBearer } from "./auth-bearer";
+import { LatestRequest } from "../core/services/latest-request";
 
 @Component({
   selector: "app-reset-password",
@@ -70,6 +71,7 @@ export class ResetPasswordComponent {
   private intents = inject(PendingLinkIntentService);
   private invitations = inject(PendingInvitationService);
   private location = inject(Location);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
 
   readonly busy = signal(false);
@@ -97,15 +99,19 @@ export class ResetPasswordComponent {
 
   async submit(): Promise<void> {
     if (this.form.invalid || this.busy()) return;
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     this.error.set(null);
     try {
       await this.api.post("/api/v1/auth/reset-password", { token: this.token, password: this.form.value.password });
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.done.set(true);
     } catch (err) {
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo restablecer la contraseña");
+      if (this.requests.isCurrent(request, this.token)) {
+        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo restablecer la contraseña");
+      }
     } finally {
-      this.busy.set(false);
+      if (this.requests.isCurrent(request, this.token)) this.busy.set(false);
     }
   }
 }

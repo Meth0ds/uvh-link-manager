@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRef } from "@angular/core";
 
 import { Router } from "@angular/router";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
@@ -17,11 +17,14 @@ import QRCode from "qrcode";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ThemeService, type ThemePreference } from "../../core/services/theme.service";
+import { downloadBlob } from "../../core/services/browser-download";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import type { AccountDeletionImpact, DataExportStatus, PrivacyRightRequest, PrivacyRightStatus, PrivacyRightType, Session } from "../../core/models";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { LatestRequest } from "../../core/services/latest-request";
+import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-decoders";
 
 @Component({
   selector: "app-settings",
@@ -55,6 +58,11 @@ export class SettingsComponent {
   private snackbar = inject(MatSnackBar);
   private actions = inject(ActionDialogService);
   private api = inject(ApiService);
+  private destroyRef = inject(DestroyRef);
+  private sessionsRequest = new LatestRequest(this.destroyRef);
+  private exportRequest = new LatestRequest(this.destroyRef);
+  private deletionRequest = new LatestRequest(this.destroyRef);
+  private privacyRequest = new LatestRequest(this.destroyRef);
   private readonly dateTimeFormatter = new Intl.DateTimeFormat("es-ES", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -182,11 +190,18 @@ export class SettingsComponent {
     void this.loadPrivacyRequests();
   }
 
-  private toast(err: unknown, ok: string): void {
-    if (err instanceof ApiRequestError) {
-      this.snackbar.open(err.message, "Cerrar", { duration: 4000 });
-    } else {
-      this.snackbar.open(ok, "Cerrar", { duration: 2500 });
+  private toast(err: unknown, fallback: string): void {
+    const message = err instanceof ApiRequestError
+      ? err.message
+      : fallback || "No se pudo completar la operación";
+    this.snackbar.open(message, "Cerrar", { duration: 4000 });
+  }
+
+  /** A committed security change must never be reported as rolled back. */
+  private async settleAfterConfirmedMutation(tasks: Promise<unknown>[]): Promise<void> {
+    const results = await Promise.allSettled(tasks);
+    if (!this.destroyRef.destroyed && results.some((result) => result.status === "rejected")) {
+      this.snackbar.open("El cambio se aplicó, pero no se pudo actualizar toda la vista. Recárgala antes de repetir la operación.", "Cerrar", { duration: 5000 });
     }
   }
 
@@ -292,8 +307,8 @@ export class SettingsComponent {
         factorControl.value.trim() || undefined,
       );
       this.passwordForm.reset();
-      await Promise.all([this.auth.refreshUser(), this.loadSessions()]);
       this.snackbar.open("Contraseña actualizada", "Cerrar", { duration: 2500 });
+      await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
       this.toast(err, "");
     } finally {
@@ -302,29 +317,38 @@ export class SettingsComponent {
   }
 
   async loadSessions(): Promise<void> {
+    const context = this.auth.sessionGeneration();
+    const request = this.sessionsRequest.begin(context);
     this.sessionsLoading.set(true);
     this.sessionsError.set(null);
     try {
       const now = Date.now();
       const sessions = await this.auth.listSessions();
+      if (!this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.sessions.set(sessions.filter((session) => !session.revoked_at && new Date(session.expires_at).getTime() > now));
     } catch (err) {
+      if (!this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.sessions.set([]);
       this.sessionsError.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las sesiones");
     } finally {
-      this.sessionsLoading.set(false);
+      if (this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) this.sessionsLoading.set(false);
     }
   }
 
-  async loadExportStatus(): Promise<void> {
+  async loadExportStatus(notify = true): Promise<void> {
+    const context = this.auth.sessionGeneration();
+    const request = this.exportRequest.begin(context);
     this.exportLoading.set(true);
     try {
-      this.exportStatus.set(await this.auth.dataExportStatus());
+      const status = await this.auth.dataExportStatus();
+      if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
+      this.exportStatus.set(status);
     } catch (err) {
+      if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.exportStatus.set(null);
-      this.toast(err, "");
+      if (notify) this.toast(err, "No se pudo consultar el estado de la exportación");
     } finally {
-      this.exportLoading.set(false);
+      if (this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) this.exportLoading.set(false);
     }
   }
 
@@ -346,8 +370,8 @@ export class SettingsComponent {
       );
       this.exportStatus.set(status);
       this.exportForm.reset();
-      await this.auth.refreshUser();
       this.snackbar.open("Revisa tu email para confirmar la exportación", "Cerrar", { duration: 3500 });
+      await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
     } catch (err) {
       this.toast(err, "");
       void this.loadExportStatus();
@@ -368,8 +392,8 @@ export class SettingsComponent {
     this.exportBusy.set(true);
     try {
       await this.auth.cancelDataExport();
-      await this.loadExportStatus();
       this.snackbar.open("Exportación cancelada", "Cerrar", { duration: 2500 });
+      await this.settleAfterConfirmedMutation([this.loadExportStatus(false)]);
     } catch (err) {
       this.toast(err, "");
     } finally {
@@ -381,15 +405,20 @@ export class SettingsComponent {
     return ["requested", "processing", "ready"].includes(this.exportStatus()?.status ?? "");
   }
 
-  async loadDeletionImpact(): Promise<void> {
+  async loadDeletionImpact(notify = true): Promise<void> {
+    const context = this.auth.sessionGeneration();
+    const request = this.deletionRequest.begin(context);
     this.deletionLoading.set(true);
     try {
-      this.deletionImpact.set(await this.auth.accountDeletionImpact());
+      const impact = await this.auth.accountDeletionImpact();
+      if (!this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) return;
+      this.deletionImpact.set(impact);
     } catch (err) {
+      if (!this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.deletionImpact.set(null);
-      this.toast(err, "");
+      if (notify) this.toast(err, "No se pudo consultar el impacto de la eliminación");
     } finally {
-      this.deletionLoading.set(false);
+      if (this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) this.deletionLoading.set(false);
     }
   }
 
@@ -419,8 +448,8 @@ export class SettingsComponent {
         factor.value.trim() || undefined,
       );
       this.deletionForm.reset();
-      await Promise.all([this.loadDeletionImpact(), this.auth.refreshUser()]);
       this.snackbar.open("Revisa tu email para confirmar la solicitud", "Cerrar", { duration: 4000 });
+      await this.settleAfterConfirmedMutation([this.loadDeletionImpact(false), this.auth.refreshUser()]);
     } catch (err) {
       this.toast(err, "");
       void this.loadDeletionImpact();
@@ -429,21 +458,31 @@ export class SettingsComponent {
     }
   }
 
-  async loadPrivacyRequests(): Promise<void> {
+  async loadPrivacyRequests(notify = false): Promise<void> {
+    const page = this.privacyPage() + 1;
+    const perPage = this.privacyPageSize();
+    const context = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${perPage}`;
+    const request = this.privacyRequest.begin(context);
     this.privacyLoading.set(true);
     this.privacyError.set(null);
     try {
       const response = await this.api.get<{ requests: PrivacyRightRequest[]; total: number }>("/api/v1/auth/privacy-requests", {
-        page: this.privacyPage() + 1,
-        perPage: this.privacyPageSize(),
-      });
+        page,
+        perPage,
+      }, (value) => decodePrivacyRequestsPage(value, { page, perPage }));
+      const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
+      if (!this.privacyRequest.isCurrent(request, current)) return;
       this.privacyRequests.set(response.requests);
       this.privacyTotal.set(response.total);
     } catch (error) {
+      const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
+      if (!this.privacyRequest.isCurrent(request, current)) return;
       this.privacyRequests.set([]);
       this.privacyError.set(error instanceof ApiRequestError ? error.message : "No se pudieron cargar las solicitudes");
+      if (notify) this.toast(error, "No se pudieron cargar las solicitudes");
     } finally {
-      this.privacyLoading.set(false);
+      const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
+      if (this.privacyRequest.isCurrent(request, current)) this.privacyLoading.set(false);
     }
   }
 
@@ -474,11 +513,11 @@ export class SettingsComponent {
       await this.api.post("/api/v1/auth/privacy-requests", { type, details });
       this.privacyForm.reset({ type: "access", details: "" });
       this.privacyPage.set(0);
-      await this.loadPrivacyRequests();
+      await this.loadPrivacyRequests(false);
       this.snackbar.open("Solicitud registrada y plazo iniciado", "Cerrar", { duration: 3500 });
     } catch (error) {
       this.toast(error, "");
-      await this.loadPrivacyRequests();
+      await this.loadPrivacyRequests(false);
     } finally {
       this.privacyBusy.set(false);
     }
@@ -500,7 +539,7 @@ export class SettingsComponent {
         message: this.privacyResponseForm.controls.message.value.trim(),
       });
       this.privacyResponseId.set(null);
-      await this.loadPrivacyRequests();
+      await this.loadPrivacyRequests(false);
       this.snackbar.open("Respuesta incorporada al expediente", "Cerrar", { duration: 3000 });
     } catch (error) {
       this.toast(error, "");
@@ -542,22 +581,36 @@ export class SettingsComponent {
   }
 
   async openOwnedWorkspace(id: number): Promise<void> {
+    const previous = this.workspaces.currentId();
     this.workspaces.select(id);
-    await this.router.navigate(["/app/team"]);
+    try {
+      const navigated = await this.router.navigate(["/app/team"]);
+      if (!navigated && this.workspaces.currentId() === id) this.workspaces.select(previous);
+    } catch (error) {
+      if (this.workspaces.currentId() === id) this.workspaces.select(previous);
+      this.toast(error, "No se pudo abrir el workspace");
+    }
   }
 
   async revokeSession(session: Session): Promise<void> {
+    let revokedCurrent: boolean;
     try {
-      await this.auth.revokeSession(session.id, session.current);
-      if (session.current) {
-        await this.router.navigate(["/auth"]);
-        return;
-      }
-      this.snackbar.open("Sesión revocada", "Cerrar", { duration: 2500 });
-      void this.loadSessions();
+      revokedCurrent = await this.auth.revokeSession(session.id, session.current);
     } catch (err) {
-      this.toast(err, "");
+      this.toast(err, "No se pudo revocar la sesión");
+      return;
     }
+    if (revokedCurrent) {
+      try {
+        const navigated = await this.router.navigate(["/auth"]);
+        if (!navigated) this.snackbar.open("La sesión quedó revocada. Abre la pantalla de acceso para continuar.", "Cerrar", { duration: 5000 });
+      } catch {
+        this.snackbar.open("La sesión quedó revocada, pero no se pudo abrir la pantalla de acceso.", "Cerrar", { duration: 5000 });
+      }
+      return;
+    }
+    this.snackbar.open("Sesión revocada", "Cerrar", { duration: 2500 });
+    void this.loadSessions();
   }
 
   async startMfaSetup(): Promise<void> {
@@ -579,7 +632,14 @@ export class SettingsComponent {
       const { secret, uri } = await this.auth.mfaSetup(password, code);
       this.mfaSecret.set(secret);
       this.mfaUri.set(uri);
-      this.mfaQr.set(await QRCode.toDataURL(uri, { width: 240, margin: 1 }));
+      try {
+        this.mfaQr.set(await QRCode.toDataURL(uri, { width: 240, margin: 1 }));
+      } catch {
+        // The server-side setup already exists. Preserve the manual secret
+        // instead of inviting a retry that could rotate it again.
+        this.mfaQr.set(null);
+        this.snackbar.open("La configuración está preparada, pero no se pudo generar el QR. Usa la clave manual mostrada.", "Cerrar", { duration: 5000 });
+      }
       this.mfaCodeForm.reset();
     } catch (err) {
       this.toast(err, "");
@@ -601,9 +661,9 @@ export class SettingsComponent {
       const { recoveryCodes } = await this.auth.mfaEnable(this.mfaCodeForm.controls.code.value);
       this.recoveryCodes.set(recoveryCodes);
       this.recoveryCodesAcknowledged.set(false);
-      await this.auth.refreshUser();
       this.clearMfaSetupUi();
       this.snackbar.open("MFA activado", "Cerrar", { duration: 2500 });
+      await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
     } catch (err) {
       this.toast(err, "");
     } finally {
@@ -635,8 +695,8 @@ export class SettingsComponent {
       this.mfaPasswordForm.reset();
       this.mfaCodeForm.reset();
       this.mfaDisableForm.reset();
-      await this.auth.refreshUser();
       this.snackbar.open("MFA desactivado", "Cerrar", { duration: 2500 });
+      await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
     } catch (err) {
       this.toast(err, "");
     } finally {
@@ -715,9 +775,8 @@ export class SettingsComponent {
       this.recoveryCodesAcknowledged.set(false);
       this.recoveryRegenerating.set(false);
       this.recoveryRegenerateForm.reset();
-      await this.auth.refreshUser();
-      void this.loadSessions();
       this.snackbar.open("Códigos regenerados", "Cerrar", { duration: 2500 });
+      await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
       this.toast(err, "");
     } finally {
@@ -751,12 +810,9 @@ export class SettingsComponent {
       "",
       `Generados: ${new Date().toISOString()}`,
     ].join("\n");
-    const url = URL.createObjectURL(new Blob([body], { type: "text/plain;charset=utf-8" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "uvh-codigos-recuperacion.txt";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    if (!downloadBlob(new Blob([body], { type: "text/plain;charset=utf-8" }), "uvh-codigos-recuperacion.txt")) {
+      this.snackbar.open("El navegador no pudo descargar los códigos. Cópialos antes de continuar.", "Cerrar", { duration: 5000 });
+    }
   }
 
   setTheme(pref: ThemePreference): void {

@@ -105,7 +105,14 @@ class GenerateDataExportJob implements ShouldQueue
         // million analytics rows can exhaust a worker before json_encode() ever
         // measures the payload. Large cases stay available through the managed
         // privacy-rights workflow instead of destabilising the shared queue.
-        if (! $this->withinAutomatedRowBudget($userId)) {
+        try {
+            $payload = $this->buildConsistentPayload($userId);
+        } catch (\Throwable) {
+            PrivateArtifactCleanup::attempt($requestId, $artifactPath);
+            throw new \RuntimeException('No se pudo generar la exportación de datos');
+        }
+
+        if ($payload === null) {
             $failed = DB::transaction(function () use ($requestId, $userId, $artifactPath): bool {
                 User::where('id', $userId)->lockForUpdate()->first();
                 $request = DataExportRequest::where('id', $requestId)
@@ -136,7 +143,6 @@ class GenerateDataExportJob implements ShouldQueue
         }
 
         try {
-            $payload = $this->buildPayload($userId);
             $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             if (strlen($json) > self::MAX_JSON_BYTES) {
                 throw new \RuntimeException('Export exceeds automated size limit');
@@ -210,6 +216,25 @@ class GenerateDataExportJob implements ShouldQueue
             PrivateArtifactCleanup::attempt($requestId, $artifactPath);
             throw new \RuntimeException('No se pudo generar la exportación de datos');
         }
+    }
+
+    /**
+     * Read the size budget and every export section from one PostgreSQL
+     * snapshot. The transaction is deliberately read-only and ends before JSON
+     * encoding, encryption, filesystem I/O or mail admission.
+     *
+     * @return array<string, mixed>|null Null means the automated row budget was exceeded.
+     */
+    private function buildConsistentPayload(int $userId): ?array
+    {
+        return DB::transaction(function () use ($userId): ?array {
+            DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+            if (! $this->withinAutomatedRowBudget($userId)) {
+                return null;
+            }
+
+            return $this->buildPayload($userId);
+        });
     }
 
     public function failed(\Throwable $exception): void

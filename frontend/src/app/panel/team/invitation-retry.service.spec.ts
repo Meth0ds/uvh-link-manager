@@ -3,17 +3,19 @@ import { InvitationRetryService } from "./invitation-retry.service";
 
 describe("InvitationRetryService", () => {
   let service: InvitationRetryService;
+  let timestamp: number;
 
   beforeEach(() => {
-    jasmine.clock().install();
-    jasmine.clock().mockDate(new Date("2026-09-05T12:00:00Z"));
+    timestamp = Date.parse("2026-09-05T12:00:00Z");
+    // Zone.js owns browser timers. Control only the elapsed wall clock so the
+    // test cannot corrupt global timer functions for another randomized spec.
+    spyOn(Date, "now").and.callFake(() => timestamp);
     TestBed.configureTestingModule({ providers: [InvitationRetryService] });
     service = TestBed.inject(InvitationRetryService);
   });
 
   afterEach(() => {
     TestBed.resetTestingModule();
-    jasmine.clock().uninstall();
   });
 
   it("shares advice across create/resend email spellings, not other recipients/workspaces", () => {
@@ -25,15 +27,15 @@ describe("InvitationRetryService", () => {
 
   it("expires at the deadline and never requires an API dependency", () => {
     service.defer(1, "person@example.test", 60);
-    jasmine.clock().tick(59_001);
+    timestamp += 59_001;
     expect(service.remaining(1, "person@example.test")).toBe(1);
-    jasmine.clock().tick(999);
+    timestamp += 999;
     expect(service.remaining(1, "person@example.test")).toBe(0);
   });
 
   it("uses elapsed time after a throttled/background timer", () => {
     service.defer(1, "person@example.test", 60);
-    jasmine.clock().mockDate(new Date("2026-09-05T12:02:00Z"));
+    timestamp += 120_000;
     expect(service.remaining(1, "person@example.test")).toBe(0);
   });
 

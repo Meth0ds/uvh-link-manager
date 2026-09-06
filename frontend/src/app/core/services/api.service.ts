@@ -1,10 +1,13 @@
 import { Injectable, inject } from "@angular/core";
 import { HttpClient, HttpErrorResponse, HttpParams } from "@angular/common/http";
-import { catchError, firstValueFrom, throwError, type Observable } from "rxjs";
+import { catchError, firstValueFrom, map, throwError, type Observable } from "rxjs";
 import type { ApiError } from "../models";
 import { retryAfterSeconds } from "./retry-after";
 
 const CSRF_COOKIES = ["__Host-uvh_csrf", "uvh_csrf"] as const;
+
+/** Runtime contract applied before an HTTP value reaches application state. */
+export type ApiDecoder<T> = (value: unknown) => T;
 
 export class ApiRequestError extends Error {
   status: number;
@@ -87,14 +90,26 @@ export class ApiService {
     return new ApiRequestError(message, err.status, body?.details, retryAfterSeconds(err.headers.get("Retry-After")));
   }
 
-  private request<T>(source: Observable<T>): Promise<T> {
-    return firstValueFrom(source).catch((err: unknown) => {
+  private decodeResponse<T>(value: unknown, decoder?: ApiDecoder<T>): T {
+    if (!decoder) return value as T;
+    try {
+      return decoder(value);
+    } catch (error) {
+      if (error instanceof ApiRequestError) throw error;
+      // Do not attach the untrusted body or decoder details: either may contain
+      // secrets and neither is useful to the end user.
+      throw new ApiRequestError("El servidor devolvió una respuesta no válida", 502);
+    }
+  }
+
+  private request<T>(source: Observable<T>, decoder?: ApiDecoder<T>): Promise<T> {
+    return firstValueFrom(source).then((value) => this.decodeResponse(value, decoder)).catch((err: unknown) => {
       throw err instanceof HttpErrorResponse ? this.errorOf(err) : err;
     });
   }
 
   /** GET (safe — no CSRF header required). */
-  get<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>): Promise<T> {
+  get<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
     let hp = new HttpParams();
     if (params) {
@@ -102,14 +117,14 @@ export class ApiService {
         if (v != null && v !== "") hp = hp.set(k, String(v));
       }
     }
-    return this.request(this.http.get<T>(path, { headers: this.headers(false), params: hp }));
+    return this.request(this.http.get<T>(path, { headers: this.headers(false), params: hp }), decoder);
   }
 
   /** POST (mutation — requires CSRF). */
-  async post<T>(path: string, body?: unknown): Promise<T> {
+  async post<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
     await this.ensureCsrf();
-    return this.request(this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }));
+    return this.request(this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
   }
 
   /** POST returning a private binary artifact while preserving JSON errors. */
@@ -140,21 +155,21 @@ export class ApiService {
   }
 
   /** PATCH (mutation — requires CSRF). */
-  async patch<T>(path: string, body?: unknown): Promise<T> {
+  async patch<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
     await this.ensureCsrf();
-    return this.request(this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }));
+    return this.request(this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
   }
 
   /** DELETE (mutation — requires CSRF). */
-  async delete<T>(path: string, body?: unknown): Promise<T> {
+  async delete<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
     await this.ensureCsrf();
-    return this.request(this.http.delete<T>(path, { headers: this.headers(true), body }));
+    return this.request(this.http.delete<T>(path, { headers: this.headers(true), body }), decoder);
   }
 
   /** Raw observable for callers that need streaming/loading states. */
-  get$<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>): Observable<T> {
+  get$<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>, decoder?: ApiDecoder<T>): Observable<T> {
     this.assertApiPath(path);
     let hp = new HttpParams();
     if (params) {
@@ -163,6 +178,7 @@ export class ApiService {
       }
     }
     return this.http.get<T>(path, { headers: this.headers(false), params: hp }).pipe(
+      map((value) => this.decodeResponse(value, decoder)),
       catchError((err: unknown) => throwError(() => err instanceof HttpErrorResponse ? this.errorOf(err) : err)),
     );
   }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -8,6 +8,7 @@ import { AuthShellComponent } from "./auth-shell.component";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { AuthService } from "../core/services/auth.service";
 import { authBearer } from "./auth-bearer";
+import { LatestRequest } from "../core/services/latest-request";
 
 @Component({
   selector: "app-confirm-email-change",
@@ -41,6 +42,7 @@ export class ConfirmEmailChangeComponent {
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
   private location = inject(Location);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
 
   readonly busy = signal(false);
@@ -59,18 +61,26 @@ export class ConfirmEmailChangeComponent {
 
   async confirm(): Promise<void> {
     if (this.busy() || this.done() || !this.token) return;
+    const generation = this.auth.sessionGeneration();
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     try {
       await this.api.post("/api/v1/auth/confirm-email-change", { token: this.token });
-      this.auth.accountSignedOut();
+      // The response clears the session cookie. Reconcile global auth even if
+      // this view closed, but never erase a login from a newer generation.
+      this.auth.accountSignedOut(generation);
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.message.set("La nueva dirección ha quedado verificada. Hemos cerrado todas las sesiones para proteger la cuenta.");
     } catch (error) {
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(false);
       this.message.set(error instanceof ApiRequestError ? error.message : "El enlace no es válido o ha caducado.");
     } finally {
-      this.busy.set(false);
-      this.done.set(true);
+      if (this.requests.isCurrent(request, this.token)) {
+        this.busy.set(false);
+        this.done.set(true);
+      }
     }
   }
 }

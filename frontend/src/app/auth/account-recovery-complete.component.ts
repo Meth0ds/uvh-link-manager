@@ -1,5 +1,5 @@
 import { Location } from "@angular/common";
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -10,6 +10,8 @@ import { MatInputModule } from "@angular/material/input";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { authBearer } from "./auth-bearer";
 import { AuthShellComponent } from "./auth-shell.component";
+import { LatestRequest } from "../core/services/latest-request";
+import { decodePublicActionMessage } from "../core/services/public-action-response-decoders";
 
 @Component({
   selector: "app-account-recovery-complete",
@@ -77,6 +79,7 @@ export class AccountRecoveryCompleteComponent {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly location = inject(Location);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly token = authBearer(this.route);
   readonly busy = signal(false);
@@ -110,6 +113,7 @@ export class AccountRecoveryCompleteComponent {
       this.form.markAllAsTouched();
       return;
     }
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -117,12 +121,14 @@ export class AccountRecoveryCompleteComponent {
         token: this.token,
         password: this.form.controls.password.value,
         confirmation: this.form.controls.confirmation.value,
-      });
+      }, decodePublicActionMessage);
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.message.set(result.message);
       this.done.set(true);
       this.form.reset();
     } catch (error) {
+      if (!this.requests.isCurrent(request, this.token)) return;
       const message = error instanceof ApiRequestError ? error.message : "No se pudo completar la recuperación";
       if (error instanceof ApiRequestError && [400, 409].includes(error.status)) {
         this.message.set(message);
@@ -131,7 +137,7 @@ export class AccountRecoveryCompleteComponent {
         this.error.set(message);
       }
     } finally {
-      this.busy.set(false);
+      if (this.requests.isCurrent(request, this.token)) this.busy.set(false);
     }
   }
 }

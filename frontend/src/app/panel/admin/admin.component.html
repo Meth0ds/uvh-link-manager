@@ -110,10 +110,10 @@
                 <div class="usage" data-label="Actividad"><b>{{ user.links }}</b><small>enlaces</small><b>{{ user.workspaces }}</b><small>workspaces</small></div>
                 <time data-label="Alta">{{ formatDate(user.created_at) }}</time>
                 <div class="row-actions">
-                  <button mat-stroked-button type="button" (click)="toggleAdmin(user)" [disabled]="actionKey() !== null">
+                  <button mat-stroked-button type="button" (click)="toggleAdmin(user)" [disabled]="usersLoading() || actionKey() !== null">
                     {{ isAdminUser(user) ? 'Retirar admin' : 'Hacer admin' }}
                   </button>
-                  <button mat-stroked-button type="button" [class.danger-button]="!user.deleted_at" (click)="toggleBlock(user)" [disabled]="actionKey() !== null">
+                  <button mat-stroked-button type="button" [class.danger-button]="!user.deleted_at" (click)="toggleBlock(user)" [disabled]="usersLoading() || actionKey() !== null">
                     {{ user.deleted_at ? 'Restaurar' : 'Bloquear' }}
                   </button>
                 </div>
@@ -162,8 +162,8 @@
                 <dl><div><dt>Email confirmado</dt><dd>{{ recovery.emailConfirmedAt ? formatDate(recovery.emailConfirmedAt) : 'Pendiente' }}</dd></div><div><dt>Solicitud</dt><dd>{{ formatDate(recovery.createdAt) }}</dd></div></dl>
                 @if (recovery.status === 'email_confirmed' || recovery.status === 'in_review') {
                   <footer>
-                    <button mat-flat-button type="button" (click)="approveRecovery(recovery)" [disabled]="actionKey() !== null"><mat-icon>verified_user</mat-icon>Registrar aprobación</button>
-                    <button mat-stroked-button class="danger-button" type="button" (click)="rejectRecovery(recovery)" [disabled]="actionKey() !== null">Rechazar</button>
+                    <button mat-flat-button type="button" (click)="approveRecovery(recovery)" [disabled]="recoveriesLoading() || actionKey() !== null"><mat-icon>verified_user</mat-icon>Registrar aprobación</button>
+                    <button mat-stroked-button class="danger-button" type="button" (click)="rejectRecovery(recovery)" [disabled]="recoveriesLoading() || actionKey() !== null">Rechazar</button>
                   </footer>
                 }
               </article>
@@ -203,10 +203,10 @@
                 <div class="report-copy"><span>Motivo</span><b>{{ report.reason }}</b>@if (report.details) { <p>{{ report.details }}</p> }</div>
                 <dl><div><dt>Remitente</dt><dd>{{ report.reporter_email ?? 'Anónimo' }}</dd></div><div><dt>Workspace</dt><dd>#{{ report.workspace_id }}</dd></div><div><dt>Enlace</dt><dd>{{ report.link_state }}</dd></div></dl>
                 <footer>
-                  @if (report.status !== 'reviewed') { <button mat-stroked-button type="button" (click)="reviewReport(report)" [disabled]="actionKey() !== null">Revisada</button> }
-                  @if (report.status !== 'dismissed') { <button mat-stroked-button type="button" (click)="dismissReport(report)" [disabled]="actionKey() !== null">Desestimar</button> }
-                  @if (report.link_state !== 'blocked') { <button mat-flat-button class="destructive" type="button" (click)="blockLink(report)" [disabled]="actionKey() !== null"><mat-icon>block</mat-icon>Bloquear</button> }
-                  @else { <button mat-flat-button type="button" (click)="unblockLink(report)" [disabled]="actionKey() !== null"><mat-icon>restart_alt</mat-icon>Desbloquear</button> }
+                  @if (report.status !== 'reviewed') { <button mat-stroked-button type="button" (click)="reviewReport(report)" [disabled]="reportsLoading() || actionKey() !== null">Revisada</button> }
+                  @if (report.status !== 'dismissed') { <button mat-stroked-button type="button" (click)="dismissReport(report)" [disabled]="reportsLoading() || actionKey() !== null">Desestimar</button> }
+                  @if (report.link_state !== 'blocked') { <button mat-flat-button class="destructive" type="button" (click)="blockLink(report)" [disabled]="reportsLoading() || actionKey() !== null"><mat-icon>block</mat-icon>Bloquear</button> }
+                  @else { <button mat-flat-button type="button" (click)="unblockLink(report)" [disabled]="reportsLoading() || actionKey() !== null"><mat-icon>restart_alt</mat-icon>Desbloquear</button> }
                 </footer>
               </article>
             }
@@ -269,11 +269,11 @@
                 @if (request.messages.length) { <div class="privacy-thread">@for (message of request.messages; track message.id) { <div [class.admin]="message.authorRole === 'admin'"><span>{{ message.authorRole === 'admin' ? 'Equipo' : 'Usuario' }} · {{ formatDate(message.createdAt) }}</span><p>{{ message.body ?? 'Contenido cifrado no disponible' }}</p></div> }</div> }
                 @if (privacyActive(request.status)) {
                   <footer>
-                    @if (request.status === 'submitted') { <button mat-stroked-button type="button" (click)="startPrivacyReview(request)" [disabled]="actionKey() !== null">Tomar expediente</button> }
-                    @if (request.status !== 'waiting_user') { <button mat-stroked-button type="button" (click)="requestPrivacyInformation(request)" [disabled]="actionKey() !== null">Pedir información</button> }
-                    @if (!request.extendedUntil) { <button mat-stroked-button type="button" (click)="extendPrivacy(request, 'complexity')" [disabled]="actionKey() !== null">Ampliar: complejidad</button><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'request_volume')" [disabled]="actionKey() !== null">Ampliar: volumen</button> }
-                    <button mat-flat-button color="primary" type="button" (click)="completePrivacy(request)" [disabled]="actionKey() !== null">Resolver</button>
-                    <button mat-stroked-button class="danger-button" type="button" (click)="rejectPrivacy(request)" [disabled]="actionKey() !== null">Cerrar motivadamente</button>
+                    @if (request.status === 'submitted') { <button mat-stroked-button type="button" (click)="startPrivacyReview(request)" [disabled]="privacyLoading() || actionKey() !== null">Tomar expediente</button> }
+                    @if (request.status !== 'waiting_user') { <button mat-stroked-button type="button" (click)="requestPrivacyInformation(request)" [disabled]="privacyLoading() || actionKey() !== null">Pedir información</button> }
+                    @if (!request.extendedUntil) { <button mat-stroked-button type="button" (click)="extendPrivacy(request, 'complexity')" [disabled]="privacyLoading() || actionKey() !== null">Ampliar: complejidad</button><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'request_volume')" [disabled]="privacyLoading() || actionKey() !== null">Ampliar: volumen</button> }
+                    <button mat-flat-button color="primary" type="button" (click)="completePrivacy(request)" [disabled]="privacyLoading() || actionKey() !== null">Resolver</button>
+                    <button mat-stroked-button class="danger-button" type="button" (click)="rejectPrivacy(request)" [disabled]="privacyLoading() || actionKey() !== null">Cerrar motivadamente</button>
                   </footer>
                 }
               </article>
@@ -312,7 +312,7 @@
                   <span class="badge" [class.success]="message.status === 'sent' || message.status === 'compensated'" [class.warning]="message.status === 'pending' || message.status === 'queued' || message.status === 'processing' || message.status === 'comp_pending' || message.status === 'compensating'" [class.danger]="message.status === 'failed'" [class.neutral]="message.status === 'obsolete'">{{ mailStatusLabel(message.status) }}</span>
                   <div class="outbox-attempts"><span>Intentos</span><b>{{ message.attempts }} + {{ message.manualRetryCount }} manuales</b></div>
                   <time>{{ formatDate(message.updatedAt) }}</time>
-                  <button mat-stroked-button type="button" (click)="retryMail(message)" [disabled]="!message.retryable || actionKey() !== null"><mat-icon>replay</mat-icon>{{ message.retryable ? 'Reintentar' : 'No disponible' }}</button>
+                  <button mat-stroked-button type="button" (click)="retryMail(message)" [disabled]="mailLoading() || !message.retryable || actionKey() !== null"><mat-icon>replay</mat-icon>{{ message.retryable ? 'Reintentar' : 'No disponible' }}</button>
                 </article>
               }
             </div>

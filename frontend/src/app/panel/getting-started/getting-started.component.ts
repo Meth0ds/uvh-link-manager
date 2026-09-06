@@ -7,6 +7,7 @@ import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import type { WorkspaceGettingStarted } from "../../core/models";
+import { decodeWorkspaceGettingStarted } from "../../core/services/workspace-response-decoders";
 import { PageHeaderComponent } from "../page-header.component";
 import { gettingStartedSteps } from "./getting-started.steps";
 
@@ -76,16 +77,15 @@ export class GettingStartedComponent {
     if (!context || this.destroyRef.destroyed) return;
     const isCurrent = () => !this.destroyRef.destroyed && request === this.requestNumber && context.key === this.context()?.key;
     try {
-      const data = await this.api.get<WorkspaceGettingStarted>(`/api/v1/workspaces/${context.workspaceId}/getting-started`);
+      const data = await this.api.get<WorkspaceGettingStarted>(
+        `/api/v1/workspaces/${context.workspaceId}/getting-started`,
+        undefined,
+        (value) => decodeWorkspaceGettingStarted(value, context.workspaceId),
+      );
       if (!isCurrent()) return;
-      // A malformed/stale response must not become a falsely completed guide.
-      if (data.workspaceId !== context.workspaceId || !data.facts || !data.capabilities
-        || ![data.facts.linkPresent, data.facts.redirectObserved, data.facts.domainPresent,
-          data.facts.teammatePresent, data.facts.mfaEnabled, data.capabilities.createLink,
-          data.capabilities.addDomain, data.capabilities.inviteTeam].every((v) => typeof v === "boolean")
-        || (data.facts.invitationPending !== null && typeof data.facts.invitationPending !== "boolean")) {
-        throw new Error("Invalid onboarding response");
-      }
+      // Keep a local context assertion as defence in depth and for test doubles
+      // that do not execute ApiService's decoder callback.
+      if (data.workspaceId !== context.workspaceId) throw new Error("Invalid onboarding response");
       this.state.set({ key: context.key, loading: false, error: null, data });
     } catch (error) {
       if (!isCurrent()) return;

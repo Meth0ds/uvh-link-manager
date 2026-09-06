@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from "@angular/core";
+import { Component, ChangeDetectionStrategy, DestroyRef, inject, signal } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
@@ -8,6 +8,8 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import type { Workspace } from "../core/models";
+import { LatestRequest } from "../core/services/latest-request";
+import { decodeCreatedWorkspaceResponse } from "../core/services/workspace-response-decoders";
 
 export interface WorkspaceDialogResult {
   workspace: Workspace;
@@ -65,6 +67,7 @@ export class WorkspaceDialogComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ApiService);
   private readonly dialogRef = inject(MatDialogRef<WorkspaceDialogComponent, WorkspaceDialogResult | undefined>);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   readonly form = this.fb.nonNullable.group({
@@ -73,17 +76,22 @@ export class WorkspaceDialogComponent {
 
   async save(): Promise<void> {
     if (this.form.invalid || this.busy()) return;
+    const name = this.form.controls.name.value.trim();
+    const request = this.requests.begin(name);
     this.busy.set(true);
     this.error.set(null);
     try {
       const { workspace } = await this.api.post<{ workspace: Workspace }>("/api/v1/workspaces", {
-        name: this.form.controls.name.value.trim(),
-      });
+        name,
+      }, decodeCreatedWorkspaceResponse);
+      if (!this.requests.isCurrent(request, name)) return;
       this.dialogRef.close({ workspace });
     } catch (err) {
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo crear el workspace");
+      if (this.requests.isCurrent(request, name)) {
+        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo crear el workspace");
+      }
     } finally {
-      this.busy.set(false);
+      if (this.requests.isCurrent(request, name)) this.busy.set(false);
     }
   }
 }

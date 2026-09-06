@@ -34,6 +34,8 @@ Estado: auditoría manual reabierta y en curso. Este documento conserva los hall
 | Código y migración preparados; sin ejecutar | BAF-136 | Reserva SQL de correo por cuenta/workspace/destinatario/IP/global y cooldown; rollback, keyring, métricas y limpieza. |
 | Aplicado estáticamente; sin ejecutar | BAF-137 | Gate de esquema/configuración en arranque estándar y healthchecks de contenedor, sin ejecutar migraciones. |
 | Aplicado estáticamente; sin ejecutar | BAF-138 | Cliente conserva Retry-After y Equipo muestra espera manual por destinatario sin bloquear cancelación. |
+| Corregido y validado aisladamente | BAF-139 a BAF-142 | El panel propaga paradas fallidas; las intenciones distinguen borrado autoritativo de limpieza acotada; la publicación webhook usa un lease recuperable. |
+| Corregido y validado en frontend | BAF-143 a BAF-180 | Aislamiento por workspace/destrucción, limpieza de secretos, sondeos acotados, Storage estricto, QR/descargas robustos y contexto de workspace validado. |
 
 ### Cambios de compatibilidad del frontend
 
@@ -1680,7 +1682,8 @@ de esta pasada; “resuelto” describe implementación, no validación de runti
 ### BAF-138 — El cliente descartaba la espera del servidor al reenviar invitaciones
 
 - Severidad: baja de usabilidad y peticiones repetidas innecesarias.
-- Estado: implementación y diecisiete casos frontend preparados; no ejecutados.
+- Estado: implementación validada; los diecisiete casos pasaron dentro de la
+  suite frontend completa.
 - Evidencia: `ApiService.errorOf` y errores JSON de `postBlob` sólo conservaban
   mensaje/status/details. Equipo mostraba un snackbar genérico, sin espera ni
   guard adicional para volver a pulsar o usar Enter.
@@ -1697,5 +1700,73 @@ de esta pasada; “resuelto” describe implementación, no validación de runti
   la dimensión agotada. Otras operaciones pueden recibir un nuevo `429` del
   servidor; vencer la espera no garantiza admisión. Un `503` genérico no crea
   este cooldown. No prueba accesibilidad, renderizado ni navegación concurrente.
-- Evidencia preparada: cuatro casos de parser, cuatro de API, seis del servicio
-  y tres de handlers de Equipo. Sin tests, typecheck, build o navegador ejecutados.
+- Evidencia: cuatro casos de parser, cuatro de API, seis del servicio y tres de
+  handlers de Equipo pasaron; typecheck y build también. E2E real sigue pendiente.
+
+### BAF-139 — El panel daba éxito a una parada fallida y continuaba el reinicio
+
+- Estado: corregido y validado con dependencias simuladas.
+- Evidencia: `Stop-UvhLocal` invocaba Compose con `-AllowFailure`; un código
+  distinto de cero se convertía en texto, la CLI devolvía éxito y `Restart`
+  continuaba hacia `Start-UvhLocal` pese a la parada parcial.
+- Corrección: propagar la excepción del helper de Compose y conservar el
+  diagnóstico. El flujo de reinicio se interrumpe antes del arranque.
+- Regresión: `tools/tests/control-stop.tests.ps1` carga mediante AST las
+  funciones y el despacho reales, simula las dependencias externas y comprueba
+  parada fallida, reinicio abortado, parada correcta y reinicio correcto.
+  No ejecuta Docker, terminación de procesos ni migraciones.
+
+### BAF-140 — Completar una intención confundía consumo y limpieza auxiliar
+
+- Severidad: media de continuidad y disponibilidad.
+- Estado: corregido; cuatro casos relacionados pasan con 65 aserciones en
+  `uvh_test`.
+- Evidencia: `complete` no comprobaba el resultado de `Cache::forget`; podía
+  responder éxito dejando el bearer reutilizable. En sentido inverso, si el
+  token ya se había borrado pero fallaba después el lock o la escritura de sus
+  contadores, devolvía `503` aunque el consumo fuese irreversible.
+- Corrección: el borrado autoritativo debe confirmar éxito. Después, la limpieza
+  de contadores mantiene el orden global→IP, valida ambas escrituras, registra
+  indisponibilidad y converge por TTL sin cambiar la respuesta ya confirmada.
+- Regresión: se simulan por separado rechazo del borrado y contención durante la
+  limpieza; se comprueban reintento seguro y ausencia del token consumido.
+
+### BAF-141 — Una revocación fallida perdía su índice de reintento
+
+- Severidad: media de cierre de sesión y minimización.
+- Estado: corregido; un caso dedicado pasa con 7 aserciones en `uvh_test`.
+- Evidencia: `LinkIntentRegistry::revokeForUser` ignoraba un `false` de
+  `Cache::forget`, incrementaba `revoked` y eliminaba la fila inversa aunque el
+  registro con destino continuase en caché.
+- Corrección: conservar la fila inversa, contabilizarla como ocupada y continuar
+  con las demás intenciones. Cada entrada aísla fallos del store y el release del
+  lock tiene una métrica genérica; una ejecución posterior completa la revocación.
+
+### BAF-142 — Housekeeping podía encolar indefinidamente el mismo webhook
+
+- Severidad: media de disponibilidad de cola.
+- Estado: corregido; dos regresiones y cinco casos SSRF/webhook pasan con 73
+  aserciones en `uvh_test`.
+- Evidencia: una entrega `pending` seguía con `next_attempt_at` vencido después
+  de publicar su job. Con el worker detenido, cada pasada de housekeeping volvía
+  a publicar la misma fila y hacía crecer `jobs`, aunque los locks evitasen la
+  entrega externa simultánea.
+- Corrección: reclamar la publicación mediante `locked_at` durante diez minutos.
+  Una segunda pasada no publica de nuevo; un job perdido recupera elegibilidad
+  al vencer el lease. Si el dispatcher falla de inmediato, se libera el claim y
+  se programa un reintento al minuto sin alterar una decisión escrita por un
+  worker síncrono.
+- Contrato: `next_attempt_at` conserva su significado público. Las pruebas
+  comprueban deduplicación, recuperación tras caducidad y publicación fallida.
+
+### BAF-143–180 — Respuestas tardías, Storage y descargas debilitaban el aislamiento del panel
+
+- Severidad: combinación de media de confidencialidad/estado y baja de robustez.
+- Estado: corregido; 125 casos frontend, typecheck y build correctos.
+- Alcance: 38 modos reproducibles en carga/cambio/destrucción de ocho vistas,
+  sondeos DNS/TLS, secretos webhook/token, intenciones e invitaciones persistidas,
+  QR, descargas, compatibilidad de tema e identificadores de workspace.
+- Corrección estructural: `LatestRequest` exige revisión, contexto y vista viva;
+  `browser-download` conserva y limpia Object URLs de forma segura. Los bearers
+  persistidos validan estructura/TTL y toleran fallos parciales sin reaparecer.
+- Inventario y límites: `docs/frontend-stability-batch-2026-09-05.md`.

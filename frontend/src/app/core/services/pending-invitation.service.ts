@@ -13,10 +13,12 @@ interface PendingInvitation {
 @Injectable({ providedIn: "root" })
 export class PendingInvitationService {
   private fallback: PendingInvitation | null = null;
+  private cleared = false;
   readonly persistent = signal(true);
 
   capture(token: string, expiresAt?: string | null): void {
     if (!TOKEN_PATTERN.test(token)) return;
+    this.cleared = false;
     const advertisedExpiry = expiresAt ? Date.parse(expiresAt) : Number.NaN;
     const value = {
       token,
@@ -48,6 +50,9 @@ export class PendingInvitationService {
 
   clear(): void {
     this.fallback = null;
+    // A partially denied Storage implementation must not immediately
+    // resurrect the bearer from a failed removeItem call in this app session.
+    this.cleared = true;
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -56,6 +61,7 @@ export class PendingInvitationService {
   }
 
   private read(): PendingInvitation | null {
+    if (this.cleared) return null;
     let value = this.fallback;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -63,7 +69,9 @@ export class PendingInvitationService {
     } catch {
       this.persistent.set(false);
     }
-    if (!value || !TOKEN_PATTERN.test(value.token) || !Number.isFinite(value.expiresAt) || value.expiresAt <= Date.now()) {
+    if (!value || typeof value.token !== "string" || typeof value.expiresAt !== "number"
+      || !TOKEN_PATTERN.test(value.token) || !Number.isFinite(value.expiresAt)
+      || value.expiresAt <= Date.now() || value.expiresAt > Date.now() + TTL_MS) {
       this.clear();
       return null;
     }

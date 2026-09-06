@@ -1,5 +1,5 @@
 import { Location } from "@angular/common";
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -7,6 +7,8 @@ import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { authBearer } from "./auth-bearer";
 import { AuthShellComponent } from "./auth-shell.component";
+import { LatestRequest } from "../core/services/latest-request";
+import { decodePublicActionMessage } from "../core/services/public-action-response-decoders";
 
 @Component({
   selector: "app-account-recovery-confirm",
@@ -40,6 +42,7 @@ export class AccountRecoveryConfirmComponent {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly location = inject(Location);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly token = authBearer(this.route);
   readonly busy = signal(false);
@@ -57,16 +60,26 @@ export class AccountRecoveryConfirmComponent {
 
   async confirm(): Promise<void> {
     if (!this.token || this.busy() || this.done()) return;
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     try {
-      const result = await this.api.post<{ ok: true; message: string }>("/api/v1/auth/account-recovery/confirm", { token: this.token });
+      const result = await this.api.post<{ ok: true; message: string }>(
+        "/api/v1/auth/account-recovery/confirm",
+        { token: this.token },
+        decodePublicActionMessage,
+      );
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.message.set(result.message);
     } catch (error) {
-      this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar la solicitud");
+      if (this.requests.isCurrent(request, this.token)) {
+        this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar la solicitud");
+      }
     } finally {
-      this.busy.set(false);
-      this.done.set(true);
+      if (this.requests.isCurrent(request, this.token)) {
+        this.busy.set(false);
+        this.done.set(true);
+      }
     }
   }
 }

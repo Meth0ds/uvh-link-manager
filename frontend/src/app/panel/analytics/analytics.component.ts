@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 
 import { MatButtonModule } from "@angular/material/button";
@@ -12,6 +12,8 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import type { AnalyticsOverview } from "../../core/models";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { LatestRequest } from "../../core/services/latest-request";
+import { decodeAnalyticsOverview } from "../../core/services/link-response-decoders";
 
 @Component({
   selector: "app-analytics",
@@ -34,6 +36,7 @@ import { PanelSkeletonComponent } from "../panel-skeleton.component";
 export class AnalyticsComponent {
   private api = inject(ApiService);
   private workspaces = inject(WorkspaceService);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
   readonly router = inject(Router);
 
   readonly overview = signal<AnalyticsOverview | null>(null);
@@ -48,6 +51,10 @@ export class AnalyticsComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      // Never retain metrics from the previous authorization context.
+      this.requests.invalidate();
+      this.overview.set(null);
+      this.error.set(null);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -57,15 +64,29 @@ export class AnalyticsComponent {
   }
 
   async load(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.requests.invalidate();
+      this.overview.set(null);
+      this.loading.set(false);
+      return;
+    }
+    const request = this.requests.begin(workspaceId);
     this.loading.set(true);
     this.error.set(null);
     try {
-      const a = await this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period: this.period() });
+      const a = await this.api.get<AnalyticsOverview>(
+        "/api/v1/analytics/overview",
+        { period: this.period() },
+        decodeAnalyticsOverview,
+      );
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.overview.set(a);
     } catch (err) {
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las métricas");
     } finally {
-      this.loading.set(false);
+      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
   }
 

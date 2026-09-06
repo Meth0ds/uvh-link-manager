@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 
 import { MatButtonModule } from "@angular/material/button";
@@ -14,6 +14,8 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { GettingStartedComponent } from "../getting-started/getting-started.component";
 import type { AnalyticsOverview, LinksResponse, LinkDto } from "../../core/models";
+import { LatestRequest } from "../../core/services/latest-request";
+import { decodeAnalyticsOverview, decodeLinksResponse } from "../../core/services/link-response-decoders";
 
 type DashboardPeriod = "24h" | "7d" | "30d" | "90d";
 
@@ -47,6 +49,7 @@ export class DashboardComponent {
   private linkDialog = inject(LinkDialogService);
   private auth = inject(AuthService);
   private workspaces = inject(WorkspaceService);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly user = this.auth.user;
   readonly workspaceName = computed(() => this.workspaces.list().find((w) => w.id === this.workspaces.currentId())?.name);
@@ -66,15 +69,16 @@ export class DashboardComponent {
   readonly firstName = computed(() => (this.user()?.name ?? "").split(/\s+/)[0] ?? "");
 
   private loadedWorkspaceId: number | null | undefined;
-  private loadRequest = 0;
-
   constructor() {
     effect(() => {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.requests.invalidate();
+      this.overview.set(null);
+      this.recent.set([]);
+      this.error.set(null);
       if (workspaceId === null) {
-        this.loadRequest += 1;
         this.loading.set(false);
         return;
       }
@@ -83,25 +87,34 @@ export class DashboardComponent {
   }
 
   async load(): Promise<void> {
-    const request = ++this.loadRequest;
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.requests.invalidate();
+      this.overview.set(null);
+      this.recent.set([]);
+      this.loading.set(false);
+      return;
+    }
+    const request = this.requests.begin(workspaceId);
     const period = this.period();
     this.loading.set(true);
     this.error.set(null);
     try {
       const [a, links] = await Promise.all([
-        this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period }),
-        this.api.get<LinksResponse>("/api/v1/links", { sort: "created_at_desc", perPage: 5 }),
+        this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period }, decodeAnalyticsOverview),
+        this.api.get<LinksResponse>("/api/v1/links", { sort: "created_at_desc", perPage: 5 },
+          (value) => decodeLinksResponse(value, { page: 1, perPage: 5 })),
       ]);
-      if (request !== this.loadRequest) return;
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.overview.set(a);
       this.recent.set(links.links);
     } catch (err) {
-      if (request !== this.loadRequest) return;
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       const message = err instanceof ApiRequestError ? err.message : "No se pudieron cargar los datos";
       this.error.set(message);
       this.snackbar.open(message, "Cerrar", { duration: 3500 });
     } finally {
-      if (request === this.loadRequest) this.loading.set(false);
+      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
   }
 

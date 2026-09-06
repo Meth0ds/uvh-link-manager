@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -6,6 +6,7 @@ import { MatIconModule } from "@angular/material/icon";
 import { AuthShellComponent } from "./auth-shell.component";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { authBearer } from "./auth-bearer";
+import { downloadBlob } from "../core/services/browser-download";
 
 @Component({
   selector: "app-download-data-export",
@@ -34,6 +35,7 @@ export class DownloadDataExportComponent {
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private location = inject(Location);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly token: string;
 
   readonly busy = signal(false);
@@ -56,19 +58,22 @@ export class DownloadDataExportComponent {
     this.busy.set(true);
     try {
       const blob = await this.api.postBlob("/api/v1/auth/data-export/download", { token: this.token });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `uvh-datos-${new Date().toISOString().slice(0, 10)}.json`;
-      anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 0);
+      if (this.destroyRef.destroyed) return;
+      if (!downloadBlob(blob, `uvh-datos-${new Date().toISOString().slice(0, 10)}.json`)) {
+        // The server has already consumed this one-use bearer. Do not imply
+        // that retrying the same link can recover a browser-side failure.
+        this.error.set(true);
+        this.message.set("El servidor entregó el archivo, pero el navegador no pudo guardarlo. Solicita una nueva exportación.");
+        return;
+      }
       this.downloaded.set(true);
       this.message.set("El archivo se ha entregado y el enlace ya ha quedado invalidado.");
     } catch (error) {
+      if (this.destroyRef.destroyed) return;
       this.error.set(true);
       this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo descargar el archivo.");
     } finally {
-      this.busy.set(false);
+      if (!this.destroyRef.destroyed) this.busy.set(false);
     }
   }
 }

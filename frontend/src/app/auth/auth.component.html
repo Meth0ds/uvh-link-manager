@@ -20,10 +20,10 @@
     @if (step() === 'login' || step() === 'register') {
       <div class="auth-mode-tabs" role="tablist" aria-label="Elige cómo acceder">
         <span class="mode-indicator" [class.register]="tabIndex() === 1" aria-hidden="true"></span>
-        <button id="login-tab" type="button" role="tab" aria-controls="login-panel" [attr.aria-selected]="tabIndex() === 0" [attr.tabindex]="tabIndex() === 0 ? 0 : -1" [class.active]="tabIndex() === 0" (click)="onTabChange(0)" (keydown)="onAuthTabKeydown($event, 0)">
+        <button id="login-tab" type="button" role="tab" aria-controls="login-panel" [attr.aria-selected]="tabIndex() === 0" [attr.tabindex]="tabIndex() === 0 ? 0 : -1" [class.active]="tabIndex() === 0" [disabled]="busy() || verificationBusy()" (click)="onTabChange(0)" (keydown)="onAuthTabKeydown($event, 0)">
           <mat-icon aria-hidden="true">login</mat-icon><span>Iniciar sesión</span>
         </button>
-        <button id="register-tab" type="button" role="tab" aria-controls="register-panel" [attr.aria-selected]="tabIndex() === 1" [attr.tabindex]="tabIndex() === 1 ? 0 : -1" [class.active]="tabIndex() === 1" (click)="onTabChange(1)" (keydown)="onAuthTabKeydown($event, 1)">
+        <button id="register-tab" type="button" role="tab" aria-controls="register-panel" [attr.aria-selected]="tabIndex() === 1" [attr.tabindex]="tabIndex() === 1 ? 0 : -1" [class.active]="tabIndex() === 1" [disabled]="busy() || verificationBusy()" (click)="onTabChange(1)" (keydown)="onAuthTabKeydown($event, 1)">
           <mat-icon aria-hidden="true">person_add</mat-icon><span>Crear cuenta</span>
         </button>
       </div>
@@ -59,7 +59,7 @@
                 </button>
               </mat-form-field>
               <div class="form-row">
-                <button class="forgot" type="button" (click)="goForgot()">¿Olvidaste tu contraseña?</button>
+                <button class="forgot" type="button" (click)="goForgot()" [disabled]="busy()">¿Olvidaste tu contraseña?</button>
               </div>
 
               @if (captchaConfigBusy()) {
@@ -253,7 +253,7 @@
           @if (mfaRecoveryAvailable()) {
             <button mat-button type="button" class="method-link" (click)="goRecovery()"><mat-icon aria-hidden="true">key</mat-icon>Usar un código de recuperación</button>
           }
-          <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()">Volver al inicio de sesión</button>
+          <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()">Volver al inicio de sesión</button>
         </form>
       </section>
     }
@@ -286,7 +286,7 @@
           </button>
           <button mat-button type="button" class="method-link" (click)="backToMfa()"><mat-icon aria-hidden="true">phonelink_lock</mat-icon>Usar la aplicación autenticadora</button>
           <a mat-button class="method-link" routerLink="/auth/account-recovery"><mat-icon aria-hidden="true">support_agent</mat-icon>No tengo acceso a ningún factor</a>
-          <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()">Volver al inicio de sesión</button>
+          <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()">Volver al inicio de sesión</button>
         </form>
       </section>
     }
@@ -319,8 +319,8 @@
             <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
             {{ verificationBusy() ? 'Enviando…' : 'Reenviar correo' }}
           </button>
-          <button mat-stroked-button class="ghost" (click)="changeRegistrationEmail()"><mat-icon aria-hidden="true">edit</mat-icon> Cambiar email</button>
-          <button mat-button class="ghost" (click)="closeRegistration()"><mat-icon aria-hidden="true">logout</mat-icon> Cerrar sesión</button>
+          <button mat-stroked-button class="ghost" (click)="changeRegistrationEmail()" [disabled]="verificationBusy()"><mat-icon aria-hidden="true">edit</mat-icon> Cambiar email</button>
+          <button mat-button class="ghost" (click)="closeRegistration()" [disabled]="verificationBusy()"><mat-icon aria-hidden="true">logout</mat-icon> Cerrar sesión</button>
         </div>
       </section>
     }

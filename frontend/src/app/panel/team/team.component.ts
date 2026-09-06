@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
@@ -18,6 +18,8 @@ import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { InvitationRetryService } from "./invitation-retry.service";
+import { LatestRequest } from "../../core/services/latest-request";
+import { decodeWorkspaceDetail } from "../../core/services/workspace-response-decoders";
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Propietario",
@@ -55,6 +57,7 @@ export class TeamComponent {
   private workspaces = inject(WorkspaceService);
   private actions = inject(ActionDialogService);
   readonly invitationRetry = inject(InvitationRetryService);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly detail = signal<WorkspaceDetail | null>(null);
   readonly loading = signal(true);
@@ -92,6 +95,7 @@ export class TeamComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.requests.invalidate();
       this.detail.set(null);
       this.memberPageIndex.set(0);
       this.invitationPageIndex.set(0);
@@ -104,20 +108,34 @@ export class TeamComponent {
   }
 
   async load(): Promise<void> {
-    this.loading.set(true);
-    this.error.set(null);
     const wid = this.workspaces.currentId();
     if (wid == null) {
+      this.requests.invalidate();
+      this.detail.set(null);
       this.loading.set(false);
       return;
     }
+    const request = this.requests.begin(wid);
+    const memberPage = this.memberPageIndex() + 1;
+    const memberPerPage = this.memberPageSize();
+    const invitationPage = this.invitationPageIndex() + 1;
+    const invitationPerPage = this.invitationPageSize();
+    this.loading.set(true);
+    this.error.set(null);
     try {
       const detail = await this.api.get<WorkspaceDetail>(`/api/v1/workspaces/${wid}`, {
-        memberPage: this.memberPageIndex() + 1,
-        memberPerPage: this.memberPageSize(),
-        invitationPage: this.invitationPageIndex() + 1,
-        invitationPerPage: this.invitationPageSize(),
-      });
+        memberPage,
+        memberPerPage,
+        invitationPage,
+        invitationPerPage,
+      }, (value) => decodeWorkspaceDetail(value, {
+        workspaceId: wid,
+        memberPage,
+        memberPerPage,
+        invitationPage,
+        invitationPerPage,
+      }));
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       if (detail.members.length === 0 && detail.membersPage.total > 0 && this.memberPageIndex() > 0) {
         this.memberPageIndex.set(Math.max(0, Math.ceil(detail.membersPage.total / detail.membersPage.perPage) - 1));
         await this.load();
@@ -131,10 +149,11 @@ export class TeamComponent {
       this.detail.set(detail);
       this.renameValue.set(detail.workspace.name);
     } catch (err) {
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.detail.set(null);
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar el workspace");
     } finally {
-      this.loading.set(false);
+      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
   }
 

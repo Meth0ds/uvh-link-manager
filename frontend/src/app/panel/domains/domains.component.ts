@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -13,6 +13,12 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { LatestRequest } from "../../core/services/latest-request";
+import {
+  decodeCreatedDomainResponse,
+  decodeDomainsResponse,
+  decodeDomainStateResponse,
+} from "../../core/services/domain-response-decoders";
 
 const STATE_LABEL: Record<DomainState, string> = {
   pending: "Pendiente",
@@ -64,6 +70,8 @@ export class DomainsComponent {
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
   private actions = inject(ActionDialogService);
+  private readonly loadRequests = new LatestRequest(inject(DestroyRef));
+  private readonly pollRequests = new LatestRequest(inject(DestroyRef));
 
   readonly domains = signal<DomainDto[]>([]);
   readonly loading = signal(true);
@@ -105,6 +113,12 @@ export class DomainsComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.loadRequests.invalidate();
+      this.pollRequests.invalidate();
+      this.domains.set([]);
+      this.error.set(null);
+      this.actionId.set(null);
+      this.verifyingId.set(null);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -114,15 +128,25 @@ export class DomainsComponent {
   }
 
   async load(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.loadRequests.invalidate();
+      this.domains.set([]);
+      this.loading.set(false);
+      return;
+    }
+    const request = this.loadRequests.begin(workspaceId);
     this.loading.set(true);
     this.error.set(null);
     try {
-      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains");
+      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+      if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.domains.set(domains);
     } catch (err) {
+      if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los dominios");
     } finally {
-      this.loading.set(false);
+      if (this.loadRequests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
   }
 
@@ -131,7 +155,11 @@ export class DomainsComponent {
     if (!domain || this.adding() || !this.canEdit()) return;
     this.adding.set(true);
     try {
-      const { domain: created } = await this.api.post<{ domain: DomainDto }>("/api/v1/domains", { domain });
+      const { domain: created } = await this.api.post<{ domain: DomainDto }>(
+        "/api/v1/domains",
+        { domain },
+        decodeCreatedDomainResponse,
+      );
       this.newDomain.set("");
       this.snackbar.open("Dominio añadido. Añade el registro TXT para verificar.", "Cerrar", { duration: 4000 });
       this.domains.update((d) => [created, ...d]);
@@ -144,16 +172,20 @@ export class DomainsComponent {
 
   async verify(d: DomainDto): Promise<void> {
     if (this.actionId() || !this.canEdit()) return;
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
     this.actionId.set(d.id);
     this.verifyingId.set(d.id);
     try {
       const revalidation = d.state === "active" || d.state === "verified" || d.state === "disabled";
       const path = `/api/v1/domains/${d.id}/${revalidation ? "revalidate" : "verify"}`;
-      const result = await this.api.post<{ state: DomainState }>(path);
+      const result = await this.api.post<{ state: DomainState }>(path, undefined, decodeDomainStateResponse);
+      if (this.workspaces.currentId() !== workspaceId) return;
       this.snackbar.open("Verificación DNS iniciada. Actualizaremos el estado automáticamente.", "Cerrar", { duration: 4000 });
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       void this.pollVerification(d.id);
     } catch (err) {
+      if (this.workspaces.currentId() !== workspaceId) return;
       this.snackbar.open(
         err instanceof ApiRequestError ? err.message : "No se pudo verificar el dominio",
         "Cerrar",
@@ -161,17 +193,24 @@ export class DomainsComponent {
       );
       void this.load();
     } finally {
-      this.verifyingId.set(null);
-      this.actionId.set(null);
+      if (this.workspaces.currentId() === workspaceId && this.actionId() === d.id) {
+        this.verifyingId.set(null);
+        this.actionId.set(null);
+      }
     }
   }
 
   private async pollVerification(id: number): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
+    const request = this.pollRequests.begin(workspaceId);
     const attempts = 15;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
+      if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
       try {
-        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains");
+        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+        if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
         this.domains.set(domains);
         const current = domains.find((domain) => domain.id === id);
         if (!current) return;
@@ -180,14 +219,23 @@ export class DomainsComponent {
         return;
       }
     }
-    this.snackbar.open("La comprobación sigue en cola. Puedes actualizar el estado dentro de unos minutos.", "Cerrar", { duration: 5000 });
+    if (this.pollRequests.isCurrent(request, this.workspaces.currentId())) {
+      this.snackbar.open("La comprobación sigue en cola. Puedes actualizar el estado dentro de unos minutos.", "Cerrar", { duration: 5000 });
+    }
   }
 
   async activate(d: DomainDto): Promise<void> {
     if (this.actionId() || !this.canEdit()) return;
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
     this.actionId.set(d.id);
     try {
-      const result = await this.api.post<{ state: DomainState }>(`/api/v1/domains/${d.id}/activate`);
+      const result = await this.api.post<{ state: DomainState }>(
+        `/api/v1/domains/${d.id}/activate`,
+        undefined,
+        decodeDomainStateResponse,
+      );
+      if (this.workspaces.currentId() !== workspaceId) return;
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       if (result.state === "provisioning") {
         this.snackbar.open("Emitiendo y validando el certificado…", "Cerrar", { duration: 3500 });
@@ -196,17 +244,23 @@ export class DomainsComponent {
         this.snackbar.open("Dominio activado", "Cerrar", { duration: 2500 });
       }
     } catch (err) {
+      if (this.workspaces.currentId() !== workspaceId) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.actionId.set(null);
+      if (this.workspaces.currentId() === workspaceId && this.actionId() === d.id) this.actionId.set(null);
     }
   }
 
   private async pollActivation(id: number): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
+    const request = this.pollRequests.begin(workspaceId);
     for (let attempt = 0; attempt < 30; attempt += 1) {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
+      if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
       try {
-        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains");
+        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+        if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
         this.domains.set(domains);
         const current = domains.find((domain) => domain.id === id);
         if (!current || current.state !== "provisioning") return;
@@ -214,7 +268,9 @@ export class DomainsComponent {
         return;
       }
     }
-    this.snackbar.open("La emisión continúa en segundo plano. El estado se actualizará al terminar.", "Cerrar", { duration: 5000 });
+    if (this.pollRequests.isCurrent(request, this.workspaces.currentId())) {
+      this.snackbar.open("La emisión continúa en segundo plano. El estado se actualizará al terminar.", "Cerrar", { duration: 5000 });
+    }
   }
 
   async disable(d: DomainDto): Promise<void> {

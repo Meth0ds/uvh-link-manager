@@ -1,6 +1,6 @@
 import { TestBed } from "@angular/core/testing";
 import { HttpClient, HttpErrorResponse, HttpHeaders } from "@angular/common/http";
-import { firstValueFrom, throwError } from "rxjs";
+import { firstValueFrom, of, throwError } from "rxjs";
 import { ApiRequestError, ApiService } from "./api.service";
 
 describe("ApiService retry advice", () => {
@@ -45,5 +45,23 @@ describe("ApiService retry advice", () => {
     await expectAsync(api.get("/api/v1/example")).toBeRejectedWith(
       new ApiRequestError("No se pudo conectar con el servidor", 0),
     );
+  });
+
+  it("rejects an invalid decoded response without exposing its body or decoder error", async () => {
+    http.get.and.returnValue(of({ accessToken: "must-not-leak" }));
+    const decoder = (): never => { throw new Error("decoder detail must-not-leak"); };
+
+    await expectAsync(api.get("/api/v1/auth/me", undefined, decoder)).toBeRejectedWith(
+      new ApiRequestError("El servidor devolvió una respuesta no válida", 502),
+    );
+  });
+
+  it("publishes only the value returned by a runtime decoder", async () => {
+    http.get.and.returnValue(of({ id: 7, ignored: "server-only" }));
+    const value = await api.get("/api/v1/example", undefined, (source) => ({
+      id: (source as { id: number }).id,
+    }));
+
+    expect(value).toEqual({ id: 7 });
   });
 });

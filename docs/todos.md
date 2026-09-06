@@ -1,11 +1,21 @@
 # UVH — TODOs técnicos, de cuenta y de lanzamiento
 
-Última revisión manual: 5 de septiembre de 2026.
+Última revisión manual: 6 de septiembre de 2026.
 
 Este archivo distingue implementación de código y validación real. Una tarea
 marcada como implementada no equivale a estar desplegada, probada ni aprobada
-jurídicamente. En esta pasada no se ejecutaron pruebas automatizadas, por
-petición expresa.
+jurídicamente. El 5 de septiembre se autorizó una pasada de estabilidad en el
+entorno aislado `uvh_test`: 250 pruebas backend (2078 aserciones) y, tras el lote
+de sesión/Ajustes/enlaces/autenticación, flujos bearer, denuncia y diálogo de
+workspace, consola administrativa, borde HTTP de identidad, cobertura completa
+de Ajustes, contratos sensibles de cuenta, credenciales de workspace y handoff
+de enlaces, snapshots de Equipo/workspace y cierre de contratos runtime, 231 pruebas frontend finalizaron
+correctamente;
+también pasaron typecheck, build, lint PHP y
+`uvh:release-check`. Composer y dependencias npm de producción no tienen avisos
+conocidos; el árbol npm completo quedó en 0 críticos/altos y 5 moderados de la
+cadena local de desarrollo, documentados abajo. Esto no sustituye E2E,
+concurrencia multiproceso, infraestructura real ni revisión legal.
 
 La fotografía transversal que contrasta estos estados con rutas, controladores,
 migraciones y pantallas está en `docs/project-radiography-2026-09-04.md`.
@@ -51,8 +61,9 @@ implementación parcial.
 - [ ] **INVITATION-004 — Presupuestos de correo complementarios (código presente;
   operación pendiente).** Reserva SQL de cuenta/workspace/destinatario/IP/global,
   cooldown, rollback, métricas y limpieza de contadores implementados en BAF-136.
-  Falta aplicar migración 000032 en entorno autorizado, validar multiproceso,
-  calibrar valores, coordinar el keyring y conectar alertas. Procedimiento en
+  La migración 000032 y sus contratos pasaron en `uvh_test`; falta desplegarla en
+  cada entorno autorizado, validar multiproceso, calibrar valores, coordinar el
+  keyring y conectar alertas. Procedimiento en
   `docs/invitation-mail-budget-runbook.md`. No cerrar BAF-041 sólo por este código.
 - [x] **RELEASE-001 — Comprobación previa de esquema.** `uvh:release-check`
   de sólo lectura integrado en arranque de producción y healthchecks de
@@ -63,6 +74,108 @@ implementación parcial.
   conserva `Retry-After`; Equipo muestra espera por workspace/destinatario tras
   `429`, bloquea crear/reenviar/Enter durante ese plazo y permite cancelar.
   Sin reenvío automático ni persistencia del email. BAF-138; revisión estática.
+- [x] **FRONTEND-STABILITY-001 — Aislamiento y tolerancia a fallos.** Se cerraron
+  38 modos reproducibles BAF-143–180: respuestas tardías y datos/secretos entre
+  workspaces, sondeos tras destruir, Storage parcial o mal tipado, QR rechazado,
+  Object URLs prematuros, webviews sin `matchMedia` e IDs de workspace inválidos.
+  Los 125 casos frontend, typecheck y build pasaron. Falta E2E/QA visual real;
+  inventario en `docs/frontend-stability-batch-2026-09-05.md`.
+- [x] **FRONTEND-STABILITY-002 — Sesión y Ajustes bajo respuestas tardías.**
+  Generación monotónica impide que init/login/MFA/perfil/secretos de una cuenta
+  anterior resuciten o sobrescriban una sesión nueva; 401/403 sólo afectan a la
+  petición autenticada y generación que los originó, y la cabecera workspace se
+  limita a APIs tenant. Ajustes descarta listados obsoletos o destruidos, conserva
+  el resultado de mutaciones sensibles aunque falle el refresco, ofrece secreto
+  MFA manual si falla el QR y revierte la selección si la navegación se cancela.
+  Typecheck, build y 143 casos frontend pasaron; quedan E2E real y los candidatos
+  abiertos de `docs/bug-analysis-100-candidates-2026-09-05.md`.
+- [x] **FRONTEND-STABILITY-003 — Contrato y ciclo de vida del diálogo de enlaces.**
+  Fechas, UTM y reglas se validan antes de enviar con los mismos límites del
+  servidor; destino de regla vacío conserva su semántica de borrado. Tags y
+  reglas respetan el máximo de 20, los tags se deduplican sin distinguir
+  mayúsculas y un alias no disponible bloquea el guardado. Subscripciones,
+  debounce, cargas y submit ignoran finalizaciones posteriores al cierre. Cinco
+  regresiones directas elevan la suite a 148 casos; typecheck y build pasaron.
+- [x] **FRONTEND-STABILITY-004 — Flujos de acceso correlacionados.** Configuración
+  hCaptcha, login, MFA, recovery, registro/cambio de email y reenvío descartan
+  respuestas de otra revisión o de una vista destruida. El destino se captura al
+  iniciar, el challenge debe seguir vigente y el login interactivo no compite con
+  la redirección de visitantes ya autenticados. Los cambios de pestaña quedan
+  deshabilitados durante operaciones sensibles. Siete regresiones nuevas elevan
+  la suite a 155; typecheck y build pasaron.
+- [x] **FRONTEND-STABILITY-005 — Aceptación de invitaciones correlacionada.** La
+  inicialización, aceptar, rechazar y cambiar de cuenta sólo actualizan una vista
+  viva, con el mismo bearer y —cuando corresponde— la misma generación de sesión.
+  Un bearer nuevo no puede ser borrado por una respuesta antigua; fallo de
+  `auth.init()` abandona el loading con mensaje recuperable, y aceptación
+  confirmada se mantiene aunque falle el refresco de workspaces. Cinco pruebas
+  directas elevan la suite a 160; typecheck y build pasaron.
+- [x] **FRONTEND-STABILITY-006 — Recuperación y confirmaciones bearer.** Forgot,
+  reset, recuperación reforzada, verificación de email, exportación, eliminación,
+  cancelación e incidente descartan resultados de vistas destruidas. Los cambios
+  que limpian cookie actualizan el estado global sólo si conservan la generación
+  que los inició, evitando expulsar un login posterior. Reautenticación MFA tiene
+  una única navegación terminal. Catorce regresiones elevan la suite a 174;
+  typecheck y build pasaron.
+- [x] **FRONTEND-STABILITY-007 — Denuncia y diálogo de workspace.** La carga de
+  hCaptcha de denuncia aplica sólo la revisión más reciente; submit y alta/edición
+  de workspace capturan su contexto y no escriben, resetean ni cierran una vista
+  destruida. Se restauraron los seis casos históricos de denuncia y se añadieron
+  tres regresiones dirigidas entre ambos componentes. La suite completa alcanza
+  177 casos; typecheck y build pasaron sin tocar backend ni bases de datos.
+- [x] **FRONTEND-STABILITY-008 — Consola administrativa correlacionada.** Los
+  listados de recuperaciones, usuarios, denuncias, dominios, auditoría, outbox y
+  privacidad, además de overview y operaciones, descartan respuestas antiguas y
+  finalizaciones tras destroy. Cada petición captura filtros y paginación; una
+  recarga antigua no apaga la vigente y las acciones sobre filas en recarga se
+  deshabilitan. Once regresiones elevan la suite a 188; typecheck y build pasaron
+  sin tocar backend ni bases de datos.
+- [x] **FRONTEND-STABILITY-009 — Decodificación runtime de identidad.** El borde
+  HTTP permite decoders opt-in y convierte contratos inválidos en un error 502
+  controlado sin incluir cuerpos ni detalles internos. `AuthService` valida
+  identidad, resultados login/MFA y la lista completa de workspaces antes de
+  publicar estado. Seis regresiones elevan la suite a 194; typecheck y build
+  pasaron. BUG-083 sigue abierto hasta cubrir los demás DTO sensibles.
+- [x] **FRONTEND-STABILITY-010 — Intercalaciones completas de Ajustes.** Las
+  cargas de sesiones, exportación, impacto de eliminación y solicitudes de
+  privacidad cuentan con regresiones directas que demuestran última petición y
+  generación/página vigentes, incluido el loading. Tres casos nuevos elevan la
+  suite a 197; typecheck y build pasaron. BUG-070–073 quedan reclasificados como
+  confirmados/corregidos.
+- [x] **FRONTEND-STABILITY-011 — Contratos runtime sensibles de cuenta.** Todos
+  los resultados que `AuthService` consume para publicar sesión, tenant, MFA,
+  perfil, exportación, eliminación, sesiones o recovery codes se validan antes
+  de alterar estado o llegar a la interfaz. Los decoders rechazan estructuras,
+  enums, enteros, booleanos y secretos malformados mediante un 502 controlado,
+  sin adjuntar cuerpos ni detalles internos. Cinco regresiones nuevas elevan la
+  suite a 202; typecheck y build pasaron. BUG-083 sigue probable porque aún falta
+  inventariar y proteger los DTO sensibles consumidos fuera de `AuthService`.
+- [x] **FRONTEND-STABILITY-012 — Credenciales e intenciones en el borde HTTP.**
+  Listas y altas de tokens API, webhooks y entregas se reconstruyen de forma
+  atómica con límites, IDs, scopes, eventos, estados y booleanos comprobados. Los
+  secretos de una sola visualización se publican sólo si cumplen el contrato del
+  servidor. El handoff valida bearer, caducidad acotada y URL http/https sin
+  credenciales antes de abrir un diálogo o navegar. El modelo de entrega incorpora
+  `next_attempt_at`, ya emitido por Laravel. Siete regresiones elevan la suite a
+  209; typecheck y build pasaron. No se tocaron backend ni bases de datos.
+- [x] **FRONTEND-STABILITY-013 — Roles y Equipo ligados a la petición.** El
+  detalle de workspace se reconstruye por completo antes de publicarse y valida
+  roles, miembros, invitaciones, estados y paginación. El decoder queda ligado al
+  workspace, página y tamaño capturados, por lo que una respuesta bien formada
+  pero de otro tenant o contexto también se rechaza. La creación sólo acepta un
+  resultado que conceda `owner` antes de cerrar el diálogo. Cinco regresiones
+  nuevas elevan la suite a 214; typecheck y build pasaron sin tocar backend ni
+  bases de datos.
+- [x] **FRONTEND-STABILITY-014 — Cierre transversal de contratos runtime.** El
+  inventario de cuerpos JSON realmente consumidos queda cubierto por decoders o,
+  en actividad de workspace, por su lector runtime manual. Se añadieron enlaces,
+  detalle/reglas/analítica, dominios, todos los listados y snapshots de
+  Administración, privacidad de cuenta y operador, onboarding, configuración
+  pública y confirmaciones bearer. Los listados se ligan a página/tamaño y los
+  DTO se reconstruyen con límites, IDs, enums, booleanos y URLs verificadas antes
+  de publicarse. Diecisiete regresiones nuevas elevan la suite a 231; las 36
+  pruebas específicas de decoders, typecheck, build y suite completa pasaron.
+  BUG-083 queda confirmado y corregido. No se tocaron backend ni bases de datos.
 - [ ] **MAIL-002 — Operación y privacidad del outbox (implementación amplia;
   cierre pendiente).** Ya existen reintento administrativo acotado, antigüedad
   de cola, métricas sin contenido, purga configurable y compensación por
@@ -74,6 +187,20 @@ implementación parcial.
   pendiente).** La paginación y las purgas configurables de tokens, outbox, jobs
   fallidos y auditoría existen en código; falta aprobación jurídica/operativa y
   validación sobre una copia representativa.
+- [x] **DATA-002 — Snapshot coherente de exportación.** El presupuesto de filas
+  y las doce secciones del export se leen dentro de una transacción PostgreSQL
+  `REPEATABLE READ READ ONLY`. La transacción termina antes de serializar, cifrar,
+  escribir el artefacto o admitir correo, evitando I/O y locks prolongados. La
+  prueba dirigida (8 aserciones) y la suite completa de 250 pruebas/2078
+  aserciones pasaron en `uvh_test`; no se aplicaron migraciones ni se tocó
+  `uvh_local`.
+- [ ] **DEPENDENCY-001 — Avisos moderados del servidor de desarrollo.** Se
+  fijaron `fast-uri@3.1.7`, `less@4.9.1` y `qs@6.16.0`, eliminando todos los
+  avisos altos/críticos; typecheck, build y 101 casos pasaron después. Permanecen
+  cinco avisos moderados agregados por `webpack-dev-server → sockjs → uuid@8`.
+  SockJS sólo invoca `uuid.v4()` (el advisory afecta v3/v5/v6) y UVH liga `ng
+  serve` a `127.0.0.1`. No forzar `uuid@11`: esperar una actualización compatible
+  de Webpack/SockJS y repetir `npm audit` al actualizar el lockfile.
 - [ ] **OPS-UI-001 — Consola local de servicios (implementación inicial;
   cierre pendiente).** Validar y documentar `UVH Control` como interfaz para
   iniciar, detener y comprobar backend/frontend sin privilegios elevados ni
@@ -91,69 +218,73 @@ implementación parcial.
     imágenes, contenedores o volúmenes; detectar la recurrencia sin esperar el
     timeout completo.
   - [x] Mostrar migraciones reales mediante una consulta local sin contraseña:
-    la base `uvh_local` tiene 17 aplicadas y 16 pendientes a fecha de esta revisión.
+    la base `uvh_local` tiene 33 aplicadas y 3 pendientes (000032–000034) en la
+    comprobación de las 16:46 del 5 de septiembre; el panel no aplicó ninguna.
   - [x] Normalizar stdout/stderr vacíos en Windows PowerShell 5.1, fijar el
     estado del temporizador/proceso y contener excepciones del callback para que
-    no escapen al diálogo JIT. El estado inicial se repitió sin ese fallo el 5
-    de septiembre; Docker y ambos endpoints estaban detenidos/no disponibles.
+    no escapen al diálogo JIT. El acceso a `Exception.Response` también comprueba
+    primero que la propiedad exista bajo StrictMode. `Status` terminó sin error
+    el 5 de septiembre; Docker/PostgreSQL estaban sanos y ambos HTTP detenidos.
   - [ ] Validar visualmente los botones de la GUI, parada/reinicio completos,
     cierre de la ventana durante una operación y recuperación tras reiniciar
     Windows. No cerrar este punto sólo por funcionar en modo de consola.
 
 ### 2. Validación manual, E2E y resiliencia
 
-- [ ] **PRODUCT-VALID-001 — Primeros pasos.** Cinco casos backend y trece frontend
-  preparados, sin ejecutar. Falta typecheck/build, integración Dashboard/ruta lazy,
-  E2E con cambios de cuenta/workspace/rol, omitir/reanudar entre visitas y QA
-  visual/accesible. Detalle en `docs/getting-started-roadmap.md`.
-- [ ] **RELEASE-VALID-001 — Arranque y deriva del esquema.** Ocho casos en
-  `UvhReleaseCheckTest` preparados, sin ejecutar. Probar además la imagen real:
-  fallo antes de servir/procesar, pérdida posterior de readiness y migración
-  explícita disponible con base vacía. Sólo en entorno aislado autorizado.
-- [ ] **PRODUCT-VALID-002 — Actividad y atribución.** Seis casos preparados en
-  `AuditWorkspaceAttributionTest`: scope explícito, global, borrado, commit,
-  rollback y scope inválido. Requieren 000033 en `*_test`, sin ejecutar. Veinte
-  casos adicionales de `WorkspaceActivityTest` preparados para roles, aislamiento,
-  cursores, límites y redacción, sin ejecutar. Pantalla ya implementada; 29 casos
-  frontend preparados (18 componente, 5 DTO y 6 navegación), sin ejecutar. Faltan
-  typecheck/build, E2E, visual/accesibilidad, rendimiento, concurrencia y despliegue.
+- [ ] **PRODUCT-VALID-001 — Primeros pasos.** Los cinco casos backend y trece
+  frontend pasaron el 5 de septiembre dentro de las suites completas; typecheck
+  y build también pasaron. Faltan E2E con cambios de cuenta/workspace/rol,
+  omitir/reanudar entre visitas y QA visual/accesible. Detalle en
+  `docs/getting-started-roadmap.md`.
+- [ ] **RELEASE-VALID-001 — Arranque y deriva del esquema.** Los nueve casos de
+  `UvhReleaseCheckTest` pasaron en `uvh_test` y el comando de sólo lectura pasó
+  con las 36 migraciones aisladas aplicadas. Una migración limpia desde base
+  vacía y los contratos de esquema/release (12 casos, 290 aserciones) pasaron en
+  `uvh_clean_20260905_1648_test`, eliminada después. Probar además la imagen real:
+  fallo antes de servir/procesar y pérdida posterior de readiness.
+- [ ] **PRODUCT-VALID-002 — Actividad y atribución.** Los seis casos de
+  `AuditWorkspaceAttributionTest`, veinte de `WorkspaceActivityTest` y 29 casos
+  frontend pasaron el 5 de septiembre con 000033 aplicada sólo en `uvh_test`.
+  Typecheck y build también pasaron. Faltan E2E, visual/accesibilidad,
+  rendimiento, concurrencia y despliegue.
 - [ ] **INVITATION-UI-VALID-001 — Contrato y cuenta atrás.** Diecisiete casos
-  preparados en `retry-after.spec.ts`, `api.service.spec.ts`,
-  `invitation-retry.service.spec.ts` y `team.component.spec.ts`, sin ejecutar.
-  Falta typecheck/build, E2E, navegación durante peticiones, pestaña suspendida,
+  pasaron en `retry-after.spec.ts`, `api.service.spec.ts`,
+  `invitation-retry.service.spec.ts` y `team.component.spec.ts`; typecheck y build
+  también pasaron. Falta E2E, navegación durante peticiones, pestaña suspendida,
   teclado/lector de pantalla y visual móvil/temas. No confundir espera UI con cuota.
-- [ ] **INVITATION-VALID-001 — Ciclo de vida de invitaciones.** Ejecutar los
-  once casos preparados de `InvitationExpiryTest`: renovación, rollback,
+- [ ] **INVITATION-VALID-001 — Ciclo de vida de invitaciones.** Los once casos de
+  `InvitationExpiryTest` pasaron: renovación, rollback,
   generaciones, frontera temporal, listado sin escritura y conflictos.
-  Añadir los seis de `InvitationAuthorityLifecycleTest`: retorno de propiedad,
+  También pasaron los seis de `InvitationAuthorityLifecycleTest`: retorno de propiedad,
   rollback del segundo aviso, suspensión/restauración explícita o compensada,
-  rollback tras revocar invitaciones y degradación/promoción. Sin ejecutar.
-  Añadir nueve casos de `InvitationBudgetTest`: sesiones y formas del ID,
+  rollback tras revocar invitaciones y degradación/promoción; los nueve casos de
+  `InvitationBudgetTest` cubrieron sesiones y formas del ID,
   creación 99/100, cancelación que libera plaza, reenvíos vigentes/vencidos,
-  exceso histórico y rollback. Falta concurrencia real de varios administradores.
-  Añadir trece casos de `InvitationMailBudgetTest`: dimensiones compartidas,
-  destinatario real, fallos SQL/outbox, autoridad/configuración, rotación y limpieza. Sin
-  ejecutar; el `TestCase` requiere 000032 y limpia contadores sólo en `*_test`.
+  exceso histórico y rollback; y los trece de `InvitationMailBudgetTest` cubrieron
+  dimensiones compartidas, destinatario real, fallos SQL/outbox,
+  autoridad/configuración, rotación y limpieza. Todo se ejecutó en `uvh_test`.
+  Falta concurrencia real de varios administradores.
   Faltan E2E del panel, carreras de aceptar/cancelar/reenviar, cambios de autoridad
   del invitador y eliminación de cuentas. No ejecutar contra `uvh_local`.
   Revisar el estado heredado de transiciones anteriores al parche antes de
   afirmar saneamiento histórico; no se ha aplicado ninguna reparación de datos.
-- [ ] **WORKSPACE-VALID-001 — Límites y concurrencia de propiedad.** Ejecutar
-  los seis casos preparados en `WorkspaceOwnershipLimitTest`: 19/20/21 al crear
+- [ ] **WORKSPACE-VALID-001 — Límites y concurrencia de propiedad.** Los seis
+  casos de `WorkspaceOwnershipLimitTest` pasaron: 19/20/21 al crear
   y transferir, pertenencias ajenas, salida de un propietario con exceso y
   reintento con el mismo recovery code tras liberar una plaza mediante borrado.
   Añadir validación multiproceso de crear/transferir y dos transferencias hacia
-  el mismo receptor con una plaza libre. Nada de esto se ha ejecutado.
+  el mismo receptor con una plaza libre; esa parte concurrente sigue pendiente.
 - [ ] **OUTBOX-VALID-001 — Matriz transaccional y de fallos.** Demostrar en una
   base aislada que cuenta/bearer/invitación y outbox confirman o revierten juntos;
   simular caída antes/después de commit, publicación perdida, worker detenido,
   proveedor caído, obsolescencia, agotamiento y compensación generacional.
   Incluir cambio/reset/finalización de recuperación, conservación del enlace
-  nuevo y rollback exterior de `PasswordNoticeAtomicityTest` (sin ejecutar).
+  nuevo y rollback exterior de `PasswordNoticeAtomicityTest` (casos unitarios pasados).
   Incluir también `SecurityNoticeAtomicityTest`: MFA y fallo del segundo aviso
-  de cambio de email, sin sobres/publicaciones parciales (sin ejecutar).
+  de cambio de email, sin sobres/publicaciones parciales (casos pasados).
   Añadir `WorkspaceNoticeAtomicityTest`: tokens, transferencia/borrado, webhook
-  ocupado y cancelación protectora con savepoint (sin ejecutar).
+  ocupado y cancelación protectora con savepoint (casos pasados). Siguen faltando
+  las caídas reales, procesos separados y observación operativa descritos arriba.
 - [ ] **CRYPTO-VALID-001 — Ceremonia de rotación.** Ejecutar en una copia el
   dry-run, recifrado, interrupción/reanudación, concurrencia, drenaje de jobs y
   tokens, rollback en ambos sentidos y retirada de la clave anterior según
@@ -308,7 +439,9 @@ confirmación del nuevo buzón. Falta validación E2E/concurrente antes de produ
   falle una escritura intermedia; un fallo parcial no puede reducir cuota ajena.
 - [ ] Simular indisponibilidad y contención del store compartido durante emisión,
   claim y complete; comprobar compensación de cuotas, reintento tras recarga y
-  caducidad final sin conservar el destino más de 24 horas.
+  caducidad final sin conservar el destino más de 24 horas. Cubierto ya el
+  rechazo de borrado al completar, la contención al liberar contadores y el
+  reintento del índice inverso; faltan caída multiproceso, emisión/claim y TTL real.
 - [x] Diseñar la purga/anonimización por fases para cuenta y membresías, con
   revocación inmediata, siete días de gracia y anonimización desde housekeeping.
 - [ ] Completar con asesoría jurídica la política para auditoría, analítica,
@@ -452,18 +585,21 @@ backlog no certifican cumplimiento legal.
 - [x] Cambio/reset de contraseña y finalización de recuperación reforzada
   confirman credenciales, revocaciones y aviso de incidente en un solo commit.
   Un fallo de admisión revierte la operación; la limpieza conserva explícitamente
-  el bearer nuevo. BAF-124/125; revisión estática, pruebas pendientes.
+  el bearer nuevo. BAF-124/125; pruebas automatizadas pasadas, fault injection pendiente.
 - [x] Alta/sustitución/desactivación de MFA, regeneración de recovery codes y
   avisos de ambos buzones en cambio de email se admiten con sus mutaciones.
   El fallo del segundo aviso revierte ambos; no se devuelven códigos nuevos si
-  la operación se revierte. BAF-126; pruebas preparadas, no ejecutadas.
+  la operación se revierte. BAF-126; pruebas automatizadas pasadas.
 - [x] Admitir avisos de token API y transferencia/borrado de workspace con sus
   mutaciones; preservar el recovery code si un webhook impide borrar. BAF-127/128.
 - [x] Intentar el aviso de cancelación de cuenta dentro de un savepoint: su fallo
   no puede mantener la eliminación programada. BAF-129; excepción documentada,
-  sin prometer correo recuperable cuando no se pudo admitir. Pruebas pendientes.
+  sin prometer correo recuperable cuando no se pudo admitir. Casos automatizados pasados.
 - [x] Los errores de webhook persistidos son genéricos y no incluyen IP, TLS,
   cURL, secretos ni URLs internas; los creadores bloqueados dejan de emitir.
+- [x] Reclamar durante diez minutos la publicación de cada entrega webhook
+  pendiente. Housekeeping no multiplica jobs si el worker está parado; un lease
+  vencido o un fallo inmediato conserva el reintento durable. BAF-142.
 - [x] El arranque de producción rechaza queue `sync/deferred/background/failover`,
   cache no compartida, `failed_jobs` desactivado, rate limits/retenciones fuera
   de rango, DB sin `verify-full` y secretos de ejemplo.
@@ -481,7 +617,7 @@ backlog no certifican cumplimiento legal.
   reintento acotado y compensación sin exponer destinatarios.
 - [x] Validar transportes efectivos, alias y `MAIL_URL`; impedir respaldos
   `log/array` en entrega real y exigir aceptación explícita del mailer sin
-  perder la parte de texto. BAF-122/123; contratos preparados, no ejecutados.
+  perder la parte de texto. BAF-122/123; contratos automatizados pasados.
 - [x] Documentar estados, cadencias, recuperación, presupuestos de reintento,
   compensación, conservación y evidencia pendiente en el runbook del outbox.
 - [ ] Conectar las señales de correo a alertas externas, aprobar la conservación
@@ -522,7 +658,7 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
     correlacionada con autorización y sin escrituras de progreso. Pantalla, menú,
     tarjeta Dashboard, omitir/reanudar por usuario/workspace y ocultación al observar
     las tres señales iniciales. Dominio/equipo opcionales. Cinco casos backend y
-    trece frontend preparados, sin ejecutar. `PRODUCT-VALID-001` permanece abierto;
+    trece frontend pasaron el 5 de septiembre. `PRODUCT-VALID-001` permanece abierto;
     detalles y límites en `docs/getting-started-roadmap.md`.
 - [x] **PRODUCT-002 — Actividad del workspace (`/app/activity`).** Añadir un
   registro paginado para propietarios y administradores con actor, acción,
@@ -532,19 +668,25 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
   actual: cada detalle de enlace muestra sus últimos 50 eventos, sin paginación
   ni vista transversal del workspace.
   - Base iniciada: migración 000033 para atribución durable, argumento opcional
-    de auditoría e integración en controladores/jobs principales. No aplicada;
-    seis casos preparados, sin ejecutar. API owner/admin con cursor cifrado ligado
+    de auditoría e integración en controladores/jobs principales. Aplicada sólo
+    en `uvh_test`, no en `uvh_local`;
+    seis casos pasaron en `uvh_test`. API owner/admin con cursor cifrado ligado
     a contexto, catálogo cerrado, DTO mínimo y límites operativos implementada;
-    veinte casos API preparados, sin ejecutar. Pantalla y navegación owner/admin
+    veinte casos API pasaron. Pantalla y navegación owner/admin
     implementadas: DTO separado/minimizado, estados de error y cobertura, páginas
     manuales de 25 hasta 500, invalidación por contexto y respuesta tardía, sin
-    persistir cursores ni reintentar solos. 29 casos frontend preparados, sin
-    ejecutar. `PRODUCT-VALID-002` sigue abierto; esto no acredita producción.
+    persistir cursores ni reintentar solos. Los 29 casos frontend, typecheck y
+    build pasaron. `PRODUCT-VALID-002` sigue abierto; esto no acredita producción.
     Plan, garantías y despliegue en `docs/workspace-activity-roadmap.md`.
 - [ ] **PRODUCT-003 — Uso y límites (`/app/usage`).** Exponer consumo frente a
   cuotas reales de enlaces, dominios, miembros, tokens, webhooks y retención de
   analítica. Indicar qué operación alcanzó un límite y cómo liberar capacidad,
   sin presentar precios, upgrades o capacidades que todavía no existen.
+  - Base backend implementada antes de pausar nuevas funciones: constantes de
+    política compartidas, GET agregado y minimizado por rol, throttle por cuenta,
+    índices 000034 y fallo cerrado ante cuota/esquema ausentes. Sus doce casos
+    pasaron en `uvh_test`; 000034 no se aplicó a `uvh_local`. Falta la UI y la
+    validación E2E/operativa, por lo que PRODUCT-003 permanece abierto.
 - [ ] **PRODUCT-004 — Centro de notificaciones (`/app/notifications`).** Crear
   una bandeja durable, paginada y deduplicada para dominios/DNS/TLS, webhooks
   agotados, enlaces próximos a expirar o agotar clics, tokens próximos a caducar,
@@ -682,6 +824,12 @@ validan la seguridad, el modelo legal ni el alcance de UVH:
 - [x] Actualizar documentación de API para challenges MFA, recovery codes,
   dominios, errores `409/429/503`, truncado de listados y semántica webhook al
   menos una vez con deduplicación por `event_id`.
-- [ ] Cuando se autoricen pruebas, ejecutar typecheck/build/suite Angular,
-  PHPUnit en `uvh_test`, migración limpia, concurrencia multiproceso y E2E. No
-  usar nunca migraciones destructivas de pruebas contra `uvh_local`.
+- [x] Ejecutar typecheck, build, suite Angular y PHPUnit sobre `uvh_test`: pasaron
+  el 5 de septiembre (101 frontend; 244 backend/2038 aserciones). Lint PHP,
+  Composer audit y release check también pasaron. npm quedó sin críticos/altos y
+  con cinco moderados de desarrollo mitigados/documentados en `DEPENDENCY-001`.
+  000034 se aplicó sólo a `uvh_test`; `uvh_local` no se migró.
+- [x] Ejecutar migración limpia desde cero en base aislada: las 36 migraciones,
+  release check y 12 casos/290 aserciones pasaron; la base temporal se eliminó.
+- [ ] Ejecutar concurrencia multiproceso y E2E. No usar nunca migraciones
+  destructivas de pruebas contra `uvh_local`.

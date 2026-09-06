@@ -473,7 +473,9 @@ function Stop-UvhLocal {
     $frontend = Stop-Frontend
     $compose = ''
     if (Get-Command docker -ErrorAction SilentlyContinue) {
-        $compose = Invoke-UvhCompose -Arguments @('stop') -AllowFailure
+        # Propagate a failed stop to the CLI/UI. Restart must not start services
+        # after a partial shutdown or claim success while containers still run.
+        $compose = Invoke-UvhCompose -Arguments @('stop')
     }
 
     return (($frontend, $compose | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "`r`n")
@@ -499,8 +501,15 @@ function Test-HttpEndpoint {
 
         return "$availability · HTTP $([int] $response.StatusCode) · ${elapsed}s"
     } catch {
-        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
-            return "ERROR · HTTP $([int] $_.Exception.Response.StatusCode)"
+        # PowerShell 5.1 WebException usually exposes Response, whereas newer
+        # connection/timeout exceptions may not. StrictMode turns a direct read
+        # of that absent property into the panel-wide NULL/runtime failure.
+        $responseProperty = $_.Exception.PSObject.Properties['Response']
+        if ($null -ne $responseProperty -and $null -ne $responseProperty.Value) {
+            $statusProperty = $responseProperty.Value.PSObject.Properties['StatusCode']
+            if ($null -ne $statusProperty -and $null -ne $statusProperty.Value) {
+                return "ERROR · HTTP $([int] $statusProperty.Value)"
+            }
         }
         return "NO DISPONIBLE · $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 1))s"
     }

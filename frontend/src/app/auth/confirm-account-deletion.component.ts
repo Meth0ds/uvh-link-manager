@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -7,6 +7,8 @@ import { AuthShellComponent } from "./auth-shell.component";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { AuthService } from "../core/services/auth.service";
 import { authBearer } from "./auth-bearer";
+import { LatestRequest } from "../core/services/latest-request";
+import { decodeAccountDeletionConfirmation } from "../core/services/public-action-response-decoders";
 
 @Component({
   selector: "app-confirm-account-deletion",
@@ -35,6 +37,7 @@ export class ConfirmAccountDeletionComponent {
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
   private location = inject(Location);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
 
   readonly busy = signal(false);
@@ -53,17 +56,25 @@ export class ConfirmAccountDeletionComponent {
 
   async confirm(): Promise<void> {
     if (this.busy() || this.done() || this.error()) return;
+    const generation = this.auth.sessionGeneration();
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     try {
-      const result = await this.api.post<{ ok: true; executeAfter: string }>("/api/v1/auth/account-deletion/confirm", { token: this.token });
-      this.auth.accountSignedOut();
+      const result = await this.api.post<{ ok: true; executeAfter: string }>(
+        "/api/v1/auth/account-deletion/confirm",
+        { token: this.token },
+        decodeAccountDeletionConfirmation,
+      );
+      this.auth.accountSignedOut(generation);
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.done.set(true);
       this.message.set(`El acceso está cerrado. La anonimización se ejecutará a partir de ${new Date(result.executeAfter).toLocaleString()}. Revisa tu email para conservar el enlace de cancelación.`);
     } catch (error) {
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.error.set(true);
       this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo completar la confirmación.");
     } finally {
-      this.busy.set(false);
+      if (this.requests.isCurrent(request, this.token)) this.busy.set(false);
     }
   }
 }

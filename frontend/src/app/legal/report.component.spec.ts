@@ -1,16 +1,31 @@
-import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
+import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormControl } from "@angular/forms";
 import { provideRouter } from "@angular/router";
+
+import { HCaptchaWidgetComponent } from "../auth/hcaptcha-widget.component";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { normalizeReportReference, ReportComponent, reportReferenceValidator } from "./report.component";
-import { HCaptchaWidgetComponent } from "../auth/hcaptcha-widget.component";
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((onResolve) => { resolve = onResolve; });
+  return { promise, resolve };
+}
 
 @Component({ selector: "app-hcaptcha-widget", standalone: true, template: "" })
 class FakeHCaptchaWidgetComponent {
   @Input() siteKey = "";
   @Output() readonly tokenChange = new EventEmitter<string>();
-  reset(): void { this.tokenChange.emit(""); }
+
+  reset(): void {
+    this.tokenChange.emit("");
+  }
 }
 
 describe("abuse report reference", () => {
@@ -128,5 +143,36 @@ describe("ReportComponent", () => {
 
     expect(api.post).not.toHaveBeenCalled();
     expect(component.error()).toContain("comprobación antiabuso");
+  });
+
+  it("keeps the newest hCaptcha configuration", async () => {
+    component.hcaptchaSiteKey.set("");
+    const older = deferred<{ hcaptcha: { enabled: boolean; siteKey: string } }>();
+    const newer = deferred<{ hcaptcha: { enabled: boolean; siteKey: string } }>();
+    api.get.and.returnValues(older.promise, newer.promise);
+
+    const first = component.loadCaptchaConfiguration();
+    const second = component.loadCaptchaConfiguration();
+    newer.resolve({ hcaptcha: { enabled: true, siteKey: "10000000-ffff-ffff-ffff-000000000002" } });
+    await second;
+    older.resolve({ hcaptcha: { enabled: true, siteKey: "10000000-ffff-ffff-ffff-000000000003" } });
+    await first;
+
+    expect(component.hcaptchaSiteKey()).toBe("10000000-ffff-ffff-ffff-000000000002");
+  });
+
+  it("does not reset or mark a destroyed report view as completed", async () => {
+    const response = deferred<unknown>();
+    api.post.and.returnValue(response.promise);
+    component.form.setValue({ link: "safe-alias", reason: "Otro", details: "", email: "" });
+    component.onCaptchaToken("captcha-token");
+
+    const submission = component.submit();
+    fixture.destroy();
+    response.resolve({});
+    await submission;
+
+    expect(component.done()).toBeFalse();
+    expect(component.form.controls.link.value).toBe("safe-alias");
   });
 });

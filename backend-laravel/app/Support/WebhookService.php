@@ -5,14 +5,18 @@ namespace App\Support;
 use App\Jobs\WebhookDeliveryJob;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class WebhookService
 {
     private const MAX_PENDING_DELIVERIES_PER_WORKSPACE = 1000;
+
     private const CONFIG_LOCK_SECONDS = 30;
+
+    private const QUEUE_LEASE_MINUTES = 10;
+
     public const EVENTS = [
         'link.created',
         'link.updated',
@@ -124,10 +128,6 @@ class WebhookService
     /** Queue an already-pending durable delivery without changing its state. */
     public static function enqueueExisting(int $deliveryId): void
     {
-        if (! WebhookDelivery::where('id', $deliveryId)->where('status', 'pending')->exists()) {
-            return;
-        }
-
         self::dispatchReserved([$deliveryId]);
     }
 
@@ -176,10 +176,12 @@ class WebhookService
                 'webhook_id' => (int) $webhookId,
                 'exception' => $e::class,
             ]);
+
             return;
         }
         if (! $acquired) {
             OperationalMetrics::increment('lock.unavailable');
+
             return;
         }
 
@@ -202,6 +204,7 @@ class WebhookService
                         'locked_at' => null,
                     ]);
                     OperationalMetrics::increment('webhook.failed');
+
                     return null;
                 }
                 $creatorAuthorized = $webhook->created_by === null
@@ -309,10 +312,12 @@ class WebhookService
                 'webhook_id' => $webhookId,
                 'exception' => $e::class,
             ]);
+
             return [false, null];
         }
         if (! $acquired) {
             OperationalMetrics::increment('lock.unavailable');
+
             return [false, null];
         }
 
@@ -473,8 +478,8 @@ class WebhookService
     private static function uuid(): string
     {
         $bytes = random_bytes(16);
-        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
-        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0F) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3F) | 0x80);
 
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
     }
@@ -490,7 +495,7 @@ class WebhookService
      * delivery cannot be preserved; a manual ping may return an empty list to
      * produce the explicit capacity response in its controller.
      *
-     * @param callable(int): array<int, int> $reserve
+     * @param  callable(int): array<int, int>  $reserve
      * @return array<int, int>
      */
     private static function reserveWorkspaceDeliveries(int $workspaceId, callable $reserve): array
@@ -574,6 +579,7 @@ class WebhookService
         foreach ($deliveryIds as $id) {
             if (DB::transactionLevel() < 1) {
                 self::publishDelivery($id);
+
                 continue;
             }
             try {
@@ -594,10 +600,46 @@ class WebhookService
 
     private static function publishDelivery(int $id): void
     {
+        $claimedAt = now();
+        $staleBefore = $claimedAt->copy()->subMinutes(self::QUEUE_LEASE_MINUTES);
+        try {
+            // Claim publication before adding a queue job. If workers are down,
+            // repeated housekeeping passes cannot enqueue the same durable row
+            // every minute. locked_at is internal and preserves the public
+            // next_attempt_at meaning; an expired claim recovers a lost job.
+            $claimed = WebhookDelivery::where('id', $id)->where('status', 'pending')
+                ->where(function ($query) {
+                    $query->whereNull('next_attempt_at')->orWhere('next_attempt_at', '<=', now());
+                })
+                ->where(function ($query) use ($staleBefore) {
+                    $query->whereNull('locked_at')->orWhere('locked_at', '<=', $staleBefore);
+                })
+                ->update(['locked_at' => $claimedAt]);
+        } catch (\Throwable $error) {
+            Log::error('[webhook] queue claim failed; delivery remains pending', [
+                'delivery_id' => $id,
+                'exception' => $error::class,
+            ]);
+
+            return;
+        }
+        if ($claimed !== 1) {
+            return;
+        }
+
         try {
             WebhookDeliveryJob::dispatch($id);
         } catch (\Throwable $error) {
-            Log::error('[webhook] queue dispatch failed; delivery remains pending', [
+            try {
+                // Reset only our lease. A synchronous worker may already have
+                // written a different retry time and that decision must win.
+                WebhookDelivery::where('id', $id)->where('status', 'pending')
+                    ->where('locked_at', $claimedAt)
+                    ->update(['locked_at' => null, 'next_attempt_at' => now()->addMinute()]);
+            } catch (\Throwable) {
+                // The bounded lease is the recovery path if persistence is down.
+            }
+            Log::error('[webhook] queue dispatch failed; delivery remains pending until lease retry', [
                 'delivery_id' => $id,
                 'exception' => $error::class,
             ]);

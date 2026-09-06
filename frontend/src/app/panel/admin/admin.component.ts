@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -27,6 +27,19 @@ import type {
   PrivacyRightType,
 } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
+import {
+  decodeAccountRecoveryDecision,
+  decodeAdminAuditPage,
+  decodeAdminDomainsPage,
+  decodeAdminMailPage,
+  decodeAdminOperations,
+  decodeAdminOverview,
+  decodeAdminRecoveriesPage,
+  decodeAdminReportsPage,
+  decodeAdminUsersPage,
+} from "../../core/services/admin-response-decoders";
+import { LatestRequest } from "../../core/services/latest-request";
+import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-decoders";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
@@ -103,9 +116,23 @@ const RECOVERY_LABELS: Record<AccountRecoveryStatus, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdminComponent {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly api = inject(ApiService);
   private readonly snackbar = inject(MatSnackBar);
   private readonly actions = inject(ActionDialogService);
+
+  // Each source owns its revision so an unrelated refresh cannot invalidate it.
+  // The guards also prevent queued HTTP continuations from writing after destroy.
+  private readonly reloadRequests = new LatestRequest(this.destroyRef);
+  private readonly overviewRequests = new LatestRequest(this.destroyRef);
+  private readonly operationsRequests = new LatestRequest(this.destroyRef);
+  private readonly usersRequests = new LatestRequest(this.destroyRef);
+  private readonly recoveriesRequests = new LatestRequest(this.destroyRef);
+  private readonly reportsRequests = new LatestRequest(this.destroyRef);
+  private readonly domainsRequests = new LatestRequest(this.destroyRef);
+  private readonly auditRequests = new LatestRequest(this.destroyRef);
+  private readonly mailRequests = new LatestRequest(this.destroyRef);
+  private readonly privacyLoadRequests = new LatestRequest(this.destroyRef);
 
   readonly overview = signal<AdminOverview | null>(null);
   readonly operations = signal<AdminOperations | null>(null);
@@ -191,6 +218,7 @@ export class AdminComponent {
   }
 
   async reloadAll(): Promise<void> {
+    const request = this.reloadRequests.begin(null);
     this.refreshing.set(true);
     await Promise.all([
       this.loadOverview(),
@@ -203,26 +231,35 @@ export class AdminComponent {
       this.loadMailOutbox(),
       this.loadPrivacyRequests(),
     ]);
+    if (!this.reloadRequests.isCurrent(request, null)) return;
     this.initialLoading.set(false);
     this.refreshing.set(false);
   }
 
   async loadRecoveries(): Promise<void> {
+    const query = this.recoveryQuery();
+    const status = this.recoveryStatus();
+    const page = this.recoveriesPage() + 1;
+    const perPage = this.recoveriesPageSize();
+    const context = JSON.stringify([query, status, page, perPage]);
+    const request = this.recoveriesRequests.begin(context);
     this.recoveriesLoading.set(true);
     this.recoveriesError.set(null);
     try {
       const response = await this.api.get<PageResponse<AdminAccountRecovery>>("/api/v1/admin/account-recoveries", {
-        q: this.recoveryQuery(),
-        status: this.recoveryStatus(),
-        page: this.recoveriesPage() + 1,
-        perPage: this.recoveriesPageSize(),
-      });
+        q: query,
+        status,
+        page,
+        perPage,
+      }, (value) => decodeAdminRecoveriesPage(value, { page, perPage }));
+      if (!this.recoveriesRequests.isCurrent(request, context)) return;
       this.recoveries.set(response.recoveries ?? []);
       this.recoveriesTotal.set(response.total);
     } catch (error) {
+      if (!this.recoveriesRequests.isCurrent(request, context)) return;
       this.recoveriesError.set(this.adminError(error, "No se pudieron cargar las recuperaciones"));
     } finally {
-      this.recoveriesLoading.set(false);
+      if (this.recoveriesRequests.isCurrent(request, context)) this.recoveriesLoading.set(false);
     }
   }
 
@@ -273,7 +310,7 @@ export class AdminComponent {
         decision,
         reasonCode,
         identityVerified: decision === "approve",
-      });
+      }, decodeAccountRecoveryDecision);
       const message = result.status === "approved"
         ? "Doble aprobación completada; se ha emitido un enlace de 30 minutos"
         : result.status === "in_review"
@@ -289,30 +326,42 @@ export class AdminComponent {
   }
 
   async loadOverview(): Promise<void> {
+    const request = this.overviewRequests.begin(null);
     this.summaryError.set(null);
     try {
-      this.overview.set(await this.api.get<AdminOverview>("/api/v1/admin/overview"));
+      const response = await this.api.get<AdminOverview>("/api/v1/admin/overview", undefined, decodeAdminOverview);
+      if (!this.overviewRequests.isCurrent(request, null)) return;
+      this.overview.set(response);
     } catch (error) {
+      if (!this.overviewRequests.isCurrent(request, null)) return;
       this.summaryError.set(this.adminError(error, "No se pudo cargar el resumen"));
     }
   }
 
   async loadUsers(): Promise<void> {
+    const query = this.userQuery();
+    const status = this.userStatus();
+    const page = this.usersPage() + 1;
+    const perPage = this.usersPageSize();
+    const context = JSON.stringify([query, status, page, perPage]);
+    const request = this.usersRequests.begin(context);
     this.usersLoading.set(true);
     this.usersError.set(null);
     try {
       const response = await this.api.get<PageResponse<AdminUser>>("/api/v1/admin/users", {
-        q: this.userQuery(),
-        status: this.userStatus(),
-        page: this.usersPage() + 1,
-        perPage: this.usersPageSize(),
-      });
+        q: query,
+        status,
+        page,
+        perPage,
+      }, (value) => decodeAdminUsersPage(value, { page, perPage }));
+      if (!this.usersRequests.isCurrent(request, context)) return;
       this.users.set(response.users ?? []);
       this.usersTotal.set(response.total);
     } catch (error) {
+      if (!this.usersRequests.isCurrent(request, context)) return;
       this.usersError.set(this.errorMessage(error, "No se pudieron cargar los usuarios"));
     } finally {
-      this.usersLoading.set(false);
+      if (this.usersRequests.isCurrent(request, context)) this.usersLoading.set(false);
     }
   }
 
@@ -393,21 +442,29 @@ export class AdminComponent {
   }
 
   async loadReports(): Promise<void> {
+    const query = this.reportQuery();
+    const status = this.reportStatus();
+    const page = this.reportsPage() + 1;
+    const perPage = this.reportsPageSize();
+    const context = JSON.stringify([query, status, page, perPage]);
+    const request = this.reportsRequests.begin(context);
     this.reportsLoading.set(true);
     this.reportsError.set(null);
     try {
       const response = await this.api.get<PageResponse<AdminReport>>("/api/v1/admin/reports", {
-        q: this.reportQuery(),
-        status: this.reportStatus(),
-        page: this.reportsPage() + 1,
-        perPage: this.reportsPageSize(),
-      });
+        q: query,
+        status,
+        page,
+        perPage,
+      }, (value) => decodeAdminReportsPage(value, { page, perPage }));
+      if (!this.reportsRequests.isCurrent(request, context)) return;
       this.reports.set(response.reports ?? []);
       this.reportsTotal.set(response.total);
     } catch (error) {
+      if (!this.reportsRequests.isCurrent(request, context)) return;
       this.reportsError.set(this.errorMessage(error, "No se pudieron cargar las denuncias"));
     } finally {
-      this.reportsLoading.set(false);
+      if (this.reportsRequests.isCurrent(request, context)) this.reportsLoading.set(false);
     }
   }
 
@@ -470,21 +527,29 @@ export class AdminComponent {
   }
 
   async loadDomains(): Promise<void> {
+    const query = this.domainQuery();
+    const state = this.domainState();
+    const page = this.domainsPage() + 1;
+    const perPage = this.domainsPageSize();
+    const context = JSON.stringify([query, state, page, perPage]);
+    const request = this.domainsRequests.begin(context);
     this.domainsLoading.set(true);
     this.domainsError.set(null);
     try {
       const response = await this.api.get<PageResponse<AdminDomain>>("/api/v1/admin/domains", {
-        q: this.domainQuery(),
-        state: this.domainState(),
-        page: this.domainsPage() + 1,
-        perPage: this.domainsPageSize(),
-      });
+        q: query,
+        state,
+        page,
+        perPage,
+      }, (value) => decodeAdminDomainsPage(value, { page, perPage }));
+      if (!this.domainsRequests.isCurrent(request, context)) return;
       this.domains.set(response.domains ?? []);
       this.domainsTotal.set(response.total);
     } catch (error) {
+      if (!this.domainsRequests.isCurrent(request, context)) return;
       this.domainsError.set(this.errorMessage(error, "No se pudieron cargar los dominios"));
     } finally {
-      this.domainsLoading.set(false);
+      if (this.domainsRequests.isCurrent(request, context)) this.domainsLoading.set(false);
     }
   }
 
@@ -507,20 +572,27 @@ export class AdminComponent {
   }
 
   async loadAudit(): Promise<void> {
+    const query = this.auditQuery();
+    const page = this.auditPage() + 1;
+    const perPage = this.auditPageSize();
+    const context = JSON.stringify([query, page, perPage]);
+    const request = this.auditRequests.begin(context);
     this.auditLoading.set(true);
     this.auditError.set(null);
     try {
       const response = await this.api.get<PageResponse<AuditEvent>>("/api/v1/admin/audit", {
-        q: this.auditQuery(),
-        page: this.auditPage() + 1,
-        perPage: this.auditPageSize(),
-      });
+        q: query,
+        page,
+        perPage,
+      }, (value) => decodeAdminAuditPage(value, { page, perPage }));
+      if (!this.auditRequests.isCurrent(request, context)) return;
       this.events.set(response.events ?? []);
       this.auditTotal.set(response.total);
     } catch (error) {
+      if (!this.auditRequests.isCurrent(request, context)) return;
       this.auditError.set(this.errorMessage(error, "No se pudo cargar la auditoría"));
     } finally {
-      this.auditLoading.set(false);
+      if (this.auditRequests.isCurrent(request, context)) this.auditLoading.set(false);
     }
   }
 
@@ -537,32 +609,43 @@ export class AdminComponent {
   }
 
   async loadOperations(): Promise<void> {
+    const request = this.operationsRequests.begin(null);
     this.operationsLoading.set(true);
     this.operationsError.set(null);
     try {
-      this.operations.set(await this.api.get<AdminOperations>("/api/v1/admin/operations"));
+      const response = await this.api.get<AdminOperations>("/api/v1/admin/operations", undefined, decodeAdminOperations);
+      if (!this.operationsRequests.isCurrent(request, null)) return;
+      this.operations.set(response);
     } catch (error) {
+      if (!this.operationsRequests.isCurrent(request, null)) return;
       this.operationsError.set(this.errorMessage(error, "No se pudo leer el estado operativo"));
     } finally {
-      this.operationsLoading.set(false);
+      if (this.operationsRequests.isCurrent(request, null)) this.operationsLoading.set(false);
     }
   }
 
   async loadMailOutbox(): Promise<void> {
+    const status = this.mailStatus();
+    const page = this.mailPage() + 1;
+    const perPage = this.mailPageSize();
+    const context = JSON.stringify([status, page, perPage]);
+    const request = this.mailRequests.begin(context);
     this.mailLoading.set(true);
     this.mailError.set(null);
     try {
       const response = await this.api.get<PageResponse<AdminMailOutboxMessage>>("/api/v1/admin/mail-outbox", {
-        status: this.mailStatus(),
-        page: this.mailPage() + 1,
-        perPage: this.mailPageSize(),
-      });
+        status,
+        page,
+        perPage,
+      }, (value) => decodeAdminMailPage(value, { page, perPage }));
+      if (!this.mailRequests.isCurrent(request, context)) return;
       this.mailMessages.set(response.messages ?? []);
       this.mailTotal.set(response.total);
     } catch (error) {
+      if (!this.mailRequests.isCurrent(request, context)) return;
       this.mailError.set(this.adminError(error, "No se pudo cargar el outbox de correo"));
     } finally {
-      this.mailLoading.set(false);
+      if (this.mailRequests.isCurrent(request, context)) this.mailLoading.set(false);
     }
   }
 
@@ -616,21 +699,29 @@ export class AdminComponent {
   }
 
   async loadPrivacyRequests(): Promise<void> {
+    const status = this.privacyStatus();
+    const type = this.privacyType();
+    const page = this.privacyPage() + 1;
+    const perPage = this.privacyPageSize();
+    const context = JSON.stringify([status, type, page, perPage]);
+    const request = this.privacyLoadRequests.begin(context);
     this.privacyLoading.set(true);
     this.privacyError.set(null);
     try {
       const response = await this.api.get<PageResponse<PrivacyRightRequest>>("/api/v1/admin/privacy-requests", {
-        status: this.privacyStatus(),
-        type: this.privacyType(),
-        page: this.privacyPage() + 1,
-        perPage: this.privacyPageSize(),
-      });
+        status,
+        type,
+        page,
+        perPage,
+      }, (value) => decodePrivacyRequestsPage(value, { page, perPage, admin: true }));
+      if (!this.privacyLoadRequests.isCurrent(request, context)) return;
       this.privacyRequests.set(response.requests ?? []);
       this.privacyTotal.set(response.total);
     } catch (error) {
+      if (!this.privacyLoadRequests.isCurrent(request, context)) return;
       this.privacyError.set(this.adminError(error, "No se pudieron cargar las solicitudes de privacidad"));
     } finally {
-      this.privacyLoading.set(false);
+      if (this.privacyLoadRequests.isCurrent(request, context)) this.privacyLoading.set(false);
     }
   }
 

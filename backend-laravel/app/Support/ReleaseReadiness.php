@@ -42,6 +42,11 @@ final class ReleaseReadiness
             if (! Schema::hasColumn('audit_events', 'workspace_id')) {
                 $errors[] = 'Falta la atribución de actividad por workspace (000033).';
             }
+            if (! Schema::hasIndex('custom_domains', 'workspace_usage_domains_idx')
+                || ! Schema::hasIndex('api_tokens', 'workspace_usage_tokens_idx')
+                || ! Schema::hasIndex('webhooks', 'workspace_usage_webhooks_idx')) {
+                $errors[] = 'Faltan índices acotados de uso por workspace (000034).';
+            }
         } catch (\Throwable) {
             $errors[] = 'No se pudo comprobar el esquema del release.';
         }

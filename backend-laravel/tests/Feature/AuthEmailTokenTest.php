@@ -12,6 +12,8 @@ class AuthEmailTokenTest extends TestCase
 {
     private const CSRF = 'email-token-csrf';
 
+    private const CAPTCHA = 'email-token-test-captcha';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -33,13 +35,21 @@ class AuthEmailTokenTest extends TestCase
             'created_at' => now()->subSeconds(61),
         ]);
 
-        $this->postJson('/api/v1/auth/resend-verification', ['email' => $user->email])
+        // These are unauthenticated anti-enumeration endpoints, so their
+        // tests must exercise the same server-verified hCaptcha boundary.
+        $this->postJson('/api/v1/auth/resend-verification', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])
             ->assertOk()->assertExactJson(['ok' => true]);
         $currentId = DB::table('email_tokens')->where('user_id', $user->id)->where('kind', 'verify')->value('id');
         $this->assertNotSame(str_repeat('a', 64), $currentId);
         $this->assertDatabaseCount('email_tokens', 1);
 
-        $this->postJson('/api/v1/auth/resend-verification', ['email' => $user->email])
+        $this->postJson('/api/v1/auth/resend-verification', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])
             ->assertOk()->assertExactJson(['ok' => true]);
         $this->assertSame($currentId, DB::table('email_tokens')->where('user_id', $user->id)->value('id'));
         Queue::assertPushed(DeliverMailOutboxJob::class, 1);
@@ -49,12 +59,18 @@ class AuthEmailTokenTest extends TestCase
     {
         $user = User::factory()->create(['email' => 'reset-cooldown@example.test', 'email_verified_at' => now()]);
 
-        $this->postJson('/api/v1/auth/forgot-password', ['email' => $user->email])
+        $this->postJson('/api/v1/auth/forgot-password', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])
             ->assertOk()->assertExactJson(['ok' => true]);
         $firstId = DB::table('email_tokens')->where('user_id', $user->id)->where('kind', 'reset')->value('id');
         $this->assertIsString($firstId);
 
-        $this->postJson('/api/v1/auth/forgot-password', ['email' => $user->email])
+        $this->postJson('/api/v1/auth/forgot-password', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])
             ->assertOk()->assertExactJson(['ok' => true]);
         $this->assertSame($firstId, DB::table('email_tokens')->where('user_id', $user->id)->value('id'));
         $this->assertDatabaseCount('email_tokens', 1);

@@ -20,7 +20,9 @@ final class WorkspaceUsageController
                 DB::statement("SET LOCAL statement_timeout = '5s'");
                 $membership = WorkspaceAccess::getMembershipLocked($user->id, $id, 'viewer',
                     expectedSecurityVersion: (int) $user->security_version);
-                if (! $membership) return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+                if (! $membership) {
+                    return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+                }
 
                 $editor = WorkspaceAccess::roleAtLeast($membership->role, 'editor');
                 $admin = WorkspaceAccess::roleAtLeast($membership->role, 'admin');
@@ -47,11 +49,14 @@ final class WorkspaceUsageController
                         AND i.status = 'pending' AND i.expires_at > ?) AS invitations_used", [$asOf]);
                 }
                 $row = $query->first();
-                if (! $row) throw new \RuntimeException('Missing usage snapshot');
+                if (! $row) {
+                    throw new \RuntimeException('Missing usage snapshot');
+                }
                 $linksLimit = $row->links_limit;
                 // Missing/corrupt configuration is not an unlimited plan. Keep
                 // it explicit without fabricating a default from registration.
                 $validLinksLimit = $linksLimit !== null && (int) $linksLimit >= 0;
+
                 return response()->json([
                     'workspaceId' => $id, 'role' => $membership->role, 'measuredAt' => $asOf->toIso8601String(),
                     'resources' => [

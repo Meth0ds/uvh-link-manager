@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -7,6 +7,7 @@ import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { AuthShellComponent } from "./auth-shell.component";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { authBearer } from "./auth-bearer";
+import { LatestRequest } from "../core/services/latest-request";
 
 @Component({
   selector: "app-confirm-data-export",
@@ -39,6 +40,7 @@ export class ConfirmDataExportComponent {
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private location = inject(Location);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
 
   readonly busy = signal(false);
@@ -57,16 +59,22 @@ export class ConfirmDataExportComponent {
 
   async confirm(): Promise<void> {
     if (this.busy() || this.done() || !this.token) return;
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     try {
       await this.api.post("/api/v1/auth/data-export/confirm", { token: this.token });
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.message.set("Estamos preparando el archivo en segundo plano. Recibirás un enlace de descarga de un solo uso cuando esté listo.");
     } catch (error) {
-      this.message.set(error instanceof ApiRequestError ? error.message : "El enlace no es válido o ha caducado.");
+      if (this.requests.isCurrent(request, this.token)) {
+        this.message.set(error instanceof ApiRequestError ? error.message : "El enlace no es válido o ha caducado.");
+      }
     } finally {
-      this.busy.set(false);
-      this.done.set(true);
+      if (this.requests.isCurrent(request, this.token)) {
+        this.busy.set(false);
+        this.done.set(true);
+      }
     }
   }
 }

@@ -37,6 +37,7 @@ class LinkIntentRegistry
                 }
                 DB::table('link_intent_claims')->where('intent_hash', $intentHash)
                     ->update(['expires_at' => $expiry]);
+
                 return;
             }
             if (DB::table('link_intent_claims')->where('user_id', $userId)->count() >= self::MAX_ACTIVE_PER_USER) {
@@ -66,22 +67,47 @@ class LinkIntentRegistry
 
         foreach ($rows as $row) {
             $intentHash = (string) $row->intent_hash;
-            $lock = Cache::lock('link-intent-lock:'.$intentHash, 5);
-            if (! $lock->get()) {
+            try {
+                $lock = Cache::lock('link-intent-lock:'.$intentHash, 5);
+                if (! $lock->get()) {
+                    $busy++;
+
+                    continue;
+                }
+            } catch (\Throwable) {
                 $busy++;
+
                 continue;
             }
 
             try {
-                $record = Cache::get('link-intent:'.$intentHash);
-                if (is_array($record) && (int) ($record['claimed_by'] ?? 0) === $userId) {
-                    Cache::forget('link-intent:'.$intentHash);
-                    self::releaseCounters($record);
-                    $revoked++;
+                try {
+                    $record = Cache::get('link-intent:'.$intentHash);
+                    if (is_array($record) && (int) ($record['claimed_by'] ?? 0) === $userId) {
+                        if (! Cache::forget('link-intent:'.$intentHash)) {
+                            // Retain the inverse index so a later security or
+                            // housekeeping pass can retry the revocation.
+                            $busy++;
+
+                            continue;
+                        }
+                        self::releaseCounters($record);
+                        $revoked++;
+                    }
+                    self::forget($intentHash);
+                } catch (\Throwable) {
+                    // One unavailable cache entry must not prevent revocation
+                    // of the remaining handoffs in this bounded batch.
+                    $busy++;
                 }
-                self::forget($intentHash);
             } finally {
-                $lock->release();
+                try {
+                    $lock->release();
+                } catch (\Throwable) {
+                    // The five-second lease bounds stale ownership. Revocation
+                    // state above remains authoritative after a release error.
+                    OperationalMetrics::increment('lock.unavailable');
+                }
             }
         }
 
@@ -114,6 +140,7 @@ class LinkIntentRegistry
         $counterLock = Cache::lock($counterLockKey.':lock', 5);
         if (! $counterLock->get()) {
             $globalLock->release();
+
             return;
         }
 

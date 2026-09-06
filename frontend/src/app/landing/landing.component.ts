@@ -7,6 +7,7 @@ import { MatExpansionModule } from "@angular/material/expansion";
 import { MatIconModule } from "@angular/material/icon";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
+import { decodePublicConfig } from "../core/services/public-response-decoders";
 import { ThemeToggleComponent } from "../core/theme-toggle.component";
 
 type ProductViewId = "publish" | "route" | "measure";
@@ -131,7 +132,7 @@ export class LandingComponent {
   constructor() {
     this.appUrl.set(this.currentOrigin());
     this.api
-      .get<{ appUrl: string }>("/api/v1/config")
+      .get<{ appUrl: string }>("/api/v1/config", undefined, decodePublicConfig)
       .then((config) => this.appUrl.set(this.resolveAppUrl(config.appUrl)))
       .catch(() => undefined);
     this.destroyRef.onDestroy(() => this.document.body.classList.remove("uvh-menu-open"));

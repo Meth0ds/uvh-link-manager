@@ -165,6 +165,7 @@ export interface WebhookDelivery {
   status: "pending" | "processing" | "success" | "failed";
   attempts: number;
   last_error: string | null;
+  next_attempt_at: string | null;
   created_at: string;
   delivered_at: string | null;
 }

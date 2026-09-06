@@ -1,5 +1,5 @@
 import { Location } from "@angular/common";
-import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -9,6 +9,7 @@ import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { AuthService } from "../core/services/auth.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { authBearer } from "./auth-bearer";
+import { LatestRequest } from "../core/services/latest-request";
 
 @Component({
   selector: "app-invitation-accept",
@@ -50,6 +51,7 @@ export class InvitationAcceptComponent {
   private router = inject(Router);
   private location = inject(Location);
   private invitations = inject(PendingInvitationService);
+  private readonly operations = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
 
   readonly busy = signal(true);
@@ -72,66 +74,97 @@ export class InvitationAcceptComponent {
 
   async reject(): Promise<void> {
     if (!this.token || !this.auth.authenticated() || !this.ready() || this.busy()) return;
+    const generation = this.auth.sessionGeneration();
+    const context = `${this.token}:${generation}`;
+    const request = this.operations.begin(context);
     this.busy.set(true);
     this.ready.set(false);
     try {
       await this.api.post("/api/v1/workspaces/invitations/reject", { token: this.token });
+      if (!this.operations.isCurrent(request, context)
+        || this.auth.sessionGeneration() !== generation
+        || this.invitations.token() !== this.token) return;
       this.invitations.clear();
       this.ok.set(false);
       this.rejected.set(true);
       this.needsLogin.set(false);
       this.message.set("La invitación ha sido rechazada.");
     } catch (err) {
-      this.message.set(err instanceof ApiRequestError ? err.message : "No se pudo rechazar la invitación.");
+      if (this.operations.isCurrent(request, context)) {
+        this.message.set(err instanceof ApiRequestError ? err.message : "No se pudo rechazar la invitación.");
+      }
     } finally {
-      this.busy.set(false);
-      this.done.set(true);
+      if (this.operations.isCurrent(request, context)) {
+        this.busy.set(false);
+        this.done.set(true);
+      }
     }
   }
 
   async switchAccount(): Promise<void> {
     if (this.busy()) return;
+    const request = this.operations.begin(this.token);
     this.busy.set(true);
     try {
       await this.auth.logout();
+      if (!this.operations.isCurrent(request, this.token)) return;
       await this.router.navigate(["/auth"], { queryParams: { returnTo: this.returnTo } });
     } catch (error) {
-      this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo cerrar la sesión actual.");
+      if (this.operations.isCurrent(request, this.token)) {
+        this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo cerrar la sesión actual.");
+      }
     } finally {
-      this.busy.set(false);
+      if (this.operations.isCurrent(request, this.token)) this.busy.set(false);
     }
   }
 
   discard(): void {
     if (this.busy()) return;
+    this.operations.invalidate();
     this.invitations.clear();
     void this.router.navigate(["/app"]);
   }
 
   async accept(): Promise<void> {
     if (!this.token || !this.auth.authenticated() || !this.ready() || this.busy()) return;
+    const generation = this.auth.sessionGeneration();
+    const context = `${this.token}:${generation}`;
+    const request = this.operations.begin(context);
     this.busy.set(true);
     this.ready.set(false);
     try {
       await this.api.post<{ workspaceId: number }>("/api/v1/workspaces/invitations/accept", { token: this.token });
+      if (!this.operations.isCurrent(request, context)
+        || this.auth.sessionGeneration() !== generation
+        || this.invitations.token() !== this.token) return;
       this.invitations.clear();
       this.ok.set(true);
       this.message.set("Te has unido al workspace. Ya puedes colaborar en sus enlaces.");
       try {
-        await this.auth.refreshWorkspaces();
+        const refreshed = await this.auth.refreshWorkspaces(generation);
+        if (!refreshed && this.operations.isCurrent(request, context)) {
+          this.message.set("La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.");
+        }
       } catch {
-        this.message.set("La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.");
+        if (this.operations.isCurrent(request, context)) {
+          this.message.set("La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.");
+        }
       }
     } catch (err) {
-      this.ok.set(false);
-      this.message.set(err instanceof ApiRequestError ? err.message : "La invitación no es válida o ha caducado.");
+      if (this.operations.isCurrent(request, context)) {
+        this.ok.set(false);
+        this.message.set(err instanceof ApiRequestError ? err.message : "La invitación no es válida o ha caducado.");
+      }
     } finally {
-      this.busy.set(false);
-      this.done.set(true);
+      if (this.operations.isCurrent(request, context)) {
+        this.busy.set(false);
+        this.done.set(true);
+      }
     }
   }
 
   private async initialize(): Promise<void> {
+    const request = this.operations.begin(this.token);
     if (!this.token) {
       this.busy.set(false);
       this.done.set(true);
@@ -139,8 +172,20 @@ export class InvitationAcceptComponent {
       return;
     }
     if (!this.auth.loaded()) {
-      await this.auth.init();
+      try {
+        await this.auth.init();
+      } catch (error) {
+        if (this.operations.isCurrent(request, this.token)) {
+          this.busy.set(false);
+          this.done.set(true);
+          this.message.set(error instanceof ApiRequestError
+            ? error.message
+            : "No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.");
+        }
+        return;
+      }
     }
+    if (!this.operations.isCurrent(request, this.token) || this.invitations.token() !== this.token) return;
     if (!this.auth.authenticated()) {
       this.busy.set(false);
       this.done.set(true);

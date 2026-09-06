@@ -56,7 +56,7 @@ describe("DashboardComponent period selection", () => {
 
     expect(component.period()).toBe("7d");
     expect(component.periodLabel()).toBe("7 días");
-    expect(api.get).toHaveBeenCalledWith("/api/v1/analytics/overview", { period: "7d" });
+    expect(api.get).toHaveBeenCalledWith("/api/v1/analytics/overview", { period: "7d" }, jasmine.any(Function));
   });
 
   it("does not request again when the same period is selected", () => {
@@ -65,5 +65,23 @@ describe("DashboardComponent period selection", () => {
     component.setPeriod("30d");
 
     expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it("ignores queued results after the dashboard is destroyed", async () => {
+    let resolveAnalytics!: (value: AnalyticsOverview) => void;
+    let resolveLinks!: (value: { links: [] }) => void;
+    api.get.and.callFake(<T>(path: string) => (path.includes("analytics")
+      ? new Promise<AnalyticsOverview>((resolve) => { resolveAnalytics = resolve; })
+      : new Promise<{ links: [] }>((resolve) => { resolveLinks = resolve; })) as Promise<T>);
+    component.overview.set(null);
+    component.recent.set([]);
+    const pending = component.load();
+    fixture.destroy();
+
+    resolveAnalytics(overview);
+    resolveLinks({ links: [] });
+    await pending;
+
+    expect(component.overview()).toBeNull();
   });
 });

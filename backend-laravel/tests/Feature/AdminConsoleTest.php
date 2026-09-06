@@ -29,7 +29,12 @@ class AdminConsoleTest extends TestCase
         $this->withCookie('uvh_session', $token)
             ->getJson('/api/v1/admin/overview')
             ->assertForbidden()
-            ->assertJson(['error' => 'El área de administración requiere MFA activado en tu cuenta']);
+            // Enabling MFA on the account is insufficient: the current
+            // session must have completed its own MFA challenge.
+            ->assertJson([
+                'error' => 'Esta operación requiere una sesión autenticada con MFA',
+                'details' => ['reason' => 'mfa_required'],
+            ]);
 
         $this->assertTrue($admin->mfa_enabled);
     }

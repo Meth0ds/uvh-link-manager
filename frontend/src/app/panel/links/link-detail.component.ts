@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 
 import { MatButtonModule } from "@angular/material/button";
@@ -19,6 +19,12 @@ import { MatDialog } from "@angular/material/dialog";
 import { ChartsComponent } from "../analytics/charts.component";
 import type { LinkDetailResponse, AnalyticsOverview, AuditEvent, LinkDto, RedirectRule } from "../../core/models";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { LatestRequest } from "../../core/services/latest-request";
+import {
+  decodeAnalyticsOverview,
+  decodeLinkActivityResponse,
+  decodeLinkDetailResponse,
+} from "../../core/services/link-response-decoders";
 
 @Component({
   selector: "app-link-detail",
@@ -50,6 +56,9 @@ export class LinkDetailComponent {
   private workspaces = inject(WorkspaceService);
   private actions = inject(ActionDialogService);
   private linkDialog = inject(LinkDialogService);
+  private readonly loadRequests = new LatestRequest(inject(DestroyRef));
+  private readonly analyticsRequests = new LatestRequest(inject(DestroyRef));
+  private readonly activityRequests = new LatestRequest(inject(DestroyRef));
 
   readonly link = signal<LinkDto | null>(null);
   readonly rules = signal<RedirectRule[]>([]);
@@ -80,6 +89,17 @@ export class LinkDetailComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.loadRequests.invalidate();
+      this.analyticsRequests.invalidate();
+      this.activityRequests.invalidate();
+      // The route can stay mounted while its workspace authorization changes.
+      this.link.set(null);
+      this.rules.set([]);
+      this.analytics.set(null);
+      this.activity.set([]);
+      this.error.set(null);
+      this.analyticsError.set(null);
+      this.activityError.set(null);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -89,40 +109,77 @@ export class LinkDetailComponent {
   }
 
   async load(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.loadRequests.invalidate();
+      this.link.set(null);
+      this.rules.set([]);
+      this.loading.set(false);
+      return;
+    }
+    const request = this.loadRequests.begin(workspaceId);
     this.loading.set(true);
     this.error.set(null);
     try {
-      const detail = await this.api.get<LinkDetailResponse>(`/api/v1/links/${this.linkId}`);
+      const detail = await this.api.get<LinkDetailResponse>(
+        `/api/v1/links/${this.linkId}`,
+        undefined,
+        (value) => decodeLinkDetailResponse(value, this.linkId),
+      );
+      if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.link.set(detail.link);
       this.rules.set(detail.rules);
       await Promise.all([this.loadAnalytics(), this.loadActivity()]);
     } catch (err) {
+      if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar el enlace");
     } finally {
-      this.loading.set(false);
+      if (this.loadRequests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
   }
 
   async loadAnalytics(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.analyticsRequests.invalidate();
+      this.analytics.set(null);
+      return;
+    }
+    const request = this.analyticsRequests.begin(workspaceId);
     this.analyticsError.set(null);
     try {
       const a = await this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", {
         linkId: this.linkId,
         period: this.period(),
-      });
+      }, decodeAnalyticsOverview);
+      if (!this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.analytics.set(a);
     } catch (err) {
+      if (!this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.analytics.set(null);
       this.analyticsError.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la analítica");
     }
   }
 
   async loadActivity(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.activityRequests.invalidate();
+      this.activity.set([]);
+      return;
+    }
+    const request = this.activityRequests.begin(workspaceId);
     this.activityError.set(null);
     try {
-      const { events } = await this.api.get<{ events: AuditEvent[] }>(`/api/v1/links/${this.linkId}/activity`);
+      const { events } = await this.api.get<{ events: AuditEvent[] }>(
+        `/api/v1/links/${this.linkId}/activity`,
+        undefined,
+        decodeLinkActivityResponse,
+      );
+      if (!this.activityRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.activity.set(events);
     } catch (err) {
+      if (!this.activityRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.activity.set([]);
       this.activityError.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la actividad");
     }

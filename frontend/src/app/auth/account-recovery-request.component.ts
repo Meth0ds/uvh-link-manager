@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ViewChild, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ViewChild, inject, signal } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -8,6 +8,8 @@ import { MatInputModule } from "@angular/material/input";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { AuthShellComponent } from "./auth-shell.component";
 import { HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
+import { LatestRequest } from "../core/services/latest-request";
+import { decodePublicConfig } from "../core/services/public-response-decoders";
 
 interface PublicAuthConfig {
   hcaptcha?: { enabled?: boolean; siteKey?: string | null };
@@ -83,6 +85,8 @@ export class AccountRecoveryRequestComponent {
 
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
+  private readonly configRequests = new LatestRequest(inject(DestroyRef));
+  private readonly submitRequests = new LatestRequest(inject(DestroyRef));
 
   readonly busy = signal(false);
   readonly sent = signal(false);
@@ -105,20 +109,24 @@ export class AccountRecoveryRequestComponent {
       if (!this.captchaToken()) this.error.set("Completa hCaptcha para continuar.");
       return;
     }
+    const email = this.form.controls.email.value.trim().toLowerCase();
+    const request = this.submitRequests.begin(email);
     this.busy.set(true);
     this.error.set(null);
     try {
       await this.api.post("/api/v1/auth/account-recovery/request", {
-        email: this.form.controls.email.value.trim().toLowerCase(),
+        email,
         captchaToken: this.captchaToken(),
       });
+      if (!this.submitRequests.isCurrent(request, email)) return;
       this.sent.set(true);
     } catch (error) {
+      if (!this.submitRequests.isCurrent(request, email)) return;
       this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo iniciar la recuperación");
       this.captchaToken.set("");
       this.captchaWidget?.reset();
     } finally {
-      this.busy.set(false);
+      if (this.submitRequests.isCurrent(request, email)) this.busy.set(false);
     }
   }
 
@@ -128,18 +136,22 @@ export class AccountRecoveryRequestComponent {
   }
 
   async loadCaptchaConfiguration(): Promise<void> {
+    const request = this.configRequests.begin(null);
     this.captchaConfigBusy.set(true);
     this.captchaConfigError.set(null);
     try {
-      const config = await this.api.get<PublicAuthConfig>("/api/v1/config");
+      const config = await this.api.get<PublicAuthConfig>("/api/v1/config", undefined, decodePublicConfig);
+      if (!this.configRequests.isCurrent(request, null)) return;
       const siteKey = config.hcaptcha?.enabled ? config.hcaptcha.siteKey : null;
       if (!siteKey || !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey)) throw new Error("hCaptcha unavailable");
       this.hcaptchaSiteKey.set(siteKey);
     } catch {
-      this.hcaptchaSiteKey.set("");
-      this.captchaConfigError.set("No se pudo cargar hCaptcha.");
+      if (this.configRequests.isCurrent(request, null)) {
+        this.hcaptchaSiteKey.set("");
+        this.captchaConfigError.set("No se pudo cargar hCaptcha.");
+      }
     } finally {
-      this.captchaConfigBusy.set(false);
+      if (this.configRequests.isCurrent(request, null)) this.captchaConfigBusy.set(false);
     }
   }
 }

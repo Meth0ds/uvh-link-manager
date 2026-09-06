@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -16,6 +16,8 @@ import { AuthService } from "../../core/services/auth.service";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { LatestRequest } from "../../core/services/latest-request";
+import { decodeApiTokensResponse, decodeCreatedApiTokenResponse } from "../../core/services/credential-response-decoders";
 
 const SCOPES = [
   { value: "links:read", label: "Consultar enlaces" },
@@ -51,6 +53,8 @@ export class TokensComponent {
   private snackbar = inject(MatSnackBar);
   private actions = inject(ActionDialogService);
   private auth = inject(AuthService);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly mutations = new LatestRequest(inject(DestroyRef));
 
   readonly tokens = signal<ApiTokenDto[]>([]);
   readonly loading = signal(true);
@@ -73,6 +77,15 @@ export class TokensComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.requests.invalidate();
+      this.mutations.invalidate();
+      this.tokens.set([]);
+      this.error.set(null);
+      // Plain tokens and authentication factors must never cross workspaces.
+      this.plainToken.set(null);
+      this.password.set("");
+      this.factorCode.set("");
+      this.creating.set(false);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -82,15 +95,25 @@ export class TokensComponent {
   }
 
   async load(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.requests.invalidate();
+      this.tokens.set([]);
+      this.loading.set(false);
+      return;
+    }
+    const request = this.requests.begin(workspaceId);
     this.loading.set(true);
     this.error.set(null);
     try {
-      const { tokens } = await this.api.get<{ tokens: ApiTokenDto[] }>("/api/v1/tokens");
+      const { tokens } = await this.api.get<{ tokens: ApiTokenDto[] }>("/api/v1/tokens", undefined, decodeApiTokensResponse);
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.tokens.set(tokens);
     } catch (err) {
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los tokens");
     } finally {
-      this.loading.set(false);
+      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
   }
 
@@ -101,6 +124,9 @@ export class TokensComponent {
   async create(): Promise<void> {
     if (!this.name().trim() || !this.selectedScopes().length || !this.password()
       || (this.user()?.mfaEnabled && !this.factorCode().trim()) || this.creating()) return;
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
+    const request = this.mutations.begin(workspaceId);
     this.creating.set(true);
     try {
       const { token, plainToken } = await this.api.post<{ token: ApiTokenDto; plainToken: string }>("/api/v1/tokens", {
@@ -109,7 +135,8 @@ export class TokensComponent {
         expiresAt: this.expiresAt() ? new Date(this.expiresAt()).toISOString() : null,
         password: this.password(),
         ...(this.factorCode().trim() ? { factorCode: this.factorCode().trim() } : {}),
-      });
+      }, decodeCreatedApiTokenResponse);
+      if (!this.mutations.isCurrent(request, this.workspaces.currentId())) return;
       this.tokens.update((t) => [token, ...t]);
       this.plainToken.set(plainToken);
       this.name.set("");
@@ -123,9 +150,10 @@ export class TokensComponent {
         this.snackbar.open("Token creado. Recarga Ajustes para actualizar el estado de recuperación.", "Cerrar", { duration: 4000 });
       }
     } catch (err) {
+      if (!this.mutations.isCurrent(request, this.workspaces.currentId())) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo crear el token", "Cerrar", { duration: 4000 });
     } finally {
-      this.creating.set(false);
+      if (this.mutations.isCurrent(request, this.workspaces.currentId())) this.creating.set(false);
     }
   }
 

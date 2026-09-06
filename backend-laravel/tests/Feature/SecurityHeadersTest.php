@@ -37,7 +37,10 @@ class SecurityHeadersTest extends TestCase
         config(['uvh.hsts_enabled' => true]);
 
         $this->get('/health')->assertHeaderMissing('Strict-Transport-Security');
-        $this->get('https://localhost/health')
+        // Never bless an arbitrary Host header with HSTS; emit it only for a
+        // configured first-party origin over an authenticated HTTPS request.
+        $this->get('https://attacker.invalid/health')->assertHeaderMissing('Strict-Transport-Security');
+        $this->get('https://app.uvh.test/health')
             ->assertHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
 }

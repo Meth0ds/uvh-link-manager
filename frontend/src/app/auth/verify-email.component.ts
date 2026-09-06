@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -9,6 +9,7 @@ import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { authBearer } from "./auth-bearer";
+import { LatestRequest } from "../core/services/latest-request";
 
 @Component({
   selector: "app-verify-email",
@@ -47,6 +48,7 @@ export class VerifyEmailComponent {
   private intents = inject(PendingLinkIntentService);
   private invitations = inject(PendingInvitationService);
   private location = inject(Location);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly busy = signal(true);
   readonly done = signal(false);
@@ -72,10 +74,12 @@ export class VerifyEmailComponent {
 
   async verify(): Promise<void> {
     if (!this.token || this.busy() || this.ok()) return;
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     this.attempted.set(true);
     try {
       await this.api.post("/api/v1/auth/verify-email", { token: this.token });
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.done.set(true);
       this.message.set(
@@ -86,10 +90,11 @@ export class VerifyEmailComponent {
             : "Tu email quedó confirmado. Ya puedes iniciar sesión y crear enlaces.",
       );
     } catch (err) {
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(false);
       this.message.set(err instanceof ApiRequestError ? err.message : "El enlace de verificación no es válido o ha caducado.");
     } finally {
-      this.busy.set(false);
+      if (this.requests.isCurrent(request, this.token)) this.busy.set(false);
     }
   }
 }

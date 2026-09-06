@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { DatePipe } from "@angular/common";
 import { ActivatedRoute, Router } from "@angular/router";
 
@@ -25,6 +25,8 @@ import { PendingLinkIntentService } from "../../core/services/pending-link-inten
 import type { LinksResponse, LinkDto, LinkState } from "../../core/models";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { LatestRequest } from "../../core/services/latest-request";
+import { decodeLinksResponse } from "../../core/services/link-response-decoders";
 
 type StateFilter = "" | LinkState;
 
@@ -73,6 +75,7 @@ export class LinksComponent {
   private workspaces = inject(WorkspaceService);
   private actions = inject(ActionDialogService);
   private intents = inject(PendingLinkIntentService);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly links = signal<LinkDto[]>([]);
   readonly total = signal(0);
@@ -115,6 +118,14 @@ export class LinksComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.requests.invalidate();
+      // Link titles and destinations are workspace-confidential; clear them
+      // synchronously instead of waiting for the next HTTP response.
+      this.links.set([]);
+      this.total.set(0);
+      this.error.set(null);
+      this.actionId.set(null);
+      this.pendingAutoHandled = false;
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -124,6 +135,17 @@ export class LinksComponent {
   }
 
   async reload(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.requests.invalidate();
+      this.links.set([]);
+      this.total.set(0);
+      this.loading.set(false);
+      return;
+    }
+    const request = this.requests.begin(workspaceId);
+    const page = this.page() + 1;
+    const perPage = this.pageSize();
     this.loading.set(true);
     this.error.set(null);
     try {
@@ -132,16 +154,18 @@ export class LinksComponent {
         state: this.state(),
         tag: this.tag(),
         sort: this.sort(),
-        page: this.page() + 1,
-        perPage: this.pageSize(),
-      });
+        page,
+        perPage,
+      }, (value) => decodeLinksResponse(value, { page, perPage }));
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.links.set(res.links);
       this.total.set(res.total);
       void this.openPendingLink();
     } catch (err) {
+      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los enlaces");
     } finally {
-      this.loading.set(false);
+      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
   }
 

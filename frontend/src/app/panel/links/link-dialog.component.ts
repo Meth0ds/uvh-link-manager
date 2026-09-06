@@ -1,4 +1,5 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
   FormArray,
   FormBuilder,
@@ -23,6 +24,8 @@ import { MatTooltipModule } from "@angular/material/tooltip";
 
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import type { DomainDto, LinkDto, RedirectRule } from "../../core/models";
+import { decodeDomainsResponse } from "../../core/services/domain-response-decoders";
+import { decodeAliasAvailability, decodeLinkResponse, decodeRulesResponse } from "../../core/services/link-response-decoders";
 
 export interface LinkDialogData {
   mode: "create" | "edit";
@@ -52,6 +55,44 @@ function httpUrlValidator(control: AbstractControl): ValidationErrors | null {
   } catch {
     return { url: true };
   }
+}
+
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+
+function noControlCharacters(control: AbstractControl): ValidationErrors | null {
+  const value = String(control.value ?? "");
+  return CONTROL_CHARACTERS.test(value) ? { controlCharacters: true } : null;
+}
+
+function localDateTimeValidator(control: AbstractControl): ValidationErrors | null {
+  const value = String(control.value ?? "");
+  if (!value) return null;
+  const match = LOCAL_DATE_TIME.exec(value);
+  if (!match) return { localDateTime: true };
+
+  const [, year, month, day, hour, minute] = match.map(Number);
+  const parsed = new Date(year, month - 1, day, hour, minute);
+  return parsed.getFullYear() === year
+    && parsed.getMonth() === month - 1
+    && parsed.getDate() === day
+    && parsed.getHours() === hour
+    && parsed.getMinutes() === minute
+    ? null
+    : { localDateTime: true };
+}
+
+function lifecycleOrderValidator(control: AbstractControl): ValidationErrors | null {
+  const scheduled = control.get("scheduledAt");
+  const expires = control.get("expiresAt");
+  if (!scheduled?.value || !expires?.value || scheduled.invalid || expires.invalid) return null;
+  return new Date(scheduled.value).getTime() < new Date(expires.value).getTime()
+    ? null
+    : { lifecycleOrder: true };
+}
+
+function integerValidator(control: AbstractControl): ValidationErrors | null {
+  return control.value == null || Number.isInteger(control.value) ? null : { integer: true };
 }
 
 function toLocalInput(iso: string | null | undefined): string {
@@ -93,6 +134,7 @@ export class LinkDialogComponent {
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
   private dialogRef = inject(MatDialogRef<LinkDialogComponent>);
+  private readonly destroyRef = inject(DestroyRef);
   readonly data = inject<LinkDialogData>(MAT_DIALOG_DATA);
 
   readonly isEdit = this.data.mode === "edit";
@@ -105,33 +147,40 @@ export class LinkDialogComponent {
   readonly aliasStatus = signal<"idle" | "checking" | "available" | "taken" | "invalid" | "reserved">("idle");
   readonly aliasStatusText = signal("");
   private aliasRequest = 0;
+  private saveRequest = 0;
 
   form = this.fb.nonNullable.group({
     destination: ["", [Validators.required, Validators.maxLength(2048), httpUrlValidator]],
-    alias: ["", [Validators.maxLength(64)]],
+    alias: ["", [Validators.maxLength(64), Validators.pattern(/^[a-z0-9][a-z0-9_-]{0,63}$/i)]],
     domainId: [null as number | null],
     fallbackDestination: ["", [Validators.maxLength(2048), httpUrlValidator]],
     password: ["", [Validators.maxLength(72)]],
     clearPassword: [false],
     maxClicks: [null as number | null, [Validators.min(1), Validators.max(10_000_000)]],
     singleUse: [false],
-    scheduledAt: [""],
-    expiresAt: [""],
-    notes: ["", [Validators.maxLength(1000)]],
+    scheduledAt: ["", [localDateTimeValidator]],
+    expiresAt: ["", [localDateTimeValidator]],
+    notes: ["", [Validators.maxLength(1000), noControlCharacters]],
     utm: this.fb.nonNullable.group({
-      source: [""],
-      medium: [""],
-      campaign: [""],
-      term: [""],
-      content: [""],
+      source: ["", [Validators.maxLength(100), noControlCharacters]],
+      medium: ["", [Validators.maxLength(100), noControlCharacters]],
+      campaign: ["", [Validators.maxLength(100), noControlCharacters]],
+      term: ["", [Validators.maxLength(100), noControlCharacters]],
+      content: ["", [Validators.maxLength(100), noControlCharacters]],
     }),
-  });
+  }, { validators: lifecycleOrderValidator });
 
   rules = this.fb.array<RuleGroup>([]);
 
   constructor() {
-    this.form.controls.alias.valueChanges.subscribe(() => this.checkAlias());
-    this.form.controls.domainId.valueChanges.subscribe(() => this.checkAlias());
+    this.form.controls.alias.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.checkAlias());
+    this.form.controls.domainId.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.checkAlias());
+    this.destroyRef.onDestroy(() => {
+      // Invalidate every completion already queued for this dialog. This is
+      // still necessary even if a future transport layer adds cancellation.
+      ++this.aliasRequest;
+      ++this.saveRequest;
+    });
     void this.load();
   }
 
@@ -148,27 +197,35 @@ export class LinkDialogComponent {
     try {
       await Promise.all(requests);
     } finally {
-      this.loading.set(false);
+      if (!this.destroyRef.destroyed) this.loading.set(false);
     }
   }
 
   private async loadDomains(): Promise<void> {
     try {
-      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains");
+      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+      if (this.destroyRef.destroyed) return;
       this.domains.set(domains.filter((d) => d.state === "active" && d.edgeEligible && d.tlsReadyAt !== null));
     } catch {
-      this.domains.set([]);
+      if (!this.destroyRef.destroyed) this.domains.set([]);
     }
   }
 
   private async loadEditRules(linkId: number): Promise<void> {
     try {
-      const { rules } = await this.api.get<{ rules: RedirectRule[] }>(`/api/v1/links/${linkId}`);
+      const { rules } = await this.api.get<{ rules: RedirectRule[] }>(
+        `/api/v1/links/${linkId}`,
+        undefined,
+        decodeRulesResponse,
+      );
+      if (this.destroyRef.destroyed) return;
       this.rules.clear();
       rules.forEach((rule) => this.addRule(rule));
       this.editDetailsLoaded.set(true);
     } catch (err) {
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las reglas del enlace");
+      if (!this.destroyRef.destroyed) {
+        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las reglas del enlace");
+      }
     }
   }
 
@@ -203,6 +260,11 @@ export class LinkDialogComponent {
       this.aliasStatusText.set("");
       return;
     }
+    if (this.form.controls.alias.invalid) {
+      this.aliasStatus.set("invalid");
+      this.aliasStatusText.set("Alias inválido");
+      return;
+    }
     if (sameAsCurrent) {
       this.aliasStatus.set("available");
       this.aliasStatusText.set("Alias actual");
@@ -213,13 +275,13 @@ export class LinkDialogComponent {
     // Debounce keystrokes locally so the availability endpoint cannot be used
     // as an accidental request amplifier while typing.
     await new Promise((resolve) => setTimeout(resolve, 220));
-    if (requestId !== this.aliasRequest) return;
+    if (this.destroyRef.destroyed || requestId !== this.aliasRequest) return;
     try {
       const { available, reason } = await this.api.post<{ available: boolean; reason?: string }>("/api/v1/links/check-alias", {
         alias,
         domainId: this.form.value.domainId,
-      });
-      if (requestId !== this.aliasRequest) return;
+      }, decodeAliasAvailability);
+      if (this.destroyRef.destroyed || requestId !== this.aliasRequest) return;
       if (available) {
         this.aliasStatus.set("available");
         this.aliasStatusText.set("Alias disponible");
@@ -230,7 +292,7 @@ export class LinkDialogComponent {
         );
       }
     } catch {
-      if (requestId !== this.aliasRequest) return;
+      if (this.destroyRef.destroyed || requestId !== this.aliasRequest) return;
       this.aliasStatus.set("idle");
       this.aliasStatusText.set("");
     }
@@ -239,7 +301,10 @@ export class LinkDialogComponent {
   // ---------- Tags ----------
   addTag(event: { value: string; chipInput: { clear: () => void } }): void {
     const value = (event.value ?? "").trim().slice(0, 40);
-    if (value && !this.tags().includes(value)) {
+    // PostgreSQL resolves tag identity case-insensitively in LinkService, so
+    // mirror that rule before presenting what would be the same server tag.
+    const duplicate = this.tags().some((tag) => tag.toLowerCase() === value.toLowerCase());
+    if (value && !CONTROL_CHARACTERS.test(value) && !duplicate && this.tags().length < 20) {
       this.tags.update((t) => [...t, value]);
     }
     event.chipInput.clear();
@@ -254,20 +319,28 @@ export class LinkDialogComponent {
     return this.rules.controls;
   }
 
+  /** Blank destinations delete rows, so only rules that will be sent can block saving. */
+  get hasInvalidRules(): boolean {
+    return this.rules.controls.some((rule) => Boolean(rule.controls.destination.value.trim()) && rule.invalid);
+  }
+
   addRule(initial: Partial<RedirectRule> = {}): void {
+    if (this.rules.length >= 20) return;
     const raw = initial as RedirectRule & { time_from?: string | null; time_to?: string | null };
     this.rules.push(
       this.fb.nonNullable.group({
-        priority: [initial.priority ?? this.rules.length],
-        country: [initial.country ?? ""],
-        language: [initial.language ?? ""],
+        priority: [initial.priority ?? this.rules.length, [Validators.min(0), Validators.max(1000), integerValidator]],
+        country: [initial.country ?? "", [Validators.pattern(/^[a-zA-Z]{2}$/)]],
+        language: [initial.language ?? "", [Validators.maxLength(8), Validators.pattern(/^[a-zA-Z0-9-]+$/)]],
         device: [initial.device ?? ""],
-        os: [initial.os ?? ""],
-        timeFrom: [initial.timeFrom ?? raw.time_from ?? ""],
-        timeTo: [initial.timeTo ?? raw.time_to ?? ""],
-        referrer: [initial.referrer ?? ""],
-        campaign: [initial.campaign ?? ""],
-        destination: [initial.destination ?? ""],
+        os: [initial.os ?? "", [Validators.maxLength(40), noControlCharacters]],
+        timeFrom: [initial.timeFrom ?? raw.time_from ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
+        timeTo: [initial.timeTo ?? raw.time_to ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
+        referrer: [initial.referrer ?? "", [Validators.maxLength(200), noControlCharacters]],
+        campaign: [initial.campaign ?? "", [Validators.maxLength(100), noControlCharacters]],
+        // Empty means delete/omit the row. Non-empty destinations must still
+        // satisfy exactly the same URL contract as the primary destination.
+        destination: [initial.destination ?? "", [Validators.maxLength(2048), httpUrlValidator]],
       }),
     );
   }
@@ -299,7 +372,10 @@ export class LinkDialogComponent {
   }
 
   async save(): Promise<void> {
-    if (this.form.invalid || this.busy() || (this.isEdit && !this.editDetailsLoaded())) return;
+    const aliasUnavailable = ["checking", "taken", "invalid", "reserved"].includes(this.aliasStatus());
+    if (this.destroyRef.destroyed || this.form.invalid || this.hasInvalidRules || aliasUnavailable
+      || this.busy() || (this.isEdit && !this.editDetailsLoaded())) return;
+    const requestId = ++this.saveRequest;
     this.busy.set(true);
     this.error.set(null);
     const v = this.form.value;
@@ -334,17 +410,25 @@ export class LinkDialogComponent {
     try {
       let link: LinkDto;
       if (this.isEdit) {
-        const res = await this.api.patch<{ link: LinkDto }>(`/api/v1/links/${this.data.link!.id}`, payload);
+        const expectedLinkId = this.data.link!.id;
+        const res = await this.api.patch<{ link: LinkDto }>(
+          `/api/v1/links/${expectedLinkId}`,
+          payload,
+          (value) => decodeLinkResponse(value, expectedLinkId),
+        );
         link = res.link;
       } else {
-        const res = await this.api.post<{ link: LinkDto }>("/api/v1/links", payload);
+        const res = await this.api.post<{ link: LinkDto }>("/api/v1/links", payload, decodeLinkResponse);
         link = res.link;
       }
+      if (this.destroyRef.destroyed || requestId !== this.saveRequest) return;
       this.dialogRef.close(link);
     } catch (err) {
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo guardar el enlace");
+      if (!this.destroyRef.destroyed && requestId === this.saveRequest) {
+        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo guardar el enlace");
+      }
     } finally {
-      this.busy.set(false);
+      if (!this.destroyRef.destroyed && requestId === this.saveRequest) this.busy.set(false);
     }
   }
 }

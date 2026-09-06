@@ -55,7 +55,7 @@ describe("GettingStartedComponent", () => {
   afterEach(() => fixture.destroy());
 
   it("renders five observations and only fixed internal action routes", () => {
-    expect(api.get).toHaveBeenCalledWith("/api/v1/workspaces/1/getting-started");
+    expect(api.get).toHaveBeenCalledWith("/api/v1/workspaces/1/getting-started", undefined, jasmine.any(Function));
     expect(fixture.nativeElement.querySelectorAll("[data-step]").length).toBe(5);
     expect(component.observed()).toBe(0);
     for (const link of fixture.nativeElement.querySelectorAll(".steps a") as NodeListOf<HTMLAnchorElement>) {

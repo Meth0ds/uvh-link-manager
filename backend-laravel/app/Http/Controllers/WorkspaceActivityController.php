@@ -16,9 +16,12 @@ final class WorkspaceActivityController
     {
         $user = UvhRequest::user($request);
         $limit = $request->query('limit', '25');
+        $cursorProvided = $request->query->has('cursor');
         $cursor = $request->query('cursor');
         if (! is_string($limit) || ! preg_match('/^[1-9][0-9]{0,2}$/D', $limit) || (int) $limit > 100
-            || ($cursor !== null && (! is_string($cursor) || strlen($cursor) > 2048))) {
+            // ConvertEmptyStringsToNull preserves key presence. Reject an
+            // explicitly empty cursor instead of treating it as a fresh page.
+            || ($cursorProvided && (! is_string($cursor) || $cursor === '' || strlen($cursor) > 2048))) {
             return response()->json(['error' => 'Paginación inválida'], 422);
         }
         try {

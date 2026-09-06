@@ -76,7 +76,9 @@ class DatabaseSchemaTest extends TestCase
             'abuse_reports' => ['link_id', 'reason', 'status', 'reporter_hash', 'report_day'],
             'audit_events' => ['user_id', 'workspace_id', 'action', 'resource_type', 'resource_id', 'metadata'],
             'email_tokens' => ['id', 'user_id', 'kind', 'expires_at', 'used_at'],
-            'email_change_requests' => ['id', 'user_id', 'new_email', 'token_hash', 'expires_at', 'confirmed_at', 'cancelled_at'],
+            // The primary string ID is itself the one-way bearer digest. Rows
+            // are deleted on completion/cancellation rather than tombstoned.
+            'email_change_requests' => ['id', 'user_id', 'new_email', 'security_version', 'expires_at', 'created_at'],
             'data_export_requests' => ['id', 'user_id', 'security_version', 'status', 'confirmation_token_hash', 'download_token_hash', 'artifact_path'],
             'account_deletion_requests' => ['id', 'user_id', 'security_version', 'status', 'confirmation_token_hash', 'cancel_token_hash', 'execute_after'],
             'link_intent_claims' => ['intent_hash', 'user_id', 'expires_at'],
@@ -93,6 +95,18 @@ class DatabaseSchemaTest extends TestCase
             foreach ($columns as $column) {
                 $this->assertTrue(Schema::hasColumn($table, $column), "Missing column {$table}.{$column}");
             }
+        }
+    }
+
+    #[Test]
+    public function it_creates_the_workspace_usage_indexes(): void
+    {
+        foreach ([
+            'custom_domains' => 'workspace_usage_domains_idx',
+            'api_tokens' => 'workspace_usage_tokens_idx',
+            'webhooks' => 'workspace_usage_webhooks_idx',
+        ] as $table => $index) {
+            $this->assertTrue(Schema::hasIndex($table, $index), "Missing index: {$index}");
         }
     }
 }

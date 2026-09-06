@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -6,6 +6,7 @@ import { MatIconModule } from "@angular/material/icon";
 import { AuthShellComponent } from "./auth-shell.component";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { authBearer } from "./auth-bearer";
+import { LatestRequest } from "../core/services/latest-request";
 
 @Component({
   selector: "app-cancel-account-deletion",
@@ -32,6 +33,7 @@ export class CancelAccountDeletionComponent {
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private location = inject(Location);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
 
   readonly busy = signal(false);
@@ -50,16 +52,19 @@ export class CancelAccountDeletionComponent {
 
   async cancel(): Promise<void> {
     if (this.busy() || this.done() || this.error()) return;
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     try {
       await this.api.post("/api/v1/auth/account-deletion/cancel", { token: this.token });
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.done.set(true);
       this.message.set("La cuenta vuelve a estar activa. Inicia sesión para revisar tus sesiones, MFA y accesos de integración.");
     } catch (error) {
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.error.set(true);
       this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo cancelar la eliminación.");
     } finally {
-      this.busy.set(false);
+      if (this.requests.isCurrent(request, this.token)) this.busy.set(false);
     }
   }
 }

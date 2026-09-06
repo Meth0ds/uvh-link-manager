@@ -11,6 +11,7 @@ describe("AppComponent startup", () => {
       init: jasmine.createSpy("init").and.returnValue(neverSettles),
       authenticated: signal(false),
       sessionInvalidated: signal(false),
+      adminMfaReauthenticationRequired: signal(false),
     };
 
     TestBed.configureTestingModule({

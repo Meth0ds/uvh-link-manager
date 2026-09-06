@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
-use App\Support\Ids;
 use App\Support\Ssrf;
 use App\Support\UvhCrypto;
 use App\Support\WebhookService;
@@ -46,11 +45,15 @@ class SsrfTest extends TestCase
 
     public function test_ipv6_private_forms_are_detected(): void
     {
-        $private = [
+        $blocked = [
             '::', '::1', 'fc00::1', 'fd12:3456::1', 'fe80::1', 'fec0::1', 'ff02::1',
             '2001:db8::1',
             // IPv4-mapped / compatible
             '::ffff:127.0.0.1', '::ffff:10.0.0.1', '::127.0.0.1', '::192.168.1.1',
+            // Reject mapped literals even when the embedded IPv4 is public.
+            // Different URL/network parsers do not classify every transition
+            // form consistently, so webhook destinations fail closed here.
+            '::ffff:8.8.8.8',
             // NAT64 64:ff9b::/96 → 10.0.0.1
             '64:ff9b::a00:1',
             // 6to4 2002::/16 → 127.0.0.1
@@ -58,13 +61,13 @@ class SsrfTest extends TestCase
             // Teredo 2001::/32 → complemento de 3fff:fdd2 = 192.0.2.45 (TEST-NET)
             '2001:0:4136:e378:8000:63bf:3fff:fdd2',
         ];
-        foreach ($private as $ip) {
-            $this->assertTrue(Ssrf::isPrivateIp($ip), "{$ip} debería ser privada");
+        foreach ($blocked as $ip) {
+            $this->assertTrue(Ssrf::isPrivateIp($ip), "{$ip} debería estar bloqueada");
         }
 
         $public = [
             '2606:4700:4700::1111', '2001:4860:4860::8888',
-            '::ffff:8.8.8.8', '64:ff9b::808:808', '2002:808:808::',
+            '64:ff9b::808:808', '2002:808:808::',
         ];
         foreach ($public as $ip) {
             $this->assertFalse(Ssrf::isPrivateIp($ip), "{$ip} debería ser pública");
@@ -132,13 +135,19 @@ class SsrfTest extends TestCase
             'active' => true,
         ]);
 
-        WebhookService::dispatch($workspace->id, 'link.created', ['linkId' => 1, 'alias' => 'x']);
+        // Durable webhook admission belongs to the same business transaction
+        // as its event; publishing happens only after that commit succeeds.
+        DB::transaction(function () use ($workspace): void {
+            WebhookService::dispatch($workspace->id, 'link.created', ['linkId' => 1, 'alias' => 'x']);
+        });
 
         $delivery = WebhookDelivery::where('webhook_id', $webhook->id)->firstOrFail();
         $this->assertSame('pending', $delivery->status);
         $this->assertSame((int) $webhook->fresh()->config_version, (int) $delivery->config_version);
         $this->assertGreaterThanOrEqual(1, (int) $delivery->attempts);
-        $this->assertStringContainsString('SSRF', (string) $delivery->last_error);
+        // Persist a stable operator-facing category, never raw curl details,
+        // destination IPs or internal guard implementation names.
+        $this->assertSame('Destino bloqueado por la política de red', $delivery->last_error);
         $this->assertNull($delivery->delivered_at);
     }
 }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -8,6 +8,8 @@ import { AuthShellComponent } from "./auth-shell.component";
 import { authBearer } from "./auth-bearer";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { AuthService } from "../core/services/auth.service";
+import { LatestRequest } from "../core/services/latest-request";
+import { decodePublicActionMessage } from "../core/services/public-action-response-decoders";
 
 @Component({
   selector: "app-security-incident",
@@ -50,6 +52,7 @@ export class SecurityIncidentComponent {
   private readonly auth = inject(AuthService);
   private readonly location = inject(Location);
   private readonly route = inject(ActivatedRoute);
+  private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly token = authBearer(this.route);
   readonly busy = signal(false);
@@ -67,17 +70,28 @@ export class SecurityIncidentComponent {
 
   async revoke(): Promise<void> {
     if (!this.token || this.busy() || this.done()) return;
+    const generation = this.auth.sessionGeneration();
+    const request = this.requests.begin(this.token);
     this.busy.set(true);
     try {
-      const result = await this.api.post<{ ok: true; message: string }>("/api/v1/auth/security-incident/revoke", { token: this.token });
-      this.auth.accountSignedOut();
+      const result = await this.api.post<{ ok: true; message: string }>(
+        "/api/v1/auth/security-incident/revoke",
+        { token: this.token },
+        decodePublicActionMessage,
+      );
+      this.auth.accountSignedOut(generation);
+      if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.message.set(result.message);
     } catch (error) {
-      this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo revocar el acceso. Inicia la recuperación de contraseña.");
+      if (this.requests.isCurrent(request, this.token)) {
+        this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo revocar el acceso. Inicia la recuperación de contraseña.");
+      }
     } finally {
-      this.busy.set(false);
-      this.done.set(true);
+      if (this.requests.isCurrent(request, this.token)) {
+        this.busy.set(false);
+        this.done.set(true);
+      }
     }
   }
 }

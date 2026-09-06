@@ -2,20 +2,24 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\Webhook;
 use App\Exceptions\LinkException;
 use App\Http\Middleware\RecordOperationalResponse;
+use App\Jobs\ProvisionDomainTlsJob;
 use App\Jobs\VerifyDomainDnsJob;
+use App\Models\User;
+use App\Models\Webhook;
 use App\Support\Ids;
 use App\Support\LinkService;
 use App\Support\UvhCrypto;
+use Carbon\Carbon;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -134,7 +138,7 @@ class ApiParityTest extends TestCase
         $intent = $issued->json('intent');
         $this->assertIsString($intent);
         $this->assertMatchesRegularExpression('/^[A-Za-z0-9_-]{43}$/', $intent);
-        $this->assertTrue(now()->diffInHours(\Carbon\Carbon::parse($issued->json('expiresAt')), false) >= 23);
+        $this->assertTrue(now()->diffInHours(Carbon::parse($issued->json('expiresAt')), false) >= 23);
 
         $ownerSession = $this->registerVerifiedLogin('intent-owner@example.com');
         $claimed = $this->withCookie('uvh_session', $ownerSession)
@@ -183,6 +187,64 @@ class ApiParityTest extends TestCase
         $this->postJson('/api/v1/link-intents', [
             'destination' => 'https://example.com/after-expiry',
         ])->assertCreated();
+    }
+
+    public function test_consumed_link_intent_stays_successful_when_counter_cleanup_is_unavailable(): void
+    {
+        $issued = $this->postJson('/api/v1/link-intents', ['destination' => 'https://example.com/cleanup']);
+        $intent = $issued->json('intent');
+        $session = $this->registerVerifiedLogin('intent-cleanup@example.com');
+        $this->withCookie('uvh_session', $session)
+            ->postJson('/api/v1/link-intents/claim', ['intent' => $intent])->assertOk();
+
+        $cache = Cache::getFacadeRoot();
+        $cacheMock = Mockery::mock($cache)->makePartial();
+        $unavailable = Mockery::mock(Lock::class);
+        $unavailable->shouldReceive('get')->once()->andReturnFalse();
+        $cacheMock->shouldReceive('lock')->andReturnUsing(
+            static function (string $name, int $seconds = 0, ?string $owner = null) use ($cache, $unavailable) {
+                return $name === 'link-intent-active:global:lock'
+                    ? $unavailable
+                    : $cache->lock($name, $seconds, $owner);
+            }
+        );
+        Cache::swap($cacheMock);
+        try {
+            $this->withCookie('uvh_session', $session)
+                ->postJson('/api/v1/link-intents/complete', ['intent' => $intent])
+                ->assertOk()->assertExactJson(['ok' => true]);
+        } finally {
+            Cache::swap($cache);
+        }
+
+        $this->withCookie('uvh_session', $session)
+            ->postJson('/api/v1/link-intents/claim', ['intent' => $intent])->assertNotFound();
+    }
+
+    public function test_link_intent_completion_does_not_claim_success_when_delete_is_rejected(): void
+    {
+        $issued = $this->postJson('/api/v1/link-intents', ['destination' => 'https://example.com/delete']);
+        $intent = $issued->json('intent');
+        $session = $this->registerVerifiedLogin('intent-delete@example.com');
+        $this->withCookie('uvh_session', $session)
+            ->postJson('/api/v1/link-intents/claim', ['intent' => $intent])->assertOk();
+
+        $cache = Cache::getFacadeRoot();
+        $cacheMock = Mockery::mock($cache)->makePartial();
+        $cacheMock->shouldReceive('forget')->once()->andReturnFalse();
+        Cache::swap($cacheMock);
+        try {
+            $this->withCookie('uvh_session', $session)
+                ->postJson('/api/v1/link-intents/complete', ['intent' => $intent])->assertStatus(503);
+        } finally {
+            Cache::swap($cache);
+        }
+
+        // The failed deletion remains retryable and restores its inverse index.
+        $this->withCookie('uvh_session', $session)
+            ->postJson('/api/v1/link-intents/claim', ['intent' => $intent])->assertOk();
+        $this->withCookie('uvh_session', $session)
+            ->postJson('/api/v1/link-intents/complete', ['intent' => $intent])->assertOk();
     }
 
     public function test_new_workspace_response_immediately_reports_owner_role(): void
@@ -681,7 +743,7 @@ class ApiParityTest extends TestCase
         $this->assertDatabaseMissing('links', ['workspace_id' => $workspaceId]);
     }
 
-    public function test_domain_verification_is_queued_and_disabled_domains_can_be_reactivated(): void
+    public function test_domain_verification_tls_provisioning_and_disabled_revalidation_are_queued(): void
     {
         Queue::fake();
         $email = 'domain-flow@example.com';
@@ -698,17 +760,31 @@ class ApiParityTest extends TestCase
         Queue::assertPushed(VerifyDomainDnsJob::class, fn (VerifyDomainDnsJob $job) => $job->domainId === $domainId);
         $this->assertDatabaseHas('custom_domains', ['id' => $domainId, 'state' => 'verifying']);
 
-        Cache::forget('uvh:domain-verification:'.$workspaceId.':'.$domainId);
+        Cache::lock('uvh:domain-verification:'.$workspaceId.':'.$domainId)->forceRelease();
+        // Simulate the successful, version-matched DNS worker result. A
+        // domain must never become edge-active from a stale `disabled` row:
+        // activation first requires fresh ownership and routing evidence.
         DB::table('custom_domains')->where('id', $domainId)->update([
-            'state' => 'disabled',
+            'state' => 'verified',
             'verified_at' => now(),
+            'ownership_verified_at' => now(),
+            'routing_verified_at' => now(),
+            'dns_check_completed_at' => now(),
+            'dns_error' => null,
         ]);
         $authorized->postJson('/api/v1/domains/'.$domainId.'/activate')
-            ->assertOk()->assertJson(['state' => 'active']);
+            ->assertStatus(202)->assertJson(['state' => 'provisioning']);
+        Queue::assertPushed(ProvisionDomainTlsJob::class, fn (ProvisionDomainTlsJob $job) => $job->domainId === $domainId);
 
+        $authorized->postJson('/api/v1/domains/'.$domainId.'/disable')
+            ->assertOk()->assertJson(['state' => 'disabled']);
+
+        // Queue::fake() cannot run the worker that normally releases its
+        // owner-scoped lock, so explicitly release only this fixture's lock.
+        Cache::lock('uvh:domain-verification:'.$workspaceId.':'.$domainId)->forceRelease();
         $authorized->postJson('/api/v1/domains/'.$domainId.'/revalidate')
-            ->assertStatus(202)->assertJson(['ok' => true, 'state' => 'active']);
-        $this->assertDatabaseHas('custom_domains', ['id' => $domainId, 'state' => 'active']);
+            ->assertStatus(202)->assertJson(['ok' => true, 'state' => 'disabled']);
+        $this->assertDatabaseHas('custom_domains', ['id' => $domainId, 'state' => 'disabled', 'edge_eligible' => false]);
     }
 
     public function test_queue_admission_failure_does_not_undo_a_created_link(): void

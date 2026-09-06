@@ -48,7 +48,7 @@ final class UvhReleaseCheckTest extends TestCase
 
     public static function missingSchema(): array
     {
-        return [['ledger'], ['table'], ['column'], ['audit_column']];
+        return [['ledger'], ['table'], ['column'], ['audit_column'], ['usage_index']];
     }
 
     #[DataProvider('missingSchema')]
@@ -66,6 +66,8 @@ final class UvhReleaseCheckTest extends TestCase
                 Schema::table('audit_events', function (Blueprint $table): void {
                     $table->renameColumn('workspace_id', 'release_check_hidden_workspace');
                 });
+            } elseif ($part === 'usage_index') {
+                DB::statement('DROP INDEX workspace_usage_tokens_idx');
             } else {
                 Schema::table('invitation_mail_budgets', function (Blueprint $table): void {
                     $table->renameColumn('used', 'release_check_hidden_used');
@@ -74,6 +76,7 @@ final class UvhReleaseCheckTest extends TestCase
             $expected = match ($part) {
                 'ledger' => 'Falta el registro de migraciones. Ejecuta la migración del release de forma autorizada.',
                 'audit_column' => 'Falta la atribución de actividad por workspace (000033).',
+                'usage_index' => 'Faltan índices acotados de uso por workspace (000034).',
                 default => 'Falta el esquema de presupuestos de invitación (000032).',
             };
             $this->assertContains($expected, ReleaseReadiness::errors());

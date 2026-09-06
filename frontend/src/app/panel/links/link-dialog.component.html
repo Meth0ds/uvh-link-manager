@@ -38,6 +38,7 @@
                 @if (aliasStatus() === 'taken' || aliasStatus() === 'reserved' || aliasStatus() === 'invalid') {
                   <mat-hint class="err-hint">{{ aliasStatusText() }}</mat-hint>
                 }
+                @if (form.controls.alias.hasError('pattern')) { <mat-error>Usa letras, números, guion o guion bajo.</mat-error> }
               </mat-form-field>
               <mat-form-field appearance="outline" class="domain">
                 <mat-label>Dominio</mat-label>
@@ -82,13 +83,18 @@
                 <mat-label>Activación programada</mat-label>
                 <input matInput formControlName="scheduledAt" type="datetime-local" />
                 <mat-icon matPrefix>event</mat-icon>
+                @if (form.controls.scheduledAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
               </mat-form-field>
               <mat-form-field appearance="outline" class="grow">
                 <mat-label>Expiración</mat-label>
                 <input matInput formControlName="expiresAt" type="datetime-local" />
                 <mat-icon matPrefix>event_busy</mat-icon>
+                @if (form.controls.expiresAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
               </mat-form-field>
             </div>
+            @if (form.hasError('lifecycleOrder')) {
+              <div class="alert error">La expiración debe ser posterior a la activación.</div>
+            }
             <mat-form-field appearance="outline" class="full">
               <mat-label>Notas internas</mat-label>
               <textarea matInput formControlName="notes" rows="2" placeholder="Contexto para tu equipo…"></textarea>
@@ -99,7 +105,7 @@
                 @for (tag of tags(); track tag) {
                   <mat-chip-row (removed)="removeTag(tag)">
                     {{ tag }}
-                    <button matChipRemove [attr.aria-label]="'Quitar ' + tag"><mat-icon>cancel</mat-icon></button>
+                    <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + tag"><mat-icon>cancel</mat-icon></button>
                   </mat-chip-row>
                 }
                 <input [matChipInputFor]="tagGrid" (matChipInputTokenEnd)="addTag($event)" placeholder="Añadir etiqueta…" />
@@ -132,8 +138,8 @@
                     </button>
                   </div>
                   <div class="rule-grid">
-                    <mat-form-field appearance="outline"><mat-label>País (ISO)</mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2" /></mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es" maxlength="8" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>País (ISO)</mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2" />@if (rule.controls.country.invalid) { <mat-error>Usa un código ISO de dos letras.</mat-error> }</mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es" maxlength="8" />@if (rule.controls.language.invalid) { <mat-error>Usa letras, números o guiones.</mat-error> }</mat-form-field>
                     <mat-form-field appearance="outline">
                       <mat-label>Dispositivo</mat-label>
                       <mat-select formControlName="device">
@@ -143,20 +149,21 @@
                         <mat-option value="tablet">Tablet</mat-option>
                       </mat-select>
                     </mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>SO (contiene)</mat-label><input matInput formControlName="os" placeholder="Android" /></mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Desde (HH:mm UTC)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" /></mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Hasta (HH:mm UTC)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" /></mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="twitter.com" /></mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>SO (contiene)</mat-label><input matInput formControlName="os" placeholder="Android" maxlength="40" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Desde (HH:mm UTC)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" />@if (rule.controls.timeFrom.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Hasta (HH:mm UTC)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" />@if (rule.controls.timeTo.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="twitter.com" maxlength="200" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" maxlength="100" /></mat-form-field>
                   </div>
                   <mat-form-field appearance="outline" class="full">
                     <mat-label>Destino de la regla</mat-label>
                     <input matInput formControlName="destination" placeholder="https://ejemplo.com/oferta" />
+                    @if (rule.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales o déjala vacía.</mat-error> }
                   </mat-form-field>
                 </div>
               }
             </div>
-            <button mat-stroked-button type="button" class="add-rule" (click)="addRule()">
+            <button mat-stroked-button type="button" class="add-rule" (click)="addRule()" [disabled]="ruleForms.length >= 20">
               <mat-icon>add</mat-icon> Añadir regla
             </button>
           </div>
@@ -172,7 +179,7 @@
 
 <mat-dialog-actions align="end">
   <button mat-button mat-dialog-close>Cancelar</button>
-  <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || busy() || loading() || (isEdit && !editDetailsLoaded())">
+  <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || hasInvalidRules || ['checking', 'taken', 'invalid', 'reserved'].includes(aliasStatus()) || busy() || loading() || (isEdit && !editDetailsLoaded())">
     {{ busy() ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear enlace" }}
   </button>
 </mat-dialog-actions>

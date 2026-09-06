@@ -18,7 +18,10 @@ export class ThemeService {
 
   constructor() {
     const view = this.document.defaultView;
-    this.mediaQuery = view?.matchMedia("(prefers-color-scheme: dark)");
+    // Older embedded webviews can expose a Window without matchMedia.
+    this.mediaQuery = typeof view?.matchMedia === "function"
+      ? view.matchMedia("(prefers-color-scheme: dark)")
+      : undefined;
     this.systemDark.set(this.mediaQuery?.matches === true);
 
     const onSystemThemeChange = (event: MediaQueryListEvent): void => this.systemDark.set(event.matches);
@@ -73,7 +76,8 @@ export class ThemeService {
   private beginTransition(origin?: { x: number; y: number }): void {
     const root = this.document.documentElement;
     const view = this.document.defaultView;
-    if (!view || view.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!view || (typeof view.matchMedia === "function"
+      && view.matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
 
     if (origin) {
       root.style.setProperty("--uvh-theme-origin-x", `${origin.x}px`);

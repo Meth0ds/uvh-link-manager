@@ -13,7 +13,9 @@ checkout; no es una consola de producción.
    sigue respondiendo y muestra un aviso cada diez segundos mientras trabaja.
 3. **Actualizar estado** consulta Docker Compose, `http://127.0.0.1:8000/health`
    y la web local también en segundo plano. Una respuesta válida de tres
-   segundos o más se presenta como `LENTO`, no como una caída falsa.
+   segundos o más se presenta como `LENTO`, no como una caída falsa. Una
+   conexión rechazada o timeout que no exponga `Exception.Response` se muestra
+   como `NO DISPONIBLE`; bajo StrictMode no debe interrumpir el panel.
 4. **Logs backend** y **Logs frontend** abren consolas de seguimiento separadas.
 5. **Detener** para los servicios Compose y únicamente el proceso Angular cuya
    identidad fue registrada por esta herramienta.
@@ -59,6 +61,10 @@ migraciones `000016`–`000031` siguen necesitando ensayo sobre una copia
 representativa, medición de locks y rollback documentado.
 
 ## Recuperación
+
+Si Compose falla al detener los contenedores, el panel informa del error y un
+reinicio se interrumpe antes de arrancarlos de nuevo. La parada puede ser parcial
+(Angular ya detenido): consulta el estado antes de reintentar.
 
 Si Windows o el terminal se cierran inesperadamente, la siguiente lectura de
 estado compara el instante de creación antes de confiar en el PID guardado. Si

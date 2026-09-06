@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Support\Ids;
 use App\Support\LinkIntentRegistry;
+use App\Support\OperationalMetrics;
 use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use Illuminate\Http\Request;
@@ -19,7 +20,9 @@ use Illuminate\Support\Facades\Cache;
 class LinkIntentController
 {
     private const TTL_HOURS = 24;
+
     private const MAX_ACTIVE_PER_IP = 20;
+
     private const MAX_ACTIVE_GLOBAL = 100_000;
 
     public function issue(Request $request)
@@ -55,6 +58,7 @@ class LinkIntentController
                     throw new \RuntimeException('Intent global counter rejected write');
                 }
                 $globalCounterIncremented = true;
+
                 return true;
             });
         } catch (\Throwable) {
@@ -67,6 +71,7 @@ class LinkIntentController
                     $globalCounterIncremented,
                 );
             }
+
             return $this->temporarilyUnavailable();
         }
         if (! $accepted) {
@@ -86,6 +91,7 @@ class LinkIntentController
             }
         } catch (\Throwable) {
             $this->rollbackAdmission($counterBaseKey, $counterKey, $globalCounterKey, true, true);
+
             return $this->temporarilyUnavailable();
         }
 
@@ -168,23 +174,21 @@ class LinkIntentController
                     return false;
                 }
 
-                LinkIntentRegistry::forget($intentHash);
-                Cache::forget($this->cacheKey($intent));
-                if (is_string($record['counter_key'] ?? null)) {
-                    $counterLockKey = is_string($record['counter_lock_key'] ?? null)
-                        ? $record['counter_lock_key']
-                        : $record['counter_key'];
-                    $this->withCounterLocks($counterLockKey, function () use ($record): bool {
-                        $active = max(0, (int) Cache::get($record['counter_key'], 0) - 1);
-                        $globalKey = is_string($record['global_counter_key'] ?? null)
-                            ? $record['global_counter_key']
-                            : $this->globalCounterKey();
-                        $global = max(0, (int) Cache::get($globalKey, 0) - 1);
-                        Cache::put($record['counter_key'], $active, now()->addHours(self::TTL_HOURS));
-                        Cache::put($globalKey, $global, now()->addHours(self::TTL_HOURS));
-                        return true;
-                    });
+                if (! Cache::forget($this->cacheKey($intent))) {
+                    // A false success would leave a reusable handoff after the
+                    // browser was told it had been consumed. The inverse index
+                    // is deliberately retained so revocation can still find it.
+                    throw new \RuntimeException('Intent store rejected delete');
                 }
+                try {
+                    LinkIntentRegistry::forget($intentHash);
+                } catch (\Throwable) {
+                    // The bearer is already gone and cannot be retried. Its
+                    // metadata-only inverse row expires through housekeeping.
+                    OperationalMetrics::increment('lock.unavailable');
+                }
+                $this->releaseConsumedIntentCounters($record);
+
                 return true;
             });
         } catch (\Throwable) {
@@ -205,7 +209,7 @@ class LinkIntentController
     }
 
     /**
-     * @param mixed $record
+     * @param  mixed  $record
      */
     private function validRecord($record): bool
     {
@@ -226,7 +230,8 @@ class LinkIntentController
 
     /**
      * @template T
-     * @param callable(): T $callback
+     *
+     * @param  callable(): T  $callback
      * @return T|null
      */
     private function withLock(string $intent, callable $callback)
@@ -315,8 +320,7 @@ class LinkIntentController
         string $globalCounterKey,
         bool $decrementIp,
         bool $decrementGlobal,
-    ): void
-    {
+    ): void {
         try {
             $this->withCounterLocks($counterBaseKey, function () use ($counterKey, $globalCounterKey, $decrementIp, $decrementGlobal): bool {
                 if ($decrementIp) {
@@ -325,11 +329,44 @@ class LinkIntentController
                 if ($decrementGlobal) {
                     Cache::put($globalCounterKey, max(0, (int) Cache::get($globalCounterKey, 0) - 1), now()->addHours(self::TTL_HOURS + 2));
                 }
+
                 return true;
             });
         } catch (\Throwable) {
             // Buckets have a bounded TTL. Preserve the original service error
             // instead of replacing it with a cleanup exception.
+        }
+    }
+
+    /** @param array<string, mixed> $record */
+    private function releaseConsumedIntentCounters(array $record): void
+    {
+        if (! is_string($record['counter_key'] ?? null)) {
+            return;
+        }
+
+        try {
+            $counterLockKey = is_string($record['counter_lock_key'] ?? null)
+                ? $record['counter_lock_key']
+                : $record['counter_key'];
+            $this->withCounterLocks($counterLockKey, function () use ($record): bool {
+                $active = max(0, (int) Cache::get($record['counter_key'], 0) - 1);
+                $globalKey = is_string($record['global_counter_key'] ?? null)
+                    ? $record['global_counter_key']
+                    : $this->globalCounterKey();
+                $global = max(0, (int) Cache::get($globalKey, 0) - 1);
+                if (! Cache::put($record['counter_key'], $active, now()->addHours(self::TTL_HOURS))
+                    || ! Cache::put($globalKey, $global, now()->addHours(self::TTL_HOURS))) {
+                    throw new \RuntimeException('Intent counter store rejected cleanup');
+                }
+
+                return true;
+            });
+        } catch (\Throwable) {
+            // The handoff is already irreversibly consumed. Its hourly counter
+            // buckets expire, so cleanup failure must not turn success into a
+            // misleading 503 and cause clients to retry a deleted token.
+            OperationalMetrics::increment('lock.unavailable');
         }
     }
 

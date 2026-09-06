@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -16,6 +16,12 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { LatestRequest } from "../../core/services/latest-request";
+import {
+  decodeCreatedWebhookResponse,
+  decodeWebhookDeliveriesResponse,
+  decodeWebhooksResponse,
+} from "../../core/services/credential-response-decoders";
 
 const EVENTS = [
   "link.created",
@@ -51,6 +57,10 @@ export class WebhooksComponent {
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
   private actions = inject(ActionDialogService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly loadRequests = new LatestRequest(this.destroyRef);
+  private readonly mutationRequests = new LatestRequest(this.destroyRef);
+  private readonly deliveryRequests = new Map<number, LatestRequest>();
 
   readonly webhooks = signal<WebhookDto[]>([]);
   readonly deliveries = signal<Record<number, WebhookDelivery[]>>({});
@@ -77,6 +87,19 @@ export class WebhooksComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.loadRequests.invalidate();
+      this.mutationRequests.invalidate();
+      for (const guard of this.deliveryRequests.values()) guard.invalidate();
+      this.deliveryRequests.clear();
+      this.webhooks.set([]);
+      this.deliveries.set({});
+      this.deliveriesLoading.set({});
+      this.deliveriesError.set({});
+      this.error.set(null);
+      this.actionId.set(null);
+      this.saving.set(false);
+      // A newly generated webhook secret belongs only to its source workspace.
+      this.resetForm();
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -86,15 +109,25 @@ export class WebhooksComponent {
   }
 
   async load(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) {
+      this.loadRequests.invalidate();
+      this.webhooks.set([]);
+      this.loading.set(false);
+      return;
+    }
+    const request = this.loadRequests.begin(workspaceId);
     this.loading.set(true);
     this.error.set(null);
     try {
-      const { webhooks } = await this.api.get<{ webhooks: WebhookDto[] }>("/api/v1/webhooks");
+      const { webhooks } = await this.api.get<{ webhooks: WebhookDto[] }>("/api/v1/webhooks", undefined, decodeWebhooksResponse);
+      if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.webhooks.set(webhooks);
     } catch (err) {
+      if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los webhooks");
     } finally {
-      this.loading.set(false);
+      if (this.loadRequests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
   }
 
@@ -131,6 +164,9 @@ export class WebhooksComponent {
       this.snackbar.open("El secreto debe tener entre 16 y 128 caracteres", "Cerrar", { duration: 3500 });
       return;
     }
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
+    const request = this.mutationRequests.begin(workspaceId);
     this.saving.set(true);
     const payload = {
       url: this.url().trim(),
@@ -143,18 +179,25 @@ export class WebhooksComponent {
         await this.api.patch(`/api/v1/webhooks/${this.editId()}`, payload);
         this.snackbar.open("Webhook actualizado", "Cerrar", { duration: 2500 });
       } else {
-        const { webhook, secret } = await this.api.post<{ webhook: WebhookDto; secret: string }>("/api/v1/webhooks", payload);
+        const { webhook, secret } = await this.api.post<{ webhook: WebhookDto; secret: string }>(
+          "/api/v1/webhooks",
+          payload,
+          decodeCreatedWebhookResponse,
+        );
+        if (!this.mutationRequests.isCurrent(request, this.workspaces.currentId())) return;
         createdSecret = secret;
         this.webhooks.update((list) => [webhook, ...list]);
         this.snackbar.open("Webhook creado. Guarda el secreto ahora; no volverá a mostrarse.", "Cerrar", { duration: 6000 });
       }
+      if (!this.mutationRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.resetForm();
       if (createdSecret) this.plainSecret.set(createdSecret);
       void this.load();
     } catch (err) {
+      if (!this.mutationRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo guardar el webhook", "Cerrar", { duration: 4000 });
     } finally {
-      this.saving.set(false);
+      if (this.mutationRequests.isCurrent(request, this.workspaces.currentId())) this.saving.set(false);
     }
   }
 
@@ -225,18 +268,33 @@ export class WebhooksComponent {
   async loadDeliveries(w: WebhookDto): Promise<void> {
     if (this.deliveriesLoading()[w.id]) return;
     if (this.deliveries()[w.id] && !this.deliveriesError()[w.id]) return;
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
+    // Expanded rows may load concurrently, so each webhook needs an
+    // independent latest-request guard.
+    const guard = this.deliveryRequests.get(w.id) ?? new LatestRequest(this.destroyRef);
+    this.deliveryRequests.set(w.id, guard);
+    const request = guard.begin(workspaceId);
     this.deliveriesLoading.update((state) => ({ ...state, [w.id]: true }));
     this.deliveriesError.update((state) => ({ ...state, [w.id]: null }));
     try {
-      const { deliveries } = await this.api.get<{ deliveries: WebhookDelivery[] }>(`/api/v1/webhooks/${w.id}/deliveries`);
+      const { deliveries } = await this.api.get<{ deliveries: WebhookDelivery[] }>(
+        `/api/v1/webhooks/${w.id}/deliveries`,
+        undefined,
+        decodeWebhookDeliveriesResponse,
+      );
+      if (!guard.isCurrent(request, this.workspaces.currentId())) return;
       this.deliveries.update((d) => ({ ...d, [w.id]: deliveries }));
     } catch (err) {
+      if (!guard.isCurrent(request, this.workspaces.currentId())) return;
       this.deliveriesError.update((state) => ({
         ...state,
         [w.id]: err instanceof ApiRequestError ? err.message : "No se pudieron cargar las entregas",
       }));
     } finally {
-      this.deliveriesLoading.update((state) => ({ ...state, [w.id]: false }));
+      if (guard.isCurrent(request, this.workspaces.currentId())) {
+        this.deliveriesLoading.update((state) => ({ ...state, [w.id]: false }));
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ViewChild, computed, effect, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ViewChild, computed, effect, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
@@ -11,6 +11,7 @@ import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { AuthShellComponent } from "./auth-shell.component";
 import { AuthService } from "../core/services/auth.service";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
+import { decodePublicConfig } from "../core/services/public-response-decoders";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
@@ -106,7 +107,12 @@ export class AuthComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly intents = inject(PendingLinkIntentService);
   private readonly invitations = inject(PendingInvitationService);
+  private readonly destroyRef = inject(DestroyRef);
   private redirectedAuthenticatedVisitor = false;
+  private interactiveAuthStarted = false;
+  private flowRevision = 0;
+  private verificationRevision = 0;
+  private captchaConfigRevision = 0;
 
   readonly step = signal<Step>("login");
   readonly registerStep = signal<RegisterStep>(1);
@@ -232,6 +238,7 @@ export class AuthComponent {
     effect(() => {
       if (
         this.redirectedAuthenticatedVisitor
+        || this.interactiveAuthStarted
         || !this.auth.loaded()
         || !this.auth.authenticated()
       ) return;
@@ -241,6 +248,7 @@ export class AuthComponent {
   }
 
   onTabChange(index: number): void {
+    this.invalidateFlow();
     this.tabIndex.set(index);
     this.step.set(index === 0 ? "login" : "register");
     this.registerStep.set(1);
@@ -275,6 +283,7 @@ export class AuthComponent {
   }
 
   previousRegisterStep(): void {
+    this.invalidateFlow();
     this.error.set(null);
     this.info.set(null);
     this.registerStep.set(1);
@@ -286,6 +295,9 @@ export class AuthComponent {
       if (!this.loginCaptchaToken()) this.error.set("Completa hCaptcha para continuar.");
       return;
     }
+    const revision = ++this.flowRevision;
+    const destination = this.returnTo();
+    this.interactiveAuthStarted = true;
     this.busy.set(true);
     this.error.set(null);
     this.verificationEmail.set(null);
@@ -295,6 +307,7 @@ export class AuthComponent {
         this.loginForm.controls.password.value,
         this.loginCaptchaToken(),
       );
+      if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
       if (outcome.mfaRequired) {
         this.mfaChallenge.set(outcome.challenge);
         this.mfaRecoveryAvailable.set(outcome.recoveryAvailable);
@@ -303,9 +316,12 @@ export class AuthComponent {
         this.step.set("mfa");
         this.info.set(null);
       } else {
-        await this.router.navigateByUrl(this.returnTo());
+        this.redirectedAuthenticatedVisitor = true;
+        await this.router.navigateByUrl(destination);
       }
     } catch (err) {
+      if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
+      this.interactiveAuthStarted = false;
       if (
         err instanceof ApiRequestError &&
         err.status === 403 &&
@@ -319,7 +335,7 @@ export class AuthComponent {
       this.loginCaptchaToken.set("");
       this.loginCaptchaWidget?.reset();
     } finally {
-      this.busy.set(false);
+      if (!this.destroyRef.destroyed) this.busy.set(false);
     }
   }
 
@@ -328,6 +344,8 @@ export class AuthComponent {
       this.mfaForm.markAllAsTouched();
       return;
     }
+    const revision = ++this.flowRevision;
+    const destination = this.returnTo();
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -337,13 +355,16 @@ export class AuthComponent {
         return;
       }
       await this.auth.verifyMfa(challenge, this.mfaForm.controls.code.value);
-      await this.router.navigateByUrl(this.returnTo());
+      if (!this.isFlowCurrent(revision) || this.step() !== "mfa" || this.mfaChallenge() !== challenge) return;
+      this.redirectedAuthenticatedVisitor = true;
+      await this.router.navigateByUrl(destination);
     } catch (err) {
+      if (!this.isFlowCurrent(revision) || this.step() !== "mfa") return;
       const message = err instanceof ApiRequestError ? err.message : "Código incorrecto";
       if (message === "Sesión MFA caducada") this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
       else this.error.set(message);
     } finally {
-      this.busy.set(false);
+      if (!this.destroyRef.destroyed) this.busy.set(false);
     }
   }
 
@@ -352,6 +373,8 @@ export class AuthComponent {
       this.recoveryForm.markAllAsTouched();
       return;
     }
+    const revision = ++this.flowRevision;
+    const destination = this.returnTo();
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -361,13 +384,16 @@ export class AuthComponent {
         return;
       }
       await this.auth.recoverMfa(challenge, this.recoveryForm.controls.code.value);
-      await this.router.navigateByUrl(this.returnTo());
+      if (!this.isFlowCurrent(revision) || this.step() !== "recovery" || this.mfaChallenge() !== challenge) return;
+      this.redirectedAuthenticatedVisitor = true;
+      await this.router.navigateByUrl(destination);
     } catch (err) {
+      if (!this.isFlowCurrent(revision) || this.step() !== "recovery") return;
       const message = err instanceof ApiRequestError ? err.message : "Código de recuperación incorrecto";
       if (message === "Sesión MFA caducada") this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
       else this.error.set(message);
     } finally {
-      this.busy.set(false);
+      if (!this.destroyRef.destroyed) this.busy.set(false);
     }
   }
 
@@ -382,18 +408,26 @@ export class AuthComponent {
       return;
     }
 
+    const revision = ++this.flowRevision;
     this.busy.set(true);
     this.error.set(null);
+    const changeEmail = this.changeEmailMode();
+    const currentEmail = this.registeredEmail();
+    const email = this.registerForm.controls.email.value.trim().toLowerCase();
+    const step = this.step();
+    const stillCurrent = () => this.isFlowCurrent(revision)
+      && this.step() === step
+      && this.registerStep() === 2
+      && this.changeEmailMode() === changeEmail
+      && this.registerForm.controls.email.value.trim().toLowerCase() === email;
     try {
-      const email = this.registerForm.controls.email.value.trim().toLowerCase();
       const antiBot = {
         captchaToken: this.registerCaptchaToken(),
         website: this.registerForm.controls.company.value,
       };
-      if (this.changeEmailMode()) {
-        const currentEmail = this.registeredEmail();
+      if (changeEmail) {
         if (!currentEmail) {
-          this.error.set("No hay un registro pendiente que actualizar");
+          if (stillCurrent()) this.error.set("No hay un registro pendiente que actualizar");
           return;
         }
         if (currentEmail.toLowerCase() === email) {
@@ -419,6 +453,7 @@ export class AuthComponent {
           },
         );
       }
+      if (!stillCurrent()) return;
       this.registeredEmail.set(email);
       this.verificationEmail.set(email);
       this.changeEmailMode.set(false);
@@ -430,13 +465,14 @@ export class AuthComponent {
       );
       this.registerCaptchaToken.set("");
     } catch (err) {
+      if (!stillCurrent()) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo crear la cuenta");
       // hCaptcha tokens are short-lived and single-use. Never reuse one after
       // the server has attempted verification, even when credentials fail.
       this.registerCaptchaToken.set("");
       this.registerCaptchaWidget?.reset();
     } finally {
-      this.busy.set(false);
+      if (!this.destroyRef.destroyed) this.busy.set(false);
     }
   }
 
@@ -448,14 +484,19 @@ export class AuthComponent {
       if (!captchaToken) this.error.set("Completa hCaptcha para reenviar el correo.");
       return;
     }
+    const revision = ++this.verificationRevision;
     this.verificationBusy.set(true);
     this.error.set(null);
     try {
       await this.auth.resendVerification(email, captchaToken);
+      if (!this.isVerificationCurrent(revision, pendingStep, email)) return;
       this.info.set("Si la cuenta necesita verificación, recibirás un nuevo correo en breve. Revisa también spam.");
     } catch (err) {
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo reenviar el correo");
+      if (this.isVerificationCurrent(revision, pendingStep, email)) {
+        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo reenviar el correo");
+      }
     } finally {
+      if (this.destroyRef.destroyed || revision !== this.verificationRevision) return;
       if (pendingStep) {
         this.resendCaptchaToken.set("");
         this.resendCaptchaWidget?.reset();
@@ -470,6 +511,7 @@ export class AuthComponent {
   changeRegistrationEmail(): void {
     const email = this.registeredEmail() ?? this.verificationEmail();
     if (!email) return;
+    this.invalidateFlow();
     this.tabIndex.set(1);
     this.step.set("register");
     this.registerStep.set(1);
@@ -483,6 +525,7 @@ export class AuthComponent {
   closeRegistration(): void {
     // Registration is intentionally sessionless; no server session exists to
     // revoke here.
+    this.invalidateFlow();
     this.changeEmailMode.set(false);
     this.registeredEmail.set(null);
     this.verificationEmail.set(null);
@@ -504,11 +547,13 @@ export class AuthComponent {
   }
 
   goForgot(): void {
+    this.invalidateFlow();
     void this.router.navigate(["/auth/forgot-password"], { queryParams: { returnTo: this.returnTo() } });
   }
 
   goRecovery(): void {
     if (!this.mfaChallenge() || !this.mfaRecoveryAvailable()) return;
+    this.invalidateFlow();
     this.step.set("recovery");
     this.error.set(null);
     this.info.set(null);
@@ -519,6 +564,7 @@ export class AuthComponent {
       this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
       return;
     }
+    this.invalidateFlow();
     this.step.set("mfa");
     this.recoveryForm.reset();
     this.error.set(null);
@@ -526,6 +572,7 @@ export class AuthComponent {
   }
 
   restartMfaLogin(message?: string): void {
+    this.invalidateFlow();
     this.mfaChallenge.set(null);
     this.mfaRecoveryAvailable.set(false);
     this.mfaForm.reset();
@@ -539,6 +586,7 @@ export class AuthComponent {
   }
 
   backToLogin(): void {
+    this.invalidateFlow();
     this.tabIndex.set(0);
     this.step.set("login");
     this.changeEmailMode.set(false);
@@ -567,21 +615,48 @@ export class AuthComponent {
 
   private async loadCaptchaConfiguration(): Promise<void> {
     if (this.captchaConfigBusy() && this.hcaptchaSiteKey()) return;
+    const revision = ++this.captchaConfigRevision;
     this.captchaConfigBusy.set(true);
     this.captchaConfigError.set(null);
     try {
-      const config = await this.api.get<PublicAuthConfig>("/api/v1/config");
+      const config = await this.api.get<PublicAuthConfig>("/api/v1/config", undefined, decodePublicConfig);
+      if (!this.isCaptchaConfigurationCurrent(revision)) return;
       const siteKey = config.hcaptcha?.enabled ? config.hcaptcha.siteKey : null;
       if (!siteKey || !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey)) {
         throw new Error("hCaptcha no está configurado");
       }
       this.hcaptchaSiteKey.set(siteKey);
     } catch {
-      this.hcaptchaSiteKey.set("");
-      this.captchaConfigError.set("No se pudo cargar hCaptcha.");
+      if (this.isCaptchaConfigurationCurrent(revision)) {
+        this.hcaptchaSiteKey.set("");
+        this.captchaConfigError.set("No se pudo cargar hCaptcha.");
+      }
     } finally {
-      this.captchaConfigBusy.set(false);
+      if (this.isCaptchaConfigurationCurrent(revision)) this.captchaConfigBusy.set(false);
     }
+  }
+
+  private invalidateFlow(): void {
+    ++this.flowRevision;
+    ++this.verificationRevision;
+    this.verificationBusy.set(false);
+  }
+
+  private isFlowCurrent(revision: number): boolean {
+    return !this.destroyRef.destroyed && revision === this.flowRevision;
+  }
+
+  private isVerificationCurrent(revision: number, pendingStep: boolean, email: string): boolean {
+    const expectedStep = pendingStep ? "verify-pending" : "login";
+    const currentEmail = this.verificationEmail() ?? this.loginForm.controls.email.value.trim().toLowerCase();
+    return !this.destroyRef.destroyed
+      && revision === this.verificationRevision
+      && this.step() === expectedStep
+      && currentEmail === email;
+  }
+
+  private isCaptchaConfigurationCurrent(revision: number): boolean {
+    return !this.destroyRef.destroyed && revision === this.captchaConfigRevision;
   }
 
   private returnTo(): string {

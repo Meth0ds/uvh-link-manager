@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from "@angular/core";
 import { ApiRequestError, ApiService } from "./api.service";
+import { decodeClaimedLinkIntent, decodeLinkIntentReceipt } from "./link-intent-response-decoders";
 
 const STORAGE_KEY = "uvh.pending-link-intent.v1";
 const TTL_MS = 24 * 60 * 60 * 1000;
@@ -18,6 +19,7 @@ export interface ClaimedLinkIntent {
 interface StoredLinkIntent extends LinkIntentReceipt {
   storage: "local" | "session" | "memory";
   state: "active" | "completing";
+  savedAt: number;
 }
 
 /**
@@ -43,7 +45,7 @@ export class PendingLinkIntentService {
   }
 
   async create(destination: string): Promise<LinkIntentReceipt> {
-    return this.api.post<LinkIntentReceipt>("/api/v1/link-intents", { destination });
+    return this.api.post<LinkIntentReceipt>("/api/v1/link-intents", { destination }, decodeLinkIntentReceipt);
   }
 
   /** Capture a token from the app-host URL and remove it from the route afterwards. */
@@ -51,16 +53,20 @@ export class PendingLinkIntentService {
     if (!TOKEN_PATTERN.test(intent)) return false;
     const expires = expiresAt ? this.validExpiry(expiresAt) : new Date(Date.now() + TTL_MS).toISOString();
     if (!expires) return false;
-    const record: StoredLinkIntent = { intent, expiresAt: expires, storage: "memory", state: "active" };
+    const savedAt = Date.now();
+    const record: StoredLinkIntent = { intent, expiresAt: expires, storage: "memory", state: "active", savedAt };
+    const payload = JSON.stringify({ intent, expiresAt: expires, state: "active", savedAt });
 
     if (typeof window !== "undefined") {
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ intent, expiresAt: expires, state: "active" }));
-        window.sessionStorage.removeItem(STORAGE_KEY);
+        window.localStorage.setItem(STORAGE_KEY, payload);
         record.storage = "local";
+        // Cleanup is independent: a denied sessionStorage operation must not
+        // downgrade a localStorage write that has already succeeded.
+        try { window.sessionStorage.removeItem(STORAGE_KEY); } catch { /* stale fallback is ignored below */ }
       } catch {
         try {
-          window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ intent, expiresAt: expires, state: "active" }));
+          window.sessionStorage.setItem(STORAGE_KEY, payload);
           record.storage = "session";
         } catch {
           // Keep the current app session useful even under strict privacy modes.
@@ -77,7 +83,11 @@ export class PendingLinkIntentService {
     const intent = this.freshIntent();
     if (!intent) return null;
     try {
-      return await this.api.post<ClaimedLinkIntent>("/api/v1/link-intents/claim", { intent: intent.intent });
+      return await this.api.post<ClaimedLinkIntent>(
+        "/api/v1/link-intents/claim",
+        { intent: intent.intent },
+        decodeClaimedLinkIntent,
+      );
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 404) this.clear();
       throw error;
@@ -112,21 +122,35 @@ export class PendingLinkIntentService {
 
   private read(): StoredLinkIntent | null {
     if (typeof window === "undefined") return null;
-    return this.readStorage(window.localStorage, "local") ?? this.readStorage(window.sessionStorage, "session");
+    let local: StoredLinkIntent | null = null;
+    let session: StoredLinkIntent | null = null;
+    // Access to the Storage objects themselves can throw in sandboxed frames.
+    try { local = this.readStorage(window.localStorage, "local"); } catch { /* storage is optional */ }
+    try { session = this.readStorage(window.sessionStorage, "session"); } catch { /* storage is optional */ }
+    // A local write can later become unavailable while the completing state is
+    // safely persisted in sessionStorage. Never resurrect its active twin.
+    if (local?.intent === session?.intent && session?.state === "completing") return session;
+    if (local && session && session.savedAt > local.savedAt) return session;
+    return local ?? session;
   }
 
   private readStorage(storage: Storage, storageKind: StoredLinkIntent["storage"]): StoredLinkIntent | null {
     try {
       const raw = storage.getItem(STORAGE_KEY);
       if (!raw) return null;
-      const value = JSON.parse(raw) as Partial<LinkIntentReceipt> & { state?: unknown };
-      if (!value.intent || !TOKEN_PATTERN.test(value.intent) || !this.validExpiry(value.expiresAt)) {
+      const value = JSON.parse(raw) as Partial<LinkIntentReceipt> & { state?: unknown; savedAt?: unknown };
+      if (typeof value?.intent !== "string" || typeof value.expiresAt !== "string"
+        || !TOKEN_PATTERN.test(value.intent) || !this.validExpiry(value.expiresAt)
+        || (value.state !== undefined && value.state !== "active" && value.state !== "completing")) {
         storage.removeItem(STORAGE_KEY);
         return null;
       }
       const state = value.state === "completing" ? "completing" : "active";
-      return { intent: value.intent, expiresAt: value.expiresAt!, storage: storageKind, state };
+      const savedAt = typeof value.savedAt === "number" && Number.isSafeInteger(value.savedAt)
+        && value.savedAt > 0 && value.savedAt <= Date.now() + 5 * 60_000 ? value.savedAt : 0;
+      return { intent: value.intent, expiresAt: value.expiresAt!, storage: storageKind, state, savedAt };
     } catch {
+      try { storage.removeItem(STORAGE_KEY); } catch { /* storage is optional */ }
       return null;
     }
   }
@@ -134,12 +158,18 @@ export class PendingLinkIntentService {
   private validExpiry(value: string | undefined): string | null {
     if (!value) return null;
     const time = Date.parse(value);
-    return Number.isFinite(time) && time > Date.now() ? new Date(time).toISOString() : null;
+    // The URL parameter is untrusted. It may shorten, but never extend, the
+    // server-intent lifetime retained by this browser.
+    return Number.isFinite(time) && time > Date.now() && time <= Date.now() + TTL_MS
+      ? new Date(time).toISOString()
+      : null;
   }
 
   private persist(record: StoredLinkIntent): void {
     if (typeof window === "undefined" || record.storage === "memory") return;
-    const payload = JSON.stringify({ intent: record.intent, expiresAt: record.expiresAt, state: record.state });
+    const payload = JSON.stringify({
+      intent: record.intent, expiresAt: record.expiresAt, state: record.state, savedAt: record.savedAt,
+    });
     try {
       const target = record.storage === "local" ? window.localStorage : window.sessionStorage;
       target.setItem(STORAGE_KEY, payload);

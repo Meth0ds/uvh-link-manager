@@ -6,9 +6,13 @@ namespace App\Support;
 final class WorkspaceLimits
 {
     public const DOMAINS = 20;
+
     public const ACTIVE_TOKENS = 20;
+
     public const WEBHOOKS = 20;
+
     public const ACTIVE_INVITATIONS = 100;
+
     public const ANALYTICS_RANGE_DAYS = 180;
 
     public static function analyticsRetentionDays(): int

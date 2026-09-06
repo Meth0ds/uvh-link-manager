@@ -14,7 +14,7 @@ export class WorkspaceService {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const n = raw ? Number(raw) : NaN;
-      return Number.isFinite(n) && n > 0 ? n : null;
+      return Number.isSafeInteger(n) && n > 0 ? n : null;
     } catch {
       return null;
     }
@@ -29,10 +29,13 @@ export class WorkspaceService {
   }
 
   select(id: number | null): void {
-    this.currentId.set(id);
+    // This value becomes an authorization-context header. Reject fractional,
+    // negative and unsafe IDs even when a caller bypasses the workspace list.
+    const selected = id !== null && Number.isSafeInteger(id) && id > 0 ? id : null;
+    this.currentId.set(selected);
     try {
-      if (id == null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, String(id));
+      if (selected === null) localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, String(selected));
     } catch {
       /* ignore */
     }
