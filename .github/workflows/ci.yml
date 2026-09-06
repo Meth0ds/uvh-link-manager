@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Una ejecución nueva sustituye a la anterior para la misma rama o PR. Esto
+# reduce consumo sin mezclar resultados entre revisiones distintas.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Ningún paso de CI necesita escribir en el repositorio.
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend / typecheck, tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # npm ci respeta exactamente el lockfile y falla si package.json diverge.
+      - name: Install locked dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Audit production dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Test
+        working-directory: frontend
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+  backend:
+    name: Backend / audit and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    # La base de CI es efímera y termina en _test. El guard de TestCase rechaza
+    # cualquier base que no cumpla esta invariante antes de alterar datos.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: uvh_test
+          POSTGRES_USER: uvh_test
+          POSTGRES_PASSWORD: uvh_test_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U uvh_test -d uvh_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: uvh_test
+      DB_USERNAME: uvh_test
+      DB_PASSWORD: uvh_test_ci_only
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use PHP 8.4
+        uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: "8.4"
+          extensions: bcmath, curl, intl, mbstring, pdo_pgsql, pgsql, zip
+          coverage: none
+          tools: composer:v2
+
+      # Los jobs que corren directamente en el runner alcanzan el servicio por
+      # loopback. Conservamos el hostname postgres que phpunit.xml fuerza para
+      # que la misma configuración siga siendo válida dentro de Docker local.
+      - name: Bind the isolated database hostname
+        run: echo "127.0.0.1 postgres" | sudo tee -a /etc/hosts
+
+      - name: Validate Composer metadata
+        working-directory: backend-laravel
+        run: composer validate --strict --no-check-publish
+
+      - name: Install locked dependencies
+        working-directory: backend-laravel
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit production dependencies
+        working-directory: backend-laravel
+        run: composer audit --locked --no-dev
+
+      - name: Run test suite against uvh_test
+        working-directory: backend-laravel
+        run: composer test

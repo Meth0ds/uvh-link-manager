@@ -1,0 +1,12 @@
+# Las rutas sensibles requieren revisión explícita del propietario cuando la
+# regla de protección de rama "Require review from Code Owners" esté activa.
+* @Meth0ds
+
+# Mantener entradas específicas documenta las fronteras de mayor riesgo y
+# permite añadir propietarios especializados sin reestructurar este archivo.
+/backend-laravel/app/Http/Middleware/ @Meth0ds
+/backend-laravel/app/Support/ @Meth0ds
+/backend-laravel/config/ @Meth0ds
+/backend-laravel/database/migrations/ @Meth0ds
+/docker/ @Meth0ds
+/.github/ @Meth0ds
