@@ -8,6 +8,7 @@ use App\Jobs\ProvisionDomainTlsJob;
 use App\Jobs\VerifyDomainDnsJob;
 use App\Models\User;
 use App\Models\Webhook;
+use App\Support\HCaptcha;
 use App\Support\Ids;
 use App\Support\LinkService;
 use App\Support\UvhCrypto;
@@ -391,6 +392,36 @@ class ApiParityTest extends TestCase
             'error' => 'La verificación antiabuso no está disponible. Espera un momento y vuelve a intentarlo.',
         ]);
         $this->assertDatabaseHas('operational_metrics', ['metric' => 'hcaptcha.unavailable']);
+    }
+
+    public function test_hcaptcha_verifier_override_is_testable_but_immutable_everywhere_else(): void
+    {
+        config(['uvh.hcaptcha.verify_url' => 'http://hcaptcha.test/siteverify']);
+        Http::swap(new HttpFactory);
+        Http::fake([
+            'http://hcaptcha.test/siteverify' => Http::response([
+                'success' => true,
+                'hostname' => 'dummy-key-pass',
+            ]),
+        ]);
+
+        $request = Request::create('/api/v1/auth/login', 'POST', server: ['REMOTE_ADDR' => '127.0.0.1']);
+        $this->assertSame(HCaptcha::VALID, HCaptcha::verify($request, 'test-endpoint-token'));
+        Http::assertSentCount(1);
+
+        // The override exists solely for deterministic E2E. Even if an
+        // environment variable is injected elsewhere, neither a developer
+        // machine nor production may disclose the secret or user response.
+        try {
+            foreach (['local', 'production'] as $environment) {
+                app()->detectEnvironment(static fn (): string => $environment);
+                Http::fake();
+                $this->assertSame(HCaptcha::UNAVAILABLE, HCaptcha::verify($request, $environment.'-token'));
+                Http::assertNothingSent();
+            }
+        } finally {
+            app()->detectEnvironment(static fn (): string => 'testing');
+        }
     }
 
     public function test_operational_response_records_429_without_request_dimensions(): void

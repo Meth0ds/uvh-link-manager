@@ -1,6 +1,7 @@
 const eslint = require("@eslint/js");
 const tseslint = require("typescript-eslint");
 const angular = require("angular-eslint");
+const globals = require("globals");
 
 // Flat config keeps the linter independent from Angular CLI builders and makes
 // the same command reproducible locally and in CI.
@@ -9,7 +10,7 @@ module.exports = tseslint.config(
     ignores: ["dist/**", "coverage/**", ".angular/**", "node_modules/**"],
   },
   {
-    files: ["**/*.ts"],
+    files: ["src/**/*.ts"],
     extends: [
       eslint.configs.recommended,
       ...tseslint.configs.recommended,
@@ -34,10 +35,20 @@ module.exports = tseslint.config(
     },
   },
   {
-    files: ["**/*.html"],
+    files: ["src/**/*.html"],
     extends: [
       ...angular.configs.templateRecommended,
       ...angular.configs.templateAccessibility,
     ],
+  },
+  {
+    files: ["e2e/**/*.ts", "playwright.config.ts"],
+    extends: [eslint.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ["e2e/**/*.mjs"],
+    extends: [eslint.configs.recommended],
+    languageOptions: { globals: globals.node, sourceType: "module" },
   },
 );
