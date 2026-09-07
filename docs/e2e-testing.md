@@ -18,6 +18,9 @@ sigue verificando cada token antiabuso servidor a servidor.
   enlace del destinatario y tipo solicitados.
 - Tokens API, secretos TOTP y códigos de recuperación permanecen en memoria y
   nunca se escriben en logs, capturas ni comandos de shell.
+- Los helpers que envejecen sesiones o papelera vuelven a comprobar
+  `APP_ENV=testing` y el sufijo `_test`. El de papelera exige además workspace,
+  prefijo sin comodines y cardinalidad exacta antes de modificar una sola fila.
 - El teardown elimina contenedores, red y volúmenes incluso cuando falla una
   aserción. Si una ejecución se interrumpe de forma abrupta, `pree2e` limpia la
   pila exacta `uvh-e2e` antes de volver a empezar.
@@ -47,7 +50,7 @@ Los fallos conservan captura, vídeo y trace bajo `frontend/test-results`; esos
 artefactos están ignorados por Git. CI los adjunta durante siete días sólo si
 el job falla.
 
-## Cobertura actual: 18 recorridos
+## Cobertura actual: 24 recorridos
 
 1. Registro, verificación por email e inicio de sesión.
 2. Bloqueo de sesión para una cuenta no verificada.
@@ -64,14 +67,21 @@ el job falla.
 13. Solicitud y cancelación de exportación con invalidación del enlace.
 14. Creación, uso y revocación efectiva de un token Bearer de alcance mínimo.
 15. Invitación y aceptación por el destinatario verificado con rol `viewer`.
-16. Uso y límites con snapshot real ligado al workspace y redacción prudente.
+16. Uso y límites con roles reales `owner`, `admin`, `editor` y `viewer`.
 17. Centro de seguridad minimizado y revocación de la sesión actual.
-18. Purga irreversible de un enlace con frase y contraseña obligatorias.
+18. Purga irreversible con contraseña, TOTP y doble confirmación.
+19. Uso con teclado, reflow móvil y Axe WCAG A/AA.
+20. Revocación independiente de una sesión remota desde otro navegador.
+21. Reautenticación administrativa de una sesión MFA envejecida.
+22. Carrera multiproceso de clic/restore con contador exacto.
+23. Carrera multiproceso de restore/purge con un único ganador.
+24. Carrera entre restore y housekeeping sobre papelera envejecida.
 
 ## Qué no acredita
 
 La suite no convierte el proyecto en listo para producción. Siguen requiriendo
 evidencia separada el navegador y dispositivo reales adicionales, accesibilidad
 manual, DNS/TLS, proxy y cookies de producción, correo y webhooks externos,
-concurrencia multiproceso, backups/restauración, observabilidad y revisión
-legal. Consulta `production-readiness.md` para el inventario completo.
+concurrencia multiproceso fuera de las carreras concretas ya cubiertas,
+backups/restauración, observabilidad y revisión legal. Consulta
+`production-readiness.md` para el inventario completo.

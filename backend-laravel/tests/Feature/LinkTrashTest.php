@@ -122,7 +122,10 @@ final class LinkTrashTest extends TestCase
 
     private function signIn(User $user, Workspace $workspace): void
     {
-        $this->withCookie('uvh_session', SessionManager::create($user->id, Request::create('/'), (int) $user->security_version, true));
+        // Read the production application's configured cookie contract. A
+        // hard-coded name made this suite silently unauthenticated whenever an
+        // isolated stack deliberately used a distinct E2E cookie name.
+        $this->withCookie((string) config('uvh.session_cookie'), SessionManager::create($user->id, Request::create('/'), (int) $user->security_version, true));
         $this->withHeader('X-Workspace-Id', (string) $workspace->id);
     }
 }

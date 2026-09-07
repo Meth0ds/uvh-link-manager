@@ -272,6 +272,21 @@ test("una sesión MFA caducada reautentica administración y registra el evento"
 test("la purga irreversible exige frase y contraseña y elimina el enlace", async ({ page }) => {
   test.setTimeout(600_000);
   await registerVerifyAndLogin(page, "trash-purge-validation");
+
+  // Enable a real second factor before creating disposable data so this case
+  // proves that irreversible deletion cannot silently fall back to password-only.
+  await page.goto("/app/settings#security");
+  await page.getByLabel("Contraseña actual").filter({ visible: true }).last().fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Empezar configuración" }).click();
+  const mfaSecret = (await page.locator(".mfa-secret code").textContent())?.trim() ?? "";
+  expect(mfaSecret).not.toBe("");
+  await page.getByLabel("Código de la nueva aplicación").fill(currentTotp(mfaSecret));
+  const enableMfaResponse = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/mfa/enable"));
+  await page.getByRole("button", { name: "Verificar y continuar" }).click();
+  expect((await enableMfaResponse).status()).toBe(200);
+  await page.getByRole("checkbox", { name: /He guardado los códigos/ }).check();
+  await page.getByRole("button", { name: "Finalizar configuración" }).click();
+
   await createWorkspaceFromBrowser(page, "Purga E2E");
 
   await page.goto("/app/links");
@@ -293,15 +308,24 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   expect((await deleteResponse).status()).toBe(200);
 
   await page.goto("/app/links/trash");
+  await expect(page.getByRole("heading", { name: "Papelera de enlaces" })).toBeVisible();
+  await expectNoWcagAAIssues(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+
   const deletedRow = page.locator(".trash-row").filter({ hasText: alias });
   await expect(deletedRow).toBeVisible();
   await deletedRow.getByRole("button", { name: "Borrar definitivamente" }).click();
 
   const confirmation = deletedRow.getByLabel("Confirmación de borrado definitivo");
+  await expect(confirmation.getByLabel("Frase exacta")).toBeFocused();
+  await expectNoWcagAAIssues(page);
   const purgeButton = confirmation.getByRole("button", { name: "Confirmar borrado irreversible" });
   await expect(purgeButton).toBeDisabled();
   await confirmation.getByLabel("Frase exacta").fill(`ELIMINAR ${alias}`);
   await confirmation.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
+  await confirmation.getByLabel("Código MFA o recuperación").fill(currentTotp(mfaSecret));
   await expect(purgeButton).toBeEnabled();
 
   const purgeResponse = page.waitForResponse((response) =>
@@ -310,7 +334,9 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   await purgeButton.click();
   // Purge deliberately has two independent confirmations: typed credentials
   // in the page and a final destructive alert dialog.
-  await page.getByRole("alertdialog").getByRole("button", { name: "Borrar definitivamente" }).click();
+  const destructiveDialog = page.getByRole("alertdialog");
+  await expect(destructiveDialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+  await destructiveDialog.getByRole("button", { name: "Borrar definitivamente" }).click();
   expect((await purgeResponse).status()).toBe(200);
   await expect(deletedRow).toHaveCount(0);
   await expect(page.getByText("La papelera está vacía")).toBeVisible();

@@ -773,9 +773,14 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
   aserciones, decoder y regresión de retención pasaron.
 - [ ] **PRODUCT-VALID-009 — Validación E2E/concurrente de papelera.** Revisar
   diálogo/foco/lector/móvil y carreras multiproceso entre clic, restore, purge y
-  housekeeping sobre datos desechables; confirmar la retención aprobada. El ciclo
-  Playwright ya cubre eliminar/restaurar y, por separado, purgar con frase y
-  contraseña; no cubre MFA, carreras, housekeeping ni aprobación de retención.
+  housekeeping sobre datos desechables; confirmar la retención aprobada. El 7 de
+  septiembre, Playwright añadió tres carreras sobre PostgreSQL efímero y cuatro
+  workers PHP: clic/restore conserva un contador exacto; restore/purge tiene un
+  único ganador; restore/housekeeping no deja filas varadas. La purga visible ya
+  exige contraseña y TOTP reales, prueba foco inicial y foco seguro del diálogo,
+  reflow 390×844 y Axe WCAG A/AA. Se corrigieron el foco de la región revelada y
+  un contraste de 2,92:1 en las fechas. El gate permanece abierto únicamente
+  para lector de pantalla real y aprobación formal de la política de retención.
 - [ ] **PRODUCT-010 — Páginas públicas de resolución.** Rediseñar y unificar la
   introducción de contraseña y los estados desconocido, pausado, caducado,
   bloqueado y límite agotado. Deben ser accesibles, `no-store`, resistentes a
