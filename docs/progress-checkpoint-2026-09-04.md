@@ -316,6 +316,39 @@ de secretos/proxy/TLS y validación jurídica.
   confirmación. La pila efímera se eliminó al terminar y `uvh_local` no se tocó.
   PRODUCT-VALID-003/008/009 avanzaron, pero siguen abiertos por roles, sesión
   remota, MFA de purga, accesibilidad, rendimiento y carreras multiproceso.
+- El 7 de septiembre PRODUCT-VALID-003 avanzó con dos E2E de navegador real:
+  owner/admin/editor/viewer recorrieron registro, verificación, invitación,
+  aceptación, login y proyección de Uso; teclado, enlace de salto, reflow móvil
+  390×844 y Axe WCAG 2.0/2.1 A/AA también pasaron. Se corrigieron el salto que
+  abandonaba `/app` sin mover el foco y el contraste insuficiente de la etiqueta
+  superior. `WorkspaceUsageTest` pasó 13 casos/120 aserciones en PostgreSQL
+  efímero, incluido el agregado de 10.000 enlaces en una consulta y menos de 5 s.
+  La suite reveló y corrigió contaminación de `RateLimiter` entre métodos al
+  reiniciar IDs. El gate continúa abierto sólo para la revisión manual con lector
+  de pantalla; las pilas efímeras se desmontaron y `uvh_local` no se modificó.
+- PRODUCT-VALID-008 añadió ese mismo día revocación entre dos contextos de
+  navegador: el dispositivo remoto perdió acceso en su siguiente petición y la
+  sesión que revocó siguió activa. El diálogo mantuvo foco inicial en Cancelar,
+  la vista pasó reflow 390×844 y Axe A/AA. Otro recorrido activó MFA, conservó
+  dos recovery codes sólo en memoria, promovió la cuenta con el comando auditado,
+  envejeció exclusivamente su sesión en `uvh_e2e_test`, exigió step-up y acreditó
+  acceso admin más el evento `auth.mfa_reauthenticated`. Al escanear la vista se
+  hallaron y corrigieron cinco textos de 2,92:1. Ambos E2E pasaron; el gate sigue
+  abierto para lector de pantalla real y las pilas efímeras fueron eliminadas.
+- PRODUCT-VALID-009 añadió tres carreras con procesos PHP independientes:
+  clic/restore conserva el contador exacto, restore/purge tiene un único ganador
+  y restore/housekeeping no deja papelera varada. La purga visible pasó con TOTP,
+  foco, móvil y Axe; queda lector real y aprobación formal de retención.
+- PRODUCT-VALID-001/002 añadieron E2E con dos cuentas y workspaces, omisión
+  aislada, cambio real de rol y autorización/minimización de Actividad para los
+  cuatro roles. Ambos pasaron teclado, reflow 390×844 y Axe; mantienen abiertos
+  lector real y los límites operativos descritos en sus roadmaps.
+- PRODUCT-VALID-011 ya acredita en navegador el fallo cerrado local: feed ausente,
+  HTTP 503, estado desconocido, actualización manual, teclado, móvil y Axe. No
+  acredita independencia; aún exige monitor externo y ensayos de caída reales.
+- Los 27/27 recorridos Playwright pasaron juntos el 7 de septiembre en 27,6
+  minutos con un worker sobre `uvh_e2e_test`. El teardown eliminó contenedores,
+  red, base y volúmenes; `uvh_local` no se modificó.
 - La PR #17 conserva estos cambios en `test/playwright-e2e`. GitHub Actions y
   CodeQL no iniciaron ningún step porque GitHub informó que la cuenta estaba
   bloqueada por facturación; esa señal externa no sustituye la validación local.
@@ -338,16 +371,16 @@ de secretos/proxy/TLS y validación jurídica.
 
 ## Próximo punto exacto de continuación
 
-1. Mantener pausadas nuevas funciones mientras se completan los gates de estabilidad
-   que no cubre la suite actual: revisión visual/accesible, roles y sesiones remotas,
-   concurrencia multiproceso, fault injection y dependencias externas, siempre en
-   entornos aislados. Migración limpia y 18 E2E autenticados ya tienen evidencia.
+1. Mantener pausadas nuevas funciones mientras se completan los gates que la suite
+   no puede acreditar: lector de pantalla/revisión visual real, fault injection,
+   DNS/TLS, receptor webhook, monitor externo y políticas operativas. Las carreras
+   concretas de papelera y los 27 E2E conjuntos ya tienen evidencia aislada.
 2. PRODUCT-001/002/003/006/007/008/009/011 están implementados, pero continúan
    abiertos sus gates `PRODUCT-VALID-*`. La siguiente prioridad segura es ampliar
    roles/accesibilidad/concurrencia y validar dependencias reales, no el roadmap.
 3. Para estado público, provisionar primero el monitor realmente externo y ejecutar
-   el ensayo de independencia de `docs/public-status-feed.md`; sin configuración
-   `/status` debe seguir mostrando `unknown`.
+   el ensayo de independencia de `docs/public-status-feed.md`; el comportamiento
+   local sin configuración ya pasó con HTTP 503 y `unknown`.
 4. Mantener abiertos `MAIL-002` y los gates de validación/producción: alertas,
    retención aprobada, fault injection y proveedor real no se han acreditado.
 5. Las suites están autorizadas únicamente con el guard `*_test`. No aplicar

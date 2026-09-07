@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, viewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -50,6 +50,7 @@ export class LinkTrashComponent {
   readonly mfaEnabled = computed(() => this.auth.user()?.mfaEnabled === true);
   readonly canRestore = computed(() => ["owner", "admin", "editor"].includes(this.workspaces.currentRole() ?? ""));
   readonly canPurge = computed(() => ["owner", "admin"].includes(this.workspaces.currentRole() ?? ""));
+  private readonly purgeConfirmationInput = viewChild<ElementRef<HTMLInputElement>>("purgeConfirmation");
   private loadedWorkspaceId: number | null | undefined;
 
   constructor() {
@@ -99,7 +100,15 @@ export class LinkTrashComponent {
     } finally { this.actionId.set(null); }
   }
 
-  openPurge(row: TrashLinkDto): void { if (!this.canPurge()) return; this.purgeId.set(row.link.id); this.password.set(""); this.factorCode.set(""); this.confirmation.set(""); }
+  openPurge(row: TrashLinkDto): void {
+    if (!this.canPurge()) return;
+    this.purgeId.set(row.link.id); this.password.set(""); this.factorCode.set(""); this.confirmation.set("");
+    // Move keyboard and screen-reader users into the newly revealed region.
+    // The next task lets signal-driven rendering create the input first.
+    setTimeout(() => {
+      if (this.purgeId() === row.link.id) this.purgeConfirmationInput()?.nativeElement.focus();
+    });
+  }
   closePurge(): void { this.purgeId.set(null); this.password.set(""); this.factorCode.set(""); this.confirmation.set(""); }
 
   async purge(row: TrashLinkDto): Promise<void> {

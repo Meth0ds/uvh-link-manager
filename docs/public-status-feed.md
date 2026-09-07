@@ -71,5 +71,11 @@ componente. Tolera como máximo 60 segundos de desfase al futuro.
 6. Detener UVH desde fuera y confirmar que el monitor continúa publicando la
    interrupción. Este punto demuestra la independencia real.
 
+El 7 de septiembre de 2026 se validó sólo la condición local de fallo cerrado:
+Playwright recibió 503 con el feed sin configurar, mostró “Estado desconocido”
+también tras actualizar y pasó teclado, reflow 390×844 y Axe WCAG A/AA. La base
+`uvh_e2e_test` y la pila efímera se eliminaron al terminar. No se configuró un
+feed falso, por lo que esta prueba no acredita ninguno de los pasos 1–6.
+
 Registrar resultado y fecha en el runbook de producción. No cerrar
 `PRODUCT-VALID-011` únicamente con mocks o pruebas unitarias.

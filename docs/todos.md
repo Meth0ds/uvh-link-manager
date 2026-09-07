@@ -239,19 +239,23 @@ implementación parcial.
 
 ### 2. Validación manual, E2E y resiliencia
 
-- [x] **BROWSER-E2E-001 — Base Playwright aislada.** Dieciocho recorridos reales
-  sobre Chromium, Angular, Laravel y PostgreSQL pasaron juntos el 6 de septiembre
-  en 16,3 minutos. Incluyen identidad, MFA/recovery, cambio de email, exportación,
-  workspace/enlace/papelera, invitación, token Bearer, uso y centro de seguridad.
+- [x] **BROWSER-E2E-001 — Base Playwright aislada.** Los 27 recorridos reales
+  pasaron juntos sobre Chromium, Angular, Laravel y PostgreSQL el 7 de septiembre
+  en 27,6 minutos, con un worker para detectar contaminación entre casos. Cubren
+  identidad, roles/accesibilidad de Uso, seguridad entre navegadores, carreras de
+  papelera, Primeros pasos, Actividad y el fallo cerrado del estado público.
   hCaptcha y la entrega de correo usan adaptadores locales deterministas, pero la
   verificación antiabuso continúa siendo servidor a servidor. La base
   `uvh_e2e_test`, los contenedores y la red se eliminaron al terminar; `uvh_local`
   no se tocó. Alcance y límites en `docs/e2e-testing.md`.
 - [ ] **PRODUCT-VALID-001 — Primeros pasos.** Los cinco casos backend y trece
   frontend pasaron el 5 de septiembre dentro de las suites completas; typecheck
-  y build también pasaron. Faltan E2E con cambios de cuenta/workspace/rol,
-  omitir/reanudar entre visitas y QA visual/accesible. Detalle en
-  `docs/getting-started-roadmap.md`.
+  y build también pasaron. El 7 de septiembre Playwright validó dos cuentas, dos
+  workspaces, aislamiento de la omisión por cuenta/workspace, reanudación tras
+  recarga y actualización tras un cambio real `viewer` → `editor`. También pasó
+  teclado/enlace de salto, reflow 390×844 y Axe WCAG A/AA. Faltan lector de
+  pantalla y revisión visual reales, además de acreditar en este recorrido las
+  señales de redirección y MFA. Detalle en `docs/getting-started-roadmap.md`.
 - [ ] **RELEASE-VALID-001 — Arranque y deriva del esquema.** Los nueve casos de
   `UvhReleaseCheckTest` pasaron en `uvh_test` y el comando de sólo lectura pasó
   con las 36 migraciones aisladas aplicadas. Una migración limpia desde base
@@ -261,8 +265,11 @@ implementación parcial.
 - [ ] **PRODUCT-VALID-002 — Actividad y atribución.** Los seis casos de
   `AuditWorkspaceAttributionTest`, veinte de `WorkspaceActivityTest` y 29 casos
   frontend pasaron el 5 de septiembre con 000033 aplicada sólo en `uvh_test`.
-  Typecheck y build también pasaron. Faltan E2E, visual/accesibilidad,
-  rendimiento, concurrencia y despliegue.
+  Typecheck y build también pasaron. El 7 de septiembre Playwright comprobó con
+  roles reales que `viewer`/`editor` ni consultan Actividad, `owner`/`admin` sí,
+  y que la representación no contiene emails ni el destino secreto de un enlace.
+  Pasaron teclado, reflow 390×844 y Axe WCAG A/AA. Faltan lector de pantalla y
+  revisión visual reales, volumen/rendimiento, concurrencia, retención y despliegue.
 - [ ] **INVITATION-UI-VALID-001 — Contrato y cuenta atrás.** Diecisiete casos
   pasaron en `retry-after.spec.ts`, `api.service.spec.ts`,
   `invitation-retry.service.spec.ts` y `team.component.spec.ts`; typecheck y build
@@ -679,8 +686,10 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
     correlacionada con autorización y sin escrituras de progreso. Pantalla, menú,
     tarjeta Dashboard, omitir/reanudar por usuario/workspace y ocultación al observar
     las tres señales iniciales. Dominio/equipo opcionales. Cinco casos backend y
-    trece frontend pasaron el 5 de septiembre. `PRODUCT-VALID-001` permanece abierto;
-    detalles y límites en `docs/getting-started-roadmap.md`.
+    trece frontend pasaron el 5 de septiembre. El E2E dirigido de aislamiento,
+    omisión/reanudación, cambio de rol, teclado, móvil y Axe pasó el 7 de septiembre.
+    `PRODUCT-VALID-001` permanece abierto por sus comprobaciones manuales y señales
+    todavía no recorridas; detalles y límites en `docs/getting-started-roadmap.md`.
 - [x] **PRODUCT-002 — Actividad del workspace (`/app/activity`).** Añadir un
   registro paginado para propietarios y administradores con actor, acción,
   recurso, fecha y resultado; aplicar aislamiento estricto por workspace,
@@ -697,7 +706,9 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
     implementadas: DTO separado/minimizado, estados de error y cobertura, páginas
     manuales de 25 hasta 500, invalidación por contexto y respuesta tardía, sin
     persistir cursores ni reintentar solos. Los 29 casos frontend, typecheck y
-    build pasaron. `PRODUCT-VALID-002` sigue abierto; esto no acredita producción.
+    build pasaron. El E2E dirigido de los cuatro roles, minimización, teclado,
+    móvil y Axe pasó el 7 de septiembre. `PRODUCT-VALID-002` sigue abierto por
+    lector real, volumen, concurrencia, retención y despliegue; esto no acredita producción.
     Plan, garantías y despliegue en `docs/workspace-activity-roadmap.md`.
 - [x] **PRODUCT-003 — Uso y límites (`/app/usage`).** Exponer consumo frente a
   cuotas reales de enlaces, dominios, miembros, tokens, webhooks y retención de
@@ -717,9 +728,14 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
 - [ ] **PRODUCT-VALID-003 — Validación E2E/operativa de Uso y límites.** Recorrer
   la pantalla autenticada con owner/admin/editor/viewer sobre una copia aislada,
   verificar teclado, lector, móvil y contraste, y medir el endpoint con volumen
-  representativo. Playwright ya recorre la respuesta y la redacción de política
-  con un owner sobre `uvh_e2e_test`; faltan el resto de roles, QA accesible y
-  volumen. No aplicar 000034 a `uvh_local` para cerrar este gate.
+  representativo. El 7 de septiembre Playwright completó el ciclo real de alta,
+  verificación, invitación, cambio de sesión y proyección para owner/admin/editor/
+  viewer; también pasó teclado, enlace de salto, reflow a 390×844 y Axe WCAG
+  2.0/2.1 A/AA sobre `uvh_e2e_test`. El backend pasó 13 casos/120 aserciones en
+  base efímera: 10.000 enlaces, 5.000 activos, una consulta agregada y respuesta
+  dentro del presupuesto de 5 s. El gate permanece abierto hasta revisar la
+  experiencia con un lector de pantalla real; Axe no sustituye esa prueba. No
+  aplicar 000034 a `uvh_local` para cerrar este gate.
 - [ ] **PRODUCT-004 — Centro de notificaciones (`/app/notifications`).** Crear
   una bandeja durable, paginada y deduplicada para dominios/DNS/TLS, webhooks
   agotados, enlaces próximos a expirar o agotar clics, tokens próximos a caducar,
@@ -753,9 +769,14 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
   y cobertura del decoder pasaron.
 - [ ] **PRODUCT-VALID-008 — Validación E2E del centro de seguridad.** Recorrer
   reautenticación, MFA, recovery, email y revocación de sesión actual/remota en
-  navegador real; revisar foco, lector, móvil y expiración. Playwright ya valida
-  la proyección minimizada y la revocación de la sesión actual; continúa pendiente
-  la sesión remota, expiración y QA accesible.
+  navegador real; revisar foco, lector, móvil y expiración. Playwright ya cubre
+  cambio de email con cierre total, alta MFA, TOTP, uso único de recovery y
+  revocación actual. El 7 de septiembre añadió dos navegadores independientes
+  para revocar sólo la sesión remota y un admin MFA cuya frescura se envejece de
+  forma acotada en `uvh_e2e_test`: exige reautenticación, consume otro recovery,
+  entra en administración y registra el evento. Se verificaron foco seguro del
+  diálogo, reflow 390×844 y Axe WCAG A/AA; se corrigieron cinco contrastes de
+  2,92:1. El gate permanece abierto para lector de pantalla real.
 - [x] **PRODUCT-009 — Papelera de enlaces (`/app/links/trash`).** Listado,
   búsqueda y paginación; fecha de purga del servidor; restore editor+ y borrado
   owner/admin con frase exacta, contraseña y MFA. Usa locks ordenados, cascada
@@ -763,9 +784,14 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
   aserciones, decoder y regresión de retención pasaron.
 - [ ] **PRODUCT-VALID-009 — Validación E2E/concurrente de papelera.** Revisar
   diálogo/foco/lector/móvil y carreras multiproceso entre clic, restore, purge y
-  housekeeping sobre datos desechables; confirmar la retención aprobada. El ciclo
-  Playwright ya cubre eliminar/restaurar y, por separado, purgar con frase y
-  contraseña; no cubre MFA, carreras, housekeeping ni aprobación de retención.
+  housekeeping sobre datos desechables; confirmar la retención aprobada. El 7 de
+  septiembre, Playwright añadió tres carreras sobre PostgreSQL efímero y cuatro
+  workers PHP: clic/restore conserva un contador exacto; restore/purge tiene un
+  único ganador; restore/housekeeping no deja filas varadas. La purga visible ya
+  exige contraseña y TOTP reales, prueba foco inicial y foco seguro del diálogo,
+  reflow 390×844 y Axe WCAG A/AA. Se corrigieron el foco de la región revelada y
+  un contraste de 2,92:1 en las fechas. El gate permanece abierto únicamente
+  para lector de pantalla real y aprobación formal de la política de retención.
 - [ ] **PRODUCT-010 — Páginas públicas de resolución.** Rediseñar y unificar la
   introducción de contraseña y los estados desconocido, pausado, caducado,
   bloqueado y límite agotado. Deben ser accesibles, `no-store`, resistentes a
@@ -784,7 +810,10 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
 - [ ] **PRODUCT-VALID-011 — Activación del monitor público externo.** Provisionar
   el monitor fuera de UVH, guardar su bearer en secretos, configurar el feed y
   ensayar caída de UVH y del monitor. Hasta entonces `/status` muestra de forma
-  segura “desconocido”. Runbook: `docs/public-status-feed.md`.
+  segura “desconocido”. El 7 de septiembre Playwright comprobó en Chromium que
+  la ausencia del feed devuelve 503, nunca se presenta como salud y conserva
+  actualización manual, teclado, reflow 390×844 y Axe WCAG A/AA. Esta evidencia
+  local no demuestra independencia. Runbook: `docs/public-status-feed.md`.
 
 ## 4 — Roadmap opcional — Productividad y escalado
 

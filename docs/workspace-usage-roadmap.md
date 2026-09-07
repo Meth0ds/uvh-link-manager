@@ -30,13 +30,19 @@ internas fijas donde un rol autorizado puede liberar capacidad.
 ## Evidencia actual
 
 - Typecheck y build Angular correctos.
-- Suite frontend completa: 245/245.
-- Suite backend `WorkspaceUsageTest`: 12 casos y 116 aserciones en `uvh_test`.
+- Suite frontend completa: 253/253 en la última ejecución registrada.
+- Suite backend `WorkspaceUsageTest`: 13 casos y 120 aserciones en `uvh_test`.
+- El caso de volumen insertó 10.000 enlaces (5.000 activos), obtuvo el agregado
+  mediante una sola consulta indexada y respondió dentro del presupuesto de 5 s.
+- Playwright recorrió `owner`, `admin`, `editor` y `viewer`, teclado/enlace de
+  salto, reflow 390×844 y Axe WCAG 2.0/2.1 A/AA. Los 27 E2E, incluidos ambos de
+  Uso, pasaron juntos el 7 de septiembre en 27,6 minutos con un worker.
 - No se aplicó la migración 000034 ni se ejecutaron pruebas en `uvh_local`.
 
 ## Gate operativo pendiente
 
-PRODUCT-VALID-003 requiere una ejecución autenticada en navegador para los cuatro
-roles, teclado/lector de pantalla, temas, móvil y contraste. También requiere
-medir la consulta con volumen representativo y el índice 000034 aplicado en una
-copia aislada. Ese gate no se deduce de las pruebas unitarias o de componente.
+Los cuatro roles, teclado, móvil, contraste automatizable y volumen representativo
+ya tienen evidencia aislada. PRODUCT-VALID-003 permanece abierto únicamente para
+una revisión con lector de pantalla real; Axe no sustituye esa prueba. La revisión
+global de temas continúa en el gate manual transversal, no justifica tocar
+`uvh_local` ni aplicar allí 000034.

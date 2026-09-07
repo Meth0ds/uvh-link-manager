@@ -1,32 +1,344 @@
-import { expect, test } from "@playwright/test";
-import { E2E_PASSWORD, registerVerifyAndLogin } from "../support/auth";
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+import { browserApi, selectedWorkspaceId } from "../support/api";
+import { E2E_PASSWORD, loginFromBrowser, logoutFromBrowser, registerVerifyAndLogin } from "../support/auth";
 import { installHCaptchaBridge } from "../support/hcaptcha";
+import { readMailLink } from "../support/mail";
+import { ageE2EMfaSession, promoteE2EAdmin } from "../support/security";
+import { currentTotp } from "../support/totp";
 import { createWorkspaceFromBrowser } from "../support/workspace";
+
+type InvitableRole = "admin" | "editor" | "viewer";
+
+const ROLE_LABELS: Record<"owner" | InvitableRole, string> = {
+  owner: "Propietario",
+  admin: "Administrador",
+  editor: "Editor",
+  viewer: "Visualizador",
+};
+
+async function expectUsageProjection(page: Page, workspaceName: string, role: keyof typeof ROLE_LABELS): Promise<void> {
+  const usageResponse = page.waitForResponse((response) =>
+    /\/api\/v1\/workspaces\/\d+\/usage$/.test(response.url())
+      && response.request().method() === "GET");
+  await page.goto("/app/usage");
+  const response = await usageResponse;
+  expect(response.status()).toBe(200);
+
+  // Rendering the cards is also a strict response-contract assertion:
+  // UsageComponent rejects a payload whose role differs from the authenticated
+  // workspace role before exposing any of these headings.
+  await expect(page.getByRole("heading", { name: "Uso y límites" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: workspaceName })).toBeVisible();
+  await expect(page.getByText(ROLE_LABELS[role], { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Enlaces" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dominios" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Miembros" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Webhooks" })).toBeVisible();
+
+  const editorProjection = role !== "viewer";
+  const adminProjection = role === "owner" || role === "admin";
+  await expect(page.getByRole("heading", { name: "Tokens API" })).toHaveCount(editorProjection ? 1 : 0);
+  await expect(page.getByRole("heading", { name: "Invitaciones pendientes" })).toHaveCount(adminProjection ? 1 : 0);
+  if (role === "viewer") {
+    await expect(page.getByText("Puedes consultar el consumo; la gestión requiere un rol con más permisos.").first()).toBeVisible();
+  }
+}
+
+async function inviteMember(page: Page, email: string, role: InvitableRole): Promise<string> {
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("combobox", { name: "Rol" }).last().click();
+  await page.getByRole("option", { name: role === "admin" ? "Administrador" : role === "editor" ? "Editor" : "Visor" }).click();
+  const invitationResponse = page.waitForResponse((response) =>
+    /\/api\/v1\/workspaces\/\d+\/invitations$/.test(response.url())
+      && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Invitar" }).click();
+  expect((await invitationResponse).status()).toBe(201);
+  return readMailLink(email, "invitation");
+}
+
+async function acceptInvitation(page: Page, email: string, invitationUrl: string, workspaceName: string): Promise<void> {
+  await loginFromBrowser(page, email);
+  await expect(page).toHaveURL(/\/app\/(dashboard|getting-started)$/);
+  await page.goto(invitationUrl);
+  const acceptResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/workspaces/invitations/accept")
+      && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Aceptar invitación" }).click();
+  expect((await acceptResponse).status()).toBe(200);
+  await page.getByRole("link", { name: "Ir a mi panel" }).click();
+  await page.getByRole("combobox", { name: "Workspace" }).click();
+  await page.getByRole("option", { name: workspaceName, exact: true }).click();
+  await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
+}
+
+async function selectWorkspace(page: Page, workspaceName: string): Promise<void> {
+  await page.getByRole("combobox", { name: "Workspace" }).click();
+  await page.getByRole("option", { name: workspaceName, exact: true }).click();
+  await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
+}
+
+async function changeMemberRole(page: Page, email: string, role: InvitableRole): Promise<void> {
+  await page.goto("/app/team");
+  await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();
+  const member = page.locator(".member-row").filter({ hasText: email });
+  await expect(member).toHaveCount(1);
+  const response = page.waitForResponse((candidate) =>
+    /\/api\/v1\/workspaces\/\d+\/members\/\d+$/.test(candidate.url())
+      && candidate.request().method() === "PATCH");
+  await member.getByRole("combobox", { name: "Rol" }).click();
+  await page.getByRole("option", { name: role === "admin" ? "Administrador" : role === "editor" ? "Editor" : "Visor" }).click();
+  expect((await response).status()).toBe(200);
+}
+
+async function expectNoWcagAAIssues(page: Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
+}
 
 test.beforeEach(async ({ page }) => {
   await installHCaptchaBridge(page);
 });
 
-test("uso y límites presenta un snapshot real ligado al workspace", async ({ page }) => {
-  test.setTimeout(360_000);
-  await registerVerifyAndLogin(page, "usage-validation");
-  const workspaceName = await createWorkspaceFromBrowser(page, "Uso E2E");
+test("uso y límites aplica la proyección real de owner, admin, editor y viewer", async ({ page }) => {
+  test.setTimeout(1_200_000);
 
-  const usageResponse = page.waitForResponse((response) =>
-    /\/api\/v1\/workspaces\/\d+\/usage$/.test(response.url())
-      && response.request().method() === "GET");
-  await page.goto("/app/usage");
-  expect((await usageResponse).status()).toBe(200);
+  // Every role crosses registration, email verification, login, invitation and
+  // acceptance. This catches authorization drift that a seeded database would hide.
+  const memberEmails: Record<InvitableRole, string> = { admin: "", editor: "", viewer: "" };
+  for (const role of Object.keys(memberEmails) as InvitableRole[]) {
+    memberEmails[role] = (await registerVerifyAndLogin(page, `usage-${role}`)).email;
+    await logoutFromBrowser(page);
+  }
 
-  await expect(page.getByRole("heading", { name: "Uso y límites" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: workspaceName })).toBeVisible();
+  await registerVerifyAndLogin(page, "usage-owner");
+  const workspaceName = await createWorkspaceFromBrowser(page, "Uso por roles E2E");
+  await page.goto("/app/team");
+  await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();
+  const invitationUrls = new Map<InvitableRole, string>();
+  for (const role of Object.keys(memberEmails) as InvitableRole[]) {
+    invitationUrls.set(role, await inviteMember(page, memberEmails[role], role));
+  }
+
+  await expectUsageProjection(page, workspaceName, "owner");
   await expect(page.getByText("Es una fotografía informativa")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Enlaces" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Retención de analítica" })).toBeVisible();
+  await expect(page.getByText(/no acredita que la última purga se haya ejecutado/i)).toBeVisible();
+
+  for (const role of Object.keys(memberEmails) as InvitableRole[]) {
+    await logoutFromBrowser(page);
+    await acceptInvitation(page, memberEmails[role], invitationUrls.get(role)!, workspaceName);
+    await expectUsageProjection(page, workspaceName, role);
+  }
+});
+
+test("uso y límites conserva navegación por teclado, reflow móvil y WCAG AA automatizable", async ({ page }) => {
+  test.setTimeout(600_000);
+  await registerVerifyAndLogin(page, "usage-accessibility");
+  await createWorkspaceFromBrowser(page, "Uso accesible E2E");
+  await page.goto("/app/usage");
+  await expect(page.getByRole("heading", { name: "Uso y límites" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Retención de analítica" })).toBeVisible();
 
-  // The UI must describe server policy rather than implying that a displayed
-  // count reserves capacity or proves the background purge ran successfully.
-  await expect(page.getByText(/no acredita que la última purga se haya ejecutado/i)).toBeVisible();
+  // The first tab stop must let keyboard-only users bypass the persistent shell.
+  await page.locator("body").press("Tab");
+  const skipLink = page.getByRole("link", { name: "Saltar al contenido" });
+  await expect(skipLink).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#panel-content")).toBeFocused();
+  await expectNoWcagAAIssues(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Uso y límites" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Retención de analítica" })).toBeVisible();
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(hasHorizontalOverflow).toBe(false);
+  await expectNoWcagAAIssues(page);
+});
+
+test("primeros pasos aísla omisión por cuenta y workspace y reacciona al rol real", async ({ page, browser }) => {
+  test.setTimeout(900_000);
+  const memberEmail = (await registerVerifyAndLogin(page, "onboarding-role-member")).email;
+  await logoutFromBrowser(page);
+  await registerVerifyAndLogin(page, "onboarding-role-owner");
+
+  const firstWorkspace = await createWorkspaceFromBrowser(page, "Guía aislada A");
+  await page.goto("/app/getting-started");
+  await expect(page.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+  await page.getByRole("button", { name: "Omitir por ahora" }).click();
+  await expect(page.getByRole("heading", { name: "Has omitido esta guía" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Has omitido esta guía" })).toBeVisible();
+
+  const secondWorkspace = await createWorkspaceFromBrowser(page, "Guía aislada B");
+  await page.goto("/app/getting-started");
+  await expect(page.getByRole("heading", { name: `Primeros pasos de ${secondWorkspace}` })).toBeVisible();
+  await selectWorkspace(page, firstWorkspace);
+  await page.goto("/app/getting-started");
+  await expect(page.getByRole("heading", { name: "Has omitido esta guía" })).toBeVisible();
+  await page.getByRole("button", { name: "Reanudar guía" }).click();
+  await expect(page.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+
+  await page.goto("/app/team");
+  const invitationUrl = await inviteMember(page, memberEmail, "viewer");
+  await page.goto("/app/getting-started");
+  await page.getByRole("button", { name: "Omitir por ahora" }).click();
+
+  const memberContext = await browser.newContext();
+  const memberPage = await memberContext.newPage();
+  try {
+    await installHCaptchaBridge(memberPage);
+    await acceptInvitation(memberPage, memberEmail, invitationUrl, firstWorkspace);
+    await memberPage.goto("/app/getting-started");
+    // The owner's local preference must never hide another account's guide.
+    await expect(memberPage.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+    await expect(memberPage.getByRole("link", { name: "Ver enlaces" })).toBeVisible();
+    await expect(memberPage.getByRole("link", { name: "Ver dominios" })).toBeVisible();
+    await expect(memberPage.getByRole("link", { name: "Ver equipo" })).toBeVisible();
+
+    await changeMemberRole(page, memberEmail, "editor");
+    await memberPage.reload();
+    await expect(memberPage.getByRole("link", { name: "Gestionar enlaces" })).toBeVisible();
+    await expect(memberPage.getByRole("link", { name: "Ver equipo" })).toBeVisible();
+
+    await memberPage.locator("body").press("Tab");
+    const skipLink = memberPage.getByRole("link", { name: "Saltar al contenido" });
+    await expect(skipLink).toBeFocused();
+    await memberPage.keyboard.press("Enter");
+    await expect(memberPage.locator("#panel-content")).toBeFocused();
+    await expectNoWcagAAIssues(memberPage);
+    await memberPage.setViewportSize({ width: 390, height: 844 });
+    await memberPage.reload();
+    expect(await memberPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+    await expectNoWcagAAIssues(memberPage);
+  } finally {
+    await memberContext.close();
+  }
+});
+
+test("actividad aplica owner admin editor viewer y minimiza datos en navegador real", async ({ page, browser }) => {
+  test.setTimeout(900_000);
+  const memberEmail = (await registerVerifyAndLogin(page, "activity-role-member")).email;
+  await logoutFromBrowser(page);
+  const { email: ownerEmail } = await registerVerifyAndLogin(page, "activity-role-owner");
+  const workspaceName = await createWorkspaceFromBrowser(page, "Actividad por roles E2E");
+  const workspaceId = await selectedWorkspaceId(page);
+
+  await page.goto("/app/team");
+  const invitationUrl = await inviteMember(page, memberEmail, "viewer");
+  const secretDestination = `https://example.com/private-${Date.now()}`;
+  const created = await browserApi(page, workspaceId, "POST", "/api/v1/links", {
+    alias: `activity-private-${Date.now()}`,
+    destination: secretDestination,
+  });
+  expect(created.status).toBe(201);
+
+  const memberContext = await browser.newContext();
+  const memberPage = await memberContext.newPage();
+  try {
+    await installHCaptchaBridge(memberPage);
+    await acceptInvitation(memberPage, memberEmail, invitationUrl, workspaceName);
+    let unauthorizedActivityRequests = 0;
+    memberPage.on("request", (request) => {
+      if (/\/api\/v1\/workspaces\/\d+\/activity/.test(request.url())) unauthorizedActivityRequests += 1;
+    });
+
+    await memberPage.goto("/app/activity");
+    await expect(memberPage.getByRole("heading", { name: "Actividad no disponible" })).toBeVisible();
+    expect(unauthorizedActivityRequests).toBe(0);
+
+    await changeMemberRole(page, memberEmail, "editor");
+    await memberPage.reload();
+    await memberPage.goto("/app/activity");
+    await expect(memberPage.getByRole("heading", { name: "Actividad no disponible" })).toBeVisible();
+    expect(unauthorizedActivityRequests).toBe(0);
+
+    await changeMemberRole(page, memberEmail, "admin");
+    const adminActivityResponse = memberPage.waitForResponse((response) =>
+      /\/api\/v1\/workspaces\/\d+\/activity/.test(response.url())
+        && response.request().method() === "GET");
+    // The member is already on /app/activity. Reload once so the workspace
+    // role refresh and the protected request belong to the same navigation;
+    // starting another navigation would make Chromium discard this body.
+    await memberPage.reload();
+    const activityResponse = await adminActivityResponse;
+    expect(activityResponse.status()).toBe(200);
+    await expect(memberPage.getByRole("heading", { name: workspaceName })).toBeVisible();
+    await expect(memberPage.locator("[data-activity-event]").first()).toBeVisible();
+
+    // Chromium can release a navigation response body as Angular stabilizes the
+    // route. Read the same protected representation immediately through the
+    // authenticated browser so the minimization assertion remains deterministic.
+    const minimizedActivity = await browserApi(
+      memberPage,
+      workspaceId,
+      "GET",
+      `/api/v1/workspaces/${workspaceId}/activity`,
+    );
+    expect(minimizedActivity.status).toBe(200);
+    const responseText = JSON.stringify(minimizedActivity.body);
+    expect(responseText).not.toContain(memberEmail);
+    expect(responseText).not.toContain(ownerEmail);
+    expect(responseText).not.toContain(secretDestination);
+
+    const ownerActivityResponse = page.waitForResponse((response) =>
+      /\/api\/v1\/workspaces\/\d+\/activity/.test(response.url())
+        && response.request().method() === "GET");
+    await page.goto("/app/activity");
+    expect((await ownerActivityResponse).status()).toBe(200);
+    await expect(page.getByRole("heading", { name: workspaceName })).toBeVisible();
+
+    await memberPage.locator("body").press("Tab");
+    const skipLink = memberPage.getByRole("link", { name: "Saltar al contenido" });
+    await expect(skipLink).toBeFocused();
+    await memberPage.keyboard.press("Enter");
+    await expect(memberPage.locator("#panel-content")).toBeFocused();
+    await expectNoWcagAAIssues(memberPage);
+    await memberPage.setViewportSize({ width: 390, height: 844 });
+    await memberPage.reload();
+    await expect(memberPage.getByRole("heading", { name: workspaceName })).toBeVisible();
+    expect(await memberPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+    await expectNoWcagAAIssues(memberPage);
+  } finally {
+    await memberContext.close();
+  }
+});
+
+test("estado público falla cerrado sin monitor y conserva accesibilidad", async ({ page }) => {
+  const initialStatus = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/public-status")
+      && response.request().method() === "GET");
+  await page.goto("/status");
+  expect((await initialStatus).status()).toBe(503);
+  await expect(page.getByRole("heading", { name: "Estado del servicio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
+  await expect(page.getByText("No asumimos que el servicio esté operativo.")).toBeVisible();
+
+  // A manual refresh must preserve fail-closed semantics when the independent
+  // feed is absent; the fact that this page loads is never treated as health.
+  const refreshedStatus = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/public-status")
+      && response.request().method() === "GET");
+  await page.getByRole("button", { name: "Actualizar" }).click();
+  expect((await refreshedStatus).status()).toBe(503);
+  await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Actualizar" }).focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("link", { name: "Iniciar sesión" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("link", { name: "Ayuda técnica" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("link", { name: "UVH, inicio" })).toBeFocused();
+  await expectNoWcagAAIssues(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+  await expectNoWcagAAIssues(page);
 });
 
 test("el centro de seguridad minimiza actividad y permite cerrar la sesión actual", async ({ page }) => {
@@ -61,9 +373,122 @@ test("el centro de seguridad minimiza actividad y permite cerrar la sesión actu
   await expect(page).toHaveURL(/\/auth\?returnTo=%2Fapp%2Fsecurity$/);
 });
 
+test("el centro de seguridad revoca una sesión remota sin cerrar la actual", async ({ page, browser }) => {
+  test.setTimeout(480_000);
+  const { email } = await registerVerifyAndLogin(page, "security-remote-session");
+  const remoteContext = await browser.newContext();
+  const remotePage = await remoteContext.newPage();
+
+  try {
+    await installHCaptchaBridge(remotePage);
+    await loginFromBrowser(remotePage, email);
+    await expect(remotePage).toHaveURL(/\/app\/(dashboard|getting-started)$/);
+
+    await page.goto("/app/security");
+    await expect(page.getByRole("heading", { name: "Centro de seguridad" })).toBeVisible();
+    const remoteSession = page.locator("article.session").filter({ hasText: "Otra sesión" });
+    await expect(remoteSession).toHaveCount(1);
+    await expectNoWcagAAIssues(page);
+
+    const revokeResponse = page.waitForResponse((response) =>
+      /\/api\/v1\/auth\/sessions\/[^/]+\/revoke$/.test(response.url())
+        && response.request().method() === "POST");
+    await remoteSession.getByRole("button", { name: "Revocar" }).click();
+    const dialog = page.getByRole("alertdialog");
+    // Destructive dialogs deliberately focus the safe action first. Revocation
+    // therefore needs a separate, explicit user action after focus is trapped.
+    await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+    const confirmButton = dialog.getByRole("button", { name: "Revocar acceso" });
+    await confirmButton.click();
+    expect((await revokeResponse).status()).toBe(200);
+    await expect(remoteSession).toHaveCount(0);
+    await expect(page.locator("article.session").filter({ hasText: "Esta sesión" })).toHaveCount(1);
+
+    // The remote browser must discover revocation on its next authenticated
+    // request, while the revoking browser keeps its independent live session.
+    await remotePage.goto("/app/security");
+    await expect(remotePage).toHaveURL(/\/auth\?returnTo=%2Fapp%2Fsecurity$/);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Centro de seguridad" })).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Sesiones activas" })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+    await expectNoWcagAAIssues(page);
+  } finally {
+    await remoteContext.close();
+  }
+});
+
+test("una sesión MFA caducada reautentica administración y registra el evento", async ({ page }) => {
+  test.setTimeout(600_000);
+  const { email } = await registerVerifyAndLogin(page, "security-reauthentication");
+
+  await page.goto("/app/settings#security");
+  await page.getByLabel("Contraseña actual").filter({ visible: true }).last().fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Empezar configuración" }).click();
+  const secret = (await page.locator(".mfa-secret code").textContent())?.trim() ?? "";
+  expect(secret).not.toBe("");
+  await page.getByLabel("Código de la nueva aplicación").fill(currentTotp(secret));
+  const enableResponse = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/mfa/enable"));
+  await page.getByRole("button", { name: "Verificar y continuar" }).click();
+  expect((await enableResponse).status()).toBe(200);
+
+  // Recovery codes are single-display credentials. Keep two only in process:
+  // one creates a fresh admin session and the other performs the step-up.
+  const recoveryCodes = await page.locator("[aria-label='Códigos de recuperación'] code").evaluateAll((codes) =>
+    codes.slice(0, 2).map((code) => code.textContent?.trim() ?? ""));
+  expect(recoveryCodes).toHaveLength(2);
+  expect(recoveryCodes.every(Boolean)).toBe(true);
+  await page.getByRole("checkbox", { name: /He guardado los códigos/ }).check();
+  await page.getByRole("button", { name: "Finalizar configuración" }).click();
+
+  await promoteE2EAdmin(email);
+  await logoutFromBrowser(page);
+  await loginFromBrowser(page, email);
+  await page.getByRole("button", { name: "Usar un código de recuperación" }).click();
+  await page.getByRole("textbox", { name: "Código de recuperación" }).fill(recoveryCodes[0]);
+  await page.getByRole("button", { name: "Usar código y entrar" }).click();
+  await expect(page).toHaveURL(/\/app\/(dashboard|getting-started)$/);
+
+  await ageE2EMfaSession(email);
+  await page.goto("/app/admin");
+  await expect(page).toHaveURL(/\/auth\/reauthenticate\?returnTo=%2Fapp%2Fadmin$/);
+  await expect(page.getByRole("heading", { name: "Confirma que eres tú" })).toBeVisible();
+  await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
+  await page.getByLabel("Código de autenticación o recuperación").fill(recoveryCodes[1]);
+  const reauthenticateResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/auth/mfa/reauthenticate")
+      && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Continuar a administración" }).click();
+  expect((await reauthenticateResponse).status()).toBe(200);
+  await expect(page).toHaveURL(/\/app\/admin$/);
+  await expect(page.getByRole("heading", { name: "Administración" })).toBeVisible();
+
+  await page.goto("/app/security");
+  await expect(page.getByText("Reautenticación MFA completada", { exact: true })).toBeVisible();
+  await expect(page.locator("article.session").filter({ hasText: "Esta sesión · MFA verificado" })).toHaveCount(1);
+});
+
 test("la purga irreversible exige frase y contraseña y elimina el enlace", async ({ page }) => {
   test.setTimeout(600_000);
   await registerVerifyAndLogin(page, "trash-purge-validation");
+
+  // Enable a real second factor before creating disposable data so this case
+  // proves that irreversible deletion cannot silently fall back to password-only.
+  await page.goto("/app/settings#security");
+  await page.getByLabel("Contraseña actual").filter({ visible: true }).last().fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Empezar configuración" }).click();
+  const mfaSecret = (await page.locator(".mfa-secret code").textContent())?.trim() ?? "";
+  expect(mfaSecret).not.toBe("");
+  await page.getByLabel("Código de la nueva aplicación").fill(currentTotp(mfaSecret));
+  const enableMfaResponse = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/mfa/enable"));
+  await page.getByRole("button", { name: "Verificar y continuar" }).click();
+  expect((await enableMfaResponse).status()).toBe(200);
+  await page.getByRole("checkbox", { name: /He guardado los códigos/ }).check();
+  await page.getByRole("button", { name: "Finalizar configuración" }).click();
+
   await createWorkspaceFromBrowser(page, "Purga E2E");
 
   await page.goto("/app/links");
@@ -85,15 +510,24 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   expect((await deleteResponse).status()).toBe(200);
 
   await page.goto("/app/links/trash");
+  await expect(page.getByRole("heading", { name: "Papelera de enlaces" })).toBeVisible();
+  await expectNoWcagAAIssues(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+
   const deletedRow = page.locator(".trash-row").filter({ hasText: alias });
   await expect(deletedRow).toBeVisible();
   await deletedRow.getByRole("button", { name: "Borrar definitivamente" }).click();
 
   const confirmation = deletedRow.getByLabel("Confirmación de borrado definitivo");
+  await expect(confirmation.getByLabel("Frase exacta")).toBeFocused();
+  await expectNoWcagAAIssues(page);
   const purgeButton = confirmation.getByRole("button", { name: "Confirmar borrado irreversible" });
   await expect(purgeButton).toBeDisabled();
   await confirmation.getByLabel("Frase exacta").fill(`ELIMINAR ${alias}`);
   await confirmation.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
+  await confirmation.getByLabel("Código MFA o recuperación").fill(currentTotp(mfaSecret));
   await expect(purgeButton).toBeEnabled();
 
   const purgeResponse = page.waitForResponse((response) =>
@@ -102,7 +536,9 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   await purgeButton.click();
   // Purge deliberately has two independent confirmations: typed credentials
   // in the page and a final destructive alert dialog.
-  await page.getByRole("alertdialog").getByRole("button", { name: "Borrar definitivamente" }).click();
+  const destructiveDialog = page.getByRole("alertdialog");
+  await expect(destructiveDialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+  await destructiveDialog.getByRole("button", { name: "Borrar definitivamente" }).click();
   expect((await purgeResponse).status()).toBe(200);
   await expect(deletedRow).toHaveCount(0);
   await expect(page.getByText("La papelera está vacía")).toBeVisible();

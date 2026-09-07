@@ -3,7 +3,7 @@
 Iniciado el 5 de septiembre de 2026, por petición expresa de abordar el roadmap
 opcional al terminar BAF-138. No implica que producción o validación estén cerradas.
 
-## Implementado y revisado estáticamente
+## Implementado y validado parcialmente
 
 - GET `/api/v1/workspaces/:id/getting-started` para sesión verificada, con
   pertenencia y versión de cuenta reconsultadas en la misma sentencia SQL que
@@ -29,19 +29,28 @@ opcional al terminar BAF-138. No implica que producción o validación estén ce
   de contexto invalida la vista inmediatamente; respuestas tardías o posteriores
   a destruir el componente no sustituyen datos. Refrescar elimina el snapshot
   anterior y un error no conserva una falsa guía completada. No se añadió migración.
-- Cinco casos preparados en `WorkspaceOnboardingTest`: vacío, aislamiento por
+- Cinco casos de `WorkspaceOnboardingTest`: vacío, aislamiento por
   ruta/cabecera, cambios de recursos/MFA, caducidad/autoridad/roles y acceso
-  revocado/sin sesión. Sin ejecutar; guard `*_test` antes de fixtures destructivos.
+  revocado/sin sesión. Pasaron el 5 de septiembre sobre `uvh_test`; el guard
+  `*_test` continúa protegiendo los fixtures destructivos.
+
+- El 7 de septiembre un recorrido Playwright pasó sobre `uvh_e2e_test` con dos
+  cuentas y dos workspaces. Verificó omitir/reanudar entre recargas, aislamiento
+  de la preferencia por cuenta/workspace, acciones `viewer` y su actualización
+  tras un cambio real a `editor`. También pasó teclado/enlace de salto, reflow a
+  390×844 y Axe WCAG A/AA. La pila efímera se eliminó al terminar.
 
 ## Validación pendiente
 
-- Trece casos frontend preparados en `getting-started.component.spec.ts`: diez
+- Trece casos frontend de `getting-started.component.spec.ts`: diez
   de componente (incluyendo plantilla, carga/omisión, storage, contexto y respuestas
-  tardías) y tres de derivación de pasos. No ejecutados, ni tampoco los cinco PHP.
-- Typecheck, build, integración Dashboard, ruta lazy, navegación atrás/adelante,
-  cambios reales de sesión/roles/MFA, error/red lenta y reanudación entre visitas.
-- Visual claro/oscuro, móvil/escritorio, teclado, foco tras cambios y lector de
-  pantalla. No se ha renderizado ni abierto esta nueva pantalla en navegador.
+  tardías) y tres de derivación de pasos. Pasaron el 5 de septiembre junto con
+  typecheck y build.
+- El E2E ya cubre integración/ruta real, cambios de cuenta, workspace y rol,
+  además de omisión/reanudación entre visitas. Aún faltan MFA y redirección como
+  señales completadas dentro de este recorrido, y fallo/red lenta del navegador.
+- Faltan revisión visual real claro/oscuro y lector de pantalla. Playwright ya
+  cubre escritorio, móvil, teclado, foco de salto y contraste automatizado Axe.
 - Comprobación manual de redirección con un enlace de prueba reutilizable y
   credenciales/base aisladas autorizadas; nada de consumir enlaces del usuario.
 - La omisión no se sincroniza entre pestañas abiertas/dispositivos ni se purgan
@@ -59,6 +68,7 @@ opcional al terminar BAF-138. No implica que producción o validación estén ce
 - Omitir la guía no completa recursos ni cambia seguridad. MFA sigue dependiendo
   del backend; la guía no puede fabricar códigos ni cambiar credenciales.
 
-No se ejecutaron suites, typecheck/build, lint, migraciones, navegación de prueba,
-tráfico de redirección, DNS/TLS o envíos. PRODUCT-001 tiene implementación completa
-revisada estáticamente; PRODUCT-VALID-001 permanece abierto y no se acredita producción.
+Las suites unitarias indicadas, typecheck/build y el recorrido E2E dirigido sí se
+ejecutaron. No se acreditaron tráfico de redirección dentro de la guía, DNS/TLS,
+envíos, lector de pantalla ni revisión visual manual. PRODUCT-VALID-001 permanece
+abierto y no se acredita producción.

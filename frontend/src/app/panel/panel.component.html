@@ -1,4 +1,4 @@
-<a class="skip-link" href="#panel-content">Saltar al contenido</a>
+<a class="skip-link" href="#panel-content" (click)="skipToContent($event)">Saltar al contenido</a>
 <mat-sidenav-container class="shell">
   <mat-sidenav #sidenav id="panel-navigation" [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" fixedInViewport aria-label="Navegación principal">
     <div class="side-head">
@@ -102,7 +102,7 @@
     </mat-toolbar>
 
     <main class="main">
-      <div class="main-inner" id="panel-content" tabindex="-1">
+      <div #panelContent class="main-inner" id="panel-content" tabindex="-1">
         <router-outlet />
       </div>
     </main>

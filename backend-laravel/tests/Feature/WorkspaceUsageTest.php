@@ -12,7 +12,9 @@ use App\Models\Workspace;
 use App\Support\Ids;
 use App\Support\SessionManager;
 use App\Support\WorkspaceLimits;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -25,6 +27,10 @@ final class WorkspaceUsageTest extends TestCase
     {
         parent::setUp();
         DB::statement('TRUNCATE users RESTART IDENTITY CASCADE');
+        // RateLimiter uses the configured cache and user IDs restart at one in
+        // every method. Flush this isolated array store so one test cannot spend
+        // another test's allowance; limits are still accumulated within a test.
+        Cache::flush();
         $this->disableCookieEncryption();
         $this->withCredentials();
     }
@@ -192,6 +198,48 @@ final class WorkspaceUsageTest extends TestCase
         $this->getJson($this->path($first))->assertStatus(429)->assertHeader('Retry-After');
     }
 
+    public function test_representative_volume_remains_indexed_and_within_the_endpoint_timeout(): void
+    {
+        $owner = User::factory()->create();
+        $workspace = $this->workspace($owner);
+        $now = now();
+
+        // Insert in bounded batches so the fixture itself cannot exhaust a CI
+        // worker. Half of the rows are soft-deleted to exercise the partial
+        // active-link index and the endpoint's exact admission-policy count.
+        foreach (array_chunk(range(1, 10_000), 500) as $ids) {
+            DB::table('links')->insert(array_map(fn (int $id): array => [
+                'workspace_id' => $workspace->id,
+                'created_by' => $owner->id,
+                'alias' => 'usage-volume-'.$id,
+                'destination' => 'https://volume.example.test/'.$id,
+                'state' => $id <= 5_000 ? 'active' : 'deleted',
+                'deleted_at' => $id <= 5_000 ? null : $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $ids));
+        }
+
+        $this->signIn($owner);
+        $linkAggregateQueries = 0;
+        DB::listen(function (QueryExecuted $query) use (&$linkAggregateQueries): void {
+            if (str_contains($query->sql, 'FROM links l')) {
+                $linkAggregateQueries++;
+            }
+        });
+
+        $startedAt = hrtime(true);
+        $this->getJson($this->path($workspace))->assertOk()
+            ->assertJsonPath('resources.links.used', 5_000);
+        $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
+
+        // Five seconds is also enforced inside the transaction by PostgreSQL.
+        // This wall-clock assertion catches regressions outside that statement,
+        // while the query-count assertion prevents row-by-row aggregation.
+        $this->assertLessThan(5.0, $elapsedSeconds, "Usage endpoint took {$elapsedSeconds}s for 10,000 links.");
+        $this->assertSame(1, $linkAggregateQueries, 'Usage must aggregate links in one indexed snapshot query.');
+    }
+
     private function workspace(User $owner, ?User $actor = null, string $role = 'owner'): Workspace
     {
         $workspace = $owner->ownedWorkspaces()->create(['name' => 'Usage', 'slug' => 'usage-'.Ids::randomToken(8)]);
@@ -219,7 +267,10 @@ final class WorkspaceUsageTest extends TestCase
 
     private function signIn(User $user): void
     {
-        $this->withCookie('uvh_session', SessionManager::create($user->id, Request::create('/'), (int) $user->security_version, true));
+        // The test must honour the active isolated environment instead of assuming
+        // the development cookie name. E2E deliberately uses a distinct name so a
+        // test session can never be confused with a local-development session.
+        $this->withCookie((string) config('session.cookie'), SessionManager::create($user->id, Request::create('/'), (int) $user->security_version, true));
     }
 
     private function path(Workspace $workspace): string
