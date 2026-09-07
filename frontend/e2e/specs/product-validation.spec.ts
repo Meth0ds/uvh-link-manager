@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { browserApi, selectedWorkspaceId } from "../support/api";
 import { E2E_PASSWORD, loginFromBrowser, logoutFromBrowser, registerVerifyAndLogin } from "../support/auth";
 import { installHCaptchaBridge } from "../support/hcaptcha";
 import { readMailLink } from "../support/mail";
@@ -71,6 +72,25 @@ async function acceptInvitation(page: Page, email: string, invitationUrl: string
   await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
 }
 
+async function selectWorkspace(page: Page, workspaceName: string): Promise<void> {
+  await page.getByRole("combobox", { name: "Workspace" }).click();
+  await page.getByRole("option", { name: workspaceName, exact: true }).click();
+  await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
+}
+
+async function changeMemberRole(page: Page, email: string, role: InvitableRole): Promise<void> {
+  await page.goto("/app/team");
+  await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();
+  const member = page.locator(".member-row").filter({ hasText: email });
+  await expect(member).toHaveCount(1);
+  const response = page.waitForResponse((candidate) =>
+    /\/api\/v1\/workspaces\/\d+\/members\/\d+$/.test(candidate.url())
+      && candidate.request().method() === "PATCH");
+  await member.getByRole("combobox", { name: "Rol" }).click();
+  await page.getByRole("option", { name: role === "admin" ? "Administrador" : role === "editor" ? "Editor" : "Visor" }).click();
+  expect((await response).status()).toBe(200);
+}
+
 async function expectNoWcagAAIssues(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -137,6 +157,154 @@ test("uso y límites conserva navegación por teclado, reflow móvil y WCAG AA a
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(hasHorizontalOverflow).toBe(false);
   await expectNoWcagAAIssues(page);
+});
+
+test("primeros pasos aísla omisión por cuenta y workspace y reacciona al rol real", async ({ page, browser }) => {
+  test.setTimeout(900_000);
+  const memberEmail = (await registerVerifyAndLogin(page, "onboarding-role-member")).email;
+  await logoutFromBrowser(page);
+  await registerVerifyAndLogin(page, "onboarding-role-owner");
+
+  const firstWorkspace = await createWorkspaceFromBrowser(page, "Guía aislada A");
+  await page.goto("/app/getting-started");
+  await expect(page.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+  await page.getByRole("button", { name: "Omitir por ahora" }).click();
+  await expect(page.getByRole("heading", { name: "Has omitido esta guía" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Has omitido esta guía" })).toBeVisible();
+
+  const secondWorkspace = await createWorkspaceFromBrowser(page, "Guía aislada B");
+  await page.goto("/app/getting-started");
+  await expect(page.getByRole("heading", { name: `Primeros pasos de ${secondWorkspace}` })).toBeVisible();
+  await selectWorkspace(page, firstWorkspace);
+  await page.goto("/app/getting-started");
+  await expect(page.getByRole("heading", { name: "Has omitido esta guía" })).toBeVisible();
+  await page.getByRole("button", { name: "Reanudar guía" }).click();
+  await expect(page.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+
+  await page.goto("/app/team");
+  const invitationUrl = await inviteMember(page, memberEmail, "viewer");
+  await page.goto("/app/getting-started");
+  await page.getByRole("button", { name: "Omitir por ahora" }).click();
+
+  const memberContext = await browser.newContext();
+  const memberPage = await memberContext.newPage();
+  try {
+    await installHCaptchaBridge(memberPage);
+    await acceptInvitation(memberPage, memberEmail, invitationUrl, firstWorkspace);
+    await memberPage.goto("/app/getting-started");
+    // The owner's local preference must never hide another account's guide.
+    await expect(memberPage.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+    await expect(memberPage.getByRole("link", { name: "Ver enlaces" })).toBeVisible();
+    await expect(memberPage.getByRole("link", { name: "Ver dominios" })).toBeVisible();
+    await expect(memberPage.getByRole("link", { name: "Ver equipo" })).toBeVisible();
+
+    await changeMemberRole(page, memberEmail, "editor");
+    await memberPage.reload();
+    await expect(memberPage.getByRole("link", { name: "Gestionar enlaces" })).toBeVisible();
+    await expect(memberPage.getByRole("link", { name: "Ver equipo" })).toBeVisible();
+
+    await memberPage.locator("body").press("Tab");
+    const skipLink = memberPage.getByRole("link", { name: "Saltar al contenido" });
+    await expect(skipLink).toBeFocused();
+    await memberPage.keyboard.press("Enter");
+    await expect(memberPage.locator("#panel-content")).toBeFocused();
+    await expectNoWcagAAIssues(memberPage);
+    await memberPage.setViewportSize({ width: 390, height: 844 });
+    await memberPage.reload();
+    expect(await memberPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+    await expectNoWcagAAIssues(memberPage);
+  } finally {
+    await memberContext.close();
+  }
+});
+
+test("actividad aplica owner admin editor viewer y minimiza datos en navegador real", async ({ page, browser }) => {
+  test.setTimeout(900_000);
+  const memberEmail = (await registerVerifyAndLogin(page, "activity-role-member")).email;
+  await logoutFromBrowser(page);
+  const { email: ownerEmail } = await registerVerifyAndLogin(page, "activity-role-owner");
+  const workspaceName = await createWorkspaceFromBrowser(page, "Actividad por roles E2E");
+  const workspaceId = await selectedWorkspaceId(page);
+
+  await page.goto("/app/team");
+  const invitationUrl = await inviteMember(page, memberEmail, "viewer");
+  const secretDestination = `https://example.com/private-${Date.now()}`;
+  const created = await browserApi(page, workspaceId, "POST", "/api/v1/links", {
+    alias: `activity-private-${Date.now()}`,
+    destination: secretDestination,
+  });
+  expect(created.status).toBe(201);
+
+  const memberContext = await browser.newContext();
+  const memberPage = await memberContext.newPage();
+  try {
+    await installHCaptchaBridge(memberPage);
+    await acceptInvitation(memberPage, memberEmail, invitationUrl, workspaceName);
+    let unauthorizedActivityRequests = 0;
+    memberPage.on("request", (request) => {
+      if (/\/api\/v1\/workspaces\/\d+\/activity/.test(request.url())) unauthorizedActivityRequests += 1;
+    });
+
+    await memberPage.goto("/app/activity");
+    await expect(memberPage.getByRole("heading", { name: "Actividad no disponible" })).toBeVisible();
+    expect(unauthorizedActivityRequests).toBe(0);
+
+    await changeMemberRole(page, memberEmail, "editor");
+    await memberPage.reload();
+    await memberPage.goto("/app/activity");
+    await expect(memberPage.getByRole("heading", { name: "Actividad no disponible" })).toBeVisible();
+    expect(unauthorizedActivityRequests).toBe(0);
+
+    await changeMemberRole(page, memberEmail, "admin");
+    const adminActivityResponse = memberPage.waitForResponse((response) =>
+      /\/api\/v1\/workspaces\/\d+\/activity/.test(response.url())
+        && response.request().method() === "GET");
+    // The member is already on /app/activity. Reload once so the workspace
+    // role refresh and the protected request belong to the same navigation;
+    // starting another navigation would make Chromium discard this body.
+    await memberPage.reload();
+    const activityResponse = await adminActivityResponse;
+    expect(activityResponse.status()).toBe(200);
+    await expect(memberPage.getByRole("heading", { name: workspaceName })).toBeVisible();
+    await expect(memberPage.locator("[data-activity-event]").first()).toBeVisible();
+
+    // Chromium can release a navigation response body as Angular stabilizes the
+    // route. Read the same protected representation immediately through the
+    // authenticated browser so the minimization assertion remains deterministic.
+    const minimizedActivity = await browserApi(
+      memberPage,
+      workspaceId,
+      "GET",
+      `/api/v1/workspaces/${workspaceId}/activity`,
+    );
+    expect(minimizedActivity.status).toBe(200);
+    const responseText = JSON.stringify(minimizedActivity.body);
+    expect(responseText).not.toContain(memberEmail);
+    expect(responseText).not.toContain(ownerEmail);
+    expect(responseText).not.toContain(secretDestination);
+
+    const ownerActivityResponse = page.waitForResponse((response) =>
+      /\/api\/v1\/workspaces\/\d+\/activity/.test(response.url())
+        && response.request().method() === "GET");
+    await page.goto("/app/activity");
+    expect((await ownerActivityResponse).status()).toBe(200);
+    await expect(page.getByRole("heading", { name: workspaceName })).toBeVisible();
+
+    await memberPage.locator("body").press("Tab");
+    const skipLink = memberPage.getByRole("link", { name: "Saltar al contenido" });
+    await expect(skipLink).toBeFocused();
+    await memberPage.keyboard.press("Enter");
+    await expect(memberPage.locator("#panel-content")).toBeFocused();
+    await expectNoWcagAAIssues(memberPage);
+    await memberPage.setViewportSize({ width: 390, height: 844 });
+    await memberPage.reload();
+    await expect(memberPage.getByRole("heading", { name: workspaceName })).toBeVisible();
+    expect(await memberPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+    await expectNoWcagAAIssues(memberPage);
+  } finally {
+    await memberContext.close();
+  }
 });
 
 test("el centro de seguridad minimiza actividad y permite cerrar la sesión actual", async ({ page }) => {

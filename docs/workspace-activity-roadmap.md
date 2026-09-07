@@ -1,8 +1,8 @@
 # PRODUCT-002 — Actividad del workspace
 
 Iniciado el 5 de septiembre de 2026 tras la implementación estática de PRODUCT-001.
-La atribución, la API y la pantalla están implementadas y revisadas estáticamente.
-No se acredita validación runtime, despliegue ni una auditoría exhaustiva durable.
+La atribución, la API y la pantalla están implementadas y cuentan con validación
+automatizada parcial. No se acredita despliegue ni una auditoría exhaustiva durable.
 
 ## Evidencia e implementación
 
@@ -12,8 +12,9 @@ El actor puede pertenecer a varios workspaces; un join con sus pertenencias no
 demuestra a qué workspace pertenece un evento. Además, un recurso ya borrado no
 permite reconstruir siempre esa relación.
 
-- Migración `2026_09_05_000033_attribute_audit_events_to_workspaces.php` escrita,
-  **no aplicada**: `audit_events.workspace_id` nullable positivo e índice compuesto
+- Migración `2026_09_05_000033_attribute_audit_events_to_workspaces.php` escrita
+  y aplicada sólo en bases aisladas `*_test`, nunca en `uvh_local`:
+  `audit_events.workspace_id` nullable positivo e índice compuesto
   `(workspace_id, created_at, id)`. No hay FK al workspace: se conserva la identidad
   tras borrarlo y los avisos de borrado posteriores al commit pueden registrarse.
 - `Audit::write` acepta el argumento final opcional `workspaceId`. Lo conserva al
@@ -32,8 +33,8 @@ permite reconstruir siempre esa relación.
   scope de forma especulativa. La futura vista debe declarar cobertura limitada,
   no prometer un registro completo de todo lo que ocurrió.
 - `ReleaseReadiness` comprueba la columna 000033 además de ledger/pendientes.
-  El contrato de esquema la incluye. Ocho casos de release preparados en total;
-  seis nuevos de `AuditWorkspaceAttributionTest`, todos sin ejecutar.
+  El contrato de esquema la incluye. Los casos de release y los seis de
+  `AuditWorkspaceAttributionTest` pasaron en la validación aislada del 5 de septiembre.
 
 ## Semántica y despliegue pendientes
 
@@ -55,7 +56,7 @@ atribución irrecuperable sin backup; retirar primero lectores/escritores y apro
 el procedimiento. No reiniciar IDs de workspace en una base con historial retenido.
 Retención/privacidad y borrado de cuenta siguen sujetos a sus políticas existentes.
 
-## Pantalla implementada, sin ejecución
+## Pantalla implementada y validada parcialmente
 
 - `/app/activity` usa un DTO separado de `AuditEvent` interno. Navegación sólo
   para owner/admin verificado del workspace seleccionado: ser administrador de
@@ -83,24 +84,29 @@ Retención/privacidad y borrado de cuenta siguen sujetos a sus políticas existe
   sin coerción; copia sólo campos públicos. Rechaza duplicados y cursores que no
   avanzan. No decodifica, registra, muestra ni persiste el cursor. La autenticidad
   criptográfica y el aislamiento de cada fila siguen siendo controles del servidor.
-- Veintinueve casos frontend preparados: 18 de componente, 5 de lector DTO y 6
+- Veintinueve casos frontend: 18 de componente, 5 de lector DTO y 6
   de navegación. Cubren permisos, cambios de contexto, respuestas tardías, errores,
   Retry-After, HTML como texto, límites incluso con páginas cortas y malformados.
-  Ninguno ejecutado; no son evidencia de compilación, visual o accesibilidad.
+  Pasaron el 5 de septiembre junto con typecheck y build.
+- El 7 de septiembre Playwright recorrió los roles reales: `viewer` y `editor`
+  no muestran la pantalla ni emiten la petición protegida; `owner` y `admin` la
+  reciben. La lectura autenticada confirmó que no se devuelven emails ni el
+  destino secreto creado para la prueba. También pasaron teclado/enlace de salto,
+  reflow 390×844 y Axe WCAG A/AA sobre Chromium.
 
 ## Siguiente bloque
 
-1. PRODUCT-002 queda implementado en código. Continuar PRODUCT-003 (uso y límites)
-   contrastando primero cuotas y consultas reales; no inventar planes ni upgrades.
-2. Mantener `PRODUCT-VALID-002` abierto: validar 6 casos de atribución, 20 API y
-   29 frontend, más rutas/navegación reales, móvil/temas/teclado/lector de pantalla,
-   concurrencia, privacidad/retención, rendimiento e instalación de 000033.
+1. PRODUCT-002 queda implementado y automatizado parcialmente. No añadir funciones
+   nuevas hasta avanzar los gates PRODUCT-VALID priorizados.
+2. Mantener `PRODUCT-VALID-002` abierto: faltan lector de pantalla y revisión
+   visual/temas reales, volumen/rendimiento, concurrencia, privacidad/retención y
+   despliegue autorizado de 000033. Roles, ruta, móvil, teclado y Axe ya pasaron.
 3. Sólo con autorización y esquema completo aislado `*_test`; no tocar `uvh_local`.
    La UI sólo observa revocaciones al refrescar contexto o recibir un rechazo de
    API: no es revocación push de información ya entregada. La garantía afterCommit
    incompleta sigue abierta; esta vista no debe usarse como registro probatorio.
 
-## API implementada, sin ejecución
+## API implementada y validada en aislamiento
 
 - GET `/api/v1/workspaces/:id/activity`, sesión verificada y rol owner/admin
   reconsultado bajo locks usuario/workspace. No usa la cabecera para cambiar tenant.
@@ -127,10 +133,12 @@ Retención/privacidad y borrado de cuenta siguen sujetos a sus políticas existe
   espera de locks a 2 s y cada sentencia a 5 s; no es un timeout total de petición.
 - Errores genéricos: `401/403`, paginación `422`, limitación `429`, infraestructura
   o columna ausente `503`. No fallback sin scope ni detalles SQL en respuesta.
-- Veinte casos preparados en `WorkspaceActivityTest`: roles, aislamiento, catálogo,
+- Veinte casos de `WorkspaceActivityTest`: roles, aislamiento, catálogo,
   datos minimizados, empates/inserciones durante paginación, cursores y revocación,
   resultados DNS, identidades no disponibles, entradas acotadas, esquema ausente
-  y presupuesto entre sesiones/workspaces. No ejecutados; junto a los seis de
-  atribución no constituyen prueba de corrección actual ni de rendimiento.
+  y presupuesto entre sesiones/workspaces. Pasaron el 5 de septiembre junto a los
+  seis de atribución sobre `uvh_test`; no constituyen prueba de rendimiento real.
 
-No se ejecutaron suites, lint, build, migraciones, backfill, servicios ni navegador.
+No se ejecutaron migración ni backfill en `uvh_local` ni despliegue real. Las
+suites indicadas, typecheck/build y el E2E dirigido sí se ejecutaron en aislamiento;
+continúan pendientes volumen, concurrencia y operación externa.

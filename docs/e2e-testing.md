@@ -50,7 +50,7 @@ Los fallos conservan captura, vídeo y trace bajo `frontend/test-results`; esos
 artefactos están ignorados por Git. CI los adjunta durante siete días sólo si
 el job falla.
 
-## Cobertura actual: 24 recorridos
+## Cobertura actual: 26 recorridos
 
 1. Registro, verificación por email e inicio de sesión.
 2. Bloqueo de sesión para una cuenta no verificada.
@@ -76,6 +76,10 @@ el job falla.
 22. Carrera multiproceso de clic/restore con contador exacto.
 23. Carrera multiproceso de restore/purge con un único ganador.
 24. Carrera entre restore y housekeeping sobre papelera envejecida.
+25. Primeros pasos aislado por cuenta/workspace, omisión/reanudación y cambio real
+    de `viewer` a `editor`, con teclado, móvil y Axe.
+26. Actividad con `owner`/`admin` autorizados, ausencia de petición para
+    `editor`/`viewer` y respuesta minimizada, con teclado, móvil y Axe.
 
 ## Qué no acredita
 

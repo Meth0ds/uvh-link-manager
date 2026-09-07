@@ -239,19 +239,24 @@ implementación parcial.
 
 ### 2. Validación manual, E2E y resiliencia
 
-- [x] **BROWSER-E2E-001 — Base Playwright aislada.** Dieciocho recorridos reales
-  sobre Chromium, Angular, Laravel y PostgreSQL pasaron juntos el 6 de septiembre
-  en 16,3 minutos. Incluyen identidad, MFA/recovery, cambio de email, exportación,
-  workspace/enlace/papelera, invitación, token Bearer, uso y centro de seguridad.
+- [x] **BROWSER-E2E-001 — Base Playwright aislada.** El inventario contiene 26
+  recorridos reales. La base de 18 pasó junta sobre Chromium, Angular, Laravel y
+  PostgreSQL el 6 de septiembre en 16,3 minutos; los ocho recorridos incorporados
+  después se han validado de forma dirigida, no aún como una ejecución conjunta
+  de 26. Cubren además roles/accesibilidad de Uso, seguridad entre navegadores,
+  carreras de papelera, Primeros pasos y Actividad por roles.
   hCaptcha y la entrega de correo usan adaptadores locales deterministas, pero la
   verificación antiabuso continúa siendo servidor a servidor. La base
   `uvh_e2e_test`, los contenedores y la red se eliminaron al terminar; `uvh_local`
   no se tocó. Alcance y límites en `docs/e2e-testing.md`.
 - [ ] **PRODUCT-VALID-001 — Primeros pasos.** Los cinco casos backend y trece
   frontend pasaron el 5 de septiembre dentro de las suites completas; typecheck
-  y build también pasaron. Faltan E2E con cambios de cuenta/workspace/rol,
-  omitir/reanudar entre visitas y QA visual/accesible. Detalle en
-  `docs/getting-started-roadmap.md`.
+  y build también pasaron. El 7 de septiembre Playwright validó dos cuentas, dos
+  workspaces, aislamiento de la omisión por cuenta/workspace, reanudación tras
+  recarga y actualización tras un cambio real `viewer` → `editor`. También pasó
+  teclado/enlace de salto, reflow 390×844 y Axe WCAG A/AA. Faltan lector de
+  pantalla y revisión visual reales, además de acreditar en este recorrido las
+  señales de redirección y MFA. Detalle en `docs/getting-started-roadmap.md`.
 - [ ] **RELEASE-VALID-001 — Arranque y deriva del esquema.** Los nueve casos de
   `UvhReleaseCheckTest` pasaron en `uvh_test` y el comando de sólo lectura pasó
   con las 36 migraciones aisladas aplicadas. Una migración limpia desde base
@@ -261,8 +266,11 @@ implementación parcial.
 - [ ] **PRODUCT-VALID-002 — Actividad y atribución.** Los seis casos de
   `AuditWorkspaceAttributionTest`, veinte de `WorkspaceActivityTest` y 29 casos
   frontend pasaron el 5 de septiembre con 000033 aplicada sólo en `uvh_test`.
-  Typecheck y build también pasaron. Faltan E2E, visual/accesibilidad,
-  rendimiento, concurrencia y despliegue.
+  Typecheck y build también pasaron. El 7 de septiembre Playwright comprobó con
+  roles reales que `viewer`/`editor` ni consultan Actividad, `owner`/`admin` sí,
+  y que la representación no contiene emails ni el destino secreto de un enlace.
+  Pasaron teclado, reflow 390×844 y Axe WCAG A/AA. Faltan lector de pantalla y
+  revisión visual reales, volumen/rendimiento, concurrencia, retención y despliegue.
 - [ ] **INVITATION-UI-VALID-001 — Contrato y cuenta atrás.** Diecisiete casos
   pasaron en `retry-after.spec.ts`, `api.service.spec.ts`,
   `invitation-retry.service.spec.ts` y `team.component.spec.ts`; typecheck y build
@@ -679,8 +687,10 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
     correlacionada con autorización y sin escrituras de progreso. Pantalla, menú,
     tarjeta Dashboard, omitir/reanudar por usuario/workspace y ocultación al observar
     las tres señales iniciales. Dominio/equipo opcionales. Cinco casos backend y
-    trece frontend pasaron el 5 de septiembre. `PRODUCT-VALID-001` permanece abierto;
-    detalles y límites en `docs/getting-started-roadmap.md`.
+    trece frontend pasaron el 5 de septiembre. El E2E dirigido de aislamiento,
+    omisión/reanudación, cambio de rol, teclado, móvil y Axe pasó el 7 de septiembre.
+    `PRODUCT-VALID-001` permanece abierto por sus comprobaciones manuales y señales
+    todavía no recorridas; detalles y límites en `docs/getting-started-roadmap.md`.
 - [x] **PRODUCT-002 — Actividad del workspace (`/app/activity`).** Añadir un
   registro paginado para propietarios y administradores con actor, acción,
   recurso, fecha y resultado; aplicar aislamiento estricto por workspace,
@@ -697,7 +707,9 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
     implementadas: DTO separado/minimizado, estados de error y cobertura, páginas
     manuales de 25 hasta 500, invalidación por contexto y respuesta tardía, sin
     persistir cursores ni reintentar solos. Los 29 casos frontend, typecheck y
-    build pasaron. `PRODUCT-VALID-002` sigue abierto; esto no acredita producción.
+    build pasaron. El E2E dirigido de los cuatro roles, minimización, teclado,
+    móvil y Axe pasó el 7 de septiembre. `PRODUCT-VALID-002` sigue abierto por
+    lector real, volumen, concurrencia, retención y despliegue; esto no acredita producción.
     Plan, garantías y despliegue en `docs/workspace-activity-roadmap.md`.
 - [x] **PRODUCT-003 — Uso y límites (`/app/usage`).** Exponer consumo frente a
   cuotas reales de enlaces, dominios, miembros, tokens, webhooks y retención de
