@@ -239,9 +239,9 @@ implementación parcial.
 
 ### 2. Validación manual, E2E y resiliencia
 
-- [x] **BROWSER-E2E-001 — Base Playwright aislada.** El inventario contiene 26
+- [x] **BROWSER-E2E-001 — Base Playwright aislada.** El inventario contiene 27
   recorridos reales. La base de 18 pasó junta sobre Chromium, Angular, Laravel y
-  PostgreSQL el 6 de septiembre en 16,3 minutos; los ocho recorridos incorporados
+  PostgreSQL el 6 de septiembre en 16,3 minutos; los nueve recorridos incorporados
   después se han validado de forma dirigida, no aún como una ejecución conjunta
   de 26. Cubren además roles/accesibilidad de Uso, seguridad entre navegadores,
   carreras de papelera, Primeros pasos y Actividad por roles.
@@ -811,7 +811,10 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
 - [ ] **PRODUCT-VALID-011 — Activación del monitor público externo.** Provisionar
   el monitor fuera de UVH, guardar su bearer en secretos, configurar el feed y
   ensayar caída de UVH y del monitor. Hasta entonces `/status` muestra de forma
-  segura “desconocido”. Runbook: `docs/public-status-feed.md`.
+  segura “desconocido”. El 7 de septiembre Playwright comprobó en Chromium que
+  la ausencia del feed devuelve 503, nunca se presenta como salud y conserva
+  actualización manual, teclado, reflow 390×844 y Axe WCAG A/AA. Esta evidencia
+  local no demuestra independencia. Runbook: `docs/public-status-feed.md`.
 
 ## 4 — Roadmap opcional — Productividad y escalado
 

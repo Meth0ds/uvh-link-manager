@@ -307,6 +307,40 @@ test("actividad aplica owner admin editor viewer y minimiza datos en navegador r
   }
 });
 
+test("estado público falla cerrado sin monitor y conserva accesibilidad", async ({ page }) => {
+  const initialStatus = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/public-status")
+      && response.request().method() === "GET");
+  await page.goto("/status");
+  expect((await initialStatus).status()).toBe(503);
+  await expect(page.getByRole("heading", { name: "Estado del servicio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
+  await expect(page.getByText("No asumimos que el servicio esté operativo.")).toBeVisible();
+
+  // A manual refresh must preserve fail-closed semantics when the independent
+  // feed is absent; the fact that this page loads is never treated as health.
+  const refreshedStatus = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/public-status")
+      && response.request().method() === "GET");
+  await page.getByRole("button", { name: "Actualizar" }).click();
+  expect((await refreshedStatus).status()).toBe(503);
+  await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Actualizar" }).focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("link", { name: "Iniciar sesión" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("link", { name: "Ayuda técnica" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("link", { name: "UVH, inicio" })).toBeFocused();
+  await expectNoWcagAAIssues(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+  await expectNoWcagAAIssues(page);
+});
+
 test("el centro de seguridad minimiza actividad y permite cerrar la sesión actual", async ({ page }) => {
   test.setTimeout(360_000);
   await registerVerifyAndLogin(page, "security-center-validation");
