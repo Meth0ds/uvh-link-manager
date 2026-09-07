@@ -239,12 +239,11 @@ implementación parcial.
 
 ### 2. Validación manual, E2E y resiliencia
 
-- [x] **BROWSER-E2E-001 — Base Playwright aislada.** El inventario contiene 27
-  recorridos reales. La base de 18 pasó junta sobre Chromium, Angular, Laravel y
-  PostgreSQL el 6 de septiembre en 16,3 minutos; los nueve recorridos incorporados
-  después se han validado de forma dirigida, no aún como una ejecución conjunta
-  de 26. Cubren además roles/accesibilidad de Uso, seguridad entre navegadores,
-  carreras de papelera, Primeros pasos y Actividad por roles.
+- [x] **BROWSER-E2E-001 — Base Playwright aislada.** Los 27 recorridos reales
+  pasaron juntos sobre Chromium, Angular, Laravel y PostgreSQL el 7 de septiembre
+  en 27,6 minutos, con un worker para detectar contaminación entre casos. Cubren
+  identidad, roles/accesibilidad de Uso, seguridad entre navegadores, carreras de
+  papelera, Primeros pasos, Actividad y el fallo cerrado del estado público.
   hCaptcha y la entrega de correo usan adaptadores locales deterministas, pero la
   verificación antiabuso continúa siendo servidor a servidor. La base
   `uvh_e2e_test`, los contenedores y la red se eliminaron al terminar; `uvh_local`

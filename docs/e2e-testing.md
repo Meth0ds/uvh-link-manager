@@ -52,6 +52,10 @@ el job falla.
 
 ## Cobertura actual: 27 recorridos
 
+La ejecución conjunta más reciente terminó con 27/27 en 27,6 minutos el 7 de
+septiembre de 2026, usando un único worker. El teardown eliminó la base, los
+contenedores, la red y los volúmenes efímeros.
+
 1. Registro, verificación por email e inicio de sesión.
 2. Bloqueo de sesión para una cuenta no verificada.
 3. Registro duplicado sin enumeración de cuentas.
