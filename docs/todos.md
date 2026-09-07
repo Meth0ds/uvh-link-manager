@@ -758,9 +758,14 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
   y cobertura del decoder pasaron.
 - [ ] **PRODUCT-VALID-008 — Validación E2E del centro de seguridad.** Recorrer
   reautenticación, MFA, recovery, email y revocación de sesión actual/remota en
-  navegador real; revisar foco, lector, móvil y expiración. Playwright ya valida
-  la proyección minimizada y la revocación de la sesión actual; continúa pendiente
-  la sesión remota, expiración y QA accesible.
+  navegador real; revisar foco, lector, móvil y expiración. Playwright ya cubre
+  cambio de email con cierre total, alta MFA, TOTP, uso único de recovery y
+  revocación actual. El 7 de septiembre añadió dos navegadores independientes
+  para revocar sólo la sesión remota y un admin MFA cuya frescura se envejece de
+  forma acotada en `uvh_e2e_test`: exige reautenticación, consume otro recovery,
+  entra en administración y registra el evento. Se verificaron foco seguro del
+  diálogo, reflow 390×844 y Axe WCAG A/AA; se corrigieron cinco contrastes de
+  2,92:1. El gate permanece abierto para lector de pantalla real.
 - [x] **PRODUCT-009 — Papelera de enlaces (`/app/links/trash`).** Listado,
   búsqueda y paginación; fecha de purga del servidor; restore editor+ y borrado
   owner/admin con frase exacta, contraseña y MFA. Usa locks ordenados, cascada

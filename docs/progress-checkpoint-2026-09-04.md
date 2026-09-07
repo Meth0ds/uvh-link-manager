@@ -326,6 +326,15 @@ de secretos/proxy/TLS y validación jurídica.
   La suite reveló y corrigió contaminación de `RateLimiter` entre métodos al
   reiniciar IDs. El gate continúa abierto sólo para la revisión manual con lector
   de pantalla; las pilas efímeras se desmontaron y `uvh_local` no se modificó.
+- PRODUCT-VALID-008 añadió ese mismo día revocación entre dos contextos de
+  navegador: el dispositivo remoto perdió acceso en su siguiente petición y la
+  sesión que revocó siguió activa. El diálogo mantuvo foco inicial en Cancelar,
+  la vista pasó reflow 390×844 y Axe A/AA. Otro recorrido activó MFA, conservó
+  dos recovery codes sólo en memoria, promovió la cuenta con el comando auditado,
+  envejeció exclusivamente su sesión en `uvh_e2e_test`, exigió step-up y acreditó
+  acceso admin más el evento `auth.mfa_reauthenticated`. Al escanear la vista se
+  hallaron y corrigieron cinco textos de 2,92:1. Ambos E2E pasaron; el gate sigue
+  abierto para lector de pantalla real y las pilas efímeras fueron eliminadas.
 - La PR #17 conserva estos cambios en `test/playwright-e2e`. GitHub Actions y
   CodeQL no iniciaron ningún step porque GitHub informó que la cuenta estaba
   bloqueada por facturación; esa señal externa no sustituye la validación local.

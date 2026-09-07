@@ -3,6 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { E2E_PASSWORD, loginFromBrowser, logoutFromBrowser, registerVerifyAndLogin } from "../support/auth";
 import { installHCaptchaBridge } from "../support/hcaptcha";
 import { readMailLink } from "../support/mail";
+import { ageE2EMfaSession, promoteE2EAdmin } from "../support/security";
+import { currentTotp } from "../support/totp";
 import { createWorkspaceFromBrowser } from "../support/workspace";
 
 type InvitableRole = "admin" | "editor" | "viewer";
@@ -167,6 +169,104 @@ test("el centro de seguridad minimiza actividad y permite cerrar la sesión actu
   // unusable without depending on browser back-forward cache behaviour.
   await page.goto("/app/security");
   await expect(page).toHaveURL(/\/auth\?returnTo=%2Fapp%2Fsecurity$/);
+});
+
+test("el centro de seguridad revoca una sesión remota sin cerrar la actual", async ({ page, browser }) => {
+  test.setTimeout(480_000);
+  const { email } = await registerVerifyAndLogin(page, "security-remote-session");
+  const remoteContext = await browser.newContext();
+  const remotePage = await remoteContext.newPage();
+
+  try {
+    await installHCaptchaBridge(remotePage);
+    await loginFromBrowser(remotePage, email);
+    await expect(remotePage).toHaveURL(/\/app\/(dashboard|getting-started)$/);
+
+    await page.goto("/app/security");
+    await expect(page.getByRole("heading", { name: "Centro de seguridad" })).toBeVisible();
+    const remoteSession = page.locator("article.session").filter({ hasText: "Otra sesión" });
+    await expect(remoteSession).toHaveCount(1);
+    await expectNoWcagAAIssues(page);
+
+    const revokeResponse = page.waitForResponse((response) =>
+      /\/api\/v1\/auth\/sessions\/[^/]+\/revoke$/.test(response.url())
+        && response.request().method() === "POST");
+    await remoteSession.getByRole("button", { name: "Revocar" }).click();
+    const dialog = page.getByRole("alertdialog");
+    // Destructive dialogs deliberately focus the safe action first. Revocation
+    // therefore needs a separate, explicit user action after focus is trapped.
+    await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+    const confirmButton = dialog.getByRole("button", { name: "Revocar acceso" });
+    await confirmButton.click();
+    expect((await revokeResponse).status()).toBe(200);
+    await expect(remoteSession).toHaveCount(0);
+    await expect(page.locator("article.session").filter({ hasText: "Esta sesión" })).toHaveCount(1);
+
+    // The remote browser must discover revocation on its next authenticated
+    // request, while the revoking browser keeps its independent live session.
+    await remotePage.goto("/app/security");
+    await expect(remotePage).toHaveURL(/\/auth\?returnTo=%2Fapp%2Fsecurity$/);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Centro de seguridad" })).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Sesiones activas" })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+    await expectNoWcagAAIssues(page);
+  } finally {
+    await remoteContext.close();
+  }
+});
+
+test("una sesión MFA caducada reautentica administración y registra el evento", async ({ page }) => {
+  test.setTimeout(600_000);
+  const { email } = await registerVerifyAndLogin(page, "security-reauthentication");
+
+  await page.goto("/app/settings#security");
+  await page.getByLabel("Contraseña actual").filter({ visible: true }).last().fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Empezar configuración" }).click();
+  const secret = (await page.locator(".mfa-secret code").textContent())?.trim() ?? "";
+  expect(secret).not.toBe("");
+  await page.getByLabel("Código de la nueva aplicación").fill(currentTotp(secret));
+  const enableResponse = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/mfa/enable"));
+  await page.getByRole("button", { name: "Verificar y continuar" }).click();
+  expect((await enableResponse).status()).toBe(200);
+
+  // Recovery codes are single-display credentials. Keep two only in process:
+  // one creates a fresh admin session and the other performs the step-up.
+  const recoveryCodes = await page.locator("[aria-label='Códigos de recuperación'] code").evaluateAll((codes) =>
+    codes.slice(0, 2).map((code) => code.textContent?.trim() ?? ""));
+  expect(recoveryCodes).toHaveLength(2);
+  expect(recoveryCodes.every(Boolean)).toBe(true);
+  await page.getByRole("checkbox", { name: /He guardado los códigos/ }).check();
+  await page.getByRole("button", { name: "Finalizar configuración" }).click();
+
+  await promoteE2EAdmin(email);
+  await logoutFromBrowser(page);
+  await loginFromBrowser(page, email);
+  await page.getByRole("button", { name: "Usar un código de recuperación" }).click();
+  await page.getByRole("textbox", { name: "Código de recuperación" }).fill(recoveryCodes[0]);
+  await page.getByRole("button", { name: "Usar código y entrar" }).click();
+  await expect(page).toHaveURL(/\/app\/(dashboard|getting-started)$/);
+
+  await ageE2EMfaSession(email);
+  await page.goto("/app/admin");
+  await expect(page).toHaveURL(/\/auth\/reauthenticate\?returnTo=%2Fapp%2Fadmin$/);
+  await expect(page.getByRole("heading", { name: "Confirma que eres tú" })).toBeVisible();
+  await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
+  await page.getByLabel("Código de autenticación o recuperación").fill(recoveryCodes[1]);
+  const reauthenticateResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/auth/mfa/reauthenticate")
+      && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Continuar a administración" }).click();
+  expect((await reauthenticateResponse).status()).toBe(200);
+  await expect(page).toHaveURL(/\/app\/admin$/);
+  await expect(page.getByRole("heading", { name: "Administración" })).toBeVisible();
+
+  await page.goto("/app/security");
+  await expect(page.getByText("Reautenticación MFA completada", { exact: true })).toBeVisible();
+  await expect(page.locator("article.session").filter({ hasText: "Esta sesión · MFA verificado" })).toHaveCount(1);
 });
 
 test("la purga irreversible exige frase y contraseña y elimina el enlace", async ({ page }) => {
