@@ -23,6 +23,13 @@ export async function loginFromBrowser(page: Page, email: string, password = E2E
   await page.getByRole("button", { name: "Entrar en mi panel" }).click();
 }
 
+/** Ends the browser session through the same user-visible control used in production. */
+export async function logoutFromBrowser(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Menú de usuario" }).click();
+  await page.getByRole("menuitem", { name: "Cerrar sesión" }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+}
+
 /** Creates a unique account and crosses the real email-verification boundary. */
 export async function registerVerifyAndLogin(
   page: Page,

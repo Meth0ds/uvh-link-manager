@@ -316,6 +316,16 @@ de secretos/proxy/TLS y validación jurídica.
   confirmación. La pila efímera se eliminó al terminar y `uvh_local` no se tocó.
   PRODUCT-VALID-003/008/009 avanzaron, pero siguen abiertos por roles, sesión
   remota, MFA de purga, accesibilidad, rendimiento y carreras multiproceso.
+- El 7 de septiembre PRODUCT-VALID-003 avanzó con dos E2E de navegador real:
+  owner/admin/editor/viewer recorrieron registro, verificación, invitación,
+  aceptación, login y proyección de Uso; teclado, enlace de salto, reflow móvil
+  390×844 y Axe WCAG 2.0/2.1 A/AA también pasaron. Se corrigieron el salto que
+  abandonaba `/app` sin mover el foco y el contraste insuficiente de la etiqueta
+  superior. `WorkspaceUsageTest` pasó 13 casos/120 aserciones en PostgreSQL
+  efímero, incluido el agregado de 10.000 enlaces en una consulta y menos de 5 s.
+  La suite reveló y corrigió contaminación de `RateLimiter` entre métodos al
+  reiniciar IDs. El gate continúa abierto sólo para la revisión manual con lector
+  de pantalla; las pilas efímeras se desmontaron y `uvh_local` no se modificó.
 - La PR #17 conserva estos cambios en `test/playwright-e2e`. GitHub Actions y
   CodeQL no iniciaron ningún step porque GitHub informó que la cuenta estaba
   bloqueada por facturación; esa señal externa no sustituye la validación local.

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { BreakpointObserver } from "@angular/cdk/layout";
 import { map } from "rxjs";
@@ -74,6 +74,7 @@ export class PanelComponent {
   readonly mobileOpen = signal(false);
   readonly logoutBusy = signal(false);
   readonly isMobile = toSignal(this.breakpoint.observe("(max-width: 720px)").pipe(map((state) => state.matches)), { initialValue: false });
+  readonly panelContent = viewChild.required<ElementRef<HTMLElement>>("panelContent");
 
   readonly initials = computed(() => {
     const name = this.user()?.name ?? "?";
@@ -130,6 +131,14 @@ export class PanelComponent {
 
   onWorkspaceChange(id: number): void {
     this.workspaces.select(id);
+  }
+
+  skipToContent(event: Event): void {
+    // Angular's document-level link handling can resolve a bare fragment
+    // against the application base and leave the current child route. Keep the
+    // skip link on this page and move focus to the explicit main landmark.
+    event.preventDefault();
+    this.panelContent().nativeElement.focus();
   }
 
   newLink(): void {

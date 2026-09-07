@@ -717,9 +717,14 @@ levantar restricciones de pruebas, migraciones o las condiciones de PRODUCT-022�
 - [ ] **PRODUCT-VALID-003 — Validación E2E/operativa de Uso y límites.** Recorrer
   la pantalla autenticada con owner/admin/editor/viewer sobre una copia aislada,
   verificar teclado, lector, móvil y contraste, y medir el endpoint con volumen
-  representativo. Playwright ya recorre la respuesta y la redacción de política
-  con un owner sobre `uvh_e2e_test`; faltan el resto de roles, QA accesible y
-  volumen. No aplicar 000034 a `uvh_local` para cerrar este gate.
+  representativo. El 7 de septiembre Playwright completó el ciclo real de alta,
+  verificación, invitación, cambio de sesión y proyección para owner/admin/editor/
+  viewer; también pasó teclado, enlace de salto, reflow a 390×844 y Axe WCAG
+  2.0/2.1 A/AA sobre `uvh_e2e_test`. El backend pasó 13 casos/120 aserciones en
+  base efímera: 10.000 enlaces, 5.000 activos, una consulta agregada y respuesta
+  dentro del presupuesto de 5 s. El gate permanece abierto hasta revisar la
+  experiencia con un lector de pantalla real; Axe no sustituye esa prueba. No
+  aplicar 000034 a `uvh_local` para cerrar este gate.
 - [ ] **PRODUCT-004 — Centro de notificaciones (`/app/notifications`).** Crear
   una bandeja durable, paginada y deduplicada para dominios/DNS/TLS, webhooks
   agotados, enlaces próximos a expirar o agotar clics, tokens próximos a caducar,
