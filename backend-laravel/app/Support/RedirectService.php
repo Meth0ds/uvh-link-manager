@@ -209,6 +209,14 @@ class RedirectService
                 return;
             }
 
+            $destination = self::withUtmParameters($destination, [
+                'utm_source' => $fresh->utm_source,
+                'utm_medium' => $fresh->utm_medium,
+                'utm_campaign' => $fresh->utm_campaign,
+                'utm_term' => $fresh->utm_term,
+                'utm_content' => $fresh->utm_content,
+            ]);
+
             // Do not consume a single-use link or its click quota until the
             // final rule/fallback destination is known to be safe. The row
             // lock keeps the selection and consumption one atomic decision.
@@ -263,6 +271,67 @@ class RedirectService
         });
 
         return $outcome;
+    }
+
+    /**
+     * Add configured campaign parameters without reserializing unrelated query
+     * bytes. Configured values are authoritative: every exact, percent-decoded
+     * homonym is removed before one RFC 3986-encoded value is appended. Query
+     * names remain case-sensitive and the original fragment stays last.
+     *
+     * @param  array<string, ?string>  $configured
+     */
+    private static function withUtmParameters(string $destination, array $configured): string
+    {
+        $utm = [];
+        foreach ($configured as $name => $value) {
+            if ($value !== null) {
+                $utm[$name] = $value;
+            }
+        }
+        if ($utm === []) {
+            return $destination;
+        }
+
+        $fragment = '';
+        $withoutFragment = $destination;
+        $fragmentPosition = strpos($destination, '#');
+        if ($fragmentPosition !== false) {
+            $fragment = substr($destination, $fragmentPosition);
+            $withoutFragment = substr($destination, 0, $fragmentPosition);
+        }
+
+        $base = $withoutFragment;
+        $existingQuery = '';
+        $queryPosition = strpos($withoutFragment, '?');
+        if ($queryPosition !== false) {
+            $base = substr($withoutFragment, 0, $queryPosition);
+            $existingQuery = substr($withoutFragment, $queryPosition + 1);
+        }
+
+        $keptSegments = [];
+        if ($existingQuery !== '') {
+            foreach (explode('&', $existingQuery) as $segment) {
+                $separatorPosition = strpos($segment, '=');
+                $rawName = $separatorPosition === false ? $segment : substr($segment, 0, $separatorPosition);
+                if (! array_key_exists(rawurldecode($rawName), $utm)) {
+                    $keptSegments[] = $segment;
+                }
+            }
+        }
+
+        $newSegments = [];
+        foreach ($utm as $name => $value) {
+            $newSegments[] = rawurlencode($name).'='.rawurlencode($value);
+        }
+
+        $query = implode('&', $keptSegments);
+        if ($query !== '' && ! str_ends_with($query, '&')) {
+            $query .= '&';
+        }
+        $query .= implode('&', $newSegments);
+
+        return $base.'?'.$query.$fragment;
     }
 
     private static function unlockMatches(mixed $unlock, string $alias, string $host, int $linkId, int $passwordVersion): bool

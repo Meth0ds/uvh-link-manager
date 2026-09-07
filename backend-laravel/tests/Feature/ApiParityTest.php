@@ -554,6 +554,88 @@ class ApiParityTest extends TestCase
             ->assertStatus(200)->assertJson(['ok' => true]);
     }
 
+    public function test_redirect_applies_configured_utm_to_primary_rule_and_fallback_destinations(): void
+    {
+        $sessionToken = $this->registerVerifiedLogin('redirect-utm@example.com');
+        $utm = [
+            'source' => 'boletín otoño',
+            'medium' => 'email+social',
+            'campaign' => 'lanzamiento & ventas',
+            'term' => 'café premium',
+            'content' => 'hero?cta=#1',
+        ];
+        $encodedUtm = 'utm_source=bolet%C3%ADn%20oto%C3%B1o'
+            .'&utm_medium=email%2Bsocial'
+            .'&utm_campaign=lanzamiento%20%26%20ventas'
+            .'&utm_term=caf%C3%A9%20premium'
+            .'&utm_content=hero%3Fcta%3D%231';
+
+        // Configured values take precedence over every equivalent existing
+        // UTM key, while unrelated query bytes and the fragment survive.
+        $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://primary.example.test/path?keep=1&utm_source=old&utm%5Fsource=older#section',
+            'alias' => 'utm-primary',
+            'utm' => $utm,
+        ])->assertCreated();
+        $primary = $this->call('GET', 'http://uvh.es/utm-primary');
+        $primary->assertStatus(302);
+        $this->assertSame(
+            "https://primary.example.test/path?keep=1&{$encodedUtm}#section",
+            $primary->headers->get('Location'),
+        );
+
+        $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://primary.example.test/unused',
+            'alias' => 'utm-rule',
+            'utm' => $utm,
+            'rules' => [[
+                'priority' => 0,
+                'destination' => 'https://rule.example.test/offer#details',
+            ]],
+        ])->assertCreated();
+        $rule = $this->call('GET', 'http://uvh.es/utm-rule');
+        $rule->assertStatus(302);
+        $this->assertSame(
+            "https://rule.example.test/offer?{$encodedUtm}#details",
+            $rule->headers->get('Location'),
+        );
+
+        $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://primary.example.test/unused',
+            'fallbackDestination' => 'https://fallback.example.test/offer?keep=fallback&utm_term=stale#more',
+            'alias' => 'utm-fallback',
+            'utm' => $utm,
+            // This rule cannot match without a trusted country header, which
+            // exercises the configured fallback rather than the main target.
+            'rules' => [[
+                'priority' => 0,
+                'country' => 'ZZ',
+                'destination' => 'https://rule.example.test/not-selected',
+            ]],
+        ])->assertCreated();
+        $fallback = $this->call('GET', 'http://uvh.es/utm-fallback');
+        $fallback->assertStatus(302);
+        $this->assertSame(
+            "https://fallback.example.test/offer?keep=fallback&{$encodedUtm}#more",
+            $fallback->headers->get('Location'),
+        );
+
+        // A partial UTM payload must not erase campaign parameters that were
+        // intentionally left under the destination URL's control. The string
+        // "0" is a real configured value, not an absent/false value.
+        $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://partial.example.test/offer?utm_source=old&utm_medium=keep#partial',
+            'alias' => 'utm-partial',
+            'utm' => ['source' => '0'],
+        ])->assertCreated();
+        $partial = $this->call('GET', 'http://uvh.es/utm-partial');
+        $partial->assertStatus(302);
+        $this->assertSame(
+            'https://partial.example.test/offer?utm_medium=keep&utm_source=0#partial',
+            $partial->headers->get('Location'),
+        );
+    }
+
     public function test_rules_round_trip_and_partial_patch_preserves_nested_data(): void
     {
         $sessionToken = $this->registerVerifiedLogin('rules@example.com');
