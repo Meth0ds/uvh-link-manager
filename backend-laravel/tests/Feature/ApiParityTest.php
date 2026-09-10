@@ -129,6 +129,23 @@ class ApiParityTest extends TestCase
             ->assertStatus(201)->assertJsonStructure(['link' => ['id', 'shortUrl']]);
     }
 
+    public function test_maximum_length_user_name_creates_a_frontend_readable_workspace(): void
+    {
+        $name = str_repeat('Á', 80);
+        $this->postJson('/api/v1/auth/register', array_merge([
+            'name' => $name,
+            'email' => 'long-workspace-name@example.com',
+            'password' => self::PASSWORD,
+        ], $this->captchaPayload()))->assertCreated();
+
+        $user = User::where('email', 'long-workspace-name@example.com')->firstOrFail();
+        $workspaceName = (string) DB::table('workspaces')->where('owner_user_id', $user->id)->value('name');
+        // Registration and ordinary workspace writes share the same 80-code-
+        // point contract, including multibyte names.
+        $this->assertSame(80, mb_strlen($workspaceName, 'UTF-8'));
+        $this->assertStringStartsWith('Workspace de ', $workspaceName);
+    }
+
     public function test_link_intent_contract(): void
     {
         $issued = $this->postJson('/api/v1/link-intents', [
@@ -554,6 +571,17 @@ class ApiParityTest extends TestCase
             ->assertStatus(200)->assertJson(['ok' => true]);
     }
 
+    public function test_default_short_url_preserves_the_configured_local_origin_and_port(): void
+    {
+        config(['uvh.public_origin' => 'http://127.0.0.1:8010']);
+        $sessionToken = $this->registerVerifiedLogin('local-short-url@example.com');
+
+        $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://destination.example.test/path',
+            'alias' => 'local-origin',
+        ])->assertCreated()->assertJsonPath('link.shortUrl', 'http://127.0.0.1:8010/local-origin');
+    }
+
     public function test_redirect_applies_configured_utm_to_primary_rule_and_fallback_destinations(): void
     {
         $sessionToken = $this->registerVerifiedLogin('redirect-utm@example.com');
@@ -634,6 +662,49 @@ class ApiParityTest extends TestCase
             'https://partial.example.test/offer?utm_medium=keep&utm_source=0#partial',
             $partial->headers->get('Location'),
         );
+    }
+
+    public function test_redirect_language_rules_match_primary_and_regional_tags_consistently(): void
+    {
+        $sessionToken = $this->registerVerifiedLogin('redirect-language@example.com');
+
+        $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://language.example.test/default',
+            'fallbackDestination' => 'https://language.example.test/fallback',
+            'alias' => 'language-primary',
+            'rules' => [[
+                'priority' => 0,
+                'language' => 'es',
+                'destination' => 'https://language.example.test/spanish',
+            ]],
+        ])->assertCreated();
+
+        // A primary-language rule accepts a regional browser tag even when it
+        // is not the first raw header item; q=0 entries are never acceptable.
+        $primary = $this->withHeader('Accept-Language', 'en;q=0.4, es-MX;q=0.9')
+            ->call('GET', 'http://uvh.es/language-primary');
+        $primary->assertRedirect('https://language.example.test/spanish');
+        $zeroQuality = $this->withHeader('Accept-Language', 'es-MX;q=0, en;q=1')
+            ->call('GET', 'http://uvh.es/language-primary');
+        $zeroQuality->assertRedirect('https://language.example.test/fallback');
+
+        $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://language.example.test/default',
+            'fallbackDestination' => 'https://language.example.test/fallback',
+            'alias' => 'language-regional',
+            'rules' => [[
+                'priority' => 0,
+                'language' => 'es-ES',
+                'destination' => 'https://language.example.test/spain',
+            ]],
+        ])->assertCreated();
+
+        $regional = $this->withHeader('Accept-Language', 'es-ES;q=0.5, es-MX;q=0.9')
+            ->call('GET', 'http://uvh.es/language-regional');
+        $regional->assertRedirect('https://language.example.test/spain');
+        $otherRegion = $this->withHeader('Accept-Language', 'es-MX')
+            ->call('GET', 'http://uvh.es/language-regional');
+        $otherRegion->assertRedirect('https://language.example.test/fallback');
     }
 
     public function test_rules_round_trip_and_partial_patch_preserves_nested_data(): void

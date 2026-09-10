@@ -33,4 +33,22 @@ final class IsoDate
 
         return Carbon::instance($parsed);
     }
+
+    /**
+     * Serialize an instant as UTC without mutating a caller-owned date object.
+     * A literal Z is valid only after the offset has actually been normalized.
+     */
+    public static function format(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (! $value instanceof \DateTimeInterface) {
+            return (string) $value;
+        }
+
+        return \DateTimeImmutable::createFromInterface($value)
+            ->setTimezone(new \DateTimeZone('UTC'))
+            ->format('Y-m-d\TH:i:s.v\Z');
+    }
 }

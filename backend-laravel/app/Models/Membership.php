@@ -10,12 +10,12 @@ class Membership extends Model
 
     protected $fillable = ['workspace_id', 'user_id', 'role'];
 
-    public function workspace()
+    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function user()
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class);
     }

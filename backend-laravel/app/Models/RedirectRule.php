@@ -27,7 +27,7 @@ class RedirectRule extends Model
         return ['priority' => 'integer', 'created_at' => 'datetime'];
     }
 
-    public function link()
+    public function link(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Link::class);
     }

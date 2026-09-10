@@ -19,7 +19,7 @@ class Quota extends Model
         return ['links_limit' => 'integer', 'updated_at' => 'datetime'];
     }
 
-    public function workspace()
+    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Workspace::class, 'workspace_id');
     }

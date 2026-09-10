@@ -58,12 +58,26 @@ class PublicController
         $captchaSiteKey = $publicCaptcha
             ? config('uvh.hcaptcha.public_site_key')
             : config('uvh.hcaptcha.site_key');
+        $legalIdentity = [
+            'name' => trim((string) config('uvh.legal.name')),
+            'taxId' => trim((string) config('uvh.legal.tax_id')),
+            'address' => trim((string) config('uvh.legal.address')),
+            'registry' => trim((string) config('uvh.legal.registry')),
+            'hostingProvider' => trim((string) config('uvh.legal.hosting_provider')),
+            'hostingRegion' => trim((string) config('uvh.legal.hosting_region')),
+        ];
 
         return response()->json([
             'appUrl' => $appUrl,
             'publicHost' => config('uvh.public_host'),
             'appHost' => config('uvh.app_host'),
+            // These fields are legally public by design. Return null as one
+            // unit in local environments rather than exposing partial data;
+            // production startup rejects an incomplete identity altogether.
+            'legalIdentity' => in_array('', $legalIdentity, true) ? null : $legalIdentity,
             'hcaptcha' => [
+                // Capability only: the API rechecks its gates at submission.
+                'developmentFallback' => $captchaSurface === 'app' && HCaptcha::developmentFallbackAllowed($request),
                 'enabled' => HCaptcha::configured($captchaSurface),
                 // Public by design. HCAPTCHA_SECRET is never serialized.
                 'siteKey' => HCaptcha::configured($captchaSurface)
@@ -85,8 +99,15 @@ class PublicController
         $captchaConfigured = HCaptcha::configured($captchaSurface);
 
         return response()->json([
-            'externalAnalysis' => $configured,
-            'provider' => $configured ? 'configured' : null,
+            // Configuration alone is not evidence of an executed integration.
+            // Keep the capability explicitly disabled until an adapter, failure
+            // policy and operational probe exist.
+            'externalAnalysis' => [
+                'configured' => $configured,
+                'enabled' => false,
+                'operational' => false,
+                'status' => $configured ? 'not_implemented' : 'not_configured',
+            ],
             'antiAbuse' => [
                 'enabled' => $captchaConfigured,
                 'provider' => $captchaConfigured ? 'hcaptcha' : null,

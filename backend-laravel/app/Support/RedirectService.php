@@ -114,13 +114,12 @@ class RedirectService
             }
         }
 
-        $acceptLanguage = (string) ($ctx['accept_language'] ?? '');
-        $lang = $acceptLanguage !== '' ? strtolower((string) explode('-', explode(',', $acceptLanguage)[0])[0]) : null;
+        $languages = self::acceptedLanguages((string) ($ctx['accept_language'] ?? ''));
         $country = ! empty($ctx['country']) ? strtolower((string) $ctx['country']) : null;
 
         $outcome = ['kind' => 'not_found'];
 
-        DB::transaction(function () use ($id, $domainId, $alias, $host, $unlock, $now, $ua, $referrer, $country, $lang, $campaignFromReferrer, &$outcome) {
+        DB::transaction(function () use ($id, $domainId, $alias, $host, $unlock, $now, $ua, $referrer, $country, $languages, $campaignFromReferrer, &$outcome) {
             $fresh = Link::lockForUpdate()->find($id);
             if (! $fresh || $fresh->workspace_id === null) {
                 $outcome = ['kind' => 'not_found'];
@@ -134,9 +133,14 @@ class RedirectService
 
                 return;
             }
+            // Domain rows are read-only on redirects. A shared lock lets every
+            // redirect for the same hostname proceed concurrently while still
+            // ordering disable/delete after already-admitted redirects. This
+            // preserves the previous atomic eligibility boundary without the
+            // unnecessary exclusive-lock bottleneck.
             if ($freshDomainId !== null && ! CustomDomain::where('id', $freshDomainId)
                 ->where('state', 'active')->where('edge_eligible', true)
-                ->whereNotNull('tls_ready_at')->lockForUpdate()->first()) {
+                ->whereNotNull('tls_ready_at')->sharedLock()->first(['id'])) {
                 $outcome = ['kind' => 'unavailable', 'reason' => 'domain'];
 
                 return;
@@ -176,7 +180,7 @@ class RedirectService
                 if ($rule->country && strtolower((string) $rule->country) !== $country) {
                     continue;
                 }
-                if ($rule->language && strtolower((string) $rule->language) !== $lang) {
+                if ($rule->language && ! self::languageMatches((string) $rule->language, $languages)) {
                     continue;
                 }
                 if ($rule->device && strtolower((string) $rule->device) !== strtolower((string) ($ua['device'] ?? ''))) {
@@ -216,6 +220,15 @@ class RedirectService
                 'utm_term' => $fresh->utm_term,
                 'utm_content' => $fresh->utm_content,
             ]);
+
+            // Appending campaign data can push an otherwise valid target over
+            // the URL boundary. Revalidate the actual Location before spending
+            // single-use state or click quota; fail closed on an invalid result.
+            if (! UrlUtil::validateDestination($destination)['ok']) {
+                $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
+
+                return;
+            }
 
             // Do not consume a single-use link or its click quota until the
             // final rule/fallback destination is known to be safe. The row
@@ -332,6 +345,62 @@ class RedirectService
         $query .= implode('&', $newSegments);
 
         return $base.'?'.$query.$fragment;
+    }
+
+    /**
+     * Parse a bounded Accept-Language list in preference order. A primary rule
+     * such as `es` matches every accepted Spanish variant; a regional rule such
+     * as `es-ES` requires that exact tag. Rule priority still decides which of
+     * multiple matching redirect rules wins.
+     *
+     * @return array<int, string>
+     */
+    private static function acceptedLanguages(string $header): array
+    {
+        $accepted = [];
+        foreach (array_slice(explode(',', substr($header, 0, 512)), 0, 16) as $position => $entry) {
+            $parts = array_map('trim', explode(';', $entry));
+            $tag = strtolower((string) array_shift($parts));
+            if (preg_match('/^[a-z]{2,3}(?:-[a-z0-9]{2,4})?$/D', $tag) !== 1) {
+                continue;
+            }
+
+            $quality = 1.0;
+            $validQuality = true;
+            foreach ($parts as $parameter) {
+                if (preg_match('/^q=(0(?:\.\d{1,3})?|1(?:\.0{1,3})?)$/D', strtolower($parameter), $matches) === 1) {
+                    $quality = (float) $matches[1];
+                    break;
+                }
+                if (str_starts_with(strtolower($parameter), 'q=')) {
+                    // An invalid q-value must not accidentally become the
+                    // highest preference merely because the default is 1.
+                    $validQuality = false;
+                    break;
+                }
+            }
+            if ($validQuality && $quality > 0) {
+                $accepted[] = ['tag' => $tag, 'quality' => $quality, 'position' => $position];
+            }
+        }
+
+        usort($accepted, fn (array $left, array $right): int => $right['quality'] <=> $left['quality']
+            ?: $left['position'] <=> $right['position']);
+
+        return array_values(array_unique(array_column($accepted, 'tag')));
+    }
+
+    /** @param array<int, string> $accepted */
+    private static function languageMatches(string $ruleLanguage, array $accepted): bool
+    {
+        $rule = strtolower($ruleLanguage);
+        foreach ($accepted as $language) {
+            if ($language === $rule || (! str_contains($rule, '-') && str_starts_with($language, $rule.'-'))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function unlockMatches(mixed $unlock, string $alias, string $host, int $linkId, int $passwordVersion): bool

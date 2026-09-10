@@ -16,6 +16,20 @@ return [
     // gate de producción impide conservar indefinidamente un keyring ampliado.
     'secret_rotation_until' => env('APP_SECRET_ROTATION_UNTIL', ''),
     'public_host' => env('PUBLIC_HOST', 'uvh.es'),
+    // Full origin used only to generate default short URLs. Production's
+    // startup gate requires its exact PUBLIC_HOST over HTTPS.
+    'public_origin' => env('PUBLIC_ORIGIN', 'https://'.env('PUBLIC_HOST', 'uvh.es')),
+    'queue_pool' => env('UVH_QUEUE_POOL', ''),
+    'legal' => [
+        // Public legal identity. Production refuses to boot while any required
+        // value is absent or still a placeholder; never guess these values.
+        'name' => env('LEGAL_ENTITY_NAME'),
+        'tax_id' => env('LEGAL_TAX_ID'),
+        'address' => env('LEGAL_ADDRESS'),
+        'registry' => env('LEGAL_REGISTRY_DETAILS'),
+        'hosting_provider' => env('LEGAL_HOSTING_PROVIDER'),
+        'hosting_region' => env('LEGAL_HOSTING_REGION'),
+    ],
     'app_host' => env('APP_HOST', parse_url((string) env('APP_URL', 'http://localhost:8000'), PHP_URL_HOST) ?: 'app.uvh.es'),
     'session_cookie' => env('SESSION_COOKIE', 'uvh_session'),
     'csrf_cookie' => env('CSRF_COOKIE', 'uvh_csrf'),
@@ -25,6 +39,9 @@ return [
     // independently of the longer-lived authenticated session cookie.
     'admin_mfa_fresh_minutes' => (int) env('ADMIN_MFA_FRESH_MINUTES', 15),
     'hcaptcha' => [
+        // Opt-in local convenience only; HCaptcha also checks the environment,
+        // debug mode and loopback hosts on every request. Never enable in a deployment.
+        'dev_fallback' => filter_var(env('HCAPTCHA_DEV_FALLBACK', false), FILTER_VALIDATE_BOOLEAN),
         'site_key' => env('HCAPTCHA_SITE_KEY'),
         'secret' => env('HCAPTCHA_SECRET'),
         // Tests may point at an isolated deterministic verifier. HCaptcha

@@ -67,6 +67,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('auth/confirm-email-change', [AuthController::class, 'confirmEmailChange'])->middleware('throttle:uvh-email-verify');
     Route::post('auth/data-export/confirm', [AccountController::class, 'confirmExport'])->middleware('throttle:uvh-email-verify');
     Route::post('auth/data-export/download', [AccountController::class, 'downloadExport'])->middleware('throttle:uvh-email-verify');
+    Route::post('auth/data-export/download/acknowledge', [AccountController::class, 'acknowledgeExportDownload'])->middleware('throttle:uvh-email-verify');
     Route::post('auth/account-deletion/confirm', [AccountController::class, 'confirmDeletion'])->middleware('throttle:uvh-email-verify');
     Route::post('auth/account-deletion/cancel', [AccountController::class, 'cancelDeletion'])->middleware('throttle:uvh-email-verify');
     // Public: an unverified user has no session after registration/login, so

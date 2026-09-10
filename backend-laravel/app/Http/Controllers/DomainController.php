@@ -10,6 +10,7 @@ use App\Support\Audit;
 use App\Support\DomainRevalidationSchedule;
 use App\Support\Ids;
 use App\Support\OperationalMetrics;
+use App\Support\ProductionSecurity;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceAccess;
 use App\Support\WorkspaceLimits;
@@ -62,11 +63,15 @@ class DomainController
         $user = UvhRequest::user($request);
         $apiTokenContext = UvhRequest::apiToken($request);
 
-        $domain = strtolower(trim(UvhRequest::inputString($request, 'domain'), '.'));
+        $domain = $this->normalizeDomain(UvhRequest::inputString($request, 'domain'));
         // Leave room for the _uvh-verification TXT owner name while keeping
         // the complete DNS name within the protocol limit of 253 characters.
-        if (! preg_match('/^(?=.{4,235}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i', $domain)) {
-            return response()->json(['error' => 'Dominio inválido'], 422);
+        // Unicode input is stored in canonical ASCII/Punycode form so all DNS,
+        // uniqueness and edge checks operate on one representation.
+        if ($domain === null || strlen($domain) > 235 || ! ProductionSecurity::validHostname($domain)) {
+            return response()->json([
+                'error' => 'Dominio inválido. Usa un hostname DNS compatible con un CNAME directo.',
+            ], 422);
         }
         if ($this->isReservedFirstPartyDomain($domain)) {
             return response()->json(['error' => 'Este hostname está reservado por UVH'], 422);
@@ -512,6 +517,28 @@ class DomainController
         return in_array($role, ['owner', 'admin', 'editor'], true);
     }
 
+    private function normalizeDomain(string $raw): ?string
+    {
+        $candidate = trim($raw, " \t\n\r\0\x0B.");
+        if ($candidate === '' || ! mb_check_encoding($candidate, 'UTF-8')
+            || preg_match('/[\x00-\x20\x7f]/', $candidate)) {
+            return null;
+        }
+
+        if (preg_match('/[^\x20-\x7e]/', $candidate)) {
+            $candidate = idn_to_ascii(
+                $candidate,
+                IDNA_NONTRANSITIONAL_TO_ASCII | IDNA_USE_STD3_RULES | IDNA_CHECK_BIDI | IDNA_CHECK_CONTEXTJ,
+                INTL_IDNA_VARIANT_UTS46,
+            );
+            if (! is_string($candidate) || $candidate === '') {
+                return null;
+            }
+        }
+
+        return strtolower(rtrim($candidate, '.'));
+    }
+
     private function verificationHost(string $domain): string
     {
         return '_uvh-verification.'.$domain;
@@ -544,12 +571,6 @@ class DomainController
 
     private function iso(mixed $value): ?string
     {
-        if ($value === null) {
-            return null;
-        }
-
-        return $value instanceof \DateTimeInterface
-            ? $value->format('Y-m-d\TH:i:s.v\Z')
-            : (string) $value;
+        return \App\Support\IsoDate::format($value);
     }
 }

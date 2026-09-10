@@ -10,12 +10,12 @@ class Tag extends Model
 
     protected $fillable = ['workspace_id', 'name'];
 
-    public function workspace()
+    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function links()
+    public function links(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Link::class, 'link_tags', 'tag_id', 'link_id');
     }

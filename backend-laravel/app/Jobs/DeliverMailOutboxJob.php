@@ -35,7 +35,10 @@ final class DeliverMailOutboxJob implements ShouldQueue
 
     public int $timeout = 90;
 
-    public function __construct(public readonly int $outboxId) {}
+    public function __construct(public readonly int $outboxId)
+    {
+        $this->onQueue('mail');
+    }
 
     public function handle(): void
     {

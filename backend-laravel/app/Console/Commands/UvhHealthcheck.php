@@ -10,14 +10,15 @@ use Illuminate\Support\Facades\DB;
 /** Container-local liveness/readiness check with shared-state heartbeats. */
 final class UvhHealthcheck extends Command
 {
-    protected $signature = 'uvh:healthcheck {component : app, queue or scheduler}';
+    protected $signature = 'uvh:healthcheck {component : app, scheduler, queue or queue-<pool>}';
 
     protected $description = 'Check UVH database/cache readiness and process heartbeats';
 
     public function handle(): int
     {
         $component = (string) $this->argument('component');
-        if (! in_array($component, ['app', 'queue', 'scheduler'], true)) {
+        if (! in_array($component, ['app', 'queue', 'scheduler'], true)
+            && preg_match('/^queue-[a-z0-9-]{1,32}$/D', $component) !== 1) {
             return self::INVALID;
         }
 
@@ -40,7 +41,7 @@ final class UvhHealthcheck extends Command
             if (! is_int($heartbeat) && ! (is_string($heartbeat) && ctype_digit($heartbeat))) {
                 return self::FAILURE;
             }
-            $maxAge = $component === 'queue' ? 180 : 210;
+            $maxAge = str_starts_with($component, 'queue') ? 180 : 210;
 
             return time() - (int) $heartbeat <= $maxAge ? self::SUCCESS : self::FAILURE;
         } catch (\Throwable) {

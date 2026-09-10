@@ -79,7 +79,7 @@ class DatabaseSchemaTest extends TestCase
             // The primary string ID is itself the one-way bearer digest. Rows
             // are deleted on completion/cancellation rather than tombstoned.
             'email_change_requests' => ['id', 'user_id', 'new_email', 'security_version', 'expires_at', 'created_at'],
-            'data_export_requests' => ['id', 'user_id', 'security_version', 'status', 'confirmation_token_hash', 'download_token_hash', 'artifact_path'],
+            'data_export_requests' => ['id', 'user_id', 'security_version', 'status', 'confirmation_token_hash', 'download_token_hash', 'artifact_path', 'download_served_at'],
             'account_deletion_requests' => ['id', 'user_id', 'security_version', 'status', 'confirmation_token_hash', 'cancel_token_hash', 'execute_after'],
             'link_intent_claims' => ['intent_hash', 'user_id', 'expires_at'],
             'mail_outbox' => ['id', 'idempotency_key', 'encrypted_envelope', 'kind', 'resource_type', 'resource_id', 'resource_generation', 'status', 'attempts', 'manual_retry_count', 'available_at', 'queued_at', 'locked_at', 'lock_token', 'sent_at', 'failed_at', 'last_manual_retry_at', 'last_error'],

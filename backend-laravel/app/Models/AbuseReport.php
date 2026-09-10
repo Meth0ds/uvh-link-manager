@@ -15,7 +15,7 @@ class AbuseReport extends Model
         return ['created_at' => 'datetime'];
     }
 
-    public function link()
+    public function link(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Link::class);
     }

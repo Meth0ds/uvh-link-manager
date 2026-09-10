@@ -27,6 +27,11 @@ class SendUvhMailJob implements ShouldQueue
 
     public int $tries = 5;
 
+    /** Stay below the dedicated mail worker's 120-second hard timeout. */
+    public int $timeout = 90;
+
+    public bool $failOnTimeout = true;
+
     /** @var array<int, int> */
     public array $backoff = [60, 300, 900, 1800];
 
@@ -36,7 +41,11 @@ class SendUvhMailJob implements ShouldQueue
         public readonly ?string $resourceType = null,
         public readonly int|string|null $resourceId = null,
         public readonly ?string $resourceGeneration = null,
-    ) {}
+    ) {
+        // Legacy encrypted-envelope jobs share the same latency-sensitive pool
+        // as the durable outbox dispatcher during rolling upgrades.
+        $this->onQueue('mail');
+    }
 
     public function handle(): void
     {

@@ -32,12 +32,12 @@ class ApiToken extends Model
         ];
     }
 
-    public function workspace()
+    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function creator()
+    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }

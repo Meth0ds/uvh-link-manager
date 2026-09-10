@@ -17,6 +17,7 @@ class DataExportRequest extends Model
         'artifact_path',
         'confirmed_at',
         'ready_at',
+        'download_served_at',
         'downloaded_at',
     ];
 
@@ -30,13 +31,14 @@ class DataExportRequest extends Model
             'download_expires_at' => 'datetime',
             'confirmed_at' => 'datetime',
             'ready_at' => 'datetime',
+            'download_served_at' => 'datetime',
             'downloaded_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
     }
 
-    public function user()
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class);
     }

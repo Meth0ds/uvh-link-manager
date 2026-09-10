@@ -95,7 +95,11 @@ class AnalyticsController
         if ($start->gt($end)) {
             return ['ok' => false, 'error' => 'from debe ser anterior o igual a to'];
         }
-        if ($end->diffInDays($start) > self::MAX_RANGE_DAYS) {
+        // Carbon 3 returns signed differences by default. Timestamps make the
+        // limit an explicit elapsed-time boundary, including partial days and
+        // values carrying different UTC offsets, after order was validated.
+        $rangeSeconds = $end->getTimestamp() - $start->getTimestamp();
+        if ($rangeSeconds > self::MAX_RANGE_DAYS * 24 * 60 * 60) {
             return ['ok' => false, 'error' => 'El rango solicitado supera el máximo de 180 días'];
         }
 
@@ -120,13 +124,26 @@ class AnalyticsController
         $totalVisitors = (int) (clone $events)->whereNotNull('e.visitor_hash')->distinct()->count('e.visitor_hash');
 
         $seriesQuery = (clone $events)
-            ->selectRaw('e.occurred_at::date AS day, COUNT(*) AS clicks, COUNT(DISTINCT e.visitor_hash) AS visitors')
+            // Group in UTC explicitly so database-session timezone cannot move
+            // an event to a different calendar bucket than the API returns.
+            ->selectRaw("timezone('UTC', e.occurred_at)::date AS day, COUNT(*) AS clicks, COUNT(DISTINCT e.visitor_hash) AS visitors")
             ->groupBy('day')->orderBy('day');
-        $series = $seriesQuery->get()->map(fn ($r) => [
+        $observedSeries = $seriesQuery->get()->mapWithKeys(fn ($r) => [(string) $r->day => [
             'day' => $r->day,
             'clicks' => (int) $r->clicks,
             'visitors' => (int) $r->visitors,
-        ])->values();
+        ]]);
+
+        // Missing rows mean a complete day with zero events, not unavailable
+        // data. Materialize the bounded UTC calendar so spacing is temporal.
+        $series = collect();
+        $cursor = IsoDate::parse($start)?->utc()->startOfDay();
+        $lastDay = IsoDate::parse($end)?->utc()->startOfDay();
+        while ($cursor !== null && $lastDay !== null && $cursor->lte($lastDay)) {
+            $day = $cursor->toDateString();
+            $series->push($observedSeries->get($day, ['day' => $day, 'clicks' => 0, 'visitors' => 0]));
+            $cursor->addDay();
+        }
 
         $topLinks = [];
         if ($linkId === null) {
@@ -146,37 +163,63 @@ class AnalyticsController
                 ->values();
         }
 
+        $countries = $this->dimension($events, 'country');
+        $devices = $this->dimension($events, 'device');
+        $browsers = $this->dimension($events, 'browser');
+        $operatingSystems = $this->dimension($events, 'os');
+        $referrers = $this->dimension($events, 'referrer_domain');
+        $campaigns = $this->dimension($events, 'campaign');
+
         return [
             'totals' => ['clicks' => $totalClicks, 'visitors' => $totalVisitors],
+            // Visitor hashes intentionally rotate daily. Declare the privacy
+            // metric instead of suggesting cross-day person identification.
+            'visitorMetric' => 'daily_pseudonyms',
             'series' => $series,
             'topLinks' => $topLinks,
-            'countries' => $this->dimension($events, 'country'),
-            'devices' => $this->dimension($events, 'device'),
-            'browsers' => $this->dimension($events, 'browser'),
-            'os' => $this->dimension($events, 'os'),
-            'referrers' => $this->dimension($events, 'referrer_domain'),
-            'campaigns' => $this->dimension($events, 'campaign'),
+            'countries' => $countries['items'],
+            'devices' => $devices['items'],
+            'browsers' => $browsers['items'],
+            'os' => $operatingSystems['items'],
+            'referrers' => $referrers['items'],
+            'campaigns' => $campaigns['items'],
+            'dimensionTotals' => [
+                'countries' => $countries['total'],
+                'devices' => $devices['total'],
+                'browsers' => $browsers['total'],
+                'os' => $operatingSystems['total'],
+                'referrers' => $referrers['total'],
+                'campaigns' => $campaigns['total'],
+            ],
         ];
     }
 
+    /** @return array{items: array<int, array{key: string, value: int}>, total: int} */
     private function dimension($events, string $column): array
     {
         $allowed = ['country', 'device', 'browser', 'os', 'referrer_domain', 'campaign'];
         if (! in_array($column, $allowed, true)) {
-            return [];
+            return ['items' => [], 'total' => 0];
         }
 
-        return (clone $events)
+        $rows = (clone $events)
             ->whereNotNull('e.'.$column)
             ->where('e.'.$column, '!=', '')
-            ->selectRaw('e.'.$column.' AS key, COUNT(*)::int AS value')
+            // The window counts grouped categories before LIMIT, keeping the
+            // compact top-eight payload while exposing an honest total.
+            ->selectRaw('e.'.$column.' AS key, COUNT(*)::int AS value, COUNT(*) OVER()::int AS category_total')
             ->groupBy('e.'.$column)
             ->orderByDesc('value')
             ->limit(8)
-            ->get()
+            ->get();
+
+        return [
+            'items' => $rows
             ->map(fn ($row) => ['key' => $row->key, 'value' => (int) $row->value])
             ->values()
-            ->all();
+            ->all(),
+            'total' => $rows->isEmpty() ? 0 : (int) $rows->first()->category_total,
+        ];
     }
 
     private function mergeMaps(array $list): array

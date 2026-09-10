@@ -28,12 +28,19 @@ class GenerateDataExportJob implements ShouldQueue
     /** @var array<int, int> */
     public array $backoff = [60, 300];
 
-    private const MAX_JSON_BYTES = 25 * 1024 * 1024;
+    // AES-GCM and Base64URL each require another in-memory representation.
+    // Keep the plaintext well below the 256 MiB production worker ceiling.
+    private const MAX_JSON_BYTES = 12 * 1024 * 1024;
 
     /** Keep the automated export bounded before hydrating large collections. */
-    private const MAX_EXPORT_ROWS = 25_000;
+    private const MAX_EXPORT_ROWS = 10_000;
 
-    public function __construct(public readonly int $requestId) {}
+    private const REQUIRED_MEMORY_HEADROOM = 96 * 1024 * 1024;
+
+    public function __construct(public readonly int $requestId)
+    {
+        $this->onQueue('exports');
+    }
 
     public function handle(): void
     {
@@ -106,7 +113,12 @@ class GenerateDataExportJob implements ShouldQueue
         // measures the payload. Large cases stay available through the managed
         // privacy-rights workflow instead of destabilising the shared queue.
         try {
-            $payload = $this->buildConsistentPayload($userId);
+            if (! $this->hasMemoryHeadroom(self::REQUIRED_MEMORY_HEADROOM)) {
+                OperationalMetrics::increment('export.memory_budget_rejected');
+                $payload = null;
+            } else {
+                $payload = $this->buildConsistentPayload($userId);
+            }
         } catch (\Throwable) {
             PrivateArtifactCleanup::attempt($requestId, $artifactPath);
             throw new \RuntimeException('No se pudo generar la exportación de datos');
@@ -143,7 +155,13 @@ class GenerateDataExportJob implements ShouldQueue
         }
 
         try {
+            if (! $this->hasMemoryHeadroom(self::REQUIRED_MEMORY_HEADROOM)) {
+                throw new \RuntimeException('Insufficient memory headroom for export encoding');
+            }
             $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            // Release the database snapshot's materialized rows before allocating
+            // ciphertext; keeping all three representations inflates peak memory.
+            unset($payload);
             if (strlen($json) > self::MAX_JSON_BYTES) {
                 throw new \RuntimeException('Export exceeds automated size limit');
             }
@@ -151,6 +169,7 @@ class GenerateDataExportJob implements ShouldQueue
             if (! Storage::disk('local')->put($artifactPath, $encrypted)) {
                 throw new \RuntimeException('Private artifact storage rejected write');
             }
+            unset($json, $encrypted);
 
             // Recheck the account/request after generation. A password/email/MFA
             // rotation while the job was running invalidates this export.
@@ -415,6 +434,13 @@ class GenerateDataExportJob implements ShouldQueue
             'redirectRules' => $rules,
             'linkTags' => $tags,
             'aggregateAnalytics' => $analytics,
+            'aggregateAnalyticsDefinition' => [
+                // A rollup visitor is a daily rotating pseudonym. The same
+                // browser may appear once on each day and is never claimed as
+                // a unique person across the exported period.
+                'visitors' => 'distinct_daily_pseudonyms',
+                'crossDayIdentity' => false,
+            ],
             'apiTokenMetadata' => $tokens,
             'ownedWorkspaceDomains' => $ownedDomains,
             'ownedWorkspaceWebhooks' => $ownedWebhooks,
@@ -464,5 +490,30 @@ class GenerateDataExportJob implements ShouldQueue
         }
 
         return true;
+    }
+
+    /**
+     * Refuse the bounded automated path before PHP approaches a fatal OOM.
+     * An unlimited CLI memory setting is accepted, while suffixes are parsed
+     * conservatively and malformed limits fail closed.
+     */
+    private function hasMemoryHeadroom(int $requiredBytes): bool
+    {
+        $raw = trim((string) ini_get('memory_limit'));
+        if ($raw === '-1') {
+            return true;
+        }
+        if (preg_match('/^(\d+)([KMG]?)$/iD', $raw, $matches) !== 1) {
+            return false;
+        }
+        $multiplier = match (strtoupper($matches[2])) {
+            'G' => 1024 * 1024 * 1024,
+            'M' => 1024 * 1024,
+            'K' => 1024,
+            default => 1,
+        };
+        $limit = (int) $matches[1] * $multiplier;
+
+        return $limit > 0 && ($limit - memory_get_usage(true)) >= $requiredBytes;
     }
 }

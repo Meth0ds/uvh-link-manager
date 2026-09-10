@@ -32,10 +32,16 @@ class AppServiceProvider extends ServiceProvider
                 return;
             }
             try {
-                if (Cache::put('uvh:health:queue', time(), now()->addMinutes(10)) !== true) {
+                $timestamp = time();
+                $pool = strtolower((string) config('uvh.queue_pool', ''));
+                $pool = preg_match('/^[a-z0-9-]{1,32}$/D', $pool) === 1 ? $pool : '';
+                $genericStored = Cache::put('uvh:health:queue', $timestamp, now()->addMinutes(10));
+                $poolStored = $pool === ''
+                    || Cache::put('uvh:health:queue-'.$pool, $timestamp, now()->addMinutes(10));
+                if ($genericStored !== true || $poolStored !== true) {
                     throw new \RuntimeException('Queue heartbeat cache write failed');
                 }
-                $lastHeartbeat = time();
+                $lastHeartbeat = $timestamp;
             } catch (\Throwable) {
                 OperationalMetrics::increment('lock.unavailable');
             }
@@ -69,6 +75,7 @@ class AppServiceProvider extends ServiceProvider
                 || $request->is('api/v1/auth/confirm-email-change')
                 || $request->is('api/v1/auth/data-export/confirm')
                 || $request->is('api/v1/auth/data-export/download')
+                || $request->is('api/v1/auth/data-export/download/acknowledge')
                 || $request->is('api/v1/auth/account-deletion/confirm')
                 || $request->is('api/v1/auth/account-deletion/cancel')
                 ? 'token:'.hash('sha256', UvhRequest::inputString($request, 'token'))
@@ -302,6 +309,13 @@ class AppServiceProvider extends ServiceProvider
             'metrics_bearer_token' => config('uvh.metrics.bearer_token'),
             'app_host' => config('uvh.app_host'),
             'public_host' => config('uvh.public_host'),
+            'public_origin' => config('uvh.public_origin'),
+            'legal_name' => config('uvh.legal.name'),
+            'legal_tax_id' => config('uvh.legal.tax_id'),
+            'legal_address' => config('uvh.legal.address'),
+            'legal_registry' => config('uvh.legal.registry'),
+            'legal_hosting_provider' => config('uvh.legal.hosting_provider'),
+            'legal_hosting_region' => config('uvh.legal.hosting_region'),
             'cookie_secure' => config('uvh.cookie_secure'),
             'cookie_domain' => config('uvh.cookie_domain'),
             'session_cookie' => config('uvh.session_cookie'),
@@ -311,6 +325,7 @@ class AppServiceProvider extends ServiceProvider
             'admin_mfa_fresh_minutes' => config('uvh.admin_mfa_fresh_minutes'),
             'bcrypt_rounds' => config('hashing.bcrypt.rounds'),
             'hcaptcha_site_key' => config('uvh.hcaptcha.site_key'),
+            'hcaptcha_dev_fallback' => config('uvh.hcaptcha.dev_fallback'),
             'hcaptcha_secret' => config('uvh.hcaptcha.secret'),
             'hcaptcha_public_site_key' => config('uvh.hcaptcha.public_site_key'),
             'hcaptcha_public_secret' => config('uvh.hcaptcha.public_secret'),

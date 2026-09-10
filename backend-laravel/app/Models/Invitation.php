@@ -15,7 +15,7 @@ class Invitation extends Model
         return ['expires_at' => 'datetime', 'created_at' => 'datetime'];
     }
 
-    public function workspace()
+    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
