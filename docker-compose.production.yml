@@ -7,7 +7,7 @@ x-php-service: &php-service
   image: uvh-api:production
   env_file:
     - ${UVH_ENV_FILE:-./backend-laravel/.env.production}
-  environment:
+  environment: &php-environment
     APP_KEY_FILE: /run/secrets/uvh_app_key
     APP_SECRET_FILE: /run/secrets/uvh_app_secret
     DB_PASSWORD_FILE: /run/secrets/uvh_db_password
@@ -40,6 +40,18 @@ x-php-service: &php-service
   networks:
     - uvh-internal
 
+# Each queue class has an independent worker and heartbeat. Long exports or
+# DNS/TLS calls therefore cannot starve account mail or webhook delivery.
+x-queue-service: &queue-service
+  <<: *php-service
+  stop_grace_period: 190s
+  healthcheck:
+    test: ["CMD-SHELL", "php artisan uvh:healthcheck queue-$${UVH_QUEUE_POOL}"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 90s
+
 services:
   app:
     <<: *php-service
@@ -52,16 +64,49 @@ services:
       retries: 3
       start_period: 30s
 
-  queue:
-    <<: *php-service
-    command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--timeout=180", "--max-time=3600"]
-    stop_grace_period: 190s
-    healthcheck:
-      test: ["CMD", "php", "artisan", "uvh:healthcheck", "queue"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
+  queue-mail:
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: mail
+    command: ["php", "artisan", "queue:work", "--queue=mail", "--sleep=1", "--tries=3", "--timeout=120", "--max-time=3600"]
+
+  queue-webhooks:
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: webhooks
+    command: ["php", "artisan", "queue:work", "--queue=webhooks", "--sleep=1", "--tries=3", "--timeout=60", "--max-time=3600"]
+
+  queue-domains:
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: domains
+    command: ["php", "artisan", "queue:work", "--queue=domains", "--sleep=1", "--tries=3", "--timeout=90", "--max-time=3600"]
+
+  queue-exports:
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: exports
+    command: ["php", "artisan", "queue:work", "--queue=exports", "--sleep=1", "--tries=3", "--timeout=180", "--max-time=3600"]
+
+  queue-analytics:
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: analytics
+    command: ["php", "artisan", "queue:work", "--queue=analytics", "--sleep=1", "--tries=5", "--timeout=45", "--max-time=3600"]
+
+  # Drain pre-deployment jobs that were serialized onto Laravel's default
+  # queue. New application code never targets this compatibility pool.
+  queue-legacy:
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: legacy
+    command: ["php", "artisan", "queue:work", "--queue=default", "--sleep=2", "--tries=3", "--timeout=180", "--max-time=3600"]
 
   scheduler:
     <<: *php-service

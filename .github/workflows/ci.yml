@@ -86,7 +86,8 @@ jobs:
       APP_ENV: testing
       APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       DB_CONNECTION: pgsql
-      DB_HOST: postgres
+      # Runner jobs reach service-container published ports through loopback.
+      DB_HOST: 127.0.0.1
       DB_PORT: "5432"
       DB_DATABASE: uvh_test
       DB_USERNAME: uvh_test
@@ -105,12 +106,6 @@ jobs:
           extensions: bcmath, curl, intl, mbstring, pdo_pgsql, pgsql, zip
           coverage: none
           tools: composer:v2
-
-      # Los jobs que corren directamente en el runner alcanzan el servicio por
-      # loopback. Conservamos el hostname postgres que phpunit.xml fuerza para
-      # que la misma configuración siga siendo válida dentro de Docker local.
-      - name: Bind the isolated database hostname
-        run: echo "127.0.0.1 postgres" | sudo tee -a /etc/hosts
 
       - name: Validate Composer metadata
         working-directory: backend-laravel
@@ -185,5 +180,49 @@ jobs:
           path: |
             frontend/playwright-report
             frontend/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release-e2e:
+    name: Browser / production-image proxy smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install locked Chromium runtime
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # This second browser gate builds the production PHP and frontend images
+      # and crosses Caddy -> Nginx -> PHP-FPM. External ACME, mail and hCaptcha
+      # remain staging gates because CI must not receive production credentials.
+      - name: Smoke-test production images and proxy contracts
+        working-directory: frontend
+        run: npm run release:e2e
+
+      - name: Preserve release-smoke failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-release-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            frontend/playwright-report-release
+            frontend/test-results-release
           if-no-files-found: ignore
           retention-days: 7

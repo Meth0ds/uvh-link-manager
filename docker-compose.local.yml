@@ -74,11 +74,12 @@ services:
       - "127.0.0.1:8000:8000"
     command: ["php", "-d", "opcache.enable_cli=1", "-d", "opcache.validate_timestamps=1", "-S", "0.0.0.0:8000", "-t", "public", "public/index.php"]
 
-  # Laravel: worker de cola (QUEUE_CONNECTION=database).
+  # Local development uses one worker for every application queue. Production
+  # isolates these classes into separate pools so slow exports cannot starve mail.
   queue:
     <<: *php-service
     profiles: ["laravel"]
-    command: ["php", "artisan", "queue:work"]
+    command: ["php", "artisan", "queue:work", "--queue=mail,webhooks,domains,exports,analytics,default", "--timeout=180", "--tries=3"]
 
   # Laravel: scheduler local (php artisan schedule:work).
   schedule:

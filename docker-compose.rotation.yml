@@ -7,7 +7,32 @@ services:
       APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
     secrets:
       - uvh_app_secret_previous
-  queue:
+  queue-mail:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+  queue-webhooks:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+  queue-domains:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+  queue-exports:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+  queue-analytics:
+    environment:
+      APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
+    secrets:
+      - uvh_app_secret_previous
+  queue-legacy:
     environment:
       APP_SECRET_PREVIOUS_FILE: /run/secrets/uvh_app_secret_previous
     secrets:
