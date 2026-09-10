@@ -509,9 +509,10 @@ app-page-header { display: block; margin-bottom: 18px; }
     width: 200px;
     height: 200px;
     border: 1px solid var(--uvh-border);
-    border-radius: 14px;
+    border-radius: 3px;
     padding: 8px;
-    background: var(--mat-sys-surface-container-lowest, #fff);
+    // Authenticator scanners need the contrast: the QR plate stays white.
+    background: white;
   }
 
   .mfa-secret {
@@ -521,7 +522,7 @@ app-page-header { display: block; margin-bottom: 18px; }
     code {
       background: var(--uvh-surface);
       border: 1px solid var(--uvh-border);
-      border-radius: 8px;
+      border-radius: 3px;
       padding: 8px 12px;
       font-size: 13px;
       letter-spacing: 0.05em;
@@ -578,7 +579,7 @@ app-page-header { display: block; margin-bottom: 18px; }
 
     mat-icon { width: 15px; height: 15px; font-size: 15px; }
     &.active { color: var(--uvh-ink); }
-    &.active > span { border-color: var(--uvh-electric); background: var(--uvh-electric); color: #fff; transform: scale(1.06); box-shadow: 0 0 0 4px color-mix(in srgb, var(--uvh-electric) 9%, transparent); }
+    &.active > span { border-color: var(--uvh-electric); background: var(--uvh-electric); color: var(--accent-ink); transform: scale(1.06); outline: 4px solid color-mix(in srgb, var(--uvh-electric) 9%, transparent); }
     &.complete { color: var(--uvh-success); }
     &.complete > span { border-color: color-mix(in srgb, var(--uvh-success) 45%, var(--uvh-border)); background: var(--uvh-success-soft); }
     &.complete::after { background: color-mix(in srgb, var(--uvh-success) 54%, var(--uvh-border)); }
@@ -615,8 +616,8 @@ app-page-header { display: block; margin-bottom: 18px; }
   margin: 16px 0 18px;
   padding: 14px;
   border: 1px solid var(--uvh-border);
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--uvh-canvas) 70%, transparent);
+  border-radius: 3px;
+  background: var(--uvh-surface);
 
   .mfa-qr { width: 188px; height: 188px; }
   .mfa-secret { min-width: 0; }
@@ -638,20 +639,21 @@ app-page-header { display: block; margin-bottom: 18px; }
   gap: 8px;
   margin: -4px 0 14px;
   padding: 9px 11px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--uvh-electric) 7%, transparent);
+  border-left: 2px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface);
   color: var(--uvh-muted);
   font-size: 10.5px;
   line-height: 1.45;
-  mat-icon { width: 17px; height: 17px; flex: 0 0 auto; color: var(--uvh-electric); font-size: 17px; }
+  mat-icon { width: 17px; height: 17px; flex: 0 0 auto; color: var(--uvh-muted); font-size: 17px; }
 }
 
 .recovery-reveal {
   margin: 0;
   padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--uvh-warn) 26%, var(--uvh-border));
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--uvh-warn) 4%, var(--uvh-surface-raised));
+  border-left: 3px solid var(--uvh-warn);
+  border-radius: 3px;
+  background: var(--uvh-warn-soft);
 
   .codes {
     display: grid;
@@ -662,7 +664,7 @@ app-page-header { display: block; margin-bottom: 18px; }
     code {
       padding: 8px 9px;
       border: 1px solid var(--uvh-border);
-      border-radius: 8px;
+      border-radius: 3px;
       background: var(--uvh-surface-raised);
       color: var(--uvh-ink);
       font-size: 11px;
@@ -693,8 +695,8 @@ app-page-header { display: block; margin-bottom: 18px; }
     gap: 11px;
     padding: 11px 12px;
     border: 1px solid var(--uvh-border);
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--uvh-canvas) 62%, transparent);
+    border-radius: 3px;
+    background: var(--uvh-surface);
   }
 
   > div > span:nth-child(2) { min-width: 0; flex: 1; }
@@ -713,8 +715,9 @@ app-page-header { display: block; margin-bottom: 18px; }
   height: 34px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--uvh-electric) 9%, transparent);
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface);
   color: var(--uvh-electric);
   mat-icon { width: 18px; height: 18px; font-size: 18px; }
 }
@@ -726,9 +729,10 @@ app-page-header { display: block; margin-bottom: 18px; }
 .inset-form {
   margin-top: 14px;
   padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--uvh-electric) 20%, var(--uvh-border));
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--uvh-electric) 4%, transparent);
+  border: 1px solid var(--uvh-border);
+  border-left: 2px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface);
   animation: settings-step-in 220ms cubic-bezier(.22, 1, .36, 1) both;
   > div:first-child b { color: var(--uvh-ink); font-size: 12px; }
   > div:first-child p { margin: 3px 0 10px; color: var(--uvh-muted); font-size: 10.5px; line-height: 1.45; }
@@ -740,7 +744,7 @@ app-page-header { display: block; margin-bottom: 18px; }
   border-top: 1px solid var(--uvh-border);
   summary { color: var(--uvh-muted); font-size: 10.5px; font-weight: 750; cursor: pointer; }
   > p { margin: 8px 0 11px; color: var(--uvh-muted); font-size: 10px; }
-  form { padding: 12px; border: 1px solid color-mix(in srgb, var(--uvh-danger) 20%, var(--uvh-border)); border-radius: 12px; background: var(--uvh-danger-soft); }
+  form { padding: 12px; border-left: 3px solid var(--uvh-danger); border-radius: 3px; background: var(--uvh-danger-soft); }
   form > button { align-self: flex-start; }
 }
 
@@ -761,7 +765,7 @@ app-page-header { display: block; margin-bottom: 18px; }
     code {
       background: var(--uvh-surface);
       border: 1px solid var(--uvh-border);
-      border-radius: 8px;
+      border-radius: 3px;
       padding: 6px 10px;
       font-size: 12.5px;
     }
@@ -784,7 +788,7 @@ app-page-header { display: block; margin-bottom: 18px; }
     margin: 0 -10px;
     padding-right: 10px;
     padding-left: 10px;
-    border-radius: 10px;
+    border-radius: 3px;
     background: color-mix(in srgb, var(--uvh-electric) 5%, transparent);
   }
 }
@@ -821,7 +825,7 @@ app-page-header { display: block; margin-bottom: 18px; }
   display: inline-flex;
   align-items: center;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: 3px;
   background: var(--uvh-success-soft);
   color: var(--uvh-success);
   font-size: 10px;
@@ -840,7 +844,7 @@ mat-radio-group {
   margin-top: 8px;
 }
 
-mat-radio-button { min-width: 0; padding: 5px 7px; border: 1px solid var(--uvh-border); border-radius: 10px; background: color-mix(in srgb, var(--uvh-surface) 70%, transparent); font-size: 11.5px; transition: border-color 160ms ease, background-color 160ms ease; }
+mat-radio-button { min-width: 0; padding: 5px 7px; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); font-size: 11.5px; transition: border-color 160ms ease, background-color 160ms ease; }
 mat-radio-button:hover { border-color: color-mix(in srgb, var(--uvh-electric) 30%, var(--uvh-border)); background: color-mix(in srgb, var(--uvh-electric) 4%, transparent); }
 
 @media (max-width: 1180px) {
@@ -870,7 +874,7 @@ mat-radio-button:hover { border-color: color-mix(in srgb, var(--uvh-electric) 30
   .settings-section { gap: 13px; }
   .settings-section-head { gap: 10px; }
   .settings-section-head h2 { font-size: 19px; }
-  .card-block { padding: 16px; border-radius: 15px; }
+  .card-block { padding: 16px; }
   .grid-2 {
     grid-template-columns: 1fr;
   }
