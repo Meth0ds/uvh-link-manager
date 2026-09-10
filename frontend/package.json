@@ -7,9 +7,11 @@
     "start": "ng serve",
     "build": "ng build",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "lint": "eslint \"src/**/*.{ts,html}\" \"e2e/**/*.{ts,mjs}\" playwright.config.ts --max-warnings=0",
+    "lint": "eslint \"src/**/*.{ts,html}\" \"e2e/**/*.{ts,mjs}\" playwright.config.ts playwright.release.config.ts --max-warnings=0",
     "pree2e": "node e2e/prepare.mjs",
     "e2e": "playwright test",
+    "prerelease:e2e": "node e2e/prepare-release.mjs",
+    "release:e2e": "playwright test --config playwright.release.config.ts",
     "e2e:install": "playwright install chromium",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"

@@ -36,6 +36,14 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "design-preview": {
+              "browser": "design-preview/main.ts",
+              "tsConfig": "design-preview/tsconfig.json",
+              "outputPath": "dist/design-preview",
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
             }
           },
           "defaultConfiguration": "production"
@@ -44,6 +52,7 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": { "buildTarget": "uvh:build:production" },
+            "design-preview": { "buildTarget": "uvh:build:design-preview", "proxyConfig": "design-preview/proxy.json" },
             "development": { "buildTarget": "uvh:build:development" }
           },
           "defaultConfiguration": "development",

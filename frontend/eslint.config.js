@@ -10,7 +10,7 @@ module.exports = tseslint.config(
     ignores: ["dist/**", "coverage/**", ".angular/**", "node_modules/**"],
   },
   {
-    files: ["src/**/*.ts"],
+    files: ["src/**/*.ts", "design-preview/**/*.ts"],
     extends: [
       eslint.configs.recommended,
       ...tseslint.configs.recommended,
@@ -35,7 +35,7 @@ module.exports = tseslint.config(
     },
   },
   {
-    files: ["src/**/*.html"],
+    files: ["src/**/*.html", "design-preview/**/*.html"],
     extends: [
       ...angular.configs.templateRecommended,
       ...angular.configs.templateAccessibility,
