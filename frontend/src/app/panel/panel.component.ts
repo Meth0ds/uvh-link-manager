@@ -20,7 +20,7 @@ import { AuthService } from "../core/services/auth.service";
 import { WorkspaceService } from "../core/services/workspace.service";
 import { LinkDialogService } from "./links/link-dialog.service";
 import { WorkspaceDialogComponent, type WorkspaceDialogResult } from "./workspace-dialog.component";
-import { ThemeToggleComponent } from "../core/theme-toggle.component";
+import { PublicThemeToggleComponent } from "../core/public-theme-toggle.component";
 
 interface NavItem {
   path: string;
@@ -53,7 +53,7 @@ interface NavGroup {
     MatTooltipModule,
     MatDividerModule,
     MatSnackBarModule,
-    ThemeToggleComponent,
+    PublicThemeToggleComponent,
   ],
   templateUrl: "./panel.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,

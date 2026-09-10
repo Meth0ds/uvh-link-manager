@@ -1,0 +1,33 @@
+@use "@angular/material" as mat;
+
+// Content fits the dialog's available width; no viewport-based minimum may
+// force a 92vw overlay beyond the screen once Material adds its own padding.
+:host { display: block; min-width: 0; max-width: 100%; }
+h2 { display: flex; gap: 14px; align-items: center; padding-block: 24px; margin: 0 0 22px; line-height: 1.2; }
+h2::before { display: none; }
+h2 > span:last-child { display: flex; min-width: 0; flex-direction: column; }
+h2 small { margin-bottom: 6px; color: var(--uvh-muted); font: 10px/1.4 "Courier New", monospace; letter-spacing: .1em; text-transform: uppercase; }
+h2 b { color: var(--uvh-ink); font-size: 23px; font-weight: 800; letter-spacing: -.045em; overflow-wrap: anywhere; }
+.title-mark, .title-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); color: var(--uvh-electric); }
+.title-mark mat-icon, .title-icon mat-icon { width: 20px; height: 20px; font-size: 20px; }
+.title-mark.danger { background: var(--uvh-danger-soft); color: var(--uvh-danger); border-color: color-mix(in srgb, var(--uvh-danger) 40%, var(--uvh-border)); }
+.message, .intro { margin: 0 0 22px; color: var(--uvh-muted); font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
+.input-form { display: block; }
+.full { width: 100%; }
+.error { margin: 10px 0; padding: 10px 12px; border-left: 2px solid var(--uvh-danger); background: var(--uvh-danger-soft); color: var(--uvh-danger); font-size: 12px; line-height: 1.6; }
+mat-dialog-actions { gap: 8px; }
+mat-dialog-actions button { min-height: 44px; }
+.destructive-confirm {
+  @include mat.button-overrides((
+    filled-container-color: var(--uvh-danger),
+    filled-label-text-color: light-dark(#ffffff, #421617),
+    filled-state-layer-color: light-dark(#ffffff, #421617),
+  ));
+}
+@media (max-width: 420px) {
+  h2 { gap: 10px; padding-inline: 18px; }
+  h2 b { font-size: 21px; }
+  mat-dialog-content { padding-inline: 18px; }
+  mat-dialog-actions { padding-inline: 14px; }
+  mat-dialog-actions button { max-width: 100%; white-space: normal; }
+}

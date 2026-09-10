@@ -79,6 +79,7 @@ export class AnalyticsComponent {
         "/api/v1/analytics/overview",
         { period: this.period() },
         decodeAnalyticsOverview,
+        { signal: request.signal },
       );
       if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.overview.set(a);
@@ -91,6 +92,10 @@ export class AnalyticsComponent {
   }
 
   async onPeriod(value: string): Promise<void> {
+    // Never relabel an old snapshot with the newly selected period. Clearing
+    // first also leaves an unambiguous error state if the replacement fails.
+    this.requests.invalidate();
+    this.overview.set(null);
     this.period.set(value);
     await this.load();
   }

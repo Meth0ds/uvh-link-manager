@@ -323,7 +323,7 @@ export class SettingsComponent {
     this.sessionsError.set(null);
     try {
       const now = Date.now();
-      const sessions = await this.auth.listSessions();
+      const sessions = await this.auth.listSessions({ signal: request.signal });
       if (!this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.sessions.set(sessions.filter((session) => !session.revoked_at && new Date(session.expires_at).getTime() > now));
     } catch (err) {
@@ -340,7 +340,7 @@ export class SettingsComponent {
     const request = this.exportRequest.begin(context);
     this.exportLoading.set(true);
     try {
-      const status = await this.auth.dataExportStatus();
+      const status = await this.auth.dataExportStatus({ signal: request.signal });
       if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.exportStatus.set(status);
     } catch (err) {
@@ -410,7 +410,7 @@ export class SettingsComponent {
     const request = this.deletionRequest.begin(context);
     this.deletionLoading.set(true);
     try {
-      const impact = await this.auth.accountDeletionImpact();
+      const impact = await this.auth.accountDeletionImpact({ signal: request.signal });
       if (!this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.deletionImpact.set(impact);
     } catch (err) {
@@ -469,7 +469,7 @@ export class SettingsComponent {
       const response = await this.api.get<{ requests: PrivacyRightRequest[]; total: number }>("/api/v1/auth/privacy-requests", {
         page,
         perPage,
-      }, (value) => decodePrivacyRequestsPage(value, { page, perPage }));
+      }, (value) => decodePrivacyRequestsPage(value, { page, perPage }), { signal: request.signal });
       const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
       if (!this.privacyRequest.isCurrent(request, current)) return;
       this.privacyRequests.set(response.requests);

@@ -145,6 +145,27 @@ describe("ReportComponent", () => {
     expect(component.error()).toContain("comprobación antiabuso");
   });
 
+  it("focuses the missing link without sending an incomplete report", async () => {
+    await component.submit();
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('[formControlName="link"]'));
+    expect(component.form.controls.link.touched).toBeTrue();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("explains the selected reason without inviting unsafe investigation", () => {
+    component.form.controls.reason.setValue("Malware o software malicioso");
+    expect(component.selectedReasonHint).toContain("No descargues nada");
+    component.form.controls.reason.setValue("__proto__");
+    expect(component.selectedReasonHint).toContain("Si no estás seguro");
+  });
+
+  it("keeps context and contact email genuinely optional", async () => {
+    component.form.setValue({ link: "incident-42", reason: "Otro", details: "", email: "" });
+    component.onCaptchaToken("report-captcha-token");
+    await component.submit();
+    expect(api.post).toHaveBeenCalledOnceWith("/api/v1/report", jasmine.objectContaining({ details: undefined, email: "", captchaToken: "report-captcha-token" }));
+  });
+
   it("keeps the newest hCaptcha configuration", async () => {
     component.hcaptchaSiteKey.set("");
     const older = deferred<{ hcaptcha: { enabled: boolean; siteKey: string } }>();

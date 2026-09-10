@@ -16,17 +16,18 @@ import { decodeAccountDeletionConfirmation } from "../core/services/public-actio
   imports: [RouterLink, MatButtonModule, MatIconModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <main class="card center" aria-live="polite">
-        <mat-icon class="icon" [class.ok]="done()" [class.bad]="error()">{{ done() ? 'event_available' : (error() ? 'error_outline' : 'person_remove') }}</mat-icon>
-        <h2>{{ done() ? 'Eliminación programada' : (error() ? 'No se pudo programar' : 'Última confirmación') }}</h2>
-        <p class="sub">{{ message() }}</p>
+      <section class="card center" aria-labelledby="confirm-account-deletion-title">
+        <span class="step-kicker">ELIMINACIÓN DE CUENTA</span>
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="done()" [class.bad]="error()">{{ done() ? 'event_available' : (error() ? 'error_outline' : 'person_remove') }}</mat-icon>
+        <h2 id="confirm-account-deletion-title">{{ done() ? 'Eliminación programada' : (error() ? 'No se pudo programar' : 'Última confirmación') }}</h2>
+        <p class="sub" role="status">{{ message() }}</p>
         @if (!done() && !error()) {
-          <button mat-flat-button color="warn" type="button" (click)="confirm()" [disabled]="busy()">{{ busy() ? 'Programando…' : 'Cerrar acceso y programar eliminación' }}</button>
+          <button mat-flat-button class="danger-action" type="button" (click)="confirm()" [disabled]="busy()">{{ busy() ? 'Programando…' : 'Cerrar acceso y programar eliminación' }}</button>
           <a class="back" routerLink="/app/settings">No eliminar mi cuenta</a>
         } @else {
           <a mat-flat-button color="primary" routerLink="/auth">Volver al acceso</a>
         }
-      </main>
+      </section>
     </app-auth-shell>
   `,
   styleUrl: "./auth-card.scss",

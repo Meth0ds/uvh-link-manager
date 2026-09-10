@@ -19,8 +19,8 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
   imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <main class="card recovery-complete" aria-labelledby="complete-title">
-        <span class="step-kicker">Doble aprobación completada</span>
+      <section class="card recovery-complete" aria-labelledby="complete-title">
+        <span class="step-kicker">Recuperación / proteger la cuenta</span>
         <h2 id="complete-title">Protege de nuevo tu cuenta</h2>
         <p class="sub">El enlace funciona una sola vez. Al finalizar se cerrarán las sesiones, se revocarán los tokens API, se retirará el MFA perdido y tendrás que configurarlo de nuevo.</p>
 
@@ -42,8 +42,9 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Escribe RECUPERAR MI CUENTA</mat-label>
+              <mat-label>Confirmación escrita</mat-label>
               <input matInput formControlName="confirmation" autocomplete="off" maxlength="20" />
+              <mat-hint>Escribe exactamente RECUPERAR MI CUENTA.</mat-hint>
             </mat-form-field>
             @if (error(); as message) { <div class="alert error" role="alert">{{ message }}</div> }
             <button mat-flat-button color="primary" class="submit" type="submit" [disabled]="form.invalid || busy() || !token">
@@ -58,19 +59,9 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
             <a mat-flat-button color="primary" routerLink="/auth">{{ ok() ? 'Iniciar sesión' : 'Volver al acceso' }}</a>
           </section>
         }
-      </main>
+      </section>
     </app-auth-shell>
   `,
-  styles: [`
-    .recovery-complete { max-width: 500px; }
-    .step-kicker { display: block; margin-bottom: 8px; color: var(--uvh-teal); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-    .strength { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: -7px 2px 13px; }
-    .strength span { height: 4px; border-radius: 999px; background: var(--uvh-border); }
-    .strength span.met { background: var(--uvh-electric); }
-    .strength small { grid-column: 1 / -1; color: var(--uvh-muted); font-size: 10.5px; }
-    .result h3 { margin: 4px 0 7px; color: var(--uvh-ink); }
-    .result p { margin: 0 0 18px; color: var(--uvh-muted); font-size: 13px; line-height: 1.6; }
-  `],
   styleUrl: "./auth-card.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

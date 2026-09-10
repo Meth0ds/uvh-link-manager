@@ -21,17 +21,17 @@ interface PublicAuthConfig {
   imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, AuthShellComponent, HCaptchaWidgetComponent],
   template: `
     <app-auth-shell>
-      <main class="card recovery-card" aria-labelledby="recovery-title">
+      <section class="card recovery-card" aria-labelledby="recovery-title">
         <span class="step-kicker">Recuperación reforzada</span>
         <h2 id="recovery-title">¿Has perdido todos tus factores?</h2>
         <p class="sub">Utiliza este procedimiento sólo si no puedes acceder a tu contraseña, autenticador ni códigos de recuperación.</p>
 
         @if (!sent()) {
-          <section class="process" aria-label="Proceso de recuperación">
-            <div><span>1</span><p><b>Confirma tu email</b><small>El enlace no inicia sesión ni desactiva MFA.</small></p></div>
-            <div><span>2</span><p><b>Verificación por soporte</b><small>La identidad se contrasta fuera de esta página.</small></p></div>
-            <div><span>3</span><p><b>Doble aprobación</b><small>Dos administradores distintos con MFA deben aprobar.</small></p></div>
-          </section>
+          <ol class="process" aria-label="Proceso de recuperación">
+            <li><span>01</span><p><b>Confirma tu email</b><small>El enlace no inicia sesión ni desactiva MFA.</small></p></li>
+            <li><span>02</span><p><b>Verificación por soporte</b><small>La identidad se contrasta fuera de esta página.</small></p></li>
+            <li><span>03</span><p><b>Doble aprobación</b><small>Dos administradores distintos con MFA deben aprobar.</small></p></li>
+          </ol>
 
           <form class="form" [formGroup]="form" (ngSubmit)="submit()">
             <mat-form-field appearance="outline">
@@ -61,22 +61,9 @@ interface PublicAuthConfig {
         }
 
         <a class="back" routerLink="/auth">← Volver al acceso</a>
-      </main>
+      </section>
     </app-auth-shell>
   `,
-  styles: [`
-    .recovery-card { max-width: 520px; }
-    .step-kicker { display: block; margin-bottom: 8px; color: var(--uvh-electric); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-    .process { display: grid; gap: 8px; margin: 0 0 20px; }
-    .process > div { display: grid; grid-template-columns: 30px 1fr; align-items: start; gap: 10px; padding: 11px 12px; border: 1px solid var(--uvh-border); border-radius: 11px; background: var(--uvh-surface-subtle); }
-    .process > div > span { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 8px; background: color-mix(in srgb, var(--uvh-electric) 12%, transparent); color: var(--uvh-electric); font-size: 11px; font-weight: 850; }
-    .process p { display: flex; flex-direction: column; gap: 2px; margin: 0; }
-    .process b { color: var(--uvh-ink); font-size: 12px; }
-    .process small { color: var(--uvh-muted); font-size: 10.5px; line-height: 1.45; }
-    .result { padding: 18px 10px 8px; text-align: center; }
-    .result h3 { margin: 4px 0 7px; color: var(--uvh-ink); font-size: 19px; }
-    .result p { margin: 0; color: var(--uvh-muted); font-size: 13px; line-height: 1.6; }
-  `],
   styleUrl: "./auth-card.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -140,7 +127,7 @@ export class AccountRecoveryRequestComponent {
     this.captchaConfigBusy.set(true);
     this.captchaConfigError.set(null);
     try {
-      const config = await this.api.get<PublicAuthConfig>("/api/v1/config", undefined, decodePublicConfig);
+      const config = await this.api.get<PublicAuthConfig>("/api/v1/config", undefined, decodePublicConfig, { signal: request.signal });
       if (!this.configRequests.isCurrent(request, null)) return;
       const siteKey = config.hcaptcha?.enabled ? config.hcaptcha.siteKey : null;
       if (!siteKey || !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey)) throw new Error("hCaptcha unavailable");

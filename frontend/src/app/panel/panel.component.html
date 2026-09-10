@@ -2,11 +2,9 @@
 <mat-sidenav-container class="shell">
   <mat-sidenav #sidenav id="panel-navigation" [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" fixedInViewport aria-label="Navegación principal">
     <div class="side-head">
-      <a class="brand" routerLink="/">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 64 64" width="30" height="30"><rect width="64" height="64" rx="14" fill="#07111F"/><path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00A99D" stroke-width="5" stroke-linecap="round"/><path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#2457F5" stroke-width="5" stroke-linecap="round"/></svg>
-        </span>
-        <span class="brand-name">UVH</span>
+      <a class="brand" routerLink="/" aria-label="UVH · Ir al inicio">
+        <span class="brand-name" aria-hidden="true">uvh<span>.</span></span>
+        <span class="brand-caption" aria-hidden="true">El enlace, bajo control.</span>
       </a>
       <button mat-icon-button class="side-close" type="button" (click)="mobileOpen.set(false)" aria-label="Cerrar menú"><mat-icon>close</mat-icon></button>
       <div class="workspace-summary">
@@ -15,7 +13,7 @@
       </div>
     </div>
 
-    <mat-nav-list class="nav-list">
+    <mat-nav-list class="nav-list" aria-label="Secciones de tu espacio">
       @for (group of visibleNav(); track group.label) {
         <span class="nav-group">{{ group.label }}</span>
         @for (item of group.items; track item.path) {
@@ -23,6 +21,7 @@
             mat-list-item
             [routerLink]="item.path"
             routerLinkActive="active"
+            ariaCurrentWhenActive="page"
             (click)="mobileOpen.set(false)"
             class="nav-item"
             >
@@ -34,6 +33,8 @@
     </mat-nav-list>
 
     <div class="side-foot">
+      <a class="help-link" routerLink="/help"><mat-icon aria-hidden="true">help_outline</mat-icon><span>¿Cómo se hace?<small>Guías y soluciones</small></span><mat-icon aria-hidden="true">north_east</mat-icon></a>
+      <button mat-button class="workspace-create" (click)="createWorkspace()"><mat-icon aria-hidden="true">create_new_folder</mat-icon> Crear workspace</button>
       <button mat-flat-button color="primary" class="new-link" (click)="newLink()">
         <mat-icon>add_link</mat-icon> Nuevo enlace
       </button>
@@ -57,9 +58,11 @@
       <div class="topbar-context">
         <span class="topbar-label">Workspace actual</span>
         @if (workspaces.list().length > 1) {
-          <mat-form-field appearance="outline" class="ws-switch">
+          <mat-form-field appearance="outline" class="ws-switch" subscriptSizing="dynamic">
             <mat-select
               [value]="workspaces.currentId()"
+              panelWidth="min(320px, calc(100vw - 32px))"
+              panelClass="uvh-workspace-options"
               (selectionChange)="onWorkspaceChange($event.value)"
               aria-label="Workspace"
               >
@@ -83,10 +86,10 @@
         <mat-icon>add_link</mat-icon> Crear enlace
       </button>
 
-      <app-theme-toggle [compact]="true" class="panel-theme" />
+      <app-public-theme-toggle class="panel-theme" />
 
       <button mat-icon-button [matMenuTriggerFor]="userMenu" class="avatar-btn" aria-label="Menú de usuario">
-        <span class="avatar"><span>{{ initials() }}</span><i aria-hidden="true"></i></span>
+        <span class="avatar"><span>{{ initials() }}</span></span>
       </button>
       <mat-menu #userMenu="matMenu" xPosition="before">
         <div class="user-head">

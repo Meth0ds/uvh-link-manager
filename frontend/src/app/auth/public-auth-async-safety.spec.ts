@@ -15,6 +15,7 @@ import { ResetPasswordComponent } from "./reset-password.component";
 import { VerifyEmailComponent } from "./verify-email.component";
 import { ConfirmEmailChangeComponent } from "./confirm-email-change.component";
 import { ConfirmDataExportComponent } from "./confirm-data-export.component";
+import { DownloadDataExportComponent } from "./download-data-export.component";
 import { ConfirmAccountDeletionComponent } from "./confirm-account-deletion.component";
 import { CancelAccountDeletionComponent } from "./cancel-account-deletion.component";
 import { SecurityIncidentComponent } from "./security-incident.component";
@@ -55,6 +56,66 @@ function sharedProviders(api: jasmine.SpyObj<ApiService>, fragment: string | nul
 
 describe("public auth views async safety", () => {
   afterEach(() => TestBed.resetTestingModule());
+
+  it("offers a new reset link instead of a form when the bearer is absent", async () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    TestBed.configureTestingModule({ imports: [ResetPasswordComponent], providers: sharedProviders(api) });
+    const fixture = TestBed.createComponent(ResetPasswordComponent);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+    component.form.setValue({ password: "Example-only-password", confirm: "Example-only-password" });
+    await component.submit();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector("form")).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain("Solicitar otro enlace");
+  });
+
+  it("does not repeat a completed password reset", async () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    api.post.and.resolveTo({});
+    TestBed.configureTestingModule({ imports: [ResetPasswordComponent], providers: sharedProviders(api, `token=${TOKEN}`) });
+    const fixture = TestBed.createComponent(ResetPasswordComponent);
+    fixture.componentInstance.form.setValue({ password: "Example-only-password", confirm: "Example-only-password" });
+    await fixture.componentInstance.submit();
+    await fixture.componentInstance.submit();
+    fixture.detectChanges();
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.querySelector("form")).toBeNull();
+    expect(fixture.nativeElement.querySelector('[role="status"]').textContent).toContain("Contraseña actualizada");
+  });
+
+  it("does not advertise an actionable download without a bearer", async () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["postBlob", "post"]);
+    TestBed.configureTestingModule({ imports: [DownloadDataExportComponent], providers: sharedProviders(api) });
+    const fixture = TestBed.createComponent(DownloadDataExportComponent);
+    fixture.detectChanges();
+    await fixture.componentInstance.download();
+    expect(api.postBlob).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).not.toContain("Descargar mis datos");
+    expect(fixture.nativeElement.textContent).toContain("Volver al acceso");
+    // The projected screen must not create a second main landmark inside AuthShell.
+    expect(fixture.nativeElement.querySelectorAll("main").length).toBe(1);
+  });
+
+  it("keeps email verification behind an explicit action after rendering", () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    TestBed.configureTestingModule({ imports: [VerifyEmailComponent], providers: sharedProviders(api, `token=${TOKEN}`) });
+    const fixture = TestBed.createComponent(VerifyEmailComponent);
+    fixture.detectChanges();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain("Confirmar mi email");
+    expect(fixture.nativeElement.textContent).not.toContain(TOKEN);
+  });
+
+  it("does not claim administrator approval on an invalid recovery completion link", () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    TestBed.configureTestingModule({ imports: [AccountRecoveryCompleteComponent], providers: sharedProviders(api) });
+    const fixture = TestBed.createComponent(AccountRecoveryCompleteComponent);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain("Doble aprobación completada");
+    expect(fixture.nativeElement.querySelector("form")).toBeNull();
+    expect(api.post).not.toHaveBeenCalled();
+  });
 
   it("keeps the newest forgot-password hCaptcha configuration", async () => {
     const api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post"]);

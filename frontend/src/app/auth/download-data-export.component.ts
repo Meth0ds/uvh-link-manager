@@ -14,18 +14,21 @@ import { downloadBlob } from "../core/services/browser-download";
   imports: [RouterLink, MatButtonModule, MatIconModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <main class="card center" aria-live="polite">
-        <mat-icon class="icon" [class.ok]="downloaded()" [class.bad]="error()">{{ downloaded() ? 'download_done' : (error() ? 'error_outline' : 'file_download') }}</mat-icon>
-        <h2>{{ downloaded() ? 'Descarga iniciada' : (error() ? 'No se pudo descargar' : 'Tu archivo está listo') }}</h2>
-        <p class="sub">{{ message() }}</p>
-        @if (!downloaded() && !error()) {
+      <section class="card center" aria-labelledby="download-data-export-title">
+        <span class="step-kicker">TUS DATOS / DESCARGA</span>
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="downloaded()" [class.bad]="error()">{{ downloaded() ? 'download_done' : (error() ? 'error_outline' : 'file_download') }}</mat-icon>
+        <h2 id="download-data-export-title">{{ downloaded() ? 'Descarga iniciada' : (error() ? 'No se pudo descargar' : 'Descarga tus datos') }}</h2>
+        <p class="sub" role="status">{{ message() }}</p>
+        @if (!hasDownloadLink) {
+          <a mat-flat-button routerLink="/auth">Volver al acceso</a>
+        } @else if (!downloaded()) {
           <button mat-flat-button color="primary" type="button" (click)="download()" [disabled]="busy()">
             <mat-icon>download</mat-icon>{{ busy() ? 'Preparando descarga…' : 'Descargar mis datos' }}
           </button>
         } @else {
           <a mat-flat-button color="primary" routerLink="/auth">Volver a UVH</a>
         }
-      </main>
+      </section>
     </app-auth-shell>
   `,
   styleUrl: "./auth-card.scss",
@@ -38,10 +41,13 @@ export class DownloadDataExportComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly token: string;
 
+  /** Avoid presenting an enabled download that cannot do anything. */
+  get hasDownloadLink(): boolean { return this.token.length > 0; }
+
   readonly busy = signal(false);
   readonly downloaded = signal(false);
   readonly error = signal(false);
-  readonly message = signal("El enlace funciona una sola vez. La descarga sólo se consumirá cuando pulses el botón.");
+  readonly message = signal("El enlace se cerrará cuando el navegador haya recibido el archivo completo.");
 
   constructor() {
     this.token = authBearer(this.route);
@@ -49,25 +55,36 @@ export class DownloadDataExportComponent {
     this.location.replaceState("/auth/download-export");
     if (!this.token) {
       this.error.set(true);
-      this.message.set("Falta el token de descarga.");
+      this.message.set("Abre el enlace de descarga desde tu correo. Esta dirección no contiene una autorización válida.");
     }
   }
 
   async download(): Promise<void> {
-    if (this.busy() || this.downloaded() || this.error()) return;
+    if (this.busy() || this.downloaded() || !this.token) return;
     this.busy.set(true);
+    this.error.set(false);
     try {
       const blob = await this.api.postBlob("/api/v1/auth/data-export/download", { token: this.token });
       if (this.destroyRef.destroyed) return;
       if (!downloadBlob(blob, `uvh-datos-${new Date().toISOString().slice(0, 10)}.json`)) {
-        // The server has already consumed this one-use bearer. Do not imply
-        // that retrying the same link can recover a browser-side failure.
+        // The acknowledgement has not been sent, so a browser-side failure
+        // leaves the bearer and private artifact available for a safe retry.
         this.error.set(true);
-        this.message.set("El servidor entregó el archivo, pero el navegador no pudo guardarlo. Solicita una nueva exportación.");
+        this.message.set("El navegador no pudo iniciar el guardado. El enlace sigue disponible para volver a intentarlo.");
         return;
       }
       this.downloaded.set(true);
-      this.message.set("El archivo se ha entregado y el enlace ya ha quedado invalidado.");
+      try {
+        // postBlob resolves only after the complete body is in browser memory.
+        // A separate acknowledgement avoids consuming the only bearer when
+        // the network is interrupted halfway through the response.
+        await this.api.post("/api/v1/auth/data-export/download/acknowledge", { token: this.token });
+        if (!this.destroyRef.destroyed) this.message.set("El archivo se ha recibido y el enlace ha quedado invalidado.");
+      } catch {
+        if (!this.destroyRef.destroyed) {
+          this.message.set("El archivo se ha recibido. No se pudo confirmar el cierre del enlace; caducará automáticamente.");
+        }
+      }
     } catch (error) {
       if (this.destroyRef.destroyed) return;
       this.error.set(true);

@@ -32,9 +32,9 @@
 @if (overview(); as o) {
   <div class="stat-cards">
     <div class="stat-card"><span><mat-icon>touch_app</mat-icon> Clics</span><b class="tnum">{{ o.totals.clicks }}</b><small class="tnum">{{ o.series.length }} días de datos</small></div>
-    <div class="stat-card"><span><mat-icon>person_pin</mat-icon> Visitantes</span><b class="tnum">{{ o.totals.visitors }}</b><small class="tnum">usuarios únicos</small></div>
-    <div class="stat-card"><span><mat-icon>public</mat-icon> Países</span><b class="tnum">{{ o.countries.length }}</b><small class="tnum">origen del tráfico</small></div>
-    <div class="stat-card"><span><mat-icon>ads_click</mat-icon> Referentes</span><b class="tnum">{{ o.referrers.length }}</b><small class="tnum">fuentes de entrada</small></div>
+    <div class="stat-card"><span><mat-icon>person_pin</mat-icon> Pseudónimos diarios</span><b class="tnum">{{ o.totals.visitors }}</b><small>Privados; una visita puede repetirse entre días</small></div>
+    <div class="stat-card"><span><mat-icon>public</mat-icon> Países</span><b class="tnum">{{ o.dimensionTotals.countries }}</b><small class="tnum">orígenes distintos del tráfico</small></div>
+    <div class="stat-card"><span><mat-icon>ads_click</mat-icon> Referentes</span><b class="tnum">{{ o.dimensionTotals.referrers }}</b><small class="tnum">fuentes distintas de entrada</small></div>
   </div>
   <app-charts [overview]="o" />
   <div class="section-heading"><div><span>Rendimiento</span><h2>Enlaces con más clics</h2></div><small>{{ period() === '24h' ? 'Últimas 24 horas' : period() === '7d' ? 'Últimos 7 días' : period() === '30d' ? 'Últimos 30 días' : 'Últimos 90 días' }}</small></div>

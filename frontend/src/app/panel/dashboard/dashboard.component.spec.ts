@@ -11,6 +11,7 @@ import type { AnalyticsOverview } from "../../core/models";
 
 const overview: AnalyticsOverview = {
   totals: { clicks: 12, visitors: 9 },
+  visitorMetric: "daily_pseudonyms",
   series: [],
   topLinks: [],
   countries: [],
@@ -19,6 +20,7 @@ const overview: AnalyticsOverview = {
   os: [],
   referrers: [],
   campaigns: [],
+  dimensionTotals: { countries: 0, devices: 0, browsers: 0, os: 0, referrers: 0, campaigns: 0 },
 };
 
 describe("DashboardComponent period selection", () => {

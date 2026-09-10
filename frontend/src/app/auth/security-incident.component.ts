@@ -17,19 +17,20 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <main class="card center" aria-live="polite">
+      <section class="card center" aria-labelledby="security-incident-title">
+        <span class="step-kicker">SEGURIDAD / RESPUESTA DE EMERGENCIA</span>
         @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Revocando accesos" /> }
-        <mat-icon class="icon" [class.ok]="ok()" [class.bad]="done() && !ok()">
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="done() && !ok()">
           {{ ok() ? 'verified_user' : (done() ? 'error_outline' : 'gpp_maybe') }}
         </mat-icon>
-        <h2>{{ ok() ? 'Accesos revocados' : (done() ? 'No se pudo usar el enlace' : 'Cerrar accesos de emergencia') }}</h2>
-        <p class="sub">{{ message() }}</p>
+        <h2 id="security-incident-title">{{ ok() ? 'Accesos revocados' : (done() ? 'No se pudo usar el enlace' : 'Cerrar accesos de emergencia') }}</h2>
+        <p class="sub" role="status">{{ message() }}</p>
 
         @if (!done()) {
           <div class="alert emergency-copy">
             Se cerrarán todas las sesiones, se revocarán los tokens API y se cancelarán cambios de email, exports y eliminaciones pendientes. Tu email y tu MFA no se modificarán.
           </div>
-          <button mat-flat-button color="warn" type="button" class="submit" (click)="revoke()" [disabled]="busy() || !token">
+          <button mat-flat-button class="danger-action submit" type="button" (click)="revoke()" [disabled]="busy() || !token">
             {{ busy() ? 'Cerrando accesos…' : 'Revocar todos los accesos' }}
           </button>
           <a class="back" routerLink="/auth">No hacer cambios</a>
@@ -38,12 +39,9 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
         } @else {
           <a mat-flat-button color="primary" routerLink="/auth/forgot-password">Iniciar recuperación segura</a>
         }
-      </main>
+      </section>
     </app-auth-shell>
   `,
-  styles: [`
-    .emergency-copy { text-align: left; color: var(--uvh-ink); background: var(--uvh-warn-soft); border: 1px solid color-mix(in srgb, var(--uvh-warn) 35%, transparent); }
-  `],
   styleUrl: "./auth-card.scss",
   changeDetection: ChangeDetectionStrategy.Eager,
 })

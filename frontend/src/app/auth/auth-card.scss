@@ -1,107 +1,51 @@
-// Shared card styles for the secondary auth pages (forgot/reset/verify/invitation).
-// Used via `styleUrl: "./auth-card.scss"` on each standalone component.
+@use "@angular/material" as mat;
 
-.card {
-  position: relative;
-  width: 100%;
-  max-width: 460px;
-  background: var(--mat-sys-surface-container-lowest, #fff);
-  border: 1px solid var(--uvh-border);
-  border-radius: var(--uvh-radius-lg);
-  box-shadow: var(--uvh-shadow-lg);
-  padding: 32px 30px 28px;
-  overflow: hidden;
-}
+// Secondary access screens use the same editorial sheet as login. No nested
+// elevated card: the shell already provides the page surface and mobile gutter.
+:host { display: block; }
+.card { position: relative; width: 100%; max-width: 510px; min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--uvh-ink); animation: auth-sheet-enter 260ms ease-out; }
+.card h2 { margin: 0 0 18px; font-size: clamp(28px, 3vw, 36px); font-weight: 800; letter-spacing: -.055em; line-height: 1.15; text-wrap: balance; }
+.card h3 { margin: 0 0 12px; font-size: 22px; font-weight: 800; letter-spacing: -.035em; line-height: 1.25; }
+.step-kicker { display: block; margin-bottom: 20px; color: var(--uvh-muted); font: 10px/1.5 "Courier New", monospace; letter-spacing: .13em; text-transform: uppercase; }
+.sub { margin: 0 0 28px; color: var(--uvh-muted); font-size: 14px; line-height: 1.8; text-wrap: pretty; overflow-wrap: anywhere; }
+.form { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.form mat-form-field { width: 100%; min-width: 0; }
+.form mat-icon[matPrefix] { color: var(--uvh-muted); }
+.alert { margin: 0 0 16px; padding: 14px 16px; border: 0; border-left: 2px solid var(--uvh-border); border-radius: 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.alert.error { background: var(--uvh-danger-soft); color: var(--uvh-danger); border-left-color: var(--uvh-danger); }
+.alert.ok { background: var(--uvh-success-soft); color: var(--uvh-success); border-left-color: var(--uvh-success); }
+.alert.info { background: var(--soft); color: var(--uvh-ink); border-left-color: var(--uvh-electric); }
+.alert.emergency-copy { background: var(--uvh-warn-soft); color: var(--uvh-ink); border-left-color: var(--uvh-warn); }
+.submit, .card > [mat-flat-button], .card > [mat-stroked-button], .result > [mat-flat-button] { width: 100%; min-height: 48px; height: auto; padding-block: 12px; border-radius: 3px; font-size: 13px; font-weight: 700; white-space: normal; line-height: 1.5; }
+.card > [mat-flat-button] + [mat-stroked-button] { margin-top: 12px; }
+.submit mat-icon { transition: transform 180ms ease; }
+.submit:hover:not(:disabled) mat-icon { transform: translateX(3px); }
+.back { display: flex; width: fit-content; align-items: center; gap: 9px; min-height: 44px; margin-top: 18px; color: var(--uvh-electric); font-size: 12px; font-weight: 700; line-height: 1.6; text-decoration: none; }
+.back:hover { text-decoration: underline; text-underline-offset: 4px; }
+.back + .back { margin-top: 3px; color: var(--uvh-muted); font-weight: 500; }
+.auth-note { margin: 26px 0 0; padding-top: 18px; border-top: 1px solid var(--uvh-border); color: var(--uvh-muted); font-size: 12px; line-height: 1.75; }
+.icon { display: grid; place-items: center; width: 52px; height: 52px; padding: 12px; margin-bottom: 22px; border: 1px solid var(--uvh-border); border-radius: 4px; background: var(--uvh-surface-raised); color: var(--uvh-electric); font-size: 26px; box-sizing: border-box; }
+.icon.ok { color: var(--uvh-success); border-color: color-mix(in srgb, var(--uvh-success) 40%, var(--uvh-border)); }
+.icon.bad { color: var(--uvh-danger); border-color: color-mix(in srgb, var(--uvh-danger) 40%, var(--uvh-border)); }
+.center { text-align: left; }
+.card > mat-progress-bar { position: absolute; top: -18px; width: 100%; }
+.result { padding-top: 10px; }
+.result p { margin: 0 0 22px; color: var(--uvh-muted); font-size: 14px; line-height: 1.8; }
+.danger-action { @include mat.button-overrides((filled-container-color: var(--uvh-danger), filled-label-text-color: light-dark(#ffffff, #421617), filled-state-layer-color: light-dark(#ffffff, #421617))); }
 
-h2 {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin: 0 0 6px;
-}
-
-.sub {
-  color: var(--uvh-muted);
-  font-size: 14.5px;
-  line-height: 1.6;
-  margin: 0 0 20px;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  mat-form-field {
-    width: 100%;
-  }
-}
-
-.alert {
-  border-radius: 10px;
-  padding: 11px 14px;
-  font-size: 14px;
-  line-height: 1.45;
-  margin-bottom: 12px;
-
-  &.error {
-    background: var(--uvh-danger-soft);
-    border: 1px solid color-mix(in srgb, var(--uvh-danger) 30%, transparent);
-    color: var(--uvh-danger);
-  }
-
-  &.ok {
-    background: var(--uvh-success-soft);
-    border: 1px solid color-mix(in srgb, var(--uvh-success) 30%, transparent);
-    color: var(--uvh-success);
-  }
-}
-
-.submit {
-  width: 100%;
-  height: 46px;
-  font-size: 15px;
-  font-weight: 700;
-  border-radius: 10px;
-  margin-top: 4px;
-}
-
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 16px;
-  color: var(--uvh-muted);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.icon {
-  font-size: 54px;
-  width: 54px;
-  height: 54px;
-  margin-bottom: 10px;
-  color: var(--uvh-muted-soft);
-
-  &.ok {
-    color: var(--uvh-teal);
-  }
-
-  &.bad {
-    color: var(--uvh-danger);
-  }
-}
-
-.center {
-  text-align: center;
-
-  h2 {
-    margin-top: 4px;
-  }
-}
-
-.center .sub {
-  max-width: 380px;
-  margin-left: auto;
-  margin-right: auto;
-}
+// These are real recovery stages, not a progress indicator suggesting that an
+// unverified visitor has already received support or administrator approval.
+.process { display: grid; gap: 0; margin: 0 0 26px; padding: 0; border-top: 1px solid var(--uvh-border); list-style: none; }
+.process > li { display: grid; grid-template-columns: 24px 1fr; align-items: start; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--uvh-border); }
+.process > li > span { color: var(--uvh-electric); font: 12px/1.7 "Courier New", monospace; }
+.process p { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.process b { color: var(--uvh-ink); font-size: 12px; }
+.process small { color: var(--uvh-muted); font-size: 11px; line-height: 1.65; }
+.strength { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: -4px 0 10px; }
+.strength span { height: 3px; background: var(--uvh-border); }
+.strength span.met { background: var(--uvh-electric); }
+.strength small { grid-column: 1 / -1; padding-top: 4px; color: var(--uvh-muted); font-size: 11px; }
+.card a:focus-visible, .card button:focus-visible { outline: 3px solid var(--uvh-electric); outline-offset: 4px; }
+@keyframes auth-sheet-enter { from { opacity: .6; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media (max-width: 480px) { .card h2 { font-size: 30px; } .sub { font-size: 13px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

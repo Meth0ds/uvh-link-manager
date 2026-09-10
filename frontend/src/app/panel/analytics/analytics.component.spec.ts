@@ -10,6 +10,8 @@ function overview(clicks: number): AnalyticsOverview {
   return {
     totals: { clicks, visitors: clicks }, series: [], topLinks: [], countries: [],
     devices: [], browsers: [], os: [], referrers: [], campaigns: [],
+    visitorMetric: "daily_pseudonyms",
+    dimensionTotals: { countries: 0, devices: 0, browsers: 0, os: 0, referrers: 0, campaigns: 0 },
   };
 }
 

@@ -1,5 +1,11 @@
 <app-auth-shell>
   <div class="card auth-card">
+    @if (developmentCaptchaFallback()) {
+      <aside class="development-notice" role="status">
+        <mat-icon aria-hidden="true">code</mat-icon>
+        <span><b>Solo desarrollo local</b>Si hCaptcha no está disponible, podrás continuar. La contraseña, la verificación de email y MFA siguen siendo obligatorias cuando correspondan.</span>
+      </aside>
+    }
     @if (busy()) {
       <mat-progress-bar mode="indeterminate" class="top-bar" aria-label="Procesando" />
     }
@@ -32,8 +38,8 @@
           <section id="login-panel" class="auth-step login-step" role="tabpanel" aria-labelledby="login-tab login-title">
             <div class="welcome-row">
               <div>
-                <h2 id="login-title">Bienvenido de nuevo</h2>
-                <p>{{ pendingLink() ? 'Accede para retomar el enlace que acabas de preparar.' : 'Accede a tus enlaces y workspaces.' }}</p>
+                <h2 id="login-title">Vuelve a tus enlaces.</h2>
+                <p>{{ pendingLink() ? 'Accede para retomar el enlace que acabas de preparar.' : 'Destinos, campañas y trabajo compartido. Continúa donde lo dejaste.' }}</p>
               </div>
               <span class="step-icon blue"><mat-icon aria-hidden="true">login</mat-icon></span>
             </div>
@@ -66,7 +72,7 @@
                 <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
               } @else if (hcaptchaSiteKey(); as siteKey) {
                 <app-hcaptcha-widget #loginCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onLoginCaptchaToken($event)" />
-              } @else {
+              } @else if (!developmentCaptchaFallback()) {
                 <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
               }
 
@@ -75,7 +81,7 @@
                   <mat-icon aria-hidden="true">error_outline</mat-icon>
                   <span>{{ error() }}</span>
                   @if (verificationEmail()) {
-                    <button mat-stroked-button type="button" class="resend-button" (click)="resendVerification()" [disabled]="busy() || verificationBusy() || captchaConfigBusy() || !hcaptchaSiteKey()">
+                    <button mat-stroked-button type="button" class="resend-button" (click)="resendVerification()" [disabled]="busy() || verificationBusy() || !captchaReady()">
                       <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
                       {{ verificationBusy() ? 'Enviando…' : 'Reenviar verificación' }}
                     </button>
@@ -85,7 +91,7 @@
               @if (info()) {
                 <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
               }
-              <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="loginForm.invalid || busy() || verificationBusy() || captchaConfigBusy() || !hcaptchaSiteKey()">
+              <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="loginForm.invalid || busy() || verificationBusy() || !captchaReady()">
                 <span>{{ busy() ? 'Verificando acceso…' : (pendingLink() ? 'Entrar y retomar enlace' : 'Entrar en mi panel') }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
               </button>
             </form>
@@ -97,8 +103,8 @@
           <section id="register-panel" class="auth-step register-step" [attr.data-step]="registerStep()" role="tabpanel" aria-labelledby="register-tab register-title">
             <div class="register-heading">
               <div>
-                <h2 id="register-title">{{ changeEmailMode() ? 'Corrige tu email' : 'Crea tu espacio de trabajo' }}</h2>
-                <p>{{ changeEmailMode() ? 'Actualiza la dirección y te enviaremos una nueva verificación.' : (pendingLink() ? 'Crea tu cuenta y retoma el enlace al terminar.' : 'Crea una cuenta para gestionar tus enlaces.') }}</p>
+                <h2 id="register-title">{{ changeEmailMode() ? 'Corrige tu email' : 'Crea tu cuenta en UVH' }}</h2>
+                <p>{{ changeEmailMode() ? 'Actualiza la dirección y te enviaremos una nueva verificación.' : (pendingLink() ? 'Crea tu cuenta y retoma el enlace al terminar.' : 'Una cuenta para los enlaces que compartes hoy y los cambios que vendrán después.') }}</p>
               </div>
               <span class="step-icon teal"><mat-icon aria-hidden="true">rocket_launch</mat-icon></span>
             </div>
@@ -191,7 +197,7 @@
                   <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
                 } @else if (hcaptchaSiteKey(); as siteKey) {
                   <app-hcaptcha-widget #registerCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onRegisterCaptchaToken($event)" />
-                } @else {
+                } @else if (!developmentCaptchaFallback()) {
                   <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
                 }
 
@@ -212,7 +218,7 @@
                 }
                 <div class="register-actions">
                   <button mat-stroked-button type="button" (click)="previousRegisterStep()" [disabled]="busy()"><mat-icon aria-hidden="true">arrow_back</mat-icon> Atrás</button>
-                  <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy() || captchaConfigBusy() || !hcaptchaSiteKey()">
+                  <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy() || !captchaReady()">
                     <span>{{ busy() ? (changeEmailMode() ? 'Actualizando…' : 'Creando cuenta…') : (changeEmailMode() ? 'Actualizar email' : 'Crear cuenta') }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
                   </button>
                 </div>
@@ -311,11 +317,11 @@
           <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
         } @else if (hcaptchaSiteKey(); as siteKey) {
           <app-hcaptcha-widget #resendCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onResendCaptchaToken($event)" />
-        } @else {
+        } @else if (!developmentCaptchaFallback()) {
           <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
         }
         <div class="pending-actions">
-          <button mat-flat-button color="primary" (click)="resendVerification()" [disabled]="verificationBusy() || captchaConfigBusy() || !hcaptchaSiteKey()">
+          <button mat-flat-button color="primary" (click)="resendVerification()" [disabled]="verificationBusy() || !captchaReady()">
             <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
             {{ verificationBusy() ? 'Enviando…' : 'Reenviar correo' }}
           </button>

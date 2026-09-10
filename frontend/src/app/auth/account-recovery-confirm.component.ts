@@ -16,13 +16,14 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <main class="card center" aria-live="polite">
+      <section class="card center" aria-labelledby="account-recovery-confirm-title">
+        <span class="step-kicker">RECUPERACIÓN / CONFIRMAR SOLICITUD</span>
         @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Confirmando solicitud" /> }
         <mat-icon class="icon" [class.ok]="ok()" [class.bad]="done() && !ok()" aria-hidden="true">
           {{ ok() ? 'task_alt' : (done() ? 'error_outline' : 'fact_check') }}
         </mat-icon>
-        <h2>{{ ok() ? 'Expediente abierto' : (done() ? 'No se pudo confirmar' : 'Confirmar recuperación') }}</h2>
-        <p class="sub">{{ message() }}</p>
+        <h2 id="account-recovery-confirm-title">{{ ok() ? 'Expediente abierto' : (done() ? 'No se pudo confirmar' : 'Confirmar recuperación') }}</h2>
+        <p class="sub" role="status">{{ message() }}</p>
         @if (!done()) {
           <div class="alert info">Este paso sólo acredita el acceso al email. No inicia sesión, no cambia la contraseña y no desactiva MFA.</div>
           <button mat-flat-button color="primary" class="submit" type="button" (click)="confirm()" [disabled]="busy() || !token">
@@ -32,7 +33,7 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
         } @else {
           <a mat-flat-button color="primary" routerLink="/auth">Volver al acceso</a>
         }
-      </main>
+      </section>
     </app-auth-shell>
   `,
   styleUrl: "./auth-card.scss",

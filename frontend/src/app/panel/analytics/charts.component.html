@@ -1,49 +1,51 @@
 <div class="chart-block">
-  <div class="chart-title">
-    <div><small>Serie temporal</small><b>Clics por día</b></div>
-    <span class="chart-total tnum">{{ overview().totals.clicks }} clics · {{ overview().totals.visitors }} visitantes</span>
-  </div>
-
-  <div class="series-wrap">
-    @if (points()) {
-      <svg viewBox="0 0 720 220" preserveAspectRatio="none" class="series" aria-hidden="true">
-        <defs>
-          <linearGradient id="uvhArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--uvh-electric)" stop-opacity="0.28" />
-            <stop offset="100%" stop-color="var(--uvh-electric)" stop-opacity="0.02" />
-          </linearGradient>
-        </defs>
-        <path [attr.d]="areaPoints()" fill="url(#uvhArea)" />
-        <path [attr.d]="points()" fill="none" stroke="var(--uvh-electric)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
-      </svg>
-    }
-    @if (!points()) {
-      <div class="no-data">Sin clics en este periodo</div>
-    }
-    <div class="x-labels">
-      @for (l of labels(); track l.day) {
-        <span class="x-label" [class.hidden]="!l.show">{{ l.day }}</span>
-      }
-    </div>
-  </div>
-</div>
-
-<div class="breakdowns">
-  @for (b of breakdownKeys; track b) {
-    <div class="breakdown">
-      <b class="breakdown-title">{{ label(b) }}</b>
-      @for (item of breakdown(b).items; track item.key) {
-        <div class="bar-row">
-          <span class="bar-label">{{ item.key }}</span>
-          <div class="bar-track">
-            <div class="bar-fill" [style.width.%]="pct(item.value, breakdown(b).max)"></div>
-          </div>
-          <span class="bar-value tnum">{{ item.value }}</span>
+  <div class="chart-title"><b>Clics por día</b><span class="chart-legend"><i aria-hidden="true"></i>Clics registrados</span></div>
+  <div class="chart-summary">{{ formatCount(overview().totals.clicks) }} clics en el periodo · {{ overview().series.length }} días con datos en la serie</div>
+  @if (points()) {
+    <div class="plot" aria-hidden="true">
+      <div class="y-labels"><span>{{ formatCount(maxClicks()) }}</span><span>{{ formatCount(maxClicks() / 2) }}</span><span>0</span></div>
+      <div class="series-wrap">
+        <svg viewBox="0 0 720 220" preserveAspectRatio="none" class="series">
+          <!-- A flat wash avoids document-global gradient IDs when two charts
+               are rendered together. The stroke carries the actual values. -->
+          <path [attr.d]="areaPoints()" fill="var(--uvh-electric)" fill-opacity="0.06" />
+          <path [attr.d]="points()" fill="none" stroke="var(--uvh-electric)" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />
+          @if (singlePoint(); as point) { <circle [attr.cx]="point.x" [attr.cy]="point.y" r="5" fill="var(--uvh-electric)" /> }
+        </svg>
+        <div class="x-labels">
+          @for (l of labels(); track l.day) { <span [class.first]="l.position === 0" [class.last]="l.position === 100" [style.left.%]="l.position">{{ l.text }}</span> }
         </div>
-      }
-      @if (!breakdown(b).items.length) {
-        <div class="bar-empty">—</div>
-      }
+      </div>
     </div>
+    <details class="series-data">
+      <summary>Consultar datos por día <span>{{ overview().series.length }} filas</span></summary>
+      <p>Los pseudónimos cambian cada día: su suma no representa personas únicas.</p>
+      <div class="table-scroll" role="region" aria-label="Tabla diaria de actividad" tabindex="0">
+        <table><caption>Clics y pseudónimos diarios de la serie disponible</caption>
+          <thead><tr><th scope="col">Día</th><th scope="col">Clics</th><th scope="col">Pseudónimos diarios</th></tr></thead>
+          <tbody>@for (row of overview().series; track row.day) { <tr><th scope="row"><time [attr.datetime]="row.day">{{ row.day }}</time></th><td>{{ formatCount(row.clicks) }}</td><td>{{ formatCount(row.visitors) }}</td></tr> }</tbody>
+        </table>
+      </div>
+    </details>
+  } @else {
+    <div class="no-data"><b>La serie todavía está vacía.</b><p>No hay datos diarios disponibles para dibujar en este periodo.</p></div>
   }
 </div>
+
+@if (showBreakdowns()) {
+  <div class="breakdowns">
+    @for (b of breakdownKeys; track b) {
+      <section class="breakdown" [attr.aria-label]="label(b)">
+        <h3>{{ label(b) }}</h3>
+        <ul>
+          @for (item of breakdown(b).items; track item.key) {
+            <li class="bar-row"><span class="bar-label">{{ item.key }}</span><span class="bar-value">{{ formatCount(item.value) }} <small>clics</small></span>
+              <div class="bar-track" aria-hidden="true"><div class="bar-fill" [style.width.%]="pct(item.value, breakdown(b).max)"></div></div>
+            </li>
+          }
+        </ul>
+        @if (!breakdown(b).items.length) { <p class="bar-empty">Sin datos para este periodo.</p> }
+      </section>
+    }
+  </div>
+}

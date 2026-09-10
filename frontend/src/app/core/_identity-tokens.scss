@@ -1,0 +1,37 @@
+// One palette for page content AND CDK overlays. Legacy semantic names remain
+// aliases so changing appearance never changes statuses or chart data.
+@mixin light {
+  color-scheme: light;
+  --paper: #f5f2e9; --paper-raised: #fffcf5; --ink: #262821;
+  --muted: #626357; --line: #cecec0; --accent: #c44324;
+  --accent-ink: #fffaf0; --soft: #eae7dd; --guide: #e5e8dc;
+  --uvh-teal: #486344; --uvh-teal-strong: #354f31;
+  --uvh-danger: #b12e30; --uvh-danger-soft: #f9e6df;
+  --uvh-success: #386044; --uvh-success-soft: #e1eadb;
+  --uvh-warn: #805509; --uvh-warn-soft: #f4e6c3;
+  --uvh-shadow-sm: 0 2px 0 rgb(38 40 33 / 3%);
+  --uvh-shadow-md: 0 8px 24px -10px rgb(38 40 33 / 16%);
+  --uvh-shadow-lg: 0 24px 70px rgb(38 40 33 / 20%);
+}
+
+@mixin dark {
+  color-scheme: dark;
+  --paper: #21241f; --paper-raised: #2c3028; --ink: #f4f0e4;
+  --muted: #b9bbae; --line: #4d5145; --accent: #f79573;
+  --accent-ink: #25251e; --soft: #30352b; --guide: #2a3025;
+  --uvh-teal: #b1c6a2; --uvh-teal-strong: #c3d7b6;
+  --uvh-danger: #ffb0aa; --uvh-danger-soft: #492d2a;
+  --uvh-success: #a8d3a6; --uvh-success-soft: #2b402d;
+  --uvh-warn: #eac67a; --uvh-warn-soft: #443a23;
+  --uvh-shadow-sm: 0 2px 0 rgb(0 0 0 / 10%);
+  --uvh-shadow-md: 0 8px 24px -10px rgb(0 0 0 / 35%);
+  --uvh-shadow-lg: 0 24px 70px rgb(0 0 0 / 45%);
+}
+
+@mixin aliases {
+  --uvh-ink: var(--ink); --uvh-muted: var(--muted); --uvh-muted-soft: var(--muted);
+  --uvh-surface: var(--paper); --uvh-canvas: var(--paper); --uvh-surface-raised: var(--paper-raised);
+  --uvh-electric: var(--accent); --uvh-electric-strong: var(--accent);
+  --uvh-border: var(--line); --uvh-border-strong: var(--muted);
+  --uvh-radius: 6px; --uvh-radius-lg: 10px;
+}

@@ -25,6 +25,7 @@ import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import type { DomainDto, LinkDto, RedirectRule } from "../../core/models";
 import { decodeDomainsResponse } from "../../core/services/domain-response-decoders";
 import { decodeAliasAvailability, decodeLinkResponse, decodeRulesResponse } from "../../core/services/link-response-decoders";
+import { LatestRequest } from "../../core/services/latest-request";
 
 export interface LinkDialogData {
   mode: "create" | "edit";
@@ -134,6 +135,8 @@ export class LinkDialogComponent {
   private api = inject(ApiService);
   private dialogRef = inject(MatDialogRef<LinkDialogComponent>);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly domainRequests = new LatestRequest(this.destroyRef);
+  private readonly ruleRequests = new LatestRequest(this.destroyRef);
   readonly data = inject<LinkDialogData>(MAT_DIALOG_DATA);
 
   readonly isEdit = this.data.mode === "edit";
@@ -201,28 +204,36 @@ export class LinkDialogComponent {
   }
 
   private async loadDomains(): Promise<void> {
+    const request = this.domainRequests.begin("link-dialog-domains");
     try {
-      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
-      if (this.destroyRef.destroyed) return;
+      const { domains } = await this.api.get<{ domains: DomainDto[] }>(
+        "/api/v1/domains",
+        undefined,
+        decodeDomainsResponse,
+        { signal: request.signal },
+      );
+      if (!this.domainRequests.isCurrent(request, "link-dialog-domains")) return;
       this.domains.set(domains.filter((d) => d.state === "active" && d.edgeEligible && d.tlsReadyAt !== null));
     } catch {
-      if (!this.destroyRef.destroyed) this.domains.set([]);
+      if (this.domainRequests.isCurrent(request, "link-dialog-domains")) this.domains.set([]);
     }
   }
 
   private async loadEditRules(linkId: number): Promise<void> {
+    const request = this.ruleRequests.begin(linkId);
     try {
       const { rules } = await this.api.get<{ rules: RedirectRule[] }>(
         `/api/v1/links/${linkId}`,
         undefined,
         decodeRulesResponse,
+        { signal: request.signal },
       );
-      if (this.destroyRef.destroyed) return;
+      if (!this.ruleRequests.isCurrent(request, linkId)) return;
       this.rules.clear();
       rules.forEach((rule) => this.addRule(rule));
       this.editDetailsLoaded.set(true);
     } catch (err) {
-      if (!this.destroyRef.destroyed) {
+      if (this.ruleRequests.isCurrent(request, linkId)) {
         this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las reglas del enlace");
       }
     }
@@ -330,7 +341,7 @@ export class LinkDialogComponent {
       this.fb.nonNullable.group({
         priority: [initial.priority ?? this.rules.length, [Validators.min(0), Validators.max(1000), integerValidator]],
         country: [initial.country ?? "", [Validators.pattern(/^[a-zA-Z]{2}$/)]],
-        language: [initial.language ?? "", [Validators.maxLength(8), Validators.pattern(/^[a-zA-Z0-9-]+$/)]],
+        language: [initial.language ?? "", [Validators.maxLength(8), Validators.pattern(/^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,4})?$/)]],
         device: [initial.device ?? ""],
         os: [initial.os ?? "", [Validators.maxLength(40), noControlCharacters]],
         timeFrom: [initial.timeFrom ?? raw.time_from ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],

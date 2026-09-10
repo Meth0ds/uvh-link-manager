@@ -23,6 +23,7 @@ function deferred<T>(): Deferred<T> {
 
 @Component({ selector: "app-hcaptcha-widget", standalone: true, template: "" })
 class FakeHCaptchaWidgetComponent {
+  readonly state = signal("ready");
   @Input() siteKey = "";
   @Input() invisible = false;
   @Output() readonly tokenChange = new EventEmitter<string>();
@@ -119,13 +120,92 @@ describe("AuthComponent registration flow", () => {
     expect(component.registerForm.controls.email.touched).toBeTrue();
   });
 
+  async function enableLocalFallback(siteKey: string | null = "10000000-ffff-ffff-ffff-000000000001"): Promise<void> {
+    api.get.and.resolveTo({ hcaptcha: { enabled: !!siteKey, siteKey, developmentFallback: true } });
+    await component.retryCaptchaConfiguration();
+    fixture.detectChanges();
+    component.loginForm.setValue({ email: "ana@example.com", password: "unit-test-password" });
+  }
+
+  it("uses the ordinary provider token when local fallback is available but not needed", async () => {
+    await enableLocalFallback();
+    await component.onLogin();
+    expect(auth.login).toHaveBeenCalledWith("ana@example.com", "unit-test-password", "fresh-passcode");
+    expect(component.step()).toBe("mfa");
+  });
+
+  it("allows an explicitly authorized local widget failure without skipping MFA", async () => {
+    await enableLocalFallback();
+    captchaWidget("app-hcaptcha-widget").execute.and.rejectWith(new HCaptchaExecutionError("Provider unavailable"));
+    expect(fixture.nativeElement.querySelector(".development-notice").textContent).toContain("Solo desarrollo local");
+    await component.onLogin();
+    expect(auth.login).toHaveBeenCalledWith("ana@example.com", "unit-test-password", "uvh-local-captcha-unavailable");
+    expect(component.step()).toBe("mfa");
+  });
+
+  it("supports local missing keys only after the API grants the capability", async () => {
+    await enableLocalFallback(null);
+    expect(component.captchaReady()).toBeTrue();
+    await component.onLogin();
+    expect(auth.login).toHaveBeenCalledWith("ana@example.com", "unit-test-password", "uvh-local-captcha-unavailable");
+  });
+
+  it("does not wait for another challenge after a visible local provider failure", async () => {
+    await enableLocalFallback();
+    const widget = captchaWidget("app-hcaptcha-widget");
+    widget.state.set("error");
+    await component.onLogin();
+    expect(widget.execute).not.toHaveBeenCalled();
+    expect(auth.login.calls.mostRecent().args[2]).toBe("uvh-local-captcha-unavailable");
+  });
+
+  it("preserves registration consent and the honeypot with the local fallback", async () => {
+    await enableLocalFallback(null);
+    showRegistrationStep();
+    component.registerForm.patchValue({ name: "Ana García", email: "ana@example.com", password: "unique-test-password", confirmPassword: "unique-test-password", acceptTerms: true });
+    component.registerForm.controls.company.setValue("bot");
+    await component.onRegister();
+    expect(auth.register).not.toHaveBeenCalled();
+    component.registerForm.controls.company.setValue("");
+    await component.onRegister();
+    expect(auth.register).toHaveBeenCalledWith("Ana García", "ana@example.com", "unique-test-password", jasmine.objectContaining({ captchaToken: "uvh-local-captcha-unavailable", acceptTerms: true, website: "" }));
+    expect(component.step()).toBe("verify-pending");
+  });
+
+  it("revokes the local capability when config refresh fails", async () => {
+    await enableLocalFallback();
+    api.get.and.rejectWith(new Error("API offline"));
+    await component.retryCaptchaConfiguration();
+    await component.onLogin();
+    expect(component.developmentCaptchaFallback()).toBeFalse();
+    expect(component.captchaReady()).toBeFalse();
+    expect(auth.login).not.toHaveBeenCalled();
+  });
+
+  it("does not reinterpret programming errors as provider outages", async () => {
+    await enableLocalFallback();
+    captchaWidget("app-hcaptcha-widget").execute.and.rejectWith(new Error("Unexpected failure"));
+    await component.onLogin();
+    expect(auth.login).not.toHaveBeenCalled();
+  });
+
+  it("does not retry rejected credentials with a fallback marker", async () => {
+    await enableLocalFallback();
+    auth.login.and.rejectWith(new Error("Rejected credentials"));
+    await component.onLogin();
+    expect(auth.login).toHaveBeenCalledTimes(1);
+    expect(auth.login.calls.mostRecent().args[2]).toBe("fresh-passcode");
+  });
+
   it("loads only the public hCaptcha sitekey for both access modes", async () => {
     component.registerForm.controls.name.setValue("Ana García");
     component.registerForm.controls.email.setValue("ana@example.com");
     await component.nextRegisterStep();
 
     expect(component.registerStep()).toBe(2);
-    expect(api.get).toHaveBeenCalledWith("/api/v1/config", undefined, jasmine.any(Function));
+    // The existing cancellation guard now passes an AbortSignal as well as
+    // the public decoder; keep the assertion aligned with that safer contract.
+    expect(api.get).toHaveBeenCalledWith("/api/v1/config", undefined, jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
     expect(component.hcaptchaSiteKey()).toBe("10000000-ffff-ffff-ffff-000000000001");
     expect(JSON.stringify(api.get.calls.mostRecent().returnValue)).not.toContain("HCAPTCHA_SECRET");
   });
@@ -413,6 +493,6 @@ describe("AuthComponent registration flow", () => {
 
     expect(tabs[0].getAttribute("aria-selected")).toBe("false");
     expect(tabs[1].getAttribute("aria-selected")).toBe("true");
-    expect(fixture.nativeElement.textContent).toContain("Crea tu espacio de trabajo");
+    expect(fixture.nativeElement.textContent).toContain("Crea tu cuenta en UVH");
   });
 });

@@ -14,6 +14,7 @@ import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { decodePublicConfig } from "../core/services/public-response-decoders";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
+import { LatestRequest } from "../core/services/latest-request";
 import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 
 type Step = "login" | "register" | "mfa" | "recovery" | "verify-pending";
@@ -34,6 +35,7 @@ interface PublicAuthConfig {
   hcaptcha?: {
     enabled?: boolean;
     siteKey?: string | null;
+    developmentFallback?: boolean;
   };
 }
 
@@ -112,7 +114,7 @@ export class AuthComponent {
   private interactiveAuthStarted = false;
   private flowRevision = 0;
   private verificationRevision = 0;
-  private captchaConfigRevision = 0;
+  private readonly captchaConfigRequests = new LatestRequest(this.destroyRef);
 
   readonly step = signal<Step>("login");
   readonly registerStep = signal<RegisterStep>(1);
@@ -120,6 +122,9 @@ export class AuthComponent {
   readonly captchaConfigBusy = signal(true);
   readonly captchaConfigError = signal<string | null>(null);
   readonly hcaptchaSiteKey = signal("");
+  readonly developmentCaptchaFallback = signal(false);
+  readonly captchaReady = computed(() => !this.captchaConfigBusy()
+    && (!!this.hcaptchaSiteKey() || this.developmentCaptchaFallback()));
   readonly loginCaptchaToken = signal("");
   readonly registerCaptchaToken = signal("");
   readonly resendCaptchaToken = signal("");
@@ -294,7 +299,7 @@ export class AuthComponent {
       this.loginForm.markAllAsTouched();
       return;
     }
-    if (!this.loginCaptchaWidget || !this.hcaptchaSiteKey()) {
+    if (!this.captchaReady()) {
       this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
       return;
     }
@@ -308,7 +313,7 @@ export class AuthComponent {
       // Invisible hCaptcha is executed at submit time. Keeping this token local
       // to the attempt prevents an expired or previously redeemed value from
       // being reused by a later click.
-      const captchaToken = await this.loginCaptchaWidget.execute();
+      const captchaToken = await this.executeCaptcha(this.loginCaptchaWidget);
       if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
       this.loginCaptchaToken.set("");
       const outcome = await this.auth.login(
@@ -417,7 +422,7 @@ export class AuthComponent {
       this.error.set("No se pudo crear la cuenta");
       return;
     }
-    if (!this.registerCaptchaWidget || !this.hcaptchaSiteKey()) {
+    if (!this.captchaReady()) {
       this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
       return;
     }
@@ -435,7 +440,7 @@ export class AuthComponent {
       && this.changeEmailMode() === changeEmail
       && this.registerForm.controls.email.value.trim().toLowerCase() === email;
     try {
-      const captchaToken = await this.registerCaptchaWidget.execute();
+      const captchaToken = await this.executeCaptcha(this.registerCaptchaWidget);
       if (!stillCurrent()) return;
       this.registerCaptchaToken.set("");
       const antiBot = {
@@ -504,7 +509,7 @@ export class AuthComponent {
     // Login and resend share the login widget: serialize both operations so
     // its single-use result cannot be redeemed by two requests.
     if (!email || this.verificationBusy() || this.busy()) return;
-    if (!captchaWidget || !this.hcaptchaSiteKey()) {
+    if (!this.captchaReady()) {
       this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
       return;
     }
@@ -512,7 +517,7 @@ export class AuthComponent {
     this.verificationBusy.set(true);
     this.error.set(null);
     try {
-      const captchaToken = await captchaWidget.execute();
+      const captchaToken = await this.executeCaptcha(captchaWidget);
       if (!this.isVerificationCurrent(revision, pendingStep, email)) return;
       await this.auth.resendVerification(email, captchaToken);
       if (!this.isVerificationCurrent(revision, pendingStep, email)) return;
@@ -646,26 +651,57 @@ export class AuthComponent {
     await this.loadCaptchaConfiguration();
   }
 
+  private async executeCaptcha(widget?: HCaptchaWidgetComponent): Promise<string> {
+    try {
+      if (!widget || !this.hcaptchaSiteKey()) {
+        throw new HCaptchaExecutionError("La protección antiabuso no está disponible.");
+      }
+      // Do not make local developers wait for a second timeout when the
+      // visible widget has already reported an outage. Other environments
+      // still execute the normal retry and require a fresh provider token.
+      if (this.developmentCaptchaFallback() && widget.state() === "error") {
+        throw new HCaptchaExecutionError("hCaptcha no se pudo cargar.");
+      }
+      return await widget.execute();
+    } catch (error) {
+      // This marker is deliberately not a provider token. The backend must
+      // authorize it again using local/debug/opt-in/loopback gates. Never
+      // retry a failed login here: only widget failures enter this path.
+      if (!(error instanceof HCaptchaExecutionError) || !this.developmentCaptchaFallback()
+        || this.destroyRef.destroyed || this.captchaConfigBusy()) throw error;
+      widget?.reset();
+      return "uvh-local-captcha-unavailable";
+    }
+  }
+
   private async loadCaptchaConfiguration(): Promise<void> {
     if (this.captchaConfigBusy() && this.hcaptchaSiteKey()) return;
-    const revision = ++this.captchaConfigRevision;
+    const request = this.captchaConfigRequests.begin("hcaptcha-config");
     this.captchaConfigBusy.set(true);
     this.captchaConfigError.set(null);
+    this.developmentCaptchaFallback.set(false);
     try {
-      const config = await this.api.get<PublicAuthConfig>("/api/v1/config", undefined, decodePublicConfig);
-      if (!this.isCaptchaConfigurationCurrent(revision)) return;
+      const config = await this.api.get<PublicAuthConfig>(
+        "/api/v1/config",
+        undefined,
+        decodePublicConfig,
+        { signal: request.signal },
+      );
+      if (!this.captchaConfigRequests.isCurrent(request, "hcaptcha-config")) return;
       const siteKey = config.hcaptcha?.enabled ? config.hcaptcha.siteKey : null;
-      if (!siteKey || !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey)) {
+      const fallback = config.hcaptcha?.developmentFallback === true;
+      if ((!siteKey && !fallback) || (siteKey && !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey))) {
         throw new Error("hCaptcha no está configurado");
       }
-      this.hcaptchaSiteKey.set(siteKey);
+      this.hcaptchaSiteKey.set(siteKey ?? "");
+      this.developmentCaptchaFallback.set(fallback);
     } catch {
-      if (this.isCaptchaConfigurationCurrent(revision)) {
+      if (this.captchaConfigRequests.isCurrent(request, "hcaptcha-config")) {
         this.hcaptchaSiteKey.set("");
         this.captchaConfigError.set("No se pudo cargar hCaptcha.");
       }
     } finally {
-      if (this.isCaptchaConfigurationCurrent(revision)) this.captchaConfigBusy.set(false);
+      if (this.captchaConfigRequests.isCurrent(request, "hcaptcha-config")) this.captchaConfigBusy.set(false);
     }
   }
 
@@ -686,10 +722,6 @@ export class AuthComponent {
       && revision === this.verificationRevision
       && this.step() === expectedStep
       && currentEmail === email;
-  }
-
-  private isCaptchaConfigurationCurrent(revision: number): boolean {
-    return !this.destroyRef.destroyed && revision === this.captchaConfigRevision;
   }
 
   private returnTo(): string {

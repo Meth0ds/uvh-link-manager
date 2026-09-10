@@ -134,7 +134,7 @@ export class TeamComponent {
         memberPerPage,
         invitationPage,
         invitationPerPage,
-      }));
+      }), { signal: request.signal });
       if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       if (detail.members.length === 0 && detail.membersPage.total > 0 && this.memberPageIndex() > 0) {
         this.memberPageIndex.set(Math.max(0, Math.ceil(detail.membersPage.total / detail.membersPage.perPage) - 1));

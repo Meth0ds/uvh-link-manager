@@ -29,7 +29,11 @@ function integer(value: unknown, contract: string, minimum = 0, maximum = Number
 }
 
 function text(value: unknown, contract: string, maximum: number): string {
-  if (typeof value !== "string" || value.length === 0 || value.length > maximum
+  // JavaScript's string.length counts UTF-16 code units, while Laravel's
+  // mb_strlen contract counts Unicode code points. Array.from applies the same
+  // code-point policy so astral characters do not consume two positions here.
+  const length = typeof value === "string" ? Array.from(value).length : 0;
+  if (typeof value !== "string" || length === 0 || length > maximum
     || /[\u0000-\u001f\u007f]/.test(value)) {
     invalid(contract);
   }
@@ -47,7 +51,10 @@ function workspace(value: unknown, requiredRole?: WorkspaceRole): Workspace {
   if (requiredRole !== undefined && decodedRole !== requiredRole) invalid("workspace");
   return {
     id: integer(source["id"], "workspace", 1),
-    name: text(source["name"], "workspace", 80),
+    // Historical generated names may predate the 80-character write limit.
+    // PostgreSQL stores at most 255 characters, so decode them safely without
+    // destructively rewriting user-visible data; all new writes remain <= 80.
+    name: text(source["name"], "workspace", 255),
     slug: text(source["slug"], "workspace", 255),
     role: decodedRole,
     createdAt: text(source["createdAt"], "workspace", 64),

@@ -1,6 +1,6 @@
 import { Injectable, inject } from "@angular/core";
 import { HttpClient, HttpErrorResponse, HttpParams } from "@angular/common/http";
-import { catchError, firstValueFrom, map, throwError, type Observable } from "rxjs";
+import { catchError, firstValueFrom, map, Observable, throwError, timeout, TimeoutError } from "rxjs";
 import type { ApiError } from "../models";
 import { retryAfterSeconds } from "./retry-after";
 
@@ -8,6 +8,22 @@ const CSRF_COOKIES = ["__Host-uvh_csrf", "uvh_csrf"] as const;
 
 /** Runtime contract applied before an HTTP value reaches application state. */
 export type ApiDecoder<T> = (value: unknown) => T;
+
+export interface ApiReadOptions {
+  /** Abort only idempotent reads whose view/context is no longer current. */
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+const READ_TIMEOUT_MS = 20_000;
+const MUTATION_TIMEOUT_MS = 45_000;
+const ARTIFACT_TIMEOUT_MS = 120_000;
+
+/** Keep promise and observable reads under the same finite timeout policy. */
+function boundedTimeout(requested: number | undefined, fallback: number): number {
+  const value = requested ?? fallback;
+  return Number.isFinite(value) ? Math.max(1_000, Math.min(ARTIFACT_TIMEOUT_MS, value)) : fallback;
+}
 
 export class ApiRequestError extends Error {
   status: number;
@@ -102,14 +118,45 @@ export class ApiService {
     }
   }
 
-  private request<T>(source: Observable<T>, decoder?: ApiDecoder<T>): Promise<T> {
-    return firstValueFrom(source).then((value) => this.decodeResponse(value, decoder)).catch((err: unknown) => {
+  private request<T>(
+    source: Observable<T>,
+    decoder?: ApiDecoder<T>,
+    policy: "read" | "mutation" = "read",
+    options?: ApiReadOptions,
+  ): Promise<T> {
+    const defaultTimeout = policy === "read" ? READ_TIMEOUT_MS : MUTATION_TIMEOUT_MS;
+    const timeoutMs = boundedTimeout(options?.timeoutMs, defaultTimeout);
+    const cancellable = options?.signal ? this.cancelOnAbort(source, options.signal) : source;
+    return firstValueFrom(cancellable.pipe(timeout({ first: timeoutMs })))
+      .then((value) => this.decodeResponse(value, decoder)).catch((err: unknown) => {
+      if (err instanceof TimeoutError) {
+        const message = policy === "mutation"
+          ? "No se pudo confirmar el resultado a tiempo. Comprueba el estado antes de reintentar."
+          : "La lectura tardó demasiado. Comprueba tu conexión e inténtalo de nuevo.";
+        throw new ApiRequestError(message, 0, { reason: "timeout" });
+      }
       throw err instanceof HttpErrorResponse ? this.errorOf(err) : err;
     });
   }
 
+  private cancelOnAbort<T>(source: Observable<T>, signal: AbortSignal): Observable<T> {
+    return new Observable<T>((subscriber) => {
+      if (signal.aborted) {
+        subscriber.error(new ApiRequestError("Lectura cancelada", 0, { reason: "cancelled" }));
+        return;
+      }
+      const abort = () => subscriber.error(new ApiRequestError("Lectura cancelada", 0, { reason: "cancelled" }));
+      signal.addEventListener("abort", abort, { once: true });
+      const subscription = source.subscribe(subscriber);
+      return () => {
+        signal.removeEventListener("abort", abort);
+        subscription.unsubscribe();
+      };
+    });
+  }
+
   /** GET (safe — no CSRF header required). */
-  get<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>, decoder?: ApiDecoder<T>): Promise<T> {
+  get<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>, decoder?: ApiDecoder<T>, options?: ApiReadOptions): Promise<T> {
     this.assertApiPath(path);
     let hp = new HttpParams();
     if (params) {
@@ -117,14 +164,14 @@ export class ApiService {
         if (v != null && v !== "") hp = hp.set(k, String(v));
       }
     }
-    return this.request(this.http.get<T>(path, { headers: this.headers(false), params: hp }), decoder);
+    return this.request(this.http.get<T>(path, { headers: this.headers(false), params: hp }), decoder, "read", options);
   }
 
   /** POST (mutation — requires CSRF). */
   async post<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
     await this.ensureCsrf();
-    return this.request(this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
+    return this.request(this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }), decoder, "mutation");
   }
 
   /** POST returning a private binary artifact while preserving JSON errors. */
@@ -135,7 +182,7 @@ export class ApiService {
       return await firstValueFrom(this.http.post(path, body ?? {}, {
         headers: this.headers(true),
         responseType: "blob",
-      }));
+      }).pipe(timeout({ first: ARTIFACT_TIMEOUT_MS })));
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.error instanceof Blob) {
         try {
@@ -150,6 +197,9 @@ export class ApiService {
           if (parsedError instanceof ApiRequestError) throw parsedError;
         }
       }
+      if (error instanceof TimeoutError) {
+        throw new ApiRequestError("La descarga no respondió a tiempo. Comprueba su estado antes de solicitar otra.", 0, { reason: "timeout" });
+      }
       throw error instanceof HttpErrorResponse ? this.errorOf(error) : error;
     }
   }
@@ -158,18 +208,18 @@ export class ApiService {
   async patch<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
     await this.ensureCsrf();
-    return this.request(this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
+    return this.request(this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }), decoder, "mutation");
   }
 
   /** DELETE (mutation — requires CSRF). */
   async delete<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
     await this.ensureCsrf();
-    return this.request(this.http.delete<T>(path, { headers: this.headers(true), body }), decoder);
+    return this.request(this.http.delete<T>(path, { headers: this.headers(true), body }), decoder, "mutation");
   }
 
   /** Raw observable for callers that need streaming/loading states. */
-  get$<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>, decoder?: ApiDecoder<T>): Observable<T> {
+  get$<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>, decoder?: ApiDecoder<T>, options?: ApiReadOptions): Observable<T> {
     this.assertApiPath(path);
     let hp = new HttpParams();
     if (params) {
@@ -177,9 +227,15 @@ export class ApiService {
         if (v != null && v !== "") hp = hp.set(k, String(v));
       }
     }
-    return this.http.get<T>(path, { headers: this.headers(false), params: hp }).pipe(
+    const source = this.http.get<T>(path, { headers: this.headers(false), params: hp });
+    const cancellable = options?.signal ? this.cancelOnAbort(source, options.signal) : source;
+    const timeoutMs = boundedTimeout(options?.timeoutMs, READ_TIMEOUT_MS);
+    return cancellable.pipe(
+      timeout({ first: timeoutMs }),
       map((value) => this.decodeResponse(value, decoder)),
-      catchError((err: unknown) => throwError(() => err instanceof HttpErrorResponse ? this.errorOf(err) : err)),
+      catchError((err: unknown) => throwError(() => err instanceof TimeoutError
+        ? new ApiRequestError("La lectura tardó demasiado. Comprueba tu conexión e inténtalo de nuevo.", 0, { reason: "timeout" })
+        : err instanceof HttpErrorResponse ? this.errorOf(err) : err)),
     );
   }
 }

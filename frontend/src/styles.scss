@@ -1,4 +1,5 @@
 @use "@angular/material" as mat;
+@use "./app/core/identity-tokens" as identity;
 @import "@fontsource/manrope/latin-400.css";
 @import "@fontsource/manrope/latin-500.css";
 @import "@fontsource/manrope/latin-600.css";
@@ -6,126 +7,94 @@
 @import "@fontsource/manrope/latin-800.css";
 @import "material-icons/iconfont/filled.css";
 
-// ============================================================
-// UVH design system
-// Seeds: #07111F ink · #F6F8FC surface · #2457F5 electric · #00A99D teal
-// ============================================================
-
-// ---------- Brand tokens (light) ----------
-:root {
-  color-scheme: light;
-  --uvh-ink: #07111f;
-  --uvh-surface: #f6f8fc;
-  --uvh-canvas: #eef3f9;
-  --uvh-surface-raised: #ffffff;
-  --uvh-electric: #2457f5;
-  --uvh-electric-strong: #1a43c4;
-  --uvh-teal: #00a99d;
-  --uvh-teal-strong: #00897b;
-  --uvh-border: #e3e8f0;
-  --uvh-border-strong: #cdd6e3;
-  --uvh-muted: #5b6b84;
-  --uvh-muted-soft: #8a98ad;
-  --uvh-radius: 14px;
-  --uvh-radius-lg: 20px;
-  --uvh-shadow-sm: 0 1px 2px rgba(7, 17, 31, 0.05), 0 2px 8px rgba(7, 17, 31, 0.05);
-  --uvh-shadow-md: 0 4px 14px rgba(7, 17, 31, 0.08), 0 12px 32px rgba(7, 17, 31, 0.07);
-  --uvh-shadow-lg: 0 24px 70px rgba(7, 17, 31, 0.12);
-  --uvh-danger: #c62828;
-  --uvh-danger-soft: rgba(198, 40, 40, 0.08);
-  --uvh-success: #0f9d6e;
-  --uvh-success-soft: rgba(15, 157, 110, 0.1);
-  --uvh-warn: #b26a00;
-  --uvh-warn-soft: rgba(178, 106, 0, 0.1);
-}
-
-// ---------- Dark tokens ----------
-html.dark {
-  color-scheme: dark;
-  --uvh-ink: #eef2f9;
-  --uvh-surface: #0b1424;
-  --uvh-canvas: #08101d;
-  --uvh-surface-raised: #101a2b;
-  --uvh-electric: #6c8cff;
-  --uvh-electric-strong: #4a6cf5;
-  --uvh-teal: #38c9bc;
-  --uvh-teal-strong: #2bb3a7;
-  --uvh-border: #1d2a40;
-  --uvh-border-strong: #2a3a55;
-  --uvh-muted: #93a1b8;
-  --uvh-muted-soft: #74839c;
-  --uvh-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --uvh-shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
-  --uvh-shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.5);
-  --uvh-danger: #ff8a80;
-  --uvh-danger-soft: rgba(255, 138, 128, 0.1);
-  --uvh-success: #5cd6ab;
-  --uvh-success-soft: rgba(92, 214, 171, 0.12);
-  --uvh-warn: #ffc46b;
-  --uvh-warn-soft: rgba(255, 196, 107, 0.12);
-}
-
-// ---------- Material 3 theme ----------
-// Blue/cyan structure + brand overrides so every mat-* component carries the
-// UVH palette (light and dark via light-dark()).
-$uvh-theme: mat.define-theme((
-  color: (
-    theme-type: light,
-    primary: mat.$blue-palette,
-    tertiary: mat.$cyan-palette,
-  ),
-  typography: (
-    plain-family: "Manrope",
-    brand-family: "Manrope",
-  ),
-));
-
-$uvh-dark-theme: mat.define-theme((
-  color: (
-    theme-type: dark,
-    primary: mat.$blue-palette,
-    tertiary: mat.$cyan-palette,
-  ),
-  typography: (
-    plain-family: "Manrope",
-    brand-family: "Manrope",
-  ),
-));
-
-html {
-  @include mat.all-component-themes($uvh-theme);
-  @include mat.typography-hierarchy($uvh-theme);
-  @include mat.strong-focus-indicators((border-width: 2px, border-radius: 6px));
-
-  // Brand palette → system tokens (light-dark aware)
-  @include mat.theme-overrides((
-    primary: light-dark(#2457f5, #6c8cff),
-    on-primary: light-dark(#ffffff, #07111f),
-    primary-container: light-dark(#dde5ff, #24366b),
-    on-primary-container: light-dark(#10224f, #dde5ff),
-    tertiary: light-dark(#00a99d, #38c9bc),
-    on-tertiary: light-dark(#ffffff, #04302c),
-    tertiary-container: light-dark(#c9f2ec, #0d4d47),
-    on-tertiary-container: light-dark(#003b36, #c9f2ec),
-    error-container: light-dark(#ffdad6, #8c1d18),
-    on-error-container: light-dark(#410002, #ffdad6),
-    surface: light-dark(#f6f8fc, #0b1424),
-    surface-dim: light-dark(#dde3ee, #050c18),
-    surface-bright: light-dark(#f6f8fc, #101a2b),
-    surface-container-lowest: light-dark(#ffffff, #0b1424),
-    surface-container-low: light-dark(#f0f4fa, #0f1929),
-    surface-container: light-dark(#e9eef6, #142033),
-    surface-container-high: light-dark(#e3e9f2, #1e2b40),
-    surface-container-highest: light-dark(#dde3ee, #29364d),
-    on-surface: light-dark(#07111f, #eef2f9),
-    on-surface-variant: light-dark(#45566e, #c2ccdc),
-    outline-variant: light-dark(#e3e8f0, #1d2a40),
-    outline: light-dark(#7d8ba0, #93a1b8),
+// Select panels are rendered in CDK's body-level overlay, outside the public
+// shell. This opt-in class preserves that palette without restyling the app.
+.uvh-public-select-panel {
+  @include mat.select-overrides((panel-background-color: light-dark(#fffcf5, #2c3028)));
+  @include mat.option-overrides((
+    label-text-color: light-dark(#262821, #f4f0e4),
+    selected-state-label-text-color: light-dark(#c44324, #f79573),
+    selected-state-layer-color: light-dark(#eae7dd, #30352b),
+    hover-state-layer-color: light-dark(#eae7dd, #30352b),
+    focus-state-layer-color: light-dark(#e5e8dc, #3d4436),
+    label-text-size: 14px,
   ));
 }
 
+// Editorial identity: warm paper, olive ink and vermilion accents.
+:root { @include identity.light; @include identity.aliases; }
+html.dark { @include identity.dark; }
+
+// Components reference system variables, not baked-in palette colors. This
+// keeps dialogs, menus, selects and date pickers coherent outside route hosts.
+$uvh-theme: mat.define-theme((
+  color: (theme-type: light, primary: mat.$orange-palette, tertiary: mat.$green-palette, use-system-variables: true),
+  typography: (plain-family: "Manrope", brand-family: "Manrope"),
+));
+$uvh-dark-theme: mat.define-theme((
+  color: (theme-type: dark, primary: mat.$orange-palette, tertiary: mat.$green-palette, use-system-variables: true),
+  typography: (plain-family: "Manrope", brand-family: "Manrope"),
+));
+html {
+  @include mat.all-component-themes($uvh-theme);
+  @include mat.system-level-colors($uvh-theme);
+  @include mat.strong-focus-indicators((border-width: 2px, border-radius: 3px));
+}
+// Keep generated typography at its normal specificity: nesting it under html
+// otherwise overrides simple component h2 styles with the display-size default.
+@include mat.typography-hierarchy($uvh-theme);
+.mat-typography h2, .mat-typography h3, .mat-typography h4 { line-height: 1.3; }
 html.dark {
   @include mat.all-component-colors($uvh-dark-theme);
+  @include mat.system-level-colors($uvh-dark-theme);
+}
+// Both selectors deliberately follow generated dark tokens at equal/higher
+// specificity; otherwise switching themes would restore seed palette colors.
+html, html.dark {
+  @include mat.theme-overrides((
+    primary: var(--accent), on-primary: var(--accent-ink),
+    primary-container: light-dark(#f8dfd0, #553329),
+    on-primary-container: light-dark(#652d1a, #ffdbcb),
+    secondary: var(--uvh-teal), on-secondary: var(--paper),
+    secondary-container: light-dark(#e1e7d8, #3c4934),
+    on-secondary-container: var(--ink),
+    tertiary: var(--uvh-teal), on-tertiary: var(--paper),
+    tertiary-container: var(--guide), on-tertiary-container: var(--ink),
+    error: var(--uvh-danger), on-error: light-dark(#ffffff, #421617),
+    error-container: var(--uvh-danger-soft), on-error-container: var(--uvh-danger),
+    surface: var(--paper), surface-dim: var(--soft), surface-bright: var(--paper-raised),
+    surface-container-lowest: var(--paper-raised), surface-container-low: var(--paper-raised),
+    surface-container: var(--soft), surface-container-high: var(--soft),
+    surface-container-highest: var(--guide),
+    on-surface: var(--ink), on-surface-variant: var(--muted),
+    outline: var(--muted), outline-variant: var(--line),
+    inverse-surface: var(--ink), inverse-on-surface: var(--paper),
+    inverse-primary: light-dark(#f79573, #c44324),
+    surface-tint: var(--accent),
+  ));
+  @include mat.button-overrides((
+    filled-container-shape: 4px, outlined-container-shape: 4px,
+    protected-container-shape: 4px, text-container-shape: 4px,
+  ));
+}
+
+// View-transition snapshots live outside component encapsulation. These rules
+// are active only while a public-page theme control owns a native transition.
+html.landing-theme-transition::view-transition-old(root),
+html.landing-theme-transition::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+html.landing-theme-transition::view-transition-old(root) { animation: none; }
+html.landing-theme-transition::view-transition-new(root) {
+  animation: landing-theme-reveal 560ms cubic-bezier(.22, .8, .25, 1) both;
+}
+html.landing-theme-transition * { transition: none !important; }
+@keyframes landing-theme-reveal {
+  from { clip-path: circle(0 at var(--landing-theme-x) var(--landing-theme-y)); }
+  to { clip-path: circle(var(--landing-theme-radius) at var(--landing-theme-x) var(--landing-theme-y)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.landing-theme-transition::view-transition-new(root) { animation: none; }
 }
 
 // ---------- Base ----------
@@ -189,15 +158,15 @@ a {
 
 .mat-mdc-dialog-container .mat-mdc-dialog-surface {
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--uvh-electric) 12%, var(--uvh-border));
-  border-radius: 20px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 8px;
   background: var(--uvh-surface-raised);
-  box-shadow: 0 30px 90px rgba(3, 10, 22, .28), 0 3px 12px rgba(3, 10, 22, .12);
+  box-shadow: var(--uvh-shadow-lg);
 }
 
 .mat-mdc-dialog-container .mat-mdc-dialog-title {
   border-bottom: 1px solid var(--uvh-border);
-  background: linear-gradient(110deg, color-mix(in srgb, var(--uvh-electric) 5%, var(--uvh-surface-raised)), var(--uvh-surface-raised));
+  background: var(--uvh-surface-raised);
 }
 
 .mat-mdc-dialog-container .mat-mdc-dialog-actions {
@@ -209,10 +178,15 @@ a {
 
 .mat-mdc-menu-panel {
   border: 1px solid var(--uvh-border);
-  border-radius: 13px !important;
+  border-radius: 6px !important;
   background: var(--uvh-surface-raised);
   box-shadow: var(--uvh-shadow-md);
 }
+
+// The mobile trigger is deliberately compact; its overlay must still expose
+// complete workspace names instead of two indistinguishable ellipses.
+.uvh-workspace-options .mat-mdc-option { min-height: 48px; padding-block: 10px; }
+.uvh-workspace-options .mdc-list-item__primary-text { white-space: normal; overflow-wrap: anywhere; }
 
 app-panel .side .mat-drawer-inner-container {
   display: flex;
@@ -329,9 +303,6 @@ html .mat-typography .mat-body-small {
   border-radius: var(--uvh-radius);
   box-shadow: var(--uvh-shadow-sm);
 
-  html.dark & {
-    background: var(--uvh-surface-raised, var(--mat-sys-surface-container-lowest, #0b1424));
-  }
 }
 
 .card-block {
@@ -458,7 +429,7 @@ html .mat-typography .mat-body-small {
 
 .main .mat-mdc-outlined-button,
 .main .mat-mdc-unelevated-button {
-  border-radius: 10px;
+  border-radius: 4px;
   font-weight: 800;
 }
 
@@ -470,7 +441,7 @@ html .mat-typography .mat-body-small {
 }
 
 .main .mat-mdc-form-field {
-  --mdc-outlined-text-field-container-shape: 12px;
+  --mat-form-field-outlined-container-shape: 4px;
 }
 
 .main mat-progress-bar {

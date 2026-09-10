@@ -102,7 +102,7 @@ export class ForgotPasswordComponent {
     this.captchaConfigBusy.set(true);
     this.captchaConfigError.set(null);
     try {
-      const config = await this.api.get<PublicAuthConfig>("/api/v1/config", undefined, decodePublicConfig);
+      const config = await this.api.get<PublicAuthConfig>("/api/v1/config", undefined, decodePublicConfig, { signal: request.signal });
       if (!this.configRequests.isCurrent(request, null)) return;
       const siteKey = config.hcaptcha?.enabled ? config.hcaptcha.siteKey : null;
       if (!siteKey || !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey)) throw new Error("hCaptcha no está configurado");

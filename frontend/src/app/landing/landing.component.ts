@@ -1,14 +1,14 @@
 import { DOCUMENT } from "@angular/common";
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, ViewChild, afterNextRender, computed, inject, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import { FormsModule } from "@angular/forms";
-import { MatButtonModule } from "@angular/material/button";
-import { MatExpansionModule } from "@angular/material/expansion";
 import { MatIconModule } from "@angular/material/icon";
+import { MatRippleModule } from "@angular/material/core";
+import { MatExpansionModule } from "@angular/material/expansion";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { decodePublicConfig } from "../core/services/public-response-decoders";
-import { ThemeToggleComponent } from "../core/theme-toggle.component";
+import { PublicThemeToggleComponent } from "../core/public-theme-toggle.component";
 
 type ProductViewId = "publish" | "route" | "measure";
 
@@ -19,6 +19,10 @@ interface ProductView {
   title: string;
   description: string;
   bullets: string[];
+  alias: string;
+  before: string;
+  after: string;
+  note: string;
 }
 
 @Component({
@@ -27,10 +31,10 @@ interface ProductView {
   imports: [
     RouterLink,
     FormsModule,
-    MatButtonModule,
-    MatExpansionModule,
     MatIconModule,
-    ThemeToggleComponent,
+    MatRippleModule,
+    PublicThemeToggleComponent,
+    MatExpansionModule,
   ],
   templateUrl: "./landing.component.html",
   styleUrl: "./landing.component.scss",
@@ -41,6 +45,7 @@ export class LandingComponent {
   private readonly intents = inject(PendingLinkIntentService);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   @ViewChild("menuButton") private menuButton?: ElementRef<HTMLButtonElement>;
 
@@ -50,6 +55,10 @@ export class LandingComponent {
   readonly submitting = signal(false);
   readonly mobileOpen = signal(false);
   readonly scrolled = signal(false);
+  readonly pageProgress = signal(0);
+  // The illustration is a local demonstration, never a published link or a
+  // reserved alias. Switching it does not send the visitor's URL anywhere.
+  readonly destinationChanged = signal(false);
   readonly year = new Date().getFullYear();
   readonly destinationPreview = computed(() => this.previewDestination(this.demoUrl()));
   readonly destinationReady = computed(() => this.destinationPreview()?.valid === true);
@@ -60,72 +69,72 @@ export class LandingComponent {
   readonly productViews: ProductView[] = [
     {
       id: "publish",
-      label: "Crear",
+      label: "Una carta impresa",
       icon: "add_link",
-      title: "Publica con una configuración preparada para cambiar.",
-      description: "El enlace nace dentro de tu workspace con el alias, dominio y ciclo de vida que necesita; no como una URL desechable.",
-      bullets: ["Alias y dominio personalizado", "UTM, etiquetas y notas", "Programación, caducidad y límite de clics"],
+      title: "Cambian los platos. Las mesas siguen puestas.",
+      description: "Has impreso la dirección de tu carta en cada mesa. Cuando llegue la nueva temporada, cambia el destino en UVH y conserva el enlace que tus clientes ya tienen.",
+      bullets: ["Elige un alias que puedas leer en voz alta: /carta.", "Publica el enlace y úsalo en tus materiales.", "Actualiza el destino cuando cambie el menú."],
+      alias: "go.turestaurante.es/carta",
+      before: "/carta-verano.pdf",
+      after: "/carta-otono.pdf",
+      note: "Misma dirección impresa. Nueva carta al abrirla.",
     },
     {
       id: "route",
-      label: "Dirigir",
+      label: "Un evento bilingüe",
       icon: "route",
-      title: "Decide el destino en el momento de cada redirección.",
-      description: "Ordena reglas por prioridad y conserva un destino principal como fallback cuando ninguna condición coincide.",
-      bullets: ["País, idioma y dispositivo", "Sistema, horario y referente", "Campaña y destino alternativo"],
+      title: "Un cartel. Cada lector, a su programa.",
+      description: "Comparte una sola dirección para el evento. Una regla de idioma puede llevar al programa en español; el destino principal atiende a quienes no coincidan con esa regla.",
+      bullets: ["Define el programa general como destino principal.", "Añade una regla para el idioma español.", "Ordena las reglas: se aplica la primera que coincida."],
+      alias: "go.tuevento.es/programa",
+      before: "/programme",
+      after: "/es/programa",
+      note: "Idioma es → programa en español. Sin coincidencia → programa general.",
     },
     {
       id: "measure",
-      label: "Medir",
+      label: "Una newsletter",
       icon: "query_stats",
-      title: "Lee la actividad desde el mismo lugar donde operas el enlace.",
-      description: "Cambia el periodo y recorre la serie temporal, los enlaces destacados y las dimensiones que ya entrega la API.",
-      bullets: ["Clics y visitantes únicos", "Países, dispositivos y navegadores", "Referentes, campañas y sistemas"],
+      title: "Después de enviar, aún queda trabajo.",
+      description: "Prepara un enlace para tu boletín y consulta sus clics por periodo. Si la página de destino se mueve, puedes corregirla sin reenviar el correo a toda la lista.",
+      bullets: ["Usa un enlace específico para cada envío.", "Consulta cuándo recibe clics y desde qué dispositivos.", "Corrige el destino si cambia la página de la campaña."],
+      alias: "uvh.es/edicion-septiembre",
+      before: "/novedades-septiembre",
+      after: "/coleccion/septiembre",
+      note: "El correo ya está enviado. El destino sigue siendo editable.",
     },
   ];
 
-  readonly capabilities = [
-    { icon: "link", number: "01", title: "Crear", text: "Destino, alias, dominio, UTM y etiquetas en una sola configuración." },
-    { icon: "alt_route", number: "02", title: "Dirigir", text: "Reglas priorizadas y fallback para adaptar el recorrido de cada clic." },
-    { icon: "shield_lock", number: "03", title: "Proteger", text: "Contraseña, un solo uso, límites, calendario y estados operativos." },
-    { icon: "monitoring", number: "04", title: "Medir", text: "Serie temporal y procedencia sin separar analítica y operación." },
-  ];
-
   readonly operations = [
-    { icon: "language", title: "Dominios propios", text: "Verificación DNS, activación y control del estado desde el workspace." },
-    { icon: "groups", title: "Equipo y roles", text: "Owner, admin, editor y viewer con permisos coherentes en cada acción." },
-    { icon: "key", title: "API tokens", text: "Scopes de lectura y escritura, caducidad y revocación explícita." },
-    { icon: "webhook", title: "Webhooks", text: "Eventos firmados, historial de entregas, reintentos y reenvío manual." },
+    { icon: "language", guide: "domains", title: "Dominios propios", text: "Comparte go.tumarca.es en lugar de una dirección ajena. Requiere un subdominio con CNAME directo, verificación DNS y activación TLS." },
+    { icon: "key", guide: "api", title: "API tokens", text: "Crea enlaces desde tus propias herramientas. Limita los permisos de cada token, define su caducidad y revócalo cuando deje de hacer falta." },
+    { icon: "webhook", guide: "webhooks", title: "Webhooks", text: "Recibe eventos en tu sistema y revisa el historial de entregas. Las firmas y los reintentos te ayudan a comprobar qué has recibido." },
   ];
 
   readonly faqs = [
     {
-      q: "¿Qué pasa cuando pego una URL?",
-      a: "La guardamos de forma temporal durante 24 horas. Si necesitas crear una cuenta o iniciar sesión, la recuperaremos para abrir el formulario de creación ya rellenado.",
+      q: "¿Pegar una URL publica el enlace?",
+      a: "No. Primero preparas el destino. Para guardar el enlace necesitas una cuenta y verificar tu email. Conservamos la URL durante 24 horas para que puedas retomar el formulario después de entrar.",
     },
     {
-      q: "¿La URL aparece en la dirección del navegador?",
-      a: "No. UVH usa un token temporal opaco entre la página pública y el panel. El destino sólo se recupera cuando tienes una sesión verificada.",
+      q: "¿Qué puedo cambiar después de compartirlo?",
+      a: "Puedes editar el destino, las reglas y los límites, o pausar el enlace. Para conservar la dirección que ya has compartido, mantén el mismo alias y dominio. Necesitas un rol con permiso de edición.",
     },
     {
-      q: "¿Cómo se resuelven los enlaces?",
-      a: "Cada enlace responde con una redirección HTTP real desde el backend. No hay scripts intermedios entre quien hace clic y el destino.",
+      q: "¿Una contraseña en el enlace protege también el archivo?",
+      a: "Protege el paso por UVH, no el acceso directo al destino. Quien conozca la URL final podría abrirla sin pasar por el enlace corto. Para contenido privado, configura también permisos en el servicio donde lo alojas.",
     },
     {
       q: "¿Puedo usar mi propio dominio?",
-      a: "Sí. Puedes conectar dominios personalizados y verificarlos mediante DNS para que cada enlace salga con tu propia marca.",
+      a: "Sí, con un subdominio como go.tumarca.es. Necesitas acceso a su DNS para configurar el CNAME directo y la verificación de propiedad. El panel muestra el estado de DNS y TLS antes de activarlo.",
     },
     {
-      q: "¿Puedo cambiar el destino después de publicar?",
-      a: "Sí. El enlace mantiene su alias mientras actualizas el destino, las reglas, los límites o su estado desde el panel, siempre que tu rol tenga permiso de edición.",
+      q: "¿Los clics equivalen a personas?",
+      a: "No. Una persona puede abrir un enlace varias veces y también pueden acceder sistemas automáticos. Los pseudónimos de visitante rotan diariamente: no son una cifra de personas únicas entre varios días. UVH tampoco confirma una compra o una conversión en la web de destino.",
     },
     {
-      q: "¿Qué puede medir UVH?",
-      a: "El panel trabaja con clics, visitantes, serie temporal, enlaces destacados, países, dispositivos, navegadores, sistemas, referentes y campañas para el periodo seleccionado.",
-    },
-    {
-      q: "¿Necesito una cuenta para empezar?",
-      a: "Puedes pegar y comprobar una URL sin cuenta. Para guardar el enlace tendrás que entrar o registrarte; después retomaremos el borrador donde lo dejaste.",
+      q: "¿Qué ocurre cuando caduca o alcanza su límite?",
+      a: "El enlace deja de llevar al destino habitual. Puedes configurar un destino alternativo para los casos admitidos, como caducidad o límite de clics. Revisa esa configuración antes de publicar una promoción con fecha de fin.",
     },
   ];
 
@@ -135,17 +144,51 @@ export class LandingComponent {
       .get<{ appUrl: string }>("/api/v1/config", undefined, decodePublicConfig)
       .then((config) => this.appUrl.set(this.resolveAppUrl(config.appUrl)))
       .catch(() => undefined);
-    this.destroyRef.onDestroy(() => this.document.body.classList.remove("uvh-menu-open"));
+    afterNextRender(() => this.installRevealObserver());
+    this.destroyRef.onDestroy(() => {
+      this.document.body.classList.remove("uvh-menu-open");
+    });
   }
 
   @HostListener("window:scroll")
   onWindowScroll(): void {
-    this.scrolled.set((this.document.defaultView?.scrollY ?? 0) > 18);
+    const view = this.document.defaultView;
+    const offset = view?.scrollY ?? 0;
+    const travel = this.document.documentElement.scrollHeight - (view?.innerHeight ?? 0);
+    this.scrolled.set(offset > 18);
+    this.pageProgress.set(travel > 0 ? Math.min(1, Math.max(0, offset / travel)) : 0);
   }
 
   @HostListener("window:resize")
   onWindowResize(): void {
     if ((this.document.defaultView?.innerWidth ?? 0) > 940 && this.mobileOpen()) this.closeMobileMenu();
+    this.onWindowScroll();
+  }
+
+  /** Observe once and disconnect on teardown. The observer adds motion only;
+   * it never owns content visibility, even in a throttled background tab.
+   */
+  private installRevealObserver(): void {
+    const view = this.document.defaultView;
+    if (!view || typeof IntersectionObserver === "undefined"
+      || (typeof view.matchMedia === "function" && view.matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.remove("reveal-pending");
+        entry.target.classList.add("reveal-enter");
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: 0.08 });
+    const elements = this.host.nativeElement.querySelectorAll<HTMLElement>(".section-heading, .case-study, .guide-heading, .guide-notes article, .team-intro, .workspace-sheet, .operations-list article, .faq-intro, .faq-list, .closing-inner");
+    elements.forEach((element) => {
+      if (element.getBoundingClientRect().top > view.innerHeight) {
+        element.classList.add("scroll-reveal", "reveal-pending");
+        observer.observe(element);
+      }
+    });
+    this.destroyRef.onDestroy(() => observer.disconnect());
+    this.onWindowScroll();
   }
 
   @HostListener("document:keydown.escape")
@@ -187,6 +230,7 @@ export class LandingComponent {
   }
 
   async submitDemo(): Promise<void> {
+    if (this.submitting()) return;
     const destination = this.demoUrl().trim();
     if (!this.validDestination(destination)) return;
 
@@ -212,7 +256,10 @@ export class LandingComponent {
     this.document.defaultView?.requestAnimationFrame(() => {
       const input = this.document.getElementById("hero-url") as HTMLInputElement | null;
       input?.focus({ preventScroll: true });
-      input?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const view = this.document.defaultView;
+      const reducedMotion = typeof view?.matchMedia === "function"
+        && view.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      input?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
     });
   }
 

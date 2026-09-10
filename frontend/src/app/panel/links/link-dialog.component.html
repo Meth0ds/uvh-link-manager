@@ -139,7 +139,7 @@
                   </div>
                   <div class="rule-grid">
                     <mat-form-field appearance="outline"><mat-label>País (ISO)</mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2" />@if (rule.controls.country.invalid) { <mat-error>Usa un código ISO de dos letras.</mat-error> }</mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es" maxlength="8" />@if (rule.controls.language.invalid) { <mat-error>Usa letras, números o guiones.</mat-error> }</mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es o es-ES" maxlength="8" />@if (rule.controls.language.invalid) { <mat-error>Usa un idioma (es) o una variante regional (es-ES).</mat-error> }</mat-form-field>
                     <mat-form-field appearance="outline">
                       <mat-label>Dispositivo</mat-label>
                       <mat-select formControlName="device">

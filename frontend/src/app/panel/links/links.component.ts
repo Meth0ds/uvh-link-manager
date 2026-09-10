@@ -124,6 +124,9 @@ export class LinksComponent {
       // synchronously instead of waiting for the next HTTP response.
       this.links.set([]);
       this.total.set(0);
+      // Pagination is scoped to a workspace. Reusing a high page from the
+      // previous tenant can make a populated smaller workspace appear empty.
+      this.page.set(0);
       this.error.set(null);
       this.actionId.set(null);
       this.pendingAutoHandled = false;
@@ -157,7 +160,7 @@ export class LinksComponent {
         sort: this.sort(),
         page,
         perPage,
-      }, (value) => decodeLinksResponse(value, { page, perPage }));
+      }, (value) => decodeLinksResponse(value, { page, perPage }), { signal: request.signal });
       if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.links.set(res.links);
       this.total.set(res.total);

@@ -1,175 +1,98 @@
 <div class="landing-shell" [class.menu-is-open]="mobileOpen()">
-  <header class="site-header" [class.scrolled]="scrolled()" [class.menu-open]="mobileOpen()">
+  <a class="skip-link" href="#crear-enlace" [attr.inert]="mobileOpen() ? '' : null">Ir al contenido</a>
+  <header class="site-header" [class.scrolled]="scrolled()" [class.menu-open]="mobileOpen()" [style.--page-progress]="pageProgress()">
     <div class="header-inner">
-      <a class="brand" routerLink="/" aria-label="UVH, inicio">
-        <span class="brand-mark" aria-hidden="true"><mat-icon>link</mat-icon></span>
-        <span class="brand-word"><b>UVH</b></span>
-      </a>
-
-      <nav class="desktop-nav" aria-label="Navegación principal">
-        <a href="#producto">Producto</a>
-        <a href="#control">Control</a>
-        <a href="#operacion">Operación</a>
-        <a href="#faq">Preguntas</a>
-      </nav>
-
+      <a class="brand" routerLink="/" aria-label="UVH, inicio" (click)="closeMobileMenu()"><span class="brand-word">uvh<span class="brand-dot">.</span></span><span class="brand-caption">Enlaces con recorrido.</span></a>
+      <nav class="desktop-nav" aria-label="Navegación principal"><a href="#producto">En la práctica</a><a href="#control">Antes de publicar</a><a href="#operacion">Para equipos</a></nav>
       <div class="header-actions">
-        <app-theme-toggle class="header-theme" [compact]="true" />
-        <a class="login-link" [href]="loginHref()">Entrar</a>
-        <button class="button button-primary header-cta" type="button" (click)="focusHero()">
-          Crear enlace <mat-icon aria-hidden="true">arrow_outward</mat-icon>
-        </button>
-        <button
-          #menuButton
-          class="menu-trigger"
-          type="button"
-          aria-controls="mobile-navigation"
-          [attr.aria-expanded]="mobileOpen()"
-          [attr.aria-label]="mobileOpen() ? 'Cerrar navegación' : 'Abrir navegación'"
-          (click)="toggleMobileMenu()"
-        >
-          <span class="menu-glyph" [class.open]="mobileOpen()" aria-hidden="true"><i></i><i></i></span>
-        </button>
+        <app-public-theme-toggle class="header-theme" />
+        <a class="login-link" [href]="loginHref()">Entrar <span aria-hidden="true">↗</span></a>
+        <button matRipple class="button button-accent header-create" type="button" (click)="focusHero()">Crear enlace <span aria-hidden="true">↗</span></button>
+        <button #menuButton class="menu-trigger" type="button" aria-controls="mobile-navigation" [attr.aria-expanded]="mobileOpen()" [attr.aria-label]="mobileOpen() ? 'Cerrar navegación' : 'Abrir navegación'" (click)="toggleMobileMenu()"><span>{{ mobileOpen() ? 'Cerrar' : 'Menú' }}</span><mat-icon aria-hidden="true">{{ mobileOpen() ? 'close' : 'menu' }}</mat-icon></button>
       </div>
     </div>
   </header>
-
-  <div
-    class="mobile-menu-layer"
-    [class.open]="mobileOpen()"
-    [attr.aria-hidden]="!mobileOpen()"
-    [attr.inert]="mobileOpen() ? null : ''"
-  >
-    <div class="menu-backdrop" aria-hidden="true" (click)="closeMobileMenu(true)"></div>
+  <div class="mobile-menu-layer" [class.open]="mobileOpen()" [attr.aria-hidden]="!mobileOpen()" [attr.inert]="mobileOpen() ? null : ''">
     <nav id="mobile-navigation" class="mobile-sheet" aria-label="Navegación móvil">
-      <div class="mobile-links">
-        <a href="#producto" (click)="closeMobileMenu()"><span class="mobile-link-icon"><mat-icon aria-hidden="true">space_dashboard</mat-icon></span><span><b>Producto</b></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
-        <a href="#control" (click)="closeMobileMenu()"><span class="mobile-link-icon"><mat-icon aria-hidden="true">alt_route</mat-icon></span><span><b>Control del recorrido</b></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
-        <a href="#operacion" (click)="closeMobileMenu()"><span class="mobile-link-icon"><mat-icon aria-hidden="true">hub</mat-icon></span><span><b>Operación</b></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
-        <a href="#faq" (click)="closeMobileMenu()"><span class="mobile-link-icon"><mat-icon aria-hidden="true">help_outline</mat-icon></span><span><b>Preguntas frecuentes</b></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
-      </div>
-
-      <div class="mobile-appearance"><app-theme-toggle [showLabel]="true" /></div>
-      <div class="mobile-actions">
-        <a class="button button-secondary" [href]="loginHref()">Ya tengo cuenta</a>
-        <button class="button button-primary" type="button" (click)="focusHero()">Preparar una URL <mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
-      </div>
+      <a href="#producto" (click)="closeMobileMenu()"><span>01</span> En la práctica <span aria-hidden="true">↗</span></a>
+      <a href="#control" (click)="closeMobileMenu()"><span>02</span> Antes de publicar <span aria-hidden="true">↗</span></a>
+      <a href="#operacion" (click)="closeMobileMenu()"><span>03</span> Para equipos <span aria-hidden="true">↗</span></a>
+      <a href="#faq" (click)="closeMobileMenu()"><span>04</span> Preguntas <span aria-hidden="true">↗</span></a>
+      <app-public-theme-toggle class="mobile-theme" [showLabel]="true" />
+      <button matRipple class="button button-accent" type="button" (click)="focusHero()">Preparar un enlace <span aria-hidden="true">↗</span></button>
     </nav>
   </div>
-
-  <main>
-    <section class="hero" id="crear-enlace">
-      <div class="hero-grid" aria-hidden="true"></div>
-      <div class="hero-glow hero-glow-blue" aria-hidden="true"></div>
-      <div class="hero-glow hero-glow-teal" aria-hidden="true"></div>
-
-      <div class="hero-inner">
+  <main [attr.inert]="mobileOpen() ? '' : null">
+    <section class="hero wrap" id="crear-enlace" aria-labelledby="hero-title">
+      <div class="hero-kicker"><span class="section-label"><i class="signal-dot" aria-hidden="true"></i> Acorta. Comparte. Sigue al mando.</span><span class="edition">UVH / HERRAMIENTAS PARA LA WEB</span></div>
+      <div class="hero-layout">
         <div class="hero-copy">
-          <span class="eyebrow light"><i></i> Plataforma operativa de enlaces</span>
-          <h1>Crea el enlace.<br />Decide su recorrido.<br /><em>Entiende qué ocurre.</em></h1>
-          <p class="hero-lead">UVH convierte una URL en un recurso que tu equipo puede configurar, actualizar y medir desde un solo workspace.</p>
-
-          <form class="hero-form" (ngSubmit)="submitDemo()" novalidate>
-            <div class="hero-form-label"><label for="hero-url">Empieza por el destino</label></div>
-            <div class="hero-input-shell" [class.invalid]="demoError()" [class.valid]="destinationReady()" [class.has-value]="demoUrl().trim()">
-              <span class="input-state" aria-hidden="true"><mat-icon>{{ destinationReady() ? 'check' : 'link' }}</mat-icon></span>
-              <input id="hero-url" type="url" name="destination" inputmode="url" autocomplete="url" placeholder="https://tu-destino.com/campana" [ngModel]="demoUrl()" (ngModelChange)="onUrlChange($event)" [attr.aria-invalid]="demoError() ? true : null" [attr.aria-describedby]="demoError() ? 'hero-help hero-error' : 'hero-help'" />
-              <button class="button button-primary hero-submit" type="submit" [disabled]="submitting() || !demoUrl().trim()"><span>{{ submitting() ? 'Preparando…' : 'Preparar enlace' }}</span><mat-icon [class.spin]="submitting()" aria-hidden="true">{{ submitting() ? 'progress_activity' : 'arrow_forward' }}</mat-icon></button>
-            </div>
-            @if (demoError()) { <p class="form-error" id="hero-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon>{{ demoError() }}</p> }
-            <p class="hero-help" id="hero-help">Si necesitas registrarte o entrar, retomaremos esta URL donde la dejaste.</p>
-          </form>
+          <h1 id="hero-title">El enlace<br />ya está fuera.<br /><em>El control<br class="desktop-break" /> sigue aquí.</em></h1>
+          <p class="hero-lead">En un cartel, en un correo, en cien mesas. Comparte una dirección corta y cambia su destino cuando lo necesites.</p>
+          <button class="text-link hero-explore" type="button" (click)="focusHero()">Preparar mi enlace <span aria-hidden="true">↓</span></button>
         </div>
-
-        <aside class="hero-product" [class.ready]="destinationReady()" aria-label="Vista previa del espacio de creación">
-          <div class="product-window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="window-title">Vista previa</span><span class="window-status"><i></i>{{ destinationReady() ? 'Destino listo' : 'Esperando URL' }}</span></div>
-          <div class="product-window-body">
-            <div class="product-mini-nav" aria-hidden="true"><span class="mini-brand"><mat-icon>link</mat-icon></span><span class="active"><mat-icon>add_link</mat-icon></span><span><mat-icon>query_stats</mat-icon></span><span><mat-icon>language</mat-icon></span><span><mat-icon>settings</mat-icon></span></div>
-            <div class="product-draft">
-              <div class="draft-heading"><div><small>Nuevo enlace</small><b>Configura antes de publicar</b></div><span class="draft-step">Paso 1 de 3</span></div>
-              <div class="draft-field"><span>Destino</span><div><mat-icon aria-hidden="true">language</mat-icon><b>{{ destinationPreview()?.destination || 'tu-destino.com/campana' }}</b><mat-icon class="verified" aria-hidden="true">check_circle</mat-icon></div></div>
-              <div class="draft-result"><div><span>Enlace corto</span><small>Vista previa</small></div><p><span>uvh.es/</span><b>{{ destinationPreview()?.alias || 'mi-enlace' }}</b><mat-icon aria-hidden="true">content_copy</mat-icon></p></div>
-              <div class="draft-options"><span><mat-icon aria-hidden="true">event</mat-icon><small>Caducidad</small><b>Opcional</b></span><span><mat-icon aria-hidden="true">route</mat-icon><small>Reglas</small><b>Preparadas</b></span><span><mat-icon aria-hidden="true">monitoring</mat-icon><small>Analítica</small><b>Activa</b></span></div>
-              <div class="draft-next"><span><mat-icon aria-hidden="true">bookmark_added</mat-icon>{{ destinationReady() ? 'Borrador listo' : 'Pega una URL para empezar' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon></div>
-            </div>
+        <!-- This paper label is an interactive explanation, not a dashboard
+             screenshot or a published URL. All changes stay in this browser. -->
+        <figure class="route-poster" [class.destination-changed]="destinationChanged()">
+          <div class="poster-top"><span>UNA DIRECCIÓN.<br />MÁS DE UNA ETAPA.</span><span class="poster-symbol" aria-hidden="true">↗</span></div>
+          <div class="link-ticket">
+            <div class="ticket-meta"><span>EL ENLACE QUE COMPARTES</span><mat-icon aria-hidden="true">link</mat-icon></div>
+            <strong>uvh.es/<span>la-carta</span></strong>
+            <div class="ticket-bottom"><span>Este se queda.</span><span class="ticket-bars" aria-hidden="true"></span></div>
           </div>
-        </aside>
+          <div class="poster-route" aria-hidden="true"><svg viewBox="0 0 360 96" fill="none"><path d="M54 0V36Q54 58 76 58H276Q304 58 304 82V91" stroke="currentColor" stroke-width="2"/><path d="m296 82 8 9 8-9" stroke="currentColor" stroke-width="2"/></svg><span>TÚ ELIGES DÓNDE ACABA</span></div>
+          <div class="destination-ticket" aria-live="polite" aria-atomic="true"><span class="destination-label">{{ destinationChanged() ? 'NUEVO DESTINO' : 'DESTINO ACTUAL' }}</span><strong>{{ destinationChanged() ? 'restaurante.example/carta-otono' : 'restaurante.example/carta-verano' }}</strong><span class="destination-state"><i aria-hidden="true"></i>{{ destinationChanged() ? 'Destino actualizado. Mismo enlace.' : 'Listo para cambiar cuando lo necesites.' }}</span></div>
+          <button matRipple class="poster-action" type="button" (click)="destinationChanged.set(!destinationChanged())" [attr.aria-pressed]="destinationChanged()"><span>{{ destinationChanged() ? 'Volver al ejemplo inicial' : 'Prueba: cambia el destino' }}</span><span aria-hidden="true">↗</span></button>
+          <figcaption>Ejemplo ilustrativo · no crea ni reserva un enlace</figcaption>
+        </figure>
       </div>
-
-      <div class="hero-proof-bar" aria-label="Capacidades principales"><span><b>Un enlace</b><small>Un alias estable para compartir</small></span><i aria-hidden="true"></i><span><b>Múltiples decisiones</b><small>Reglas, límites y ciclo de vida</small></span><i aria-hidden="true"></i><span><b>Una superficie</b><small>Operación y analítica conectadas</small></span></div>
+      <form class="hero-form" (ngSubmit)="submitDemo()" novalidate>
+        <div class="form-intro"><span class="section-label">EMPIEZA AQUÍ</span><label for="hero-url">¿Adónde vamos?</label></div>
+        <div class="form-fields">
+          <div class="hero-input-shell" [class.invalid]="demoError()" [class.valid]="destinationReady()"><mat-icon aria-hidden="true">{{ destinationReady() ? 'check' : 'link' }}</mat-icon><input id="hero-url" type="url" name="destination" inputmode="url" autocomplete="url" maxlength="2048" placeholder="Pega tu URL larga, https://…" [ngModel]="demoUrl()" (ngModelChange)="onUrlChange($event)" [attr.aria-invalid]="demoError() ? true : null" [attr.aria-describedby]="demoError() ? 'hero-help hero-error' : 'hero-help'" /><button matRipple class="button button-accent" type="submit" [disabled]="submitting() || !demoUrl().trim()"><span>{{ submitting() ? 'Preparando…' : 'Preparar enlace' }}</span><span class="submit-arrow" [class.submitting]="submitting()" aria-hidden="true">{{ submitting() ? '◌' : '↗' }}</span></button></div>
+          @if (demoError()) { <p class="form-error" id="hero-error" role="alert">{{ demoError() }}</p> }
+          <p class="hero-help" id="hero-help">Primero el destino; después tu cuenta. Al entrar, retomaremos esta URL. Aún no se publica nada.</p>
+        </div>
+      </form>
     </section>
-
-    <section class="section capability-section" aria-labelledby="capability-title">
-      <div class="section-heading centered"><span class="eyebrow dark"><i></i> Más que acortar</span><h2 id="capability-title">Un enlace no termina cuando lo copias.</h2><p>Empieza ahí. UVH mantiene unido todo lo que ocurre antes de publicarlo y después de recibir el primer clic.</p></div>
-      <div class="capability-grid">
-        @for (capability of capabilities; track capability.title) {
-          <article class="capability-card"><span class="capability-number">{{ capability.number }}</span><span class="capability-icon"><mat-icon aria-hidden="true">{{ capability.icon }}</mat-icon></span><h3>{{ capability.title }}</h3><p>{{ capability.text }}</p><span class="card-line" aria-hidden="true"></span></article>
+    <div class="principle-strip"><div class="wrap"><span>Una URL corta es el principio.</span><span>Cambiarla por dentro es lo interesante. <span aria-hidden="true">↙</span></span></div></div>
+    <section class="practice-section wrap section-space" id="producto" aria-labelledby="practice-title">
+      <div class="section-heading"><span class="section-label">01 / EN LA PRÁCTICA</span><h2 id="practice-title">Hay cosas que no<br />puedes <em>desenviar.</em></h2><p>Una dirección impresa. Un correo que ya salió. Un cartel en la calle. Para eso sirve conservar el control del destino.</p></div>
+      <div class="product-tabs" role="tablist" aria-label="Ejemplos de uso">
+        @for (view of productViews; track view.id; let tabIndex = $index) {
+          <button matRipple type="button" role="tab" [id]="'product-tab-' + view.id" [class.active]="activeProductViewId() === view.id" [attr.aria-selected]="activeProductViewId() === view.id" [attr.aria-controls]="'product-panel-' + view.id" [attr.tabindex]="activeProductViewId() === view.id ? 0 : -1" (click)="selectProductView(view.id)" (keydown)="onProductTabKeydown($event, tabIndex)"><span class="tab-number">0{{ tabIndex + 1 }}</span>{{ view.label }}<span class="tab-arrow" aria-hidden="true">↗</span></button>
         }
       </div>
+      @for (currentView of [activeProductView()]; track currentView.id) {
+      <div class="case-study" animate.enter="case-enter" [id]="'product-panel-' + activeProductViewId()" role="tabpanel" [attr.aria-labelledby]="'product-tab-' + activeProductViewId()" tabindex="0">
+        <div class="case-copy"><h3>{{ activeProductView().title }}</h3><p>{{ activeProductView().description }}</p><ol>@for (bullet of activeProductView().bullets; track $index) { <li><span>0{{ $index + 1 }}</span>{{ bullet }}</li> }</ol></div>
+        <figure class="case-diagram"><figcaption>EL RECORRIDO / EJEMPLO ILUSTRATIVO</figcaption><div class="case-alias"><mat-icon aria-hidden="true">link</mat-icon><b>{{ activeProductView().alias }}</b></div><div class="case-connector" aria-hidden="true">↓</div><div class="case-destinations"><div><span>{{ activeProductViewId() === 'route' ? 'DESTINO PRINCIPAL' : 'ANTES' }}</span><code>{{ activeProductView().before }}</code></div><span aria-hidden="true">{{ activeProductViewId() === 'route' ? '⑂' : '→' }}</span><div class="case-after"><span>{{ activeProductViewId() === 'route' ? 'REGLA: IDIOMA ES' : 'DESPUÉS' }}</span><code>{{ activeProductView().after }}</code></div></div><p>{{ activeProductView().note }}</p></figure>
+      </div>
+      }
     </section>
-
-    <section class="product-section" id="producto" aria-labelledby="product-title">
-      <div class="section product-section-inner">
-        <div class="section-heading split light-heading"><div><span class="eyebrow light"><i></i> El producto en contexto</span><h2 id="product-title">De borrador a señal útil, sin cambiar de herramienta.</h2></div><p>Recorre las tres decisiones centrales. Cada vista representa funciones ya disponibles en el panel y la API.</p></div>
-        <div class="product-tabs" role="tablist" aria-label="Vistas del producto">
-          @for (view of productViews; track view.id; let tabIndex = $index) {
-            <button type="button" role="tab" [id]="'product-tab-' + view.id" [class.active]="activeProductViewId() === view.id" [attr.aria-selected]="activeProductViewId() === view.id" [attr.aria-controls]="'product-panel-' + view.id" [attr.tabindex]="activeProductViewId() === view.id ? 0 : -1" (click)="selectProductView(view.id)" (keydown)="onProductTabKeydown($event, tabIndex)"><span><mat-icon aria-hidden="true">{{ view.icon }}</mat-icon></span><b>{{ view.label }}</b><small>{{ view.title }}</small></button>
-          }
-        </div>
-        <div class="product-stage" [attr.id]="'product-panel-' + activeProductViewId()" role="tabpanel" [attr.aria-labelledby]="'product-tab-' + activeProductViewId()">
-          <div class="product-stage-copy"><span class="stage-index">0{{ productViews.indexOf(activeProductView()) + 1 }}</span><span class="stage-label"><mat-icon aria-hidden="true">{{ activeProductView().icon }}</mat-icon>{{ activeProductView().label }}</span><h3>{{ activeProductView().title }}</h3><p>{{ activeProductView().description }}</p><ul>@for (bullet of activeProductView().bullets; track $index) { <li><mat-icon aria-hidden="true">check</mat-icon>{{ bullet }}</li> }</ul></div>
-          <div class="product-stage-ui" [attr.data-view]="activeProductViewId()">
-            @switch (activeProductViewId()) {
-              @case ('publish') {
-                <div class="ui-toolbar"><span><i></i> Editor de enlace</span><small>Vista ilustrativa</small></div>
-                <div class="publish-ui"><div class="ui-field wide"><small>URL de destino</small><b>https://producto.example/lanzamiento</b><mat-icon aria-hidden="true">check_circle</mat-icon></div><div class="ui-field"><small>Dominio</small><b>go.example</b></div><div class="ui-field"><small>Alias</small><b>lanzamiento</b></div><div class="ui-switches"><span><i class="on"></i> Analítica</span><span><i></i> Un solo uso</span><span><i class="on"></i> UTM</span></div><div class="ui-summary"><span><mat-icon aria-hidden="true">link</mat-icon><small>Resultado</small></span><b>go.example/lanzamiento</b><button type="button" tabindex="-1">Guardar borrador</button></div></div>
-              }
-              @case ('route') {
-                <div class="ui-toolbar"><span><i></i> Motor de reglas</span><small>Orden de prioridad</small></div>
-                <div class="route-ui"><div class="rule-row active"><span class="rule-order">01</span><span class="rule-logic"><small>Si</small><b>País es ES</b></span><mat-icon aria-hidden="true">arrow_forward</mat-icon><span class="rule-target">/es/lanzamiento</span><span class="rule-status">Activa</span></div><div class="rule-row"><span class="rule-order">02</span><span class="rule-logic"><small>Si</small><b>Dispositivo es móvil</b></span><mat-icon aria-hidden="true">arrow_forward</mat-icon><span class="rule-target">/mobile</span><span class="rule-status">Activa</span></div><div class="rule-row fallback"><span class="rule-order"><mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon></span><span class="rule-logic"><small>Si nada coincide</small><b>Destino principal</b></span><mat-icon aria-hidden="true">arrow_forward</mat-icon><span class="rule-target">/lanzamiento</span></div><div class="rule-add"><mat-icon aria-hidden="true">add</mat-icon> Añadir condición</div></div>
-              }
-              @case ('measure') {
-                <div class="ui-toolbar"><span><i></i> Actividad del enlace</span><small>Periodo: 7 días</small></div>
-                <div class="measure-ui"><div class="measure-cards"><span><small>Clics</small><b>Datos del periodo</b></span><span><small>Visitantes</small><b>Únicos en el periodo</b></span></div><div class="chart-frame" aria-label="Representación ilustrativa de una serie temporal"><span style="--bar: 42%"></span><span style="--bar: 58%"></span><span style="--bar: 36%"></span><span style="--bar: 72%"></span><span style="--bar: 61%"></span><span style="--bar: 84%"></span><span style="--bar: 68%"></span></div><div class="dimension-row"><span><mat-icon aria-hidden="true">public</mat-icon> Países</span><span><mat-icon aria-hidden="true">devices</mat-icon> Dispositivos</span><span><mat-icon aria-hidden="true">campaign</mat-icon> Campañas</span></div></div>
-              }
-            }
-          </div>
+    <section class="field-guide" id="control" aria-labelledby="guide-title">
+      <div class="wrap section-space guide-layout">
+        <div class="guide-heading"><span class="section-label">02 / NOTAS ANTES DE PUBLICAR</span><h2 id="guide-title">Antes de<br />imprimir<br /><em>500 copias.</em></h2><p>Un par de decisiones ahora te ahorran tener que arreglarlo todo después.</p><a class="text-link" routerLink="/help">Abrir la guía técnica <span aria-hidden="true">↗</span></a><span class="guide-asterisk" aria-hidden="true">✳</span></div>
+        <div class="guide-notes">
+          <article><span class="note-number">A.</span><div><h3>Elige una dirección que quieras conservar.</h3><p>El destino puede cambiar. La dirección impresa, no. Usa un alias legible y mantén su dominio y alias cuando edites el enlace.</p><span class="note-example">Mejor /programa que /programa-final-v3</span></div></article>
+          <article><span class="note-number">B.</span><div><h3>Decide qué pasa cuando termine.</h3><p>Una promoción no dura para siempre. Configura la caducidad y, si corresponde, un destino alternativo para quien llegue después.</p><span class="note-example">La oferta acaba. Tu página de novedades sigue.</span></div></article>
+          <article><span class="note-number">C.</span><div><h3>Prueba también el recorrido menos obvio.</h3><p>Si añades reglas, revisa su orden y abre el enlace desde los idiomas y dispositivos previstos. Comprueba también el destino principal cuando no coincida ninguna.</p><span class="note-example">Primera regla que coincide → destino elegido.</span></div></article>
+          <article><span class="note-number">D.</span><div><h3>Mide clics. No los confundas con personas.</h3><p>Las aperturas repetidas y los sistemas automáticos también generan actividad. Los pseudónimos rotan cada día; no identifican personas únicas entre varios días.</p><a class="text-link" routerLink="/legal/privacidad">Cómo tratamos esos datos <span aria-hidden="true">↗</span></a></div></article>
         </div>
       </div>
     </section>
-
-    <section class="section control-section" id="control" aria-labelledby="control-title">
-      <div class="control-copy"><span class="eyebrow dark"><i></i> Control del recorrido</span><h2 id="control-title">Un alias estable.<br /><em>El destino adecuado.</em></h2><p>Comparte una dirección y conserva la capacidad de decidir cómo responde. Las reglas se evalúan por prioridad y el destino principal permanece como salida por defecto.</p><div class="condition-cloud" aria-label="Condiciones disponibles"><span><mat-icon aria-hidden="true">public</mat-icon> País</span><span><mat-icon aria-hidden="true">translate</mat-icon> Idioma</span><span><mat-icon aria-hidden="true">devices</mat-icon> Dispositivo</span><span><mat-icon aria-hidden="true">computer</mat-icon> Sistema</span><span><mat-icon aria-hidden="true">schedule</mat-icon> Horario</span><span><mat-icon aria-hidden="true">share</mat-icon> Referente</span><span><mat-icon aria-hidden="true">campaign</mat-icon> Campaña</span></div></div>
-      <div class="route-builder" aria-label="Ejemplo del orden de evaluación de reglas"><div class="builder-head"><span><mat-icon aria-hidden="true">alt_route</mat-icon><b>Recorrido de la redirección</b></span><small>De arriba abajo</small></div><div class="builder-flow"><article><span class="flow-node blue">01</span><div><small>Condición</small><b>Campaña = lanzamiento</b><p>Dirige al contenido específico de campaña.</p></div><span class="flow-chip">Prioridad alta</span></article><i class="flow-line" aria-hidden="true"></i><article><span class="flow-node teal">02</span><div><small>Condición</small><b>Idioma = es</b><p>Adapta el destino a la preferencia de idioma.</p></div><span class="flow-chip">Siguiente</span></article><i class="flow-line" aria-hidden="true"></i><article class="fallback"><span class="flow-node"><mat-icon aria-hidden="true">flag</mat-icon></span><div><small>Fallback</small><b>Destino principal</b><p>Responde aunque ninguna regla coincida.</p></div><span class="flow-chip">Siempre disponible</span></article></div></div>
+    <section class="team-section wrap section-space" id="operacion" aria-labelledby="team-title">
+      <div class="team-intro"><span class="section-label">03 / EL TRABAJO COMPARTIDO</span><h2 id="team-title">Que el enlace no dependa<br />de <em>«quien lo creó».</em></h2><p>Organiza los enlaces en un workspace, invita a tu equipo y decide quién puede cambiar qué. El contexto queda junto al enlace, con etiquetas, notas y actividad.</p></div>
+      <div class="workspace-sheet"><div class="workspace-heading"><span><mat-icon aria-hidden="true">folder_open</mat-icon> Workspace / Comunicación</span><span>EJEMPLO DE PERMISOS</span></div><div class="role-row"><span>Administración</span><span>Owner / Admin</span><p>Gestionar el equipo y su trabajo.</p></div><div class="role-row"><span>Edición</span><span>Editor</span><p>Crear y actualizar enlaces.</p></div><div class="role-row"><span>Consulta</span><span>Viewer</span><p>Consultar enlaces y analítica.</p></div><a class="text-link" routerLink="/help">Consulta los permisos de cada acción <span aria-hidden="true">↗</span></a></div>
+      <div class="operations-list">@for (operation of operations; track operation.title) { <article><mat-icon aria-hidden="true">{{ operation.icon }}</mat-icon><h3>{{ operation.title }}</h3><p>{{ operation.text }}</p><a class="text-link operation-guide" routerLink="/help" [fragment]="operation.guide" [attr.aria-label]="'Ver guía de ' + operation.title">Ver la guía <span aria-hidden="true">↗</span></a></article> }</div>
     </section>
-
-    <section class="operation-section" id="operacion" aria-labelledby="operation-title">
-      <div class="section operation-inner">
-        <div class="section-heading split"><div><span class="eyebrow dark"><i></i> Operación compartida</span><h2 id="operation-title">Lo que rodea al enlace también necesita control.</h2></div><p>UVH organiza la infraestructura, el equipo y las automatizaciones alrededor del mismo workspace.</p></div>
-        <div class="operation-grid">@for (operation of operations; track operation.title) { <article><span class="operation-icon"><mat-icon aria-hidden="true">{{ operation.icon }}</mat-icon></span><div><h3>{{ operation.title }}</h3><p>{{ operation.text }}</p></div><mat-icon class="operation-arrow" aria-hidden="true">north_east</mat-icon></article> }</div>
-        <div class="lifecycle-band"><div><span class="eyebrow dark"><i></i> Ciclo de vida visible</span><h3>El estado explica qué puede ocurrir ahora.</h3></div><div class="lifecycle-rail" aria-label="Estados del enlace"><span class="active"><i></i> Activo</span><mat-icon aria-hidden="true">arrow_forward</mat-icon><span><i></i> Pausado</span><mat-icon aria-hidden="true">arrow_forward</mat-icon><span><i></i> Programado</span><mat-icon aria-hidden="true">arrow_forward</mat-icon><span><i></i> Caducado</span></div></div>
-      </div>
+    <section class="faq-section wrap section-space" id="faq" aria-labelledby="faq-title">
+      <div class="faq-intro"><span class="section-label">04 / LAS PREGUNTAS RAZONABLES</span><h2 id="faq-title">La letra <em>normal.</em></h2><p>Lo que conviene saber antes de poner un enlace a circular.</p><a class="text-link" routerLink="/help">Más ayuda <span aria-hidden="true">↗</span></a></div>
+      <!-- Material owns expansion, keyboard and focus behavior; local tokens
+           keep the accordion consistent with the new editorial identity. -->
+      <mat-accordion class="faq-list" [multi]="true">@for (item of faqs; track item.q; let index = $index) { <mat-expansion-panel #faqPanel [expanded]="index === 0" [hideToggle]="true"><mat-expansion-panel-header><mat-panel-title><span class="faq-number">0{{ index + 1 }}</span>{{ item.q }}</mat-panel-title><span class="faq-plus" [class.expanded]="faqPanel.expanded" aria-hidden="true">+</span></mat-expansion-panel-header><p>{{ item.a }}</p></mat-expansion-panel> }</mat-accordion>
     </section>
-
-    <section class="section continuity-section" id="flujo" aria-labelledby="continuity-title">
-      <div class="section-heading centered narrow"><span class="eyebrow dark"><i></i> Continuidad de la tarea</span><h2 id="continuity-title">Entrar no borra lo que estabas haciendo.</h2><p>Si necesitas una cuenta, retomamos la URL al terminar el acceso para que puedas seguir sin empezar de nuevo.</p></div>
-      <div class="continuity-flow"><article><span class="step-number">01</span><span class="step-icon"><mat-icon aria-hidden="true">content_paste</mat-icon></span><h3>Pega el destino</h3><p>Comprobamos la URL antes de continuar.</p></article><span class="flow-connector" aria-hidden="true"><i></i><mat-icon>arrow_forward</mat-icon></span><article><span class="step-number">02</span><span class="step-icon"><mat-icon aria-hidden="true">schedule</mat-icon></span><h3>Lo dejamos preparado</h3><p>Conservamos el destino durante 24 horas mientras entras o creas tu cuenta.</p></article><span class="flow-connector" aria-hidden="true"><i></i><mat-icon>arrow_forward</mat-icon></span><article><span class="step-number">03</span><span class="step-icon"><mat-icon aria-hidden="true">edit_note</mat-icon></span><h3>Retoma el borrador</h3><p>Al terminar, el formulario vuelve a abrirse con tu destino.</p></article></div>
-    </section>
-
-    <section class="section faq-section" id="faq" aria-labelledby="faq-title">
-      <div class="section-heading split"><div><span class="eyebrow dark"><i></i> Preguntas directas</span><h2 id="faq-title">Antes de crear, sabes exactamente qué ocurrirá.</h2></div><p>Respuestas basadas en el comportamiento actual del producto, sin promesas comerciales ni funciones futuras.</p></div>
-      <mat-accordion class="faq-accordion">@for (item of faqs; track item.q; let index = $index) { <mat-expansion-panel [expanded]="index === 0"><mat-expansion-panel-header><span class="faq-number">0{{ index + 1 }}</span><mat-panel-title>{{ item.q }}</mat-panel-title></mat-expansion-panel-header><p>{{ item.a }}</p></mat-expansion-panel> }</mat-accordion>
-    </section>
-
-    <section class="final-cta" aria-labelledby="final-cta-title">
-      <div class="final-cta-grid" aria-hidden="true"></div>
-      <div><span class="eyebrow light"><i></i> Empieza por una URL</span><h2 id="final-cta-title">Crea algo corto.<br />Conserva todo el control.</h2><p>Prepara el destino ahora. Si necesitas acceder, seguirá esperándote al otro lado.</p></div>
-      <button class="button button-light" type="button" (click)="focusHero()">Preparar mi enlace <mat-icon aria-hidden="true">north</mat-icon></button>
-    </section>
+    <section class="closing-section" aria-labelledby="closing-title"><div class="wrap closing-inner"><span class="section-label">LA PRÓXIMA VEZ QUE COMPARTAS ALGO</span><div><h2 id="closing-title">Hazlo corto.<br /><em>Dale recorrido.</em></h2><button class="closing-button" type="button" (click)="focusHero()"><span>Preparar mi enlace</span><span aria-hidden="true">↗</span></button></div><p>Empieza con una URL. El resto lo decides tú.</p></div></section>
   </main>
-
-  <footer class="site-footer">
-    <div class="footer-main"><div class="footer-brand"><a class="brand" routerLink="/"><span class="brand-mark"><mat-icon aria-hidden="true">link</mat-icon></span><span class="brand-word"><b>UVH</b></span></a><p>Crea, dirige y mide enlaces desde una única superficie operativa.</p></div><div class="footer-column"><b>Producto</b><a href="#producto">Vista general</a><a href="#control">Reglas de recorrido</a><a href="#operacion">Operación</a></div><div class="footer-column"><b>Recursos</b><a routerLink="/help">Ayuda técnica</a><a routerLink="/status">Estado del servicio</a><a href="#faq">Preguntas frecuentes</a><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/denuncias">Denunciar un enlace</a></div><div class="footer-column"><b>Acceso</b><a [href]="loginHref()">Iniciar sesión</a><a [href]="registerHref()">Crear cuenta</a><button type="button" (click)="focusHero()">Preparar una URL</button></div></div>
-    <div class="footer-bottom"><span>© {{ year }} UVH</span><div><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos</a></div></div>
-  </footer>
+  <footer class="site-footer wrap" [attr.inert]="mobileOpen() ? '' : null"><div class="footer-top"><a class="brand" routerLink="/" aria-label="UVH, inicio"><span class="brand-word">uvh<span class="brand-dot">.</span></span></a><p>Enlaces cortos.<br />Decisiones que siguen en tus manos.</p><div><a [href]="loginHref()">Entrar ↗</a><a [href]="registerHref()">Crear cuenta ↗</a></div></div><nav class="footer-links" aria-label="Recursos y legal"><a routerLink="/help">Ayuda técnica</a><a routerLink="/status">Estado del servicio</a><a routerLink="/legal/denuncias">Denunciar un enlace</a><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos</a><span>© {{ year }} UVH</span></nav></footer>
 </div>

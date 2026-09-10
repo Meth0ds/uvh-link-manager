@@ -10,6 +10,7 @@ import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { decodeWorkspaceUsage } from "./usage-response";
+import { LatestRequest } from "../../core/services/latest-request";
 
 type UsageContext = { workspaceId: number; userId: number; name: string; role: WorkspaceRole };
 type UsageState = { context: UsageContext; data: WorkspaceUsage | null; loading: boolean; error: string | null };
@@ -48,8 +49,8 @@ export class UsageComponent {
   private readonly auth = inject(AuthService);
   private readonly workspaces = inject(WorkspaceService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly requests = new LatestRequest(this.destroyRef);
   private readonly state = signal<UsageState | null>(null);
-  private requestNumber = 0;
   private wait: { userId: number; until: number } | null = null;
 
   readonly roleLabels: Record<WorkspaceRole, string> = {
@@ -91,7 +92,6 @@ export class UsageComponent {
       untracked(() => { void this.reload(); });
     });
     this.destroyRef.onDestroy(() => {
-      ++this.requestNumber;
       this.state.set(null);
       this.wait = null;
     });
@@ -100,10 +100,11 @@ export class UsageComponent {
   async reload(): Promise<void> {
     if (this.destroyRef.destroyed) return;
     const context = this.context();
-    if (!context) { ++this.requestNumber; this.state.set(null); return; }
+    if (!context) { this.requests.invalidate(); this.state.set(null); return; }
     if (this.current()?.loading) return;
-    const request = ++this.requestNumber;
-    const isCurrent = () => !this.destroyRef.destroyed && request === this.requestNumber && this.context() === context;
+    const requestContext = `${context.userId}:${context.workspaceId}:${context.role}`;
+    const request = this.requests.begin(requestContext);
+    const isCurrent = () => this.requests.isCurrent(request, requestContext) && this.context() === context;
     const fail = (message: string) => this.state.set({ context, data: null, loading: false, error: message });
     if (this.wait?.userId === context.userId && this.wait.until > Date.now()) {
       fail(`Espera ${Math.ceil((this.wait.until - Date.now()) / 1000)} segundos antes de volver a consultar.`);
@@ -115,6 +116,7 @@ export class UsageComponent {
         `/api/v1/workspaces/${context.workspaceId}/usage`,
         undefined,
         (value) => decodeWorkspaceUsage(value, context.workspaceId, context.role),
+        { signal: request.signal },
       );
       if (!isCurrent()) return;
       this.state.set({ context, data, loading: false, error: null });

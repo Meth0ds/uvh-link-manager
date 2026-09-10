@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from "@angular/core";
-import { ApiRequestError, ApiService } from "./api.service";
+import { ApiRequestError, ApiService, type ApiReadOptions } from "./api.service";
 import { WorkspaceService } from "./workspace.service";
 import {
   decodeAccountDeletionImpact,
@@ -375,9 +375,9 @@ export class AuthService {
     return user;
   }
 
-  async dataExportStatus(): Promise<DataExportStatus | null> {
+  async dataExportStatus(options?: ApiReadOptions): Promise<DataExportStatus | null> {
     const generation = this.generation;
-    const { export: status } = await this.api.get<{ export: DataExportStatus | null }>("/api/v1/auth/data-export", undefined, decodeDataExportStatusResponse);
+    const { export: status } = await this.api.get<{ export: DataExportStatus | null }>("/api/v1/auth/data-export", undefined, decodeDataExportStatusResponse, options);
     this.assertCurrent(generation);
     return status;
   }
@@ -398,9 +398,9 @@ export class AuthService {
     this.assertCurrent(generation);
   }
 
-  async accountDeletionImpact(): Promise<AccountDeletionImpact> {
+  async accountDeletionImpact(options?: ApiReadOptions): Promise<AccountDeletionImpact> {
     const generation = this.generation;
-    const impact = await this.api.get<AccountDeletionImpact>("/api/v1/auth/account-deletion", undefined, decodeAccountDeletionImpact);
+    const impact = await this.api.get<AccountDeletionImpact>("/api/v1/auth/account-deletion", undefined, decodeAccountDeletionImpact, options);
     this.assertCurrent(generation);
     return impact;
   }
@@ -416,9 +416,9 @@ export class AuthService {
     return result;
   }
 
-  async listSessions(): Promise<Session[]> {
+  async listSessions(options?: ApiReadOptions): Promise<Session[]> {
     const generation = this.generation;
-    const { sessions } = await this.api.get<{ sessions: Session[] }>("/api/v1/auth/sessions", undefined, decodeSessionsResponse);
+    const { sessions } = await this.api.get<{ sessions: Session[] }>("/api/v1/auth/sessions", undefined, decodeSessionsResponse, options);
     this.assertCurrent(generation);
     return sessions;
   }
