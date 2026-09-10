@@ -281,17 +281,16 @@ html .mat-typography .mat-body-small {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--uvh-muted);
   margin: 32px 0 14px;
+  color: var(--uvh-muted);
+  font: 10px/1.5 "Courier New", monospace;
+  letter-spacing: .12em;
+  text-transform: uppercase;
 
   mat-icon {
-    width: 17px;
-    height: 17px;
-    font-size: 17px;
+    width: 15px;
+    height: 15px;
+    font-size: 15px;
     color: var(--uvh-electric);
   }
 }
@@ -479,11 +478,11 @@ html .mat-typography .mat-body-small {
 
 .main .alert.error,
 .main .dashboard-alert {
-  border: 1px solid color-mix(in srgb, var(--uvh-danger) 28%, var(--uvh-border));
-  border-radius: 13px;
-  background: linear-gradient(105deg, var(--uvh-danger-soft), color-mix(in srgb, var(--uvh-surface-raised) 96%, var(--uvh-danger)));
+  border-left: 3px solid var(--uvh-danger);
+  border-radius: 3px;
+  background: var(--uvh-danger-soft);
   color: var(--uvh-danger);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--uvh-danger) 7%, transparent);
+  box-shadow: none;
 }
 
 .main app-panel-skeleton { display: block; margin-bottom: 24px; }
@@ -521,8 +520,8 @@ html .mat-typography .mat-body-small {
 }
 
 .main .empty-state {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--uvh-surface-raised) 97%, var(--uvh-electric)), var(--uvh-surface-raised));
-  box-shadow: inset 0 1px color-mix(in srgb, #fff 38%, transparent);
+  background: var(--uvh-surface-raised);
+  box-shadow: none;
 }
 
 .main .card-block,
@@ -650,15 +649,17 @@ html .mat-typography .mat-body-small {
   }
 }
 
-// Small state chip (link/domain/webhook states)
+// Small state chip (link/domain/webhook states). Square editorial tag; the
+// color aliases still own the meaning.
 .state-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  border-radius: 999px;
-  padding: 3px 10px;
+  letter-spacing: .02em;
+  border-radius: 3px;
+  padding: 4px 9px;
   white-space: nowrap;
 
   &.st-active,
@@ -688,7 +689,7 @@ html .mat-typography .mat-body-small {
   &.st-archived,
   &.st-deleted,
   &.st-disabled {
-    background: rgba(91, 107, 132, 0.12);
+    background: color-mix(in srgb, var(--uvh-muted) 12%, transparent);
     color: var(--uvh-muted);
   }
 }

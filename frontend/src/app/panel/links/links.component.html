@@ -25,8 +25,11 @@
   </section>
 }
 
-<section class="filter-card" aria-label="Buscar y filtrar enlaces">
-  <div class="filter-meta"><span><mat-icon aria-hidden="true">filter_list</mat-icon> Explorar enlaces</span><b class="tnum">{{ total() }} resultados</b></div>
+<section class="filter-plate" aria-label="Buscar y filtrar enlaces">
+  <div class="filter-bar">
+    <div class="filter-meta"><mat-icon aria-hidden="true">filter_list</mat-icon>Explorar enlaces</div>
+    <b class="filter-count tnum">{{ total() }} resultados</b>
+  </div>
   <div class="filters">
     <mat-form-field appearance="outline" class="search">
       <mat-icon matPrefix>search</mat-icon>
