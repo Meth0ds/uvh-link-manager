@@ -15,9 +15,8 @@ app-page-header { display: block; margin-bottom: 18px; }
   min-width: 0;
   padding: 14px;
   border: 1px solid var(--uvh-border);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--uvh-surface-raised) 92%, transparent);
-  box-shadow: var(--uvh-shadow-sm);
+  border-radius: 3px;
+  background: var(--uvh-surface-raised);
 }
 
 .account-summary {
@@ -41,9 +40,9 @@ app-page-header { display: block; margin-bottom: 18px; }
   height: 42px;
   flex: 0 0 42px;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--uvh-electric) 24%, var(--uvh-border));
-  border-radius: 13px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--uvh-electric) 15%, var(--uvh-surface)), color-mix(in srgb, var(--uvh-teal) 11%, var(--uvh-surface)));
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface);
   color: var(--uvh-electric);
   font-size: 12px;
   font-weight: 880;
@@ -61,14 +60,14 @@ app-page-header { display: block; margin-bottom: 18px; }
     gap: 10px;
     min-height: 52px;
     padding: 8px 9px;
-    border-radius: 12px;
+    border-radius: 3px;
     color: var(--uvh-muted);
     text-decoration: none;
-    transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+    transition: background-color 160ms ease, color 160ms ease;
   }
 
-  a:hover { background: color-mix(in srgb, var(--uvh-electric) 6%, transparent); color: var(--uvh-ink); transform: translateX(2px); }
-  a:focus-visible { outline: 3px solid color-mix(in srgb, var(--uvh-electric) 24%, transparent); outline-offset: 1px; }
+  a:hover { background: color-mix(in srgb, var(--uvh-electric) 6%, transparent); color: var(--uvh-ink); }
+  a:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 1px; }
   mat-icon { width: 19px; height: 19px; flex: 0 0 19px; color: var(--uvh-electric); font-size: 19px; }
   span { min-width: 0; }
   b,
@@ -91,10 +90,11 @@ app-page-header { display: block; margin-bottom: 18px; }
   align-items: flex-start;
   gap: 9px;
   padding: 11px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--uvh-electric) 5%, var(--uvh-surface));
+  border-left: 2px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface);
 
-  mat-icon { width: 17px; height: 17px; flex: 0 0 17px; color: var(--uvh-electric); font-size: 17px; }
+  mat-icon { width: 17px; height: 17px; flex: 0 0 17px; color: var(--uvh-muted); font-size: 17px; }
   p { margin: 0; }
   b,
   span { display: block; }
@@ -130,20 +130,20 @@ app-page-header { display: block; margin-bottom: 18px; }
     flex: 0 0 30px;
     place-items: center;
     border: 1px solid var(--uvh-border);
-    border-radius: 10px;
-    background: var(--uvh-surface-raised);
-    color: var(--uvh-electric);
-    font-size: 9px;
-    font-weight: 850;
+    border-radius: 3px;
+    background: var(--uvh-surface);
+    color: var(--uvh-muted);
+    font: 11px/1 "Courier New", monospace;
   }
 
-  h2 { margin: 0; color: var(--uvh-ink); font-size: clamp(19px, 2vw, 23px); font-weight: 850; letter-spacing: -.035em; }
+  h2 { margin: 0; color: var(--uvh-ink); font-size: clamp(19px, 2vw, 23px); font-weight: 800; letter-spacing: -.035em; }
   p { margin: 4px 0 0; color: var(--uvh-muted); font-size: 12.5px; line-height: 1.5; }
 }
 
 .settings-section:target .settings-section-head > span {
-  border-color: color-mix(in srgb, var(--uvh-electric) 42%, var(--uvh-border));
-  background: color-mix(in srgb, var(--uvh-electric) 9%, var(--uvh-surface-raised));
+  border-color: var(--uvh-electric);
+  color: var(--uvh-electric);
+  background: var(--uvh-surface-raised);
 }
 
 .account-section .profile-card { grid-column: 1 / -1; }
@@ -863,7 +863,6 @@ mat-radio-button:hover { border-color: color-mix(in srgb, var(--uvh-electric) 30
   .settings-layout { grid-template-columns: 1fr; }
   .settings-sidebar { position: static; }
   .settings-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .settings-nav a:hover { transform: translateY(-1px); }
 }
 
 @media (max-width: 560px) {
