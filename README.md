@@ -33,7 +33,7 @@ datos.
 | Equipos | Workspaces aislados, roles `owner`/`admin`/`editor`/`viewer`, invitaciones y transferencia de propiedad. |
 | Integraciones | Tokens API con scopes, webhooks firmados, reintentos e inspector con payload reducido por allowlist. |
 | Cuenta | Sesiones revocables, verificación de correo, MFA TOTP, códigos de recuperación y operaciones sensibles con reautenticación. |
-| Operación | Cola, scheduler, auditoría append-only, métricas, estado público externo y comprobaciones previas de release. |
+| Operación | Workers aislados por carga, scheduler, auditoría append-only, métricas por cola, estado público externo y comprobaciones previas de release. |
 
 ## Arquitectura
 
@@ -45,7 +45,7 @@ Navegador
                               ▼
                         Laravel 13 API
                          │     │     │
-                         │     │     └── worker de webhooks/correo
+                         │     │     └── workers: mail/webhooks/domains/exports/analytics
                          │     └──────── scheduler de mantenimiento
                          └────────────── PostgreSQL 16
 ```
@@ -171,6 +171,8 @@ el [modelo de amenazas](docs/threat-model.md) para conocer el diseño actual.
 | [Seguridad](docs/security.md) | Controles de aplicación y checklist de release. |
 | [Modelo de amenazas](docs/threat-model.md) | Activos, actores, amenazas y riesgos pendientes. |
 | [Preparación para producción](docs/production-readiness.md) | Evidencias obligatorias antes del lanzamiento. |
+| [Cierre del informe ZIP](docs/report-remediation-2026-09-08.md) | Trazabilidad F01–F26 y límites de lo aún no acreditado. |
+| [Plantilla de evidencia](docs/release-evidence-template.md) | Registro de digests, proveedores, carga, restore, alertas y rollback. |
 | [Pruebas E2E](docs/e2e-testing.md) | Aislamiento, ejecución, cobertura y límites de Playwright. |
 | [TODOs](docs/todos.md) | Trabajo implementado, validado y pendiente. |
 

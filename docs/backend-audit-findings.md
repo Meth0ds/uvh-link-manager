@@ -871,8 +871,9 @@ de esta pasada; “resuelto” describe implementación, no validación de runti
   solución síncrona improvisada habría expuesto datos o bloqueado el proceso web.
 - Corrección aplicada: solicitud con step-up y confirmación email, job
   asíncrono ligado a `security_version`, selección explícita sin hashes/secretos,
-  JSON de hasta 25 MiB cifrado AES-GCM en volumen privado, descarga POST manual
-  de un uso/no-store, caducidad de 24 h, cancelación y purga.
+  JSON de hasta 12 MiB cifrado AES-GCM en volumen privado con margen de memoria,
+  descarga POST `no-store`, acuse separado tras recibir el cuerpo completo,
+  caducidad de 24 h, cancelación y purga.
 - Límite: falta separar formalmente art. 15 y art. 20 RGPD y definir la vía para
   volúmenes superiores o categorías que requieran revisión humana.
 

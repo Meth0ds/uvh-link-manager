@@ -60,7 +60,8 @@ workspace requieren `X-Workspace-Id` y autorizan por rol en backend.
 | GET | `/data-export` | sesión verificada | Estado de la solicitud de exportación más reciente. |
 | POST | `/data-export` | sesión verificada | `{ password, factorCode? }`; solicita confirmación por email tras step-up. |
 | POST | `/data-export/confirm` | — | `{ token }`; inicia el job sólo tras confirmación explícita en la SPA. |
-| POST | `/data-export/download` | — | `{ token }`; descarga JSON cifrado de un solo uso, con respuesta `no-store`. Incluye expedientes/mensajes RGPD propios, sin secretos ni identificadores internos del personal. |
+| POST | `/data-export/download` | — | `{ token }`; sirve el JSON privado con `no-store` sin consumir el bearer. Incluye expedientes/mensajes RGPD propios, sin secretos ni identificadores internos del personal. Una transferencia interrumpida se puede reintentar mientras no caduque. |
+| POST | `/data-export/download/acknowledge` | — | `{ token }`; exige que el servidor haya preparado antes una descarga válida y el navegador la invoca sólo después de recibir el cuerpo completo. Entonces marca `downloaded`, invalida el bearer y purga el artefacto. No afirma que el usuario haya abierto o guardado el fichero. |
 | POST | `/data-export/cancel` | sesión verificada | Cancela solicitud/worker/artefacto activo. |
 | GET | `/account-deletion` | sesión verificada | Impacto y bloqueos: admin, workspaces propios y confirmación pendiente. |
 | POST | `/account-deletion` | sesión verificada | `{ confirmation: "ELIMINAR MI CUENTA", password, factorCode? }`; envía doble confirmación. |
@@ -109,7 +110,9 @@ MFA reciente y aplica transiciones de estado en backend. Los mensajes libres se
 cifran en reposo; los listados nunca devuelven ciphertext ni generaciones de
 idempotencia.
 
-La configuración pública de hCaptcha se obtiene de `GET /api/v1/config`. El
+La configuración pública de hCaptcha y la identidad legal publicable se obtiene
+de `GET /api/v1/config`. La identidad se devuelve como una unidad o `null`, nunca
+parcial; producción no arranca con campos pendientes. El
 `captchaToken` se verifica siempre en backend y el secreto nunca forma parte de
 la respuesta pública. Login, registro y reenvío usan el modo invisible: cada
 submit ejecuta un reto nuevo y no conserva tokens para intentos posteriores. El
@@ -276,6 +279,10 @@ PRODUCT-001 implementada y conectada a la pantalla de primeros pasos; validació
 | POST | `/:id/revalidate` | editor | Revalida DNS de forma asíncrona conservando el estado visible anterior; devuelve `202`. |
 | DELETE | `/:id` | editor | Elimina. |
 
+El alta normaliza IDN a Punycode y soporta únicamente hostnames que puedan usar
+un CNAME directo hacia el edge configurado. Apex, ANAME/ALIAS flattening, proxies
+DNS y wildcards quedan fuera de este contrato hasta disponer de validación propia.
+
 ## API tokens — `/api/v1/tokens` (workspace)
 
 | Método | Ruta | Rol | Descripción |
@@ -343,7 +350,7 @@ de reautenticación y vuelve a la ruta interna original tras confirmar.
 | Método | Ruta | Descripción |
 | ------ | ---- | ----------- |
 | POST | `/report` | `{ reportedUrl, reason, details?, email? }` (público, CSRF y rate limit). `reportedUrl` admite alias, URL de `uvh.es`, ruta legacy `/r/:alias` o un dominio personalizado registrado; la API sólo resuelve la referencia en base de datos y nunca visita el destino. `alias` se mantiene como compatibilidad interna, pero no se aceptan identificadores numéricos globales. |
-| GET | `/status` | Estado del módulo antiabuso (incluye si hay proveedor de reputación configurado). |
+| GET | `/status` | Estado del módulo antiabuso. `externalAnalysis` separa `configured`, `enabled` y `operational`; permanece `not_implemented` aunque exista una URL candidata, por lo que nunca presenta configuración como análisis ejecutado. |
 
 ## Público
 

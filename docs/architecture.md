@@ -109,7 +109,12 @@ El backend ejecuta cada 60 s un job (`UvhHousekeeping`) que:
 4. reintenta `webhook_deliveries` pendientes con backoff;
 5. limpia sesiones/tokens revocados y expirados.
 
-En local corre con `php artisan schedule:work` (contenedor `schedule` del Compose). La entrega de webhooks es asíncrona vía cola `database` (`WebhookDeliveryJob`), procesada por el worker `php artisan queue:work`.
+En local corre con `php artisan schedule:work` (contenedor `schedule` del
+Compose). Producción separa las cargas `mail`, `webhooks`, `domains`, `exports`
+y `analytics` en workers y heartbeats independientes; `default` queda sólo como
+cola de compatibilidad para drenar jobs serializados antes del despliegue. Esta
+separación evita que una exportación o una consulta DNS/TLS larga bloquee correo
+de cuenta o entregas webhook.
 
 ## 8. Decisiones de seguridad destacadas
 

@@ -1,74 +1,69 @@
-# UVH · Landing de producto 2026
+# UVH · Enlaces con recorrido
 
-## Objetivo
+Dirección editorial y visual de la landing, 8 de septiembre de 2026.
+Sustituye la propuesta anterior de paneles azules y tarjetas de capacidades.
+El propietario autoriza cambiar la identidad completa y ha pedido extenderla
+al resto del producto. Estado y pendientes: `redesign-checkpoint-2026-09-08.md`.
 
-La landing debe explicar que UVH no es sólo un acortador: es una superficie
-operativa para crear, dirigir, proteger y medir enlaces. La conversión sigue
-siendo una única tarea —pegar una URL— y el acceso nunca rompe esa intención.
+## Idea central
 
-## Arquitectura narrativa
+«El enlace ya está fuera. El control sigue aquí.»
 
-1. **Cabecera compacta:** producto, control, operación y seguridad; una acción
-   primaria y un menú móvil desplegable, no un panel lateral.
-2. **Hero de tarea:** propuesta de valor, consola de URL y vista previa del
-   borrador. El mensaje de persistencia durante 24 horas aparece junto al campo.
-3. **Mapa de producto:** cuatro responsabilidades verificables: crear, dirigir,
-   proteger y medir.
-4. **Cockpit interactivo:** tres vistas —publicación, reglas y analítica— que
-   enseñan contratos reales del producto sin métricas inventadas.
-5. **Control de recorrido:** reglas por país, idioma, dispositivo, sistema,
-   horario, referente y campaña, con destino alternativo y prioridad.
-6. **Operación:** dominios, roles, API tokens, webhooks, estados y actividad.
-7. **Continuidad y seguridad:** intención opaca, sesiones HttpOnly, CSRF,
-   verificación de email, hCaptcha oficial y MFA.
-8. **FAQ y cierre:** respuestas concretas y vuelta directa a la consola.
+La página explica el valor de conservar una dirección compartida cuando cambia
+su destino. Habla de situaciones concretas: una carta impresa, un evento
+bilingüe y una newsletter ya enviada. Los ejemplos están identificados como
+ilustrativos; no representan clientes, métricas ni enlaces reales publicados.
 
-No se muestran precios, testimonios, logos de clientes, porcentajes de mejora
-ni volúmenes que no procedan de una API real.
+## Composición y contenido
 
-## Sistema visual
+1. Cabecera tipográfica `uvh.`, navegación breve y acceso a la preparación.
+2. Titular editorial y etiqueta interactiva: cambia la carta de verano por la
+   de otoño, conservando el alias. La demostración es local y no llama a la API.
+3. Formulario real de URL con la continuidad de acceso existente. En móvil se
+   coloca antes de la ilustración para reducir la distancia hasta la tarea.
+4. Tres casos de uso con pasos concretos y diagramas del recorrido.
+5. Guía «Antes de imprimir 500 copias»: alias, caducidad, reglas y lectura de
+   analítica. Una contraseña de UVH no se presenta como protección del destino.
+6. Workspace, roles, dominios propios, API tokens y webhooks descritos según
+   sus límites actuales, sin garantías de operación todavía no acreditadas.
+7. FAQ con Angular Material, llamada a preparar una URL y recursos públicos.
 
-- **Dirección:** software operativo premium; superficies amplias, densidad
-  controlada y detalles de producto reconocibles. La decoración nunca compite
-  con la tarea.
-- **Claro:** lienzo `#f4f7fb`, superficies blancas, tinta `#07111f`, azul
-  eléctrico y teal. Las secciones oscuras se reservan al hero y a seguridad.
-- **Oscuro:** lienzo `#07101d`, superficies `#0d1828` y `#111f33`, bordes azul
-  gris y texto frío. Cada sección tiene una variante explícita; no se invierten
-  colores mediante filtros.
-- **Tipografía:** Manrope local, títulos con tracking negativo y cuerpo entre
-  15 y 18 px. La longitud de línea se mantiene entre 55 y 75 caracteres.
-- **Retícula:** ancho máximo de 1240 px; espaciado vertical de 88–136 px en
-  escritorio y 64–88 px en móvil; radios de 14, 20 y 28 px.
+## Identidad compartida
 
-## Cabecera, tema y menú móvil
+| Uso | Claro | Oscuro |
+| --- | --- | --- |
+| Papel | `#f5f2e9` | `#21241f` |
+| Papel elevado | `#fffcf5` | `#2c3028` |
+| Tinta | `#262821` | `#f4f0e4` |
+| Texto secundario | `#626357` | `#b9bbae` |
+| Acento | `#c44324` | `#f79573` |
+| Líneas | `#cecec0` | `#4d5145` |
 
-- La cabecera usa tokens propios para ambos temas y permanece legible sobre
-  cualquier sección. Al hacer scroll reduce su altura y aumenta la opacidad.
-- El selector de tema es una acción circular en escritorio y muestra etiqueta
-  en el menú. Sol y luna se cruzan con rotación y escala; el estado se expone
-  con `role="switch"` y `aria-checked`.
-- El menú móvil cae bajo la cabecera como una hoja de navegación a ancho útil.
-  El mismo botón hamburguesa abre y cierra; no existe un segundo cierre
-  redundante. Fondo, foco, Escape, scroll y estado `inert` se gestionan de forma
-  explícita.
+Manrope local para cuerpo y titulares; Georgia cursiva para énfasis editorial;
+monoespaciada del sistema para anotaciones. Radios mínimos, líneas finas y
+espacio entre secciones. El cartel conserva sus tintas de papel impreso en
+ambos temas. No se añaden fuentes remotas, librerías, fotos ni rastreadores.
 
-## Movimiento y accesibilidad
+La paleta compartida vive en `frontend/src/app/core/_identity-tokens.scss`.
+Los controles Material, incluidos overlays, usan variables de sistema.
+La landing conserva su composición específica; acceso, páginas legales y
+estructura del panel ya comparten la identidad. La transición de apariencia
+es reutilizable y conserva ThemeService y la preferencia del producto.
 
-- Duraciones de 160–360 ms con curvas de desaceleración; sólo se animan
-  `opacity`, `transform`, color y sombra.
-- Hover eleva como máximo 2–4 px. Los paneles interactivos conservan geometría
-  para evitar saltos de layout.
-- `prefers-reduced-motion: reduce` elimina entradas, pulsos y transformaciones.
-- Objetivos táctiles de al menos 44 px, foco de alto contraste, landmarks,
-  títulos jerárquicos, estados anunciados y navegación completa por teclado.
+## Comportamiento y accesibilidad
 
-## Criterios de aceptación
+- Un solo botón abre/cierra el menú móvil. Escape restaura el foco; el contenido
+  cubierto queda `inert`, y cerrar o destruir el componente libera el scroll.
+- Pestañas con flechas, Home/End, selección ARIA y foco visible.
+- FAQ con acordeón Angular Material y semántica de expansión accesible.
+- La demostración anuncia los cambios de destino; no anuncia cada pulsación
+  del formulario ni presenta un alias como reservado.
+- La URL de acceso conserva el token opaco existente; no incorpora el destino.
+- Los saltos al formulario respetan movimiento reducido; doble submit bloqueado.
 
-- El destino nunca aparece en la URL de autenticación; sólo viaja el token
-  opaco y se recupera después del acceso.
-- Landing y menú funcionan a 360, 768, 1024, 1280 y 1440 px sin overflow.
-- Todas las superficies mantienen contraste y coherencia en claro y oscuro.
-- La vista interactiva puede operarse con ratón y teclado y comunica su estado
-  mediante `aria-selected`.
-- TypeScript estricto, build y pruebas Angular terminan sin errores.
+## Verificación
+
+La revisión del rediseño se hace con la compilación de desarrollo y el navegador
+local, incluidos tamaños móvil y escritorio, ambos temas y controles principales.
+Los resultados concretos se registran al terminar la revisión. Las suites del
+informe de depuración siguen reservadas para el final de aquel trabajo.
