@@ -840,13 +840,12 @@ app-page-header { display: block; margin-bottom: 18px; }
   color: var(--uvh-danger);
 }
 
-// Theme selection: the dashboard's segmented switch grammar, not a bare
-// stacked radio list.
+// Theme selection: the dashboard's segmented switch grammar.
 .theme-switch { display: flex; gap: 3px; width: fit-content; padding: 3px; border: 1px solid var(--uvh-border); border-radius: 4px; }
 .theme-switch button { min-height: 38px; padding: 0 16px; border: 0; border-radius: 2px; color: var(--uvh-muted); background: transparent; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; transition: color 160ms ease, background-color 160ms ease; }
 .theme-switch button:hover { color: var(--uvh-ink); background: var(--soft); }
 .theme-switch button.active { color: var(--accent-ink); background: var(--uvh-electric); }
-.theme-switch :is(button):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 2px; }
+.theme-switch :is(button):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
 
 @media (max-width: 1180px) {
   .settings-section { grid-template-columns: 1fr; }
@@ -876,6 +875,11 @@ app-page-header { display: block; margin-bottom: 18px; }
   .settings-section-head { gap: 10px; }
   .settings-section-head h2 { font-size: 19px; }
   .card-block { padding: 16px; }
+  // "Seguir sistema" no cabe junto a las otras dos etiquetas en 320px: el
+  // conmutador pasa a ancho completo repartiendo los botones, como el
+  // period-switch del panel.
+  .theme-switch { width: 100%; box-sizing: border-box; }
+  .theme-switch button { flex: 1; min-width: 0; padding-inline: 8px; }
   .grid-2 {
     grid-template-columns: 1fr;
   }
