@@ -58,7 +58,7 @@ describe("DashboardComponent period selection", () => {
 
     expect(component.period()).toBe("7d");
     expect(component.periodLabel()).toBe("7 días");
-    expect(api.get).toHaveBeenCalledWith("/api/v1/analytics/overview", { period: "7d" }, jasmine.any(Function));
+    expect(api.get).toHaveBeenCalledWith("/api/v1/analytics/overview", { period: "7d" }, jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
   });
 
   it("does not request again when the same period is selected", () => {

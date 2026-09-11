@@ -109,8 +109,8 @@ describe("AdminComponent", () => {
     expect(component.overview()).toEqual(overview);
     expect(component.operations()).toEqual(operations);
     expect(component.reports()).toEqual([report]);
-    expect(api.get).toHaveBeenCalledWith("/api/v1/admin/users", jasmine.objectContaining({ page: 1, perPage: 25 }), jasmine.any(Function));
-    expect(api.get).toHaveBeenCalledWith("/api/v1/admin/audit", jasmine.objectContaining({ page: 1, perPage: 50 }), jasmine.any(Function));
+    expect(api.get).toHaveBeenCalledWith("/api/v1/admin/users", jasmine.objectContaining({ page: 1, perPage: 25 }), jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
+    expect(api.get).toHaveBeenCalledWith("/api/v1/admin/audit", jasmine.objectContaining({ page: 1, perPage: 50 }), jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
   });
 
   it("resets pagination when applying a user filter", async () => {
@@ -121,7 +121,7 @@ describe("AdminComponent", () => {
     await fixture.whenStable();
 
     expect(component.usersPage()).toBe(0);
-    expect(api.get).toHaveBeenCalledWith("/api/v1/admin/users", jasmine.objectContaining({ status: "blocked", page: 1 }), jasmine.any(Function));
+    expect(api.get).toHaveBeenCalledWith("/api/v1/admin/users", jasmine.objectContaining({ status: "blocked", page: 1 }), jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
   });
 
   it("keeps every administration tab named for assistive technology", () => {

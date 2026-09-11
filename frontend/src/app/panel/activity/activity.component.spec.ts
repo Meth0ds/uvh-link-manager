@@ -46,7 +46,7 @@ describe("ActivityComponent", () => {
     const saveSession = spyOn(sessionStorage, "setItem");
     await component.reload();
     fixture.detectChanges();
-    expect(api.get).toHaveBeenCalledWith("/api/v1/workspaces/1/activity", { limit: 25, cursor: null });
+    expect(api.get).toHaveBeenCalledWith("/api/v1/workspaces/1/activity", { limit: 25, cursor: null }, undefined, jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
     expect(fixture.nativeElement.querySelectorAll("[data-activity-event]").length).toBe(2);
     expect(fixture.nativeElement.textContent).toContain("El historial puede ser incompleto");
     expect(fixture.nativeElement.textContent).toContain("UTC");
@@ -59,7 +59,7 @@ describe("ActivityComponent", () => {
     expect(api.get).toHaveBeenCalledTimes(1);
     api.get.and.resolveTo(page(1, ["1"], null));
     await component.loadMore();
-    expect(api.get).toHaveBeenCalledWith("/api/v1/workspaces/1/activity", { limit: 25, cursor: "cGFnZTI=" });
+    expect(api.get).toHaveBeenCalledWith("/api/v1/workspaces/1/activity", { limit: 25, cursor: "cGFnZTI=" }, undefined, jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
     expect(component.events().map((e) => e.id)).toEqual(["3", "2", "1"]);
     expect(component.hasMore()).toBeFalse();
     await component.loadMore();
@@ -81,7 +81,7 @@ describe("ActivityComponent", () => {
     finish(page(1, ["1"], null));
     await old;
     expect(component.events().map((e) => e.id)).toEqual(["90"]);
-    expect(api.get.calls.mostRecent().args).toEqual(["/api/v1/workspaces/2/activity", { limit: 25, cursor: null }]);
+    expect(api.get.calls.mostRecent().args.slice(0, 2)).toEqual(["/api/v1/workspaces/2/activity", { limit: 25, cursor: null }]);
   });
 
   it("invalidates data on refreshed identity even when the account ID is unchanged", async () => {

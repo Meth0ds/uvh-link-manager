@@ -59,7 +59,7 @@ describe("UsageComponent", () => {
   afterEach(() => fixture.destroy());
 
   it("renders the real categories, capacity advice and policy caveats without commercial claims", () => {
-    expect(api.get).toHaveBeenCalledWith("/api/v1/workspaces/1/usage", undefined, jasmine.any(Function));
+    expect(api.get).toHaveBeenCalledWith("/api/v1/workspaces/1/usage", undefined, jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
     expect(fixture.nativeElement.querySelectorAll("[data-resource]").length).toBe(6);
     expect(fixture.nativeElement.querySelector('[data-resource="links"]')?.textContent).toMatch(/4\s*de 10/);
     expect(fixture.nativeElement.textContent).toContain("Mueve a la papelera");
