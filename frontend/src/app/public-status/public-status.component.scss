@@ -16,7 +16,13 @@ h1 { margin: .45rem 0 .8rem; font-size: clamp(2.5rem, 6vw, 4.7rem); line-height:
 button { padding: .8rem 1.1rem; border: 1px solid var(--uvh-border); border-radius: 3px; color: var(--uvh-ink); background: var(--uvh-surface-raised); font: inherit; font-weight: 700; cursor: pointer; transition: border-color 160ms ease, color 160ms ease; }
 button:hover:not(:disabled) { border-color: var(--uvh-electric); color: var(--uvh-electric); }
 button:disabled { opacity: .6; cursor: wait; }
-.state-card { display: flex; align-items: center; gap: 1rem; min-height: 92px; padding: 1.2rem 1.4rem; background: var(--uvh-surface-raised); border: 1px solid var(--uvh-border); border-radius: 3px; }
+// The overall state takes a left rule in its own colour, so the plate itself
+// already reads operational / degraded / outage before the colour dot does.
+.state-card { display: flex; align-items: center; gap: 1rem; min-height: 92px; padding: 1.2rem 1.4rem; background: var(--uvh-surface-raised); border: 1px solid var(--uvh-border); border-left: 3px solid var(--uvh-muted); border-radius: 3px; }
+.state-card[data-status="operational"] { border-left-color: var(--uvh-success); }
+.state-card[data-status="degraded"], .state-card[data-status="maintenance"] { border-left-color: var(--uvh-warn); }
+.state-card[data-status="major_outage"] { border-left-color: var(--uvh-danger); }
+.state-card.unknown { border-left-color: var(--uvh-warn); }
 .state-card i, .component-grid i { width: .75rem; height: .75rem; flex: 0 0 auto; border-radius: 50%; background: var(--uvh-muted); outline: .35rem solid color-mix(in srgb, var(--uvh-muted) 14%, transparent); }
 .state-card[data-status="operational"] i, [data-status="operational"] i { background: var(--uvh-success); outline-color: var(--uvh-success-soft); }
 .state-card[data-status="degraded"] i, [data-status="degraded"] i, [data-status="maintenance"] i { background: var(--uvh-warn); outline-color: var(--uvh-warn-soft); }
@@ -24,17 +30,29 @@ button:disabled { opacity: .6; cursor: wait; }
 .state-card h2, .state-card p { margin: .15rem 0; } .state-card p { color: var(--uvh-muted); }
 .loading span { width: 1.2rem; height: 1.2rem; border: 2px solid var(--uvh-border); border-top-color: var(--uvh-electric); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.components, .incidents { margin-top: 2.7rem; } .components > h2, .incidents > h2 { font-size: 1.25rem; font-weight: 800; letter-spacing: -.03em; }
-.component-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; }
-.component-grid article { padding: 1.1rem; background: var(--uvh-surface-raised); border: 1px solid var(--uvh-border); border-radius: 3px; }
+.components, .incidents { margin-top: 2.7rem; } .components > h2, .incidents > h2 { margin: 0 0 1rem; color: var(--uvh-muted); font: 10px/1.5 "Courier New", monospace; letter-spacing: .12em; text-transform: uppercase; }
+// One ruled band, not a tile per component: the grid carries the hierarchy.
+.component-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--uvh-border); }
+.component-grid article { min-width: 0; padding: 1.1rem 1.1rem 1.2rem; border-left: 1px solid var(--uvh-border); }
+.component-grid article:nth-child(3n + 1) { padding-left: 0; border-left: 0; }
 .component-grid span { display: flex; align-items: center; gap: .7rem; min-height: 2.7rem; }
 .component-grid b { display: block; margin-top: .8rem; color: var(--uvh-muted); font-size: .83rem; }
-.incidents article, .empty { padding: 1.2rem; background: var(--uvh-surface-raised); border: 1px solid var(--uvh-border); border-radius: 3px; }
-.incidents article + article { margin-top: .7rem; } .incidents article div { display: flex; justify-content: space-between; gap: 1rem; }
+// Incidents read as a ledger: hairlines between entries, no card per entry.
+.incidents article { padding: 1.2rem 0; border-top: 1px solid var(--uvh-border); }
+.incidents article:last-child { border-bottom: 1px solid var(--uvh-border); }
+.empty { color: var(--uvh-muted); }
+.incidents article div { display: flex; justify-content: space-between; gap: 1rem; }
 .incidents h3, .incidents p { margin: .15rem 0 .7rem; } .incidents p, .empty, .incidents span { color: var(--uvh-muted); }
-.incidents article > b { text-transform: capitalize; font-size: .78rem; }
-aside { margin-top: 3rem; padding: 1.2rem 1.4rem; color: var(--uvh-muted); background: var(--uvh-surface-raised); border-left: 2px solid var(--uvh-border); border-radius: 3px; line-height: 1.7; }
+.incidents article > b { color: var(--uvh-muted); font: .72rem/1.6 "Courier New", monospace; letter-spacing: .1em; text-transform: uppercase; }
+aside { margin-top: 3rem; padding: .2rem 0 .2rem 1.2rem; color: var(--uvh-muted); border-left: 3px solid var(--uvh-electric); line-height: 1.7; }
 aside strong { color: var(--uvh-ink); }
 footer { border-top: 1px solid var(--uvh-border); justify-content: flex-start; color: var(--uvh-muted); } footer span { margin-right: auto; }
-@media (max-width: 720px) { .title-row { align-items: flex-start; flex-direction: column; } .component-grid { grid-template-columns: 1fr; } header { align-items: flex-start; } .incidents article div { flex-direction: column; } }
+@media (max-width: 720px) {
+  .title-row { align-items: flex-start; flex-direction: column; }
+  header { align-items: flex-start; }
+  .incidents article div { flex-direction: column; }
+  .component-grid { grid-template-columns: 1fr; }
+  .component-grid article { border-left: 0; }
+  .component-grid article:nth-child(n + 2) { border-top: 1px solid var(--uvh-border); }
+}
 @media (prefers-reduced-motion: reduce) { .loading span { animation: none; } * { transition: none !important; } }

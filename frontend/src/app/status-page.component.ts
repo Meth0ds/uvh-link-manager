@@ -58,8 +58,12 @@ import { MatIconModule } from "@angular/material/icon";
         text-align: center;
         background: var(--uvh-surface-raised);
         border: 1px solid var(--uvh-border);
+        border-top: 3px solid var(--uvh-electric);
         border-radius: 3px;
       }
+      /* El estado también se lee en color: 403 avisa, 404 informa. */
+      .status-page[data-kind="forbidden"] .status-card { border-top-color: var(--uvh-warn); }
+      .status-page[data-kind="forbidden"] .status-icon { color: var(--uvh-warn); }
       .status-icon {
         display: inline-flex;
         align-items: center;
@@ -76,8 +80,8 @@ import { MatIconModule } from "@angular/material/icon";
       .status-code {
         display: block;
         color: var(--uvh-muted);
-        font: 12px/1.6 "Courier New", monospace;
-        letter-spacing: .14em;
+        font: 11px/1.6 "Courier New", monospace;
+        letter-spacing: .18em;
       }
       h1 { margin: 8px 0 8px; font-size: clamp(24px, 4vw, 32px); font-weight: 800; letter-spacing: -.045em; }
       p { max-width: 420px; margin: 0 auto; color: var(--uvh-muted); font-size: 13px; line-height: 1.75; }
