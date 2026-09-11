@@ -8,7 +8,6 @@ import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
-import { MatRadioModule } from "@angular/material/radio";
 import { MatDividerModule } from "@angular/material/divider";
 import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatSelectModule } from "@angular/material/select";
@@ -37,7 +36,7 @@ import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-
     MatIconModule,
     MatProgressBarModule,
     MatSnackBarModule,
-    MatRadioModule,
+
     MatDividerModule,
     MatCheckboxModule,
     MatSelectModule,

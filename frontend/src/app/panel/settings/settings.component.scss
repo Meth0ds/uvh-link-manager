@@ -105,13 +105,13 @@ app-page-header { display: block; margin-bottom: 18px; }
 .settings-content {
   display: grid;
   min-width: 0;
-  gap: clamp(34px, 5vw, 58px);
+  gap: clamp(38px, 5vw, 60px);
 }
 
 .settings-section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 18px;
   min-width: 0;
   scroll-margin-top: 20px;
 }
@@ -121,7 +121,8 @@ app-page-header { display: block; margin-bottom: 18px; }
   grid-column: 1 / -1;
   align-items: flex-start;
   gap: 13px;
-  padding-bottom: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--uvh-border);
 
   > span {
     display: grid;
@@ -188,10 +189,10 @@ app-page-header { display: block; margin-bottom: 18px; }
   margin: 0;
 }
 
-.card-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 17px; }
+.card-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 19px; }
 .card-heading > div { min-width: 0; flex: 1; }
-.card-heading h2 { margin: 0; color: var(--uvh-ink); font-size: 15px; font-weight: 800; letter-spacing: -.02em; }
-.card-heading p { margin: 3px 0 0; color: var(--uvh-muted); font-size: 11.8px; line-height: 1.5; }
+.card-heading h2 { margin: 0; color: var(--uvh-ink); font-size: 17.5px; font-weight: 800; letter-spacing: -.03em; }
+.card-heading p { margin: 4px 0 0; color: var(--uvh-muted); font-size: 12px; line-height: 1.6; }
 .card-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); color: var(--uvh-electric); }
 .card-icon mat-icon { width: 19px; height: 19px; font-size: 19px; }
 .count-badge { display: inline-flex; min-width: 28px; height: 28px; align-items: center; justify-content: center; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); color: var(--uvh-electric); font: 11px/1 "Courier New", monospace; font-weight: 700; }
@@ -547,8 +548,9 @@ app-page-header { display: block; margin-bottom: 18px; }
     justify-items: center;
     gap: 6px;
     min-width: 52px;
-    color: var(--uvh-muted-soft);
-    font-size: 9.5px;
+    color: var(--uvh-muted);
+    font: 10px/1.5 "Courier New", monospace;
+    letter-spacing: .04em;
     transition: color 180ms ease;
 
     &:not(:last-child)::after {
@@ -570,17 +572,17 @@ app-page-header { display: block; margin-bottom: 18px; }
       width: 27px;
       height: 27px;
       place-items: center;
-      border: 1px solid var(--uvh-border-strong);
-      border-radius: 50%;
+      border: 1px solid var(--uvh-border);
+      border-radius: 3px;
       background: var(--uvh-surface-raised);
       font-size: 10px;
-      font-weight: 850;
-      transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+      font-weight: 700;
+      transition: background-color 180ms ease, border-color 180ms ease;
     }
 
     mat-icon { width: 15px; height: 15px; font-size: 15px; }
     &.active { color: var(--uvh-ink); }
-    &.active > span { border-color: var(--uvh-electric); background: var(--uvh-electric); color: var(--accent-ink); transform: scale(1.06); outline: 4px solid color-mix(in srgb, var(--uvh-electric) 9%, transparent); }
+    &.active > span { border-color: var(--uvh-electric); background: var(--uvh-electric); color: var(--accent-ink); }
     &.complete { color: var(--uvh-success); }
     &.complete > span { border-color: color-mix(in srgb, var(--uvh-success) 45%, var(--uvh-border)); background: var(--uvh-success-soft); }
     &.complete::after { background: color-mix(in srgb, var(--uvh-success) 54%, var(--uvh-border)); }
@@ -838,15 +840,13 @@ app-page-header { display: block; margin-bottom: 18px; }
   color: var(--uvh-danger);
 }
 
-mat-radio-group {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-  margin-top: 8px;
-}
-
-mat-radio-button { min-width: 0; padding: 5px 7px; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); font-size: 11.5px; transition: border-color 160ms ease, background-color 160ms ease; }
-mat-radio-button:hover { border-color: color-mix(in srgb, var(--uvh-electric) 30%, var(--uvh-border)); background: color-mix(in srgb, var(--uvh-electric) 4%, transparent); }
+// Theme selection: the dashboard's segmented switch grammar, not a bare
+// stacked radio list.
+.theme-switch { display: flex; gap: 3px; width: fit-content; padding: 3px; border: 1px solid var(--uvh-border); border-radius: 4px; }
+.theme-switch button { min-height: 38px; padding: 0 16px; border: 0; border-radius: 2px; color: var(--uvh-muted); background: transparent; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; transition: color 160ms ease, background-color 160ms ease; }
+.theme-switch button:hover { color: var(--uvh-ink); background: var(--soft); }
+.theme-switch button.active { color: var(--accent-ink); background: var(--uvh-electric); }
+.theme-switch :is(button):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 2px; }
 
 @media (max-width: 1180px) {
   .settings-section { grid-template-columns: 1fr; }
@@ -883,7 +883,6 @@ mat-radio-button:hover { border-color: color-mix(in srgb, var(--uvh-electric) 30
   .security-state { margin-left: 51px; }
   .privacy-case > header { flex-direction: column; }
   .privacy-case > dl { grid-template-columns: 1fr; }
-  mat-radio-group { grid-template-columns: 1fr; }
   .session-row { align-items: flex-start; flex-direction: column; }
   .session-row > button { margin-left: 36px; }
   .row-actions { align-items: stretch; flex-direction: column; }

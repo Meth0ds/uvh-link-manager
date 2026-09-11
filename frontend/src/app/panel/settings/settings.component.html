@@ -100,11 +100,11 @@
 
 <div class="card-block appearance-card">
   <div class="card-heading"><span class="card-icon"><mat-icon>palette</mat-icon></span><div><h2>Apariencia</h2><p>Elige el tema del panel o sigue el sistema.</p></div></div>
-  <mat-radio-group aria-label="Tema" [value]="themePref()" (change)="setTheme($event.value)">
-    @for (o of themeOptions; track o) {
-      <mat-radio-button [value]="o.value">{{ o.label }}</mat-radio-button>
+  <div class="theme-switch" role="group" aria-label="Tema del panel">
+    @for (o of themeOptions; track o.value) {
+      <button type="button" [class.active]="themePref() === o.value" [attr.aria-pressed]="themePref() === o.value" (click)="setTheme(o.value)">{{ o.label }}</button>
     }
-  </mat-radio-group>
+  </div>
 </div>
     </section>
 
