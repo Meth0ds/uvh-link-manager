@@ -66,7 +66,7 @@ function rule(value: unknown): RedirectRule {
   const country = nullableText(source["country"], "redirect country", 2);
   if (country !== null && !/^[a-z]{2}$/i.test(country)) invalid("redirect country");
   const language = nullableText(source["language"], "redirect language", 8);
-  if (language !== null && !/^[a-z0-9-]+$/i.test(language)) invalid("redirect language");
+  if (language !== null && !/^[a-z]{2,3}(?:-[a-z0-9]{2,4})?$/i.test(language)) invalid("redirect language");
   const timeFrom = nullableText(source["timeFrom"], "redirect start time", 5);
   const timeTo = nullableText(source["timeTo"], "redirect end time", 5);
   if ((timeFrom !== null && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(timeFrom))
@@ -168,8 +168,32 @@ function dimension(value: unknown, contract: string): Array<{ key: string; value
 export function decodeAnalyticsOverview(value: unknown): AnalyticsOverview {
   const source = record(value, "analytics overview");
   const totals = record(source["totals"], "analytics totals");
+  const dimensionTotals = record(source["dimensionTotals"], "analytics dimension totals");
+  const countries = dimension(source["countries"], "analytics countries");
+  const devices = dimension(source["devices"], "analytics devices");
+  const browsers = dimension(source["browsers"], "analytics browsers");
+  const os = dimension(source["os"], "analytics operating systems");
+  const referrers = dimension(source["referrers"], "analytics referrers");
+  const campaigns = dimension(source["campaigns"], "analytics campaigns");
+  const decodedDimensionTotals = {
+    countries: integer(dimensionTotals["countries"], "analytics country total"),
+    devices: integer(dimensionTotals["devices"], "analytics device total"),
+    browsers: integer(dimensionTotals["browsers"], "analytics browser total"),
+    os: integer(dimensionTotals["os"], "analytics operating-system total"),
+    referrers: integer(dimensionTotals["referrers"], "analytics referrer total"),
+    campaigns: integer(dimensionTotals["campaigns"], "analytics campaign total"),
+  };
+  // A total smaller than the returned top-eight list proves that the response
+  // mixed incompatible queries or contracts; reject it before rendering.
+  if (decodedDimensionTotals.countries < countries.length
+    || decodedDimensionTotals.devices < devices.length
+    || decodedDimensionTotals.browsers < browsers.length
+    || decodedDimensionTotals.os < os.length
+    || decodedDimensionTotals.referrers < referrers.length
+    || decodedDimensionTotals.campaigns < campaigns.length) invalid("analytics dimension totals");
   return {
     totals: { clicks: integer(totals["clicks"], "analytics totals"), visitors: integer(totals["visitors"], "analytics totals") },
+    visitorMetric: literal(source["visitorMetric"], new Set(["daily_pseudonyms"]), "analytics visitor metric"),
     series: boundedArray(source["series"], "analytics series", 181).map((item) => {
       const row = record(item, "analytics series");
       return { day: text(row["day"], "analytics day", 16), clicks: integer(row["clicks"], "analytics series"), visitors: integer(row["visitors"], "analytics series") };
@@ -184,12 +208,13 @@ export function decodeAnalyticsOverview(value: unknown): AnalyticsOverview {
         visitors: integer(row["visitors"], "analytics top link"),
       };
     }),
-    countries: dimension(source["countries"], "analytics countries"),
-    devices: dimension(source["devices"], "analytics devices"),
-    browsers: dimension(source["browsers"], "analytics browsers"),
-    os: dimension(source["os"], "analytics operating systems"),
-    referrers: dimension(source["referrers"], "analytics referrers"),
-    campaigns: dimension(source["campaigns"], "analytics campaigns"),
+    countries,
+    devices,
+    browsers,
+    os,
+    referrers,
+    campaigns,
+    dimensionTotals: decodedDimensionTotals,
   };
 }
 

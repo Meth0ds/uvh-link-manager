@@ -63,8 +63,8 @@ export class SecurityCenterComponent {
     this.error.set(null);
     try {
       const [snapshot, sessions] = await Promise.all([
-        this.api.get<SecurityCenterSnapshot>("/api/v1/auth/security-center", undefined, decodeSecurityCenter),
-        this.auth.listSessions(),
+        this.api.get<SecurityCenterSnapshot>("/api/v1/auth/security-center", undefined, decodeSecurityCenter, { signal: request.signal }),
+        this.auth.listSessions({ signal: request.signal }),
       ]);
       if (!this.requests.isCurrent(request, this.auth.sessionGeneration())) return;
       const now = Date.now();

@@ -33,7 +33,9 @@ final class ProvisionDomainTlsJob implements ShouldQueue
         public int $requestedBy,
         public string $domain,
         public int $tlsVersion,
-    ) {}
+    ) {
+        $this->onQueue('domains');
+    }
 
     public function handle(): void
     {

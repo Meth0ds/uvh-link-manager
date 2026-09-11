@@ -2,8 +2,8 @@
 
 namespace App\Support;
 
-use App\Models\ClickEvent;
 use App\Models\MetricRollup;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 class AnalyticsService
@@ -13,13 +13,15 @@ class AnalyticsService
     /**
      * @param  array{country: ?string, device: ?string, browser: ?string, os: ?string, referrer_domain: ?string, campaign: ?string, visitor_hash: ?string}  $meta
      */
-    public static function recordClick(int $linkId, array $meta): void
+    public static function recordClick(int $linkId, array $meta, ?string $eventId = null, ?string $occurredAt = null): void
     {
-        $now = now();
+        $eventId ??= (string) \Illuminate\Support\Str::uuid();
+        $now = $occurredAt !== null ? CarbonImmutable::parse($occurredAt)->utc() : CarbonImmutable::now('UTC');
         $day = $now->format('Y-m-d');
 
-        DB::transaction(function () use ($linkId, $meta, $now, $day): void {
-            ClickEvent::create([
+        DB::transaction(function () use ($eventId, $linkId, $meta, $now, $day): void {
+            $inserted = DB::table('click_events')->insertOrIgnore([
+                'event_id' => $eventId,
                 'link_id' => $linkId,
                 'occurred_at' => $now,
                 'country' => $meta['country'] ?? null,
@@ -31,6 +33,11 @@ class AnalyticsService
                 'visitor_hash' => $meta['visitor_hash'] ?? null,
                 'password_ok' => true,
             ]);
+            if ($inserted !== 1) {
+                // Database-backed queues use at-least-once delivery. A retry
+                // after commit must not increment either event or rollup twice.
+                return;
+            }
 
             $isNewVisitor = false;
             if (! empty($meta['visitor_hash'])) {

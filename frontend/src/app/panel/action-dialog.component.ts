@@ -55,7 +55,7 @@ export type ActionDialogResult = true | string | null;
       <button mat-button type="button" (click)="close()">Cancelar</button>
       <button
         mat-flat-button
-        [color]="data.destructive ? 'warn' : 'primary'"
+        [class.destructive-confirm]="data.destructive"
         type="button"
         (click)="submit()"
         [disabled]="data.inputRequired && !validInput()"
@@ -66,20 +66,7 @@ export type ActionDialogResult = true | string | null;
     </mat-dialog-actions>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: [`
-    :host { display: block; min-width: min(420px, 86vw); }
-    h2 { display: flex; align-items: center; gap: 11px; letter-spacing: -.025em; }
-    h2 > span:last-child { display: flex; flex-direction: column; }
-    h2 small { color: var(--uvh-muted-soft); font-size: 8.5px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
-    h2 b { color: var(--uvh-ink); font-size: 18px; font-weight: 850; }
-    .title-mark { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); }
-    .title-mark mat-icon { width: 20px; height: 20px; font-size: 20px; }
-    .title-mark.danger { background: var(--uvh-danger-soft); color: var(--uvh-danger); }
-    .message { margin: 0 0 16px; color: var(--uvh-muted); font-size: 14px; line-height: 1.6; }
-    .input-form { display: block; }
-    .full { width: 100%; }
-    .error { margin-top: -4px; color: var(--uvh-danger); font-size: 12px; }
-  `],
+  styleUrl: "./dialog-identity.scss",
 })
 export class ActionDialogComponent {
   readonly data = inject<ActionDialogData>(MAT_DIALOG_DATA);

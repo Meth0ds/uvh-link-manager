@@ -359,9 +359,15 @@ class LinkService
 
     public static function shortUrl(?string $domain, string $alias): string
     {
-        $host = $domain ?? (string) config('uvh.public_host');
+        if ($domain !== null) {
+            // Custom domains become active only after TLS readiness, so their
+            // generated public origin is always HTTPS.
+            return 'https://'.$domain.'/'.rawurlencode($alias);
+        }
 
-        return "https://{$host}/{$alias}";
+        // Default links use a complete configurable origin. This preserves the
+        // production HTTPS invariant while allowing local HTTP ports in E2E.
+        return rtrim((string) config('uvh.public_origin'), '/').'/'.rawurlencode($alias);
     }
 
     private static function deriveState(array $input): string
@@ -472,7 +478,8 @@ class LinkService
         if ($country !== null && (! is_string($country) || ! preg_match('/^[a-zA-Z]{2}$/', $country))) {
             return null;
         }
-        if ($language !== null && (! is_string($language) || strlen($language) > 8 || ! preg_match('/^[a-zA-Z0-9-]+$/', $language))) {
+        if ($language !== null && (! is_string($language) || strlen($language) > 8
+            || ! preg_match('/^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,4})?$/D', $language))) {
             return null;
         }
         if ($device !== null && ! in_array($device, ['desktop', 'mobile', 'tablet'], true)) {
@@ -496,7 +503,7 @@ class LinkService
         return [
             'priority' => $priority,
             'country' => $country,
-            'language' => $language,
+            'language' => $language !== null ? strtolower($language) : null,
             'device' => $device,
             'os' => $os,
             'time_from' => $timeFrom,
@@ -523,14 +530,7 @@ class LinkService
 
     private static function iso(mixed $value): ?string
     {
-        if ($value === null) {
-            return null;
-        }
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format('Y-m-d\TH:i:s.v\Z');
-        }
-
-        return (string) $value;
+        return IsoDate::format($value);
     }
 
     private static function isUniqueViolation(QueryException $e): bool

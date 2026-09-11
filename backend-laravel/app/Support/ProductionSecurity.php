@@ -56,6 +56,9 @@ final class ProductionSecurity
         if ((bool) ($settings['debug'] ?? false)) {
             $errors[] = 'APP_DEBUG debe ser false en producción';
         }
+        if (($settings['hcaptcha_dev_fallback'] ?? false) !== false) {
+            $errors[] = 'HCAPTCHA_DEV_FALLBACK debe ser false en producción';
+        }
 
         $appHost = strtolower((string) ($settings['app_host'] ?? ''));
         $publicHost = strtolower((string) ($settings['public_host'] ?? ''));
@@ -64,6 +67,12 @@ final class ProductionSecurity
         }
         if (! self::validAppUrl((string) ($settings['app_url'] ?? ''), $appHost)) {
             $errors[] = 'APP_URL debe ser el origen HTTPS exacto de APP_HOST';
+        }
+        if (! self::validAppUrl((string) ($settings['public_origin'] ?? ''), $publicHost)) {
+            $errors[] = 'PUBLIC_ORIGIN debe ser el origen HTTPS exacto de PUBLIC_HOST';
+        }
+        if (! self::validLegalIdentity($settings)) {
+            $errors[] = 'La identidad legal del prestador debe estar completa y no contener marcadores pendientes';
         }
         $metricsToken = (string) ($settings['metrics_bearer_token'] ?? '');
         if (strlen($metricsToken) < 43 || strlen($metricsToken) > 256 || preg_match('/[\x00-\x20\x7f]/', $metricsToken)) {
@@ -224,6 +233,31 @@ final class ProductionSecurity
         }
 
         return $errors;
+    }
+
+    /** @param array<string, mixed> $settings */
+    private static function validLegalIdentity(array $settings): bool
+    {
+        $limits = [
+            'legal_name' => [2, 200],
+            'legal_tax_id' => [3, 40],
+            'legal_address' => [10, 500],
+            'legal_registry' => [3, 500],
+            'legal_hosting_provider' => [2, 200],
+            'legal_hosting_region' => [2, 200],
+        ];
+        foreach ($limits as $key => [$minimum, $maximum]) {
+            $value = trim((string) ($settings[$key] ?? ''));
+            if (! mb_check_encoding($value, 'UTF-8')
+                || mb_strlen($value) < $minimum
+                || mb_strlen($value) > $maximum
+                || preg_match('/[\x00-\x1f\x7f]/u', $value)
+                || preg_match('/(?:\bpendiente\b|por completar|\btodo\b|\btbd\b|change.?me|example)/iu', $value)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static function validTrustedProxies(string $raw): bool

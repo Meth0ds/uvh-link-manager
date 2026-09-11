@@ -8,7 +8,8 @@ Este documento es un gate de lanzamiento, no una declaración de que el entorno 
 - [ ] `composer install --no-dev`, PHPUnit completo y migraciones se ejecutan con las imágenes exactas del release.
 - [ ] La imagen desplegada se identifica por digest o commit y existe un procedimiento probado de rollback compatible con las migraciones.
 - [ ] `APP_ENV=production`, `APP_DEBUG=false` y el arranque pasa las invariantes de `ProductionSecurity`.
-- [ ] La migración se ejecuta una sola vez antes de recrear `app`, `queue` y `scheduler`.
+- [ ] La migración se ejecuta una sola vez antes de recrear `app`, todos los
+  workers `queue-*` y `scheduler`.
 - [ ] `php artisan uvh:release-check` pasa con la imagen y base del release.
   Probar que esquema pendiente/ausente impide arrancar PHP-FPM, queue y scheduler
   y hace fallar sus healthchecks; el job explícito `migrate` debe seguir disponible
@@ -40,11 +41,16 @@ Este documento es un gate de lanzamiento, no una declaración de que el entorno 
 
 ## Procesos y observabilidad
 
-- [ ] Hay al menos un worker y un scheduler supervisados; su caída genera una alerta.
-- [ ] El worker usa `--timeout=180` y la cola `retry_after>=200`; se demuestra
-  que un export de 25 MiB no se entrega dos veces ni queda huérfano al matar el
-  proceso durante escritura, cifrado, publicación o correo.
-- [ ] Se alertan `/health`, latencia/errores HTTP, antigüedad de cola, `failed_jobs`, entregas webhook fallidas y uso de recursos.
+- [ ] Cada pool (`mail`, `webhooks`, `domains`, `exports`, `analytics` y
+  `legacy`) y el scheduler están supervisados; detener uno genera una alerta
+  diferenciada sin que el heartbeat genérico o el de otro pool la oculte.
+- [ ] Cada timeout de job es menor que el timeout de su worker y éste es menor
+  que `DB_QUEUE_RETRY_AFTER`; se demuestra que un export máximo de 12 MiB no se
+  ejecuta dos veces ni queda huérfano al matar el proceso durante escritura,
+  cifrado, publicación, descarga o acuse de recepción.
+- [ ] Se alertan `/health`, latencia/errores HTTP, profundidad, antigüedad y
+  heartbeat de cada cola, `failed_jobs`, entregas webhook fallidas y uso de
+  recursos.
 - [ ] Logs centralizados no contienen contraseñas, tokens, cookies, URLs sensibles ni cuerpos completos de webhooks.
 - [ ] Está probado el procedimiento para reintentar trabajos, recuperar un scheduler detenido y rotar secretos.
 - [ ] Ensayar [`mail-outbox-runbook.md`](mail-outbox-runbook.md): caída y recuperación

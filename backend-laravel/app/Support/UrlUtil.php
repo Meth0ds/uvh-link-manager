@@ -7,7 +7,7 @@ class UrlUtil
     public const RESERVED_ALIASES = [
         'app', 'api', 'admin', 'login', 'registro', 'register', 'soporte', 'support',
         'security', 'privacy', 'terms', 'denunciar', 'report', 'robots.txt',
-        'sitemap.xml', 'favicon.ico', 'health', 'legal', 'auth', 'settings',
+        'sitemap.xml', 'favicon.ico', 'health', 'help', 'status', 'legal', 'auth', 'settings',
     ];
 
     /**

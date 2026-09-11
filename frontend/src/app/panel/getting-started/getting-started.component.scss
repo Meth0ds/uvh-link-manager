@@ -1,27 +1,61 @@
-:host { display: block; }
-.guide { padding: 22px; margin-bottom: 22px; border: 1px solid var(--uvh-border); border-radius: 18px; background: var(--uvh-surface-raised); color: var(--uvh-ink); box-shadow: var(--uvh-shadow-sm); }
-h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
-p { color: var(--uvh-muted); line-height: 1.6; font-size: 14px; }
-.guide-heading, .guide-message { display: flex; align-items: center; gap: 14px; }
-.guide-heading { justify-content: space-between; }
-.guide-heading p { margin-bottom: 0; }
-.eyebrow { display: block; color: var(--uvh-electric); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin-bottom: 6px; }
-.progress-count { padding: 14px; border-radius: 14px; color: var(--uvh-electric); background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.steps { list-style: none; padding: 0; margin: 22px 0; }
-.steps li { display: flex; align-items: flex-start; gap: 16px; padding: 20px 0; border-top: 1px solid var(--uvh-border); }
-.steps mat-icon, .guide-message mat-icon { flex: 0 0 24px; color: var(--uvh-electric); }
-.observed > mat-icon { color: var(--uvh-teal); }
-.step-copy { flex: 1; min-width: 0; }
-h3 { margin: 0 0 4px; font-size: 15px; }
-.step-state { font-size: 12px; font-weight: 650; color: var(--uvh-muted); }
-.step-copy p { margin: 8px 0 0; overflow-wrap: anywhere; }
-.steps a { flex-shrink: 0; }
-.guide-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-.guide-note { font-size: 12px; margin-bottom: 0; }
-@media (max-width: 680px) {
-  .guide { padding: 16px; }
-  .steps li { flex-wrap: wrap; gap: 12px; }
-  .step-copy { flex-basis: calc(100% - 36px); }
-  .steps a { margin-left: 36px; }
-  .guide-actions { align-items: stretch; flex-direction: column; }
+:host { display: block; container-type: inline-size; }
+.guide { margin-bottom: 26px; color: var(--uvh-ink); }
+.guide.compact { padding: 22px 24px; border: 1px solid var(--uvh-border); border-left: 3px solid var(--uvh-teal); border-radius: 3px; background: var(--guide); }
+h2 { max-width: 34ch; margin: 0; color: var(--uvh-ink); font-size: clamp(22px, 3cqi, 30px); font-weight: 800; line-height: 1.3; letter-spacing: -.045em; text-wrap: balance; }
+.compact h2 { max-width: none; font-size: 18px; letter-spacing: -.03em; }
+p { color: var(--uvh-muted); line-height: 1.8; font-size: 13px; }
+.guide-heading, .guide-message { display: flex; align-items: center; gap: 20px; }
+.guide-heading { justify-content: space-between; padding-bottom: 12px; }
+.guide-heading > div { min-width: 0; }
+.guide-heading p { margin: 10px 0 0; }
+.eyebrow { display: block; color: var(--uvh-muted); font: 10px/1.5 "Courier New", monospace; text-transform: uppercase; letter-spacing: .09em; margin-bottom: 10px; }
+.progress-count { display: flex; align-items: baseline; flex-shrink: 0; gap: 7px; padding-left: 24px; border-left: 1px solid var(--uvh-border); color: var(--uvh-muted); font: 13px/1 "Courier New", monospace; }
+.progress-count b { color: var(--uvh-teal); font-family: Manrope, sans-serif; font-size: 48px; font-weight: 800; letter-spacing: -.06em; }
+.compact .progress-count b { font-size: 34px; }
+.steps { list-style: none; padding: 0; margin: 24px 0; }
+.steps li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: start; gap: 24px; padding: 28px 0; border-top: 1px solid var(--uvh-border); }
+.steps li:last-child { border-bottom: 1px solid var(--uvh-border); }
+.step-number { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; color: var(--uvh-muted); font: 13px/1 "Courier New", monospace; }
+.observed .step-number { color: var(--uvh-teal); border-color: var(--uvh-teal); background: var(--guide); }
+.step-copy { min-width: 0; }
+.step-topline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.step-kind { color: var(--uvh-muted); font: 10px/1.4 "Courier New", monospace; text-transform: uppercase; letter-spacing: .05em; }
+.step-state { display: inline-flex; gap: 4px; align-items: center; padding-left: 10px; border-left: 1px solid var(--uvh-border); font-size: 10px; color: var(--uvh-muted); }
+.step-state mat-icon { flex-shrink: 0; width: 14px; height: 14px; font-size: 14px; }
+.observed .step-state { color: var(--uvh-success); }
+.step-copy h3 { margin: 0; color: var(--uvh-ink); font-size: 19px; font-weight: 800; letter-spacing: -.035em; }
+.step-copy p { max-width: 72ch; margin: 10px 0 0; overflow-wrap: anywhere; }
+.steps a { align-self: center; margin-left: 10px; min-height: 44px; max-width: 230px; height: auto; padding-block: 10px; text-align: center; }
+.guide-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.guide-actions :is(a, button) { min-height: 44px; }
+.guide-actions a mat-icon { transition: transform 180ms ease; }
+.guide-actions a:hover mat-icon { transform: translateX(3px); }
+.guide-note { display: flex; align-items: flex-start; gap: 12px; max-width: 76ch; font-size: 12px; margin: 26px 0 0; padding: 18px; border-left: 2px solid var(--uvh-border); background: var(--uvh-surface-raised); }
+.guide-note mat-icon { flex: 0 0 18px; width: 18px; height: 18px; font-size: 18px; color: var(--uvh-muted); }
+.guide-note b { color: var(--uvh-ink); font-size: 12px; }
+.guide-note p { margin: 8px 0 0; font-size: 12px; }
+.guide-message { align-items: flex-start; margin-bottom: 14px; }
+.guide-message mat-icon { flex: 0 0 24px; color: var(--uvh-teal); }
+.guide-message[role=alert] mat-icon { color: var(--uvh-danger); }
+.guide-message p { margin: 0; }
+:is(a, button):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
+@container (max-width: 820px) {
+  .steps li { grid-template-columns: 38px minmax(0, 1fr); gap: 18px; }
+  .steps a { grid-column: 2; justify-self: start; margin: 0; }
 }
+@container (max-width: 460px) {
+  .guide.compact { padding: 20px 16px; }
+  .guide-heading { align-items: flex-start; gap: 14px; }
+  .progress-count { padding-left: 12px; gap: 4px; }
+  .progress-count b { font-size: 32px; }
+  .compact .guide-heading { flex-wrap: wrap; }
+  .compact .progress-count { display: none; } // The textual count is always visible.
+  .steps li { grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
+  .step-number { width: 26px; height: 28px; font-size: 11px; }
+  .step-topline { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .step-state { padding: 0; border: 0; }
+  .step-copy h3 { font-size: 18px; }
+  .guide-actions { align-items: stretch; flex-direction: column; gap: 8px; }
+  .guide-note { padding: 16px 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .guide-actions a mat-icon { transition: none; } }

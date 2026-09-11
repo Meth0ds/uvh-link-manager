@@ -8,6 +8,7 @@ import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import type { WorkspaceGettingStarted } from "../../core/models";
 import { decodeWorkspaceGettingStarted } from "../../core/services/workspace-response-decoders";
+import { LatestRequest } from "../../core/services/latest-request";
 import { PageHeaderComponent } from "../page-header.component";
 import { gettingStartedSteps } from "./getting-started.steps";
 
@@ -27,9 +28,9 @@ export class GettingStartedComponent {
   private readonly auth = inject(AuthService);
   private readonly workspaces = inject(WorkspaceService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly requests = new LatestRequest(this.destroyRef);
   private readonly state = signal<LoadState | null>(null);
   private readonly preference = signal<{ key: string; hidden: boolean } | null>(null);
-  private requestNumber = 0;
   readonly reviewing = signal(false);
   readonly storageWarning = signal(false);
 
@@ -72,15 +73,16 @@ export class GettingStartedComponent {
 
   async reload(): Promise<void> {
     const context = this.context();
-    const request = ++this.requestNumber;
+    const request = this.requests.begin(context?.key ?? null);
     this.state.set(context ? { key: context.key, loading: true, error: null, data: null } : null);
     if (!context || this.destroyRef.destroyed) return;
-    const isCurrent = () => !this.destroyRef.destroyed && request === this.requestNumber && context.key === this.context()?.key;
+    const isCurrent = () => this.requests.isCurrent(request, context.key) && context.key === this.context()?.key;
     try {
       const data = await this.api.get<WorkspaceGettingStarted>(
         `/api/v1/workspaces/${context.workspaceId}/getting-started`,
         undefined,
         (value) => decodeWorkspaceGettingStarted(value, context.workspaceId),
+        { signal: request.signal },
       );
       if (!isCurrent()) return;
       // Keep a local context assertion as defence in depth and for test doubles

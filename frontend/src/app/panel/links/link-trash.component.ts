@@ -73,7 +73,7 @@ export class LinkTrashComponent {
     const request = this.requests.begin(`${workspaceId}:${page}:${perPage}:${this.q()}`);
     this.loading.set(true); this.error.set(null);
     try {
-      const response = await this.api.get<LinkTrashResponse>("/api/v1/links/trash", { q: this.q(), page, perPage }, (value) => decodeLinkTrashResponse(value, { page, perPage }));
+      const response = await this.api.get<LinkTrashResponse>("/api/v1/links/trash", { q: this.q(), page, perPage }, (value) => decodeLinkTrashResponse(value, { page, perPage }), { signal: request.signal });
       if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}`)) return;
       this.rows.set(response.links); this.total.set(response.total); this.retentionDays.set(response.retentionDays);
     } catch (err) {

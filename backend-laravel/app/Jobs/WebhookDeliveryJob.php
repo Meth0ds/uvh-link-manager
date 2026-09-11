@@ -26,7 +26,10 @@ class WebhookDeliveryJob implements ShouldQueue
     /** @var array<int, int> */
     public array $backoff = [10, 30, 60, 180];
 
-    public function __construct(public int $deliveryId) {}
+    public function __construct(public int $deliveryId)
+    {
+        $this->onQueue('webhooks');
+    }
 
     public function handle(): void
     {

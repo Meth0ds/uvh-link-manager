@@ -16,13 +16,14 @@ import { LatestRequest } from "../core/services/latest-request";
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <main class="card center" aria-live="polite">
-        @if (busy()) { <mat-progress-bar mode="indeterminate" /> }
-        <mat-icon class="icon" [class.ok]="ok()" [class.bad]="done() && !ok()">
+      <section class="card center" aria-labelledby="confirm-email-change-title">
+        <span class="step-kicker">CAMBIO DE DIRECCIÓN</span>
+        @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" /> }
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="done() && !ok()">
           {{ ok() ? 'mark_email_read' : (done() ? 'error_outline' : 'mark_email_unread') }}
         </mat-icon>
-        <h2>{{ ok() ? 'Email actualizado' : (done() ? 'No se pudo completar' : 'Confirmar nuevo email') }}</h2>
-        <p class="sub">{{ message() }}</p>
+        <h2 id="confirm-email-change-title">{{ ok() ? 'Email actualizado' : (done() ? 'No se pudo completar' : 'Confirmar nuevo email') }}</h2>
+        <p class="sub" role="status">{{ message() }}</p>
         @if (!done()) {
           <button mat-flat-button color="primary" type="button" (click)="confirm()" [disabled]="busy()">
             {{ busy() ? 'Confirmando…' : 'Confirmar y cerrar sesiones' }}
@@ -31,7 +32,7 @@ import { LatestRequest } from "../core/services/latest-request";
         } @else {
           <a mat-flat-button color="primary" routerLink="/auth">{{ ok() ? 'Iniciar sesión con el nuevo email' : 'Volver al acceso' }}</a>
         }
-      </main>
+      </section>
     </app-auth-shell>
   `,
   styleUrl: "./auth-card.scss",

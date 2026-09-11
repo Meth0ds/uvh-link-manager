@@ -17,8 +17,9 @@ a 31 días.
 
 ## Invariantes que no se pueden romper
 
-1. `app`, `queue`, `scheduler` y cualquier proceso `migrate` deben recibir el
-   mismo par de claves durante toda la fase de solapamiento.
+1. `app`, todos los workers `queue-*`, `scheduler` y cualquier proceso
+   `migrate` deben recibir el mismo par de claves durante toda la fase de
+   solapamiento.
 2. No puede quedar un proceso antiguo escribiendo con la clave anterior cuando
    se considere terminado el recifrado. En un despliegue gradual, todos los
    writers deben soportar primero el keyring nuevo/anterior.
@@ -53,7 +54,7 @@ inventario, al comando y a sus pruebas antes del siguiente despliegue.
 - Abrir una ventana de cambio y detener despliegues/migraciones concurrentes.
 - Confirmar que backup y restauración recientes están acreditados.
 - Revisar trabajos pendientes/fallidos, outbox, exports activos y salud de
-  `app`, worker y scheduler sin imprimir payloads.
+  `app`, todos los workers y scheduler sin imprimir payloads.
 - Generar una clave Base64URL independiente de al menos 32 bytes en un entorno
   seguro. Guardarla como la nueva clave actual en el gestor de secretos.
 - Conservar la clave vigente como secreto anterior separado.
@@ -77,7 +78,7 @@ forma concreta de evitar pérdida de servicio depende del balanceador; este
 comando provoca sustitución de contenedores y no acredita alta disponibilidad:
 
 ```powershell
-docker compose -f docker-compose.production.yml -f docker-compose.rotation.yml up -d --no-deps --force-recreate app queue scheduler
+docker compose -f docker-compose.production.yml -f docker-compose.rotation.yml up -d --no-deps --force-recreate app queue-mail queue-webhooks queue-domains queue-exports queue-analytics queue-legacy scheduler
 ```
 
 Comprobar health/heartbeats y un flujo controlado de MFA, firma de webhook y
@@ -135,8 +136,8 @@ sin coordinar también los artefactos privados y las dos versiones de clave.
 Sólo después de preflight cero, drenaje y validación funcional:
 
 1. retirar `APP_SECRET_PREVIOUS` y vaciar `APP_SECRET_ROTATION_UNTIL`;
-2. desplegar sin `docker-compose.rotation.yml` y recrear juntos `app`, `queue`
-   y `scheduler`;
+2. desplegar sin `docker-compose.rotation.yml` y recrear juntos `app`, todos
+   los workers `queue-*` y `scheduler`;
 3. confirmar health, heartbeats, login/MFA controlado, webhook firmado, outbox
    y acceso a un export de prueba;
 4. revocar la clave anterior en el gestor de secretos según su política;

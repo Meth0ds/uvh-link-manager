@@ -210,6 +210,8 @@ export interface WebhookDeliveryPage {
 
 export interface AnalyticsOverview {
   totals: { clicks: number; visitors: number };
+  /** Counts daily rotating pseudonyms; it is not a count of people. */
+  visitorMetric: "daily_pseudonyms";
   series: Array<{ day: string; clicks: number; visitors: number }>;
   topLinks: Array<{ id: number; alias: string; destination: string; clicks: number; visitors: number }>;
   countries: Array<{ key: string; value: number }>;
@@ -218,6 +220,14 @@ export interface AnalyticsOverview {
   os: Array<{ key: string; value: number }>;
   referrers: Array<{ key: string; value: number }>;
   campaigns: Array<{ key: string; value: number }>;
+  dimensionTotals: {
+    countries: number;
+    devices: number;
+    browsers: number;
+    os: number;
+    referrers: number;
+    campaigns: number;
+  };
 }
 
 export interface Member {

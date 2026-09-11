@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Link;
-use App\Support\AnalyticsService;
+use App\Jobs\RecordClickAnalyticsJob;
 use App\Support\Ids;
 use App\Support\OperationalMetrics;
 use App\Support\RedirectService;
@@ -15,6 +15,7 @@ use App\Support\UvhRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Cookie;
 
 class RedirectController
@@ -179,7 +180,7 @@ class RedirectController
     {
         $ua = Ua::parse($ctx['user_agent'] ?? null);
         try {
-            AnalyticsService::recordClick($linkId, [
+            $meta = [
                 'country' => $ctx['country'] ?? null,
                 'device' => $ua['device'],
                 'browser' => $ua['browser'],
@@ -187,7 +188,11 @@ class RedirectController
                 'referrer_domain' => RedirectService::referrerDomain($ctx['referrer'] ?? null),
                 'campaign' => $campaign,
                 'visitor_hash' => $this->visitorHash($ctx['ip'] ?? null, $ctx['user_agent'] ?? null),
-            ]);
+            ];
+            // Queue only privacy-reduced dimensions. Redirect availability is
+            // deliberately higher priority than optional analytics admission;
+            // failure is counted and never weakens click limits/single-use.
+            RecordClickAnalyticsJob::dispatch((string) Str::uuid(), $linkId, now()->utc()->toIso8601String(), $meta);
         } catch (\Throwable $e) {
             // Redirect availability takes priority over analytics. The event is
             // observable by operators without leaking requester identifiers.

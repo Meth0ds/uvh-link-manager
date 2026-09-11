@@ -11,3 +11,17 @@ execFileSync(
   ["compose", "-p", "uvh-e2e", "-f", "docker-compose.e2e.yml", "down", "--volumes", "--remove-orphans"],
   { cwd: repositoryRoot, stdio: "inherit" },
 );
+
+// A clean checkout intentionally has no versioned vendor directory. Install
+// the locked backend dependencies through the same PHP image used by the E2E
+// application before Laravel is started. The bind mount keeps vendor available
+// to the later app container; --no-deps avoids starting or mutating a database.
+execFileSync(
+  "docker",
+  [
+    "compose", "-p", "uvh-e2e", "-f", "docker-compose.e2e.yml",
+    "run", "--rm", "--no-deps", "app",
+    "composer", "install", "--no-interaction", "--prefer-dist", "--no-progress",
+  ],
+  { cwd: repositoryRoot, stdio: "inherit" },
+);

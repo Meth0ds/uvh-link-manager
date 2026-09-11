@@ -1,6 +1,6 @@
-import { TestBed } from "@angular/core/testing";
+import { fakeAsync, flushMicrotasks, TestBed, tick } from "@angular/core/testing";
 import { HttpClient, HttpErrorResponse, HttpHeaders } from "@angular/common/http";
-import { firstValueFrom, of, throwError } from "rxjs";
+import { firstValueFrom, NEVER, of, Subject, throwError } from "rxjs";
 import { ApiRequestError, ApiService } from "./api.service";
 
 describe("ApiService retry advice", () => {
@@ -64,4 +64,32 @@ describe("ApiService retry advice", () => {
 
     expect(value).toEqual({ id: 7 });
   });
+
+  it("aborts an idempotent read and unsubscribes its HTTP transport", async () => {
+    const source = new Subject<unknown>();
+    const controller = new AbortController();
+    http.get.and.returnValue(source);
+
+    const pending = api.get("/api/v1/example", undefined, undefined, { signal: controller.signal });
+    expect(source.observers.length).toBe(1);
+    controller.abort();
+
+    await expectAsync(pending).toBeRejectedWith(jasmine.objectContaining({
+      name: "ApiRequestError", status: 0, details: { reason: "cancelled" },
+    }));
+    expect(source.observers.length).toBe(0);
+  });
+
+  it("bounds slow reads and reports a distinguishable timeout", fakeAsync(() => {
+    http.get.and.returnValue(NEVER);
+    let failure: unknown;
+    void api.get("/api/v1/example", undefined, undefined, { timeoutMs: 1_000 })
+      .catch((error: unknown) => { failure = error; });
+
+    tick(1_001);
+    flushMicrotasks();
+    expect(failure).toEqual(jasmine.objectContaining({
+      name: "ApiRequestError", status: 0, details: { reason: "timeout" },
+    }));
+  }));
 });

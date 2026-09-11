@@ -1,0 +1,41 @@
+@use "../core/public-identity" as public;
+@include public.identity;
+
+:host { min-height: 100vh; }
+.auth-shell { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr auto; }
+.auth-header { grid-column: 1 / -1; display: flex; align-items: center; gap: 24px; padding: 18px 40px; border-bottom: 1px solid var(--line); }
+.brand { font-size: 49px; line-height: 1; font-weight: 800; letter-spacing: -.09em; color: var(--ink); text-decoration: none; }
+.brand span { color: var(--accent); }
+.back-link { display: flex; gap: 24px; align-items: center; min-height: 44px; margin-left: auto; color: var(--muted); font-size: 12px; text-decoration: none; }
+.auth-brand { display: flex; flex-direction: column; gap: 40px; padding: 64px clamp(32px, 5.5vw, 90px) 32px; background: var(--guide); border-right: 1px solid var(--line); }
+.eyebrow, .note-index, .brand-footer, .auth-footer > span { font: 10px/1.5 "Courier New", monospace; letter-spacing: .06em; }
+.auth-brand .brand-copy h1 { margin: 28px 0 24px; color: var(--ink); font-size: clamp(38px, 4.2vw, 66px); line-height: 1.06; letter-spacing: -.06em; font-weight: 800; }
+.brand-copy h1 em { color: var(--accent); font-family: Georgia, serif; font-weight: 400; }
+.brand-copy p { max-width: 340px; color: var(--muted); font-size: 14px; line-height: 1.8; }
+.brand-note { width: min(100%, 350px); padding: 25px; border-top: 3px solid var(--ink); background: var(--paper-raised); transform: rotate(-2deg); box-shadow: 7px 7px 0 color-mix(in srgb, var(--ink) 7%, transparent); }
+.note-index { font-size: 8px; color: var(--muted); }
+.note-alias { padding-top: 20px; font-size: 20px; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.note-alias b { color: var(--accent); }
+.note-path { margin: 12px 0; font: 20px monospace; color: var(--accent); }
+.brand-note p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.brand-footer { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; margin-top: auto; padding-top: 24px; font-size: 8px; color: var(--muted); }
+.brand-footer a { color: var(--ink); }
+.auth-main { display: flex; align-items: center; justify-content: center; padding: 48px 32px; min-width: 0; }
+.auth-footer { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 20px; padding: 22px 40px; border-top: 1px solid var(--line); color: var(--muted); }
+.auth-footer > span { font-size: 9px; }
+.auth-footer nav { display: flex; gap: 26px; font-size: 11px; }
+.auth-footer a { color: var(--muted); text-decoration: none; }
+@media (max-width: 960px) {
+  .auth-shell { grid-template-columns: 1fr; }
+  .auth-brand { display: none; }
+  .auth-main { padding: 38px 24px 50px; }
+  .auth-header { padding: 16px 24px; }
+  .auth-footer { padding: 22px 24px; }
+}
+@media (max-width: 520px) {
+  .auth-header { padding: 14px 20px; gap: 16px; }
+  .brand { font-size: 43px; }
+  .back-link { font-size: 10px; gap: 10px; }
+  .auth-main { padding: 28px 20px 40px; }
+  .auth-footer { flex-direction: column; gap: 14px; padding-inline: 20px; }
+}

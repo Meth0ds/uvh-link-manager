@@ -28,10 +28,11 @@ import { LatestRequest } from "../core/services/latest-request";
   template: `
     <app-auth-shell>
       <section class="card" aria-labelledby="reauth-title">
+        <span class="step-kicker">ADMINISTRACIÓN / VERIFICACIÓN</span>
         @if (initializing() || busy()) {
-          <mat-progress-bar mode="indeterminate" />
+          <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
-        <mat-icon class="icon">admin_panel_settings</mat-icon>
+        <mat-icon class="icon" aria-hidden="true">admin_panel_settings</mat-icon>
         <h2 id="reauth-title">Confirma que eres tú</h2>
         <p class="sub">La consola administrativa requiere una verificación reciente. Tu sesión general seguirá abierta.</p>
 
@@ -45,7 +46,7 @@ import { LatestRequest } from "../core/services/latest-request";
               </button>
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Código de autenticación o recuperación</mat-label>
+              <mat-label>Segundo factor</mat-label>
               <input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" inputmode="text" />
               <mat-hint>6 dígitos o uno de tus códigos de recuperación</mat-hint>
             </mat-form-field>

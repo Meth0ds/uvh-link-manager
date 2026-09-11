@@ -355,9 +355,11 @@ implementación parcial.
   aislamiento de Nginx/PostgreSQL.
 - [ ] Configurar PostgreSQL con `sslmode=verify-full`, CA real, usuario de mínimo
   privilegio, backups cifrados y una restauración medida con RPO/RTO aprobados.
-- [ ] Supervisar `app`, `queue`, `scheduler`, Caddy y Nginx. Los workers y el
-  scheduler necesitan health checks externos, alertas de caída y antigüedad de
-  cola; el reinicio automático por sí solo no acredita salud funcional.
+- [ ] Supervisar `app`, `scheduler`, Caddy, Nginx y por separado `queue-mail`,
+  `queue-webhooks`, `queue-domains`, `queue-exports`, `queue-analytics` y
+  `queue-legacy`. El código ya expone profundidad, antigüedad y heartbeat por
+  pool; faltan alertas externas ensayadas. El reinicio automático por sí solo
+  no acredita salud funcional.
 - [ ] Ejecutar E2E con correo y hCaptcha reales: alta, verificación, login, MFA,
   recuperación, intención de URL, logout y caducidad/revocación de sesión.
 - [ ] Revisar manualmente todos los módulos en móvil/escritorio, claro/oscuro,
@@ -442,7 +444,7 @@ confirmación del nuevo buzón. Falta validación E2E/concurrente antes de produ
   cancelar solicitudes y compensar el agotamiento de reintentos de correo.
 - [ ] Separar contractualmente copia de acceso (art. 15 RGPD) y portabilidad
   estructurada (art. 20 RGPD), y definir el procedimiento manual para exports
-  superiores al límite automático cifrado de 25 MiB.
+  superiores al límite automático cifrado de 12 MiB.
 - [ ] Probar archivos grandes, caída de worker/almacenamiento, reintentos,
   descarga concurrente, cuenta bloqueada y purga en infraestructura real.
 

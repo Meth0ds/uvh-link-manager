@@ -15,13 +15,14 @@ import { LatestRequest } from "../core/services/latest-request";
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <main class="card center" aria-live="polite">
-        @if (busy()) { <mat-progress-bar mode="indeterminate" /> }
-        <mat-icon class="icon" [class.ok]="ok()" [class.bad]="done() && !ok()">
+      <section class="card center" aria-labelledby="confirm-data-export-title">
+        <span class="step-kicker">TUS DATOS / PREPARACIÓN</span>
+        @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" /> }
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="done() && !ok()">
           {{ ok() ? 'inventory_2' : (done() ? 'error_outline' : 'inventory') }}
         </mat-icon>
-        <h2>{{ ok() ? 'Exportación confirmada' : (done() ? 'No se pudo confirmar' : 'Preparar mi exportación') }}</h2>
-        <p class="sub">{{ message() }}</p>
+        <h2 id="confirm-data-export-title">{{ ok() ? 'Exportación confirmada' : (done() ? 'No se pudo confirmar' : 'Preparar mi exportación') }}</h2>
+        <p class="sub" role="status">{{ message() }}</p>
         @if (!done()) {
           <button mat-flat-button color="primary" type="button" (click)="confirm()" [disabled]="busy()">
             {{ busy() ? 'Confirmando…' : 'Confirmar y preparar archivo' }}
@@ -30,7 +31,7 @@ import { LatestRequest } from "../core/services/latest-request";
         } @else {
           <a mat-flat-button color="primary" routerLink="/auth">Volver a UVH</a>
         }
-      </main>
+      </section>
     </app-auth-shell>
   `,
   styleUrl: "./auth-card.scss",

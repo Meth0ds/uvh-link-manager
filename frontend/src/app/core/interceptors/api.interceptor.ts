@@ -15,6 +15,7 @@ const SESSIONLESS_AUTH_PATHS = new Set([
   "/api/v1/auth/confirm-email-change",
   "/api/v1/auth/data-export/confirm",
   "/api/v1/auth/data-export/download",
+  "/api/v1/auth/data-export/download/acknowledge",
   "/api/v1/auth/account-deletion/confirm",
   "/api/v1/auth/account-deletion/cancel",
   "/api/v1/auth/resend-verification",

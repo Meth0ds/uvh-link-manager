@@ -14,6 +14,7 @@ use App\Support\AccountRecoveryLifecycle;
 use App\Support\Audit;
 use App\Support\HCaptcha;
 use App\Support\Ids;
+use App\Support\IsoDate;
 use App\Support\LinkIntentRegistry;
 use App\Support\MailAdmissionException;
 use App\Support\MfaInfrastructureUnavailable;
@@ -132,7 +133,11 @@ class AuthController
                     ],
                 ]);
                 $workspace = $user->ownedWorkspaces()->create([
-                    'name' => "Workspace de {$name}",
+                    // Registration accepts a longer personal name than the
+                    // workspace write contract. Keep the generated resource
+                    // inside that contract instead of creating an unreadable
+                    // workspace for otherwise valid registrations.
+                    'name' => $this->defaultWorkspaceName($name),
                     'slug' => 'ws-'.strtolower(Ids::randomToken(6)),
                 ]);
                 $workspace->memberships()->create(['user_id' => $user->id, 'role' => 'owner']);
@@ -2281,7 +2286,7 @@ class AuthController
 
     private function captchaError(Request $request, string $token): ?JsonResponse
     {
-        $result = HCaptcha::verify($request, $token);
+        $result = HCaptcha::verifyAuthentication($request, $token);
         if ($result === HCaptcha::VALID) {
             return null;
         }
@@ -2323,6 +2328,17 @@ class AuthController
         return $len >= 2 && $len <= 80 && ! preg_match('/[\x00-\x1f\x7f]/', $name);
     }
 
+    private function defaultWorkspaceName(string $userName): string
+    {
+        $prefix = 'Workspace de ';
+        $maximumWorkspaceCharacters = 80;
+        $availableCharacters = $maximumWorkspaceCharacters - mb_strlen($prefix, 'UTF-8');
+
+        // mb_substr counts Unicode code points, matching the backend's name
+        // validation and the frontend decoder's explicit code-point count.
+        return $prefix.mb_substr($userName, 0, $availableCharacters, 'UTF-8');
+    }
+
     private function appUrl(): string
     {
         return rtrim((string) config('app.url'), '/');
@@ -2345,13 +2361,7 @@ class AuthController
 
     private function iso(mixed $value): ?string
     {
-        if ($value === null) {
-            return null;
-        }
-
-        return $value instanceof \DateTimeInterface
-            ? $value->format('Y-m-d\TH:i:s.v\Z')
-            : (string) $value;
+        return IsoDate::format($value);
     }
 
     private function mfaChallengeKey(string $challenge): string

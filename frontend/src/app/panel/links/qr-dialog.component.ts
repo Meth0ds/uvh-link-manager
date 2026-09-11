@@ -34,16 +34,20 @@ import QRCode from "qrcode";
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
-      h2 { display: flex; align-items: center; gap: 11px; }
-      h2 > span:last-child { display: flex; flex-direction: column; }
-      h2 small { color: var(--uvh-muted-soft); font-size: 8.5px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
-      h2 b { color: var(--uvh-ink); font-size: 19px; font-weight: 850; letter-spacing: -.035em; }
-      .title-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); }
+      /* Dialog identity matches panel/dialog-identity.scss: framed icon mark,
+         monospace eyebrow, no rounded-card chrome. */
+      h2 { display: flex; align-items: center; gap: 14px; }
+      h2 > span:last-child { display: flex; min-width: 0; flex-direction: column; }
+      h2 small { margin-bottom: 6px; color: var(--uvh-muted); font: 10px/1.4 "Courier New", monospace; letter-spacing: .1em; text-transform: uppercase; }
+      h2 b { color: var(--uvh-ink); font-size: 21px; font-weight: 800; letter-spacing: -.045em; }
+      .title-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); color: var(--uvh-electric); }
       .title-icon mat-icon { width: 20px; height: 20px; font-size: 20px; }
       .qr-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 18px 8px; text-align: center; min-width: 260px; }
-      .qr-img { width: 240px; height: 240px; border: 1px solid var(--uvh-border); border-radius: 16px; padding: 11px; background: #fff; box-shadow: var(--uvh-shadow-sm); }
-      .url { color: var(--uvh-muted); font-size: 13px; word-break: break-all; margin: 0; }
-      .qr-error { color: var(--uvh-danger); margin: 24px 0; }
+      /* The QR itself stays on white paper (scanners need the contrast) but
+         as a flat plate with a hairline frame, not an elevated rounded card. */
+      .qr-img { width: 240px; height: 240px; border: 1px solid var(--uvh-border); border-radius: 3px; padding: 11px; background: #fff; }
+      .url { color: var(--uvh-muted); font-size: 12px; font-variant-numeric: tabular-nums; word-break: break-all; margin: 0; }
+      .qr-error { border-left: 3px solid var(--uvh-danger); background: var(--uvh-danger-soft); color: var(--uvh-danger); font-size: 13px; padding: 10px 12px; margin: 24px 0 8px; text-align: left; }
     `,
   ],
 })
@@ -79,7 +83,7 @@ export class QrDialogComponent {
         width: 480,
         margin: 1,
         errorCorrectionLevel: "M",
-        color: { dark: "#07111F", light: "#FFFFFF" },
+        color: { dark: "#262821", light: "#FFFFFF" },
       });
       if (!this.destroyRef.destroyed) this.dataUrl.set(dataUrl);
     } catch {

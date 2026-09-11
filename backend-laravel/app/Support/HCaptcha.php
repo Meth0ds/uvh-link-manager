@@ -22,6 +22,9 @@ final class HCaptcha
 
     public const UNAVAILABLE = 'unavailable';
 
+    /** A browser failure marker, NOT a credential or a valid provider token. */
+    public const DEVELOPMENT_FAILURE_TOKEN = 'uvh-local-captcha-unavailable';
+
     private const VERIFY_URL = 'https://api.hcaptcha.com/siteverify';
 
     private const MAX_TOKEN_BYTES = 8192;
@@ -36,6 +39,50 @@ final class HCaptcha
         [$siteKey, $secret] = self::credentials($surface);
 
         return $siteKey !== '' && $secret !== '';
+    }
+
+    public static function developmentFallbackAllowed(Request $request): bool
+    {
+        // Do not infer development from a request header, frontend build, or
+        // merely "not production" (staging/testing must still fail closed).
+        $loopbackHosts = ['localhost', '127.0.0.1', '::1', '[::1]'];
+
+        return app()->environment('local')
+            && config('app.debug') === true
+            && config('uvh.hcaptcha.dev_fallback') === true
+            && in_array(strtolower($request->getHost()), $loopbackHosts, true)
+            && in_array(strtolower((string) config('uvh.app_host')), $loopbackHosts, true);
+    }
+
+    /**
+     * Authentication alone may use the explicit local escape hatch. Public
+     * reports continue using verify(), with no fallback on any environment.
+     * A remote verifier rejection remains INVALID, even in local development.
+     *
+     * @return self::VALID|self::INVALID|self::UNAVAILABLE
+     */
+    public static function verifyAuthentication(Request $request, string $token): string
+    {
+        $allowed = self::developmentFallbackAllowed($request);
+        if (hash_equals(self::DEVELOPMENT_FAILURE_TOKEN, $token)) {
+            if (! $allowed) {
+                return self::result(self::INVALID);
+            }
+            Log::warning('Local authentication hCaptcha fallback used', ['reason' => 'browser_unavailable']);
+
+            return self::VALID;
+        }
+
+        $result = self::verify($request, $token);
+        if ($allowed && $result === self::UNAVAILABLE) {
+            // No credentials, token, IP or email in this development notice.
+            // The provider outage metric is retained, never counted as solved.
+            Log::warning('Local authentication hCaptcha fallback used', ['reason' => 'provider_unavailable']);
+
+            return self::VALID;
+        }
+
+        return $result;
     }
 
     /** @return self::VALID|self::INVALID|self::UNAVAILABLE */

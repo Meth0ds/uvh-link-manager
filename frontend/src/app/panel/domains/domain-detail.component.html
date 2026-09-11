@@ -17,6 +17,7 @@
       <span class="eyebrow">Dominio observado</span>
       <h2 id="domain-name" class="tnum">{{ d.domain }}</h2>
       <p>Estado guardado: <strong>{{ stateLabel(d.state) }}</strong></p>
+      <p>Topología admitida: subdominio con CNAME directo. No se validan apex, flattening ni proxies DNS.</p>
     </div>
     <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
     <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || actionBusy()"><mat-icon>refresh</mat-icon> Actualizar estado</button>

@@ -451,12 +451,6 @@ class WebhookController
 
     private function iso(mixed $value): ?string
     {
-        if ($value === null) {
-            return null;
-        }
-
-        return $value instanceof \DateTimeInterface
-            ? $value->format('Y-m-d\TH:i:s.v\Z')
-            : (string) $value;
+        return \App\Support\IsoDate::format($value);
     }
 }

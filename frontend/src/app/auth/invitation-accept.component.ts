@@ -17,13 +17,14 @@ import { LatestRequest } from "../core/services/latest-request";
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <div class="card center">
+      <div class="card center" aria-labelledby="invitation-accept-title">
+        <span class="step-kicker">TRABAJO EN EQUIPO</span>
         @if (busy()) {
-          <mat-progress-bar mode="indeterminate" />
+          <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
-        <mat-icon class="icon" [class.ok]="ok() || rejected()" [class.bad]="!ok() && !rejected() && done() && !needsLogin()">{{ ok() ? 'group_add' : (rejected() ? 'person_remove' : (done() && !needsLogin() ? 'error_outline' : 'group_add')) }}</mat-icon>
-        <h2>{{ ok() ? 'Invitación aceptada' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Revisar invitación' : (done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
-        <p class="sub">{{ message() }}</p>
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok() || rejected()" [class.bad]="!ok() && !rejected() && done() && !needsLogin()">{{ ok() ? 'group_add' : (rejected() ? 'person_remove' : (done() && !needsLogin() ? 'error_outline' : 'group_add')) }}</mat-icon>
+        <h2 id="invitation-accept-title">{{ ok() ? 'Invitación aceptada' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Revisar invitación' : (done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
+        <p class="sub" role="status">{{ message() }}</p>
         @if (ready()) {
           <button mat-flat-button color="primary" type="button" (click)="accept()" [disabled]="busy()">Aceptar invitación</button>
           <button mat-stroked-button type="button" (click)="reject()" [disabled]="busy()">Rechazar</button>

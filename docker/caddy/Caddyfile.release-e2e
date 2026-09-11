@@ -1,0 +1,14 @@
+{
+	admin off
+}
+
+# The local CA is deliberate: Playwright trusts it only for this isolated
+# smoke run. Publicly trusted ACME issuance remains an external release gate.
+app.uvh.localhost, uvh.localhost {
+	tls internal
+	reverse_proxy nginx:8080 {
+		header_up Host {host}
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
+	}
+}

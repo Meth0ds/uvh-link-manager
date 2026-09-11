@@ -338,37 +338,15 @@ class AccountController
 
                     return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
                 }
-                if (! Storage::disk('local')->exists($path)) {
-                    $row->update(['status' => 'failed', 'download_token_hash' => null, 'artifact_path' => null]);
 
-                    return ['status' => 'missing'];
-                }
-                $encrypted = Storage::disk('local')->get($path);
-                if (! is_string($encrypted)) {
-                    $row->update(['status' => 'failed', 'download_token_hash' => null]);
-
-                    return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
-                }
-                try {
-                    $json = UvhCrypto::decryptAtRest($encrypted);
-                } catch (\Throwable) {
-                    $row->update(['status' => 'failed', 'download_token_hash' => null]);
-
-                    return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
-                }
-
-                $row->update([
-                    'status' => 'downloaded',
-                    'download_token_hash' => null,
-                    'downloaded_at' => now(),
-                ]);
-
-                return ['status' => 'ok', 'json' => $json, 'path' => $path, 'user_id' => (int) $user->id, 'request_id' => (int) $row->id];
+                // Return only immutable identifiers and the managed path. Slow
+                // private-volume I/O and decryption must never extend the row
+                // locks protecting the user's security generation.
+                return ['status' => 'ok', 'path' => $path, 'user_id' => (int) $user->id, 'request_id' => (int) $row->id];
             }) : ['status' => 'invalid'];
         } catch (\Throwable) {
-            // Keep the one-use bearer and request state untouched when the
-            // database or private volume is temporarily unavailable. The
-            // caller can safely retry instead of receiving an ambiguous 500.
+            // Keep the bearer and request state untouched when PostgreSQL is
+            // temporarily unavailable. The caller can safely retry.
             OperationalMetrics::increment('export.download_unavailable');
 
             return response()->json([
@@ -376,7 +354,9 @@ class AccountController
             ], 503);
         }
 
-        if (isset($result['request_id']) && is_string($result['path'] ?? null)) {
+        if ($result['status'] !== 'ok'
+            && isset($result['request_id'])
+            && is_string($result['path'] ?? null)) {
             PrivateArtifactCleanup::attempt((int) $result['request_id'], $result['path']);
         }
         if ($result['status'] === 'expired') {
@@ -388,15 +368,158 @@ class AccountController
         if ($result['status'] !== 'ok') {
             return response()->json(['error' => 'El enlace no es válido o ya se ha utilizado'], 400);
         }
-        Audit::write($result['user_id'], 'account.data_export_downloaded', 'data_export', $result['request_id']);
 
-        return response($result['json'], 200, [
+        try {
+            $encrypted = Storage::disk('local')->get($result['path']);
+            if (! is_string($encrypted)) {
+                throw new \RuntimeException('Private artifact storage returned an invalid value');
+            }
+            $json = UvhCrypto::decryptAtRest($encrypted);
+        } catch (\Throwable) {
+            // A transient volume failure or interrupted read does not consume
+            // the bearer. Housekeeping still owns eventual expiry/cleanup.
+            OperationalMetrics::increment('export.download_unavailable');
+
+            return response()->json([
+                'error' => 'La descarga no está disponible temporalmente. Inténtalo de nuevo.',
+            ], 503);
+        }
+
+        try {
+            $stillEligible = DB::transaction(function () use ($result, $tokenHash): bool {
+                $user = User::where('id', $result['user_id'])->lockForUpdate()->first();
+                $row = DataExportRequest::where('id', $result['request_id'])
+                    ->where('user_id', $result['user_id'])
+                    ->where('download_token_hash', $tokenHash)
+                    ->where('status', 'ready')->lockForUpdate()->first();
+
+                $eligible = $row !== null
+                    && $user !== null
+                    && ! $user->deleted_at
+                    && (int) $user->security_version === (int) $row->security_version
+                    && $row->download_expires_at?->isFuture() === true
+                    && is_string($row->artifact_path)
+                    && hash_equals($result['path'], $row->artifact_path);
+                if ($eligible) {
+                    // This timestamp proves only that PHP finished preparing a
+                    // response for this bearer. It enables acknowledgement but
+                    // deliberately does not consume the token or claim receipt.
+                    $row->update(['download_served_at' => now()]);
+                }
+
+                return $eligible;
+            });
+        } catch (\Throwable) {
+            OperationalMetrics::increment('export.download_unavailable');
+
+            return response()->json([
+                'error' => 'La descarga no está disponible temporalmente. Inténtalo de nuevo.',
+            ], 503);
+        }
+        if (! $stillEligible) {
+            return response()->json(['error' => 'La exportación cambió de estado antes de poder entregarse'], 409);
+        }
+
+        // "Served" means that the response is about to leave PHP. It is not a
+        // claim that the browser received every byte; the client acknowledges
+        // that separately after postBlob has completed.
+        Audit::write($result['user_id'], 'account.data_export_served', 'data_export', $result['request_id']);
+
+        return response($json, 200, [
             'Content-Type' => 'application/json; charset=utf-8',
             'Content-Disposition' => 'attachment; filename="uvh-datos-'.now()->format('Y-m-d').'.json"',
             'Cache-Control' => 'private, no-store, no-cache, max-age=0',
             'Pragma' => 'no-cache',
             'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+
+    public function acknowledgeExportDownload(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $token = UvhRequest::inputString($request, 'token');
+        if (! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token)) {
+            return response()->json(['error' => 'Token inválido'], 422);
+        }
+
+        $tokenHash = Ids::sha256Hex($token);
+        $snapshot = DataExportRequest::where('download_token_hash', $tokenHash)
+            ->where('status', 'ready')->first(['id', 'user_id']);
+        try {
+            $result = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): array {
+                // Preserve the global lock order: user before user-owned state.
+                $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
+                $row = DataExportRequest::where('id', $snapshot->id)
+                    ->where('user_id', $snapshot->user_id)
+                    ->where('download_token_hash', $tokenHash)
+                    ->where('status', 'ready')->lockForUpdate()->first();
+                if (! $row) {
+                    return ['status' => 'invalid'];
+                }
+
+                $path = is_string($row->artifact_path) ? $row->artifact_path : null;
+                if (! $row->download_expires_at || $row->download_expires_at->isPast()) {
+                    $row->update(['status' => 'expired', 'download_token_hash' => null]);
+
+                    return ['status' => 'expired', 'path' => $path, 'request_id' => (int) $row->id];
+                }
+                if (! $user || $user->deleted_at
+                    || (int) $user->security_version !== (int) $row->security_version) {
+                    $row->update(['status' => 'cancelled', 'download_token_hash' => null]);
+
+                    return ['status' => 'invalid', 'path' => $path, 'request_id' => (int) $row->id];
+                }
+                if (! $row->download_served_at) {
+                    // A caller cannot consume a bearer by invoking only the
+                    // acknowledgement endpoint; the artifact must first have
+                    // passed the complete server-side download preparation.
+                    return ['status' => 'not_served'];
+                }
+                if (! $path || ! PrivateArtifactCleanup::isManagedPath($path)) {
+                    $row->update(['status' => 'failed', 'download_token_hash' => null]);
+
+                    return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
+                }
+
+                $row->update([
+                    'status' => 'downloaded',
+                    'download_token_hash' => null,
+                    'downloaded_at' => now(),
+                ]);
+
+                return [
+                    'status' => 'ok',
+                    'path' => $path,
+                    'user_id' => (int) $user->id,
+                    'request_id' => (int) $row->id,
+                ];
+            }) : ['status' => 'invalid'];
+        } catch (\Throwable) {
+            OperationalMetrics::increment('export.download_ack_unavailable');
+
+            return response()->json([
+                'error' => 'No se pudo confirmar la recepción. El enlace caducará automáticamente.',
+            ], 503);
+        }
+
+        if (isset($result['request_id']) && is_string($result['path'] ?? null)) {
+            PrivateArtifactCleanup::attempt((int) $result['request_id'], $result['path']);
+        }
+        if ($result['status'] === 'expired') {
+            return response()->json(['error' => 'El enlace de descarga ha caducado'], 400);
+        }
+        if ($result['status'] === 'missing') {
+            return response()->json(['error' => 'El archivo ya no está disponible'], 410);
+        }
+        if ($result['status'] === 'not_served') {
+            return response()->json(['error' => 'La exportación todavía no se ha servido'], 409);
+        }
+        if ($result['status'] !== 'ok') {
+            return response()->json(['error' => 'El enlace no es válido o ya se ha utilizado'], 400);
+        }
+
+        Audit::write($result['user_id'], 'account.data_export_downloaded', 'data_export', $result['request_id']);
+
+        return response()->json(['ok' => true]);
     }
 
     public function deletionImpact(Request $request)

@@ -10,13 +10,7 @@ import { MatIconModule } from "@angular/material/icon";
   template: `
     <main class="status-page" [attr.data-kind]="kind">
       <a class="brand" routerLink="/" aria-label="UVH, inicio">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 64 64" width="32" height="32">
-            <rect width="64" height="64" rx="16" fill="#07111F" />
-            <path d="M26 38a8 8 0 0 1 0-12l6-6a8 8 0 0 1 12 12l-3 3" fill="none" stroke="#00D2C4" stroke-width="5" stroke-linecap="round" />
-            <path d="M38 26a8 8 0 0 1 0 12l-6 6a8 8 0 0 1-12-12l3-3" fill="none" stroke="#5D7CFF" stroke-width="5" stroke-linecap="round" />
-          </svg>
-        </span>
+        <span class="brand-mark" aria-hidden="true">↗</span>
         <span>UVH</span>
       </a>
 
@@ -44,10 +38,7 @@ import { MatIconModule } from "@angular/material/icon";
         place-items: center;
         gap: 36px;
         padding: 34px 20px;
-        background:
-          radial-gradient(700px 420px at 15% 0%, color-mix(in srgb, var(--uvh-electric) 13%, transparent), transparent 70%),
-          radial-gradient(600px 420px at 90% 100%, color-mix(in srgb, var(--uvh-teal) 12%, transparent), transparent 70%),
-          var(--uvh-surface);
+        background: var(--uvh-surface);
         color: var(--uvh-ink);
       }
       .brand {
@@ -60,37 +51,36 @@ import { MatIconModule } from "@angular/material/icon";
         letter-spacing: -0.04em;
         text-decoration: none;
       }
-      .brand-mark { display: inline-flex; filter: drop-shadow(0 8px 18px rgba(36, 87, 245, .22)); }
+      .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--uvh-border); border-radius: 3px; color: var(--uvh-electric); background: var(--uvh-surface-raised); }
       .status-card {
         width: min(100%, 520px);
         padding: 42px 34px 36px;
         text-align: center;
-        background: var(--mat-sys-surface-container-lowest, #fff);
+        background: var(--uvh-surface-raised);
         border: 1px solid var(--uvh-border);
-        border-radius: var(--uvh-radius-lg);
-        box-shadow: var(--uvh-shadow-lg);
+        border-radius: 3px;
       }
       .status-icon {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 64px;
-        height: 64px;
+        width: 56px;
+        height: 56px;
         margin-bottom: 14px;
-        border-radius: 20px;
+        border: 1px solid var(--uvh-border);
+        border-radius: 3px;
         color: var(--uvh-electric);
-        background: color-mix(in srgb, var(--uvh-electric) 12%, transparent);
+        background: var(--uvh-surface);
       }
       .status-icon mat-icon { width: 34px; height: 34px; font-size: 34px; }
       .status-code {
         display: block;
-        color: var(--uvh-muted-soft);
-        font-size: 12px;
-        font-weight: 800;
+        color: var(--uvh-muted);
+        font: 12px/1.6 "Courier New", monospace;
         letter-spacing: .14em;
       }
-      h1 { margin: 8px 0 8px; font-size: clamp(24px, 4vw, 32px); letter-spacing: -.04em; }
-      p { max-width: 420px; margin: 0 auto; color: var(--uvh-muted); font-size: 14px; line-height: 1.65; }
+      h1 { margin: 8px 0 8px; font-size: clamp(24px, 4vw, 32px); font-weight: 800; letter-spacing: -.045em; }
+      p { max-width: 420px; margin: 0 auto; color: var(--uvh-muted); font-size: 13px; line-height: 1.75; }
       .actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
       @media (max-width: 520px) {
         .status-page { align-content: center; }

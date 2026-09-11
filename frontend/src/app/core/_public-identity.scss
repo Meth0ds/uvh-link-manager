@@ -1,0 +1,58 @@
+@use "@angular/material" as mat;
+@use "./identity-tokens" as tokens;
+
+// Public shells share the same palette as the panel. Their local aliases keep
+// editorial layouts independent without duplicating the actual brand colors.
+@mixin identity {
+  :host {
+    @include tokens.light;
+    --uvh-ink: var(--ink); --uvh-muted: var(--muted); --uvh-muted-soft: var(--muted);
+    --uvh-surface: var(--paper); --uvh-canvas: var(--soft); --uvh-surface-raised: var(--paper-raised);
+    --uvh-electric: var(--accent); --uvh-electric-strong: var(--accent);
+    --uvh-teal: var(--accent); --uvh-teal-strong: var(--accent);
+    --uvh-border: var(--line); --uvh-border-strong: var(--line);
+    --legal-ink: var(--ink); --legal-muted: var(--muted); --legal-soft: var(--muted);
+    --legal-surface: var(--paper-raised); --legal-surface-soft: var(--soft); --legal-border: var(--line);
+    display: block; color: var(--ink); background: var(--paper);
+    @include mat.theme-overrides((
+      primary: var(--accent), on-primary: var(--accent-ink),
+      surface: var(--paper), surface-container: var(--soft),
+      surface-container-lowest: var(--paper-raised), surface-container-high: var(--soft),
+      on-surface: var(--ink), on-surface-variant: var(--muted),
+      outline: var(--muted), outline-variant: var(--line),
+    ));
+    // Explicit local tokens also preserve this shell's identity when embedded
+    // inside a differently themed surface or a component with its own overrides.
+    @include mat.button-overrides((
+      filled-container-color: var(--accent), filled-label-text-color: var(--accent-ink),
+      filled-state-layer-color: var(--accent-ink),
+      protected-container-color: var(--paper-raised), protected-label-text-color: var(--accent),
+      protected-state-layer-color: var(--accent),
+      outlined-label-text-color: var(--accent), outlined-outline-color: var(--line),
+      outlined-state-layer-color: var(--accent),
+      text-label-text-color: var(--accent), text-state-layer-color: var(--accent),
+    ));
+    @include mat.form-field-overrides((
+      outlined-focus-label-text-color: var(--accent), outlined-focus-outline-color: var(--accent),
+      outlined-label-text-color: var(--muted), outlined-outline-color: var(--muted),
+      outlined-input-text-color: var(--ink), outlined-caret-color: var(--accent),
+      outlined-hover-outline-color: var(--ink), outlined-hover-label-text-color: var(--ink),
+      focus-select-arrow-color: var(--accent),
+    ));
+    @include mat.checkbox-overrides((
+      selected-checkmark-color: var(--accent-ink), label-text-color: var(--ink),
+      selected-icon-color: var(--accent), selected-focus-icon-color: var(--accent),
+      selected-hover-icon-color: var(--accent), selected-pressed-icon-color: var(--accent),
+      selected-focus-state-layer-color: var(--accent), selected-hover-state-layer-color: var(--accent),
+    ));
+    @include mat.select-overrides((enabled-trigger-text-color: var(--ink), focused-arrow-color: var(--accent)));
+  }
+  :host-context(html.dark) {
+    @include tokens.dark;
+  }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+}

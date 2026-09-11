@@ -8,7 +8,7 @@ Documento de despliegue del stack actual: Laravel 13 + PostgreSQL 16 (local en c
 | -------------- | -------------------------------------------- | ----------------------- |
 | API            | Laravel 13 (PHP 8.4)                         | Servidor PHP integrado local; PHP-FPM en producción |
 | Base de datos  | PostgreSQL 16 (`postgres:16-alpine`)         | Contenedor `postgres` local, solo `127.0.0.1` |
-| Cola           | `QUEUE_CONNECTION=database` (tabla `jobs`)   | Contenedor `queue` (`php artisan queue:work`) |
+| Colas          | `QUEUE_CONNECTION=database` (tabla `jobs`)   | Workers `queue-mail`, `queue-webhooks`, `queue-domains`, `queue-exports`, `queue-analytics` y drenaje `queue-legacy` |
 | Scheduler      | `php artisan schedule:work`                  | Contenedor `schedule`   |
 | Frontend       | Angular 22 SPA (`dist/uvh`)                  | `ng serve` en desarrollo; estáticos en producción |
 | Email          | Resend                                       | Variable `RESEND_API_KEY` |
@@ -73,7 +73,9 @@ La producción reproducible del repositorio usa `docker-compose.production.yml`:
 
 - **Build frontend**: `cd frontend && npm run build` (emite `dist/uvh/browser`).
 - **Backend**: PHP-FPM 8.4 con extensiones `pdo_pgsql`/`pgsql`; `php artisan serve` no es un servidor de producción.
-- **Procesos persistentes**: `app` (PHP-FPM), `queue` (`queue:work`) y `scheduler` (`schedule:work`).
+- **Procesos persistentes**: `app` (PHP-FPM), los seis workers de cola y
+  `scheduler` (`schedule:work`). Cada worker consume una cola y publica su
+  propio heartbeat; `queue-legacy` sólo drena la cola histórica `default`.
 - La resolución `uvh.es/{alias}` y la API `/api/v1` deben enrutarse al backend; el panel (`app.uvh.es`) sirve la SPA.
 
 Secuencia de release recomendada:
@@ -115,7 +117,7 @@ contenido o aparente entrega. El procedimiento para estados, recuperación,
 reintentos, conservación y alertas está en
 [`docs/mail-outbox-runbook.md`](mail-outbox-runbook.md); su ensayo sigue pendiente.
 
-Partir de `backend-laravel/.env.production.example`, almacenarlo fuera del repositorio y limitar su lectura a la cuenta de despliegue. Claves requeridas: `APP_KEY` (generada con `php artisan key:generate`), `APP_SECRET` independiente y aleatorio, credenciales PostgreSQL, claves reales de hCaptcha, `RESEND_API_KEY`, hosts públicos y proxies concretos. El proceso **rechaza el arranque** si una invariante crítica no se cumple. Mantener `COOKIE_DOMAIN` vacío. La ceremonia de cambio de `APP_SECRET`, su keyring temporal y rollback están en [`docs/app-secret-rotation-runbook.md`](app-secret-rotation-runbook.md); tener el archivo no acredita que se haya ensayado.
+Partir de `backend-laravel/.env.production.example`, almacenarlo fuera del repositorio y limitar su lectura a la cuenta de despliegue. Claves requeridas: `APP_KEY` (generada con `php artisan key:generate`), `APP_SECRET` independiente y aleatorio, credenciales PostgreSQL, claves reales de hCaptcha, `RESEND_API_KEY`, hosts públicos y proxies concretos. También son obligatorios titular legal, identificador fiscal, domicilio, datos registrales, proveedor de alojamiento y región reales; el proceso **rechaza el arranque** si falta una invariante crítica o se conserva un marcador de ejemplo. Mantener `COOKIE_DOMAIN` vacío. La ceremonia de cambio de `APP_SECRET`, su keyring temporal y rollback están en [`docs/app-secret-rotation-runbook.md`](app-secret-rotation-runbook.md); tener el archivo no acredita que se haya ensayado.
 
 Opcionales: `TRUST_COUNTRY_HEADER=1` **solo** si hay un proxy de confianza que inyecte `COUNTRY_HEADER` (por defecto `cf-ipcountry`; sin esto la analítica por país ignora la cabecera y no se puede falsear). Retención: `SESSION_PURGE_DAYS` (30), `TOKEN_PURGE_DAYS` (7), `DELIVERY_PURGE_DAYS` (90), `AUDIT_PURGE_DAYS` (365), `ANALYTICS_RETENTION_DAYS` (180). Scheduler: `HOUSEKEEPING_INTERVAL_MINUTES` (60) controla cada cuánto corre la pasada pesada de purga; `API_TOKEN_LIMIT` (600/min) es la capa de rate limit agregada **por token**; `LINK_CREATE_LIMIT` (30/min) limita la creación de enlaces por IP. Fuera de producción, si `APP_SECRET` no está definido se genera un secreto efímero aleatorio en cada arranque (las sesiones no sobreviven a reinicios; nunca se usa una constante conocida).
 
@@ -160,7 +162,10 @@ subdominios.
 ## 6. Observabilidad y respuesta operativa
 
 - Monitorizar externamente `/health` con `Host: app.uvh.es`; valida proceso web y conexión a base de datos.
-- Alertar por reinicios de `app`, `queue` y `scheduler`, profundidad/antigüedad de `jobs`, filas en `failed_jobs` y entregas webhook fallidas o bloqueadas.
+- Alertar por reinicios de `app`, cada worker `queue-*` y `scheduler`, además de
+  profundidad, antigüedad y heartbeat de `mail`, `webhooks`, `domains`,
+  `exports`, `analytics` y `legacy`. Vigilar también `failed_jobs` y entregas
+  webhook fallidas o bloqueadas.
 - La pestaña **Administración → Sistema** es una ayuda para operadores autenticados, no un sustituto de alertas externas.
 - Centralizar `stderr`, aplicar redacción de datos y alertar por tasas anómalas de `4xx`, `5xx`, login, hCaptcha y rate limiting.
 - Definir responsable, canal y procedimiento para incidentes, bloqueo de enlaces, denuncias y recuperación desde backup.
@@ -168,7 +173,9 @@ subdominios.
 ## 7. Limitaciones conocidas
 
 1. **Estado compartido**: sesiones de desafío, rate limits y locks usan el store de caché configurado. `CACHE_STORE=database` funciona entre procesos; Redis es preferible al escalar por latencia y contención. No usar `array` ni `file` en producción.
-2. **Webhooks**: la entrega es asíncrona vía cola `database`; el worker `queue:work` debe estar corriendo (contenedor `queue` del Compose).
+2. **Webhooks**: la entrega es asíncrona vía cola `database`; el worker
+   `queue-webhooks` debe estar saludable. Correo, dominios, exportaciones y
+   analítica no deben usarse como sustitutos de ese heartbeat.
 3. **Scheduler**: `schedule:work` (local) o cron `php artisan schedule:run` (producción); sin cron, las transiciones de estado y purgas no se ejecutan.
 4. **`TRUST_COUNTRY_HEADER`** desactivado por defecto; si se activa, el país se toma del header configurado y debe provenir de un proxy de confianza.
 5. **Dependencias externas**: email, DNS, hCaptcha, TLS, proxy, backups y alertas deben validarse con credenciales e infraestructura reales; las pruebas locales no demuestran su funcionamiento en producción.

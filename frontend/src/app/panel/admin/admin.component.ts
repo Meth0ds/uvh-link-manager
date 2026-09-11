@@ -251,7 +251,7 @@ export class AdminComponent {
         status,
         page,
         perPage,
-      }, (value) => decodeAdminRecoveriesPage(value, { page, perPage }));
+      }, (value) => decodeAdminRecoveriesPage(value, { page, perPage }), { signal: request.signal });
       if (!this.recoveriesRequests.isCurrent(request, context)) return;
       this.recoveries.set(response.recoveries ?? []);
       this.recoveriesTotal.set(response.total);
@@ -329,7 +329,7 @@ export class AdminComponent {
     const request = this.overviewRequests.begin(null);
     this.summaryError.set(null);
     try {
-      const response = await this.api.get<AdminOverview>("/api/v1/admin/overview", undefined, decodeAdminOverview);
+      const response = await this.api.get<AdminOverview>("/api/v1/admin/overview", undefined, decodeAdminOverview, { signal: request.signal });
       if (!this.overviewRequests.isCurrent(request, null)) return;
       this.overview.set(response);
     } catch (error) {
@@ -353,7 +353,7 @@ export class AdminComponent {
         status,
         page,
         perPage,
-      }, (value) => decodeAdminUsersPage(value, { page, perPage }));
+      }, (value) => decodeAdminUsersPage(value, { page, perPage }), { signal: request.signal });
       if (!this.usersRequests.isCurrent(request, context)) return;
       this.users.set(response.users ?? []);
       this.usersTotal.set(response.total);
@@ -456,7 +456,7 @@ export class AdminComponent {
         status,
         page,
         perPage,
-      }, (value) => decodeAdminReportsPage(value, { page, perPage }));
+      }, (value) => decodeAdminReportsPage(value, { page, perPage }), { signal: request.signal });
       if (!this.reportsRequests.isCurrent(request, context)) return;
       this.reports.set(response.reports ?? []);
       this.reportsTotal.set(response.total);
@@ -541,7 +541,7 @@ export class AdminComponent {
         state,
         page,
         perPage,
-      }, (value) => decodeAdminDomainsPage(value, { page, perPage }));
+      }, (value) => decodeAdminDomainsPage(value, { page, perPage }), { signal: request.signal });
       if (!this.domainsRequests.isCurrent(request, context)) return;
       this.domains.set(response.domains ?? []);
       this.domainsTotal.set(response.total);
@@ -584,7 +584,7 @@ export class AdminComponent {
         q: query,
         page,
         perPage,
-      }, (value) => decodeAdminAuditPage(value, { page, perPage }));
+      }, (value) => decodeAdminAuditPage(value, { page, perPage }), { signal: request.signal });
       if (!this.auditRequests.isCurrent(request, context)) return;
       this.events.set(response.events ?? []);
       this.auditTotal.set(response.total);
@@ -613,7 +613,7 @@ export class AdminComponent {
     this.operationsLoading.set(true);
     this.operationsError.set(null);
     try {
-      const response = await this.api.get<AdminOperations>("/api/v1/admin/operations", undefined, decodeAdminOperations);
+      const response = await this.api.get<AdminOperations>("/api/v1/admin/operations", undefined, decodeAdminOperations, { signal: request.signal });
       if (!this.operationsRequests.isCurrent(request, null)) return;
       this.operations.set(response);
     } catch (error) {
@@ -637,7 +637,7 @@ export class AdminComponent {
         status,
         page,
         perPage,
-      }, (value) => decodeAdminMailPage(value, { page, perPage }));
+      }, (value) => decodeAdminMailPage(value, { page, perPage }), { signal: request.signal });
       if (!this.mailRequests.isCurrent(request, context)) return;
       this.mailMessages.set(response.messages ?? []);
       this.mailTotal.set(response.total);
@@ -713,7 +713,7 @@ export class AdminComponent {
         type,
         page,
         perPage,
-      }, (value) => decodePrivacyRequestsPage(value, { page, perPage, admin: true }));
+      }, (value) => decodePrivacyRequestsPage(value, { page, perPage, admin: true }), { signal: request.signal });
       if (!this.privacyLoadRequests.isCurrent(request, context)) return;
       this.privacyRequests.set(response.requests ?? []);
       this.privacyTotal.set(response.total);

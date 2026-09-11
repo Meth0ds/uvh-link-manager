@@ -1,33 +1,17 @@
+<!-- RouterLink keeps this fragment on the current document despite base href="/". -->
+<a class="skip-link" [routerLink]="[]" fragment="public-content" (click)="publicContent.focus()">Ir al contenido</a>
 <header class="legal-header">
   <div class="legal-header-inner">
-    <a class="brand" routerLink="/" aria-label="UVH, volver a la página principal">
-      <span class="brand-mark" aria-hidden="true"><mat-icon>link</mat-icon></span>
-      <span class="brand-copy"><b>UVH</b><small>Legal y soporte</small></span>
-    </a>
-
+    <a class="brand" routerLink="/" aria-label="UVH, volver a la página principal">uvh<span>.</span></a>
+    <span class="brand-caption">Enlaces con recorrido.</span>
     <nav class="legal-nav-links" aria-label="Documentos legales y soporte">
-      <a routerLink="/legal/terminos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Términos</a>
-      <a routerLink="/legal/privacidad" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Privacidad</a>
-      <a routerLink="/legal/denuncias" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><span>Denunciar abuso</span><i aria-hidden="true"></i></a>
+      <a routerLink="/help" routerLinkActive="active" ariaCurrentWhenActive="page">Ayuda</a>
+      <a routerLink="/legal/terminos" routerLinkActive="active" ariaCurrentWhenActive="page">Términos</a>
+      <a routerLink="/legal/privacidad" routerLinkActive="active" ariaCurrentWhenActive="page">Privacidad</a>
+      <a routerLink="/legal/denuncias" routerLinkActive="active" ariaCurrentWhenActive="page">Denunciar enlace</a>
     </nav>
-
-    <div class="legal-actions">
-      <app-theme-toggle />
-      <a class="back-product" routerLink="/"><span>Volver a UVH</span><mat-icon aria-hidden="true">arrow_outward</mat-icon></a>
-    </div>
+    <div class="legal-actions"><app-public-theme-toggle /><a class="back-product" routerLink="/">Volver a UVH <span aria-hidden="true">↗</span></a></div>
   </div>
 </header>
-
-<main class="legal-main">
-  <div class="legal-container">
-    <ng-content />
-  </div>
-</main>
-
-<footer class="legal-footer">
-  <div class="legal-footer-inner">
-    <div><span class="footer-mark"><mat-icon aria-hidden="true">link</mat-icon></span><span><b>UVH</b><small>Operación responsable de enlaces</small></span></div>
-    <nav aria-label="Enlaces del pie legal"><a routerLink="/legal/terminos">Términos</a><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/denuncias">Abuso</a></nav>
-    <span class="copyright">© {{ year }} UVH · uvh.es</span>
-  </div>
-</footer>
+<main #publicContent class="legal-main" id="public-content" tabindex="-1"><div class="legal-container"><ng-content /></div></main>
+<footer class="legal-footer"><div class="legal-footer-inner"><a class="brand" routerLink="/" aria-label="UVH, inicio">uvh<span>.</span></a><p>Enlaces cortos.<br />Decisiones que siguen en tus manos.</p><nav aria-label="Enlaces del pie legal"><a routerLink="/help">Ayuda</a><a routerLink="/status">Estado del servicio</a><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos</a></nav><span class="copyright">© {{ year }} UVH</span></div></footer>

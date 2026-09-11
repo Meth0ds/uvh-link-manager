@@ -52,7 +52,12 @@ export class DashboardComponent {
   private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly user = this.auth.user;
+  readonly hasWorkspace = computed(() => this.workspaces.currentId() !== null);
   readonly workspaceName = computed(() => this.workspaces.list().find((w) => w.id === this.workspaces.currentId())?.name);
+  readonly canCreate = computed(() => {
+    const role = this.workspaces.list().find((w) => w.id === this.workspaces.currentId())?.role;
+    return role === "owner" || role === "admin" || role === "editor";
+  });
   readonly overview = signal<AnalyticsOverview | null>(null);
   readonly recent = signal<LinkDto[]>([]);
   readonly loading = signal(true);
@@ -66,7 +71,7 @@ export class DashboardComponent {
   ];
   readonly periodLabel = computed(() => this.periods.find((option) => option.value === this.period())?.label ?? "30 días");
 
-  readonly firstName = computed(() => (this.user()?.name ?? "").split(/\s+/)[0] ?? "");
+  private readonly numberFormatter = new Intl.NumberFormat("es-ES");
 
   private loadedWorkspaceId: number | null | undefined;
   constructor() {
@@ -101,9 +106,9 @@ export class DashboardComponent {
     this.error.set(null);
     try {
       const [a, links] = await Promise.all([
-        this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period }, decodeAnalyticsOverview),
+        this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period }, decodeAnalyticsOverview, { signal: request.signal }),
         this.api.get<LinksResponse>("/api/v1/links", { sort: "created_at_desc", perPage: 5 },
-          (value) => decodeLinksResponse(value, { page: 1, perPage: 5 })),
+          (value) => decodeLinksResponse(value, { page: 1, perPage: 5 }), { signal: request.signal }),
       ]);
       if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.overview.set(a);
@@ -120,6 +125,10 @@ export class DashboardComponent {
 
   setPeriod(period: DashboardPeriod): void {
     if (this.period() === period) return;
+    // The period label changes immediately, so discard the prior snapshot
+    // before publishing that label and requesting its replacement.
+    this.requests.invalidate();
+    this.overview.set(null);
     this.period.set(period);
     void this.load();
   }
@@ -128,17 +137,10 @@ export class DashboardComponent {
     void this.load();
   }
 
-  openLink(id: number): void {
-    void this.router.navigate(["/app/links", id]);
-  }
-
-  openLinkFromKeyboard(event: KeyboardEvent, id: number): void {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    this.openLink(id);
-  }
-
   newLink(): void {
+    // UI capability only: the API remains authoritative. Unknown/viewer roles
+    // should not be invited into a form they cannot submit successfully.
+    if (!this.canCreate()) return;
     this.linkDialog.openCreate().subscribe((created) => {
       if (created) void this.router.navigate(["/app/links", created.id]);
     });
@@ -159,6 +161,15 @@ export class DashboardComponent {
   /** Short URL without the scheme, for display. */
   displayUrl(url: string): string {
     return url.replace(/^https?:\/\//, "");
+  }
+
+  formatCount(value: number): string {
+    return this.numberFormatter.format(value);
+  }
+
+  stateLabel(state: LinkDto["state"]): string {
+    return { active: "Activo", paused: "Pausado", scheduled: "Programado", expired: "Caducado",
+      blocked: "Bloqueado", archived: "Archivado", deleted: "En papelera" }[state];
   }
 
   /** Percentage a country value represents of the total clicks (for bars). */

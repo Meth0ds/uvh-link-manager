@@ -46,32 +46,32 @@ class User extends Authenticatable
         return $this->password_hash;
     }
 
-    public function sessions()
+    public function sessions(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(UvhSession::class);
     }
 
-    public function emailChangeRequest()
+    public function emailChangeRequest(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(EmailChangeRequest::class);
     }
 
-    public function memberships()
+    public function memberships(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Membership::class);
     }
 
-    public function ownedWorkspaces()
+    public function ownedWorkspaces(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Workspace::class, 'owner_user_id');
     }
 
-    public function apiTokens()
+    public function apiTokens(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ApiToken::class, 'created_by');
     }
 
-    public function auditEvents()
+    public function auditEvents(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(AuditEvent::class);
     }

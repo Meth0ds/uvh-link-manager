@@ -125,6 +125,7 @@ export class LinkDetailComponent {
         `/api/v1/links/${this.linkId}`,
         undefined,
         (value) => decodeLinkDetailResponse(value, this.linkId),
+        { signal: request.signal },
       );
       if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.link.set(detail.link);
@@ -151,7 +152,7 @@ export class LinkDetailComponent {
       const a = await this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", {
         linkId: this.linkId,
         period: this.period(),
-      }, decodeAnalyticsOverview);
+      }, decodeAnalyticsOverview, { signal: request.signal });
       if (!this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.analytics.set(a);
     } catch (err) {
@@ -175,6 +176,7 @@ export class LinkDetailComponent {
         `/api/v1/links/${this.linkId}/activity`,
         undefined,
         decodeLinkActivityResponse,
+        { signal: request.signal },
       );
       if (!this.activityRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.activity.set(events);

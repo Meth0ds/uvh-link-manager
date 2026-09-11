@@ -8,6 +8,7 @@ import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { readActivityPage } from "./activity-page";
+import { LatestRequest } from "../../core/services/latest-request";
 
 type Context = { workspaceId: number; userId: number; name: string };
 type State = { context: Context; events: WorkspaceActivityEvent[]; cursor: string | null; loading: boolean; error: string | null };
@@ -23,8 +24,8 @@ export class ActivityComponent {
   private readonly auth = inject(AuthService);
   private readonly workspaces = inject(WorkspaceService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly requests = new LatestRequest(this.destroyRef);
   private readonly state = signal<State | null>(null);
-  private requestNumber = 0;
   // Account-wide advice survives workspace switches in this component. It is
   // merely UX: the backend enforces its own limit across sessions and tabs.
   private wait: { userId: number; until: number } | null = null;
@@ -54,7 +55,6 @@ export class ActivityComponent {
       untracked(() => { void this.load(false); });
     });
     this.destroyRef.onDestroy(() => {
-      ++this.requestNumber;
       this.state.set(null);
       this.wait = null;
     });
@@ -66,12 +66,13 @@ export class ActivityComponent {
   private async load(append: boolean): Promise<void> {
     if (this.destroyRef.destroyed) return;
     const context = this.context();
-    if (!context) { ++this.requestNumber; this.state.set(null); return; }
+    if (!context) { this.requests.invalidate(); this.state.set(null); return; }
     const previous = this.current();
     // Guard handlers as well as disabled buttons: rapid clicks cannot issue
     // parallel pages, reuse a cursor twice or accumulate an unbounded DOM.
     if (previous?.loading || (append && (!previous?.cursor || this.capped()))) return;
-    const request = ++this.requestNumber;
+    const requestContext = `${context.userId}:${context.workspaceId}`;
+    const request = this.requests.begin(requestContext);
     const reset = (error: string) => this.state.set({ context, events: [], cursor: null, loading: false, error });
     if (this.wait?.userId === context.userId && this.wait.until > Date.now()) {
       reset(`Espera ${Math.ceil((this.wait.until - Date.now()) / 1000)} segundos antes de volver a consultar.`);
@@ -82,9 +83,14 @@ export class ActivityComponent {
     // request by remaining capacity, not by a count of full-size pages.
     const limit = Math.min(this.pageSize, this.maximumEvents - (append ? previous!.events.length : 0));
     this.state.set({ context, events: append ? previous!.events : [], cursor, loading: true, error: null });
-    const isCurrent = () => !this.destroyRef.destroyed && request === this.requestNumber && this.context() === context;
+    const isCurrent = () => this.requests.isCurrent(request, requestContext) && this.context() === context;
     try {
-      const raw = await this.api.get<unknown>(`/api/v1/workspaces/${context.workspaceId}/activity`, { limit, cursor });
+      const raw = await this.api.get<unknown>(
+        `/api/v1/workspaces/${context.workspaceId}/activity`,
+        { limit, cursor },
+        undefined,
+        { signal: request.signal },
+      );
       if (!isCurrent()) return;
       const page = readActivityPage(raw, context.workspaceId, limit);
       const existing = append ? previous!.events : [];

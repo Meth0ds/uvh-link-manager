@@ -106,7 +106,7 @@ export class TokensComponent {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const { tokens } = await this.api.get<{ tokens: ApiTokenDto[] }>("/api/v1/tokens", undefined, decodeApiTokensResponse);
+      const { tokens } = await this.api.get<{ tokens: ApiTokenDto[] }>("/api/v1/tokens", undefined, decodeApiTokensResponse, { signal: request.signal });
       if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.tokens.set(tokens);
     } catch (err) {

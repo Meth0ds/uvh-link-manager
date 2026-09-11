@@ -80,11 +80,12 @@ export class WebhookInspectorComponent {
     this.error.set(null);
     try {
       const [webhooksResponse, deliveryPage] = await Promise.all([
-        this.api.get<{ webhooks: WebhookDto[] }>("/api/v1/webhooks", undefined, decodeWebhooksResponse),
+        this.api.get<{ webhooks: WebhookDto[] }>("/api/v1/webhooks", undefined, decodeWebhooksResponse, { signal: request.signal }),
         this.api.get<WebhookDeliveryPage>(
           `/api/v1/webhooks/${this.webhookId}/deliveries`,
           { page: targetPage, perPage: this.perPage },
           (value) => decodeWebhookDeliveriesResponse(value, { webhookId: this.webhookId, page: targetPage, perPage: this.perPage }),
+          { signal: request.signal },
         ),
       ]);
       if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}:${targetPage}`)) return;

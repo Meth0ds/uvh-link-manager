@@ -108,6 +108,7 @@ export class DomainDetailComponent {
         `/api/v1/domains/${this.domainId}`,
         undefined,
         (value) => decodeDomainDetailResponse(value, this.domainId, this.canEdit()),
+        { signal: request.signal },
       );
       if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}`)) return;
       this.domain.set(response.domain);

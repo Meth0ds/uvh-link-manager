@@ -141,7 +141,7 @@ export class DomainsComponent {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const { domains } = await this.api.get<{ domains: DomainDto[]}>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()));
+      const { domains } = await this.api.get<{ domains: DomainDto[]}>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()), { signal: request.signal });
       if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.domains.set(domains);
     } catch (err) {
@@ -211,7 +211,7 @@ export class DomainsComponent {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
       if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
       try {
-        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()));
+        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()), { signal: request.signal });
         if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
         this.domains.set(domains);
         const current = domains.find((domain) => domain.id === id);
@@ -261,7 +261,7 @@ export class DomainsComponent {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
       if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
       try {
-        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()));
+        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()), { signal: request.signal });
         if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
         this.domains.set(domains);
         const current = domains.find((domain) => domain.id === id);

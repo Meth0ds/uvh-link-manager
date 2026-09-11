@@ -4,6 +4,8 @@ import type { DestroyRef } from "@angular/core";
 export interface ViewRequest {
   readonly revision: number;
   readonly context: string | number | null;
+  /** Cancels the associated read when its view/context is superseded. */
+  readonly signal: AbortSignal;
 }
 
 /**
@@ -14,6 +16,7 @@ export interface ViewRequest {
 export class LatestRequest {
   private revision = 0;
   private destroyed = false;
+  private activeController: AbortController | null = null;
 
   constructor(destroyRef: DestroyRef) {
     destroyRef.onDestroy(() => {
@@ -23,10 +26,14 @@ export class LatestRequest {
   }
 
   begin(context: ViewRequest["context"]): ViewRequest {
-    return { revision: ++this.revision, context };
+    this.activeController?.abort();
+    this.activeController = new AbortController();
+    return { revision: ++this.revision, context, signal: this.activeController.signal };
   }
 
   invalidate(): void {
+    this.activeController?.abort();
+    this.activeController = null;
     ++this.revision;
   }
 

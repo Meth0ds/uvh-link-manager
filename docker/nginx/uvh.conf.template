@@ -96,6 +96,12 @@ server {
     location = / { try_files /index.html =404; expires -1; }
     location ^~ /legal/ { try_files $uri /index.html; expires -1; }
     location = /legal { try_files /index.html =404; expires -1; }
+    # Public Angular pages need the SPA shell on direct navigation and reload;
+    # otherwise the generic public fallback incorrectly treats them as aliases.
+    location = /help { try_files /index.html =404; expires -1; }
+    location = /help/ { return 308 /help; }
+    location = /status { try_files /index.html =404; expires -1; }
+    location = /status/ { return 308 /status; }
     location = /health { try_files "" @laravel_public; }
     location = /robots.txt { try_files "" @laravel_public; }
     location = /sitemap.xml { try_files "" @laravel_public; }

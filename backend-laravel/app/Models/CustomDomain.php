@@ -43,12 +43,12 @@ class CustomDomain extends Model
         ];
     }
 
-    public function workspace()
+    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function links()
+    public function links(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Link::class, 'domain_id');
     }

@@ -1,4 +1,5 @@
-import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy, ViewChild } from "@angular/core";
+import { Component, DestroyRef, ElementRef, inject, signal, ChangeDetectionStrategy, ViewChild } from "@angular/core";
+import { RouterLink } from "@angular/router";
 
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -58,6 +59,7 @@ export function reportReferenceValidator(control: AbstractControl<string>): Vali
   selector: "app-report",
   standalone: true,
   imports: [
+    RouterLink,
     ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -77,10 +79,22 @@ export class ReportComponent {
 
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly configRequests = new LatestRequest(inject(DestroyRef));
   private readonly submitRequests = new LatestRequest(inject(DestroyRef));
 
   readonly reasons = REASONS;
+  // Guidance is presentation-only: submitted categories and API validation
+  // remain unchanged. Never ask the visitor to visit or investigate a target.
+  readonly reasonHints: Record<(typeof REASONS)[number], string> = {
+    "Phishing o suplantación de identidad": "Páginas que aparentan ser una persona o entidad para pedir contraseñas, códigos o datos privados.",
+    "Fraude, estafa o cobro engañoso": "Ofertas, pagos o solicitudes de dinero que inducen a engaño.",
+    "Malware o software malicioso": "Enlaces que distribuyen archivos o programas potencialmente dañinos. No descargues nada para comprobarlo.",
+    "Spam o comunicaciones no solicitadas": "Enlaces difundidos de forma abusiva o en mensajes no solicitados.",
+    "Amenazas o contenido ilegal": "Contenido que amenaza a personas o cuya difusión podría ser ilegal. Ante peligro inmediato, contacta con las autoridades.",
+    "Vulneración de privacidad o derechos": "Difusión de datos personales o contenido que pueda vulnerar derechos de terceros.",
+    "Otro": "Si ninguna categoría encaja, puedes explicar el problema en el contexto opcional, sin incluir datos sensibles.",
+  };
   readonly reportTypes = [
     { icon: "phishing", title: "Phishing y fraude", text: "Suplantación, robo de credenciales, pagos engañosos o estafas." },
     { icon: "bug_report", title: "Malware", text: "Descargas dañinas, ransomware, scripts o software malicioso." },
@@ -106,6 +120,11 @@ export class ReportComponent {
     void this.loadCaptchaConfiguration();
   }
 
+  get selectedReasonHint(): string {
+    const hint = this.reasonHints[this.form.controls.reason.value as (typeof REASONS)[number]];
+    return typeof hint === "string" ? hint : "Si no estás seguro, elige la opción más próxima o «Otro».";
+  }
+
   onCaptchaToken(token: string): void {
     this.captchaToken.set(token);
     if (token) this.error.set(null);
@@ -118,7 +137,7 @@ export class ReportComponent {
     this.captchaConfigError.set(null);
     this.captchaToken.set("");
     try {
-      const response = await this.api.get<PublicConfigResponse>("/api/v1/config", undefined, decodePublicConfig);
+      const response = await this.api.get<PublicConfigResponse>("/api/v1/config", undefined, decodePublicConfig, { signal: request.signal });
       if (!this.configRequests.isCurrent(request, null)) return;
       const siteKey = response.hcaptcha?.enabled && typeof response.hcaptcha.siteKey === "string"
         ? response.hcaptcha.siteKey.trim()
@@ -139,6 +158,9 @@ export class ReportComponent {
     if (this.busy()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      // Bring the first invalid control into view, including the Material
+      // select. Keep errors beside their fields instead of leaving a dead CTA.
+      this.host.nativeElement.querySelector<HTMLElement>("[formControlName].ng-invalid")?.focus();
       return;
     }
     if (!this.captchaToken()) {

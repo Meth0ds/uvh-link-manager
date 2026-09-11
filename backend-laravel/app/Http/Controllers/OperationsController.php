@@ -99,6 +99,24 @@ final class OperationsController
         $this->appendGauge($lines, 'uvh_privacy_requests_overdue', (clone $activePrivacy)
             ->whereRaw('COALESCE(extended_until, due_at) < NOW()')->count());
         $this->appendGauge($lines, 'uvh_queue_heartbeat_age_seconds', $this->heartbeatAge('queue'));
+        foreach (['mail', 'webhooks', 'domains', 'exports', 'analytics', 'legacy'] as $pool) {
+            $queueName = $pool === 'legacy' ? 'default' : $pool;
+            // Per-pool depth/age is what reveals starvation; a healthy generic
+            // worker or a small total can otherwise hide one stalled class.
+            $poolJobs = DB::table('jobs')->where('queue', $queueName);
+            $oldestPoolJob = (clone $poolJobs)->min('created_at');
+            $this->appendGauge($lines, 'uvh_queue_'.$pool.'_pending_jobs', (clone $poolJobs)->count());
+            $this->appendGauge(
+                $lines,
+                'uvh_queue_'.$pool.'_oldest_job_age_seconds',
+                $oldestPoolJob === null ? 0 : max(0, time() - (int) $oldestPoolJob),
+            );
+            $this->appendGauge(
+                $lines,
+                'uvh_queue_'.$pool.'_heartbeat_age_seconds',
+                $this->heartbeatAge('queue-'.$pool),
+            );
+        }
         $this->appendGauge($lines, 'uvh_scheduler_heartbeat_age_seconds', $this->heartbeatAge('scheduler'));
 
         return response(implode("\n", $lines)."\n", 200, [

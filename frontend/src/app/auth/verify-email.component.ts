@@ -17,14 +17,15 @@ import { LatestRequest } from "../core/services/latest-request";
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <div class="card center">
+      <div class="card center" aria-labelledby="verify-email-title">
+        <span class="step-kicker">VERIFICACIÓN DE EMAIL</span>
         @if (busy()) {
-          <mat-progress-bar mode="indeterminate" />
+          <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
-        <mat-icon class="icon" [class.ok]="ok()" [class.bad]="!token && done()">
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="!token && done()">
           {{ ok() ? 'verified_user' : (!token ? 'error_outline' : 'mark_email_read') }}
         </mat-icon>
-        <h2>{{ ok() ? 'Email verificado' : (!token ? 'Enlace no disponible' : 'Confirmar email') }}</h2>
+        <h2 id="verify-email-title">{{ ok() ? 'Email verificado' : (!token ? 'Enlace no disponible' : 'Confirmar email') }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
         @if (token && !ok()) {
           <button mat-flat-button color="primary" type="button" (click)="verify()" [disabled]="busy()">
@@ -54,7 +55,7 @@ export class VerifyEmailComponent {
   readonly done = signal(false);
   readonly ok = signal(false);
   readonly attempted = signal(false);
-  readonly message = signal("Revisa la dirección y confirma cuando quieras activar la cuenta.");
+  readonly message = signal("Confirma que tú creaste la cuenta. Si no reconoces este registro, no continúes.");
   readonly pendingLink = this.intents.pending;
   readonly pendingInvitation = this.invitations.hasPending();
   readonly token: string;

@@ -38,7 +38,9 @@ class VerifyDomainDnsJob implements ShouldQueue
         public int $verificationVersion,
         public string $dedupeKey,
         public string $dedupeOwner,
-    ) {}
+    ) {
+        $this->onQueue('domains');
+    }
 
     public function handle(): void
     {

@@ -53,32 +53,32 @@ class Link extends Model
         ];
     }
 
-    public function workspace()
+    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function creator()
+    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function domain()
+    public function domain(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(CustomDomain::class, 'domain_id');
     }
 
-    public function tags()
+    public function tags(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'link_tags', 'link_id', 'tag_id');
     }
 
-    public function rules()
+    public function rules(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(RedirectRule::class);
     }
 
-    public function clickEvents()
+    public function clickEvents(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ClickEvent::class);
     }

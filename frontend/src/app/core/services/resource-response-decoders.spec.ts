@@ -61,6 +61,7 @@ const domain: DomainDto = {
 
 const analytics: AnalyticsOverview = {
   totals: { clicks: 2, visitors: 1 },
+  visitorMetric: "daily_pseudonyms",
   series: [{ day: "2026-09-06", clicks: 2, visitors: 1 }],
   topLinks: [{ id: 4, alias: "campaign", destination: "https://example.test", clicks: 2, visitors: 1 }],
   countries: [{ key: "ES", value: 2 }],
@@ -69,6 +70,7 @@ const analytics: AnalyticsOverview = {
   os: [],
   referrers: [],
   campaigns: [],
+  dimensionTotals: { countries: 1, devices: 0, browsers: 0, os: 0, referrers: 0, campaigns: 0 },
 };
 
 describe("resource response decoders", () => {

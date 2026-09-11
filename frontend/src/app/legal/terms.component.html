@@ -10,23 +10,37 @@
       <aside class="doc-summary" aria-label="Resumen de los términos"><span>En pocas palabras</span><ul><li>Controlas los enlaces y destinos que publicas.</li><li>No se permite fraude, malware, phishing ni spam.</li><li>Podemos bloquear riesgos y revisar reclamaciones.</li><li>Los límites visibles en el panel son operativos, no precios.</li></ul></aside>
     </header>
 
-    <div class="legal-readiness" role="note">
-      <span class="readiness-label">Requisito de publicación</span>
-      <div><b>Falta identificar al prestador del servicio.</b><p>Antes de abrir UVH al público deben incorporarse aquí la razón social o nombre legal, NIF, domicilio y datos registrales del titular. El repositorio no contiene esa información y no se ha inventado.</p></div>
-      <span class="readiness-state">Pendiente</span>
-    </div>
+    @if (!legal.ready()) {
+      <div class="legal-readiness" role="status">
+        <span class="readiness-label">Identidad del prestador</span>
+        <div><b>Verificando información publicada…</b><p>La página no presupone ni sustituye datos legales mientras carga la configuración.</p></div>
+        <span class="readiness-state">Comprobando</span>
+      </div>
+    } @else if (legal.identity(); as identity) {
+      <div class="legal-readiness" role="note">
+        <span class="readiness-label">Identidad del prestador</span>
+        <div><b>{{ identity.name }} · {{ identity.taxId }}</b><p>{{ identity.address }} · {{ identity.registry }}</p></div>
+        <span class="readiness-state">Publicada</span>
+      </div>
+    } @else {
+      <div class="legal-readiness" role="alert">
+        <span class="readiness-label">Publicación bloqueada</span>
+        <div><b>No se pudo acreditar la identidad del prestador.</b><p>La configuración de producción impide arrancar sin nombre legal, NIF, domicilio y datos registrales; no se sustituyen por datos inventados.</p></div>
+        <span class="readiness-state">No disponible</span>
+      </div>
+    }
 
     <div class="doc-layout">
       <aside class="doc-sidebar">
-        <nav class="doc-toc" aria-label="Contenido de los términos">
+        <nav class="doc-toc" id="document-index" aria-label="Contenido de los términos">
           <span>Contenido</span>
-          <a href="#alcance"><b>01</b> Alcance y aceptación</a><a href="#servicio"><b>02</b> El servicio</a><a href="#cuentas"><b>03</b> Cuentas y seguridad</a><a href="#workspaces"><b>04</b> Workspaces y roles</a><a href="#uso-aceptable"><b>05</b> Uso aceptable</a><a href="#contenido"><b>06</b> Destinos y dominios</a><a href="#medidas"><b>07</b> Medidas de protección</a><a href="#limites"><b>08</b> Límites y disponibilidad</a><a href="#datos"><b>09</b> Datos y privacidad</a><a href="#propiedad"><b>10</b> Propiedad intelectual</a><a href="#terminacion"><b>11</b> Terminación</a><a href="#responsabilidad"><b>12</b> Responsabilidad</a><a href="#cambios"><b>13</b> Cambios</a><a href="#ley"><b>14</b> Ley y contacto</a>
+          <a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="alcance"><b>01</b> Alcance y aceptación</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="servicio"><b>02</b> El servicio</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="cuentas"><b>03</b> Cuentas y seguridad</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="workspaces"><b>04</b> Workspaces y roles</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="uso-aceptable"><b>05</b> Uso aceptable</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="contenido"><b>06</b> Destinos y dominios</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="medidas"><b>07</b> Medidas de protección</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="limites"><b>08</b> Límites y disponibilidad</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="datos"><b>09</b> Datos y privacidad</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="propiedad"><b>10</b> Propiedad intelectual</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="terminacion"><b>11</b> Terminación</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="responsabilidad"><b>12</b> Responsabilidad</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="cambios"><b>13</b> Cambios</a><a routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location" [routerLink]="[]" fragment="ley"><b>14</b> Ley y contacto</a>
         </nav>
         <div class="sidebar-card"><span>Documento relacionado</span><b>Cómo tratamos los datos</b><p>Consulta categorías, bases jurídicas, conservación y derechos.</p><a href="/legal/privacidad">Ver Privacidad <span aria-hidden="true">↗</span></a></div>
       </aside>
 
       <div class="doc-content">
-        <section class="doc-section" id="alcance"><span class="section-number">01</span><div><h2>Alcance y aceptación</h2><p>Estos Términos regulan el acceso y uso de <strong>uvh.es</strong>, <strong>app.uvh.es</strong>, sus API y las funciones de redirección asociadas (el “Servicio”). “UVH”, “nosotros” o “nuestro” se refiere al prestador que deberá quedar identificado en este documento antes de la puesta en producción.</p><p>Al crear una cuenta marcas una casilla de aceptación y queda registrada la versión vigente. Si actúas por cuenta de una organización, declaras que tienes capacidad para vincularla. Si no aceptas estos Términos, no debes crear una cuenta ni usar funciones autenticadas.</p><div class="clause-note"><b>Capacidad.</b><span>Debes tener capacidad legal suficiente para contratar o contar con autorización válida de quien ostente la representación.</span></div></div></section>
+        <section class="doc-section" id="alcance"><span class="section-number">01</span><div><h2>Alcance y aceptación</h2><p>Estos Términos regulan el acceso y uso de <strong>uvh.es</strong>, <strong>app.uvh.es</strong>, sus API y las funciones de redirección asociadas (el “Servicio”). “UVH”, “nosotros” o “nuestro” se refiere al prestador identificado al inicio de este documento.</p><p>Al crear una cuenta marcas una casilla de aceptación y queda registrada la versión vigente. Si actúas por cuenta de una organización, declaras que tienes capacidad para vincularla. Si no aceptas estos Términos, no debes crear una cuenta ni usar funciones autenticadas.</p><div class="clause-note"><b>Capacidad.</b><span>Debes tener capacidad legal suficiente para contratar o contar con autorización válida de quien ostente la representación.</span></div></div></section>
 
         <section class="doc-section" id="servicio"><span class="section-number">02</span><div><h2>Qué hace UVH</h2><p>UVH permite crear y administrar enlaces cortos, cambiar su destino, aplicar reglas de redirección, conectar dominios personalizados, proteger enlaces, consultar analítica, colaborar en workspaces y automatizar operaciones mediante tokens de API y webhooks.</p><p>Una redirección puede depender de su estado, calendario, límite de clics, uso único, contraseña o reglas configuradas. El destino principal actúa como fallback cuando ninguna regla coincide. Algunas funciones requieren una cuenta verificada, un rol determinado o MFA.</p><p>El Servicio no aloja ni revisa de forma previa el contenido del sitio de destino, no compra dominios por ti y no garantiza que un destino externo esté disponible.</p></div></section>
 
@@ -57,5 +71,6 @@
     </div>
 
     <footer class="doc-contact"><span>¿Necesitas reportar un enlace?</span><div><h2>Ayúdanos a actuar con contexto.</h2><p>El formulario de abuso no requiere cuenta y admite enlaces del dominio principal y dominios personalizados.</p></div><a href="/legal/denuncias">Abrir una denuncia <span aria-hidden="true">→</span></a></footer>
+    <div class="doc-end"><span>UVH / DOCUMENTO COMPLETO · 14 APARTADOS</span><a [routerLink]="[]" fragment="document-index">Volver al índice <span aria-hidden="true">↑</span></a></div>
   </article>
 </app-legal-shell>

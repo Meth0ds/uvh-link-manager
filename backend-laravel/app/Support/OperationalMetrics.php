@@ -32,6 +32,8 @@ final class OperationalMetrics
         'export.cleaned',
         'export.cleanup_failed',
         'export.download_unavailable',
+        'export.download_ack_unavailable',
+        'export.memory_budget_rejected',
         'export.queue_recovered',
         'export.queue_unavailable',
         'export.too_large',

@@ -7,6 +7,7 @@ import { apiInterceptor } from "./core/interceptors/api.interceptor";
 export const routes: Routes = [
   {
     path: "",
+    title: "UVH · Enlaces con recorrido",
     loadComponent: () => import("./landing/landing.component").then((m) => m.LandingComponent),
   },
   {
@@ -19,6 +20,7 @@ export const routes: Routes = [
   },
   {
     path: "help",
+    title: "Ayuda técnica · UVH",
     loadComponent: () => import("./help/help.component").then((m) => m.HelpComponent),
   },
   {

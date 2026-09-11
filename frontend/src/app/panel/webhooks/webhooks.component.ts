@@ -122,7 +122,7 @@ export class WebhooksComponent {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const { webhooks } = await this.api.get<{ webhooks: WebhookDto[] }>("/api/v1/webhooks", undefined, decodeWebhooksResponse);
+      const { webhooks } = await this.api.get<{ webhooks: WebhookDto[] }>("/api/v1/webhooks", undefined, decodeWebhooksResponse, { signal: request.signal });
       if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.webhooks.set(webhooks);
     } catch (err) {
@@ -284,6 +284,7 @@ export class WebhooksComponent {
         `/api/v1/webhooks/${w.id}/deliveries`,
         { page: 1, perPage: 20 },
         (value) => decodeWebhookDeliveriesResponse(value, { webhookId: w.id, page: 1, perPage: 20 }),
+        { signal: request.signal },
       );
       if (!guard.isCurrent(request, this.workspaces.currentId())) return;
       this.deliveries.update((d) => ({ ...d, [w.id]: deliveries }));

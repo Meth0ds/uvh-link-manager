@@ -457,7 +457,7 @@ test("una sesión MFA caducada reautentica administración y registra el evento"
   await expect(page).toHaveURL(/\/auth\/reauthenticate\?returnTo=%2Fapp%2Fadmin$/);
   await expect(page.getByRole("heading", { name: "Confirma que eres tú" })).toBeVisible();
   await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
-  await page.getByLabel("Código de autenticación o recuperación").fill(recoveryCodes[1]);
+  await page.getByLabel("Segundo factor", { exact: true }).fill(recoveryCodes[1]);
   const reauthenticateResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/v1/auth/mfa/reauthenticate")
       && response.request().method() === "POST");

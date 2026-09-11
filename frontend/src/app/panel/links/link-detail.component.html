@@ -13,10 +13,10 @@
 @if (link(); as link) {
   <section class="link-hero">
     <a class="back" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> Enlaces</a>
-    <div class="title-row">
+    <div class="hero-head">
       <div class="link-identity">
         <span class="link-icon" aria-hidden="true"><mat-icon>link</mat-icon></span>
-        <div>
+        <div class="link-copy">
           <span class="link-eyebrow">Detalle operativo</span>
           <div class="link-title-line">
             <h1 class="tnum">{{ displayUrl(link.shortUrl) }}</h1>
@@ -48,12 +48,12 @@
       </div>
     </div>
   </section>
-  <div class="stat-cards">
-    <div class="stat-card"><span><mat-icon>touch_app</mat-icon> Clics</span><b class="tnum">{{ link.clickCount }}</b><small>Actividad acumulada</small></div>
-    <div class="stat-card"><span><mat-icon>speed</mat-icon> Límite</span><b class="tnum">{{ link.maxClicks ?? "∞" }}</b><small>Máximo configurado</small></div>
-    <div class="stat-card"><span><mat-icon>toggle_on</mat-icon> Estado</span><b>{{ link.state === "active" ? "Activo" : link.state }}</b><small>Situación actual</small></div>
-    <div class="stat-card"><span><mat-icon>event</mat-icon> Creado</span><b class="tnum">{{ link.createdAt.slice(0, 10) }}</b><small>Fecha de alta</small></div>
-  </div>
+  <dl class="metric-strip" aria-label="Resumen del enlace">
+    <div class="metric primary-metric"><dt>Clics</dt><dd>{{ link.clickCount }}</dd><span>Actividad acumulada</span></div>
+    <div class="metric"><dt>Límite</dt><dd>{{ link.maxClicks ?? "∞" }}</dd><span>Máximo configurado</span></div>
+    <div class="metric"><dt>Estado</dt><dd>{{ link.state === "active" ? "Activo" : link.state }}</dd><span>Situación actual</span></div>
+    <div class="metric"><dt>Creado</dt><dd>{{ link.createdAt.slice(0, 10) }}</dd><span>Fecha de alta</span></div>
+  </dl>
   <div class="period-row">
     <span class="section-title">Analítica</span>
     <mat-form-field appearance="outline" class="period">

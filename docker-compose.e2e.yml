@@ -43,6 +43,7 @@ services:
       APP_URL: http://127.0.0.1:4201
       APP_HOST: 127.0.0.1
       PUBLIC_HOST: 127.0.0.1
+      PUBLIC_ORIGIN: http://127.0.0.1:${UVH_E2E_BACKEND_PORT:-8010}
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: "5432"

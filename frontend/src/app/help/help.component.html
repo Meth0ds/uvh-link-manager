@@ -1,65 +1,113 @@
-<div class="public-shell">
-  <header class="public-header">
-    <a class="brand" routerLink="/" aria-label="UVH, inicio"><span aria-hidden="true">↗</span><b>UVH</b></a>
-    <nav aria-label="Navegación pública"><a routerLink="/status">Estado del servicio</a><a routerLink="/auth/login">Iniciar sesión</a></nav>
+<app-legal-shell>
+  <header class="help-hero">
+    <div><p class="eyebrow">Centro de ayuda / UVH</p><h1>Ayuda técnica de UVH<span>Una respuesta.<br /><em>El siguiente paso.</em></span></h1></div>
+    <div class="hero-aside"><p>Publicar tu primer enlace. Resolver un atasco. Conectar tu sistema. Empieza por lo que necesitas hacer.</p><span class="version">Guías revisadas · {{ guideVersion }}</span></div>
   </header>
 
-  <main>
-    <section class="hero" aria-labelledby="help-title">
-      <p class="eyebrow">Documentación operativa</p>
-      <h1 id="help-title">Ayuda técnica de UVH</h1>
-      <p>Guías concisas para publicar enlaces, verificar dominios e integrar la API y los webhooks sin rebajar las garantías de seguridad.</p>
-      <span class="version">Versión {{ guideVersion }}</span>
+  <section class="help-search" aria-label="Buscar en la documentación">
+    <div class="search-intro"><mat-icon aria-hidden="true">manage_search</mat-icon><div><b>¿Qué necesitas resolver?</b><p>Busca por tarea, por herramienta o por mensaje de error.</p></div></div>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Buscar en la ayuda</mat-label><mat-icon matPrefix aria-hidden="true">search</mat-icon>
+      <input #guideSearch matInput type="search" [value]="query()" (input)="search($event)" (keydown.escape)="clearSearch()" maxlength="100" autocomplete="off" aria-describedby="search-hint" placeholder="Cambiar destino, captcha, firma…" />
+      @if (hasQuery()) { <button mat-icon-button matSuffix type="button" aria-label="Limpiar búsqueda" (click)="clearSearch()"><mat-icon aria-hidden="true">close</mat-icon></button> }
+    </mat-form-field>
+    <p id="search-hint" class="search-hint"><span>Búsqueda local: lo que escribes no se envía a un servidor.</span><span class="search-shortcut"><kbd>/</kbd> para buscar</span></p>
+    @if (hasQuery()) {
+      <div class="search-results">
+        <p class="search-count" role="status">{{ matchingChapters().length }} {{ matchingChapters().length === 1 ? 'guía encontrada' : 'guías encontradas' }}</p>
+        @for (chapter of matchingChapters(); track chapter.id) {
+          <a class="search-result" [routerLink]="[]" [fragment]="chapter.id"><span><b>{{ chapter.title }}</b><small>{{ chapter.summary }}</small></span><mat-icon aria-hidden="true">arrow_outward</mat-icon></a>
+        } @empty {
+          <div class="no-results"><mat-icon aria-hidden="true">search_off</mat-icon><div><h2>No hemos encontrado ese tema.</h2><p>Prueba con menos palabras: «dominio», «permisos» o «captcha». También puedes consultar el índice completo.</p><button mat-button type="button" (click)="clearSearch()">Ver todos los temas</button></div></div>
+        }
+      </div>
+    }
+  </section>
+
+  @if (!hasQuery()) {
+    <section class="quick-starts" aria-label="Elige un punto de partida">
+      @for (start of starts; track start.id) {
+        <a [routerLink]="[]" [fragment]="start.id"><mat-icon aria-hidden="true">{{ start.icon }}</mat-icon><b>{{ start.label }}</b><p>{{ start.detail }}</p><span aria-hidden="true">↗</span></a>
+      }
     </section>
+  }
 
-    <nav class="contents" aria-label="Contenido de la ayuda">
-      <a href="#links">Enlaces</a><a href="#domains">Dominios</a><a href="#api">API</a><a href="#webhooks">Firmas de webhook</a>
-    </nav>
+  <div class="help-layout">
+    <aside class="guide-index">
+      <p class="eyebrow">El manual / 7 temas</p>
+      <nav aria-label="Índice de la ayuda">
+        @for (chapter of chapters; track chapter.id; let index = $index) {
+          <a [routerLink]="[]" [fragment]="chapter.id" routerLinkActive="is-current" [routerLinkActiveOptions]="fragmentMatch" ariaCurrentWhenActive="location"><span>{{ (index + 1).toString().padStart(2, '0') }}</span>{{ chapter.title }}<b aria-hidden="true">↗</b></a>
+        }
+      </nav>
+      <div class="index-note"><span class="status-mark" aria-hidden="true">↗</span><h2>¿Algo no responde?</h2><p>Consulta el estado antes de cambiar tu configuración.</p><a routerLink="/status">Estado del servicio <span aria-hidden="true">↗</span></a></div>
+    </aside>
 
-    <div class="guide-grid">
-      <article id="links">
-        <p class="number">01</p><h2>Publicar un enlace</h2>
-        <ol>
-          <li>Crea el enlace como borrador y revisa el destino, el dominio y el alias.</li>
-          <li>Define las reglas en orden de prioridad; el destino principal actúa como salida segura.</li>
-          <li>Publica solo después de comprobar el estado, la caducidad y los límites de uso.</li>
-        </ol>
-        <p>Las ediciones posteriores quedan asociadas al workspace y a su registro de actividad.</p>
+    <div class="guide-content">
+      <article id="links" aria-labelledby="links-title">
+        <div class="chapter-heading"><span>01 / Enlaces</span><p>Empieza aquí</p></div><h2 id="links-title">Publica una vez.<br /><em>Cuídalo después.</em></h2>
+        <p class="chapter-lead">Un enlace corto es una dirección que vas a poner en manos de otras personas. Comprueba su recorrido antes de imprimirlo o enviarlo.</p>
+        <ol class="steps"><li><strong>Decide el destino.</strong> Introduce la URL completa y comprueba que la página es la correcta. Revisa el alias y el dominio elegidos.</li><li><strong>Revisa las condiciones.</strong> Si hay reglas, confirma su orden y el destino previsto. Comprueba también caducidad, límites y protección por contraseña.</li><li><strong>Abre el enlace final.</strong> Hazlo en otro navegador antes de compartirlo. Para un QR, comprueba también una copia impresa a su tamaño real.</li></ol>
+        <aside class="note"><b>El cartel no cambia. El destino, sí.</b><p>Puedes editar el destino conservando la dirección corta. Una pausa interrumpe el acceso; enviar a la papelera no equivale a una eliminación definitiva. Revisa el estado después de cada cambio.</p></aside>
+        <h3>¿Y los parámetros de campaña?</h3><p>Configura los UTM si necesitas identificar la campaña en la analítica del destino. Revisa la URL final, especialmente si ya contiene parámetros. Las métricas de UVH y las del sitio de destino miden momentos distintos y no tienen por qué coincidir.</p>
       </article>
 
-      <article id="domains">
-        <p class="number">02</p><h2>Verificar un dominio</h2>
-        <ol>
-          <li>Añade en tu proveedor DNS el registro exacto que muestra el panel.</li>
-          <li>Usa <strong>Comprobar ahora</strong> para una verificación manual o consulta la próxima revisión automática.</li>
-          <li>No publiques hasta que DNS y TLS aparezcan saludables.</li>
-        </ol>
-        <p>La propagación DNS y la emisión TLS no son instantáneas. El diagnóstico indica qué falta y cuándo se volverá a comprobar.</p>
+      <article id="domains" aria-labelledby="domains-title">
+        <div class="chapter-heading"><span>02 / Dominios</span><p>Tu nombre, también en el enlace</p></div><h2 id="domains-title">Conecta tu dominio,<br /><em>paso a paso.</em></h2>
+        <p class="chapter-lead">Añadir un dominio al panel no basta para que reciba tráfico. Debe apuntar al servicio y tener una configuración TLS válida.</p>
+        <ol class="steps"><li><strong>Copia los registros del panel.</strong> Usa los nombres y valores exactos en el proveedor que gestiona tu DNS. No reutilices los de otro dominio.</li><li><strong>Comprueba la verificación.</strong> Consulta el diagnóstico y usa la comprobación manual cuando hayas guardado los registros. La propagación puede tardar.</li><li><strong>Verifica el recorrido HTTPS.</strong> Revisa DNS y TLS antes de distribuir enlaces. Que la propiedad esté verificada no demuestra por sí solo que el certificado esté listo.</li></ol>
+        <aside class="note"><b>Si sigue pendiente</b><p>Comprueba el subdominio completo y si tu proveedor añade automáticamente la zona al nombre del registro. Evita editar registros repetidamente mientras esperas la propagación.</p></aside>
       </article>
 
-      <article id="api">
-        <p class="number">03</p><h2>Consumir la API</h2>
-        <p>Envía el token como <code>Authorization: Bearer &lt;token&gt;</code> y concede únicamente los ámbitos necesarios. Guarda el secreto fuera del código y rótalo si pudiera haberse expuesto.</p>
-        <ul>
-          <li>Usa rutas bajo <code>/api/v1</code>.</li>
-          <li>Respeta <code>Retry-After</code> y aplica espera exponencial.</li>
-          <li>Trata cada respuesta como no confiable hasta validarla contra tu contrato.</li>
-        </ul>
+      <article id="team" aria-labelledby="team-title">
+        <div class="chapter-heading"><span>03 / Equipo</span><p>Un espacio compartido</p></div><h2 id="team-title">Cada persona,<br /><em>su acceso.</em></h2>
+        <p>Cada workspace separa sus recursos y miembros. Antes de crear, editar o invitar, comprueba qué espacio tienes seleccionado. Cada persona debe entrar con su propia cuenta.</p>
+        <dl class="role-list"><div><dt>Viewer</dt><dd>Consulta la información del espacio.</dd></div><div><dt>Editor</dt><dd>Trabaja con sus enlaces y recursos.</dd></div><div><dt>Admin</dt><dd>Gestiona el equipo dentro de los límites de su rol.</dd></div><div><dt>Owner</dt><dd>Conserva la responsabilidad y las operaciones reservadas al propietario.</dd></div></dl>
+        <p>Elige el rol mínimo necesario. Revisa los miembros cuando alguien abandone el equipo; no uses un token de API para sustituir una invitación personal.</p>
       </article>
 
-      <article id="webhooks">
-        <p class="number">04</p><h2>Validar firmas de webhook</h2>
-        <p>Lee el cuerpo HTTP sin modificar y calcula HMAC-SHA256 sobre <code>&lt;timestamp&gt;.&lt;rawBody&gt;</code>. Compara en tiempo constante el hexadecimal obtenido con <code>v1</code>.</p>
-        <pre><code>UVH-Signature: t=&lt;milisegundos&gt;,v1=&lt;hmac-hex&gt;</code></pre>
-        <ul>
-          <li>Rechaza marcas de tiempo fuera de tu ventana de tolerancia.</li>
-          <li>Deduplica por identificador de evento: la entrega es al menos una vez.</li>
-          <li>Responde con éxito solo cuando el evento se haya persistido de forma duradera.</li>
-          <li>No registres el secreto, la cabecera completa ni cuerpos con datos sensibles.</li>
-        </ul>
+      <article id="analytics" aria-labelledby="analytics-title">
+        <div class="chapter-heading"><span>04 / Analítica</span><p>Antes de sacar conclusiones</p></div><h2 id="analytics-title">Un clic es una señal.<br /><em>No una persona.</em></h2>
+        <p>Una misma persona puede abrir varias veces un enlace. Los previsualizadores de mensajería, rastreadores y otros sistemas automáticos también pueden generar tráfico.</p>
+        <ul class="checklist"><li>Compara el mismo periodo y los mismos filtros.</li><li>Ten en cuenta el estado del enlace, las pausas y los cambios de destino.</li><li>No interpretes una ubicación o un dispositivo como la identidad de quien accede.</li><li>Para ventas o registros, contrasta los clics con las conversiones medidas en tu sitio.</li></ul>
+      </article>
+
+      <article id="api" aria-labelledby="api-title">
+        <div class="chapter-heading"><span>05 / API</span><p>Para integraciones</p></div><h2 id="api-title">Tu primera petición<br /><em>a la API.</em></h2>
+        <p>Los tokens pertenecen a un workspace y tienen ámbitos de acceso. Para consultar enlaces, utiliza <code>links:read</code>. Para modificarlos, necesitas <code>links:write</code>.</p>
+        <figure class="code-example"><figcaption><span>Petición de lectura · origen de tu instancia</span><button mat-button type="button" [cdkCopyToClipboard]="requestExample" (cdkCopyToClipboardCopied)="copied($event)" aria-label="Copiar ejemplo de petición API"><mat-icon aria-hidden="true">content_copy</mat-icon>Copiar</button></figcaption><pre><code>{{ requestExample }}</code></pre></figure>
+        <p>Las integraciones con token usan <code>/api/v1/public/links</code>, no la ruta de sesión del panel. Guarda el token en el servidor o en un gestor de secretos: nunca en JavaScript público, una URL o un repositorio.</p>
+        <div class="response-list"><div><code>401</code><p>Comprueba si el token es válido y sigue activo.</p></div><div><code>403</code><p>Revisa sus ámbitos y el acceso al recurso.</p></div><div><code>422</code><p>Corrige los campos indicados por la validación.</p></div><div><code>429</code><p>Respeta <code>Retry-After</code> cuando esté presente y espacia los intentos.</p></div></div>
+        <aside class="note"><b>Un timeout no confirma un fallo.</b><p>Antes de repetir una escritura, comprueba si el cambio llegó a guardarse. No reintentes operaciones de creación de forma ciega. Si un token se expone, revócalo y sustituye el secreto en tu integración.</p></aside>
+      </article>
+
+      <article id="webhooks" aria-labelledby="webhooks-title">
+        <div class="chapter-heading"><span>06 / Webhooks</span><p>Eventos, no sondeos</p></div><h2 id="webhooks-title">Verificación<br /><em>y reintentos.</em></h2>
+        <p>UVH envía eventos como <code>link.created</code>, <code>link.updated</code> y <code>domain.verified</code>. Usa una entrega de prueba para revisar el receptor antes de depender de él.</p>
+        <figure class="code-example"><figcaption><span>Cabecera de firma · HMAC-SHA256</span><button mat-button type="button" [cdkCopyToClipboard]="signatureExample" (cdkCopyToClipboardCopied)="copied($event)" aria-label="Copiar ejemplo de firma webhook"><mat-icon aria-hidden="true">content_copy</mat-icon>Copiar</button></figcaption><pre><code>{{ signatureExample }}</code></pre></figure>
+        <ol class="steps"><li><strong>Conserva el cuerpo original.</strong> La firma se calcula sobre <code>&lt;timestamp&gt;.&lt;raw_body&gt;</code>. No reformatees el JSON antes de verificarla.</li><li><strong>Comprueba firma y antigüedad.</strong> Usa el secreto del webhook, compara el hexadecimal de <code>v1</code> en tiempo constante y rechaza timestamps fuera de tu ventana de tolerancia. El timestamp está en milisegundos.</li><li><strong>Deduplica por <code>event_id</code>.</strong> Una entrega puede repetirse. Persiste el evento de forma duradera antes de responder con un estado HTTP 2xx.</li></ol>
+        <p>UVH reintenta las entregas fallidas hasta cinco intentos. Consulta el historial antes de reenviar: un reenvío puede volver a ejecutar el efecto si tu receptor no deduplica.</p>
+        <aside class="note"><b>Diagnóstico sin filtrar secretos</b><p>Registra identificadores de evento, estados y tiempos. No registres el secreto, la cabecera de firma completa ni cuerpos con datos sensibles.</p></aside>
+      </article>
+
+      <article id="troubleshooting" aria-labelledby="troubleshooting-title">
+        <div class="chapter-heading"><span>07 / Diagnóstico</span><p>Antes de volver a intentarlo</p></div><h2 id="troubleshooting-title">Cuando algo no sale<br /><em>como esperabas.</em></h2>
+        <p>Elige el síntoma y sigue las comprobaciones en orden. Cambia una cosa cada vez para saber qué ha resuelto el problema.</p>
+        <mat-accordion class="troubleshooting-list" [multi]="true">
+          @for (problem of problems; track problem.title) {
+            <mat-expansion-panel>
+              <mat-expansion-panel-header><mat-panel-title>{{ problem.title }}</mat-panel-title></mat-expansion-panel-header>
+              <ol class="steps">@for (step of problem.steps; track step) { <li>{{ step }}</li> }</ol>
+              <p class="problem-next">{{ problem.next }}</p>
+              @if (problem.id !== 'troubleshooting') { <a [routerLink]="[]" [fragment]="problem.id">Consultar la guía relacionada <span aria-hidden="true">↗</span></a> }
+            </mat-expansion-panel>
+          }
+        </mat-accordion>
+        <aside class="note"><b>¿Has encontrado un enlace abusivo?</b><p>No necesitas abrir el destino para comunicarlo. Usa el <a routerLink="/legal/denuncias">formulario de denuncia</a>; no envíes contraseñas ni documentos de identidad.</p></aside>
+        <div class="support-note"><mat-icon aria-hidden="true">support_agent</mat-icon><div><h3>Si necesitas contarnos qué ocurre</h3><p>Indica qué intentabas hacer, el mensaje de error y la hora aproximada. Oculta datos personales de las capturas. Nunca envíes tokens, contraseñas ni códigos de recuperación.</p><a href="mailto:soporte@uvh.es">soporte&#64;uvh.es <span aria-hidden="true">↗</span></a></div></div>
+        <div class="help-end"><p>¿Listo para continuar?</p><a routerLink="/auth">Volver a tu cuenta <span aria-hidden="true">↗</span></a></div>
       </article>
     </div>
-  </main>
-
-  <footer><span>© {{ year }} UVH</span><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/status">Estado</a></footer>
-</div>
+  </div>
+  <div class="copy-feedback" role="status" [class.visible]="copyMessage()">{{ copyMessage() }}</div>
+</app-legal-shell>

@@ -1,125 +1,102 @@
-@if (loading() && overview()) {
-  <mat-progress-bar mode="indeterminate" aria-label="Actualizando el panel" />
-}
-
-<app-page-header
-  icon="space_dashboard"
-  eyebrow="Vista operativa"
-  title="Actividad del workspace"
-  [description]="(workspaceName() ? workspaceName() + ' · ' : '') + 'Datos disponibles para los últimos ' + periodLabel() + '.'"
->
-  <div class="dashboard-actions">
-    <div class="period-switch" role="group" aria-label="Periodo de análisis">
-      @for (option of periods; track option.value) {
-        <button
-          type="button"
-          [class.active]="period() === option.value"
-          [attr.aria-pressed]="period() === option.value"
-          (click)="setPeriod(option.value)"
-        >{{ option.label }}</button>
-      }
-    </div>
-    <button mat-flat-button color="primary" class="hero-cta" (click)="newLink()">
-      <mat-icon aria-hidden="true">add_link</mat-icon> Crear enlace
-    </button>
-  </div>
+<app-page-header icon="space_dashboard" eyebrow="Tu espacio de trabajo" title="Cada enlace tiene un recorrido."
+  [description]="workspaceName() ? workspaceName() + ' · Una lectura de la actividad, sin perder de vista lo que has publicado.' : 'Selecciona un workspace para consultar su actividad.'">
+  @if (canCreate()) {
+    <button mat-flat-button class="create-link" type="button" (click)="newLink()"><mat-icon aria-hidden="true">add_link</mat-icon> Crear enlace</button>
+  }
 </app-page-header>
 
 <app-getting-started [compact]="true" />
 
+@if (hasWorkspace()) {
+  <div class="period-heading">
+    <div><span class="section-eyebrow">01 / Lectura del periodo</span><h2>Lo que está pasando</h2></div>
+    <div class="period-switch" role="group" aria-label="Periodo de análisis">
+      @for (option of periods; track option.value) {
+        <button type="button" [class.active]="period() === option.value" [attr.aria-pressed]="period() === option.value"
+          (click)="setPeriod(option.value)">{{ option.label }}</button>
+      }
+    </div>
+  </div>
+}
+
+@if (loading() && overview()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Actualizando el panel" />
+}
 @if (error(); as message) {
   <div class="dashboard-alert" role="alert">
     <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <div><b>No hemos podido actualizar el panel</b><span>{{ message }}</span></div>
+    <div><b>No hemos podido actualizar el panel</b><span>{{ message }}</span>@if (overview()) { <span>Los datos visibles corresponden a la última carga correcta.</span> }</div>
     <button mat-stroked-button type="button" (click)="retry()">Reintentar</button>
   </div>
 }
-
-@if (loading() && !overview()) {
-  <app-panel-skeleton variant="dashboard" label="Cargando el panel" />
-}
-
-@if (!loading() && !overview() && !error()) {
-  <div class="empty-state dashboard-empty">
-    <mat-icon aria-hidden="true">dashboard_customize</mat-icon>
-    <b>Tu panel está listo</b>
-    <p>Crea un enlace para empezar a ver clics, visitantes y procedencia.</p>
-    <button mat-flat-button color="primary" (click)="newLink()">Crear mi primer enlace</button>
-  </div>
+@if (loading() && !overview()) { <app-panel-skeleton variant="dashboard" label="Cargando el panel" /> }
+@if (!hasWorkspace()) {
+  <section class="quiet-state"><mat-icon aria-hidden="true">workspaces</mat-icon><h2>Elige dónde trabajar</h2><p>Selecciona o crea un workspace desde la navegación para ver sus enlaces. Cada espacio mantiene sus propios datos.</p></section>
 }
 
 @if (overview(); as o) {
-  <section class="stat-cards" aria-label="Resumen del periodo seleccionado">
-    <article class="stat-card"><span><mat-icon aria-hidden="true">touch_app</mat-icon> Clics</span><b class="tnum">{{ o.totals.clicks }}</b><small>En los últimos {{ periodLabel() }}</small></article>
-    <article class="stat-card"><span><mat-icon aria-hidden="true">person_pin</mat-icon> Visitantes</span><b class="tnum">{{ o.totals.visitors }}</b><small>Identificados por la analítica</small></article>
-    <article class="stat-card"><span><mat-icon aria-hidden="true">link</mat-icon> Enlaces destacados</span><b class="tnum">{{ o.topLinks.length }}</b><small>Con actividad en este periodo</small></article>
-    <article class="stat-card"><span><mat-icon aria-hidden="true">travel_explore</mat-icon> Referentes</span><b class="tnum">{{ o.referrers.length }}</b><small>Fuentes de procedencia</small></article>
-  </section>
+  <dl class="metric-strip" aria-label="Resumen del periodo seleccionado">
+    <div class="metric primary-metric"><dt>Clics registrados</dt><dd>{{ formatCount(o.totals.clicks) }}</dd><span>Últimos {{ periodLabel() }}</span></div>
+    <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ formatCount(o.totals.visitors) }}</dd><span>No son personas únicas; pueden repetirse entre días.</span></div>
+    <div class="metric"><dt>Enlaces destacados</dt><dd>{{ formatCount(o.topLinks.length) }}</dd><span>Enlaces que aparecen en la selección inferior.</span></div>
+    <div class="metric"><dt>Referentes</dt><dd>{{ formatCount(o.dimensionTotals.referrers) }}</dd><span>Fuentes distintas de procedencia.</span></div>
+  </dl>
 
   <section class="activity-section" aria-labelledby="activity-title">
-    <div class="section-header">
-      <div><span class="section-eyebrow">Serie temporal</span><h2 id="activity-title">Actividad diaria</h2></div>
-      <span class="section-note">Clics y visitantes · {{ periodLabel() }}</span>
-    </div>
-    <app-charts [overview]="o" />
+    <div class="section-header"><h2 id="activity-title">El pulso de tus enlaces</h2><a class="text-link" routerLink="/app/analytics">Abrir analítica <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+    <app-charts [overview]="o" [showBreakdowns]="false" />
   </section>
 
   <div class="dash-cols">
     <section class="data-section" aria-labelledby="top-links-title">
-      <div class="section-header compact"><div><span class="section-eyebrow">Rendimiento</span><h2 id="top-links-title">Enlaces destacados</h2></div></div>
-      <div class="top-list">
+      <div class="section-header"><div><span class="section-eyebrow">Más clics</span><h2 id="top-links-title">Enlaces destacados</h2></div><span class="section-note">{{ periodLabel() }}</span></div>
+      <ol class="top-list">
         @for (l of o.topLinks; track l.id; let i = $index) {
-          <article
-            class="top-row"
-            role="link"
-            tabindex="0"
-            [attr.aria-label]="'Abrir enlace ' + l.alias"
-            (click)="openLink(l.id)"
-            (keydown)="openLinkFromKeyboard($event, l.id)"
-          >
-            <span class="rank tnum">{{ i + 1 }}</span>
-            <div class="top-main"><b class="tnum">{{ l.alias }}</b><span>{{ l.destination }}</span></div>
-            <span class="clicks tnum"><mat-icon aria-hidden="true">touch_app</mat-icon> {{ l.clicks }}</span>
-          </article>
+          <li><a class="top-row" [routerLink]="['/app/links', l.id]" [attr.aria-label]="'Abrir enlace ' + l.alias">
+            <span class="rank" aria-hidden="true">{{ i + 1 < 10 ? '0' : '' }}{{ i + 1 }}</span>
+            <span class="top-main"><b>{{ l.alias }}</b><span>{{ l.destination }}</span></span>
+            <span class="clicks"><b>{{ formatCount(l.clicks) }}</b><small>clics</small></span>
+            <mat-icon class="row-arrow" aria-hidden="true">arrow_outward</mat-icon>
+          </a></li>
         }
-        @if (!o.topLinks.length) {
-          <div class="empty-state small-empty"><mat-icon aria-hidden="true">query_stats</mat-icon><b>Aún no hay datos</b><p>Comparte enlaces para empezar a medir actividad.</p></div>
-        }
-      </div>
+      </ol>
+      @if (!o.topLinks.length) { <div class="quiet-state small"><h3>Todavía no hay destacados</h3><p>Cuando se registren clics, podrás comparar aquí los enlaces con más actividad.</p></div> }
     </section>
-
     <section class="data-section" aria-labelledby="origins-title">
-      <div class="section-header compact"><div><span class="section-eyebrow">Procedencia</span><h2 id="origins-title">Origen geográfico</h2></div></div>
-      <div class="geo-list">
+      <div class="section-header"><div><span class="section-eyebrow">Procedencia</span><h2 id="origins-title">Desde dónde llegan</h2></div></div>
+      <ul class="geo-list">
         @for (c of o.countries.slice(0, 6); track c.key) {
-          <div class="geo-row"><span class="geo-flag">{{ flag(c.key) }}</span><span class="geo-name">{{ countryName(c.key) }}</span><div class="geo-bar"><i [style.width.%]="geoPct(c.value, o)"></i></div><b class="tnum">{{ c.value }}</b></div>
+          <li class="geo-row"><span class="geo-flag" aria-hidden="true">{{ flag(c.key) }}</span><span class="geo-name">{{ countryName(c.key) }}</span>
+            <span class="geo-bar" aria-hidden="true"><i [style.width.%]="geoPct(c.value, o)"></i></span><b>{{ formatCount(c.value) }} <small>clics</small></b></li>
         }
-        @if (!o.countries.length) { <p class="none">Sin datos de localización todavía.</p> }
-      </div>
+      </ul>
+      @if (!o.countries.length) { <p class="none">Todavía no hay datos de localización para este periodo.</p> }
+      @if (o.countries.length) { <p class="data-footnote">Hasta seis orígenes disponibles. La ubicación es aproximada, no la dirección de una persona.</p> }
     </section>
   </div>
 }
 
-@if (!error() || recent().length) {
+@if (hasWorkspace() && !loading() && (!error() || recent().length)) {
   <section class="recent-section" aria-labelledby="recent-title">
-    <div class="section-header"><div><span class="section-eyebrow">Seguimiento</span><h2 id="recent-title">Enlaces recientes</h2></div>@if (recent().length) { <a class="see-all" routerLink="/app/links">Ver todos <mat-icon aria-hidden="true">arrow_forward</mat-icon></a> }</div>
-    <div class="recent">
+    <div class="section-header"><div><span class="section-eyebrow">02 / Tu mesa de trabajo</span><h2 id="recent-title">Lo último que has creado</h2></div><a class="text-link" routerLink="/app/links">Ver todos los enlaces <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+    <p class="section-intro">Los cinco enlaces más recientes. Sus clics son acumulados, no están filtrados por el periodo de arriba.</p>
+    <ul class="recent-list">
       @for (l of recent(); track l.id) {
-        <article
-          class="recent-row"
-          role="link"
-          tabindex="0"
-          [attr.aria-label]="'Abrir enlace ' + displayUrl(l.shortUrl)"
-          (click)="openLink(l.id)"
-          (keydown)="openLinkFromKeyboard($event, l.id)"
-        >
-          <div class="recent-main"><b class="tnum">{{ displayUrl(l.shortUrl) }}</b><span>{{ l.destination }}</span></div>
-          <div class="recent-side"><span class="clicks tnum"><mat-icon aria-hidden="true">touch_app</mat-icon> {{ l.clickCount }}</span><button mat-icon-button (click)="$event.stopPropagation(); copy(l.shortUrl)" aria-label="Copiar enlace"><mat-icon aria-hidden="true">content_copy</mat-icon></button></div>
-        </article>
+        <li class="recent-row">
+          <!-- Native links keep keyboard/open-in-new-tab behaviour. Copy is a
+               sibling button: pressing Space on it must never open the detail. -->
+          <a class="recent-main" [routerLink]="['/app/links', l.id]" [attr.aria-label]="'Abrir enlace ' + displayUrl(l.shortUrl)"><b>{{ displayUrl(l.shortUrl) }}</b><span>{{ l.destination }}</span></a>
+          <span class="link-state" [class.is-active]="l.state === 'active'">{{ stateLabel(l.state) }}</span>
+          <span class="clicks"><b>{{ formatCount(l.clickCount) }}</b><small>acumulados</small></span>
+          <button mat-icon-button type="button" (click)="copy(l.shortUrl)" [attr.aria-label]="'Copiar enlace ' + displayUrl(l.shortUrl)"><mat-icon aria-hidden="true">content_copy</mat-icon></button>
+        </li>
       }
-      @if (!recent().length && !loading() && !error()) {
-        <div class="empty-state"><mat-icon aria-hidden="true">link_off</mat-icon><b>Sin enlaces todavía</b><p>Crea el primero para empezar a medir.</p><button mat-flat-button color="primary" (click)="newLink()">Crear mi primer enlace</button></div>
-      }
-    </div>
+    </ul>
+    @if (!recent().length) {
+      <div class="quiet-state"><mat-icon aria-hidden="true">add_link</mat-icon><h3>Haz sitio al primer enlace.</h3>
+        <p>{{ canCreate() ? 'Empieza por un destino que conozcas. Después podrás editarlo, compartirlo y consultar su actividad.' : 'Aquí aparecerán los enlaces que cree el equipo. Tu rol permite consultarlos y copiar su URL.' }}</p>
+        @if (canCreate()) { <button mat-flat-button type="button" (click)="newLink()">Crear mi primer enlace</button> }
+      </div>
+    }
   </section>
 }

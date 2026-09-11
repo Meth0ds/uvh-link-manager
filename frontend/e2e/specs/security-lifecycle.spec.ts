@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 test("una ruta privada devuelve al login sin crear una sesión", async ({ page }) => {
   await page.goto("/app/settings");
   await expect(page).toHaveURL(/\/auth\?returnTo=%2Fapp%2Fsettings$/);
-  await expect(page.getByRole("heading", { name: "Bienvenido de nuevo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Vuelve a tus enlaces." })).toBeVisible();
 });
 
 test("recuperar contraseña invalida la anterior y permite la nueva", async ({ page }) => {

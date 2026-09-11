@@ -28,9 +28,9 @@ export interface WorkspaceDialogResult {
     MatProgressBarModule,
   ],
   template: `
-    <h2 mat-dialog-title><span class="title-icon"><mat-icon>workspaces</mat-icon></span><span><small>Nuevo espacio</small><b>Crear workspace</b></span></h2>
+    <h2 mat-dialog-title><span class="title-icon" aria-hidden="true"><mat-icon>workspaces</mat-icon></span><span><small>Nuevo espacio</small><b>Crear workspace</b></span></h2>
     <mat-dialog-content>
-      @if (busy()) { <mat-progress-bar mode="indeterminate" /> }
+      @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Creando workspace" /> }
       <p class="intro">Crea un espacio separado para organizar enlaces, dominios y miembros.</p>
       <form [formGroup]="form" (ngSubmit)="save()">
         <mat-form-field appearance="outline" class="full">
@@ -45,23 +45,12 @@ export interface WorkspaceDialogResult {
     <mat-dialog-actions align="end">
       <button mat-button type="button" mat-dialog-close>Cancelar</button>
       <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="form.invalid || busy()">
-        <mat-icon>add</mat-icon> Crear workspace
+        <mat-icon aria-hidden="true">{{ busy() ? 'hourglass_top' : 'add' }}</mat-icon> {{ busy() ? 'Creando…' : 'Crear workspace' }}
       </button>
     </mat-dialog-actions>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: [`
-    :host { display: block; min-width: min(420px, 82vw); }
-    h2 { display: flex; align-items: center; gap: 11px; }
-    h2 > span:last-child { display: flex; flex-direction: column; }
-    h2 small { color: var(--uvh-muted-soft); font-size: 8.5px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
-    h2 b { color: var(--uvh-ink); font-size: 19px; font-weight: 850; letter-spacing: -.035em; }
-    .title-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); }
-    .title-icon mat-icon { width: 20px; height: 20px; font-size: 20px; }
-    .intro { color: var(--uvh-muted); font-size: 13.5px; line-height: 1.55; margin: 4px 0 18px; }
-    .full { width: 100%; }
-    .error { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--uvh-danger-soft); color: var(--uvh-danger); font-size: 13px; }
-  `],
+  styleUrl: "./dialog-identity.scss",
 })
 export class WorkspaceDialogComponent {
   private readonly fb = inject(FormBuilder);

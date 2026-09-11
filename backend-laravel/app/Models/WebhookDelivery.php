@@ -35,7 +35,8 @@ class WebhookDelivery extends Model
         ];
     }
 
-    public function webhook()
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Webhook, $this> */
+    public function webhook(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Webhook::class);
     }

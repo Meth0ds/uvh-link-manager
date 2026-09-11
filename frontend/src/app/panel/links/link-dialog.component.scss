@@ -1,24 +1,28 @@
 :host {
   display: block;
+  min-width: 0;
 }
 
-.dialog-title { display: flex; align-items: center; gap: 12px; min-height: 64px; padding-top: 16px !important; padding-bottom: 14px !important; }
-.title-mark { display: grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border: 1px solid color-mix(in srgb, var(--uvh-electric) 22%, var(--uvh-border)); border-radius: 12px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); }
+// Dialog identity: framed icon, monospace eyebrow, no card chrome.
+.dialog-title { display: flex; align-items: center; gap: 14px; min-height: 64px; padding-top: 16px !important; padding-bottom: 14px !important; }
+.title-mark { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); color: var(--uvh-electric); }
 .title-mark mat-icon { width: 20px; height: 20px; font-size: 20px; }
-.title-copy { display: flex; flex-direction: column; }
-.title-copy small { color: var(--uvh-muted-soft); font-size: 8.5px; font-weight: 850; letter-spacing: .12em; line-height: 1.3; text-transform: uppercase; }
-.title-copy b { color: var(--uvh-ink); font-size: 19px; font-weight: 850; letter-spacing: -.035em; }
+.title-copy { display: flex; min-width: 0; flex-direction: column; }
+.title-copy small { margin-bottom: 6px; color: var(--uvh-muted); font: 10px/1.4 "Courier New", monospace; letter-spacing: .1em; text-transform: uppercase; }
+.title-copy b { color: var(--uvh-ink); font-size: 21px; font-weight: 800; letter-spacing: -.045em; }
 
 .alias-chip {
   display: inline-block;
+  max-width: 40%;
   margin-left: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--uvh-teal);
-  background: rgba(0, 169, 157, 0.1);
-  border-radius: 999px;
-  padding: 3px 10px;
-  vertical-align: middle;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  color: var(--uvh-muted);
+  font: 11px/1.5 "Courier New", monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dlg-body {
@@ -33,11 +37,12 @@
   gap: 6px;
 }
 
-.tab-intro { display: flex; align-items: flex-start; gap: 11px; margin: 0 0 12px; padding: 11px 12px; border: 1px solid var(--uvh-border); border-radius: 12px; background: color-mix(in srgb, var(--uvh-electric) 4%, var(--uvh-surface-raised)); }
-.tab-intro > span { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--uvh-electric) 9%, transparent); color: var(--uvh-electric); }
+// Tab introductions read as margin notes, not tinted cards.
+.tab-intro { display: flex; align-items: flex-start; gap: 11px; margin: 0 0 14px; padding: 10px 12px; border-left: 2px solid var(--uvh-border); background: var(--uvh-surface-raised); }
+.tab-intro > span { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; color: var(--uvh-electric); }
 .tab-intro mat-icon { width: 17px; height: 17px; font-size: 17px; }
-.tab-intro b { color: var(--uvh-ink); font-size: 12.5px; font-weight: 850; }
-.tab-intro p { margin: 2px 0 0; color: var(--uvh-muted); font-size: 11.5px; line-height: 1.45; }
+.tab-intro b { color: var(--uvh-ink); font-size: 12.5px; font-weight: 800; letter-spacing: -.02em; }
+.tab-intro p { margin: 2px 0 0; color: var(--uvh-muted); font-size: 11.5px; line-height: 1.55; }
 
 .full {
   width: 100%;
@@ -58,16 +63,17 @@
 }
 
 .ok-hint {
-  color: var(--uvh-teal) !important;
+  color: var(--uvh-success) !important;
 }
+
 .err-hint {
-  color: #b91c1c !important;
+  color: var(--uvh-danger) !important;
 }
 
 .tab-note {
   color: var(--uvh-muted);
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.6;
   margin: 0 0 12px;
 }
 
@@ -77,19 +83,18 @@
   gap: 4px 12px;
 }
 
+// Conditional rules form a ruled list; focus raises the row, not a glow.
 .rules {
   display: flex;
   flex-direction: column;
-  gap: 14px;
 }
 
 .rule {
-  border: 1px solid var(--uvh-border);
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: color-mix(in srgb, var(--uvh-surface) 72%, var(--uvh-surface-raised));
-  transition: border-color 170ms ease, box-shadow 170ms ease;
-  &:focus-within { border-color: color-mix(in srgb, var(--uvh-electric) 35%, var(--uvh-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uvh-electric) 7%, transparent); }
+  border-top: 1px solid var(--uvh-border);
+  padding: 14px 10px 8px;
+  background: transparent;
+  transition: background-color 180ms ease;
+  &:focus-within { background: var(--uvh-surface-raised); }
 }
 
 .rule-head {
@@ -98,10 +103,10 @@
   align-items: center;
   margin-bottom: 6px;
   b {
-    font-size: 13px;
     color: var(--uvh-muted);
+    font: 10px/1.5 "Courier New", monospace;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: .08em;
   }
 }
 
@@ -112,25 +117,31 @@
 }
 
 .add-rule {
-  margin-top: 6px;
-  border-radius: 10px;
+  margin-top: 10px;
 }
 
+// Errors are left-ruled bars in soft danger, never red-tinted rounded boxes.
 .alert {
-  border-radius: 10px;
+  border-left: 3px solid var(--uvh-danger);
+  background: var(--uvh-danger-soft);
+  color: var(--uvh-danger);
   padding: 11px 14px;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.6;
   margin-top: 14px;
   &.error {
-    background: rgba(220, 38, 38, 0.08);
-    border: 1px solid rgba(220, 38, 38, 0.25);
-    color: #b91c1c;
+    border-left: 3px solid var(--uvh-danger);
+    background: var(--uvh-danger-soft);
+    color: var(--uvh-danger);
   }
 }
 
+:is(a, button):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
+
 @media (max-width: 640px) {
-  .dialog-title { gap: 9px; }
-  .title-mark { width: 36px; height: 36px; flex-basis: 36px; }
+  .dialog-title { gap: 10px; }
+  .title-mark { width: 34px; height: 34px; flex-basis: 34px; }
+  .title-copy b { font-size: 19px; }
   .alias-chip { display: none; }
   .row {
     flex-direction: column;
@@ -143,4 +154,8 @@
   .rule-grid {
     grid-template-columns: 1fr;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

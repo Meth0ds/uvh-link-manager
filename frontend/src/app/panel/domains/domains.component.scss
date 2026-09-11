@@ -1,150 +1,247 @@
-.page-head {
-  margin-bottom: 20px;
-  h1 {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    margin: 0;
-  }
-  p {
-    color: var(--uvh-muted);
-    margin: 4px 0 0;
-    font-size: 14.5px;
-  }
-}
+:host { display: block; container-type: inline-size; }
 
+// Alerts: left-ruled token bars, never red-tinted rounded boxes.
 .alert {
-  border-radius: 10px;
-  padding: 11px 14px;
-  font-size: 14px;
-  margin-bottom: 14px;
-  &.error {
-    background: rgba(220, 38, 38, 0.08);
-    border: 1px solid rgba(220, 38, 38, 0.25);
-    color: #b91c1c;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 1.6;
+
+  > span {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
+
+  > button {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  &.error {
+    border-left: 3px solid var(--uvh-danger);
+    background: var(--uvh-danger-soft);
+    color: var(--uvh-danger);
+  }
+
   &.permission {
-    background: color-mix(in srgb, var(--uvh-electric) 7%, var(--uvh-surface-raised));
-    border: 1px solid color-mix(in srgb, var(--uvh-electric) 20%, var(--uvh-border));
+    border-left: 2px solid var(--uvh-border);
+    background: var(--uvh-surface-raised);
     color: var(--uvh-muted);
   }
 }
 
+// Connect form: a flat framed plate with an editorial heading.
 .command-card {
-  margin-bottom: 18px;
-  padding: 20px;
+  margin-bottom: 26px;
+  padding: 20px 22px;
   border: 1px solid var(--uvh-border);
-  border-radius: 17px;
+  border-radius: 3px;
   background: var(--uvh-surface-raised);
-  box-shadow: var(--uvh-shadow-sm);
 }
 
-.command-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-.command-heading h2 { margin: 0; color: var(--uvh-ink); font-size: 15px; font-weight: 850; letter-spacing: -.02em; }
-.command-heading p { margin: 3px 0 0; color: var(--uvh-muted); font-size: 12.5px; line-height: 1.5; }
-.command-icon, .domain-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--uvh-electric) 10%, transparent); color: var(--uvh-electric); }
-.command-icon mat-icon, .domain-icon mat-icon { width: 19px; height: 19px; font-size: 19px; }
+.command-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+
+  h2 {
+    margin: 0;
+    color: var(--uvh-ink);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -.03em;
+  }
+
+  p {
+    max-width: 70ch;
+    margin: 6px 0 0;
+    color: var(--uvh-muted);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+}
+
+.command-icon,
+.domain-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface);
+  color: var(--uvh-electric);
+}
+
+.command-icon mat-icon,
+.domain-icon mat-icon {
+  width: 19px;
+  height: 19px;
+  font-size: 19px;
+}
 
 .add-bar {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+
   .grow {
     flex: 1;
   }
-  button { min-height: 55px; border-radius: 12px; }
+
+  button {
+    min-height: 55px;
+  }
 }
 
 .domain-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
+// Domain plates are not clickable as a whole: flat hairline frames, no lift.
 .domain-card {
-  background: var(--uvh-surface-raised);
-  border: 1px solid var(--uvh-border);
-  border-radius: 16px;
   padding: 18px 20px;
-  box-shadow: var(--uvh-shadow-sm);
-  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms cubic-bezier(.22,1,.36,1);
-  &:hover { border-color: color-mix(in srgb, var(--uvh-electric) 28%, var(--uvh-border)); box-shadow: var(--uvh-shadow-md); transform: translateY(-2px); }
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface-raised);
 }
 
 .domain-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  > div:nth-child(2) { display: flex; min-width: 0; flex: 1; flex-direction: column; }
-  > div:nth-child(2) > span { color: var(--uvh-muted-soft); font-size: 9px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
-  b { overflow: hidden; color: var(--uvh-ink); font-size: 15px; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+
+  > div:nth-child(2) {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  > div:nth-child(2) > span {
+    margin-bottom: 4px;
+    color: var(--uvh-muted);
+    font: 10px/1.4 "Courier New", monospace;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+
+  b {
+    overflow: hidden;
+    color: var(--uvh-ink);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
+// DNS verification instructions read as a margin note with mono record values.
 .verify-box {
   margin-top: 14px;
-  border: 1px dashed var(--uvh-border);
-  border-radius: 12px;
   padding: 14px 16px;
+  border-left: 2px solid var(--uvh-border);
+  border-radius: 3px;
   background: var(--uvh-surface);
+
   .verify-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--uvh-muted);
     margin: 0 0 8px;
+    color: var(--uvh-muted);
+    font-size: 12.5px;
+    font-weight: 700;
   }
+
   .txt-row {
     display: flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 12px;
+
     code {
-      font-size: 12.5px;
-      padding: 6px 10px;
-      border-radius: 8px;
-      background: var(--mat-sys-surface-container-lowest, var(--uvh-surface));
+      padding: 6px 9px;
       border: 1px solid var(--uvh-border);
-      font-family: "SFMono-Regular", Consolas, monospace;
+      border-radius: 3px;
+      background: var(--uvh-surface);
+      font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+      font-size: 11.5px;
     }
+
+    code:not(.txt-value) {
+      color: var(--uvh-muted);
+      font-size: 10px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
     .txt-value {
       flex: 1;
+      min-width: 0;
       word-break: break-all;
       color: var(--uvh-electric);
     }
   }
-  .step-title { margin-top: 15px; }
+
+  .step-title {
+    margin-top: 15px;
+  }
 }
 
 .dns-message {
   margin: 14px 0 0;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--uvh-warn) 28%, var(--uvh-border));
-  border-radius: 10px;
+  border-left: 3px solid var(--uvh-warn);
+  border-radius: 3px;
   background: var(--uvh-warn-soft);
   color: var(--uvh-warn);
   font-size: 12.5px;
   font-weight: 700;
-  line-height: 1.5;
-  &.degraded { margin-bottom: 2px; }
+  line-height: 1.6;
+
+  &.degraded {
+    margin-bottom: 2px;
+  }
 }
 
+// Readiness checks: square framed monotags that fill when confirmed.
 .readiness {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 14px;
+
   span {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 9px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--uvh-muted) 9%, transparent);
+    padding: 4px 9px;
+    border: 1px solid var(--uvh-border);
+    border-radius: 3px;
     color: var(--uvh-muted);
-    font-size: 11.5px;
-    font-weight: 800;
-    &.ready { background: var(--uvh-success-soft); color: var(--uvh-success); }
+    font: 10.5px/1.6 "Courier New", monospace;
+    letter-spacing: .04em;
+
+    &.ready {
+      border-color: transparent;
+      background: var(--uvh-success-soft);
+      color: var(--uvh-success);
+    }
   }
-  mat-icon { width: 15px; height: 15px; font-size: 15px; }
+
+  mat-icon {
+    width: 15px;
+    height: 15px;
+    font-size: 15px;
+  }
 }
 
 .state-chip.needs-attention {
@@ -152,24 +249,57 @@
   color: var(--uvh-warn);
 }
 
-@media (max-width: 620px) {
-  .add-bar { flex-direction: column; }
-  .add-bar .grow, .add-bar button { width: 100%; }
-  .domain-head { align-items: flex-start; flex-wrap: wrap; }
-  .domain-head .state-chip { margin-left: 50px; }
-  .verify-box .txt-row { align-items: flex-start; flex-wrap: wrap; }
-  .verify-box .txt-row .txt-value { min-width: 0; flex-basis: calc(100% - 72px); }
-}
-
 .domain-actions {
   display: flex;
   gap: 8px;
   margin-top: 14px;
   flex-wrap: wrap;
+
   .danger {
-    color: #b91c1c;
-    --mat-icon-color: #b91c1c;
+    color: var(--uvh-danger);
+    --mat-icon-color: var(--uvh-danger);
   }
 }
 
-.details-action { margin-top: 10px; }
+.details-action {
+  margin-top: 10px;
+}
+
+@container (max-width: 620px) {
+  .add-bar {
+    flex-direction: column;
+  }
+
+  .add-bar .grow,
+  .add-bar button {
+    width: 100%;
+  }
+
+  .domain-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .domain-head .state-chip {
+    margin-left: 50px;
+  }
+
+  .verify-box .txt-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .verify-box .txt-row .txt-value {
+    min-width: 0;
+    flex-basis: calc(100% - 72px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

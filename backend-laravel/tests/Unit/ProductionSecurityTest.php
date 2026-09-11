@@ -13,6 +13,13 @@ class ProductionSecurityTest extends TestCase
         $this->assertSame([], ProductionSecurity::errors($this->validSettings()));
     }
 
+    public function test_development_captcha_fallback_prevents_production_startup(): void
+    {
+        $settings = $this->validSettings();
+        $settings['hcaptcha_dev_fallback'] = true;
+        $this->assertContains('HCAPTCHA_DEV_FALLBACK debe ser false en producción', ProductionSecurity::errors($settings));
+    }
+
     #[DataProvider('unsafeProxyProvider')]
     public function test_unsafe_trusted_proxy_configuration_is_rejected(string $proxy): void
     {
@@ -71,6 +78,20 @@ class ProductionSecurityTest extends TestCase
             'unexpected port' => ['https://app.uvh.es:8443'],
             'wrong host' => ['https://uvh.es'],
         ];
+    }
+
+    public function test_public_origin_and_legal_identity_are_release_gates(): void
+    {
+        $settings = $this->validSettings();
+        $settings['public_origin'] = 'http://uvh.es:8080';
+        $settings['legal_registry'] = 'Pendiente de completar';
+
+        $errors = ProductionSecurity::errors($settings);
+        $this->assertContains('PUBLIC_ORIGIN debe ser el origen HTTPS exacto de PUBLIC_HOST', $errors);
+        $this->assertContains(
+            'La identidad legal del prestador debe estar completa y no contener marcadores pendientes',
+            $errors,
+        );
     }
 
     public function test_previous_secret_requires_a_short_lived_rotation_window(): void
@@ -144,6 +165,13 @@ class ProductionSecurityTest extends TestCase
             'metrics_bearer_token' => 'M7cR2vN9xK4pL8sQ1wE6tY3uI5oP0aS7dF9gH2jK4lZ',
             'app_host' => 'app.uvh.es',
             'public_host' => 'uvh.es',
+            'public_origin' => 'https://uvh.es',
+            'legal_name' => 'UVH Servicios Digitales SL',
+            'legal_tax_id' => 'B12345678',
+            'legal_address' => 'Calle de prueba 1, 28001 Madrid, España',
+            'legal_registry' => 'Registro Mercantil de Madrid, tomo 1, folio 2, hoja M-3',
+            'legal_hosting_provider' => 'Proveedor de infraestructura de prueba SL',
+            'legal_hosting_region' => 'España, Unión Europea',
             'cookie_secure' => true,
             'cookie_domain' => '',
             'session_cookie' => '__Host-uvh_session',
