@@ -1,15 +1,79 @@
-:host { display: block; }
-.activity { padding: 24px; border: 1px solid var(--uvh-border); border-radius: 18px; background: var(--uvh-surface-raised); color: var(--uvh-ink); }
+:host { display: block; container-type: inline-size; }
+
+// Activity: a ruled ledger of events. Flat framed plate, mono timestamps,
+// square outcome tags and coverage caveats as left-ruled margin notes.
+.activity {
+  padding: 22px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface-raised);
+  color: var(--uvh-ink);
+}
+
 .heading, .event-heading, .pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
 h2, h3 { margin: 0; overflow-wrap: anywhere; }
-h2 { font-size: 20px; }
-h3 { font-size: 16px; }
+h2 { font-size: 20px; font-weight: 800; letter-spacing: -.03em; }
+h3 { font-size: 14.5px; font-weight: 800; letter-spacing: -.02em; }
+
 p { line-height: 1.6; overflow-wrap: anywhere; }
-.coverage, time, .events p { color: var(--uvh-muted); font-size: 14px; }
+
+// Coverage caveats read as margin notes, not as body copy.
+.coverage {
+  margin: 14px 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--uvh-border-strong);
+  color: var(--uvh-muted);
+  font-size: 12px;
+}
+.coverage + .coverage { margin-top: 8px; }
+
 .events { list-style: none; padding: 0; margin: 24px 0 0; }
-.events li { border-top: 1px solid var(--uvh-border); padding: 20px 0; }
-.events p { margin: 8px 0; }
-.outcome { font-size: 12px; font-weight: 700; border: 1px solid var(--uvh-border); border-radius: 8px; padding: 5px 9px; }
-.error { border-left: 3px solid currentColor; padding-left: 12px; }
+.events li { border-top: 1px solid var(--uvh-border); padding: 17px 0; }
+.events p { margin: 7px 0; color: var(--uvh-muted); font-size: 12.5px; }
+
+time {
+  color: var(--uvh-muted);
+  font: 10.5px/1.5 "Courier New", monospace;
+  letter-spacing: .04em;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+}
+
+// Outcome: square tag on status tokens. The data-outcome attribute owns the
+// meaning so "admitted request" is never painted as success.
+.outcome {
+  padding: 4px 9px;
+  border-radius: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--uvh-muted) 12%, transparent);
+  color: var(--uvh-muted);
+
+  &[data-outcome="completed"] { background: var(--uvh-success-soft); color: var(--uvh-success); }
+  &[data-outcome="pending"] { background: var(--uvh-warn-soft); color: var(--uvh-warn); }
+  &[data-outcome="failed"] { background: var(--uvh-danger-soft); color: var(--uvh-danger); }
+}
+
+.pagination { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--uvh-border); }
+.pagination p { margin: 0; color: var(--uvh-muted); font: 10.5px/1.5 "Courier New", monospace; letter-spacing: .06em; text-transform: uppercase; }
+
+// Error is a left-ruled danger bar.
+.error {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--uvh-danger);
+  border-radius: 3px;
+  background: var(--uvh-danger-soft);
+  color: var(--uvh-danger);
+  font-size: 12.5px;
+}
+
 button { white-space: normal; min-height: 44px; }
-@media (max-width: 600px) { .activity { padding: 16px; } .heading { align-items: stretch; flex-direction: column; } }
+
+@container (max-width: 600px) {
+  .activity { padding: 16px; }
+  .heading { align-items: stretch; flex-direction: column; }
+}
