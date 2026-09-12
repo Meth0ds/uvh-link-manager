@@ -73,8 +73,8 @@ html, html.dark {
     surface-tint: var(--accent),
   ));
   @include mat.button-overrides((
-    filled-container-shape: 4px, outlined-container-shape: 4px,
-    protected-container-shape: 4px, text-container-shape: 4px,
+    filled-container-shape: 3px, outlined-container-shape: 3px,
+    protected-container-shape: 3px, text-container-shape: 3px,
   ));
 }
 
@@ -299,9 +299,7 @@ html .mat-typography .mat-body-small {
 .card {
   background: var(--uvh-surface-raised, var(--mat-sys-surface-container-lowest, #fff));
   border: 1px solid var(--uvh-border);
-  border-radius: var(--uvh-radius);
-  box-shadow: var(--uvh-shadow-sm);
-
+  border-radius: 3px;
 }
 
 .card-block {
@@ -330,12 +328,10 @@ html .mat-typography .mat-body-small {
   gap: 6px;
   padding: 18px;
   overflow: hidden;
-  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  transition: border-color 180ms ease;
 
   &:hover {
     border-color: color-mix(in srgb, var(--uvh-electric) 28%, var(--uvh-border));
-    box-shadow: var(--uvh-shadow-md);
-    transform: translateY(-2px);
   }
 
   > span {
@@ -397,7 +393,7 @@ html .mat-typography .mat-body-small {
 .main .mat-mdc-table {
   overflow: hidden;
   border: 1px solid var(--uvh-border);
-  border-radius: var(--uvh-radius);
+  border-radius: 3px;
   background: var(--uvh-surface-raised);
 }
 
@@ -428,7 +424,7 @@ html .mat-typography .mat-body-small {
 
 .main .mat-mdc-outlined-button,
 .main .mat-mdc-unelevated-button {
-  border-radius: 4px;
+  border-radius: 3px;
   font-weight: 800;
 }
 
@@ -440,21 +436,20 @@ html .mat-typography .mat-body-small {
 }
 
 .main .mat-mdc-form-field {
-  --mat-form-field-outlined-container-shape: 4px;
+  --mat-form-field-outlined-container-shape: 3px;
 }
 
 .main mat-progress-bar {
   height: 3px;
   margin: -8px 0 16px;
   overflow: hidden;
-  border-radius: 99px;
+  border-radius: 3px;
 }
 
 .main .mat-expansion-panel {
   border: 1px solid var(--uvh-border);
-  border-radius: var(--uvh-radius) !important;
+  border-radius: 3px !important;
   background: var(--uvh-surface-raised);
-  box-shadow: var(--uvh-shadow-sm);
 }
 
 // Consistent panel feedback: every data view can expose a retry action without
@@ -711,7 +706,7 @@ html .mat-typography .mat-body-small {
 .skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 3px;
   background: color-mix(in srgb, var(--uvh-muted) 12%, transparent);
 
   &::after {
@@ -736,7 +731,7 @@ html .mat-typography .mat-body-small {
   font-size: 12.5px;
   background: color-mix(in srgb, var(--uvh-muted) 10%, transparent);
   border: 1px solid var(--uvh-border);
-  border-radius: 8px;
+  border-radius: 3px;
   padding: 10px 12px;
   overflow-x: auto;
   word-break: break-all;
