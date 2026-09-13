@@ -3,8 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
+/**
+ * Larastan types datetime columns from the database schema as `string` and
+ * ignores the `datetime` cast, so attributes used as dates are declared here.
+ *
+ * @property Carbon|null $used_at
+ * @property Carbon|null $scheduled_at
+ * @property Carbon|null $expires_at
+ * @property Carbon|null $deleted_at
+ */
 class Link extends Model
 {
     use SoftDeletes;
@@ -53,32 +66,38 @@ class Link extends Model
         ];
     }
 
-    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function domain(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<CustomDomain, $this> */
+    public function domain(): BelongsTo
     {
         return $this->belongsTo(CustomDomain::class, 'domain_id');
     }
 
-    public function tags(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    /** @return BelongsToMany<Tag, $this> */
+    public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'link_tags', 'link_id', 'tag_id');
     }
 
-    public function rules(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<RedirectRule, $this> */
+    public function rules(): HasMany
     {
         return $this->hasMany(RedirectRule::class);
     }
 
-    public function clickEvents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<ClickEvent, $this> */
+    public function clickEvents(): HasMany
     {
         return $this->hasMany(ClickEvent::class);
     }

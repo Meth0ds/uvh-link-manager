@@ -3,7 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * Larastan types datetime columns from the database schema as `string` and
+ * ignores the `datetime` cast, so attributes used as dates are declared here.
+ *
+ * @property Carbon|null $expires_at
+ * @property Carbon|null $last_used_at
+ * @property Carbon|null $revoked_at
+ */
 class ApiToken extends Model
 {
     const UPDATED_AT = null;
@@ -32,12 +42,14 @@ class ApiToken extends Model
         ];
     }
 
-    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }

@@ -3,7 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * Larastan types datetime columns from the database schema as `string` and
+ * ignores the `datetime` cast, so the occurrence instant is declared here.
+ *
+ * @property Carbon $occurred_at
+ */
 class ClickEvent extends Model
 {
     public $timestamps = false;
@@ -27,7 +35,8 @@ class ClickEvent extends Model
         return ['occurred_at' => 'datetime', 'password_ok' => 'boolean'];
     }
 
-    public function link(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<Link, $this> */
+    public function link(): BelongsTo
     {
         return $this->belongsTo(Link::class);
     }

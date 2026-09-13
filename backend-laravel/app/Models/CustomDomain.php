@@ -3,7 +3,22 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * Larastan types datetime columns from the database schema as `string` and
+ * ignores the `datetime` cast, so attributes used as dates are declared here.
+ *
+ * @property Carbon|null $verified_at
+ * @property Carbon|null $ownership_verified_at
+ * @property Carbon|null $routing_verified_at
+ * @property Carbon|null $dns_check_started_at
+ * @property Carbon|null $dns_check_completed_at
+ * @property Carbon|null $dns_first_failed_at
+ * @property Carbon|null $tls_ready_at
+ */
 class CustomDomain extends Model
 {
     protected $fillable = [
@@ -43,12 +58,14 @@ class CustomDomain extends Model
         ];
     }
 
-    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function links(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<Link, $this> */
+    public function links(): HasMany
     {
         return $this->hasMany(Link::class, 'domain_id');
     }

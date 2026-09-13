@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Quota extends Model
 {
@@ -19,7 +20,8 @@ class Quota extends Model
         return ['links_limit' => 'integer', 'updated_at' => 'datetime'];
     }
 
-    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class, 'workspace_id');
     }

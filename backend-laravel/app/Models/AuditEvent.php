@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AuditEvent extends Model
 {
@@ -15,7 +16,8 @@ class AuditEvent extends Model
         return ['workspace_id' => 'integer', 'metadata' => 'array', 'created_at' => 'datetime'];
     }
 
-    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }

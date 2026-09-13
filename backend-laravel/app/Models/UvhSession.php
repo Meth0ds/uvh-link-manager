@@ -3,7 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * Larastan types datetime columns from the database schema as `string` and
+ * ignores the `datetime` cast, so attributes used as dates are declared here.
+ *
+ * @property Carbon $expires_at
+ * @property Carbon|null $last_used_at
+ * @property Carbon|null $revoked_at
+ * @property Carbon|null $mfa_verified_at
+ */
 class UvhSession extends Model
 {
     protected $table = 'sessions';
@@ -40,7 +51,8 @@ class UvhSession extends Model
         ];
     }
 
-    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }

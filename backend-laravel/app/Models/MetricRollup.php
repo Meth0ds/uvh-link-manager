@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MetricRollup extends Model
 {
@@ -35,7 +36,8 @@ class MetricRollup extends Model
         ];
     }
 
-    public function link(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<Link, $this> */
+    public function link(): BelongsTo
     {
         return $this->belongsTo(Link::class);
     }

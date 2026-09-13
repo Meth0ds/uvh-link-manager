@@ -3,42 +3,52 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Workspace extends Model
 {
     protected $fillable = ['name', 'slug', 'owner_user_id'];
 
-    public function owner(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<User, $this> */
+    public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
     }
 
-    public function memberships(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<Membership, $this> */
+    public function memberships(): HasMany
     {
         return $this->hasMany(Membership::class);
     }
 
-    public function links(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<Link, $this> */
+    public function links(): HasMany
     {
         return $this->hasMany(Link::class);
     }
 
-    public function customDomains(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<CustomDomain, $this> */
+    public function customDomains(): HasMany
     {
         return $this->hasMany(CustomDomain::class);
     }
 
-    public function quota(): \Illuminate\Database\Eloquent\Relations\HasOne
+    /** @return HasOne<Quota, $this> */
+    public function quota(): HasOne
     {
         return $this->hasOne(Quota::class);
     }
 
-    public function apiTokens(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<ApiToken, $this> */
+    public function apiTokens(): HasMany
     {
         return $this->hasMany(ApiToken::class);
     }
 
-    public function webhooks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<Webhook, $this> */
+    public function webhooks(): HasMany
     {
         return $this->hasMany(Webhook::class);
     }

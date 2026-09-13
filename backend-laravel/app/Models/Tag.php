@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Tag extends Model
 {
@@ -10,12 +12,14 @@ class Tag extends Model
 
     protected $fillable = ['workspace_id', 'name'];
 
-    public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function links(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    /** @return BelongsToMany<Link, $this> */
+    public function links(): BelongsToMany
     {
         return $this->belongsToMany(Link::class, 'link_tags', 'tag_id', 'link_id');
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RedirectRule extends Model
 {
@@ -27,7 +28,8 @@ class RedirectRule extends Model
         return ['priority' => 'integer', 'created_at' => 'datetime'];
     }
 
-    public function link(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /** @return BelongsTo<Link, $this> */
+    public function link(): BelongsTo
     {
         return $this->belongsTo(Link::class);
     }

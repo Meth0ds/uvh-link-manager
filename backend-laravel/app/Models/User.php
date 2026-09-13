@@ -4,8 +4,19 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Carbon;
 
+/**
+ * Larastan types datetime columns from the database schema as `string` and
+ * ignores the `datetime` cast, so attributes used as dates are declared here.
+ *
+ * @property Carbon|null $email_verified_at
+ * @property Carbon|null $mfa_pending_expires_at
+ * @property Carbon|null $deleted_at
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -46,33 +57,57 @@ class User extends Authenticatable
         return $this->password_hash;
     }
 
-    public function sessions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<UvhSession, $this> */
+    public function sessions(): HasMany
     {
         return $this->hasMany(UvhSession::class);
     }
 
-    public function emailChangeRequest(): \Illuminate\Database\Eloquent\Relations\HasOne
+    /** @return HasOne<EmailChangeRequest, $this> */
+    public function emailChangeRequest(): HasOne
     {
         return $this->hasOne(EmailChangeRequest::class);
     }
 
-    public function memberships(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<Membership, $this> */
+    public function memberships(): HasMany
     {
         return $this->hasMany(Membership::class);
     }
 
-    public function ownedWorkspaces(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<Workspace, $this> */
+    public function ownedWorkspaces(): HasMany
     {
         return $this->hasMany(Workspace::class, 'owner_user_id');
     }
 
-    public function apiTokens(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<ApiToken, $this> */
+    public function apiTokens(): HasMany
     {
         return $this->hasMany(ApiToken::class, 'created_by');
     }
 
-    public function auditEvents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** @return HasMany<AuditEvent, $this> */
+    public function auditEvents(): HasMany
     {
         return $this->hasMany(AuditEvent::class);
+    }
+
+    /** @return HasMany<PrivacyRightsRequest, $this> */
+    public function privacyRightsRequests(): HasMany
+    {
+        return $this->hasMany(PrivacyRightsRequest::class);
+    }
+
+    /** @return HasMany<PrivacyRightsRequest, $this> */
+    public function assignedPrivacyRightsRequests(): HasMany
+    {
+        return $this->hasMany(PrivacyRightsRequest::class, 'assigned_admin_id');
+    }
+
+    /** @return HasMany<LegalAcceptance, $this> */
+    public function legalAcceptances(): HasMany
+    {
+        return $this->hasMany(LegalAcceptance::class);
     }
 }
