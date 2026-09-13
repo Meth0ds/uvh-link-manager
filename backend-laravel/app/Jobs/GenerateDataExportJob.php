@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\DataExportRequest;
+use App\Models\LegalAcceptance;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Ids;
@@ -411,10 +412,14 @@ class GenerateDataExportJob implements ShouldQueue
 
                 return $message;
             });
-        $legalAcceptances = DB::table('legal_acceptances')->where('user_id', $userId)
+        $legalAcceptances = LegalAcceptance::where('user_id', $userId)
             ->orderBy('accepted_at')->orderBy('id')
             ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get(['document_type', 'version', 'source', 'accepted_at']);
+            ->get(['document_type', 'version', 'source', 'accepted_at'])
+            // The artifact emits the stored timestamp verbatim, as every other
+            // section does. Export the raw attributes so moving this query onto
+            // the model cannot silently change the accepted_at date format.
+            ->map(fn (LegalAcceptance $row): array => $row->getAttributes());
 
         return [
             'format' => 'uvh-account-export-v1',
@@ -477,6 +482,10 @@ class GenerateDataExportJob implements ShouldQueue
             [DB::table('privacy_rights_messages as m')
                 ->join('privacy_rights_requests as r', 'r.id', '=', 'm.request_id')
                 ->where('r.user_id', $userId), 'm.id'],
+            // Deliberately left on the base builder: mixing an Eloquent builder
+            // into this query list makes the inferred type a union, which
+            // silences the Larastan collection-count finding for the whole
+            // loop. That would relax the gate instead of tightening it.
             [DB::table('legal_acceptances')->where('user_id', $userId), 'id'],
         ];
 

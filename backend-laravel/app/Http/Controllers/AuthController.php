@@ -8,6 +8,7 @@ use App\Models\AuditEvent;
 use App\Models\DataExportRequest;
 use App\Models\EmailChangeRequest;
 use App\Models\EmailToken;
+use App\Models\LegalAcceptance;
 use App\Models\User;
 use App\Models\UvhSession;
 use App\Support\AccountRecoveryLifecycle;
@@ -116,7 +117,7 @@ class AuthController
                 $acceptedAt = now();
                 // These rows are business evidence, not best-effort telemetry;
                 // failure must roll back the account and its default workspace.
-                DB::table('legal_acceptances')->insert([
+                LegalAcceptance::insert([
                     [
                         'user_id' => $user->id,
                         'document_type' => 'terms',
