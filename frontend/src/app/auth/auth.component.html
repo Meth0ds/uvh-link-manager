@@ -1,4 +1,5 @@
 <app-auth-shell>
+  @if (showAuthCard()) {
   <div class="card auth-card">
     @if (developmentCaptchaFallback()) {
       <aside class="development-notice" role="status">
@@ -331,4 +332,9 @@
       </section>
     }
   </div>
+  } @else {
+    <div class="card auth-card" role="status" aria-live="polite">
+      <div class="captcha-bootstrap"><span><b>Comprobando tu sesión…</b></span><mat-progress-bar mode="indeterminate" /></div>
+    </div>
+  }
 </app-auth-shell>

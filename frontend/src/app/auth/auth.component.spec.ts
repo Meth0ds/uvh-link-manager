@@ -38,6 +38,8 @@ describe("AuthComponent registration flow", () => {
   let auth: jasmine.SpyObj<AuthService>;
   let router: jasmine.SpyObj<Router>;
   let authenticated: WritableSignal<boolean>;
+  let probeSettled: WritableSignal<boolean>;
+  let loaded: WritableSignal<boolean>;
 
   function captchaWidget(selector: string): FakeHCaptchaWidgetComponent {
     return fixture.debugElement.query(By.css(selector)).componentInstance as FakeHCaptchaWidgetComponent;
@@ -70,8 +72,11 @@ describe("AuthComponent registration flow", () => {
     auth.logout.and.resolveTo();
     auth.login.and.resolveTo({ mfaRequired: true, challenge: "mfa-challenge", recoveryAvailable: true });
     authenticated = signal(false);
+    probeSettled = signal(true);
+    loaded = signal(true);
     Object.assign(auth, {
-      loaded: signal(true),
+      loaded,
+      probeSettled,
       authenticated,
     });
     router = jasmine.createSpyObj<Router>("Router", ["navigate", "navigateByUrl"]);
@@ -108,6 +113,26 @@ describe("AuthComponent registration flow", () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
+  });
+
+  it("does not paint the login form until the session probe settles", () => {
+    loaded.set(false);
+    probeSettled.set(false);
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css("#login-panel"))).toBeNull();
+
+    probeSettled.set(true);
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css("#login-panel"))).not.toBeNull();
+  });
+
+  it("never paints the login form for a visitor with a live session", () => {
+    authenticated.set(true);
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css("#login-panel"))).toBeNull();
   });
 
   it("keeps the first step blocked until identity fields are valid", () => {

@@ -68,6 +68,40 @@ describe("AuthService session generation", () => {
     expect(workspaces.currentId()).toBe(10);
   });
 
+  it("resolves the session without waiting for the workspace list", async () => {
+    const me = deferred<{ user: AuthUser }>();
+    const list = deferred<{ workspaces: Workspace[] }>();
+    api.get.and.callFake(((path: string) => (
+      path === "/api/v1/auth/me" ? me.promise : list.promise
+    )) as typeof api.get);
+
+    const pending = auth.init();
+    me.resolve({ user: user(1) });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Guards and the /auth redirect only need the identity. Holding them until
+    // the workspace list arrives is what made a signed-in visitor stare at the
+    // login form for an extra round-trip.
+    expect(auth.loaded()).toBeTrue();
+    expect(auth.probeSettled()).toBeTrue();
+
+    list.resolve({ workspaces: [workspace(10)] });
+    await pending;
+    expect(workspaces.currentId()).toBe(10);
+  });
+
+  it("settles the probe when the session cannot be confirmed", async () => {
+    api.get.and.rejectWith(new ApiRequestError("Sin red", 0));
+
+    await auth.init();
+
+    // The form must still be reachable, so a retryable failure is a settled
+    // probe even though "loaded" deliberately stays false for a later retry.
+    expect(auth.loaded()).toBeFalse();
+    expect(auth.probeSettled()).toBeTrue();
+  });
+
   it("does not let a late init resurrect a locally signed-out account", async () => {
     const me = deferred<{ user: AuthUser }>();
     api.get.and.returnValue(me.promise as never);

@@ -54,6 +54,12 @@ export class AuthService {
 
   readonly user = signal<AuthUser | null>(null);
   readonly loaded = signal(false);
+  /**
+   * True once the startup probe has answered, whether it confirmed a session,
+   * rejected it, or failed transiently. Entry views wait for this instead of
+   * painting a login form at a visitor whose session state is still unknown.
+   */
+  readonly probeSettled = signal(false);
   readonly authenticated = computed(() => this.user() !== null);
   /** True when the server rejected the session and the panel must close. */
   readonly sessionInvalidated = signal(false);
@@ -119,9 +125,14 @@ export class AuthService {
         const { user } = await this.api.get<{ user: AuthUser }>("/api/v1/auth/me", undefined, decodeAuthUserResponse);
         this.assertCurrent(generation);
         this.user.set(user);
+        // The identity is resolved here. Guards and the /auth redirect must not
+        // wait for the workspace list: the panel refreshes it on its own, and
+        // keeping it inside the "loaded" gate added a whole extra round-trip to
+        // every redirect for a visitor who was already signed in.
+        this.loaded.set(true);
+        this.probeSettled.set(true);
         await this.refreshWorkspaces(generation);
         this.assertCurrent(generation);
-        this.loaded.set(true);
       } catch (error) {
         if (!this.isCurrent(generation)) return;
         this.user.set(null);
@@ -134,6 +145,9 @@ export class AuthService {
         } else {
           this.loaded.set(false);
         }
+        // Either way the probe answered. Entry views can stop waiting and show
+        // the form rather than hang on a session that may never be confirmed.
+        this.probeSettled.set(true);
       }
     })();
     this.initPromise = operation;

@@ -141,6 +141,14 @@ export class AuthComponent {
   readonly pendingLink = this.intents.pending;
   readonly intentStorageFallback = this.intents.usingSessionFallback;
 
+  /**
+   * Hold the card back until the startup probe has answered. A visitor arriving
+   * with a live session must never see the login form, not even for a frame;
+   * `loaded` alone is not enough because a transient probe failure leaves it
+   * retryable, and hiding the form forever would strand that visitor.
+   */
+  readonly showAuthCard = computed(() => !this.auth.authenticated() && (this.auth.loaded() || this.auth.probeSettled()));
+
   /** Notices produced after registration/resend, excluding the static success copy. */
   readonly pendingNotice = computed(() => {
     const notice = this.info();
