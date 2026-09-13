@@ -42,7 +42,7 @@ module.exports = tseslint.config(
     ],
   },
   {
-    files: ["e2e/**/*.ts", "playwright.config.ts"],
+    files: ["e2e/**/*.ts", "playwright.config.ts", "playwright.release.config.ts"],
     extends: [eslint.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: { globals: globals.node },
   },
