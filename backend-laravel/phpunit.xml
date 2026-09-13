@@ -22,6 +22,14 @@
              and credentials belong to the launcher (CI or isolated Compose),
              avoiding a second, contradictory source of connection settings.
              Tests\TestCase still refuses every database not ending in _test. -->
+        <!-- `env` alone is not enough: it writes $_ENV and the process
+             environment, but Laravel reads $_SERVER first. A container or
+             shell that exports APP_ENV or QUEUE_CONNECTION therefore won over
+             the values below, so the suite silently ran as `local` with the
+             database queue instead of `testing` with the sync queue.
+             `server` pins the same variables in $_SERVER. -->
+        <server name="APP_ENV" value="testing" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
