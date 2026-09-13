@@ -681,11 +681,14 @@ class ApiParityTest extends TestCase
 
         // A primary-language rule accepts a regional browser tag even when it
         // is not the first raw header item; q=0 entries are never acceptable.
+        // get() is required: call() forwards only its own $server argument and
+        // drops withHeader(), which left Symfony's default Accept-Language in
+        // place and made every rule look like a miss.
         $primary = $this->withHeader('Accept-Language', 'en;q=0.4, es-MX;q=0.9')
-            ->call('GET', 'http://uvh.es/language-primary');
+            ->get('http://uvh.es/language-primary');
         $primary->assertRedirect('https://language.example.test/spanish');
         $zeroQuality = $this->withHeader('Accept-Language', 'es-MX;q=0, en;q=1')
-            ->call('GET', 'http://uvh.es/language-primary');
+            ->get('http://uvh.es/language-primary');
         $zeroQuality->assertRedirect('https://language.example.test/fallback');
 
         $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
@@ -700,10 +703,10 @@ class ApiParityTest extends TestCase
         ])->assertCreated();
 
         $regional = $this->withHeader('Accept-Language', 'es-ES;q=0.5, es-MX;q=0.9')
-            ->call('GET', 'http://uvh.es/language-regional');
+            ->get('http://uvh.es/language-regional');
         $regional->assertRedirect('https://language.example.test/spain');
         $otherRegion = $this->withHeader('Accept-Language', 'es-MX')
-            ->call('GET', 'http://uvh.es/language-regional');
+            ->get('http://uvh.es/language-regional');
         $otherRegion->assertRedirect('https://language.example.test/fallback');
     }
 
