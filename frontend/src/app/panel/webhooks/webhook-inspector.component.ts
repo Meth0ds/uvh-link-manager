@@ -140,6 +140,16 @@ export class WebhookInspectorComponent {
     return JSON.stringify(delivery.payloadPreview, null, 2);
   }
 
+  // Translate only presentation labels; queue states and action guards retain
+  // their server meaning. A queued event is not a confirmed delivery.
+  deliveryLabel(status: WebhookDelivery["status"]): string {
+    return { pending: "En cola", processing: "Enviando", success: "Entregada", failed: "Fallida" }[status];
+  }
+
+  deliveryIcon(status: WebhookDelivery["status"]): string {
+    return { pending: "schedule", processing: "sync", success: "check", failed: "error_outline" }[status];
+  }
+
   formatDate(value: string | null): string {
     return value ? new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
   }

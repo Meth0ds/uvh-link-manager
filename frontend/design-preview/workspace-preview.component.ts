@@ -3,10 +3,13 @@ import { ActivatedRoute } from "@angular/router";
 import { DashboardComponent } from "../src/app/panel/dashboard/dashboard.component";
 import { GettingStartedComponent } from "../src/app/panel/getting-started/getting-started.component";
 import { fixtureMode } from "./workspace-fixture";
+import { TokensComponent } from "../src/app/panel/tokens/tokens.component";
+import { WebhookInspectorComponent } from "../src/app/panel/webhooks/webhook-inspector.component";
+import { WebhooksComponent } from "../src/app/panel/webhooks/webhooks.component";
 
 @Component({
   selector: "app-workspace-preview", standalone: true,
-  imports: [DashboardComponent, GettingStartedComponent], changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DashboardComponent, GettingStartedComponent, TokensComponent, WebhookInspectorComponent, WebhooksComponent], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <aside class="fixture-toolbar" aria-label="Controles de la vista de diseño">
       <b>VISTA DE DISEÑO · DATOS FICTICIOS · SIN API</b>
@@ -19,7 +22,7 @@ import { fixtureMode } from "./workspace-fixture";
     <!-- Changing a scenario creates a fresh component, cancelling pending
          reads without test hooks in the real application or its router. -->
     @for (scenario of [mode()]; track scenario) {
-      @if (page === 'getting-started') { <app-getting-started /> } @else { <app-dashboard /> }
+      @if (page === 'getting-started') { <app-getting-started /> } @else if (page === 'tokens') { <app-tokens /> } @else if (page === 'inspector') { <app-webhook-inspector /> } @else if (page === 'webhooks') { <app-webhooks /> } @else { <app-dashboard /> }
     }
   `,
   styles: `

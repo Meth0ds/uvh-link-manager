@@ -5,6 +5,7 @@
 import { signal } from "@angular/core";
 import type { AnalyticsOverview, LinkDto, WorkspaceGettingStarted } from "../src/app/core/models";
 import { ApiRequestError } from "../src/app/core/services/api.service";
+import { sampleStatus, sampleWebhook, sampleDeliveries } from "./service-fixture";
 
 export type FixtureMode = "populated" | "empty" | "error" | "loading";
 export const fixtureMode = signal<FixtureMode>("populated");
@@ -53,10 +54,21 @@ export async function fixtureRead<T>(path: string, params?: Record<string, unkno
   const empty = mode === "empty";
   let value: unknown;
   if (path === "/api/v1/analytics/overview") value = sampleOverview(params?.["period"], empty);
+  else if (path === "/api/v1/public-status") value = sampleStatus();
+  else if (path === "/api/v1/webhooks") value = { webhooks: empty && !location.pathname.match(/webhooks\/\d+/) ? [] : [sampleWebhook] };
+  else if (path === "/api/v1/webhooks/9001/deliveries") value = { deliveries: empty ? [] : sampleDeliveries, total: empty ? 0 : sampleDeliveries.length, page: 1, perPage: 20 };
+  else if (path === "/api/v1/tokens") value = { tokens: empty ? [] : [
+    { id: 9001, name: "Publicación editorial", scopes: ["links:read", "links:write"],
+      createdAt: "2026-09-08T12:00:00Z", lastUsedAt: "2026-09-12T12:00:00Z", expiresAt: "2026-12-31T12:00:00Z", revokedAt: null },
+    { id: 9002, name: "IntegracionConNombreLargoSinEspaciosParaComprobarLaLecturaEnPantallasEstrechas", scopes: ["analytics:read", "domains:read", "domains:write"],
+      createdAt: "2026-09-01T12:00:00Z", lastUsedAt: null, expiresAt: null, revokedAt: "2026-09-12T12:00:00Z" },
+  ] };
   else if (path === "/api/v1/links") value = { links: empty ? [] : links, total: empty ? 0 : links.length, page: 1, perPage: 5 };
   else if (path === `/api/v1/workspaces/${currentId()}/getting-started`) {
+    const workspaceId = currentId();
+    if (workspaceId === null) return blocked();
     const viewer = currentId() === 2;
-    value = { workspaceId: currentId(), role: viewer ? "viewer" : "owner",
+    value = { workspaceId, role: viewer ? "viewer" : "owner",
       facts: { linkPresent: !empty, redirectObserved: !empty, mfaEnabled: false, domainPresent: false, teammatePresent: false, invitationPending: viewer ? null : false },
       capabilities: { createLink: !viewer, addDomain: !viewer, inviteTeam: !viewer },
     } satisfies WorkspaceGettingStarted;

@@ -7,14 +7,14 @@
   <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
 }
 
-<div class="create-card">
+<section class="create-card" aria-labelledby="token-create-title">
   <div class="card-intro">
     <span class="card-icon" aria-hidden="true"><mat-icon>key</mat-icon></span>
-    <div><h2>Generar una credencial</h2><p>Selecciona únicamente los permisos que necesite la integración.</p></div>
+    <div><span class="section-kicker">Una credencial por integración</span><h2 id="token-create-title">Define qué podrá hacer.</h2><p>Dale un nombre reconocible y selecciona sólo los permisos necesarios. Podrás revocarla desde este registro.</p></div>
   </div>
   <div class="create-fields">
     <mat-form-field appearance="outline" class="grow">
-      <mat-label>Nombre</mat-label>
+      <mat-label>Nombre de la integración</mat-label>
       <input matInput placeholder="CI, integración, cron…" [(ngModel)]="name" maxlength="80" />
     </mat-form-field>
     <mat-form-field appearance="outline" class="expires">
@@ -37,42 +37,51 @@
   </fieldset>
 
   <div class="credential-fields">
-    <div class="credential-copy"><b>Confirma esta emisión</b><span>Una credencial nueva permite operar fuera de tu sesión. Vuelve a identificarte para crearla.</span></div>
+    <div class="credential-copy"><span class="section-kicker">Confirmación de identidad</span><b>Autoriza esta credencial</b><span>El token permite operar fuera de tu sesión. Confirma tu identidad antes de generarlo.</span></div>
     <mat-form-field appearance="outline">
       <mat-label>Contraseña actual</mat-label>
       <input matInput type="password" [(ngModel)]="password" autocomplete="current-password" maxlength="72" />
-      <mat-icon matPrefix>lock_outline</mat-icon>
+      <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
     </mat-form-field>
     @if (user()?.mfaEnabled) {
       <mat-form-field appearance="outline">
-        <mat-label>Código de autenticación o recuperación</mat-label>
+        <mat-label>Segundo factor</mat-label>
         <input matInput [(ngModel)]="factorCode" autocomplete="one-time-code" maxlength="24" />
-        <mat-icon matPrefix>key</mat-icon>
+        <mat-icon matPrefix aria-hidden="true">key</mat-icon>
+        <mat-hint>Código del autenticador o de recuperación.</mat-hint>
       </mat-form-field>
     }
   </div>
 
-  <button mat-flat-button color="primary" (click)="create()" [disabled]="!name().trim() || !selectedScopes().length || !password() || (user()?.mfaEnabled && !factorCode().trim()) || creating()">
-    <mat-icon>add</mat-icon> Generar token
-  </button>
+  <div class="issue-actions">
+    <button mat-flat-button color="primary" type="button" (click)="create()" [disabled]="!name().trim() || !selectedScopes().length || !password() || (user()?.mfaEnabled && !factorCode().trim()) || creating()" [attr.aria-busy]="creating()">
+      <mat-icon aria-hidden="true">add</mat-icon> {{ creating() ? 'Generando token…' : 'Generar token' }}
+    </button>
+    <p>El secreto se mostrará una sola vez. Guárdalo fuera del código y de los registros de tu aplicación.</p>
+  </div>
 
   @if (plainToken(); as pt) {
-    <div class="plain-box">
+    <!-- Announce availability, not the credential itself: live regions must
+         not read the secret aloud as soon as a successful response arrives. -->
+    <p class="issued-notice" role="status">Token generado. Guarda el secreto que se muestra a continuación.</p>
+    <section class="plain-box" aria-label="Secreto del token generado">
       <p class="warning"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Guarda este token ahora.</b> Sólo se muestra una vez y no podrás volver a verlo.</span></p>
       <div class="plain-row">
         <code class="tnum">{{ pt }}</code>
-        <button mat-icon-button (click)="copyPlain()" aria-label="Copiar token"><mat-icon>content_copy</mat-icon></button>
+        <button mat-icon-button type="button" (click)="copyPlain()" aria-label="Copiar token"><mat-icon aria-hidden="true">content_copy</mat-icon></button>
       </div>
-    </div>
+    </section>
   }
-</div>
+</section>
+
+<div class="registry-heading"><div><span class="section-kicker">Credenciales del workspace</span><h2 id="token-registry-title">Registro de tokens</h2></div><span class="registry-note">Revocar interrumpe las integraciones que lo usan.</span></div>
 
 @if (loading() && !tokens().length) {
   <app-panel-skeleton variant="list" label="Cargando tokens" />
 }
 
 @if (!loading() && (!error() || tokens().length)) {
-  <div class="token-list">
+  <section class="token-list" aria-labelledby="token-registry-title">
     @for (t of tokens(); track trackByToken($index, t)) {
       <article class="token-row">
         <span class="token-icon" aria-hidden="true"><mat-icon>{{ t.revokedAt ? 'key_off' : 'key' }}</mat-icon></span>
@@ -82,21 +91,22 @@
             @for (s of t.scopes; track s) {
               <span class="scope-chip"><code>{{ s }}</code></span>
             }
-          </div>          <span class="meta tnum">
+          </div>
+          <span class="meta tnum">
             Creado {{ t.createdAt.slice(0, 10) }}{{ t.lastUsedAt ? " · Último uso " + t.lastUsedAt.slice(0, 10) : " · Sin usar" }}{{ t.expiresAt ? " · Caduca " + t.expiresAt.slice(0, 10) : "" }}
           </span>
         </div>
         <div class="token-actions">
-          <button mat-stroked-button class="danger" (click)="revoke(t)" [disabled]="!!t.revokedAt"><mat-icon>block</mat-icon> {{ t.revokedAt ? "Revocado" : "Revocar" }}</button>
+          <button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="!!t.revokedAt" [attr.aria-label]="(t.revokedAt ? 'Token revocado: ' : 'Revocar token: ') + t.name"><mat-icon aria-hidden="true">block</mat-icon> {{ t.revokedAt ? "Revocado" : "Revocar" }}</button>
         </div>
       </article>
     }
     @if (!tokens().length && !error()) {
       <div class="empty-state">
-        <mat-icon>key_off</mat-icon>
+        <mat-icon aria-hidden="true">key_off</mat-icon>
         <b>Sin tokens</b>
-        <p>Crea un token para integrar UVH con tus sistemas.</p>
+        <p>Si necesitas conectar una aplicación, configura su credencial arriba. Para usar el panel no necesitas ningún token.</p>
       </div>
     }
-  </div>
+  </section>
 }

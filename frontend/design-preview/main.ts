@@ -20,6 +20,8 @@ import { ApiService } from "../src/app/core/services/api.service";
 import { LinkDialogService } from "../src/app/panel/links/link-dialog.service";
 import { WorkspacePreviewComponent } from "./workspace-preview.component";
 import { blocked, currentId, fixtureRead } from "./workspace-fixture";
+import { StatusPageComponent } from "../src/app/status-page.component";
+import { PublicStatusPreviewComponent } from "./public-status-preview.component";
 
 @Component({
   selector: "app-design-preview-content",
@@ -63,15 +65,21 @@ class DesignPreviewRootComponent {}
 void bootstrapApplication(DesignPreviewRootComponent, {
   providers: [
     provideRouter([
+      { path: "status", component: PublicStatusPreviewComponent, title: "Estado · Vista de diseño" },
+      { path: "forbidden", component: StatusPageComponent, data: { kind: "forbidden" }, title: "403 · Vista de diseño" },
+      { path: "not-found", component: StatusPageComponent, data: { kind: "not-found" }, title: "404 · Vista de diseño" },
       { path: "app", component: PanelComponent, children: [
         { path: "dashboard", component: WorkspacePreviewComponent, data: { page: "dashboard" } },
         { path: "getting-started", component: WorkspacePreviewComponent, data: { page: "getting-started" } },
+        { path: "tokens", component: WorkspacePreviewComponent, data: { page: "tokens" } },
+        { path: "webhooks", component: WorkspacePreviewComponent, data: { page: "webhooks" } },
+        { path: "webhooks/:id", component: WorkspacePreviewComponent, data: { page: "inspector" } },
         { path: "**", component: DesignPreviewContentComponent },
       ] },
       { path: "**", redirectTo: "app/dashboard" },
     ]),
     { provide: AuthService, useValue: { user: signal({ id: 900001, name: "Persona de ejemplo", email: "preview@example.invalid", isAdmin: false, emailVerified: true, mfaEnabled: false }), logout: blocked, refreshWorkspaces: blocked } },
-    { provide: WorkspaceService, useValue: { currentId, list: signal([{ id: 1, name: "Estudio Norte", role: "owner" }, { id: 2, name: "Archivo editorial", role: "viewer" }]), select: (id: number) => currentId.set(id) } },
+    { provide: WorkspaceService, useValue: { currentId, currentRole: () => currentId() === 1 ? "owner" : "viewer", list: signal([{ id: 1, name: "Estudio Norte", role: "owner" }, { id: 2, name: "Archivo editorial", role: "viewer" }]), select: (id: number) => currentId.set(id) } },
     { provide: ApiService, useValue: { get: fixtureRead, post: blocked, patch: blocked, delete: blocked } },
     { provide: LinkDialogService, useValue: { openCreate: () => of(null) } },
   ],

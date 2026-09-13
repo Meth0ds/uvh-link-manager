@@ -1,19 +1,37 @@
 <div class="status-shell">
-  <header><a class="brand" routerLink="/" aria-label="UVH, inicio"><span aria-hidden="true">↗</span><b>UVH</b></a><nav aria-label="Navegación pública"><a routerLink="/help">Ayuda técnica</a><a routerLink="/auth/login">Iniciar sesión</a></nav></header>
-  <main aria-labelledby="status-title">
-    <p class="eyebrow">Medición independiente</p>
-    <div class="title-row"><div><h1 id="status-title">Estado del servicio</h1><p>La señal procede de un monitor externo. La aplicación no se declara saludable a sí misma.</p></div><button type="button" (click)="refresh()" [disabled]="loading()">{{ loading() ? "Consultando…" : "Actualizar" }}</button></div>
+  <a class="skip-link" href="#service-status" (click)="$event.preventDefault(); content.focus()">Ir al estado del servicio</a>
+  <header class="public-header">
+    <a class="brand" routerLink="/" aria-label="UVH, inicio">uvh<span>.</span></a><span class="brand-caption">Enlaces con recorrido.</span>
+    <nav aria-label="Navegación pública"><a routerLink="/help">Ayuda</a><a routerLink="/auth/login">Iniciar sesión</a></nav><app-public-theme-toggle />
+  </header>
+  <main #content id="service-status" tabindex="-1" aria-labelledby="status-title">
+    <div class="page-heading">
+      <div><p class="eyebrow">Disponibilidad / Medición externa</p><h1 id="status-title">Estado del servicio</h1><p class="intro">Una lectura de la disponibilidad de UVH a partir del monitor externo. Que esta página cargue no significa que todos los servicios funcionen.</p></div>
+      <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()"><mat-icon aria-hidden="true">refresh</mat-icon>{{ loading() ? 'Consultando…' : 'Actualizar estado' }}</button>
+    </div>
 
     @if (loading() && !snapshot()) {
-      <section class="state-card loading" aria-live="polite"><span></span><p>Consultando el último estado externo…</p></section>
-    } @else if (unavailable() || !snapshot()) {
-      <section class="state-card unknown" role="status"><i aria-hidden="true"></i><div><h2>Estado desconocido</h2><p>No hay una medición externa reciente y válida. No asumimos que el servicio esté operativo.</p></div></section>
-    } @else {
-      <section class="state-card" [attr.data-status]="snapshot()!.overall" aria-live="polite"><i aria-hidden="true"></i><div><h2>{{ statusLabel(snapshot()!.overall) }}</h2><p>Medición externa generada el {{ snapshot()!.generatedAt | date:'medium' }}.</p></div></section>
-      <section class="components" aria-labelledby="components-title"><h2 id="components-title">Componentes públicos</h2><div class="component-grid">@for (component of snapshot()!.components; track component.id) { <article [attr.data-status]="component.status"><span><i aria-hidden="true"></i>{{ component.label }}</span><b>{{ statusLabel(component.status) }}</b></article> }</div></section>
-      <section class="incidents" aria-labelledby="incidents-title"><h2 id="incidents-title">Incidentes recientes</h2>@if (snapshot()!.incidents.length === 0) { <p class="empty">El monitor no comunica incidentes recientes.</p> } @else { @for (incident of snapshot()!.incidents; track incident.id) { <article><div><h3>{{ incident.title }}</h3><span>{{ incident.updatedAt | date:'medium' }}</span></div><p>{{ incident.message }}</p><b>{{ incident.status }}</b></article> } }</section>
+      <section class="state-card loading" role="status"><span class="state-icon" aria-hidden="true"><mat-icon>hourglass_empty</mat-icon></span><div><span class="eyebrow">Consulta en curso</span><h2>Buscando la última medición.</h2><p>Todavía no hay un resultado que mostrar.</p><mat-progress-bar mode="indeterminate" aria-label="Consultando medición externa" /></div></section>
+    } @else if (unknown()) {
+      <section class="state-card unknown" role="status"><span class="state-icon" aria-hidden="true"><mat-icon>help_outline</mat-icon></span><div><span class="eyebrow">Sin confirmación externa</span><h2>Estado desconocido</h2><p>No hay una medición externa reciente y válida. No asumimos que el servicio esté operativo ni que esté caído.</p></div></section>
+      <div class="unknown-guidance"><h3>¿Qué puedes hacer ahora?</h3><p>Vuelve a consultar el estado dentro de unos minutos. Si estás resolviendo un problema concreto, la ayuda puede orientarte aunque no haya una medición disponible.</p><a routerLink="/help">Consultar la ayuda<mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+    } @else if (snapshot(); as state) {
+      <section class="state-card" [attr.data-status]="state.overall" role="status"><span class="state-icon" aria-hidden="true"><mat-icon>{{ statusIcon(state.overall) }}</mat-icon></span><div><span class="eyebrow">Resultado de la medición disponible</span><h2>{{ statusLabel(state.overall) }}</h2><p>Generada el <time [attr.datetime]="state.generatedAt">{{ state.generatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</time> · hora de tu dispositivo.</p></div></section>
+      @if (loading()) { <p class="refresh-note" role="status">Consultando de nuevo. Mientras tanto se muestra la medición anterior.</p> }
+      <section class="components" aria-labelledby="components-title"><div class="section-heading"><h2 id="components-title">Servicio por servicio</h2><span>Tres componentes públicos</span></div>
+        <div class="component-grid">@for (component of state.components; track component.id) {
+          <article [attr.data-status]="component.status"><span class="component-icon" aria-hidden="true"><mat-icon>{{ component.id === 'links' ? 'link' : component.id === 'panel' ? 'space_dashboard' : 'webhook' }}</mat-icon></span><h3>{{ component.label }}</h3><p class="component-state"><mat-icon aria-hidden="true">{{ statusIcon(component.status) }}</mat-icon>{{ statusLabel(component.status) }}</p></article>
+        }</div>
+      </section>
+      <section class="incidents" aria-labelledby="incidents-title"><div class="section-heading"><h2 id="incidents-title">Incidentes comunicados</h2><span>Según el monitor externo</span></div>
+        @if (!state.incidents.length) { <div class="no-incidents"><mat-icon aria-hidden="true">notes</mat-icon><p>El monitor no comunica incidentes recientes. Esta lista no sustituye el estado de los componentes.</p></div> }
+        @for (incident of state.incidents; track incident.id) {
+          <article><div class="incident-meta"><span class="incident-state" [class.resolved]="incident.status === 'resolved'">{{ incidentLabel(incident.status) }}</span><time [attr.datetime]="incident.updatedAt">Actualizado {{ incident.updatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</time></div><h3>{{ incident.title }}</h3><p>{{ incident.message }}</p><small>Inicio <time [attr.datetime]="incident.startedAt">{{ incident.startedAt | date:'yyyy-MM-dd HH:mm:ss' }}</time> · hora de tu dispositivo</small></article>
+        }
+      </section>
     }
-    <aside><strong>Diseñado para fallar de forma segura.</strong> Si el feed externo falta, está caducado o no cumple el contrato, esta página muestra estado desconocido. No publica versiones, direcciones internas ni topología.</aside>
+
+    <details class="reading-guide"><summary>Cómo leer esta página<mat-icon aria-hidden="true">expand_more</mat-icon></summary><div><p><b>Mediciones, no promesas.</b> Se muestra una instantánea del monitor externo, no una comprobación continua desde tu navegador. Usa «Actualizar estado» para consultar otra vez.</p><p><b>Sin señal no significa operativo.</b> Si el feed falta, está caducado o no cumple el contrato, el resultado es desconocido. No publicamos versiones, direcciones internas ni topología.</p><p><b>Una página no demuestra independencia.</b> La continuidad del monitor durante una caída de UVH debe verificarse en el despliegue. El diseño de esta pantalla no acredita esa prueba.</p></div></details>
   </main>
-  <footer><span>© {{ year }} UVH</span><a routerLink="/help">Ayuda</a><a routerLink="/legal/privacidad">Privacidad</a></footer>
+  <footer><span>© {{ year }} UVH / Estado del servicio</span><nav aria-label="Información y soporte"><a routerLink="/help">Ayuda</a><a routerLink="/legal/privacidad">Privacidad</a></nav></footer>
 </div>

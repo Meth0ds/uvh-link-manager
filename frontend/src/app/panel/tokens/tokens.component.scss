@@ -35,16 +35,14 @@
   background: var(--uvh-surface-raised);
 
   .create-fields {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 240px);
     align-items: flex-start;
     gap: 12px;
 
-    .grow {
-      flex: 1;
-    }
-
-    .expires {
-      width: 240px;
+    mat-form-field {
+      min-width: 0;
+      width: 100%;
     }
   }
 }
@@ -55,12 +53,15 @@
   gap: 14px;
   margin-bottom: 17px;
 
+  > div { min-width: 0; }
+
   h2 {
     margin: 0;
     color: var(--uvh-ink);
-    font-size: 18px;
+    font-size: clamp(22px, 3cqi, 30px);
     font-weight: 800;
-    letter-spacing: -.03em;
+    letter-spacing: -.045em;
+    text-wrap: balance;
   }
 
   p {
@@ -111,6 +112,7 @@
   }
 
   mat-checkbox {
+    min-width: 0;
     padding: 7px 9px;
     border: 1px solid var(--uvh-border);
     border-radius: 3px;
@@ -128,6 +130,7 @@
   display: inline-flex;
   flex-direction: column;
   gap: 1px;
+  overflow-wrap: anywhere;
 
   code {
     color: var(--uvh-ink);
@@ -208,6 +211,7 @@
 
     code {
       flex: 1;
+      min-width: 0;
       overflow-wrap: anywhere;
       color: var(--uvh-ink);
       font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
@@ -224,12 +228,15 @@
 
 // Registry ledger: hairline rows, mono scope tags, no hover lift.
 .token-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   justify-content: space-between;
   align-items: center;
   gap: 14px;
   padding: 16px 4px;
   border-bottom: 1px solid var(--uvh-border);
+  transition: background-color 160ms ease;
+  &:hover, &:focus-within { background: var(--uvh-surface-raised); }
 
   .token-main {
     display: flex;
@@ -243,6 +250,7 @@
       font-size: 14px;
       font-weight: 800;
       letter-spacing: -.015em;
+      overflow-wrap: anywhere;
     }
 
     .scope-chips {
@@ -251,6 +259,8 @@
       flex-wrap: wrap;
 
       .scope-chip {
+        min-width: 0;
+        overflow-wrap: anywhere;
         padding: 2px 7px;
         border: 1px solid var(--uvh-border);
         border-radius: 3px;
@@ -264,6 +274,7 @@
     }
 
     .meta {
+      overflow-wrap: anywhere;
       color: var(--uvh-muted);
       font-size: 11.5px;
     }
@@ -285,12 +296,10 @@
 }
 
 @container (max-width: 640px) {
-  .create-fields {
-    flex-direction: column;
-
-    .expires {
-      width: 100%;
-    }
+  // Match the desktop selector: a lower-specificity mobile selector left
+  // the fixed expiry width in force, overflowing the narrow form.
+  .create-card .create-fields {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .scopes,
@@ -300,13 +309,43 @@
 
   .token-row {
     align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: 38px minmax(0, 1fr);
   }
 
   .token-actions {
-    width: 100%;
-    margin-left: 50px;
+    grid-column: 2;
+    justify-self: start;
+    min-width: 0;
   }
+
+}
+
+.section-kicker { display: block; margin-bottom: 8px; color: var(--uvh-muted); font: 10px/1.5 "Courier New", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.registry-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin: 32px 0 20px; }
+.registry-heading h2 { margin: 0; color: var(--uvh-ink); font-size: 22px; font-weight: 800; letter-spacing: -.035em; }
+.registry-note { max-width: 32ch; color: var(--uvh-muted); font-size: 11px; line-height: 1.7; }
+.credential-fields mat-form-field { min-width: 0; width: 100%; }
+.issue-actions { display: flex; align-items: center; gap: 18px; }
+.issue-actions button { flex-shrink: 0; min-height: 44px; }
+.issue-actions p { max-width: 54ch; margin: 0; color: var(--uvh-muted); font-size: 11px; line-height: 1.7; }
+.plain-row button { flex: 0 0 48px; }
+.issued-notice { color: var(--uvh-success); font-size: 12px; line-height: 1.7; }
+.token-actions button { min-height: 44px; }
+:is(button, a):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
+@container (max-width: 640px) {
+  .registry-heading { align-items: flex-start; flex-direction: column; }
+  .issue-actions { align-items: stretch; flex-direction: column; }
+}
+@container (max-width: 420px) {
+  .create-card { padding: 20px 14px; }
+  .card-intro { gap: 10px; }
+  .card-icon { width: 30px; height: 30px; flex-basis: 30px; }
+  .credential-fields { padding-left: 10px; }
+  .scopes mat-checkbox { padding-inline: 3px; }
+  .token-row { gap: 10px; }
+  .plain-box { padding: 14px 10px; }
+  .alert { flex-wrap: wrap; }
+  .alert > button { margin-left: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

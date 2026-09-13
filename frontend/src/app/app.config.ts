@@ -25,6 +25,7 @@ export const routes: Routes = [
   },
   {
     path: "status",
+    title: "Estado del servicio · UVH",
     loadComponent: () => import("./public-status/public-status.component").then((m) => m.PublicStatusComponent),
   },
   {
@@ -35,11 +36,13 @@ export const routes: Routes = [
   },
   {
     path: "forbidden",
+    title: "403 · Acceso restringido · UVH",
     data: { kind: "forbidden" },
     loadComponent: () => import("./status-page.component").then((m) => m.StatusPageComponent),
   },
   {
     path: "not-found",
+    title: "404 · Página no encontrada · UVH",
     data: { kind: "not-found" },
     loadComponent: () => import("./status-page.component").then((m) => m.StatusPageComponent),
   },

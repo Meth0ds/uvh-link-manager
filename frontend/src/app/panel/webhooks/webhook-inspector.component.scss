@@ -1,305 +1,73 @@
-// Webhook inspector: flat endpoint and history plates; each delivery is a
-// self-contained record with ruled data cells and a mono payload viewer.
-:host { display: block; container-type: inline-size; }
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 14px;
-  color: var(--uvh-muted);
-  font-size: 12.5px;
-  font-weight: 700;
-  text-decoration: none;
-  transition: color 160ms ease;
-
-  &:hover {
-    color: var(--uvh-electric);
-  }
-
-  mat-icon {
-    width: 17px;
-    height: 17px;
-    font-size: 17px;
-    transition: transform 180ms ease;
-  }
-
-  &:hover mat-icon {
-    transform: translateX(-3px);
-  }
-}
-
-.endpoint-card,
-.deliveries-card {
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface-raised);
-}
-
-.endpoint-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px 22px;
-
-  > div {
-    flex: 1;
-    min-width: 0;
-  }
-
-  h2 {
-    margin: 3px 0;
-    overflow-wrap: anywhere;
-    color: var(--uvh-electric);
-    font-size: 16px;
-    font-weight: 800;
-    letter-spacing: -.025em;
-  }
-
-  p {
-    margin: 0;
-    color: var(--uvh-muted);
-    font-size: 12px;
-    line-height: 1.6;
-  }
-}
-
-.eyebrow {
-  color: var(--uvh-muted);
-  font: 10px/1.4 "Courier New", monospace;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-
-// Safety note: a success-tinted margin note, no rounded tinted card.
-.safety-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 14px 0;
-  padding: 12px 14px;
-  border-left: 2px solid var(--uvh-success);
-  border-radius: 3px;
-  background: var(--uvh-success-soft);
-  color: var(--uvh-muted);
-  font-size: 12px;
-  line-height: 1.7;
-
-  mat-icon {
-    width: 17px;
-    height: 17px;
-    flex: 0 0 17px;
-    font-size: 17px;
-    color: var(--uvh-success);
-  }
-}
-
-.alert {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin: 14px 0;
-  padding: 12px 14px;
-  border-radius: 3px;
-  font-size: 13px;
-  line-height: 1.6;
-
-  > span {
-    flex: 1;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  &.error {
-    border-left: 3px solid var(--uvh-danger);
-    background: var(--uvh-danger-soft);
-    color: var(--uvh-danger);
-  }
-
-  &.permission {
-    border-left: 2px solid var(--uvh-border);
-    background: var(--uvh-surface-raised);
-    color: var(--uvh-muted);
-  }
-}
-
-.deliveries-card {
-  padding: 18px 20px;
-
-  > header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-
-    h2 {
-      margin: 2px 0;
-      color: var(--uvh-ink);
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: -.03em;
-    }
-
-    > span {
-      flex-shrink: 0;
-      color: var(--uvh-muted);
-      font: 11px/1.5 "Courier New", monospace;
-      letter-spacing: .04em;
-    }
-  }
-}
-
-.delivery {
-  margin-top: 12px;
-  padding: 14px 16px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface);
-
-  &.failed {
-    border-left: 3px solid var(--uvh-danger);
-  }
-}
-
-.delivery-head {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 9px;
-  font-size: 11.5px;
-
-  > code {
-    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-    font-size: 11px;
-  }
-}
-
-.event-id {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--uvh-muted);
-}
-
-// Status tags: square, alias-colored, appearance never changes meaning.
-.status {
-  padding: 3px 8px;
-  border-radius: 3px;
-  color: var(--uvh-muted);
-  background: color-mix(in srgb, var(--uvh-muted) 10%, transparent);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-
-  &.success {
-    background: var(--uvh-success-soft);
-    color: var(--uvh-success);
-  }
-
-  &.failed {
-    background: var(--uvh-danger-soft);
-    color: var(--uvh-danger);
-  }
-
-  &.processing,
-  &.pending {
-    background: color-mix(in srgb, var(--uvh-electric) 12%, transparent);
-    color: var(--uvh-electric);
-  }
-}
-
-// Timestamps: ruled cells instead of rounded inner tiles.
-.delivery dl {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 14px;
-  margin: 12px 0;
-}
-
-.delivery dl > div {
-  padding: 8px 0;
-  border-top: 1px solid var(--uvh-border);
-}
-
-.delivery dt {
-  color: var(--uvh-muted);
-  font: 9.5px/1.6 "Courier New", monospace;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-
-.delivery dd {
-  margin: 3px 0 0;
-  color: var(--uvh-ink);
-  font-size: 11px;
-  line-height: 1.6;
-}
-
-.delivery-error {
-  padding: 9px 12px;
-  border-left: 3px solid var(--uvh-danger);
-  border-radius: 3px;
-  background: var(--uvh-danger-soft);
-  color: var(--uvh-danger);
-  font-size: 11.5px;
-  line-height: 1.6;
-}
-
-details {
-  margin: 10px 0;
-}
-
-summary {
-  cursor: pointer;
-  color: var(--uvh-electric);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-// Payload viewer: ink-on-paper mono block, no navy glow.
-pre {
-  max-height: 280px;
-  overflow: auto;
-  margin: 8px 0 0;
-  padding: 12px 14px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  color: var(--uvh-ink);
-  background: var(--uvh-surface);
-  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-  color: var(--uvh-muted);
-  font-size: 12px;
-}
-
+// One endpoint, then a ruled delivery ledger. Status color belongs to the
+// delivery outcome, never to the mere presence of a signing secret.
+:host { display: block; container-type: inline-size; min-width: 0; }
+.back-link { display: inline-flex; align-items: center; min-height: 44px; gap: 8px; margin-bottom: 12px; color: var(--muted); font-size: 12px; font-weight: 700; text-decoration: none; }
+.back-link mat-icon { width: 18px; height: 18px; font-size: 18px; transition: transform 180ms ease; }
+.back-link:hover { color: var(--accent); }
+.back-link:hover mat-icon { transform: translateX(-3px); }
+.endpoint-card { padding: 24px; border: 1px solid var(--line); border-radius: 3px; background: var(--paper-raised); }
+.eyebrow { color: var(--muted); font: 10px/1.6 "Courier New", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.endpoint-address h2 { margin: 8px 0 24px; color: var(--ink); font-size: clamp(17px, 2.6cqi, 23px); font-weight: 800; letter-spacing: -.025em; line-height: 1.5; overflow-wrap: anywhere; }
+dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; gap: 20px; }
+dl > div { min-width: 0; padding-top: 12px; border-top: 1px solid var(--line); }
+dt { color: var(--muted); font: 10px/1.6 "Courier New", monospace; }
+dd { margin: 6px 0 0; color: var(--ink); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.test-action { display: flex; align-items: center; gap: 20px; margin-top: 24px; }
+button { min-height: 44px; flex-shrink: 0; }
+.test-action p { margin: 0; max-width: 58ch; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.safety-note, .permission { display: flex; align-items: flex-start; gap: 12px; padding: 18px 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
+.safety-note mat-icon, .permission mat-icon { flex: 0 0 20px; width: 20px; height: 20px; font-size: 20px; }
+.safety-note p { margin: 0; max-width: 85ch; }
+.safety-note b { color: var(--ink); }
+.permission { margin: 0 0 16px; border-block: 1px solid var(--line); }
+.alert { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 0; padding: 14px 16px; font-size: 13px; line-height: 1.7; }
+.alert span { min-width: 0; overflow-wrap: anywhere; }
+.error, .delivery-error { border-left: 3px solid var(--uvh-danger); border-radius: 3px; background: var(--uvh-danger-soft); color: var(--uvh-danger); }
+.deliveries-card { margin-top: 22px; }
+.deliveries-card > header { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding-bottom: 24px; }
+.deliveries-card h2 { margin: 0; color: var(--ink); font-size: 24px; font-weight: 800; letter-spacing: -.035em; }
+.deliveries-card header p { margin: 10px 0 0; max-width: 65ch; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.total { flex-shrink: 0; color: var(--muted); font: 11px/1.6 "Courier New", monospace; }
+.delivery { --delivery-ink: var(--muted); --delivery-soft: var(--soft); padding: 26px 0; border-top: 1px solid var(--line); }
+.delivery:last-of-type { border-bottom: 1px solid var(--line); }
+.delivery[data-status=success] { --delivery-ink: var(--uvh-success); --delivery-soft: var(--uvh-success-soft); }
+.delivery[data-status=failed] { --delivery-ink: var(--uvh-danger); --delivery-soft: var(--uvh-danger-soft); }
+.delivery[data-status=pending], .delivery[data-status=processing] { --delivery-ink: var(--uvh-warn); --delivery-soft: var(--uvh-warn-soft); }
+.delivery-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 3px; color: var(--delivery-ink); background: var(--delivery-soft); font-size: 11px; font-weight: 800; }
+.status mat-icon { width: 16px; height: 16px; font-size: 16px; }
+.delivery h3 { margin: 0; color: var(--ink); font: 700 14px/1.6 "Courier New", monospace; overflow-wrap: anywhere; }
+.attempts { margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.event-id { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 14px 0 20px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.event-id code { min-width: 0; overflow-wrap: anywhere; font: 11px/1.7 "Courier New", monospace; }
+.delivery-error { display: grid; gap: 6px; padding: 12px 14px; margin: 20px 0; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.delivery-error strong { font: 700 11px/1.6 "Courier New", monospace; }
+details { margin-top: 20px; border-block: 1px solid var(--line); }
+summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 8px 0; color: var(--ink); font-size: 12px; font-weight: 750; cursor: pointer; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary mat-icon { flex-shrink: 0; transition: transform 180ms ease; }
+details[open] summary mat-icon { transform: rotate(180deg); }
+.payload-caption { display: inline-block; margin-left: 14px; color: var(--muted); font-size: 10px; font-weight: 400; }
+pre { max-height: 320px; max-width: 100%; overflow: auto; margin: 0 0 16px; padding: 16px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); background: var(--paper-raised); font: 11px/1.8 "Courier New", monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.delivery-actions { display: flex; align-items: center; gap: 18px; margin-top: 16px; }
+.delivery-actions > span { color: var(--muted); font-size: 11px; line-height: 1.7; }
+.empty-state { padding: 36px 24px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); text-align: center; }
+.empty-state > mat-icon { color: var(--accent); }
+.empty-state h3 { color: var(--ink); font: 800 20px/1.4 Manrope, sans-serif; letter-spacing: -.03em; }
+.empty-state p { max-width: 60ch; margin: 12px auto 0; font-size: 13px; line-height: 1.8; }
+.pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; color: var(--muted); font-size: 12px; }
+:is(a, button, summary, pre):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @container (max-width: 680px) {
-  .endpoint-card {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .delivery dl {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  dl { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .endpoint-card { padding: 20px 16px; }
+  .test-action, .delivery-actions, .alert { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .deliveries-card > header { flex-direction: column; gap: 12px; }
+  .attempts { margin-left: 0; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
+@container (max-width: 420px) {
+  .payload-caption { display: block; margin: 4px 0 0; }
+  .pagination > span { order: -1; flex-basis: 100%; text-align: center; }
+  .pagination button { flex: 1; }
+  .test-action button, .delivery-actions button { width: 100%; }
 }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

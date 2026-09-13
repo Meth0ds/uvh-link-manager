@@ -1,4 +1,4 @@
-import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
 import { FormsModule } from "@angular/forms";
@@ -81,14 +81,20 @@ export class WebhooksComponent {
   readonly eventOptions = EVENTS;
   readonly saving = signal(false);
   readonly actionId = signal<number | null>(null);
+  readonly canEdit = computed(() => ["owner", "admin", "editor"].includes(this.workspaces.currentRole() ?? ""));
+  readonly eventDescriptions: Record<string, string> = {
+    "link.created": "Se crea un enlace", "link.updated": "Se modifica un enlace", "link.deleted": "Se elimina un enlace",
+    "link.threshold_reached": "Un enlace alcanza su umbral", "domain.verified": "Se verifica un dominio",
+  };
 
-  private loadedWorkspaceId: number | null | undefined;
+  private loadedContext: string | undefined;
 
   constructor() {
     effect(() => {
       const workspaceId = this.workspaces.currentId();
-      if (workspaceId === this.loadedWorkspaceId) return;
-      this.loadedWorkspaceId = workspaceId;
+      const context = `${workspaceId}:${this.workspaces.currentRole()}`;
+      if (context === this.loadedContext) return;
+      this.loadedContext = context;
       this.loadRequests.invalidate();
       this.mutationRequests.invalidate();
       for (const guard of this.deliveryRequests.values()) guard.invalidate();
@@ -147,11 +153,14 @@ export class WebhooksComponent {
   }
 
   startCreate(): void {
+    if (!this.canEdit() || this.saving()) return;
     this.resetForm();
     this.showForm.set(true);
   }
 
   startEdit(w: WebhookDto): void {
+    if (!this.canEdit() || this.saving()) return;
+    this.plainSecret.set(null);
     this.showForm.set(true);
     this.editId.set(w.id);
     this.url.set(w.url);
@@ -161,7 +170,7 @@ export class WebhooksComponent {
 
   async save(): Promise<void> {
     const secret = this.secret();
-    if (!this.url().trim() || !this.selectedEvents().length || this.saving()) return;
+    if (!this.canEdit() || !this.url().trim() || !this.selectedEvents().length || this.saving()) return;
     if (secret && (secret.length < 16 || secret.length > 128)) {
       this.snackbar.open("El secreto debe tener entre 16 y 128 caracteres", "Cerrar", { duration: 3500 });
       return;
@@ -222,7 +231,7 @@ export class WebhooksComponent {
   }
 
   async toggleActive(w: WebhookDto): Promise<void> {
-    if (this.actionId()) return;
+    if (!this.canEdit() || this.actionId()) return;
     this.actionId.set(w.id);
     try {
       await this.api.patch(`/api/v1/webhooks/${w.id}`, { active: !w.active });
@@ -235,11 +244,11 @@ export class WebhooksComponent {
   }
 
   async test(w: WebhookDto): Promise<void> {
-    if (this.actionId()) return;
+    if (!this.canEdit() || !w.active || this.actionId()) return;
     this.actionId.set(w.id);
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/test`);
-      this.snackbar.open("Ping enviado", "Cerrar", { duration: 2500 });
+      this.snackbar.open("Ping admitido en la cola. Consulta el inspector para ver su entrega.", "Cerrar", { duration: 4500 });
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
@@ -248,13 +257,17 @@ export class WebhooksComponent {
   }
 
   async remove(w: WebhookDto): Promise<void> {
+    if (!this.canEdit() || this.actionId()) return;
+    const sourceWorkspace = this.workspaces.currentId();
     const confirmed = await this.actions.confirm({
       title: "Eliminar webhook",
       message: `¿Eliminar el webhook ${w.url}? Se cancelarán las entregas pendientes. Si hay una entrega en curso, tendrás que reintentarlo al terminar.`,
       confirmLabel: "Eliminar webhook",
       destructive: true,
     });
-    if (!confirmed || this.actionId()) return;
+    // A confirmation belongs to the workspace in which it was opened. Never
+    // apply it to a newly selected workspace or after capability was lost.
+    if (!confirmed || !this.canEdit() || sourceWorkspace !== this.workspaces.currentId() || this.actionId()) return;
     this.actionId.set(w.id);
     try {
       await this.api.delete(`/api/v1/webhooks/${w.id}`);
@@ -302,7 +315,7 @@ export class WebhooksComponent {
   }
 
   async resend(w: WebhookDto, deliveryId: number): Promise<void> {
-    if (this.actionId()) return;
+    if (!this.canEdit() || this.actionId()) return;
     this.actionId.set(w.id);
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/deliveries/${deliveryId}/resend`);
@@ -317,5 +330,9 @@ export class WebhooksComponent {
 
   trackByWebhook(_i: number, w: WebhookDto): number {
     return w.id;
+  }
+
+  deliveryLabel(status: WebhookDelivery["status"]): string {
+    return { pending: "En cola", processing: "Enviando", success: "Entregada", failed: "Fallida" }[status];
   }
 }
