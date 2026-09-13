@@ -15,7 +15,15 @@ class SecurityHeaders
         // Laravel only serves dynamic responses in production. Prevent auth,
         // workspace data and mutable redirects from being retained by a
         // browser, service worker or intermediary cache.
-        $response->headers->set('Cache-Control', 'no-store, private, max-age=0');
+        //
+        // A controller that already forbids retention owns its own policy: the
+        // blanket value below replaced it wholesale and silently dropped
+        // directives such as the data-export download's `no-cache`. Symfony
+        // seeds every response with `no-cache, private`, so an unset or
+        // untouched header never contains `no-store` and still gets the floor.
+        if (! $response->headers->hasCacheControlDirective('no-store')) {
+            $response->headers->set('Cache-Control', 'no-store, private, max-age=0');
+        }
         $response->headers->set('Pragma', 'no-cache');
         $response->headers->set('Expires', '0');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
