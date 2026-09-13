@@ -9,6 +9,7 @@ use App\Models\Link;
 use App\Support\Audit;
 use App\Support\DomainRevalidationSchedule;
 use App\Support\Ids;
+use App\Support\IsoDate;
 use App\Support\OperationalMetrics;
 use App\Support\ProductionSecurity;
 use App\Support\UvhRequest;
@@ -571,6 +572,6 @@ class DomainController
 
     private function iso(mixed $value): ?string
     {
-        return \App\Support\IsoDate::format($value);
+        return IsoDate::format($value);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Webhook;
 use App\Support\Audit;
 use App\Support\Ids;
+use App\Support\IsoDate;
 use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
@@ -451,6 +452,6 @@ class WebhookController
 
     private function iso(mixed $value): ?string
     {
-        return \App\Support\IsoDate::format($value);
+        return IsoDate::format($value);
     }
 }

@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\Response;
 
 class AccountController
 {
@@ -434,7 +435,7 @@ class AccountController
         ]);
     }
 
-    public function acknowledgeExportDownload(Request $request): \Symfony\Component\HttpFoundation\Response
+    public function acknowledgeExportDownload(Request $request): Response
     {
         $token = UvhRequest::inputString($request, 'token');
         if (! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token)) {

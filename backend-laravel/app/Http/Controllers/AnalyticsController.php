@@ -215,9 +215,9 @@ class AnalyticsController
 
         return [
             'items' => $rows
-            ->map(fn ($row) => ['key' => $row->key, 'value' => (int) $row->value])
-            ->values()
-            ->all(),
+                ->map(fn ($row) => ['key' => $row->key, 'value' => (int) $row->value])
+                ->values()
+                ->all(),
             'total' => $rows->isEmpty() ? 0 : (int) $rows->first()->category_total,
         ];
     }

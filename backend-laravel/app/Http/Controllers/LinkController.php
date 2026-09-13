@@ -7,6 +7,7 @@ use App\Models\Link;
 use App\Models\User;
 use App\Models\UvhSession;
 use App\Support\Audit;
+use App\Support\IsoDate;
 use App\Support\LinkService;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\MfaStepUp;
@@ -671,7 +672,7 @@ class LinkController
 
     private function iso(mixed $value): ?string
     {
-        return \App\Support\IsoDate::format($value);
+        return IsoDate::format($value);
     }
 
     private function positiveQueryInteger(mixed $value, int $default, int $max): int

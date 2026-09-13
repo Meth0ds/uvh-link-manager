@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Link;
 use App\Jobs\RecordClickAnalyticsJob;
+use App\Models\Link;
 use App\Support\Ids;
 use App\Support\OperationalMetrics;
 use App\Support\RedirectService;

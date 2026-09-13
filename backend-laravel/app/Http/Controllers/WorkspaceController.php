@@ -12,6 +12,7 @@ use App\Support\Ids;
 use App\Support\InvitationBudgetExceeded;
 use App\Support\InvitationBudgetUnavailable;
 use App\Support\InvitationMailBudget;
+use App\Support\IsoDate;
 use App\Support\MailAdmissionException;
 use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
@@ -1034,6 +1035,6 @@ class WorkspaceController
 
     private function iso(mixed $value): ?string
     {
-        return \App\Support\IsoDate::format($value);
+        return IsoDate::format($value);
     }
 }

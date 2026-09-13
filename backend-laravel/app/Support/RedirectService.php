@@ -206,7 +206,7 @@ class RedirectService
             }
 
             $destination = $location ?? $fresh->destination;
-            $validDestination = is_string($destination) ? UrlUtil::validateDestination($destination) : ['ok' => false];
+            $validDestination = UrlUtil::validateDestination($destination);
             if (! $validDestination['ok']) {
                 $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
 

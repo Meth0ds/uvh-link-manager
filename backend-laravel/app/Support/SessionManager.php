@@ -71,14 +71,22 @@ class SessionManager
             ->whereHas('user', fn ($q) => $q->whereNull('deleted_at'))
             ->first();
 
-        if (! $session || ! $session->user || $session->expires_at->isPast()) {
+        if (! $session) {
+            return null;
+        }
+
+        // Hold the owner in a local: the relation is nullable on the model, and
+        // reading it once keeps the guards below and the returned array
+        // referring to the same, non-null instance.
+        $user = $session->user;
+        if (! $user || $session->expires_at->isPast()) {
             return null;
         }
 
         // Revocation alone is not sufficient for a request that started just
         // before a password/MFA change. Security versioning makes that stale
         // cookie unusable on its next request.
-        if ((int) $session->security_version !== (int) $session->user->security_version) {
+        if ((int) $session->security_version !== (int) $user->security_version) {
             self::revoke($session->id);
 
             return null;
@@ -87,7 +95,7 @@ class SessionManager
         // Sessions from before the verified-login policy are revoked on first
         // use. This closes the migration window for stale cookies without
         // preventing the public verification endpoint from working.
-        if (! $session->user->email_verified_at) {
+        if (! $user->email_verified_at) {
             self::revoke($session->id);
 
             return null;
@@ -99,7 +107,7 @@ class SessionManager
         }
 
         return [
-            'user' => $session->user,
+            'user' => $user,
             'session_id' => $session->id,
             'mfa_verified' => $session->mfa_verified_at !== null,
             'mfa_verified_at' => $session->mfa_verified_at,

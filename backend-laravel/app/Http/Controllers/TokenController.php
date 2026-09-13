@@ -200,6 +200,6 @@ class TokenController
 
     private function iso(mixed $value): ?string
     {
-        return \App\Support\IsoDate::format($value);
+        return IsoDate::format($value);
     }
 }

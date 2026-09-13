@@ -1,12 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Cannot call method lt\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Console/Commands/UvhHousekeeping.php
-
-		-
 			message: '#^Method App\\Console\\Commands\\UvhHousekeeping\:\:purgeInBatches\(\) has parameter \$params with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -17,24 +11,6 @@ parameters:
 			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Console/Commands/UvhHousekeeping.php
-
-		-
-			message: '#^Cannot call method isFuture\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Http/Controllers/AccountController.php
-
-		-
-			message: '#^Cannot call method isPast\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 6
-			path: app/Http/Controllers/AccountController.php
-
-		-
-			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 7
-			path: app/Http/Controllers/AccountController.php
 
 		-
 			message: '#^Left side of && is always true\.$#'
@@ -95,12 +71,6 @@ parameters:
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/AccountController.php
-
-		-
-			message: '#^Cannot call method isPast\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Http/Controllers/AdminController.php
 
 		-
 			message: '#^Method App\\Http\\Controllers\\AdminController\:\:accountRecoveries\(\) has no return type specified\.$#'
@@ -205,12 +175,6 @@ parameters:
 			path: app/Http/Controllers/AnalyticsController.php
 
 		-
-			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:dimension\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Http/Controllers/AnalyticsController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:mergeMaps\(\) has parameter \$list with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -259,21 +223,9 @@ parameters:
 			path: app/Http/Controllers/AnalyticsController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\AccountRecoveryRequest\:\:\$user\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
 			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 9
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Cannot call method isPast\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 11
 			path: app/Http/Controllers/AuthController.php
 
 		-
@@ -493,12 +445,6 @@ parameters:
 			path: app/Http/Controllers/AuthController.php
 
 		-
-			message: '#^Relation ''user'' is not found in App\\Models\\AccountRecoveryRequest model\.$#'
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
 			message: '#^Result of && is always false\.$#'
 			identifier: booleanAnd.alwaysFalse
 			count: 1
@@ -551,12 +497,6 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Cannot call method lt\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Http/Controllers/DomainController.php
 
 		-
 			message: '#^Method App\\Http\\Controllers\\DomainController\:\:activate\(\) has no return type specified\.$#'
@@ -643,18 +583,6 @@ parameters:
 			path: app/Http/Controllers/DomainController.php
 
 		-
-			message: '#^Cannot call method isFuture\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Http/Controllers/LinkController.php
-
-		-
-			message: '#^Cannot call method isPast\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Http/Controllers/LinkController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\LinkController\:\:activity\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -730,18 +658,6 @@ parameters:
 			message: '#^Method App\\Http\\Controllers\\LinkController\:\:update\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
-			path: app/Http/Controllers/LinkController.php
-
-		-
-			message: '#^Relation ''domain'' is not found in App\\Models\\Link model\.$#'
-			identifier: larastan.relationExistence
-			count: 5
-			path: app/Http/Controllers/LinkController.php
-
-		-
-			message: '#^Relation ''tags'' is not found in App\\Models\\Link model\.$#'
-			identifier: larastan.relationExistence
-			count: 6
 			path: app/Http/Controllers/LinkController.php
 
 		-
@@ -1027,24 +943,6 @@ parameters:
 			path: app/Http/Controllers/WorkspaceActivityController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Workspace\:\:\$memberships\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/WorkspaceController.php
-
-		-
-			message: '#^Cannot call method lte\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 4
-			path: app/Http/Controllers/WorkspaceController.php
-
-		-
-			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Http/Controllers/WorkspaceController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\WorkspaceController\:\:acceptInvitation\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -1141,12 +1039,6 @@ parameters:
 			path: app/Http/Controllers/WorkspaceController.php
 
 		-
-			message: '#^Relation ''memberships'' is not found in App\\Models\\Workspace model\.$#'
-			identifier: larastan.relationExistence
-			count: 2
-			path: app/Http/Controllers/WorkspaceController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\WorkspaceOnboardingController\:\:show\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -1165,39 +1057,9 @@ parameters:
 			path: app/Http/Controllers/WorkspaceUsageController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\ApiToken\:\:\$creator\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/RequireApiToken.php
-
-		-
 			message: '#^Call to function in_array\(\) with arguments string, array\{\} and true will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 1
-			path: app/Http/Middleware/RequireApiToken.php
-
-		-
-			message: '#^Cannot call method isFuture\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Http/Middleware/RequireApiToken.php
-
-		-
-			message: '#^Cannot call method isPast\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Http/Middleware/RequireApiToken.php
-
-		-
-			message: '#^Cannot call method lt\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Http/Middleware/RequireApiToken.php
-
-		-
-			message: '#^Relation ''creator'' is not found in App\\Models\\ApiToken model\.$#'
-			identifier: larastan.relationExistence
-			count: 2
 			path: app/Http/Middleware/RequireApiToken.php
 
 		-
@@ -1225,264 +1087,6 @@ parameters:
 			path: app/Jobs/VerifyDomainDnsJob.php
 
 		-
-			message: '#^Method App\\Models\\AbuseReport\:\:link\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/AbuseReport.php
-
-		-
-			message: '#^Method App\\Models\\AccountDeletionRequest\:\:user\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/AccountDeletionRequest.php
-
-		-
-			message: '#^Method App\\Models\\AccountRecoveryRequest\:\:user\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/AccountRecoveryRequest.php
-
-		-
-			message: '#^Method App\\Models\\ApiToken\:\:creator\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/ApiToken.php
-
-		-
-			message: '#^Method App\\Models\\ApiToken\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/ApiToken.php
-
-		-
-			message: '#^Method App\\Models\\AuditEvent\:\:user\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/AuditEvent.php
-
-		-
-			message: '#^Method App\\Models\\ClickEvent\:\:link\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/ClickEvent.php
-
-		-
-			message: '#^Method App\\Models\\CustomDomain\:\:links\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/CustomDomain.php
-
-		-
-			message: '#^Method App\\Models\\CustomDomain\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/CustomDomain.php
-
-		-
-			message: '#^Method App\\Models\\DataExportRequest\:\:user\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/DataExportRequest.php
-
-		-
-			message: '#^Method App\\Models\\EmailChangeRequest\:\:user\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/EmailChangeRequest.php
-
-		-
-			message: '#^Method App\\Models\\EmailToken\:\:user\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/EmailToken.php
-
-		-
-			message: '#^Method App\\Models\\Invitation\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Invitation.php
-
-		-
-			message: '#^Method App\\Models\\Link\:\:clickEvents\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Link.php
-
-		-
-			message: '#^Method App\\Models\\Link\:\:creator\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Link.php
-
-		-
-			message: '#^Method App\\Models\\Link\:\:domain\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Link.php
-
-		-
-			message: '#^Method App\\Models\\Link\:\:rules\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Link.php
-
-		-
-			message: '#^Method App\\Models\\Link\:\:tags\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Link.php
-
-		-
-			message: '#^Method App\\Models\\Link\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Link.php
-
-		-
-			message: '#^Method App\\Models\\Membership\:\:user\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Membership.php
-
-		-
-			message: '#^Method App\\Models\\Membership\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Membership.php
-
-		-
-			message: '#^Method App\\Models\\MetricRollup\:\:link\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/MetricRollup.php
-
-		-
-			message: '#^Method App\\Models\\Quota\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Quota.php
-
-		-
-			message: '#^Method App\\Models\\RedirectRule\:\:link\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/RedirectRule.php
-
-		-
-			message: '#^Method App\\Models\\Tag\:\:links\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Tag.php
-
-		-
-			message: '#^Method App\\Models\\Tag\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Tag.php
-
-		-
-			message: '#^Method App\\Models\\User\:\:apiTokens\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Method App\\Models\\User\:\:auditEvents\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Method App\\Models\\User\:\:emailChangeRequest\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Method App\\Models\\User\:\:memberships\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Method App\\Models\\User\:\:ownedWorkspaces\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Method App\\Models\\User\:\:sessions\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
-			message: '#^Method App\\Models\\UvhSession\:\:user\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/UvhSession.php
-
-		-
-			message: '#^Method App\\Models\\Webhook\:\:deliveries\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Webhook.php
-
-		-
-			message: '#^Method App\\Models\\Webhook\:\:workspace\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Webhook.php
-
-		-
-			message: '#^Method App\\Models\\WebhookDelivery\:\:webhook\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/WebhookDelivery.php
-
-		-
-			message: '#^Method App\\Models\\Workspace\:\:apiTokens\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Workspace.php
-
-		-
-			message: '#^Method App\\Models\\Workspace\:\:customDomains\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Workspace.php
-
-		-
-			message: '#^Method App\\Models\\Workspace\:\:links\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Workspace.php
-
-		-
-			message: '#^Method App\\Models\\Workspace\:\:memberships\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Workspace.php
-
-		-
-			message: '#^Method App\\Models\\Workspace\:\:owner\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Workspace.php
-
-		-
-			message: '#^Method App\\Models\\Workspace\:\:quota\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Workspace.php
-
-		-
-			message: '#^Method App\\Models\\Workspace\:\:webhooks\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Workspace.php
-
-		-
 			message: '#^Parameter \#1 \$map of static method App\\Support\\AnalyticsService\:\:bump\(\) expects array\<string, int\>\|null, string\|null given\.$#'
 			identifier: argument.type
 			count: 6
@@ -1495,34 +1099,10 @@ parameters:
 			path: app/Support/Audit.php
 
 		-
-			message: '#^Cannot call method copy\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Support/DomainRevalidationSchedule.php
-
-		-
-			message: '#^Cannot call method gt\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Support/DomainRevalidationSchedule.php
-
-		-
 			message: '#^Method App\\Support\\InvitationMailBudget\:\:limits\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Support/InvitationMailBudget.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Link\:\:\$domain\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Support/LinkService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Link\:\:\$tags\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Support/LinkService.php
 
 		-
 			message: '#^Call to function is_array\(\) with array\<mixed, mixed\> will always evaluate to true\.$#'
@@ -1633,18 +1213,6 @@ parameters:
 			path: app/Support/PasswordStrength.php
 
 		-
-			message: '#^Cannot call method isFuture\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Support/RedirectService.php
-
-		-
-			message: '#^Cannot call method isPast\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Support/RedirectService.php
-
-		-
 			message: '#^Offset ''alias'' on array\{host\: string, alias\: string, user_agent\?\: string\|null, accept_language\?\: string\|null, referrer\?\: string\|null, ip\?\: string\|null, country\?\: string\|null, unlock_token\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -1661,42 +1229,6 @@ parameters:
 			identifier: identical.alwaysFalse
 			count: 1
 			path: app/Support/RedirectService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\UvhSession\:\:\$user\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Support/SessionManager.php
-
-		-
-			message: '#^Cannot call method isFuture\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Support/SessionManager.php
-
-		-
-			message: '#^Cannot call method isPast\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Support/SessionManager.php
-
-		-
-			message: '#^Cannot call method lt\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Support/SessionManager.php
-
-		-
-			message: '#^Method App\\Support\\SessionManager\:\:hydrate\(\) should return array\{user\: App\\Models\\User, session_id\: string, mfa_verified\: bool, mfa_verified_at\: DateTimeInterface\|null\}\|null but returns array\{user\: mixed, session_id\: string, mfa_verified\: bool, mfa_verified_at\: string\|null\}\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Support/SessionManager.php
-
-		-
-			message: '#^Relation ''user'' is not found in App\\Models\\UvhSession model\.$#'
-			identifier: larastan.relationExistence
-			count: 2
-			path: app/Support/SessionManager.php
 
 		-
 			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
@@ -1717,18 +1249,6 @@ parameters:
 			path: app/Support/WebhookService.php
 
 		-
-			message: '#^Offset ''event'' on string on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Support/WebhookService.php
-
-		-
-			message: '#^Offset ''event_id'' on string on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Support/WebhookService.php
-
-		-
 			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 1
@@ -1737,12 +1257,6 @@ parameters:
 		-
 			message: '#^Call to function is_string\(\) with non\-empty\-string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Support/WorkspaceAccess.php
-
-		-
-			message: '#^Cannot call method isPast\(\) on string\.$#'
-			identifier: method.nonObject
 			count: 1
 			path: app/Support/WorkspaceAccess.php
 

@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\MetricRollup;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AnalyticsService
 {
@@ -15,7 +16,7 @@ class AnalyticsService
      */
     public static function recordClick(int $linkId, array $meta, ?string $eventId = null, ?string $occurredAt = null): void
     {
-        $eventId ??= (string) \Illuminate\Support\Str::uuid();
+        $eventId ??= (string) Str::uuid();
         $now = $occurredAt !== null ? CarbonImmutable::parse($occurredAt)->utc() : CarbonImmutable::now('UTC');
         $day = $now->format('Y-m-d');
 
