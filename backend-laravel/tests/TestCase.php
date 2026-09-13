@@ -18,6 +18,18 @@ abstract class TestCase extends BaseTestCase
             throw new \RuntimeException("Refusing to run destructive tests against non-test database [{$database}]. Set DB_DATABASE to a dedicated *_test database.");
         }
 
+        // The same guard for the environment. Environment-dependent code (the
+        // hCaptcha test override) and the test-only HTTP fakes assume
+        // APP_ENV=testing. A launcher exporting APP_ENV used to win over
+        // phpunit.xml's <env> because Laravel reads $_SERVER first, so the
+        // suite could pass while proving something other than what it claims.
+        // phpunit.xml now pins it in $_SERVER; this fails loudly if that pin is
+        // ever removed or another harness bootstraps the suite.
+        $environment = (string) app()->environment();
+        if ($environment !== 'testing') {
+            throw new \RuntimeException("Refusing to run the suite outside the testing environment [{$environment}]. Set APP_ENV=testing; the test-only overrides and fakes assume it.");
+        }
+
         // IDs and client IPs are intentionally reused by isolated fixtures.
         // Clear limiter state only after the database-name guard so one test
         // class cannot make an unrelated later class fail with a stray 429.
