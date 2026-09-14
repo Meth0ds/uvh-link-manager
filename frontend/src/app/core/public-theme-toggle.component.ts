@@ -1,6 +1,5 @@
 import { DOCUMENT } from "@angular/common";
 import { ChangeDetectionStrategy, Component, Injectable, inject, input, signal } from "@angular/core";
-import { MatRippleModule } from "@angular/material/core";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { ThemeService } from "./services/theme.service";
 
@@ -58,12 +57,13 @@ export class PublicThemeTransitionService {
 @Component({
   selector: "app-public-theme-toggle",
   standalone: true,
-  imports: [MatRippleModule, MatTooltipModule],
+  imports: [MatTooltipModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <button matRipple type="button" role="switch" [class.with-label]="showLabel()"
-      [disabled]="transition.busy()" [attr.aria-checked]="transition.theme.resolved() === 'dark'"
+    <button type="button" role="switch" [class.with-label]="showLabel()"
+      [attr.aria-disabled]="transition.busy()" [attr.aria-busy]="transition.busy()" [attr.aria-checked]="transition.theme.resolved() === 'dark'"
       aria-label="Modo oscuro"
+      [matTooltipDisabled]="transition.busy()"
       [matTooltip]="showLabel() ? '' : (transition.theme.resolved() === 'dark' ? 'Cambiar a papel claro' : 'Cambiar a tinta oscura')"
       (click)="transition.toggle($event)">
       <span class="theme-disc" aria-hidden="true">◐</span>
@@ -77,7 +77,7 @@ export class PublicThemeTransitionService {
     button:hover { background: var(--soft, #eae7dd); }
     button:active { transform: scale(.97); }
     button:focus-visible { outline: 3px solid var(--accent, #c44324); outline-offset: 4px; }
-    button:disabled { cursor: wait; }
+    button[aria-disabled="true"] { cursor: progress; }
     .theme-disc { display: inline-block; font: 25px Georgia, serif; transition: transform 350ms cubic-bezier(.2,.8,.2,1); }
     button[aria-checked="true"] .theme-disc { transform: rotate(180deg); }
     b { margin-left: auto; font: 11px "Courier New", monospace; }

@@ -1,5 +1,29 @@
 # Progress Log
 
+## Navigation and dashboard implementation — 2026-09-14
+- User explicitly paused tests and reprioritized navigation plus panel homepage. No new test/build/browser run for this batch.
+- Navigation now follows shared theme tokens, places creation near the workspace, exposes workspace role and current route label, and has a dedicated profile footer. Creation affordances are hidden and entry point guarded for read-only roles.
+- Dashboard now starts with existing task destinations, separates period selection from the working desk, emphasizes real click totals and frames activity; all API, loading/error handling and analytics semantics retained.
+- Validation pending: responsive/keyboard, theme contrast, current-route updates and role changes. Earlier Settings validation does not certify this new batch.
+
+## Settings redesign — 2026-09-14
+- User prioritized a full profile/settings redesign; implemented account masthead, profile/email hierarchy, theme options, ruled content, container responsiveness and local keyboard navigation.
+- Added isolated settings route and presentation tests. Initial 11 tests, app/preview typecheck, targeted lint and production build passed; final polish adds one error-count regression test, rerun pending.
+- Browser verified 320/768/1024/1440 in both themes; further pending-email/loading checks ongoing. No backend, DB, migrations or actual account mutations.
+- Read-only PowerShell search failed because of a quoted regex; split into simple reads. First screenshot immediately after viewport resize was transiently clipped; settled DOM and screenshot verified actual layout.
+
+## Phase 5 verified after resumption
+- Current HEAD 8b03b83 already includes prior implementation via user commits. This agent made no commits; latest local UI change adds dynamic hint sizing.
+- Final build 496.30 kB, targeted HTML lint and diff whitespace check pass. Earlier 9 focused tests passed; no production runtime changes since those tests, only hint layout.
+- Browser verified shared confirmation at 320 with Cancelar focused, canceled. Edit help, long URL, viewport matrix, viewer/error/empty/loading, and keyboard verified. Final light 320 form client/scroll 276/276; hint/actions separated by 28px.
+- Full goal remains active. Next phase covers remaining workspace/security/invitation modals and later page-level audit.
+
+## Webhook list/form implementation (phase 5)
+- Added labelled semantic form, event descriptions, correct edit-secret guidance, dynamic hints and responsive accordion rows.
+- Added UI capabilities and guarded write entry points; role changes clear drafts/secrets, confirmation checks original workspace. No backend edits.
+- 9 focused list/inspector tests pass, exit 0 (slow Chrome shutdown warning). App/preview types and targeted lint pass. Latest production build after dynamic hints: pass, initial 496.30 kB.
+- After resumed user input, old process/browser handles were absent and preview port had no listener. Started preview anew on 4301, session 13303; final visual work continuing.
+
 ## Second batch completed: public status and webhook inspector
 - Preserved additional unrelated backend/lint changes found on resume.
 - Implemented both surfaces, documented non-obvious state handling; retained backend contracts and mutation methods.

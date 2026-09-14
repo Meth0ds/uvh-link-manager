@@ -6,6 +6,31 @@
 
 ## Revisión y continuación del 13 de septiembre
 
+### Tercer lote: listado y formulario de webhooks
+
+La continuación parte ahora de `8b03b83`: los commits recientes del usuario
+incorporan el trabajo anterior. No se han deshecho sus cambios adicionales.
+
+- Formulario semántico con URL etiquetada, eventos descritos, selección agrupada
+  y texto correcto del secreto en edición. Ayudas Material con altura dinámica:
+  en móvil, el final de la ayuda queda 28px antes de las acciones.
+- Listado con cabecera, expansión Material que admite URLs largas, errores
+  completos y estados de cola/entrega en español. Activo no implica entrega sana.
+- Roles de solo lectura sin controles de escritura; guardas de entrada, borrado
+  confirmado ligado al workspace de origen y borradores limpiados al perder rol.
+  Se anuncia la disponibilidad del secreto, no su contenido.
+- 9 pruebas focalizadas de listado/inspector pasan, salida 0; tipos y lint
+  correctos. Build final de producción correcto: 496,30 kB iniciales.
+- Vista aislada: formulario claro/oscuro, 320/768/1024/1440; Enter en acordeón,
+  Space en eventos, vacío/error/carga y viewer. A 320px asentado el formulario
+  tiene client/scroll 276/276. El shell aún muestra geometrías transitorias al
+  cambiar rápidamente de breakpoint; no se certifican todos sus frames.
+- Confirmación real compartida revisada a 320px: ancho 294,4px, foco inicial
+  Cancelar y cierre sin eliminar. No se emitieron secretos ni envíos reales.
+
+Siguiente: profundizar en modales de workspace/MFA/invitaciones y las demás
+superficies aún sin revisión completa. No se declara cerrado el objetivo global.
+
 ### Segundo lote: estado público e inspector de webhooks
 
 - `/status`: identidad pública compartida, tema claro/oscuro, actualización manual,

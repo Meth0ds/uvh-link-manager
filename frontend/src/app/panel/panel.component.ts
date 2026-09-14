@@ -1,8 +1,8 @@
 import { Component, computed, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { BreakpointObserver } from "@angular/cdk/layout";
-import { map } from "rxjs";
-import { RouterOutlet, RouterLink, RouterLinkActive, Router } from "@angular/router";
+import { filter, map, startWith } from "rxjs";
+import { NavigationEnd, RouterOutlet, RouterLink, RouterLinkActive, Router } from "@angular/router";
 import { MatSidenavModule } from "@angular/material/sidenav";
 import { MatToolbarModule } from "@angular/material/toolbar";
 import { MatListModule } from "@angular/material/list";
@@ -71,6 +71,20 @@ export class PanelComponent {
   readonly user = this.auth.user;
   readonly isAdmin = computed(() => this.user()?.isAdmin === true);
   readonly workspaceName = computed(() => this.workspaces.list().find((workspace) => workspace.id === this.workspaces.currentId())?.name ?? "Sin workspace");
+  readonly workspaceRole = computed(() => this.workspaces.list().find(w => w.id === this.workspaces.currentId())?.role);
+  readonly canCreate = computed(() => ["owner", "admin", "editor"].includes(this.workspaceRole() ?? ""));
+  readonly roleLabel = computed(() => {
+    const role = this.workspaceRole();
+    return role ? ({ owner: "Propietario", admin: "Administrador", editor: "Editor", viewer: "Solo lectura" })[role] : "Sin rol asignado";
+  });
+  // Derive the breadcrumb from known routes only; never echo URL parameters.
+  private readonly currentUrl = toSignal(this.router.events.pipe(
+    filter(event => event instanceof NavigationEnd),
+    map(event => event.urlAfterRedirects.split(/[?#]/)[0]),
+    startWith(this.router.url.split(/[?#]/)[0]),
+  ));
+  readonly currentPage = computed(() => this.nav.flatMap(group => group.items)
+    .find(item => this.currentUrl() === item.path || this.currentUrl()?.startsWith(item.path + "/"))?.label ?? "Panel");
   readonly mobileOpen = signal(false);
   readonly logoutBusy = signal(false);
   readonly isMobile = toSignal(this.breakpoint.observe("(max-width: 720px)").pipe(map((state) => state.matches)), { initialValue: false });
@@ -142,6 +156,7 @@ export class PanelComponent {
   }
 
   newLink(): void {
+    if (!this.canCreate()) return;
     this.dialog.openCreate().subscribe((created) => {
       if (created) void this.router.navigate(["/app/links", created.id]);
     });

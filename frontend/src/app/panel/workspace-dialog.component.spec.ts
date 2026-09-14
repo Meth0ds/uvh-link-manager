@@ -7,6 +7,21 @@ import { ApiService } from "../core/services/api.service";
 import { WorkspaceDialogComponent } from "./workspace-dialog.component";
 
 describe("WorkspaceDialogComponent async safety", () => {
+  it("rejects whitespace-padded short names and provides a visible validation message", async () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    TestBed.configureTestingModule({ imports: [WorkspaceDialogComponent], providers: [
+      { provide: ApiService, useValue: api }, { provide: MatDialogRef, useValue: { close: jasmine.createSpy("close") } },
+    ] });
+    const fixture = TestBed.createComponent(WorkspaceDialogComponent);
+    fixture.componentInstance.form.controls.name.setValue("  a  ");
+    await fixture.componentInstance.save(); fixture.detectChanges();
+    expect(fixture.componentInstance.form.invalid).toBeTrue();
+    expect(fixture.nativeElement.querySelector("mat-error").textContent).toContain("al menos 2 caracteres");
+    expect(api.post).not.toHaveBeenCalled();
+    fixture.componentInstance.form.controls.name.setValue("  Estudio Norte  ");
+    expect(fixture.componentInstance.form.valid).toBeTrue();
+    fixture.destroy();
+  });
   it("does not close a destroyed dialog when creation finishes later", async () => {
     let resolve!: (value: { workspace: Workspace }) => void;
     const response = new Promise<{ workspace: Workspace }>((onResolve) => { resolve = onResolve; });

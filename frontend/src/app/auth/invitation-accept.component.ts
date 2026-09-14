@@ -17,17 +17,20 @@ import { LatestRequest } from "../core/services/latest-request";
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <div class="card center" aria-labelledby="invitation-accept-title">
+      <section class="card center" aria-labelledby="invitation-accept-title">
         <span class="step-kicker">TRABAJO EN EQUIPO</span>
         @if (busy()) {
           <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
-        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok() || rejected()" [class.bad]="!ok() && !rejected() && done() && !needsLogin()">{{ ok() ? 'group_add' : (rejected() ? 'person_remove' : (done() && !needsLogin() ? 'error_outline' : 'group_add')) }}</mat-icon>
-        <h2 id="invitation-accept-title">{{ ok() ? 'Invitación aceptada' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Revisar invitación' : (done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
-        <p class="sub" role="status">{{ message() }}</p>
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.invitation-neutral]="rejected()" [class.bad]="!busy() && !ok() && !rejected() && done() && !needsLogin()">{{ busy() ? 'hourglass_empty' : ok() ? 'group_add' : (rejected() ? 'person_remove' : (done() && !needsLogin() ? 'error_outline' : 'group_add')) }}</mat-icon>
+        <h2 id="invitation-accept-title">{{ busy() ? 'Procesando invitación' : ok() ? 'Ya formas parte del equipo' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Tú decides si te unes' : (done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
+        <p class="sub" role="status">{{ busy() ? 'Espera a que termine la comprobación. No cierres la página mientras se procesa una acción.' : message() }}</p>
         @if (ready()) {
+          <div class="decision-guide"><div><h3>Si aceptas</h3><p>Se añadirá tu cuenta al workspace de la invitación. El servidor comprobará que corresponde a tu cuenta.</p></div><div><h3>Si rechazas</h3><p>Este enlace de invitación quedará invalidado. Tendrás que pedir una nueva invitación si cambias de opinión.</p></div></div>
+          <div class="invitation-actions">
           <button mat-flat-button color="primary" type="button" (click)="accept()" [disabled]="busy()">Aceptar invitación</button>
           <button mat-stroked-button type="button" (click)="reject()" [disabled]="busy()">Rechazar</button>
+          </div>
         }
         @if (ok() || rejected()) {
           <a mat-flat-button color="primary" routerLink="/app">Ir a mi panel</a>
@@ -35,15 +38,17 @@ import { LatestRequest } from "../core/services/latest-request";
         @if (done() && !ok() && needsLogin()) {
           <a mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="{ returnTo: returnTo }">Iniciar sesión para continuar</a>
         }
-        @if (done() && !ok() && !rejected() && !needsLogin() && !ready()) {
+        @if (!busy() && done() && !ok() && !rejected() && !needsLogin() && !ready()) {
+          <div class="invitation-actions">
           <button mat-flat-button color="primary" type="button" (click)="switchAccount()" [disabled]="busy()">Cambiar de cuenta</button>
-          <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()">Descartar invitación</button>
+          <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()">Descartar de este navegador</button>
+          </div><p class="auth-note">Cambiar de cuenta cierra tu sesión actual. Descartar solo borra la invitación pendiente de este navegador; no equivale a rechazarla.</p>
         }
-      </div>
+      </section>
     </app-auth-shell>
     `,
   changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrl: "./auth-card.scss",
+  styleUrl: "./security-flow.scss",
 })
 export class InvitationAcceptComponent {
   private api = inject(ApiService);

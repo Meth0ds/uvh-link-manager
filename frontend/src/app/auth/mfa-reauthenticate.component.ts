@@ -34,37 +34,43 @@ import { LatestRequest } from "../core/services/latest-request";
         }
         <mat-icon class="icon" aria-hidden="true">admin_panel_settings</mat-icon>
         <h2 id="reauth-title">Confirma que eres tú</h2>
-        <p class="sub">La consola administrativa requiere una verificación reciente. Tu sesión general seguirá abierta.</p>
+        <p class="sub">Vas a entrar en administración. Confirma tu contraseña y un segundo factor para realizar acciones sensibles con una verificación reciente.</p>
+        @if (initializing()) { <p class="auth-note" role="status">Comprobando la sesión y los requisitos de acceso. Todavía no necesitas introducir ningún código.</p> }
 
         @if (!initializing()) {
           <form class="form" [formGroup]="form" (ngSubmit)="submit()">
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>Contraseña</mat-label>
-              <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="current-password" maxlength="72" />
+              <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="current-password" maxlength="72" [readonly]="busy()" />
               <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())" [attr.aria-label]="hidePassword() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
                 <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
               </button>
+              @if (form.controls.password.touched && form.controls.password.invalid) { <mat-error>Introduce tu contraseña actual.</mat-error> }
             </mat-form-field>
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>Segundo factor</mat-label>
-              <input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" inputmode="text" />
-              <mat-hint>6 dígitos o uno de tus códigos de recuperación</mat-hint>
+              <input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" inputmode="text" autocapitalize="off" spellcheck="false" [readonly]="busy()" />
+              <mat-hint>El código de 6 dígitos de tu aplicación o un código de recuperación.</mat-hint>
+              @if (form.controls.factorCode.touched && form.controls.factorCode.invalid) { <mat-error>Introduce un segundo factor para continuar.</mat-error> }
             </mat-form-field>
+
+            <details class="factor-help"><summary>¿No tienes tu aplicación a mano?<mat-icon aria-hidden="true">expand_more</mat-icon></summary><p>Puedes usar uno de los códigos de recuperación que guardaste al activar MFA. Cada código de recuperación sirve una sola vez; el código temporal de tu aplicación no es lo mismo.</p><p>Si no dispones de ninguno, vuelve al panel. No necesitas desactivar la protección para salir de esta pantalla.</p></details>
 
             @if (error()) {
               <div class="alert error" role="alert">{{ error() }}</div>
             }
-            <button mat-flat-button color="primary" class="submit" type="submit" [disabled]="form.invalid || busy()">
+            <button mat-flat-button color="primary" class="submit" type="submit" [disabled]="form.invalid || busy()" [attr.aria-busy]="busy()">
               {{ busy() ? 'Verificando…' : 'Continuar a administración' }}
             </button>
           </form>
         }
 
-        <a class="back" routerLink="/app/dashboard">Volver al panel</a>
+        <a class="back" routerLink="/app/dashboard"><mat-icon aria-hidden="true">arrow_back</mat-icon>Volver al panel</a>
+        <p class="auth-note">Esta comprobación no cierra tu sesión general. Solo confirma el acceso reciente a la consola administrativa.</p>
       </section>
     </app-auth-shell>
   `,
-  styleUrl: "./auth-card.scss",
+  styleUrl: "./security-flow.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MfaReauthenticateComponent {

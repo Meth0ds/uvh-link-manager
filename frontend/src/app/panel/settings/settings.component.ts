@@ -1,9 +1,12 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRef } from "@angular/core";
+import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRef, Injector } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { MatDialog, MatDialogRef } from "@angular/material/dialog";
+import { AccountDeletionDialogComponent } from "./account-deletion-dialog.component";
 
 import { Router } from "@angular/router";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
-import { MatFormFieldModule } from "@angular/material/form-field";
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS, MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
@@ -45,6 +48,8 @@ import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-
     PanelSkeletonComponent,
   ],
   templateUrl: "./settings.component.html",
+  // Hints and validation messages must reserve their real height on narrow screens.
+  providers: [{ provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { subscriptSizing: "dynamic" } }],
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./settings.component.scss",
 })
@@ -58,6 +63,9 @@ export class SettingsComponent {
   private actions = inject(ActionDialogService);
   private api = inject(ApiService);
   private destroyRef = inject(DestroyRef);
+  private readonly dialogs = inject(MatDialog);
+  private readonly injector = inject(Injector);
+  private deletionDialog?: MatDialogRef<AccountDeletionDialogComponent, boolean>;
   private sessionsRequest = new LatestRequest(this.destroyRef);
   private exportRequest = new LatestRequest(this.destroyRef);
   private deletionRequest = new LatestRequest(this.destroyRef);
@@ -68,6 +76,15 @@ export class SettingsComponent {
   });
 
   readonly user = this.auth.user;
+  /** Keep local jumps inside this route despite the document's base href.
+   * Focus follows the section so keyboard users continue at the destination.
+   * No form is unmounted: unfinished MFA setup and recovery codes stay intact.
+   */
+  goToSection(event: Event, section: HTMLElement): void {
+    event.preventDefault();
+    section.focus({ preventScroll: true });
+    section.scrollIntoView({ block: "start", behavior: "instant" });
+  }
   readonly userInitials = computed(() => {
     const parts = (this.user()?.name ?? "UVH").trim().split(/\s+/).filter(Boolean);
     return parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "UV";
@@ -120,12 +137,6 @@ export class SettingsComponent {
   // ---------------- Account deletion ----------------
   readonly deletionImpact = signal<AccountDeletionImpact | null>(null);
   readonly deletionLoading = signal(true);
-  readonly deletionBusy = signal(false);
-  deletionForm = this.fb.nonNullable.group({
-    password: ["", [Validators.required, Validators.maxLength(72)]],
-    factorCode: ["", [Validators.pattern(/^(?:\d{6}|[A-Za-z2-9\s-]{16,24})$/)]],
-    confirmation: ["", [Validators.required, Validators.pattern(/^ELIMINAR MI CUENTA$/)]],
-  });
 
   // ---------------- Privacy rights ----------------
   readonly privacyRequests = signal<PrivacyRightRequest[]>([]);
@@ -183,6 +194,7 @@ export class SettingsComponent {
   ];
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.deletionDialog?.close());
     void this.loadSessions();
     void this.loadExportStatus();
     void this.loadDeletionImpact();
@@ -421,40 +433,19 @@ export class SettingsComponent {
     }
   }
 
-  async requestAccountDeletion(): Promise<void> {
-    const factor = this.deletionForm.controls.factorCode;
-    if (this.user()?.mfaEnabled && !factor.value.trim()) {
-      factor.setErrors({ required: true });
-      factor.markAsTouched();
-    }
-    if (this.deletionForm.invalid || this.deletionBusy()) {
-      this.deletionForm.markAllAsTouched();
-      return;
-    }
-    const confirmed = await this.actions.confirm({
-      title: "Solicitar eliminación de cuenta",
-      message: "Te enviaremos un email y tendrás que confirmar de nuevo. Al hacerlo se cerrará el acceso y comenzará un periodo de gracia de 7 días.",
-      confirmLabel: "Enviar confirmación",
-      destructive: true,
+  openAccountDeletion(): void {
+    if (this.deletionDialog || this.deletionLoading() || !this.deletionImpact()?.canDelete) return;
+    this.deletionDialog = this.dialogs.open(AccountDeletionDialogComponent, {
+      width: "min(580px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
+      autoFocus: "button", restoreFocus: true, injector: this.injector,
+      ariaLabel: "Solicitar el cierre de cuenta",
     });
-    if (!confirmed) return;
-
-    this.deletionBusy.set(true);
-    try {
-      await this.auth.requestAccountDeletion(
-        this.deletionForm.controls.password.value,
-        this.deletionForm.controls.confirmation.value,
-        factor.value.trim() || undefined,
-      );
-      this.deletionForm.reset();
-      this.snackbar.open("Revisa tu email para confirmar la solicitud", "Cerrar", { duration: 4000 });
-      await this.settleAfterConfirmedMutation([this.loadDeletionImpact(false), this.auth.refreshUser()]);
-    } catch (err) {
-      this.toast(err, "");
+    this.deletionDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.deletionDialog = undefined;
+      // Refresh even on Escape after a successful send; the returned value is
+      // never used as proof of server state and contains no credentials.
       void this.loadDeletionImpact();
-    } finally {
-      this.deletionBusy.set(false);
-    }
+    });
   }
 
   async loadPrivacyRequests(notify = false): Promise<void> {

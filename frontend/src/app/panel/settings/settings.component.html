@@ -1,26 +1,26 @@
-<app-page-header icon="settings" eyebrow="Preferencias de cuenta" title="Ajustes" description="Gestiona tu identidad, acceso, preferencias y derechos sobre tus datos desde un único lugar." />
+<app-page-header icon="manage_accounts" eyebrow="Tu cuenta UVH" title="Ajustes de perfil" description="Actualiza tu identidad, protege el acceso y decide qué ocurre con tus datos." />
+
+<section class="profile-masthead" aria-label="Tu perfil de cuenta">
+  <span class="profile-monogram" aria-hidden="true">{{ userInitials() }}</span>
+  <div class="profile-identity"><span class="profile-caption">Perfil personal</span><h2>{{ user()?.name || 'Tu cuenta' }}</h2><p>{{ user()?.email }}</p></div>
+  <div class="profile-access"><mat-icon aria-hidden="true">{{ user()?.emailVerified ? 'mark_email_read' : 'mail_outline' }}</mat-icon><span>{{ user()?.emailVerified ? 'Email verificado' : 'Email sin verificar' }}</span></div>
+</section>
 
 <section class="security-strip" [class.protected]="user()?.mfaEnabled" aria-label="Estado de seguridad de la cuenta">
   <span class="security-icon" aria-hidden="true"><mat-icon>{{ user()?.mfaEnabled ? 'verified_user' : 'shield' }}</mat-icon></span>
   <div><b>{{ user()?.mfaEnabled ? 'Verificación en dos pasos activa' : 'Añade un segundo factor de acceso' }}</b><p>{{ user()?.mfaEnabled ? 'Las operaciones sensibles requieren una comprobación adicional.' : 'Configura una aplicación autenticadora y guarda los códigos de recuperación.' }}</p></div>
-  <a class="security-state" href="#security">{{ user()?.mfaEnabled ? 'Gestionar MFA' : 'Configurar MFA' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
+  <a class="security-state" href="#security" (click)="goToSection($event, securitySection)">{{ user()?.mfaEnabled ? 'Gestionar MFA' : 'Configurar MFA' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
 </section>
 
 <!-- La navegación local mantiene una página extensa predecible sin duplicar rutas ni estado. -->
 <div class="settings-layout">
   <aside class="settings-sidebar" aria-label="Resumen y navegación de ajustes">
-    <div class="account-summary">
-      <span class="account-avatar" aria-hidden="true">{{ userInitials() }}</span>
-      <div>
-        <strong>{{ user()?.name || 'Tu cuenta' }}</strong>
-        <span>{{ user()?.email }}</span>
-      </div>
-    </div>
+    <p class="navigation-caption">Ajustes de perfil</p>
     <nav class="settings-nav" aria-label="Secciones de ajustes">
-      <a href="#account"><mat-icon aria-hidden="true">person_outline</mat-icon><span><b>Cuenta</b><small>Perfil y apariencia</small></span></a>
-      <a href="#security"><mat-icon aria-hidden="true">lock_outline</mat-icon><span><b>Acceso</b><small>Contraseña y MFA</small></span></a>
-      <a href="#privacy"><mat-icon aria-hidden="true">policy</mat-icon><span><b>Datos y privacidad</b><small>Descarga y derechos</small></span></a>
-      <a href="#danger"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Zona crítica</b><small>Eliminación de cuenta</small></span></a>
+      <a href="#account" (click)="goToSection($event, accountSection)"><mat-icon aria-hidden="true">person_outline</mat-icon><span><b>Perfil y apariencia</b><small>Nombre, email y tema</small></span></a>
+      <a href="#security" (click)="goToSection($event, securitySection)"><mat-icon aria-hidden="true">lock_outline</mat-icon><span><b>Acceso y seguridad</b><small>Contraseña, MFA y sesiones</small></span></a>
+      <a href="#privacy" (click)="goToSection($event, privacySection)"><mat-icon aria-hidden="true">policy</mat-icon><span><b>Tus datos</b><small>Descargas y solicitudes</small></span></a>
+      <a href="#danger" (click)="goToSection($event, dangerSection)"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Cerrar la cuenta</b><small>Requisitos y consecuencias</small></span></a>
     </nav>
     <div class="privacy-note">
       <mat-icon aria-hidden="true">contact_support</mat-icon>
@@ -29,33 +29,30 @@
   </aside>
 
   <div class="settings-content">
-    <section id="account" class="settings-section account-section" aria-labelledby="account-title">
+    <section #accountSection id="account" tabindex="-1" class="settings-section account-section" aria-labelledby="account-title">
       <header class="settings-section-head">
-        <span aria-hidden="true">01</span>
-        <div><h2 id="account-title">Cuenta</h2><p>Tu identidad visible y cómo quieres ver el panel.</p></div>
+        <div><h2 id="account-title">Perfil y apariencia</h2><p>Los detalles que hacen que esta cuenta sea tuya.</p></div>
       </header>
 
 <div class="card-block profile-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>person</mat-icon></span><div><h2>Perfil</h2><p>Información que identifica tu cuenta dentro de UVH.</p></div></div>
-  <form class="stack" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
-    <mat-form-field appearance="outline">
-      <mat-label>Email</mat-label>
-      <input matInput [value]="user()?.email ?? ''" readonly />
-      <mat-icon matPrefix>mail_outline</mat-icon>
-    </mat-form-field>
-    <mat-form-field appearance="outline">
-      <mat-label>Nombre</mat-label>
-      <input matInput formControlName="name" autocomplete="name" />
+  <div class="card-heading"><span class="card-icon"><mat-icon>person</mat-icon></span><div><h3>Cómo te ven los demás</h3><p>Usa un nombre reconocible para las personas con las que compartes workspace.</p></div></div>
+  <form class="stack profile-form" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Tu nombre</mat-label>
+      <input matInput formControlName="name" autocomplete="name" maxlength="80" [readonly]="profileBusy()" />
       <mat-icon matPrefix>person_outline</mat-icon>
+      <mat-hint>Entre 2 y 80 caracteres. No cambia tu email de acceso.</mat-hint>
+      @if (profileForm.controls.name.invalid && profileForm.controls.name.touched) { <mat-error>Escribe un nombre de entre 2 y 80 caracteres.</mat-error> }
     </mat-form-field>
     <div class="row-actions">
-      <button mat-flat-button color="primary" type="submit" [disabled]="profileForm.invalid || profileBusy()">Guardar</button>
+      <span class="save-note">Los cambios se aplican al guardar.</span>
+      <button mat-flat-button color="primary" type="submit" [attr.aria-busy]="profileBusy()" [disabled]="profileForm.invalid || profileBusy()"><mat-icon aria-hidden="true">check</mat-icon>{{ profileBusy() ? 'Guardando…' : 'Guardar nombre' }}</button>
     </div>
   </form>
 
   <div class="email-management">
     <div class="email-management-heading">
-      <div><b>Email de acceso</b><p>Un cambio sólo se aplica después de confirmar el nuevo buzón.</p></div>
+      <div><h3>Email de acceso</h3><p class="current-email">{{ user()?.email }}</p><p>Tu dirección para iniciar sesión y recibir avisos de seguridad. El cambio requiere confirmar el nuevo buzón.</p></div>
       @if (!emailChangeOpen()) {
         <button mat-stroked-button type="button" (click)="beginEmailChange()" [disabled]="emailBusy()">
           <mat-icon>alternate_email</mat-icon>{{ user()?.pendingEmail ? 'Usar otro email' : 'Cambiar email' }}
@@ -99,24 +96,26 @@
 </div>
 
 <div class="card-block appearance-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>palette</mat-icon></span><div><h2>Apariencia</h2><p>Elige el tema del panel o sigue el sistema.</p></div></div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>palette</mat-icon></span><div><h3>Elige tu ambiente</h3><p>Claro, oscuro o al ritmo de tu dispositivo. El cambio de tema se aplica al instante.</p></div></div>
   <div class="theme-switch" role="group" aria-label="Tema del panel">
     @for (o of themeOptions; track o.value) {
-      <button type="button" [class.active]="themePref() === o.value" [attr.aria-pressed]="themePref() === o.value" (click)="setTheme(o.value)">{{ o.label }}</button>
+      <button type="button" [class.active]="themePref() === o.value" [attr.aria-pressed]="themePref() === o.value" (click)="setTheme(o.value)">
+        <span class="theme-illustration" aria-hidden="true"><mat-icon>{{ o.value === 'light' ? 'light_mode' : o.value === 'dark' ? 'dark_mode' : 'desktop_windows' }}</mat-icon><span class="theme-lines"><i></i><i></i><i></i></span></span>
+        <span class="theme-label">{{ o.label }}<mat-icon aria-hidden="true">{{ themePref() === o.value ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon></span>
+      </button>
     }
   </div>
 </div>
     </section>
 
-    <section id="security" class="settings-section security-section" aria-labelledby="security-title">
+    <section #securitySection id="security" tabindex="-1" class="settings-section security-section" aria-labelledby="security-title">
       <header class="settings-section-head">
-        <span aria-hidden="true">02</span>
         <div><h2 id="security-title">Acceso y seguridad</h2><p>Credenciales, segundo factor y dispositivos con sesión abierta.</p></div>
       </header>
 
 <!-- Password -->
 <div class="card-block password-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>password</mat-icon></span><div><h2>Contraseña</h2><p>Actualiza tu credencial y mantén una combinación única.</p></div></div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>password</mat-icon></span><div><h3>Contraseña</h3><p>Actualiza tu credencial y mantén una combinación única.</p></div></div>
   <form class="stack" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
     <mat-form-field appearance="outline">
       <mat-label>Contraseña actual</mat-label>
@@ -156,7 +155,7 @@
 
 <!-- MFA -->
 <div class="card-block mfa-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>verified_user</mat-icon></span><div><h2>Verificación en dos pasos</h2><p>Configura una aplicación autenticadora y tus métodos de recuperación.</p></div><span class="mini-state" [class.on]="user()?.mfaEnabled">{{ user()?.mfaEnabled ? 'Activo' : 'Inactivo' }}</span></div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>verified_user</mat-icon></span><div><h3>Verificación en dos pasos</h3><p>Configura una aplicación autenticadora y tus métodos de recuperación.</p></div><span class="mini-state" [class.on]="user()?.mfaEnabled">{{ user()?.mfaEnabled ? 'Activo' : 'Inactivo' }}</span></div>
 
   @if (recoveryCodes().length || mfaSecret() || !user()?.mfaEnabled || mfaReconfiguring()) {
     <ol class="mfa-progress" [attr.aria-label]="'Paso ' + mfaSetupStep() + ' de 3'">
@@ -235,7 +234,7 @@
 
 <!-- Sessions -->
 <div class="card-block sessions-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>devices</mat-icon></span><div><h2>Sesiones activas</h2><p>Revisa y revoca accesos que ya no reconozcas.</p></div>@if (!sessionsLoading()) { <span class="count-badge tnum">{{ sessions().length }}</span> }</div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>devices</mat-icon></span><div><h3>Sesiones activas</h3><p>Revisa y revoca accesos que ya no reconozcas.</p></div>@if (!sessionsLoading() && !sessionsError()) { <span class="count-badge tnum">{{ sessions().length }}</span> }</div>
   @if (sessionsLoading()) {
     <app-panel-skeleton variant="list" label="Cargando sesiones" />
   }
@@ -271,15 +270,14 @@
 
     </section>
 
-    <section id="privacy" class="settings-section privacy-section" aria-labelledby="privacy-title">
+    <section #privacySection id="privacy" tabindex="-1" class="settings-section privacy-section" aria-labelledby="privacy-title">
       <header class="settings-section-head">
-        <span aria-hidden="true">03</span>
         <div><h2 id="privacy-title">Datos y privacidad</h2><p>Descarga tu información y gestiona tus derechos desde un expediente trazable.</p></div>
       </header>
 
 <!-- Data portability -->
 <div class="card-block data-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>download_for_offline</mat-icon></span><div><h2>Descarga de datos</h2><p>Solicita una copia estructurada de la información asociada a tu cuenta.</p></div></div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>download_for_offline</mat-icon></span><div><h3>Descarga de datos</h3><p>Solicita una copia estructurada de la información asociada a tu cuenta.</p></div></div>
   @if (exportLoading()) {
     <app-panel-skeleton variant="form" label="Consultando exportaciones" />
   } @else {
@@ -317,7 +315,7 @@
 
 <!-- Account lifecycle -->
 <div class="card-block privacy-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>policy</mat-icon></span><div><h2>Derechos sobre tus datos</h2><p>Registra y sigue solicitudes de acceso, rectificación, supresión, oposición, limitación o portabilidad.</p></div></div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>policy</mat-icon></span><div><h3>Derechos sobre tus datos</h3><p>Registra y sigue solicitudes de acceso, rectificación, supresión, oposición, limitación o portabilidad.</p></div></div>
   <ol class="rights-process" aria-label="Proceso de una solicitud sobre datos personales">
     <li><span aria-hidden="true">1</span><div><b>Define el alcance</b><p>Selecciona el derecho y concreta qué información o tratamiento quieres revisar.</p></div></li>
     <li><span aria-hidden="true">2</span><div><b>Recibe tu expediente</b><p>La solicitud queda registrada con su estado y fecha límite de respuesta.</p></div></li>
@@ -366,15 +364,14 @@
 
     </section>
 
-    <section id="danger" class="settings-section danger-section" aria-labelledby="danger-title">
+    <section #dangerSection id="danger" tabindex="-1" class="settings-section danger-section" aria-labelledby="danger-title">
       <header class="settings-section-head danger-section-head">
-        <span aria-hidden="true">04</span>
-        <div><h2 id="danger-title">Zona crítica</h2><p>Acciones con impacto permanente sobre el acceso y los datos de la cuenta.</p></div>
+        <div><h2 id="danger-title">Cerrar la cuenta</h2><p>Antes de despedirte, revisa qué ocurre con tu acceso, tus datos y tus workspaces.</p></div>
       </header>
 
 <!-- Account lifecycle -->
 <div class="card-block deletion-card">
-  <div class="card-heading"><span class="card-icon danger-icon"><mat-icon>person_remove</mat-icon></span><div><h2>Eliminación de cuenta</h2><p>Cierra el acceso y programa la anonimización de tus datos personales.</p></div></div>
+  <div class="card-heading"><span class="card-icon danger-icon"><mat-icon>person_remove</mat-icon></span><div><h3>Eliminación de cuenta</h3><p>Cierra el acceso y programa la anonimización de tus datos personales.</p></div></div>
   @if (deletionLoading()) {
     <app-panel-skeleton variant="form" label="Comprobando requisitos de eliminación" />
   } @else if (deletionImpact(); as impact) {
@@ -389,22 +386,11 @@
       </div>
     } @else if (impact.blockingPrivacyRequests.length) {
       <div class="deletion-blocker" role="status"><mat-icon>policy</mat-icon><div><b>Hay solicitudes de privacidad en curso</b><p>Para no destruir información necesaria para responderlas, resuélvelas o cancélalas antes de programar la anonimización.</p></div></div>
-      <div class="owned-workspaces">@for (privacy of impact.blockingPrivacyRequests; track privacy.id) { <a mat-stroked-button href="#privacy"><mat-icon>fact_check</mat-icon><span>{{ privacyTypeLabel(privacy.type) }} #{{ privacy.id }}</span></a> }</div>
+      <div class="owned-workspaces">@for (privacy of impact.blockingPrivacyRequests; track privacy.id) { <a mat-stroked-button href="#privacy" (click)="goToSection($event, privacySection)"><mat-icon>fact_check</mat-icon><span>{{ privacyTypeLabel(privacy.type) }} #{{ privacy.id }}</span></a> }</div>
     } @else if (impact.request) {
       <div class="deletion-pending" aria-live="polite"><mat-icon>mark_email_unread</mat-icon><div><b>Confirmación pendiente</b><p>Revisa tu email antes de {{ formatDate(impact.request.confirmationExpiresAt) }}. La cuenta seguirá activa hasta que confirmes.</p></div></div>
     } @else if (impact.canDelete) {
-      <details class="account-danger">
-        <summary>Solicitar la eliminación</summary>
-        <div class="deletion-consequences"><p>Después de confirmar por email:</p><ul><li>se cerrarán todas las sesiones y se revocarán los tokens API;</li><li>tendrás 7 días para cancelar desde el enlace enviado;</li><li>al terminar el plazo se anonimizará la cuenta y se retirarán sus membresías;</li><li>los enlaces creados dentro de workspaces ajenos permanecen como contenido de esos workspaces, con el autor anonimizado.</li></ul></div>
-        <form class="stack deletion-form" [formGroup]="deletionForm" (ngSubmit)="requestAccountDeletion()">
-          <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
-          @if (user()?.mfaEnabled) {
-            <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon>@if (deletionForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> } @if (deletionForm.controls.factorCode.hasError('pattern')) { <mat-error>El código no tiene un formato válido.</mat-error> }</mat-form-field>
-          }
-          <mat-form-field appearance="outline"><mat-label>Escribe ELIMINAR MI CUENTA</mat-label><input matInput formControlName="confirmation" autocomplete="off" maxlength="18" spellcheck="false" /><mat-icon matPrefix>warning</mat-icon>@if (deletionForm.controls.confirmation.invalid && deletionForm.controls.confirmation.touched) { <mat-error>Escribe exactamente ELIMINAR MI CUENTA.</mat-error> }</mat-form-field>
-          <div class="row-actions"><button mat-flat-button type="submit" class="destructive-button" [disabled]="deletionForm.invalid || deletionBusy()">{{ deletionBusy() ? 'Enviando…' : 'Enviar confirmación de eliminación' }}</button></div>
-        </form>
-      </details>
+      <div class="deletion-entry"><p>Revisa las consecuencias y confirma tu identidad en un proceso guiado. El cierre requiere después una confirmación por email.</p><button mat-stroked-button type="button" class="danger" (click)="openAccountDeletion()"><mat-icon aria-hidden="true">person_remove</mat-icon>Revisar cierre de cuenta</button></div>
     }
   }
 </div>

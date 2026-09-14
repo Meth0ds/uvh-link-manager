@@ -85,10 +85,15 @@ html.landing-theme-transition::view-transition-new(root) {
   mix-blend-mode: normal;
 }
 html.landing-theme-transition::view-transition-old(root) { animation: none; }
+html.landing-theme-transition::view-transition-group(root) { animation: none; }
 html.landing-theme-transition::view-transition-new(root) {
   animation: landing-theme-reveal 560ms cubic-bezier(.22, .8, .25, 1) both;
 }
-html.landing-theme-transition * { transition: none !important; }
+// Freeze other effects while capturing the page. Animated charts, skeletons and
+// ripples should not produce an intermediate frame inside the theme snapshot.
+html.landing-theme-transition *,
+html.landing-theme-transition *::before,
+html.landing-theme-transition *::after { transition: none !important; animation-play-state: paused !important; }
 @keyframes landing-theme-reveal {
   from { clip-path: circle(0 at var(--landing-theme-x) var(--landing-theme-y)); }
   to { clip-path: circle(var(--landing-theme-radius) at var(--landing-theme-x) var(--landing-theme-y)); }

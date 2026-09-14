@@ -1,15 +1,23 @@
-<app-page-header icon="space_dashboard" eyebrow="Tu espacio de trabajo" title="Cada enlace tiene un recorrido."
-  [description]="workspaceName() ? workspaceName() + ' · Una lectura de la actividad, sin perder de vista lo que has publicado.' : 'Selecciona un workspace para consultar su actividad.'">
+<app-page-header icon="space_dashboard" eyebrow="Vista general" [title]="workspaceName() || 'Tu panel de trabajo'"
+  description="Retoma tus enlaces, consulta su recorrido y prepara lo siguiente.">
   @if (canCreate()) {
     <button mat-flat-button class="create-link" type="button" (click)="newLink()"><mat-icon aria-hidden="true">add_link</mat-icon> Crear enlace</button>
   }
 </app-page-header>
 
+@if (hasWorkspace()) {
+  <nav class="workbench" aria-label="Accesos rápidos del workspace">
+    <a routerLink="/app/links" class="workbench-primary"><span class="workbench-icon"><mat-icon aria-hidden="true">link</mat-icon></span><span><b>Tu archivo de enlaces</b><small>Busca, consulta y comparte lo que has publicado.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
+    <a routerLink="/app/analytics"><span class="workbench-icon"><mat-icon aria-hidden="true">query_stats</mat-icon></span><span><b>Entiende el recorrido</b><small>Consulta clics, fuentes y periodos.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
+    <a routerLink="/app/team"><span class="workbench-icon"><mat-icon aria-hidden="true">group</mat-icon></span><span><b>Trabaja en equipo</b><small>Consulta quién forma parte de este espacio.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
+  </nav>
+}
+
 <app-getting-started [compact]="true" />
 
 @if (hasWorkspace()) {
   <div class="period-heading">
-    <div><span class="section-eyebrow">01 / Lectura del periodo</span><h2>Lo que está pasando</h2></div>
+    <div><span class="section-eyebrow">Actividad del workspace</span><h2>El periodo, de un vistazo.</h2><p class="period-description">Elige el intervalo para leer las cifras y el gráfico juntos.</p></div>
     <div class="period-switch" role="group" aria-label="Periodo de análisis">
       @for (option of periods; track option.value) {
         <button type="button" [class.active]="period() === option.value" [attr.aria-pressed]="period() === option.value"
@@ -43,7 +51,7 @@
   </dl>
 
   <section class="activity-section" aria-labelledby="activity-title">
-    <div class="section-header"><h2 id="activity-title">El pulso de tus enlaces</h2><a class="text-link" routerLink="/app/analytics">Abrir analítica <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+    <div class="section-header"><div><span class="section-eyebrow">Evolución</span><h2 id="activity-title">El pulso de tus enlaces</h2></div><a class="text-link" routerLink="/app/analytics">Abrir analítica <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
     <app-charts [overview]="o" [showBreakdowns]="false" />
   </section>
 
@@ -78,7 +86,7 @@
 
 @if (hasWorkspace() && !loading() && (!error() || recent().length)) {
   <section class="recent-section" aria-labelledby="recent-title">
-    <div class="section-header"><div><span class="section-eyebrow">02 / Tu mesa de trabajo</span><h2 id="recent-title">Lo último que has creado</h2></div><a class="text-link" routerLink="/app/links">Ver todos los enlaces <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+    <div class="section-header"><div><span class="section-eyebrow">Retoma el trabajo</span><h2 id="recent-title">Tus últimos enlaces</h2></div><a class="text-link" routerLink="/app/links">Ver todos los enlaces <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
     <p class="section-intro">Los cinco enlaces más recientes. Sus clics son acumulados, no están filtrados por el periodo de arriba.</p>
     <ul class="recent-list">
       @for (l of recent(); track l.id) {

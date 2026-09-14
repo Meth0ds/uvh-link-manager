@@ -22,6 +22,8 @@ import { WorkspacePreviewComponent } from "./workspace-preview.component";
 import { blocked, currentId, fixtureRead } from "./workspace-fixture";
 import { StatusPageComponent } from "../src/app/status-page.component";
 import { PublicStatusPreviewComponent } from "./public-status-preview.component";
+import { SecurityPreviewComponent } from "./security-preview.component";
+import { SettingsPreviewComponent } from "./settings-preview.component";
 
 @Component({
   selector: "app-design-preview-content",
@@ -65,10 +67,13 @@ class DesignPreviewRootComponent {}
 void bootstrapApplication(DesignPreviewRootComponent, {
   providers: [
     provideRouter([
+      { path: "preview/mfa", component: SecurityPreviewComponent, data: { page: "mfa" } },
+      { path: "preview/invitation", component: SecurityPreviewComponent, data: { page: "invitation" } },
       { path: "status", component: PublicStatusPreviewComponent, title: "Estado · Vista de diseño" },
       { path: "forbidden", component: StatusPageComponent, data: { kind: "forbidden" }, title: "403 · Vista de diseño" },
       { path: "not-found", component: StatusPageComponent, data: { kind: "not-found" }, title: "404 · Vista de diseño" },
       { path: "app", component: PanelComponent, children: [
+        { path: "settings", component: SettingsPreviewComponent },
         { path: "dashboard", component: WorkspacePreviewComponent, data: { page: "dashboard" } },
         { path: "getting-started", component: WorkspacePreviewComponent, data: { page: "getting-started" } },
         { path: "tokens", component: WorkspacePreviewComponent, data: { page: "tokens" } },

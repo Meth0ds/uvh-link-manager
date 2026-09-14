@@ -79,13 +79,20 @@ export class ThemeService {
     if (!view || (typeof view.matchMedia === "function"
       && view.matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
 
+    // The native circular reveal already owns the visual change. Running the
+    // fallback as well forces a whole-document layout during snapshot capture.
+    if (root.classList.contains("landing-theme-transition")) {
+      if (this.transitionTimer !== undefined) view.clearTimeout(this.transitionTimer);
+      root.classList.remove("theme-changing");
+      return;
+    }
+
     if (origin) {
       root.style.setProperty("--uvh-theme-origin-x", `${origin.x}px`);
       root.style.setProperty("--uvh-theme-origin-y", `${origin.y}px`);
     }
-    root.classList.remove("theme-changing");
-    // Re-arm the short transition even when users toggle twice quickly.
-    void root.offsetWidth;
+    // CSS transitions retarget from their current value; no forced reflow is
+    // needed to restart them when preferences change in quick succession.
     root.classList.add("theme-changing");
     if (this.transitionTimer !== undefined) view.clearTimeout(this.transitionTimer);
     this.transitionTimer = view.setTimeout(() => root.classList.remove("theme-changing"), 320);

@@ -1,0 +1,12 @@
+@use "./dialog-identity";
+
+:host { container-type: inline-size; }
+.workspace-note { display: flex; align-items: flex-start; gap: 12px; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
+.workspace-note mat-icon { flex-shrink: 0; color: var(--accent); }
+.workspace-note p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
+.workspace-note b { display: block; color: var(--ink); font-weight: 750; }
+mat-dialog-actions button mat-icon { transition: transform 180ms ease; }
+mat-dialog-actions button:hover:not(:disabled) mat-icon { transform: rotate(90deg); }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@container (max-width: 340px) { .workspace-note { gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }

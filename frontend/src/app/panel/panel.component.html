@@ -9,8 +9,11 @@
       <button mat-icon-button class="side-close" type="button" (click)="mobileOpen.set(false)" aria-label="Cerrar menú"><mat-icon>close</mat-icon></button>
       <div class="workspace-summary">
         <mat-icon aria-hidden="true">workspaces</mat-icon>
-        <span>{{ workspaceName() }}</span>
+        <span><b>{{ workspaceName() }}</b><small>{{ roleLabel() }}</small></span>
       </div>
+      @if (canCreate()) {
+        <button mat-flat-button class="new-link side-primary" type="button" (click)="newLink()"><mat-icon aria-hidden="true">add</mat-icon> Crear enlace</button>
+      }
     </div>
 
     <mat-nav-list class="nav-list" aria-label="Secciones de tu espacio">
@@ -27,6 +30,7 @@
             >
             <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
             <span matListItemTitle>{{ item.label }}</span>
+            <mat-icon matListItemMeta class="nav-arrow" aria-hidden="true">chevron_right</mat-icon>
           </a>
         }
       }
@@ -35,9 +39,7 @@
     <div class="side-foot">
       <a class="help-link" routerLink="/help"><mat-icon aria-hidden="true">help_outline</mat-icon><span>¿Cómo se hace?<small>Guías y soluciones</small></span><mat-icon aria-hidden="true">north_east</mat-icon></a>
       <button mat-button class="workspace-create" (click)="createWorkspace()"><mat-icon aria-hidden="true">create_new_folder</mat-icon> Crear workspace</button>
-      <button mat-flat-button color="primary" class="new-link" (click)="newLink()">
-        <mat-icon>add_link</mat-icon> Nuevo enlace
-      </button>
+      <a class="side-account" routerLink="/app/settings" (click)="mobileOpen.set(false)"><span class="account-initials" aria-hidden="true">{{ initials() }}</span><span><b>{{ user()?.name || 'Tu cuenta' }}</b><small>Perfil y preferencias</small></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
     </div>
   </mat-sidenav>
 
@@ -55,41 +57,35 @@
         <span class="menu-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
       </button>
 
-      <div class="topbar-context">
-        <span class="topbar-label">Workspace actual</span>
-        @if (workspaces.list().length > 1) {
-          <mat-form-field appearance="outline" class="ws-switch" subscriptSizing="dynamic">
-            <mat-select
-              [value]="workspaces.currentId()"
-              panelWidth="min(320px, calc(100vw - 32px))"
-              panelClass="uvh-workspace-options"
-              (selectionChange)="onWorkspaceChange($event.value)"
-              aria-label="Workspace"
-              >
-              @for (w of workspaces.list(); track w.id) {
-                <mat-option [value]="w.id">{{ w.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-        }
-        @if (workspaces.list().length <= 1) {
-          <span class="ws-name">{{ workspaceName() }}</span>
-        }
-      </div>
-      <button mat-icon-button matTooltip="Crear workspace" class="workspace-add" (click)="createWorkspace()" aria-label="Crear workspace">
-        <mat-icon>create_new_folder</mat-icon>
+      <button mat-button class="workspace-picker" type="button" [matMenuTriggerFor]="workspaceMenu" aria-label="Cambiar workspace">
+        <span class="workspace-emblem" aria-hidden="true"><mat-icon>workspaces</mat-icon></span>
+        <span class="workspace-picker-copy"><small>Espacio de trabajo</small><b>{{ workspaceName() }}</b></span>
+        <mat-icon class="picker-chevron" aria-hidden="true">unfold_more</mat-icon>
       </button>
+      <mat-menu #workspaceMenu="matMenu" class="workspace-menu">
+        <div class="user-head"><b>Tus espacios de trabajo</b><span>Cambiar de espacio cambia los enlaces y datos visibles.</span></div>
+        @for (w of workspaces.list(); track w.id) {
+          <button mat-menu-item type="button" (click)="onWorkspaceChange(w.id)" [attr.aria-current]="workspaces.currentId() === w.id ? 'true' : null">
+            <mat-icon aria-hidden="true">{{ workspaces.currentId() === w.id ? 'check' : 'workspaces' }}</mat-icon><span>{{ w.name }}</span>
+          </button>
+        }
+        <mat-divider />
+        <button mat-menu-item type="button" (click)="createWorkspace()"><mat-icon aria-hidden="true">create_new_folder</mat-icon>Crear workspace</button>
+      </mat-menu>
+      <div class="route-context" aria-label="Página actual"><span aria-hidden="true">/</span><b>{{ currentPage() }}</b></div>
 
       <span class="spacer"></span>
 
-      <button mat-flat-button color="primary" class="new-link-top" (click)="newLink()">
+      @if (canCreate()) { <button mat-flat-button color="primary" class="new-link-top" (click)="newLink()">
         <mat-icon>add_link</mat-icon> Crear enlace
-      </button>
+      </button> }
 
       <app-public-theme-toggle class="panel-theme" />
 
-      <button mat-icon-button [matMenuTriggerFor]="userMenu" class="avatar-btn" aria-label="Menú de usuario">
+      <button mat-button [matMenuTriggerFor]="userMenu" class="avatar-btn" aria-label="Menú de usuario">
         <span class="avatar"><span>{{ initials() }}</span></span>
+        <span class="user-button-copy"><b>{{ user()?.name || 'Tu cuenta' }}</b><small>Cuenta personal</small></span>
+        <mat-icon class="user-chevron" aria-hidden="true">expand_more</mat-icon>
       </button>
       <mat-menu #userMenu="matMenu" xPosition="before">
         <div class="user-head">

@@ -1,0 +1,38 @@
+<h2 mat-dialog-title><span class="title-mark danger" aria-hidden="true"><mat-icon>person_remove</mat-icon></span><span><small>Cierre de cuenta</small><b>Una decisión, paso a paso.</b></span></h2>
+<mat-dialog-content>
+  <ol class="steps" aria-label="Progreso de la solicitud">
+    <li [attr.aria-current]="step() === 1 ? 'step' : null" [class.done]="step() > 1"><span>1</span>Revisar</li>
+    <li [attr.aria-current]="step() === 2 ? 'step' : null" [class.done]="step() > 2"><span>2</span>Identificarte</li>
+    <li [attr.aria-current]="step() === 3 ? 'step' : null"><span>3</span>Confirmar por email</li>
+  </ol>
+  <h3 #stepHeading tabindex="-1">{{ step() === 1 ? 'Qué ocurre al cerrar tu cuenta' : step() === 2 ? 'Confirma que eres tú' : 'El siguiente paso está en tu correo' }}</h3>
+  @if (step() === 1) {
+    <p class="intro">Esta ventana no elimina tu cuenta. Primero te enviaremos un enlace de confirmación.</p>
+    <ul class="consequences"><li>Al confirmar por email, se cerrarán tus sesiones y se revocarán tus tokens API.</li><li>Dispondrás de <b>7 días para cancelar</b> desde el enlace enviado.</li><li>Después se anonimizarán tus datos personales y se retirarán tus membresías.</li><li>Los enlaces de workspaces ajenos permanecerán, con el autor anonimizado.</li></ul>
+    @if (loading()) { <p role="status">Comprobando los requisitos de tu cuenta…</p> }
+    @if (!loading() && allowed()) { <mat-checkbox [checked]="acknowledged()" (change)="acknowledged.set($event.checked)">He leído las consecuencias y quiero continuar.</mat-checkbox> }
+  } @else if (step() === 2) {
+    <p class="intro">El envío requiere tu contraseña{{ auth.user()?.mfaEnabled ? ' y tu segundo factor' : '' }}. La cuenta seguirá activa hasta que confirmes por email.</p>
+    <form id="account-deletion-request" class="credentials" [formGroup]="form" (ngSubmit)="submit()">
+      <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" [readonly]="busy()" />@if (form.controls.password.invalid && form.controls.password.touched) { <mat-error>Introduce tu contraseña actual.</mat-error> }</mat-form-field>
+      @if (auth.user()?.mfaEnabled) { <mat-form-field appearance="outline"><mat-label>Segundo factor</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" [readonly]="busy()" /><mat-hint>Código de la aplicación o un código de recuperación.</mat-hint>@if (form.controls.factorCode.invalid && form.controls.factorCode.touched) { <mat-error>Introduce un código válido.</mat-error> }</mat-form-field> }
+      <mat-form-field appearance="outline"><mat-label>Confirmación escrita</mat-label><input matInput formControlName="confirmation" autocomplete="off" spellcheck="false" maxlength="18" [readonly]="busy()" /><mat-hint>Escribe exactamente ELIMINAR MI CUENTA.</mat-hint>@if (form.controls.confirmation.invalid && form.controls.confirmation.touched) { <mat-error>La frase debe coincidir exactamente.</mat-error> }</mat-form-field>
+    </form>
+  } @else {
+    <div class="email-next" role="status"><mat-icon aria-hidden="true">mark_email_unread</mat-icon><p>Solicitud enviada. <b>Tu cuenta aún no se ha eliminado.</b> Revisa el correo de tu cuenta y sigue el enlace si quieres confirmar el cierre.</p></div>
+    <p class="intro">El plazo de 7 días comienza al confirmar por email, no al cerrar esta ventana.</p>
+  }
+  @if (error(); as message) { <div class="error" role="alert">{{ message }}</div> }
+</mat-dialog-content>
+<mat-dialog-actions>
+  @if (step() !== 3) {
+    <button mat-button type="button" (click)="ref.close(false)" [disabled]="busy()">Cancelar</button>
+    @if (step() === 1) {
+      @if (!loading() && !allowed()) { <button mat-stroked-button type="button" (click)="checkImpact()">Volver a comprobar</button> }
+      <button mat-flat-button type="button" (click)="next()" [disabled]="loading() || !allowed() || !acknowledged()">Continuar</button>
+    } @else {
+      <button mat-stroked-button type="button" (click)="back()" [disabled]="busy()">Atrás</button>
+      <button mat-flat-button class="destructive-confirm" type="submit" form="account-deletion-request" [disabled]="form.invalid || busy()" [attr.aria-busy]="busy()">{{ busy() ? 'Enviando…' : 'Enviar confirmación' }}</button>
+    }
+  } @else { <button mat-flat-button type="button" (click)="ref.close(true)">Entendido</button> }
+</mat-dialog-actions>

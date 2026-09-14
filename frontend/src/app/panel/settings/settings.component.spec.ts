@@ -109,6 +109,59 @@ describe("SettingsComponent async safety", () => {
     expect(component.sessionsLoading()).toBeFalse();
   });
 
+  it("keeps section jumps local and moves keyboard focus without clearing MFA setup", () => {
+    const event = new MouseEvent("click", { cancelable: true });
+    const section = document.createElement("section");
+    const focus = spyOn(section, "focus");
+    const scroll = spyOn(section, "scrollIntoView");
+    component.recoveryCodes.set(["fictional-code"]);
+    component.goToSection(event, section);
+    expect(event.defaultPrevented).toBeTrue();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
+    expect(component.recoveryCodes()).toEqual(["fictional-code"]);
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it("renders identity, explicit save feedback and accessible theme choices", async () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
+    expect(element.querySelector(".profile-identity")?.textContent).toContain("User");
+    expect(element.querySelectorAll('.theme-switch button[aria-pressed]')).toHaveSize(3);
+    fixture.componentInstance.profileBusy.set(true);
+    fixture.detectChanges();
+    const save = element.querySelector<HTMLButtonElement>('.profile-form button[type="submit"]');
+    expect(save?.textContent).toContain("Guardando…");
+    expect(save?.disabled).toBeTrue();
+    expect(save?.getAttribute("aria-busy")).toBe("true");
+    expect(auth.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("keeps all sensitive sections mounted and account deletion behind disclosure", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.componentInstance.deletionLoading.set(false);
+    fixture.componentInstance.deletionImpact.set({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null });
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
+    expect(element.querySelectorAll('.settings-section[tabindex="-1"]')).toHaveSize(4);
+    const disclosure = element.querySelector<HTMLDetailsElement>(".account-danger");
+    expect(disclosure?.open).toBeFalse();
+    expect(element.querySelector<HTMLButtonElement>('.deletion-form button[type="submit"]')?.disabled).toBeTrue();
+  });
+
+  it("does not report zero sessions as a successful result when the read fails", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.componentInstance.sessionsLoading.set(false);
+    fixture.componentInstance.sessionsError.set("No se pudieron cargar las sesiones");
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
+    expect(element.querySelector(".sessions-card .count-badge")).toBeNull();
+    expect(element.querySelector(".sessions-card [role=alert]")?.textContent).toContain("Reintentar");
+  });
+
   it("keeps the newest data-export status and loading state", async () => {
     const older = deferred<DataExportStatus | null>();
     const newer = deferred<DataExportStatus | null>();

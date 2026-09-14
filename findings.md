@@ -1,9 +1,25 @@
 # Findings & Decisions
 
+## Settings redesign — 2026-09-14
+- Rebuilt identity masthead, profile/name form, email row and three visual theme choices; flattened nested panels into ruled sections. Current tokens and user commits preserved.
+- Local fragment links were resolving against the root base href. Local jump handler now keeps the settings route and moves keyboard focus without unmounting security forms.
+- Sessions read failure no longer displays a misleading zero-count badge. All existing security mutation methods retained.
+- Isolated browser: profile mobile/light and security mobile/dark at 320px have no horizontal overflow; 768/1024/1440 checked in both themes. Name save, email confirmation and destructive actions were not submitted.
+- Settings preview uses fictional data, explicit decoded read fixture and rejecting mutation methods. Error states show retry rather than empty-success counts.
+
 ## Requirements
 Continue the redesign, inspect and preserve the user's newer commits; change existing work only where useful.
 
 ## Research Findings
+- Workspace real modal at 320/light: labelled name field initially focused, no overflow in screenshot, create disabled. Name hint and workspace selector explanation wrap correctly. This is non-destructive creation; no request submitted.
+- Invitation desktop/dark screenshot verified with explicit accept/reject consequences; mobile error distinguishes switching account from local discard. Only fixture scenario buttons used, no accept/reject/logout.
+- MFA isolated preview mobile/light: fields, recovery explanation and disabled continue button fit; Enter opens the native help disclosure with visible focus. No password or factor was entered.
+- Phase 6: workspace validator previously accepted padded one-character/blank names while the API payload trims. Added matching trimmed minimum, visible Material error and dynamic hints. MFA and invitation pages retain their auth/token contracts; pending invitation no longer looks like a login failure, and recovery-code help is explicit.
+- List viewer has no New webhook control. Empty copy identifies roles able to configure; simulated failure and loading remain distinct. Rapid desktop-to-mobile resizing again yields transient shell widths; not accepted as steady-state overflow evidence.
+- Dark/mobile shared confirmation screenshot verified, canceled without deletion. Edit form shows preserve-current-secret guidance. Dark form client/scroll match at 320/768/1024/1440, including dynamic multi-line hints.
+- Current worktree advanced to 8b03b83 (user commits cf5375a/8b03b83 incorporate prior design edits). Preserved new RedirectService/docs edits. This agent did not commit them.
+- Webhook accordion opens via Enter; real shared delete dialog tested with fictional data, width 294.4px at viewport 320 and initial focus Cancelar. Final destructive action not taken.
+- Webhook form at 320px: main client/scroll 310/310; Space selects the native event checkbox. Added dynamic Material hint sizing so multi-line secret guidance participates in layout rather than overlapping actions.
 - Phase 5 preview shows labelled creation form and five described events; no credential entered. Preview intentionally recreates its single component on scenario changes (Angular NG0956 warning, not a production route).
 - Phase 5: backend update preserves the current signing secret when omitted (WebhookController update); previous form copy incorrectly promised generation. List lacked viewer capability gating and live region contained the secret. Corrected presentation and entry guards; confirmed deletions now check the original workspace after awaiting the dialog.
 - Final inspector mobile/light after layout settles: main client/scroll 310/310; screenshot readable, no persistent overflow. Rapid breakpoint changes briefly exposed intermediate shell widths, so this batch does not certify animation frames. Browser viewport reset.
