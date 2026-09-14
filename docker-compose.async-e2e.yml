@@ -1,0 +1,320 @@
+# Full asynchronous E2E stack. The browser stack (docker-compose.e2e.yml) only
+# proves that a request is accepted; every queued job it produces is never
+# consumed. This stack runs the real workers, the real scheduler and
+# deterministic providers, so a scenario can follow
+#   HTTP -> transaction -> commit -> queue -> worker -> retry -> final state
+# to its end.
+#
+# Two deliberate differences from production are worth naming:
+#   * APP_ENV stays `testing` so the anti-captcha and mail guards keep their
+#     local behaviour. The production boot path is covered by
+#     docker-compose.release-boot.yml instead.
+#   * The webhook receiver lives on a routable-looking fixture subnet because
+#     Ssrf::safeFetch refuses every private address by design. The guard is
+#     not weakened for the test.
+name: uvh-async-e2e
+
+x-php-service: &php-service
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  working_dir: /app
+  volumes:
+    - ./backend-laravel:/app
+  environment: &php-environment
+    APP_ENV: testing
+    APP_DEBUG: "false"
+    APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    APP_SECRET: uvh-async-e2e-only-secret-never-use-outside-tests
+    APP_URL: http://127.0.0.1:${UVH_ASYNC_BACKEND_PORT:-8011}
+    APP_HOST: 127.0.0.1
+    PUBLIC_HOST: 127.0.0.1
+    PUBLIC_ORIGIN: http://127.0.0.1:${UVH_ASYNC_BACKEND_PORT:-8011}
+    DB_CONNECTION: pgsql
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_DATABASE: uvh_e2e_test
+    DB_USERNAME: uvh_e2e
+    DB_PASSWORD: uvh_e2e_only
+    BCRYPT_ROUNDS: "4"
+    # The broker and cache store are the production ones. A suite that consumed
+    # the `jobs` table would prove the async chains on a driver production no
+    # longer runs, which is exactly the gap this stack exists to close.
+    CACHE_STORE: redis
+    CACHE_LIMITER: failover
+    CACHE_FAILOVER_STORES: redis,database
+    CACHE_PREFIX: uvh-async-cache-
+    REDIS_CLIENT: phpredis
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    REDIS_PASSWORD: uvh-async-e2e-only
+    REDIS_PREFIX: uvh-async-
+    REDIS_DB: "0"
+    REDIS_CACHE_DB: "1"
+    SESSION_DRIVER: database
+    SESSION_COOKIE: uvh_async_session
+    SESSION_DOMAIN: ""
+    COOKIE_DOMAIN: ""
+    COOKIE_SECURE: "false"
+    QUEUE_CONNECTION: redis
+    # Above the longest worker timeout in this stack (180 s), which is what the
+    # production gate requires for the same reason.
+    REDIS_QUEUE_RETRY_AFTER: "300"
+    # A real SMTP conversation is required: UvhMail only short-circuits for the
+    # development `log`/`array` mailers, so the mail chain must reach a socket.
+    MAIL_MAILER: smtp
+    MAIL_HOST: mail-sink
+    MAIL_PORT: "1025"
+    MAIL_FROM_ADDRESS: no-reply@e2e.uvh
+    MAIL_FROM_NAME: UVH
+    # Non-empty target: routing ownership must be proven by a real CNAME lookup
+    # instead of the local-development shortcut.
+    CUSTOM_DOMAIN_CNAME_TARGET: edge.e2e.uvh
+    HCAPTCHA_SITE_KEY: 10000000-ffff-ffff-ffff-000000000001
+    HCAPTCHA_SECRET: uvh-e2e-hcaptcha-secret
+    HCAPTCHA_VERIFY_URL: http://hcaptcha:8080/siteverify
+    HCAPTCHA_DEV_FALLBACK: "false"
+    REGISTER_LIMIT: "100"
+    AUTH_LIMIT: "100"
+    RESOLVE_LIMIT: "5000"
+    LOG_CHANNEL: stderr
+    LOG_LEVEL: warning
+    PHP_CLI_SERVER_WORKERS: "4"
+  # Joining `fixture` is what makes the webhook receiver reachable: bridge
+  # networks are isolated, so a worker has to share the network that owns the
+  # 11.0.0.10 address instead of merely routing to it.
+  networks:
+    - backend
+    - fixture
+  # Route lookups through the fixture so `.e2e.uvh` is authoritative here.
+  # Every other name (postgres, mail-sink, ...) is forwarded upstream.
+  dns:
+    - 172.31.0.53
+
+x-queue-service: &queue-service
+  <<: *php-service
+  depends_on:
+    redis:
+      condition: service_healthy
+    app:
+      condition: service_healthy
+
+services:
+  # One-off commands (`composer install`, diagnostics). It deliberately carries
+  # no healthcheck: the application's probe checks the broker, and during this
+  # pre-start step the broker is not up yet, so inheriting the probe would spawn
+  # overlapping processes that starve the very command being run. No ports and
+  # no dependencies either, so `run --rm --no-deps tools ...` starts nothing
+  # else and cannot disturb a running stack.
+  #
+  # It sits behind a profile so a plain `up` never creates it: the service exits
+  # on its own, and `docker compose up --wait` treats *any* exited container as
+  # a failed start, so leaving it in the default set makes the whole stack look
+  # broken while every real service came up healthy. `compose run tools` names
+  # the service explicitly and therefore ignores the profile.
+  tools:
+    <<: *php-service
+    profiles: [tools]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: uvh_e2e_test
+      POSTGRES_USER: uvh_e2e
+      POSTGRES_PASSWORD: uvh_e2e_only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uvh_e2e -d uvh_e2e_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - backend
+
+  # Cache, rate limits, locks and the queues. Ephemeral on purpose: this stack
+  # exists to prove the chains, and durability across a Redis restart is proven
+  # by the reconciler drill in the same harness.
+  redis:
+    image: redis:7-alpine
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      UVH_REDIS_PASSWORD: uvh-async-e2e-only
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --appendonly no
+        --maxmemory-policy noeviction
+        --requirepass "$${UVH_REDIS_PASSWORD}"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$${UVH_REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - backend
+
+  hcaptcha:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app:ro
+    environment:
+      HCAPTCHA_E2E_SECRET: uvh-e2e-hcaptcha-secret
+    command: ["php", "-S", "0.0.0.0:8080", "tests/E2E/hcaptcha-stub.php"]
+    networks:
+      - backend
+
+  # Deterministic provider: records every attempt and can reject on demand.
+  mail-sink:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app:ro
+      - async-fixture-state:/state
+    environment:
+      UVH_FIXTURE_STATE: /state/mail.json
+      UVH_SMTP_SINK_PORT: "1025"
+    ports:
+      - "127.0.0.1:${UVH_ASYNC_MAIL_CONTROL_PORT:-8092}:8081"
+    command:
+      - sh
+      - -c
+      - php -S 0.0.0.0:8081 tests/E2E/fixture-control.php & exec php tests/E2E/smtp-sink.php
+    networks:
+      - backend
+
+  # Deterministic receiver on a routable-looking fixture address. Port 8080 is
+  # one of the four ports Ssrf::assertSafeUrl allows.
+  webhook-sink:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app:ro
+      - async-fixture-state:/state
+    environment:
+      UVH_FIXTURE_STATE: /state/webhook.json
+    ports:
+      - "127.0.0.1:${UVH_ASYNC_WEBHOOK_CONTROL_PORT:-8090}:8080"
+    command: ["php", "-S", "0.0.0.0:8080", "tests/E2E/webhook-sink.php"]
+    networks:
+      backend:
+      fixture:
+        ipv4_address: 11.0.0.10
+
+  # Authoritative for `.e2e.uvh`; forwards every other query to Docker's
+  # embedded resolver so internal names keep working.
+  dns-fixture:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app:ro
+      - async-fixture-state:/state
+    environment:
+      UVH_FIXTURE_STATE: /state/dns.json
+      UVH_DNS_ZONE: e2e.uvh
+      UVH_DNS_UPSTREAM: 127.0.0.11:53
+    ports:
+      - "127.0.0.1:${UVH_ASYNC_DNS_CONTROL_PORT:-8091}:8081"
+    command:
+      - sh
+      - -c
+      - php -S 0.0.0.0:8081 tests/E2E/fixture-control.php & exec php tests/E2E/dns-fixture.php
+    networks:
+      backend:
+        ipv4_address: 172.31.0.53
+
+  app:
+    <<: *php-service
+    ports:
+      - "127.0.0.1:${UVH_ASYNC_BACKEND_PORT:-8011}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      hcaptcha:
+        condition: service_started
+      mail-sink:
+        condition: service_started
+      dns-fixture:
+        condition: service_started
+    healthcheck:
+      # The probe is a full Laravel CLI boot, and this stack mounts the
+      # workspace through a bind mount. On Docker Desktop for Windows a cold
+      # boot measured 12-14 s, so a 10 s timeout made the container report
+      # `starting` forever and the whole stack fail to come up — the probe, not
+      # the application, was the failure. The generous timeout keeps the check
+      # meaningful (it still has to boot, reach the schema and round-trip the
+      # rate limiter's store) without racing the I/O of the host filesystem.
+      test: ["CMD", "php", "artisan", "uvh:healthcheck", "app"]
+      interval: 5s
+      timeout: 30s
+      retries: 30
+      start_period: 10s
+    command:
+      - sh
+      - -lc
+      - |
+        case "$$DB_DATABASE" in
+          *_test) ;;
+          *) echo "Refusing async E2E schema reset outside a _test database" >&2; exit 64 ;;
+        esac
+        php artisan migrate:fresh --force --no-interaction
+        exec php -d opcache.enable_cli=1 -S 0.0.0.0:8000 -t public public/index.php
+
+  # One worker per queue class, mirroring the production topology. A long DNS
+  # or export job therefore cannot starve mail or webhook delivery.
+  queue-mail:
+    <<: *queue-service
+    command: ["php", "artisan", "queue:work", "--queue=mail", "--sleep=1", "--tries=3", "--timeout=120"]
+  queue-webhooks:
+    <<: *queue-service
+    command: ["php", "artisan", "queue:work", "--queue=webhooks", "--sleep=1", "--tries=3", "--timeout=60"]
+  queue-domains:
+    <<: *queue-service
+    command: ["php", "artisan", "queue:work", "--queue=domains", "--sleep=1", "--tries=3", "--timeout=90"]
+  queue-exports:
+    <<: *queue-service
+    command: ["php", "artisan", "queue:work", "--queue=exports", "--sleep=1", "--tries=3", "--timeout=180"]
+  queue-analytics:
+    <<: *queue-service
+    command: ["php", "artisan", "queue:work", "--queue=analytics", "--sleep=1", "--tries=5", "--timeout=45"]
+  # Compatibility pool for jobs that predate the per-class workers.
+  queue-default:
+    <<: *queue-service
+    command: ["php", "artisan", "queue:work", "--queue=default", "--sleep=1", "--tries=3", "--timeout=180"]
+
+  scheduler:
+    <<: *php-service
+    depends_on:
+      app:
+        condition: service_healthy
+    command: ["php", "artisan", "schedule:work"]
+
+volumes:
+  async-fixture-state:
+
+networks:
+  backend:
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+  fixture:
+    ipam:
+      config:
+        - subnet: 11.0.0.0/24

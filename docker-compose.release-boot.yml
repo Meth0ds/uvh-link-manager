@@ -1,0 +1,199 @@
+# Production boot contract.
+#
+# WHY THIS STACK EXISTS
+#
+# docker-compose.release-e2e.yml builds the production images but runs them with
+# APP_ENV=testing, so docker/php/production-entrypoint.sh skips its entire
+# production branch: `php artisan config:cache` and `php artisan uvh:release-check`
+# never run there. That stack proves the Caddy -> Nginx -> PHP-FPM proxy
+# contracts; it cannot prove the startup contract, because it never enters it.
+#
+# This stack boots the same image the way production does, with APP_ENV=production
+# and every ProductionSecurity invariant satisfied, and then asserts that each
+# single broken invariant stops the container instead of degrading quietly.
+#
+# WHY POSTGRES SERVES TLS HERE
+#
+# Production refuses to boot unless DB_SSLMODE is verify-full over a readable CA
+# chain, so a stack without database TLS cannot reach the production branch at
+# all. The trust material is generated per run by the `certs` service and is
+# never reused outside this isolated stack.
+#
+# WHY `migrate` IS A SEPARATE SERVICE
+#
+# The entrypoint gates long-lived runtime commands but deliberately leaves
+# schema repair available: an empty database must still be migratable. Splitting
+# the one-shot migration out is what lets `app` keep the image's real CMD, so
+# the entrypoint sees `php-fpm` and runs the release check.
+name: uvh-release-boot
+
+services:
+  certs:
+    build:
+      context: .
+      dockerfile: docker/release-boot/certs/Dockerfile
+    image: uvh-release-boot-certs
+    read_only: true
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      UVH_CERT_HOSTNAME: postgres
+      # PostgreSQL refuses a server key owned by anyone but the database user,
+      # and postgres:16-alpine creates that user as 70:70 (not 999, which is the
+      # uid the Debian-based images use). These must match the pinned image.
+      UVH_CERT_OWNER_UID: "70"
+      UVH_CERT_OWNER_GID: "70"
+    volumes:
+      - release-boot-ca:/ca
+      - release-boot-tls:/tls
+    tmpfs:
+      - /tmp:size=8m,noexec,nosuid,nodev,mode=1777
+    networks:
+      - release-boot
+
+  postgres:
+    image: postgres:16-alpine
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_DB: uvh_release_boot_test
+      POSTGRES_USER: uvh_release_boot
+      POSTGRES_PASSWORD: uvh-release-boot-db-credential
+    volumes:
+      # Read-only: the fixture only needs to present the certificate.
+      - release-boot-tls:/tls:ro
+      - ./docker/release-boot/postgres/90-tls.sh:/docker-entrypoint-initdb.d/90-tls.sh:ro
+    tmpfs:
+      - /var/lib/postgresql/data
+      - /var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uvh_release_boot -d uvh_release_boot_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+    networks:
+      - release-boot
+
+  # Cache, rate limits, locks and queues. Production refuses to boot with a
+  # loopback or unauthenticated Redis, so the fixture has to run a real one.
+  # `--appendonly no` is deliberate: this stack is ephemeral (its data lives on
+  # tmpfs) and durability is proven by the async harness, not here. What the
+  # boot contract needs is authentication and a reachable host.
+  redis:
+    image: redis:7-alpine
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      UVH_REDIS_PASSWORD: uvh-release-boot-redis-secret-01
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --appendonly no
+        --maxmemory-policy noeviction
+        --requirepass "$${UVH_REDIS_PASSWORD}"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$${UVH_REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - release-boot
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.production
+    image: uvh-api:release-boot
+    read_only: true
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - ./docker/release-boot/production.env
+    volumes:
+      - release-boot-storage:/var/www/html/storage
+      - release-boot-ca:/ca:ro
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev,mode=1777
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      - sh
+      - -lc
+      - |
+        case "$$DB_DATABASE" in
+          *_test) ;;
+          *) echo "Refusing to migrate outside a _test database" >&2; exit 64 ;;
+        esac
+        exec php artisan migrate --force --no-interaction
+    networks:
+      - release-boot
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.production
+    image: uvh-api:release-boot
+    read_only: true
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - ./docker/release-boot/production.env
+    volumes:
+      - release-boot-storage:/var/www/html/storage
+      # The CA only. The application must never mount the private key.
+      - release-boot-ca:/ca:ro
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev,mode=1777
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Deliberately no `command:` override. The image CMD is `php-fpm -F`, which
+    # is the argument the entrypoint matches to run `uvh:release-check`; wrapping
+    # it in a shell command would bypass that gate without any visible failure.
+    healthcheck:
+      # Proves both halves of the production branch: the configuration cache was
+      # written from runtime secrets, and PHP-FPM is actually accepting
+      # connections. A container that only started would not satisfy this.
+      test:
+        - CMD
+        - php
+        - -r
+        - "exit((is_file('/tmp/uvh-config.php') && @fsockopen('127.0.0.1', 9000) !== false) ? 0 : 1);"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - release-boot
+
+networks:
+  release-boot:
+    ipam:
+      config:
+        # Pinned so TRUSTED_PROXIES and EDGE_INTERNAL_CIDRS in the fixture
+        # describe the addresses the containers actually use.
+        - subnet: 172.28.0.0/24
+
+volumes:
+  release-boot-ca:
+  release-boot-tls:
+  release-boot-storage:

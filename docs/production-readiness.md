@@ -13,7 +13,18 @@ Este documento es un gate de lanzamiento, no una declaración de que el entorno 
 - [ ] `php artisan uvh:release-check` pasa con la imagen y base del release.
   Probar que esquema pendiente/ausente impide arrancar PHP-FPM, queue y scheduler
   y hace fallar sus healthchecks; el job explícito `migrate` debe seguir disponible
-  con una base vacía. Gate implementado en BAF-137, todavía sin ensayo en contenedor.
+  con una base vacía. Gate implementado en BAF-137 y ensayado en contenedor con
+  `npm run release:boot` (imagen de producción, `APP_ENV=production`); sigue
+  pendiente la evidencia sobre la base de datos y el entorno reales.
+
+  Evidencia automatizada: `frontend/e2e/release-boot.mjs` arranca la imagen de
+  producción con todas las invariantes satisfechas y comprueba que cada
+  invariante rota detiene el contenedor con un mensaje diagnosticable, no con un
+  error accidental. Su primer hallazgo fue que `BCRYPT_ROUNDS` procedente del
+  entorno imposibilitaba el arranque en producción: `hashing.bcrypt.rounds`
+  llegaba como cadena mientras el gate exige un entero, de modo que seguir
+  `.env.production.example` impedía arrancar. Corregido con un cast explícito en
+  `config/hashing.php`.
 - [ ] Las migraciones `000019`–`000033` se prueban sobre copia representativa;
   se valida rollback y el bloqueo de los índices únicos de email/export/cuenta,
   además del índice de revocación de intenciones reclamadas.
@@ -31,9 +42,29 @@ Este documento es un gate de lanzamiento, no una declaración de que el entorno 
 
 ## Datos y continuidad
 
+- [ ] Redis (caché, rate limits, locks y colas) está desplegado con
+  autenticación, sin puerto publicado, con persistencia y con
+  `maxmemory-policy noeviction`, y se alerta de `cache.failed_over` y de
+  `queue.metrics_unavailable`.
+  El modo de operación y su runbook están en `docs/redis-operations.md`. El
+  arranque de producción rechaza un Redis sin contraseña, en loopback o con un
+  limiter no compartido (`npm run release:boot`), y los ensayos en contenedor
+  cubren el fallback del rate limiter, la pérdida del contenido del broker y las
+  cadenas asíncronas sobre Redis. **Falta la evidencia sobre la instancia
+  real**: memoria frente al límite, latencia observada y persistencia tras un
+  reinicio real no se acreditan con un contenedor efímero.
 - [ ] PostgreSQL usa `sslmode=verify-full` con una cadena de confianza válida.
 - [ ] Existe backup automático cifrado, política de retención y alerta de fallo.
+  El mecanismo está implementado y probado (`docker/backup/`, `docs/backup-and-restore.md`,
+  `npm run e2e:backup`): cifrado AES-256-CBC con clave en volumen independiente,
+  retención por número y hook de alerta que el drill verifica. Lo que falta es
+  cablearlo al entorno real —programación (cron/systemd), almacenamiento
+  independiente y endpoint de alerta—, no escribirlo.
 - [ ] Se ha restaurado el último backup en un entorno aislado y se han registrado RPO/RTO reales.
+  El drill destruye una base a propósito, restaura la copia en una instancia
+  aislada y mide el RPO/RTO logrados. Las cifras son de un ensayo en contenedor;
+  las de producción siguen pendientes y sólo valen medidas sobre la base y el
+  almacenamiento reales.
 - [ ] Se han probado migraciones con un volumen de datos representativo y se conoce su bloqueo/duración.
 - [ ] Retenciones de sesiones, auditoría, analítica, entregas, exports,
   solicitudes de eliminación y denuncias están aprobadas y alineadas con la
@@ -45,7 +76,8 @@ Este documento es un gate de lanzamiento, no una declaración de que el entorno 
   `legacy`) y el scheduler están supervisados; detener uno genera una alerta
   diferenciada sin que el heartbeat genérico o el de otro pool la oculte.
 - [ ] Cada timeout de job es menor que el timeout de su worker y éste es menor
-  que `DB_QUEUE_RETRY_AFTER`; se demuestra que un export máximo de 12 MiB no se
+  que el `retry_after` de la cola (`REDIS_QUEUE_RETRY_AFTER` con Redis,
+  `DB_QUEUE_RETRY_AFTER` con la base); se demuestra que un export máximo de 12 MiB no se
   ejecuta dos veces ni queda huérfano al matar el proceso durante escritura,
   cifrado, publicación, descarga o acuse de recepción.
 - [ ] Se alertan `/health`, latencia/errores HTTP, profundidad, antigüedad y

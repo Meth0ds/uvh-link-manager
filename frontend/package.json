@@ -12,6 +12,9 @@
     "e2e": "playwright test",
     "prerelease:e2e": "node e2e/prepare-release.mjs",
     "release:e2e": "playwright test --config playwright.release.config.ts",
+    "release:boot": "node e2e/release-boot.mjs",
+    "e2e:async": "node e2e/async-stack.mjs",
+    "e2e:backup": "node e2e/backup-restore.mjs",
     "e2e:install": "playwright install chromium",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"

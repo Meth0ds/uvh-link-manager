@@ -1,0 +1,161 @@
+# Backup and restore drill stack.
+#
+# The point of this stack is to make the parts that are usually assumed
+# explicit and independent:
+#   * `backup-store` holds the copies the application must not be able to
+#     reach on its own volume, standing in for object storage;
+#   * `key-store` holds the encryption key in a different volume, so a stolen
+#     backup store is not enough to read anything;
+#   * `alert-sink` receives the failure hook, so "alerta de fallo" is an
+#     asserted behaviour rather than a paragraph in a runbook;
+#   * `backup-runner` is where every script runs, one isolated container per
+#     invocation, never inside the database it is dumping.
+name: uvh-backup-e2e
+
+x-postgres-image: &postgres-image
+  image: postgres:16-alpine
+
+x-db-environment: &db-environment
+  PGHOST: postgres
+  PGUSER: uvh_backup
+  PGPASSWORD: uvh_backup_only
+  PGDATABASE: uvh_backup_test
+
+# The application reads DB_*; the scripts read PG_*. Keeping both explicit is
+# what lets one invocation target the isolated restore instance instead.
+x-app-db: &app-db
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_DATABASE: uvh_backup_test
+  DB_USERNAME: uvh_backup
+  DB_PASSWORD: uvh_backup_only
+
+services:
+  postgres:
+    <<: *postgres-image
+    environment:
+      POSTGRES_DB: uvh_backup_test
+      POSTGRES_USER: uvh_backup
+      POSTGRES_PASSWORD: uvh_backup_only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uvh_backup -d uvh_backup_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - backend
+
+  # An isolated instance. A restore is proven here before it is allowed to
+  # touch the instance the application is using.
+  restore-target:
+    <<: *postgres-image
+    environment:
+      POSTGRES_DB: uvh_restore_test
+      POSTGRES_USER: uvh_backup
+      POSTGRES_PASSWORD: uvh_backup_only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uvh_backup -d uvh_restore_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - backend
+
+  # Stands in for storage the deployment cannot rewrite at will.
+  backup-store:
+    <<: *postgres-image
+    command: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - backup-store:/backups
+    networks:
+      - backend
+
+  # A second, independent volume: losing the backups must not mean losing the
+  # key that decrypts them.
+  key-store:
+    <<: *postgres-image
+    command: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - backup-key:/run/secrets
+    networks:
+      - backend
+
+  alert-sink:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app:ro
+      - alert-state:/state
+    environment:
+      UVH_FIXTURE_STATE: /state/alert.json
+    ports:
+      - "127.0.0.1:${UVH_BACKUP_ALERT_PORT:-8093}:8080"
+    command: ["php", "-S", "0.0.0.0:8080", "tests/E2E/webhook-sink.php"]
+    networks:
+      - backend
+
+  # One container per operation. `run --rm` replaces the command, so the
+  # sleep keeps `up` happy without ever performing the work in place.
+  backup-runner:
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    command: ["sh", "-c", "while true; do sleep 3600; done"]
+    environment:
+      <<: *db-environment
+      BACKUP_DIR: /backups
+      BACKUP_KEY_FILE: /run/secrets/backup_key
+      ALERT_HOOK_URL: http://alert-sink:8080/hook
+    volumes:
+      - backup-store:/backups
+      - backup-key:/run/secrets
+      - ./docker/backup:/scripts:ro
+    networks:
+      - backend
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app
+    environment:
+      <<: *app-db
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_SECRET: uvh-backup-e2e-only-secret-never-use-outside-tests
+      APP_URL: http://127.0.0.1:8012
+      APP_HOST: 127.0.0.1
+      PUBLIC_HOST: 127.0.0.1
+      BCRYPT_ROUNDS: "4"
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+      MAIL_MAILER: array
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: warning
+    depends_on:
+      postgres:
+        condition: service_healthy
+      restore-target:
+        condition: service_healthy
+    command: ["sh", "-c", "while true; do sleep 3600; done"]
+    networks:
+      - backend
+
+volumes:
+  backup-store:
+  backup-key:
+  alert-state:
+
+networks:
+  backend:

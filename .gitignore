@@ -45,6 +45,9 @@ playwright-report/
 test-results/
 blob-report/
 
+# ── Backup drill evidence (generated) ────────────────────────
+backup-drill-evidence.json
+
 # ── Agent tooling (local) ───────────────────────────────────
 .agents/
 skills-lock.json

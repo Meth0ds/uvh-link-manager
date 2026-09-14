@@ -103,7 +103,12 @@ jobs:
         uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
         with:
           php-version: "8.4"
-          extensions: bcmath, curl, intl, mbstring, pdo_pgsql, pgsql, zip
+          # `redis` is listed because the production image requires it at boot.
+          # No Redis service is added here: these tests deliberately prove the
+          # behaviour of an unreachable backend (the rate limiter's fallback),
+          # so a live one would remove what they assert. The stack that runs on a
+          # real Redis is the asynchronous contract job below.
+          extensions: bcmath, curl, intl, mbstring, pdo_pgsql, pgsql, redis, zip
           coverage: none
           tools: composer:v2
 
@@ -226,3 +231,93 @@ jobs:
             frontend/test-results-release
           if-no-files-found: ignore
           retention-days: 7
+
+  boot-contract:
+    name: Runtime / production boot contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      # This gate builds the production PHP image and boots it with
+      # APP_ENV=production, then asserts that each broken production invariant
+      # stops the container with a diagnosable error. It deliberately stays out of
+      # the browser smoke, which runs with APP_ENV=testing and therefore never
+      # enters the production startup branch at all.
+      - name: Boot the production image and assert the startup contract
+        working-directory: frontend
+        run: npm run release:boot
+
+  async-e2e:
+    name: Runtime / asynchronous queue contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      # The browser suite stops at the HTTP response, so anything a request
+      # puts on a queue stays unverified there and the suite would pass with
+      # every worker stopped. This gate runs one worker per queue class, the
+      # scheduler and deterministic providers, and follows mail, webhooks,
+      # analytics, exports and custom domains to their final durable state.
+      - name: Drive the real workers and scheduler end to end
+        working-directory: frontend
+        run: npm run e2e:async
+
+      - name: Preserve container logs on failure
+        if: failure()
+        run: docker compose -p uvh-async-e2e -f docker-compose.async-e2e.yml logs --no-color --tail 400
+
+  backup-drills:
+    name: Runtime / backup and restore drills
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      # Destroys a database on purpose, refuses a corrupted copy, restores the
+      # encrypted backup into an isolated instance and measures the RPO/RTO
+      # that were actually achieved instead of the interval somebody planned.
+      - name: Back up, destroy, restore and verify
+        working-directory: frontend
+        run: npm run e2e:backup
+
+      - name: Preserve the measured drill evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backup-drill-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backup-drill-evidence.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Preserve container logs on failure
+        if: failure()
+        run: docker compose -p uvh-backup-e2e -f docker-compose.backup-e2e.yml logs --no-color --tail 400

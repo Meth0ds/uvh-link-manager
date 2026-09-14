@@ -87,11 +87,45 @@ contenedores, la red y los volúmenes efímeros.
 27. Estado público sin feed: HTTP 503 y estado desconocido tras carga/actualización,
     con navegación por teclado, reflow móvil y Axe.
 
+## Pila asíncrona y continuidad
+
+Por encima de la suite de navegador hay dos puertas que no miran pantallas:
+
+- `npm run e2e:async` levanta la topología real de colas —un worker por clase
+  (`mail`, `webhooks`, `domains`, `exports`, `analytics`, `default`) más el
+  scheduler— contra proveedores deterministas (SMTP, receptor de webhooks y
+  resolutor DNS propios) y sigue cada cadena hasta su estado final: registro →
+  outbox → worker → aceptación SMTP → enlace utilizable; evento → entrega → 500
+  → reintento programado por el scheduler → 200 → cuerpo firmado y entregado;
+  302 → evento de clic → rollup; exportación → artefacto cifrado → descarga →
+  consumo y retirada; dominio → TXT y CNAME controlados → transición de estado.
+  El fallo del proveedor y su reintento se comprueban de verdad: el primer
+  intento se rechaza a propósito y el segundo debe conservar el mismo
+  `event_id` y superar la verificación HMAC de la firma.
+
+  La pila corre sobre **Redis** (`CACHE_STORE=redis`, `QUEUE_CONNECTION=redis`),
+  el mismo broker que producción, así que las cadenas no se acreditan en un store
+  que el despliegue ya no usa. Además de las cinco cadenas, cubre dos propiedades
+  que sólo existen con un broker separado: pausar el worker y comprobar que la
+  profundidad **ve** el trabajo pendiente (con la lectura de la tabla `jobs`
+  habría publicado un cero), y perder el contenido del broker
+  (`broker-flush`) comprobando que la fila de `mail_outbox` sigue siendo la
+  verdad y que el reconciliador de housekeeping la republica hasta la entrega.
+- `npm run e2e:backup` destruye una base a propósito, restaura la copia cifrada
+  en una instancia aislada, compara la huella del contenido, rechaza una copia
+  manipulada y mide el RPO/RTO logrados. Detalles en `backup-and-restore.md`.
+
+La suite de navegador **no consume la cola**: cualquier trabajo que encola una
+petición se queda sin procesar allí, de modo que seguiría en verde con todos los
+workers parados. Esa laguna es la que cubren estas dos puertas.
+
 ## Qué no acredita
 
 La suite no convierte el proyecto en listo para producción. Siguen requiriendo
 evidencia separada el navegador y dispositivo reales adicionales, accesibilidad
 manual, DNS/TLS, proxy y cookies de producción, correo y webhooks externos,
-concurrencia multiproceso fuera de las carreras concretas ya cubiertas,
-backups/restauración, observabilidad y revisión legal. Consulta
+concurrencia multiproceso fuera de las carreras y cadenas ya cubiertas, el
+cableado de backups, alertas y observabilidad al entorno real (gestor de
+secretos, almacenamiento independiente, servicio de guardia) y la revisión
+legal. Consulta
 `production-readiness.md` para el inventario completo.

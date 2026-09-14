@@ -29,6 +29,13 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
+      # Deliberately `testing`: this stack proves the browser journeys and the
+      # proxy contracts, not the production startup branch. Keeping it in
+      # production mode would mean publishing Caddy on 443 (APP_URL must be the
+      # exact HTTPS origin of APP_HOST) and switching the captcha surface to the
+      # public sitekey, which would make CI depend on live hCaptcha. The
+      # production startup contract has its own stack:
+      # docker-compose.release-boot.yml.
       APP_ENV: testing
       APP_DEBUG: "false"
       APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
@@ -57,6 +64,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Note: wrapping the start command in a shell is exactly why the entrypoint's
+    # production branch never runs here. It decides by $1, and `sh` never matches
+    # `php-fpm`, so `uvh:release-check` is skipped without any visible symptom.
+    # That is harmless while APP_ENV=testing and is asserted by the release-boot
+    # contract, which keeps the image CMD intact.
     command:
       - sh
       - -lc
