@@ -30,9 +30,21 @@ final class UvhHealthcheck extends Command
                 return self::FAILURE;
             }
             if ($component === 'app') {
+                // Probe the store this process actually promises to serve
+                // traffic on: the rate limiter's store when one is configured.
+                // Production points that store at a failover chain (Redis, then
+                // PostgreSQL), so a Redis outage the application is designed to
+                // ride out must not take the container out of rotation and turn
+                // a degraded public surface into no public surface at all.
+                //
+                // The degradation is not hidden by this: every actual fallback
+                // is counted as `cache.failed_over`, and a deployment that runs
+                // without a fallback store still fails this probe when its only
+                // store is gone, which is the honest answer for it.
+                $limiterStore = config('cache.limiter');
+                $store = Cache::store(is_string($limiterStore) && $limiterStore !== '' ? $limiterStore : null);
                 $probe = 'uvh:health:probe:'.bin2hex(random_bytes(12));
-                Cache::put($probe, 'ok', 30);
-                $healthy = hash_equals('ok', (string) Cache::pull($probe));
+                $healthy = $store->put($probe, 'ok', 30) && hash_equals('ok', (string) $store->pull($probe));
 
                 return $healthy ? self::SUCCESS : self::FAILURE;
             }

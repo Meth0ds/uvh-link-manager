@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Support\OperationalMetrics;
 use App\Support\ProductionSecurity;
 use App\Support\UvhRequest;
+use Illuminate\Cache\Events\CacheFailedOver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -22,6 +24,15 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->assertProductionSecurityConfiguration();
+
+        // Rate limiting counts its attempts on the configured limiter store,
+        // which production points at a failover store (Redis, then PostgreSQL).
+        // Degrading keeps public redirects served during a Redis outage, but a
+        // silent degradation would hide a failing dependency, so every actual
+        // fallback is counted and exported as a time series.
+        Event::listen(CacheFailedOver::class, function (): void {
+            OperationalMetrics::increment('cache.failed_over');
+        });
 
         // A throttled shared heartbeat proves that a real queue worker is
         // looping, even when the queue is empty. It contains no job payload or
@@ -344,6 +355,9 @@ class AppServiceProvider extends ServiceProvider
             'db_username' => config('database.connections.pgsql.username'),
             'db_password' => config('database.connections.pgsql.password'),
             'cache_store' => config('cache.default'),
+            'cache_limiter_driver' => self::cacheStoreDriver(config('cache.limiter')),
+            'cache_failover_drivers' => self::cacheStoreDrivers(config('cache.stores.failover.stores')),
+            'redis_connections' => self::redisConnectionsInUse(),
             'queue_connection' => config('queue.default'),
             'queue_retry_after' => config('queue.connections.'.config('queue.default').'.retry_after'),
             'queue_failed_driver' => config('queue.failed.driver'),
@@ -378,5 +392,80 @@ class AppServiceProvider extends ServiceProvider
         if ($errors !== []) {
             throw new \RuntimeException('Configuración de seguridad de producción inválida: '.implode('; ', $errors));
         }
+    }
+
+    /** Driver of a named cache store, or null when the store is not defined. */
+    private static function cacheStoreDriver(mixed $store): ?string
+    {
+        if (! is_string($store) || $store === '') {
+            return null;
+        }
+
+        $driver = config('cache.stores.'.$store.'.driver');
+
+        return is_string($driver) ? $driver : null;
+    }
+
+    /** @return list<string> */
+    private static function cacheStoreDrivers(mixed $stores): array
+    {
+        if (! is_array($stores)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(self::cacheStoreDriver(...), $stores)));
+    }
+
+    /**
+     * Redis connections this deployment actually reads.
+     *
+     * A store only counts when it is in use: the default cache store, the rate
+     * limiter store (including the members of a failover store, because the
+     * limiter really does contact the first one) and the queue connection.
+     * Anything else is configuration the running deployment never opens.
+     *
+     * @return list<array{host: string, url: string, password: string}>
+     */
+    private static function redisConnectionsInUse(): array
+    {
+        $stores = array_merge(
+            [(string) config('cache.default')],
+            is_string(config('cache.limiter')) ? [(string) config('cache.limiter')] : [],
+            is_array(config('cache.stores.failover.stores')) ? config('cache.stores.failover.stores') : [],
+        );
+
+        $names = [];
+        foreach ($stores as $store) {
+            if (! is_string($store) || self::cacheStoreDriver($store) !== 'redis') {
+                continue;
+            }
+            $names[self::redisConnectionName(config('cache.stores.'.$store.'.connection'))] = true;
+        }
+
+        if ((string) config('queue.default') === 'redis') {
+            $names[self::redisConnectionName(config('queue.connections.redis.connection'))] = true;
+        }
+
+        $connections = [];
+        foreach (array_keys($names) as $name) {
+            $connection = config('database.redis.'.$name);
+            if (! is_array($connection)) {
+                continue;
+            }
+            $connections[] = [
+                'host' => (string) ($connection['host'] ?? ''),
+                'url' => (string) ($connection['url'] ?? ''),
+                'password' => (string) ($connection['password'] ?? ''),
+            ];
+        }
+
+        return $connections;
+    }
+
+    private static function redisConnectionName(mixed $name): string
+    {
+        $name = is_string($name) ? trim($name) : '';
+
+        return $name === '' ? 'default' : $name;
     }
 }

@@ -11,12 +11,17 @@ RUN APP_ENV=local \
 
 FROM php:8.4-fpm-bookworm
 
+# phpredis is not bundled with PHP, so it is compiled here. The build
+# toolchain ($PHPIZE_DEPS) is purged in the same layer: the runtime image must
+# not carry a compiler. The last step fails the build rather than the container
+# start if the extension did not land, because production requires it.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libcurl4-openssl-dev \
         libicu-dev \
         libonig-dev \
         libpq-dev \
         libzip-dev \
+        $PHPIZE_DEPS \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
         curl \
@@ -27,7 +32,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         pdo_pgsql \
         pgsql \
         zip \
-    && rm -rf /var/lib/apt/lists/*
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && pecl clear-cache \
+    && apt-get purge -y --auto-remove $PHPIZE_DEPS \
+    && php -r 'exit(extension_loaded("redis") ? 0 : 1);' \
+    && rm -rf /var/lib/apt/lists/* /tmp/pear
 
 WORKDIR /var/www/html
 COPY --from=vendor --chown=www-data:www-data /build ./

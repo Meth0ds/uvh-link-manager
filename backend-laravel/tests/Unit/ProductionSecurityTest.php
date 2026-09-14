@@ -55,6 +55,96 @@ class ProductionSecurityTest extends TestCase
         $this->assertContains('QUEUE_CONNECTION debe usar una cola persistente en producción', $errors);
     }
 
+    public function test_redis_must_be_shared_and_authenticated(): void
+    {
+        $settings = $this->validSettings();
+        $settings['cache_store'] = 'redis';
+        $settings['queue_connection'] = 'redis';
+        $settings['redis_connections'] = [[
+            'host' => '127.0.0.1',
+            'url' => '',
+            'password' => 'change-me-please',
+        ]];
+
+        $errors = ProductionSecurity::errors($settings);
+
+        // A loopback endpoint would give every process its own view of rate
+        // limits and locks, which is the opposite of what a shared store is for.
+        $this->assertContains('REDIS_HOST debe apuntar a un host compartido entre procesos, no a loopback, en producción', $errors);
+        $this->assertContains('REDIS_PASSWORD debe ser un secreto concreto y robusto en producción', $errors);
+    }
+
+    public function test_a_shared_authenticated_redis_is_accepted(): void
+    {
+        $settings = $this->validSettings();
+        $settings['cache_store'] = 'redis';
+        $settings['queue_connection'] = 'redis';
+        $settings['redis_connections'] = [[
+            'host' => 'redis',
+            'url' => '',
+            'password' => 'kR7mQ2xP9sL4tW8bZ3cN6vD1fG5hJ0aY',
+        ]];
+
+        $this->assertSame([], ProductionSecurity::errors($settings));
+    }
+
+    public function test_a_redis_url_with_the_wrong_scheme_is_rejected(): void
+    {
+        $settings = $this->validSettings();
+        $settings['cache_store'] = 'redis';
+        $settings['redis_connections'] = [[
+            'host' => '',
+            'url' => 'http://cache.internal:6379',
+            'password' => 'kR7mQ2xP9sL4tW8bZ3cN6vD1fG5hJ0aY',
+        ]];
+
+        $this->assertContains(
+            'REDIS_URL debe usar el esquema redis:// o rediss:// en producción',
+            ProductionSecurity::errors($settings),
+        );
+    }
+
+    public function test_rate_limiting_must_count_where_every_process_can_see_it(): void
+    {
+        $settings = $this->validSettings();
+        $settings['cache_limiter_driver'] = 'array';
+        $this->assertContains(
+            'CACHE_LIMITER debe usar uno o más stores compartidos entre procesos en producción',
+            ProductionSecurity::errors($settings),
+        );
+
+        // A failover store is legitimate because every member is shared; one
+        // that falls back to a per-process store is not, because the fallback
+        // would stop limiting the moment it is used.
+        $settings['cache_limiter_driver'] = 'failover';
+        $settings['cache_failover_drivers'] = ['array'];
+        $this->assertContains(
+            'CACHE_LIMITER debe usar uno o más stores compartidos entre procesos en producción',
+            ProductionSecurity::errors($settings),
+        );
+
+        $settings['cache_failover_drivers'] = ['redis', 'database'];
+        $this->assertSame([], ProductionSecurity::errors($settings));
+    }
+
+    public function test_the_redis_queue_retry_window_is_a_release_gate(): void
+    {
+        // The Redis driver does not inherit DB_QUEUE_RETRY_AFTER, so switching
+        // brokers without setting REDIS_QUEUE_RETRY_AFTER leaves the framework
+        // default of 90 seconds. Accepting it would let a worker pick up a job
+        // that another worker is still running, so it must stop the boot.
+        $settings = $this->validSettings();
+        $settings['queue_connection'] = 'redis';
+        $settings['queue_retry_after'] = 90;
+        $this->assertContains(
+            'El retry_after de la cola debe estar entre 200 y 3600 segundos para superar el timeout máximo de los workers',
+            ProductionSecurity::errors($settings),
+        );
+
+        $settings['queue_retry_after'] = 240;
+        $this->assertSame([], ProductionSecurity::errors($settings));
+    }
+
     #[DataProvider('unsafeAppUrlProvider')]
     public function test_app_url_must_be_the_exact_https_origin(string $url): void
     {

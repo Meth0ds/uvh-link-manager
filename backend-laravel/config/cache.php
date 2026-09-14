@@ -19,6 +19,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rate Limiter Cache Store
+    |--------------------------------------------------------------------------
+    |
+    | Laravel resolves the rate limiter with this store, so every throttle
+    | middleware counts its attempts here. It is separate from the default
+    | store because throttling is the one cache consumer that must keep working
+    | when Redis is unavailable: the public redirect surface is guarded by it.
+    | Production points this at the failover store. Leaving it empty keeps the
+    | default store, which is what every non-Redis environment uses.
+    |
+    */
+
+    'limiter' => env('CACHE_LIMITER'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |
@@ -97,12 +113,18 @@ return [
             'driver' => 'octane',
         ],
 
+        // Counting attempts on a second backend keeps public traffic served
+        // while the first backend is down. Locks deliberately do NOT run on a
+        // failover store: a lock needs one owner, and moving it silently to
+        // another backend would let two processes believe they hold it. The
+        // members are configurable so a deployment can order them as it likes;
+        // the default assumes Redis is the fast path and PostgreSQL the net.
         'failover' => [
             'driver' => 'failover',
-            'stores' => [
-                'database',
-                'array',
-            ],
+            'stores' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env('CACHE_FAILOVER_STORES', 'redis,database')),
+            ))),
         ],
 
     ],

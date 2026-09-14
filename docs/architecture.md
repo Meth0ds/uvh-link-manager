@@ -20,7 +20,7 @@ UVH es una plataforma de acortamiento, administración y analítica de enlaces c
 | Capa          | Tecnología                                                                                              |
 | ------------- | ------------------------------------------------------------------------------------------------------- |
 | Frontend      | Angular 22, TypeScript estricto, Angular Material + CDK, Signals, componentes standalone, lazy loading  |
-| Backend       | Laravel 13 (PHP 8.4), Eloquent/Query Builder, cola `database`, scheduler                                |
+| Backend       | Laravel 13 (PHP 8.4), Eloquent/Query Builder, colas en Redis, scheduler                                 |
 | Base de datos | PostgreSQL 16 (local vía Docker Compose), transacciones con `lockForUpdate` para carreras               |
 | Email         | Resend (transaccional: verificación y recuperación)                                                     |
 | QR            | Generación local con `qrcode` (PNG), sin llamadas externas ni visita al destino                         |
@@ -75,7 +75,9 @@ GET uvh.es/{alias} (o dominio personalizado)
   → emitir click_event de forma asíncrona (la respuesta no espera a la analítica pesada)
 ```
 
-La redirección **no visita** el destino. El clic se registra con `UPDATE ... WHERE` atómico para `single_use` y `max_clicks`, de modo que dos peticiones simultáneas solo consumen una (testeado con concurrencia real en `backend-laravel/tests/Feature/ApiParityTest.php`).
+La redirección **no visita** el destino. El clic se registra con `UPDATE ... WHERE` atómico para `single_use` y `max_clicks`, de modo que dos peticiones simultáneas solo consumen una. La prueba es `backend-laravel/tests/Feature/RedirectConcurrencyTest.php`: procesos reales liberados desde una barrera común, con una aserción que falla si no llegan a solaparse. (Una versión anterior de este documento atribuía esa cobertura a `ApiParityTest`, que solo comprueba la forma del payload.)
+
+Un enlace **sin** límites no toma bloqueo exclusivo: lee bajo `SELECT ... FOR SHARE` y suma su contador en una sentencia propia fuera de la transacción, de modo que los redirects del mismo alias no se bloquean entre sí. El reparto y sus límites están en `docs/redirect-and-webhook-availability-policy.md`.
 
 ## 5. Modelo de datos
 
@@ -98,6 +100,33 @@ Las fechas se almacenan siempre en UTC (ISO 8601). La zona horaria solo se aplic
 - **Nunca** `localStorage`/`sessionStorage` para credenciales o tokens (solo se usa `localStorage` para preferencias no sensibles: workspace seleccionado y tema).
 - **Autorización 100% en backend** con comprobación de pertenencia al workspace y rol (`WorkspaceAccess`). Los guards de Angular son solo UX; nunca son una frontera de seguridad.
 - Los endpoints administrativos exigen `is_admin` + MFA activado (`uvh.mfa`).
+
+## 6.b Almacenes de estado
+
+Dos almacenes, con responsabilidades que no se solapan:
+
+| Almacén | Qué guarda | Por qué ahí |
+|---|---|---|
+| PostgreSQL | Fuente de verdad: cuentas, enlaces, dominios, auditoría, `mail_outbox`, `webhook_deliveries`, `data_export_requests`, `failed_jobs` y las sesiones propias (`uvh_sessions`) | Necesita transacciones, integridad referencial y restauración con RPO/RTO medibles |
+| Redis | Caché de aplicación, rate limits, locks distribuidos y las colas (`mail`, `webhooks`, `domains`, `exports`, `analytics`, `default`) | Es el estado efímero que comparten procesos: PHP-FPM, un worker por cola y el scheduler. No sobrevive como verdad: lo que importa se reconstruye desde PostgreSQL |
+
+El camino de un redirect público (la operación más frecuente del producto) sólo
+toca PostgreSQL para leer el enlace y actualizar su contador. Antes, el throttle
+`uvh-resolve` contaba cada intento en la tabla `cache`, con un `SELECT ... FOR
+UPDATE` por petición y por IP; con el limiter en Redis esa escritura desaparece
+del camino crítico.
+
+Las sesiones **no** se mueven a Redis a propósito. La sesión propia es la fuente
+de verdad de la revocación inmediata: cerrar sesión o revocar accesos debe
+efectarse en el mismo sitio que los consulta, sin caché intermedia. Además el
+stack de sesión de Laravel está desactivado (`bootstrap/app.php` retira
+`StartSession`), así que `SESSION_DRIVER` no interviene.
+
+El rate limiter tiene su propio store (`CACHE_LIMITER`) porque es el único
+consumidor de caché que no puede caer con su backend: apunta a un store
+`failover` (Redis y, si no responde, PostgreSQL). Se degrada con una métrica
+(`cache.failed_over`), no en silencio. Los locks no usan ese store: mover un
+lock a otro backend permitiría que dos procesos lo creyeran suyo.
 
 ## 7. Trabajos programados (scheduler)
 

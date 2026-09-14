@@ -21,7 +21,7 @@ load_secret_file() {
 }
 
 for secret_name in \
-    APP_KEY APP_SECRET APP_SECRET_PREVIOUS DB_PASSWORD HCAPTCHA_SECRET HCAPTCHA_PUBLIC_SECRET \
+    APP_KEY APP_SECRET APP_SECRET_PREVIOUS DB_PASSWORD REDIS_PASSWORD HCAPTCHA_SECRET HCAPTCHA_PUBLIC_SECRET \
     RESEND_API_KEY EDGE_ASK_SECRET METRICS_BEARER_TOKEN
 do
     load_secret_file "$secret_name"
@@ -30,7 +30,7 @@ unset secret_name secret_file
 
 # Fail before framework boot if a custom/rebuilt image omitted a runtime
 # capability on which authentication, SSRF controls or PostgreSQL depend.
-php -r '$required=["curl","intl","mbstring","openssl","pcntl","pdo_pgsql"]; $missing=array_values(array_filter($required, fn($ext) => !extension_loaded($ext))); if ($missing !== []) { fwrite(STDERR, "Missing required PHP extensions: ".implode(",", $missing).PHP_EOL); exit(1); }'
+php -r '$required=["curl","intl","mbstring","openssl","pcntl","pdo_pgsql","redis"]; $missing=array_values(array_filter($required, fn($ext) => !extension_loaded($ext))); if ($missing !== []) { fwrite(STDERR, "Missing required PHP extensions: ".implode(",", $missing).PHP_EOL); exit(1); }'
 
 # Build configuration from runtime secrets on every fresh container. The
 # command boots the application, so ProductionSecurity aborts startup before a

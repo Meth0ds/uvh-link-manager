@@ -12,17 +12,39 @@ x-php-service: &php-service
     APP_SECRET_FILE: /run/secrets/uvh_app_secret
     DB_PASSWORD_FILE: /run/secrets/uvh_db_password
     DB_SSLROOTCERT: /run/secrets/uvh_db_ca
+    REDIS_PASSWORD_FILE: /run/secrets/uvh_redis_password
     HCAPTCHA_SECRET_FILE: /run/secrets/uvh_hcaptcha_secret
     HCAPTCHA_PUBLIC_SECRET_FILE: /run/secrets/uvh_hcaptcha_public_secret
     RESEND_API_KEY_FILE: /run/secrets/uvh_resend_api_key
     EDGE_ASK_SECRET_FILE: /run/secrets/uvh_edge_ask_secret
     METRICS_BEARER_TOKEN_FILE: /run/secrets/uvh_metrics_token
     EDGE_INTERNAL_CIDRS: ${UVH_INTERNAL_SUBNET:-172.29.0.0/24}
+    # This file declares the Redis service and requires its password secret, so
+    # it also pins the settings that consume it. `environment` wins over
+    # `env_file`, which keeps a deployer's env file left at the template values
+    # from silently pointing cache, rate limits, locks and queues back at
+    # PostgreSQL while the Redis service sits unused — a topology whose boot
+    # contract would then never be the one exercised by `npm run release:boot`.
+    CACHE_STORE: redis
+    CACHE_LIMITER: failover
+    CACHE_FAILOVER_STORES: redis,database
+    QUEUE_CONNECTION: redis
+    REDIS_CLIENT: phpredis
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    REDIS_DB: "0"
+    REDIS_CACHE_DB: "1"
+    # The Redis queue driver does not inherit DB_QUEUE_RETRY_AFTER, and the
+    # framework default (90 s) is below the longest worker timeout in this file
+    # (180 s). A worker would then be able to claim a job another one is still
+    # running, so the value is stated here rather than left to a default.
+    REDIS_QUEUE_RETRY_AFTER: "240"
   secrets:
     - uvh_app_key
     - uvh_app_secret
     - uvh_db_password
     - uvh_db_ca
+    - uvh_redis_password
     - uvh_hcaptcha_secret
     - uvh_hcaptcha_public_secret
     - uvh_resend_api_key
@@ -39,6 +61,13 @@ x-php-service: &php-service
     - /tmp:size=32m,noexec,nosuid,nodev,mode=1777
   networks:
     - uvh-internal
+  # Cache, rate limits, locks and the queues live in Redis. Waiting for its
+  # health here keeps workers from crash-looping through the first seconds of a
+  # deployment without changing the product: a Redis that goes down later is
+  # handled by the limiter's failover store and by failing locks closed.
+  depends_on:
+    redis:
+      condition: service_healthy
 
 # Each queue class has an independent worker and heartbeat. Long exports or
 # DNS/TLS calls therefore cannot starve account mail or webhook delivery.
@@ -118,6 +147,43 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
+
+  # Cache, rate limits, distributed locks and the queues.
+  #
+  # No published port: only this deployment talks to it, and Redis has no
+  # authorization model beyond its password. `appendonly yes` keeps queued work
+  # across a restart. `maxmemory-policy noeviction` is deliberate — an eviction
+  # would silently drop a queued job or release a lock that is still held, so
+  # Redis refuses the write instead and the operator is alerted by the
+  # `CacheFailedOver`/error signal rather than by lost work.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --appendonly yes
+        --appendfsync everysec
+        --maxmemory-policy noeviction
+        --requirepass "$$(cat /run/secrets/uvh_redis_password)"
+    secrets:
+      - uvh_redis_password
+    volumes:
+      - uvh-redis-data:/data
+    healthcheck:
+      # The client must authenticate, so this also verifies the secret the
+      # application will use is the one the server accepts.
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/uvh_redis_password)\" ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - uvh-internal
 
   nginx:
     build:
@@ -201,6 +267,7 @@ services:
 
 volumes:
   uvh-storage:
+  uvh-redis-data:
   uvh-caddy-data:
   uvh-caddy-config:
 
@@ -223,6 +290,10 @@ secrets:
     file: ${UVH_EDGE_ASK_SECRET_FILE:?Define UVH_EDGE_ASK_SECRET_FILE}
   uvh_metrics_token:
     file: ${UVH_METRICS_TOKEN_FILE:?Define UVH_METRICS_TOKEN_FILE}
+  # Authenticates every client of the internal Redis. Generate it like the
+  # other secrets: 32+ random bytes, stored outside the repository.
+  uvh_redis_password:
+    file: ${UVH_REDIS_PASSWORD_FILE:?Define UVH_REDIS_PASSWORD_FILE}
 
 networks:
   uvh-internal:

@@ -7,6 +7,22 @@ use Illuminate\Encryption\Encrypter;
 final class ProductionSecurity
 {
     /**
+     * Stores whose contents are visible to every process. A rate limit or a
+     * lock counted in one that is not shared only protects the process that
+     * wrote it, which is indistinguishable from having no limit at all.
+     */
+    private const SHARED_CACHE_STORES = ['database', 'redis', 'memcached', 'dynamodb'];
+
+    /**
+     * Hosts that only ever serve the process they run in. Redis exists here to
+     * be shared: a production deployment always runs more than one process
+     * (PHP-FPM plus one worker per queue class plus the scheduler), so a
+     * loopback endpoint would silently give each of them its own view of rate
+     * limits and locks.
+     */
+    private const LOOPBACK_REDIS_HOSTS = ['127.0.0.1', 'localhost', '::1', '0.0.0.0'];
+
+    /**
      * Validate invariants that must hold before a production worker serves a
      * request. Values are passed explicitly so the rules remain unit-testable
      * and work with Laravel's config cache.
@@ -155,8 +171,14 @@ final class ProductionSecurity
         )) {
             $errors[] = 'Las credenciales de PostgreSQL deben ser concretas y la contraseña debe ser robusta';
         }
-        if (! in_array((string) ($settings['cache_store'] ?? ''), ['database', 'redis', 'memcached', 'dynamodb'], true)) {
+        if (! in_array((string) ($settings['cache_store'] ?? ''), self::SHARED_CACHE_STORES, true)) {
             $errors[] = 'CACHE_STORE debe ser compartido entre procesos en producción';
+        }
+        if (! self::validLimiterStore($settings)) {
+            $errors[] = 'CACHE_LIMITER debe usar uno o más stores compartidos entre procesos en producción';
+        }
+        foreach (self::redisErrors($settings) as $redisError) {
+            $errors[] = $redisError;
         }
         if (in_array((string) ($settings['queue_connection'] ?? ''), ['', 'sync', 'null', 'background', 'deferred', 'failover'], true)) {
             $errors[] = 'QUEUE_CONNECTION debe usar una cola persistente en producción';
@@ -233,6 +255,99 @@ final class ProductionSecurity
         }
 
         return $errors;
+    }
+
+    /**
+     * The rate limiter must count attempts where every process can see them.
+     * A failover store is allowed because each of its members is shared, which
+     * is what keeps public throttling working while the first backend is down.
+     *
+     * @param  array<string, mixed>  $settings
+     */
+    private static function validLimiterStore(array $settings): bool
+    {
+        $driver = $settings['cache_limiter_driver'] ?? null;
+        if (! is_string($driver) || $driver === '') {
+            // No dedicated store: the limiter inherits cache.default, which the
+            // rule above already requires to be shared.
+            return true;
+        }
+
+        if ($driver !== 'failover') {
+            return in_array($driver, self::SHARED_CACHE_STORES, true);
+        }
+
+        $members = $settings['cache_failover_drivers'] ?? [];
+        if (! is_array($members) || $members === []) {
+            return false;
+        }
+        foreach ($members as $member) {
+            if (! in_array((string) $member, self::SHARED_CACHE_STORES, true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Errors for the Redis connections this deployment actually reads.
+     *
+     * Only connections in use are checked: a deployment running Memcached must
+     * not be rejected by an unrelated Redis setting it never contacts. The
+     * remaining errors are the ones an operator has to fix, and they complete
+     * to at most one per rule because the settings they name are shared across
+     * connections — reporting the same broken REDIS_HOST once per connection
+     * would dilute the message without adding anything to act on.
+     *
+     * @param  array<string, mixed>  $settings
+     * @return list<string>
+     */
+    private static function redisErrors(array $settings): array
+    {
+        $connections = $settings['redis_connections'] ?? [];
+        if (! is_array($connections)) {
+            return [];
+        }
+
+        $errors = [];
+        foreach ($connections as $connection) {
+            if (! is_array($connection)) {
+                continue;
+            }
+
+            $host = strtolower(trim((string) ($connection['host'] ?? ''), '[]'));
+            $url = trim((string) ($connection['url'] ?? ''));
+            if ($url !== '') {
+                $parts = parse_url($url);
+                if (! is_array($parts)
+                    || ! in_array(strtolower((string) ($parts['scheme'] ?? '')), ['redis', 'rediss'], true)) {
+                    $errors[] = 'REDIS_URL debe usar el esquema redis:// o rediss:// en producción';
+
+                    continue;
+                }
+                $host = strtolower(trim((string) ($parts['host'] ?? ''), '[]'));
+            }
+
+            if ($host === '' || in_array($host, self::LOOPBACK_REDIS_HOSTS, true)) {
+                $errors[] = 'REDIS_HOST debe apuntar a un host compartido entre procesos, no a loopback, en producción';
+            }
+
+            if (! self::validRedisPassword((string) ($connection['password'] ?? ''))) {
+                $errors[] = 'REDIS_PASSWORD debe ser un secreto concreto y robusto en producción';
+            }
+        }
+
+        return array_values(array_unique($errors));
+    }
+
+    private static function validRedisPassword(string $password): bool
+    {
+        if (strlen($password) < 16 || strlen($password) > 512 || preg_match('/[\x00-\x20\x7f]/', $password) === 1) {
+            return false;
+        }
+
+        return preg_match('/(?:change.?me|example|password|local-only)/i', $password) !== 1;
     }
 
     /** @param array<string, mixed> $settings */

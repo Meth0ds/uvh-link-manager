@@ -15,6 +15,7 @@ use App\Support\MailTransportPolicy;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\ProductionSecurity;
+use App\Support\QueueBacklog;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Carbon\Carbon;
@@ -833,8 +834,19 @@ class AdminController
             ),
         ];
 
-        $jobCount = DB::table('jobs')->count();
-        $oldestJob = DB::table('jobs')->min('created_at');
+        // Depth and age are asked of the configured broker, not of the `jobs`
+        // table: that table is only populated by the database driver, so with
+        // Redis as the broker the panel would have reported an empty queue
+        // forever. The oldest job overall is the maximum of the per-pool ages.
+        $jobCount = 0;
+        $oldestJobAge = null;
+        foreach (QueueBacklog::pools() as $queueName) {
+            $jobCount += QueueBacklog::pending($queueName) ?? 0;
+            $poolAge = QueueBacklog::oldestAgeSeconds($queueName);
+            if ($poolAge !== null) {
+                $oldestJobAge = max($oldestJobAge ?? 0, $poolAge);
+            }
+        }
         $failedJobs = DB::table('failed_jobs')->count();
         // The same bounded-cardinality counters exported to Prometheus are
         // surfaced here so an operator can diagnose the last hour even before
@@ -953,7 +965,7 @@ class AdminController
             'checks' => $checks,
             'metrics' => [
                 'pendingJobs' => $jobCount,
-                'oldestJobAgeSeconds' => $oldestJob !== null ? max(0, time() - (int) $oldestJob) : null,
+                'oldestJobAgeSeconds' => $oldestJobAge,
                 'failedJobs' => $failedJobs,
                 'webhookDeliveries' => $deliveryCounts,
                 'oldestPendingWebhookAgeSeconds' => $oldestPendingWebhookAge,

@@ -51,6 +51,14 @@ final class OperationalMetrics
         'webhook.admission_failed',
         'housekeeping.stage_failed',
         'lock.unavailable',
+        // Rate limiting counts on Redis first and falls back to PostgreSQL when
+        // it is unreachable, so public traffic keeps being served. The fallback
+        // is recorded because a silent one would hide a failing dependency.
+        'cache.failed_over',
+        // Queue depth and age come from the configured driver. A failed read
+        // must be distinguishable from a genuinely empty queue, otherwise a
+        // monitoring gap looks like a healthy idle system.
+        'queue.metrics_unavailable',
     ];
 
     private static bool $reportingFailure = false;

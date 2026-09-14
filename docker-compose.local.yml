@@ -43,6 +43,23 @@ x-php-service: &php-service
       condition: service_healthy
 
 services:
+  # Paridad con producción, opcional. El desarrollo local usa la base de datos
+  # como store compartido por defecto (ver .env.example), así que este servicio
+  # sólo hace falta si quieres reproducir la ruta real: arranca `redis` y usa el
+  # bloque de Redis del .env con REDIS_HOST=redis (desde dentro del contenedor
+  # `127.0.0.1` es el propio contenedor de PHP, no este servicio).
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:${REDIS_PUBLISHED_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped

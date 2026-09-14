@@ -15,6 +15,32 @@ services:
       timeout: 3s
       retries: 30
 
+  # Cache, rate limits, locks and the queues. Ephemeral: the stack is rebuilt
+  # from scratch on every run, which is what keeps limiter state from leaking
+  # between specs now that it no longer lives in the database.
+  redis:
+    image: redis:7-alpine
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      UVH_REDIS_PASSWORD: uvh-e2e-only
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --appendonly no
+        --maxmemory-policy noeviction
+        --requirepass "$${UVH_REDIS_PASSWORD}"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$${UVH_REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
   hcaptcha:
     build:
       context: .
@@ -51,13 +77,26 @@ services:
       DB_USERNAME: uvh_e2e
       DB_PASSWORD: uvh_e2e_only
       BCRYPT_ROUNDS: "4"
-      CACHE_STORE: database
+      # Same broker and cache store as production, so no suite silently runs a
+      # store the deployment never uses.
+      CACHE_STORE: redis
+      CACHE_LIMITER: failover
+      CACHE_FAILOVER_STORES: redis,database
+      CACHE_PREFIX: uvh-e2e-cache-
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: uvh-e2e-only
+      REDIS_PREFIX: uvh-e2e-
+      REDIS_DB: "0"
+      REDIS_CACHE_DB: "1"
       SESSION_DRIVER: database
       SESSION_COOKIE: uvh_e2e_session
       SESSION_DOMAIN: ""
       COOKIE_DOMAIN: ""
       COOKIE_SECURE: "false"
-      QUEUE_CONNECTION: database
+      QUEUE_CONNECTION: redis
+      REDIS_QUEUE_RETRY_AFTER: "300"
       MAIL_MAILER: array
       HCAPTCHA_SITE_KEY: 10000000-ffff-ffff-ffff-000000000001
       HCAPTCHA_SECRET: uvh-e2e-hcaptcha-secret
@@ -73,6 +112,8 @@ services:
       PHP_CLI_SERVER_WORKERS: "4"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       hcaptcha:
         condition: service_started

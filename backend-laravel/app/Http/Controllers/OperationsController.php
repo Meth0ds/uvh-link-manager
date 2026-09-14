@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\OperationalMetrics;
+use App\Support\QueueBacklog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -31,10 +32,24 @@ final class OperationsController
             $lines[] = $name.' '.$total;
         }
 
-        $this->appendGauge($lines, 'uvh_queue_pending_jobs', DB::table('jobs')->count());
+        // Depth and age come from the configured broker: the database driver
+        // answers from the `jobs` table and Redis from its own structures.
+        // Reading `jobs` unconditionally would report an empty queue forever
+        // once the broker is Redis. The global series is the sum of the
+        // monitored pools, which are the only queues this deployment writes to.
+        $pendingByPool = [];
+        $oldestAgeByPool = [];
+        foreach (QueueBacklog::pools() as $pool => $queueName) {
+            // An unreadable sample is exported as zero but counted in
+            // `queue.metrics_unavailable`, so a monitoring gap cannot pass as a
+            // genuinely idle queue.
+            $pendingByPool[$pool] = QueueBacklog::pending($queueName) ?? 0;
+            $oldestAgeByPool[$pool] = QueueBacklog::oldestAgeSeconds($queueName);
+        }
+        $readableAges = array_values(array_filter($oldestAgeByPool, static fn (?int $age): bool => $age !== null));
+        $this->appendGauge($lines, 'uvh_queue_pending_jobs', array_sum($pendingByPool));
         $this->appendGauge($lines, 'uvh_queue_failed_jobs', DB::table('failed_jobs')->count());
-        $oldestJob = DB::table('jobs')->min('created_at');
-        $this->appendGauge($lines, 'uvh_queue_oldest_job_age_seconds', $oldestJob === null ? 0 : max(0, time() - (int) $oldestJob));
+        $this->appendGauge($lines, 'uvh_queue_oldest_job_age_seconds', $readableAges === [] ? 0 : min($readableAges));
         foreach (['pending', 'queued', 'processing', 'sent', 'failed', 'obsolete', 'comp_pending', 'compensating', 'compensated'] as $status) {
             $this->appendGauge($lines, 'uvh_mail_outbox_'.$status, DB::table('mail_outbox')->where('status', $status)->count());
         }
@@ -99,18 +114,11 @@ final class OperationsController
         $this->appendGauge($lines, 'uvh_privacy_requests_overdue', (clone $activePrivacy)
             ->whereRaw('COALESCE(extended_until, due_at) < NOW()')->count());
         $this->appendGauge($lines, 'uvh_queue_heartbeat_age_seconds', $this->heartbeatAge('queue'));
-        foreach (['mail', 'webhooks', 'domains', 'exports', 'analytics', 'legacy'] as $pool) {
-            $queueName = $pool === 'legacy' ? 'default' : $pool;
+        foreach (QueueBacklog::pools() as $pool => $queueName) {
             // Per-pool depth/age is what reveals starvation; a healthy generic
             // worker or a small total can otherwise hide one stalled class.
-            $poolJobs = DB::table('jobs')->where('queue', $queueName);
-            $oldestPoolJob = (clone $poolJobs)->min('created_at');
-            $this->appendGauge($lines, 'uvh_queue_'.$pool.'_pending_jobs', (clone $poolJobs)->count());
-            $this->appendGauge(
-                $lines,
-                'uvh_queue_'.$pool.'_oldest_job_age_seconds',
-                $oldestPoolJob === null ? 0 : max(0, time() - (int) $oldestPoolJob),
-            );
+            $this->appendGauge($lines, 'uvh_queue_'.$pool.'_pending_jobs', $pendingByPool[$pool]);
+            $this->appendGauge($lines, 'uvh_queue_'.$pool.'_oldest_job_age_seconds', $oldestAgeByPool[$pool] ?? 0);
             $this->appendGauge(
                 $lines,
                 'uvh_queue_'.$pool.'_heartbeat_age_seconds',
