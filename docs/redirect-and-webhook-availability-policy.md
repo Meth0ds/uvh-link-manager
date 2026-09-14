@@ -22,7 +22,25 @@ y la consola/métricas hacen visible la saturación.
 
 ## Reducción de contención aplicada
 
-- El enlace conserva el bloqueo exclusivo que protege cuotas y uso único.
+- El enlace **con límite** (`single_use` o `max_clicks`) conserva el bloqueo
+  exclusivo: ahí la admisión consume una cuota y tiene que serializarse.
+- El enlace **sin límite** ya no toma bloqueo exclusivo. Lee bajo
+  `SELECT ... FOR SHARE` y suma su contador en una sentencia atómica propia,
+  después de la transacción. Dos consecuencias, ambas deliberadas:
+  - los redirects del mismo alias dejan de bloquearse entre sí, que era el
+    cuello de botella de un alias viral;
+  - el contador sigue siendo exacto e inmediato (el producto no cambia),
+    porque nada autoritativo se decide en esa escritura.
+- El bloqueo compartido sigue ordenando las escrituras de estado (pausar,
+  bloquear, borrar) por detrás de los redirects ya admitidos, y PostgreSQL
+  encola a los lectores nuevos detrás de un escritor que espera, de modo que un
+  alias viral no puede dejar sin turno a un operador.
+- Si el enlace pasa a tener límite mientras se resuelve, la lectura sin bloqueo
+  no puede consumirlo: consumir bajo un bloqueo compartido obligaría a la
+  transacción a escalar su propio lock, y dos peticiones así pueden esperarse
+  mutuamente. La resolución se repite **una vez** bajo el bloqueo exclusivo, que
+  sólo puede esperar al lock ya elegido y por tanto no puede bloquearse. El
+  bucle está acotado a dos pasadas y nunca encadena reintentos.
 - La comprobación de dominio en la ruta de redirección ya no toma un bloqueo
   exclusivo sobre una fila que sólo lee.
 - La escritura de evento y agregado analítico se ejecuta en el pool
@@ -30,6 +48,39 @@ y la consola/métricas hacen visible la saturación.
 - Correo, webhooks, dominios, exportaciones, analítica y compatibilidad legacy
   tienen workers y heartbeats separados. Las métricas exponen profundidad,
   antigüedad y heartbeat por pool.
+
+## Estado de la medición
+
+Una comparación local (equipo de desarrollo, no un entorno autorizado) midió la
+ventana entre el primer y el último trabajador en salir de la resolución, con 8
+procesos liberados desde una barrera común y el mismo trabajo de CPU en las dos
+condiciones: alias caliente (contención de fila) contra alias repartidos (sin
+contención). Medianas de 3 rondas intercaladas:
+
+| Versión | Alias caliente | Alias repartidos | Sobreprecio por contención |
+|---|---|---|---|
+| Bloqueo exclusivo para todos | 57,79 ms | 28,75 ms | +29,0 ms |
+| Bloqueo compartido (actual) | 42,30 ms | 25,22 ms | +17,1 ms |
+
+Lo que esto sostiene y lo que no:
+
+- **Sostiene** que la serialización por fila bajó, y que las garantías de límite
+  siguen cumpliéndose bajo paralelismo real (`RedirectConcurrencyTest`).
+- **No sostiene** ninguna cifra de capacidad: son milisegundos de un portátil con
+  8 procesos, con un valor atípico de 693 ms en una ronda, y el coste por
+  resolución de este entorno no representa al de producción.
+- Una pasada de diagnóstico con la escritura del contador desactivada **no** bajó
+  la cifra en caliente (43,27 ms frente a 42,30 ms). Es decir, el residuo no es
+  el contador, y el contador asíncrono **no** queda justificado por esta
+  medición. Sigue siendo una decisión de producto versionada —el `clickCount`
+  visible pasaría a ser eventualmente consistente— que necesita números de
+  release.
+- Otro sospechoso del residuo era la fila del limitador en `cache`, que se
+  escribía en cada redirect. Ya no se escribe: el limiter tiene su propio store
+  (Redis con conmutación a PostgreSQL), y su coste medido por intento es ~3,8 ms
+  menor que con el store de base de datos
+  ([`docs/redis-operations.md`](redis-operations.md)). Eso acota el residuo, no
+  lo explica: ~4 ms no son +17,1 ms.
 
 ## Medición autorizada
 

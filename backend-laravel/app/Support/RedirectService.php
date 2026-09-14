@@ -117,171 +117,222 @@ class RedirectService
         $languages = self::acceptedLanguages((string) ($ctx['accept_language'] ?? ''));
         $country = ! empty($ctx['country']) ? strtolower((string) $ctx['country']) : null;
 
+        // Which lock a request needs depends on whether the link has an
+        // authoritative limit it may consume. An unlimited link takes a shared
+        // lock instead of an exclusive one: concurrent redirects of the same
+        // alias stop blocking each other, while pausing, blocking or deleting
+        // the link still waits for the redirects already in flight. PostgreSQL
+        // also queues new readers behind a waiting writer, so a viral alias
+        // cannot starve an operator's pause.
+        //
+        // This hint comes from the unlocked snapshot, so the locked phase
+        // re-reads it, and a link flipped to limited in the meantime asks for
+        // one retry. The retry is not cosmetic: consuming a limit from inside a
+        // shared-lock transaction would make it upgrade its own lock, and two
+        // such requests can each wait on the other's shared lock. Retaking the
+        // resolution exclusively can only wait on the lock already chosen, so
+        // it cannot deadlock.
+        $exclusive = (bool) $link->single_use || $link->max_clicks !== null;
+        $bumpClick = false;
         $outcome = ['kind' => 'not_found'];
 
-        DB::transaction(function () use ($id, $domainId, $alias, $host, $unlock, $now, $ua, $referrer, $country, $languages, $campaignFromReferrer, &$outcome) {
-            $fresh = Link::lockForUpdate()->find($id);
-            if (! $fresh || $fresh->workspace_id === null) {
-                $outcome = ['kind' => 'not_found'];
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $retry = false;
+            $bumpClick = false;
 
-                return;
-            }
+            DB::transaction(function () use ($id, $domainId, $alias, $host, $unlock, $now, $ua, $referrer, $country, $languages, $campaignFromReferrer, $exclusive, &$outcome, &$retry, &$bumpClick) {
+                // A shared lock is compatible with itself, so redirects of the
+                // same alias run in parallel; it still conflicts with the
+                // exclusive lock every state change takes.
+                $fresh = $exclusive ? Link::lockForUpdate()->find($id) : Link::sharedLock()->find($id);
+                if (! $fresh || $fresh->workspace_id === null) {
+                    $outcome = ['kind' => 'not_found'];
 
-            $freshDomainId = $fresh->domain_id !== null ? (int) $fresh->domain_id : null;
-            if ($fresh->alias !== $alias || $freshDomainId !== $domainId) {
-                $outcome = ['kind' => 'not_found'];
-
-                return;
-            }
-            // Domain rows are read-only on redirects. A shared lock lets every
-            // redirect for the same hostname proceed concurrently while still
-            // ordering disable/delete after already-admitted redirects. This
-            // preserves the previous atomic eligibility boundary without the
-            // unnecessary exclusive-lock bottleneck.
-            if ($freshDomainId !== null && ! CustomDomain::where('id', $freshDomainId)
-                ->where('state', 'active')->where('edge_eligible', true)
-                ->whereNotNull('tls_ready_at')->sharedLock()->first(['id'])) {
-                $outcome = ['kind' => 'unavailable', 'reason' => 'domain'];
-
-                return;
-            }
-            if ($fresh->password_hash && ! self::unlockMatches($unlock, $alias, $host, $id, (int) $fresh->password_version)) {
-                $outcome = ['kind' => 'password_required', 'link_id' => $id];
-
-                return;
-            }
-
-            $freshState = $fresh->state;
-            if ($freshState === 'deleted') {
-                $outcome = ['kind' => 'not_found'];
-
-                return;
-            }
-            if (in_array($freshState, ['blocked', 'paused', 'archived'], true)) {
-                $outcome = ['kind' => 'unavailable', 'reason' => $freshState];
-
-                return;
-            }
-            if ($freshState === 'scheduled' || ($fresh->scheduled_at && $fresh->scheduled_at->isFuture())) {
-                $outcome = ['kind' => 'unavailable', 'reason' => 'scheduled'];
-
-                return;
-            }
-            if ($freshState === 'expired' || ($fresh->expires_at && $fresh->expires_at->isPast())) {
-                $outcome = ['kind' => 'unavailable', 'reason' => 'expired'];
-
-                return;
-            }
-
-            // Rules: deterministic order by priority then id; first match wins.
-            $rules = $fresh->rules()->orderBy('priority')->orderBy('id')->get();
-            $location = null;
-            foreach ($rules as $rule) {
-                if ($rule->country && strtolower((string) $rule->country) !== $country) {
-                    continue;
+                    return;
                 }
-                if ($rule->language && ! self::languageMatches((string) $rule->language, $languages)) {
-                    continue;
+
+                $freshDomainId = $fresh->domain_id !== null ? (int) $fresh->domain_id : null;
+                if ($fresh->alias !== $alias || $freshDomainId !== $domainId) {
+                    $outcome = ['kind' => 'not_found'];
+
+                    return;
                 }
-                if ($rule->device && strtolower((string) $rule->device) !== strtolower((string) ($ua['device'] ?? ''))) {
-                    continue;
+                // A shared lock is only safe while the link has no authoritative
+                // limit. Re-read that decision under the lock so a concurrent edit
+                // cannot slip an unconditional redirect past a limit, and so a
+                // consumption never runs on the shared lock the read took.
+                if (! $exclusive && ((bool) $fresh->single_use || $fresh->max_clicks !== null)) {
+                    $retry = true;
+                    $outcome = ['kind' => 'retry'];
+
+                    return;
                 }
-                if ($rule->os && ! str_contains(strtolower((string) ($ua['os'] ?? '')), strtolower((string) $rule->os))) {
-                    continue;
+                // Domain rows are read-only on redirects. A shared lock lets every
+                // redirect for the same hostname proceed concurrently while still
+                // ordering disable/delete after already-admitted redirects. This
+                // preserves the previous atomic eligibility boundary without the
+                // unnecessary exclusive-lock bottleneck.
+                if ($freshDomainId !== null && ! CustomDomain::where('id', $freshDomainId)
+                    ->where('state', 'active')->where('edge_eligible', true)
+                    ->whereNotNull('tls_ready_at')->sharedLock()->first(['id'])) {
+                    $outcome = ['kind' => 'unavailable', 'reason' => 'domain'];
+
+                    return;
                 }
-                if ($rule->referrer && ! str_contains(strtolower((string) ($referrer ?? '')), strtolower((string) $rule->referrer))) {
-                    continue;
+                if ($fresh->password_hash && ! self::unlockMatches($unlock, $alias, $host, $id, (int) $fresh->password_version)) {
+                    $outcome = ['kind' => 'password_required', 'link_id' => $id];
+
+                    return;
                 }
-                if ($rule->campaign && strtolower((string) $rule->campaign) !== strtolower((string) ($campaignFromReferrer ?? ''))) {
-                    continue;
+
+                $freshState = $fresh->state;
+                if ($freshState === 'deleted') {
+                    $outcome = ['kind' => 'not_found'];
+
+                    return;
                 }
-                if (! self::inTimeRange($rule->time_from, $rule->time_to, $now)) {
-                    continue;
+                if (in_array($freshState, ['blocked', 'paused', 'archived'], true)) {
+                    $outcome = ['kind' => 'unavailable', 'reason' => $freshState];
+
+                    return;
                 }
-                $location = $rule->destination;
+                if ($freshState === 'scheduled' || ($fresh->scheduled_at && $fresh->scheduled_at->isFuture())) {
+                    $outcome = ['kind' => 'unavailable', 'reason' => 'scheduled'];
+
+                    return;
+                }
+                if ($freshState === 'expired' || ($fresh->expires_at && $fresh->expires_at->isPast())) {
+                    $outcome = ['kind' => 'unavailable', 'reason' => 'expired'];
+
+                    return;
+                }
+
+                // Rules: deterministic order by priority then id; first match wins.
+                $rules = $fresh->rules()->orderBy('priority')->orderBy('id')->get();
+                $location = null;
+                foreach ($rules as $rule) {
+                    if ($rule->country && strtolower((string) $rule->country) !== $country) {
+                        continue;
+                    }
+                    if ($rule->language && ! self::languageMatches((string) $rule->language, $languages)) {
+                        continue;
+                    }
+                    if ($rule->device && strtolower((string) $rule->device) !== strtolower((string) ($ua['device'] ?? ''))) {
+                        continue;
+                    }
+                    if ($rule->os && ! str_contains(strtolower((string) ($ua['os'] ?? '')), strtolower((string) $rule->os))) {
+                        continue;
+                    }
+                    if ($rule->referrer && ! str_contains(strtolower((string) ($referrer ?? '')), strtolower((string) $rule->referrer))) {
+                        continue;
+                    }
+                    if ($rule->campaign && strtolower((string) $rule->campaign) !== strtolower((string) ($campaignFromReferrer ?? ''))) {
+                        continue;
+                    }
+                    if (! self::inTimeRange($rule->time_from, $rule->time_to, $now)) {
+                        continue;
+                    }
+                    $location = $rule->destination;
+                    break;
+                }
+                if ($location === null && $fresh->fallback_destination) {
+                    $location = $fresh->fallback_destination;
+                }
+
+                $destination = $location ?? $fresh->destination;
+                $validDestination = UrlUtil::validateDestination($destination);
+                if (! $validDestination['ok']) {
+                    $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
+
+                    return;
+                }
+
+                $destination = self::withUtmParameters($destination, [
+                    'utm_source' => $fresh->utm_source,
+                    'utm_medium' => $fresh->utm_medium,
+                    'utm_campaign' => $fresh->utm_campaign,
+                    'utm_term' => $fresh->utm_term,
+                    'utm_content' => $fresh->utm_content,
+                ]);
+
+                // Appending campaign data can push an otherwise valid target over
+                // the URL boundary. Revalidate the actual Location before spending
+                // single-use state or click quota; fail closed on an invalid result.
+                if (! UrlUtil::validateDestination($destination)['ok']) {
+                    $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
+
+                    return;
+                }
+
+                // Do not consume a single-use link or its click quota until the
+                // final rule/fallback destination is known to be safe. The row
+                // lock keeps the selection and consumption one atomic decision.
+                if ($fresh->single_use) {
+                    if ($fresh->used_at) {
+                        $outcome = ['kind' => 'gone'];
+
+                        return;
+                    }
+                    $updated = Link::where('id', $id)->whereNull('used_at')->update([
+                        'used_at' => now(),
+                        'click_count' => DB::raw('click_count + 1'),
+                        'updated_at' => now(),
+                    ]);
+                    if ($updated === 0) {
+                        $outcome = ['kind' => 'gone'];
+
+                        return;
+                    }
+                } elseif ($fresh->max_clicks !== null) {
+                    $updated = Link::where('id', $id)->whereRaw('click_count < max_clicks')->update([
+                        'click_count' => DB::raw('click_count + 1'),
+                        'updated_at' => now(),
+                    ]);
+                    if ($updated === 0) {
+                        $outcome = ['kind' => 'gone'];
+
+                        return;
+                    }
+                } else {
+                    // Deferred until after the transaction; see the note below.
+                    $bumpClick = true;
+                }
+
+                $thresholdReached = $fresh->max_clicks !== null
+                    && (int) $fresh->click_count + 1 === (int) $fresh->max_clicks;
+                if ($thresholdReached) {
+                    WebhookService::dispatch((int) $fresh->workspace_id, 'link.threshold_reached', [
+                        'linkId' => $id,
+                        'threshold' => (int) $fresh->max_clicks,
+                    ]);
+                }
+
+                $outcome = [
+                    'kind' => 'redirect',
+                    'location' => $destination,
+                    'link_id' => $id,
+                    'campaign' => $fresh->utm_campaign ?? $campaignFromReferrer,
+                ];
+            });
+
+            if (! $retry) {
                 break;
             }
-            if ($location === null && $fresh->fallback_destination) {
-                $location = $fresh->fallback_destination;
-            }
+            // Retake the whole resolution under the exclusive lock. The second
+            // pass cannot ask for another retry, so this stays bounded.
+            $exclusive = true;
+        }
 
-            $destination = $location ?? $fresh->destination;
-            $validDestination = UrlUtil::validateDestination($destination);
-            if (! $validDestination['ok']) {
-                $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
-
-                return;
-            }
-
-            $destination = self::withUtmParameters($destination, [
-                'utm_source' => $fresh->utm_source,
-                'utm_medium' => $fresh->utm_medium,
-                'utm_campaign' => $fresh->utm_campaign,
-                'utm_term' => $fresh->utm_term,
-                'utm_content' => $fresh->utm_content,
+        // The unlimited path bumps its counter after the transaction, so no
+        // exclusive row lock is held while the rules and the destination are
+        // resolved. The statement is atomic on its own and the plain path
+        // consumes no quota, so nothing authoritative is decided here.
+        if ($bumpClick && $outcome['kind'] === 'redirect') {
+            Link::where('id', $id)->whereNull('deleted_at')->update([
+                'click_count' => DB::raw('click_count + 1'),
+                'updated_at' => now(),
             ]);
-
-            // Appending campaign data can push an otherwise valid target over
-            // the URL boundary. Revalidate the actual Location before spending
-            // single-use state or click quota; fail closed on an invalid result.
-            if (! UrlUtil::validateDestination($destination)['ok']) {
-                $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
-
-                return;
-            }
-
-            // Do not consume a single-use link or its click quota until the
-            // final rule/fallback destination is known to be safe. The row
-            // lock keeps the selection and consumption one atomic decision.
-            if ($fresh->single_use) {
-                if ($fresh->used_at) {
-                    $outcome = ['kind' => 'gone'];
-
-                    return;
-                }
-                $updated = Link::where('id', $id)->whereNull('used_at')->update([
-                    'used_at' => now(),
-                    'click_count' => DB::raw('click_count + 1'),
-                    'updated_at' => now(),
-                ]);
-                if ($updated === 0) {
-                    $outcome = ['kind' => 'gone'];
-
-                    return;
-                }
-            } elseif ($fresh->max_clicks !== null) {
-                $updated = Link::where('id', $id)->whereRaw('click_count < max_clicks')->update([
-                    'click_count' => DB::raw('click_count + 1'),
-                    'updated_at' => now(),
-                ]);
-                if ($updated === 0) {
-                    $outcome = ['kind' => 'gone'];
-
-                    return;
-                }
-            } else {
-                Link::where('id', $id)->update([
-                    'click_count' => DB::raw('click_count + 1'),
-                    'updated_at' => now(),
-                ]);
-            }
-
-            $thresholdReached = $fresh->max_clicks !== null
-                && (int) $fresh->click_count + 1 === (int) $fresh->max_clicks;
-            if ($thresholdReached) {
-                WebhookService::dispatch((int) $fresh->workspace_id, 'link.threshold_reached', [
-                    'linkId' => $id,
-                    'threshold' => (int) $fresh->max_clicks,
-                ]);
-            }
-
-            $outcome = [
-                'kind' => 'redirect',
-                'location' => $destination,
-                'link_id' => $id,
-                'campaign' => $fresh->utm_campaign ?? $campaignFromReferrer,
-            ];
-        });
+        }
 
         return $outcome;
     }
