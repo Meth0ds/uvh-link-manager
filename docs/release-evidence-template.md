@@ -34,7 +34,20 @@ ni cuerpos de correo/webhook.
 
 - [ ] Redirección: carga, p50/p95/p99, errores y bloqueos PostgreSQL.
 - [ ] Saturación independiente de mail/webhooks/domains/exports/analytics.
+- [ ] Rollups analíticos: contención sobre una misma fila `link_id + day` con
+  backlog real y varios workers, fidelidad de contadores y techo del pool.
+  Método, números de referencia y límites del ensayo:
+  [`analytics-rollup-capacity.md`](analytics-rollup-capacity.md).
 - [ ] Export pequeño y máximo; OOM rechazado, worker/volumen/red interrumpidos y reintento de descarga.
+- [ ] Ráfaga desde un solo origen contra la superficie pública y el panel con
+  el borde activo: el rechazo es del borde (no del `throttle` de Laravel), el
+  `429` lleva `Retry-After`, y ningún cliente legítimo por debajo del límite de
+  Laravel se quedó fuera. Requisito de despliegue previo: capa de CDN/WAF
+  contratada por delante.
+- [ ] Reputación de destinos: proveedor elegido y evaluado; tasa de falsos
+  positivos observada con auto-bloqueo desactivado; umbrales de auto-bloqueo
+  aprobados; el propio dominio no aparece mal valorado. Método y límites:
+  [`url-reputation-runbook.md`](url-reputation-runbook.md).
 - [ ] Carreras de papelera/restore/purge/housekeeping.
 - Evidencias y umbrales aprobados:
 

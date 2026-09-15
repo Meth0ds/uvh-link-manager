@@ -207,6 +207,7 @@ el [modelo de amenazas](docs/threat-model.md).
 | [Arquitectura](docs/architecture.md) | Componentes, flujos, hosts y decisiones técnicas. |
 | [API](docs/api.md) | Contratos HTTP, autenticación y errores. |
 | [Despliegue](docs/deployment.md) | Desarrollo, producción, TLS, secretos y operación. |
+| [Configuración](docs/configuration.md) | Referencia de todas las variables: obligatoriedad, valores por defecto, qué pasa si faltan e interruptores de seguridad. |
 | [Seguridad](docs/security.md) | Controles de aplicación y checklist de release. |
 | [Modelo de amenazas](docs/threat-model.md) | Activos, actores, amenazas y riesgos pendientes. |
 | [Sistema de diseño](docs/design-system.md) | Tokens, temas y convenciones visuales del panel. |

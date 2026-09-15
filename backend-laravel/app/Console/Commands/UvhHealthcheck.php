@@ -41,6 +41,16 @@ final class UvhHealthcheck extends Command
                 // is counted as `cache.failed_over`, and a deployment that runs
                 // without a fallback store still fails this probe when its only
                 // store is gone, which is the honest answer for it.
+                //
+                // Credential limiters count on `cache.limiter_security`
+                // instead. It is deliberately NOT probed here: the shipped
+                // value is the database, whose availability the `SELECT 1`
+                // above already requires and whose failure is already fatal
+                // for the whole process, and failing the container for a
+                // credential-counter store would turn a degraded public
+                // surface into no public surface at all. A deployment that
+                // points that setting at another backend must alert on it
+                // separately.
                 $limiterStore = config('cache.limiter');
                 $store = Cache::store(is_string($limiterStore) && $limiterStore !== '' ? $limiterStore : null);
                 $probe = 'uvh:health:probe:'.bin2hex(random_bytes(12));

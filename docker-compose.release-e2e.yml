@@ -59,6 +59,9 @@ services:
       SESSION_DOMAIN: ""
       SESSION_COOKIE: __Host-uvh_release_session
       CSRF_COOKIE: __Host-uvh_csrf
+      # The same list Nginx uses to restore the client address. Laravel reads it
+      # too, so the stack proves one contract rather than two.
+      TRUSTED_PROXIES: 172.29.0.0/24
       LOG_CHANNEL: stderr
       LOG_LEVEL: warning
     depends_on:
@@ -98,7 +101,16 @@ services:
       PUBLIC_HOST: uvh.localhost
       EDGE_ASK_SECRET: release-e2e-edge-secret-not-used-by-public-smoke
       METRICS_BEARER_TOKEN: release-e2e-metrics-token-not-exposed
-      NGINX_ENVSUBST_FILTER: "^(APP_HOST|PUBLIC_HOST|EDGE_ASK_SECRET|METRICS_BEARER_TOKEN)$"
+      TRUSTED_PROXIES: 172.29.0.0/24
+      # Shipped defaults. `frontend/e2e/edge-limits.mjs` overrides them per phase
+      # through compose interpolation, so the enforced and the dry-run rollout
+      # are measured on the same image the release uses.
+      EDGE_PUBLIC_RATE: ${EDGE_PUBLIC_RATE:-20r/s}
+      EDGE_APP_RATE: ${EDGE_APP_RATE:-20r/s}
+      EDGE_BURST: ${EDGE_BURST:-100}
+      EDGE_CONN: ${EDGE_CONN:-64}
+      EDGE_DRY_RUN: ${EDGE_DRY_RUN:-off}
+      NGINX_ENVSUBST_FILTER: "^(APP_HOST|PUBLIC_HOST|EDGE_ASK_SECRET|METRICS_BEARER_TOKEN|EDGE_PUBLIC_RATE|EDGE_APP_RATE|EDGE_BURST|EDGE_CONN|EDGE_DRY_RUN)$"
     depends_on:
       - app
     tmpfs:
@@ -130,3 +142,13 @@ volumes:
   release-storage:
   release-caddy-data:
   release-caddy-config:
+
+networks:
+  # Pinned for the same reason `docker-compose.release-boot.yml` pins its own:
+  # TRUSTED_PROXIES has to describe the addresses the containers really use, and
+  # Nginx restores the client address from that list. A subnet assigned at
+  # random would make the fixture describe a network that does not exist.
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24

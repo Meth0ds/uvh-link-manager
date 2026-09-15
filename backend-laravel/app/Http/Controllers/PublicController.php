@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DestinationDenylist;
+use App\Support\DestinationReputationService;
+use App\Support\ExternalEndpoint;
 use App\Support\HCaptcha;
 use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
@@ -89,7 +92,17 @@ class PublicController
 
     public function status(Request $request)
     {
-        $configured = trim((string) config('uvh.reputation_provider_url')) !== '';
+        // Reputation is reported as three separate facts: a URL is configured,
+        // an adapter exists for it, and a provider has actually answered
+        // something usable recently. Only the third one supports the claim that
+        // the integration works, so a configured-but-silent provider is
+        // published as `not_verified` instead of as coverage.
+        $configured = trim((string) config('uvh.reputation.provider_url', '')) !== '';
+        $provider = DestinationReputationService::provider();
+        $enabled = $provider->configured();
+        $lastVerdictAt = $enabled ? DestinationReputationService::lastProviderVerdictAt() : null;
+        $operational = $lastVerdictAt !== null
+            && $lastVerdictAt->greaterThan(now()->subHours(max(1, (int) config('uvh.reputation.cache_ttl_hours', 24))));
         $host = strtolower(rtrim($request->getHost(), '.'));
         $publicHost = strtolower(rtrim((string) config('uvh.public_host'), '.'));
         $captchaSurface = app()->environment('production')
@@ -99,14 +112,19 @@ class PublicController
         $captchaConfigured = HCaptcha::configured($captchaSurface);
 
         return response()->json([
-            // Configuration alone is not evidence of an executed integration.
-            // Keep the capability explicitly disabled until an adapter, failure
-            // policy and operational probe exist.
+            // Configuration alone is not evidence of an executed integration:
+            // `enabled` still requires an adapter, and `operational` requires a
+            // verdict that actually came back from a provider.
             'externalAnalysis' => [
                 'configured' => $configured,
-                'enabled' => false,
-                'operational' => false,
-                'status' => $configured ? 'not_implemented' : 'not_configured',
+                'enabled' => $enabled,
+                'operational' => $operational,
+                'status' => ! $configured
+                    ? 'not_configured'
+                    : ($operational ? 'operational' : 'not_verified'),
+                // How many destinations the platform refuses to serve. A count,
+                // never an entry: the list itself is operator data.
+                'denylistEntries' => DestinationDenylist::count(),
             ],
             'antiAbuse' => [
                 'enabled' => $captchaConfigured,
@@ -175,23 +193,16 @@ class PublicController
         }
     }
 
+    /**
+     * The feed is a configuration value, but rejecting local addressing,
+     * embedded credentials and non-TLS ports prevents an accidental SSRF probe
+     * during deployment or secret rotation. The same rule governs the
+     * reputation provider (`ExternalEndpoint`), because both are operator
+     * supplied outbound URLs.
+     */
     private function safeExternalStatusUrl(string $url): bool
     {
-        if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false) {
-            return false;
-        }
-        $parts = parse_url($url);
-        $host = strtolower(rtrim((string) ($parts['host'] ?? ''), '.'));
-
-        // The feed is a configuration value, but rejecting local addressing,
-        // embedded credentials and non-TLS ports prevents accidental SSRF
-        // during deployment or secret rotation.
-        return ($parts['scheme'] ?? null) === 'https' && $host !== ''
-            && ! isset($parts['user']) && ! isset($parts['pass']) && ! isset($parts['fragment'])
-            && (! isset($parts['port']) || (int) $parts['port'] === 443)
-            && filter_var($host, FILTER_VALIDATE_IP) === false
-            && $host !== 'localhost' && ! str_ends_with($host, '.localhost')
-            && ! str_ends_with($host, '.local') && ! str_ends_with($host, '.internal');
+        return ExternalEndpoint::isSafeHttps($url);
     }
 
     private function normalizePublicStatus(mixed $input): ?array

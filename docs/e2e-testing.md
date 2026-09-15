@@ -46,6 +46,28 @@ Para aislar un recorrido durante la depuración:
 npm run e2e -- --grep "token mínimo"
 ```
 
+### Una `PORT` heredada rompe el arranque
+
+Angular CLI respeta la variable `PORT` del entorno y **antepone** su valor a
+`--port`. Con `PORT` definida, `ng serve --port 4201` escucha en ese otro puerto
+—uno aleatorio si vale `0`— y anuncia «Environment variable PORT detected. Using
+port …»; Playwright, que espera en `4201`, agota su timeout sin ninguna pista de
+la causa real. Ocurrió en una corrida real: un shell que exportaba `PORT=0`
+convirtió un arranque correcto en un fallo de webServer.
+
+Arranca con el entorno limpio:
+
+```powershell
+Remove-Item Env:PORT -ErrorAction SilentlyContinue   # PowerShell
+```
+
+```bash
+env -u PORT npm run e2e                             # bash/Git Bash
+```
+
+Lo mismo vale para `npm run e2e:async`, que también pasa el entorno a la pila
+contenedora.
+
 Los fallos conservan captura, vídeo y trace bajo `frontend/test-results`; esos
 artefactos están ignorados por Git. CI los adjunta durante siete días sólo si
 el job falla.
@@ -111,6 +133,20 @@ Por encima de la suite de navegador hay dos puertas que no miran pantallas:
   habría publicado un cero), y perder el contenido del broker
   (`broker-flush`) comprobando que la fila de `mail_outbox` sigue siendo la
   verdad y que el reconciliador de housekeeping la republica hasta la entrega.
+  El ensayo de rollups analíticos (`analyticsContentionDrill`) es la parte de esa
+  suite que mide en vez de comprobar. Cada pase fija un volumen y varía una sola
+  cosa —una fila o varias, un worker o cuatro, `fillfactor` 100 o 70—, compara la
+  mediana de drenaje entre pases intercalados y asevera en todos ellos que cada
+  clic aparece exactamente una vez en `click_events`, en el rollup diario y en el
+  contador visible. Tiene dos orígenes de carga: **arrival** (clics admitidos por
+  el redirect público) y **flood** (jobs encolados directamente sobre un enlace),
+  porque en una pila local el propio redirect es más lento que el worker y el
+  backlog nunca llega a formarse. Knobs:
+  `UVH_ASYNC_ANALYTICS_{ROUNDS,REQUESTS,CONCURRENCY,FLOOD,LINKS,LOW_WORKERS,HIGH_WORKERS,FILLFACTOR,SAMPLE_MS}`.
+  `UVH_ASYNC_DRILL_ONLY=1` levanta la pila y corre sólo el ensayo, para iterar
+  sobre el volumen sin pagar el resto de la suite (CI nunca lo fija). Los números
+  de la corrida de referencia y lo que el ensayo **no** acredita están en
+  [`analytics-rollup-capacity.md`](analytics-rollup-capacity.md).
 - `npm run e2e:backup` destruye una base a propósito, restaura la copia cifrada
   en una instancia aislada, compara la huella del contenido, rechaza una copia
   manipulada y mide el RPO/RTO logrados. Detalles en `backup-and-restore.md`.

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DestinationDenylist;
 use App\Support\OperationalMetrics;
 use App\Support\QueueBacklog;
 use Illuminate\Http\Request;
@@ -35,8 +36,10 @@ final class OperationsController
         // Depth and age come from the configured broker: the database driver
         // answers from the `jobs` table and Redis from its own structures.
         // Reading `jobs` unconditionally would report an empty queue forever
-        // once the broker is Redis. The global series is the sum of the
-        // monitored pools, which are the only queues this deployment writes to.
+        // once the broker is Redis. Depth aggregates as the sum of the
+        // monitored pools, which are the only queues this deployment writes to;
+        // age aggregates as the maximum, because the oldest job overall is the
+        // one a stalled pool is holding, not the newest one in a healthy pool.
         $pendingByPool = [];
         $oldestAgeByPool = [];
         foreach (QueueBacklog::pools() as $pool => $queueName) {
@@ -49,7 +52,7 @@ final class OperationsController
         $readableAges = array_values(array_filter($oldestAgeByPool, static fn (?int $age): bool => $age !== null));
         $this->appendGauge($lines, 'uvh_queue_pending_jobs', array_sum($pendingByPool));
         $this->appendGauge($lines, 'uvh_queue_failed_jobs', DB::table('failed_jobs')->count());
-        $this->appendGauge($lines, 'uvh_queue_oldest_job_age_seconds', $readableAges === [] ? 0 : min($readableAges));
+        $this->appendGauge($lines, 'uvh_queue_oldest_job_age_seconds', $readableAges === [] ? 0 : max($readableAges));
         foreach (['pending', 'queued', 'processing', 'sent', 'failed', 'obsolete', 'comp_pending', 'compensating', 'compensated'] as $status) {
             $this->appendGauge($lines, 'uvh_mail_outbox_'.$status, DB::table('mail_outbox')->where('status', $status)->count());
         }
@@ -113,6 +116,13 @@ final class OperationsController
         $this->appendGauge($lines, 'uvh_privacy_requests_active', (clone $activePrivacy)->count());
         $this->appendGauge($lines, 'uvh_privacy_requests_overdue', (clone $activePrivacy)
             ->whereRaw('COALESCE(extended_until, due_at) < NOW()')->count());
+        // Destination reputation and the moderation queue it feeds. A growing
+        // open-appeal count is what turns "we blocked it" into "and nobody is
+        // looking at it".
+        $this->appendGauge($lines, 'uvh_denylist_entries', DestinationDenylist::count());
+        $this->appendGauge($lines, 'uvh_appeals_open', DB::table('link_appeals')->where('status', 'open')->count());
+        $this->appendGauge($lines, 'uvh_reputation_cases_open', DB::table('abuse_reports')
+            ->where('source', 'reputation')->where('status', 'open')->count());
         $this->appendGauge($lines, 'uvh_queue_heartbeat_age_seconds', $this->heartbeatAge('queue'));
         foreach (QueueBacklog::pools() as $pool => $queueName) {
             // Per-pool depth/age is what reveals starvation; a healthy generic

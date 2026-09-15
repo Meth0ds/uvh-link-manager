@@ -127,6 +127,45 @@ class ProductionSecurityTest extends TestCase
         $this->assertSame([], ProductionSecurity::errors($settings));
     }
 
+    public function test_credential_limiters_must_count_where_the_window_cannot_restart(): void
+    {
+        $settings = $this->validSettings();
+
+        // Empty: the credential limiters would silently keep using the
+        // availability chain, keeping the discontinuity invisible.
+        $settings['cache_limiter_security_driver'] = null;
+        $this->assertContains(
+            'CACHE_LIMITER_SECURITY debe usar un store compartido propio, ni la cadena de failover ni Redis',
+            ProductionSecurity::errors($settings),
+        );
+
+        // A failover chain is a second, empty counter: an outage of the first
+        // member grants a fresh budget instead of preserving the old one.
+        $settings['cache_limiter_security_driver'] = 'failover';
+        $this->assertContains(
+            'CACHE_LIMITER_SECURITY debe usar un store compartido propio, ni la cadena de failover ni Redis',
+            ProductionSecurity::errors($settings),
+        );
+
+        // Redis is the dependency whose outage this separation exists to
+        // survive, and login must keep working when it falls.
+        $settings['cache_limiter_security_driver'] = 'redis';
+        $this->assertContains(
+            'CACHE_LIMITER_SECURITY debe usar un store compartido propio, ni la cadena de failover ni Redis',
+            ProductionSecurity::errors($settings),
+        );
+
+        // A per-process store would stop limiting between workers.
+        $settings['cache_limiter_security_driver'] = 'array';
+        $this->assertContains(
+            'CACHE_LIMITER_SECURITY debe usar un store compartido propio, ni la cadena de failover ni Redis',
+            ProductionSecurity::errors($settings),
+        );
+
+        $settings['cache_limiter_security_driver'] = 'database';
+        $this->assertSame([], ProductionSecurity::errors($settings));
+    }
+
     public function test_the_redis_queue_retry_window_is_a_release_gate(): void
     {
         // The Redis driver does not inherit DB_QUEUE_RETRY_AFTER, so switching
@@ -289,6 +328,9 @@ class ProductionSecurityTest extends TestCase
             'db_username' => 'uvh',
             'db_password' => 'Q8v!p2L#r7S@x4N$z9T',
             'cache_store' => 'database',
+            // Credential limiters count here instead of on the availability
+            // chain; production refuses an empty value.
+            'cache_limiter_security_driver' => 'database',
             'queue_connection' => 'database',
             'queue_retry_after' => 240,
             'queue_failed_driver' => 'database-uuids',

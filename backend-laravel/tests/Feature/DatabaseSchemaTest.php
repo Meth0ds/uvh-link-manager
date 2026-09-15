@@ -44,6 +44,9 @@ class DatabaseSchemaTest extends TestCase
             'privacy_rights_requests',
             'privacy_rights_messages',
             'legal_acceptances',
+            'destination_denylist',
+            'destination_reputation_checks',
+            'link_appeals',
         ];
 
         foreach ($tables as $table) {
@@ -73,7 +76,7 @@ class DatabaseSchemaTest extends TestCase
             'api_tokens' => ['workspace_id', 'name', 'token_hash', 'scopes', 'revoked_at', 'expires_at', 'created_by'],
             'webhooks' => ['workspace_id', 'created_by', 'url', 'secret', 'events', 'active', 'config_version'],
             'webhook_deliveries' => ['webhook_id', 'config_version', 'event', 'event_id', 'payload', 'status', 'attempts', 'locked_at', 'next_attempt_at'],
-            'abuse_reports' => ['link_id', 'reason', 'status', 'reporter_hash', 'report_day'],
+            'abuse_reports' => ['link_id', 'reason', 'status', 'source', 'reporter_hash', 'report_day'],
             'audit_events' => ['user_id', 'workspace_id', 'action', 'resource_type', 'resource_id', 'metadata'],
             'email_tokens' => ['id', 'user_id', 'kind', 'expires_at', 'used_at'],
             // The primary string ID is itself the one-way bearer digest. Rows
@@ -89,12 +92,29 @@ class DatabaseSchemaTest extends TestCase
             'privacy_rights_requests' => ['id', 'user_id', 'security_version', 'type', 'status', 'generation_hash', 'assigned_admin_id', 'identity_verified_at', 'due_at', 'extended_until', 'completed_at'],
             'privacy_rights_messages' => ['id', 'request_id', 'author_role', 'author_user_id', 'encrypted_body', 'created_at'],
             'legal_acceptances' => ['id', 'user_id', 'document_type', 'version', 'source', 'accepted_at'],
+            'destination_denylist' => ['id', 'match_kind', 'match_value', 'reason', 'source', 'created_by', 'expires_at'],
+            'destination_reputation_checks' => ['id', 'url_hash', 'host', 'verdict', 'score', 'provider', 'checked_at', 'expires_at', 'failure_count', 'last_error'],
+            'link_appeals' => ['id', 'link_id', 'workspace_id', 'actor_user_id', 'message', 'status', 'decided_by', 'decided_at', 'decision_note'],
         ];
 
         foreach ($expect as $table => $columns) {
             foreach ($columns as $column) {
                 $this->assertTrue(Schema::hasColumn($table, $column), "Missing column {$table}.{$column}");
             }
+        }
+    }
+
+    #[Test]
+    public function it_indexes_the_analytics_retention_purges(): void
+    {
+        // The purge filters on `day`, which is not the leading column of either
+        // table's key. Without these indexes the minute tick scans both tables
+        // in full — the same tables the click path updates.
+        foreach ([
+            'metric_rollups' => 'metric_rollups_day_index',
+            'metric_unique_visitors' => 'metric_unique_visitors_day_index',
+        ] as $table => $index) {
+            $this->assertTrue(Schema::hasIndex($table, $index), "Missing index: {$index}");
         }
     }
 

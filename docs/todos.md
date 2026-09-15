@@ -195,6 +195,14 @@ implementación parcial.
   pendiente).** La paginación y las purgas configurables de tokens, outbox, jobs
   fallidos y auditoría existen en código; falta aprobación jurídica/operativa y
   validación sobre una copia representativa.
+- [ ] **ANALYTICS-001 — Capacidad de los rollups diarios (mecanismo medido;
+  capacidad productiva pendiente).** `npm run e2e:async` ejerce la contención
+  sobre una misma fila `link_id + day` con un backlog real y varios workers, y
+  asevera la fidelidad de los contadores en cada pase; la retención por fecha ya
+  tiene índices propios en las dos tablas de analítica. Falta la cifra que decide
+  la arquitectura: en una pila local la ingesta del redirect es más lenta que el
+  worker, así que el ensayo no satura el pool. Ver
+  [`analytics-rollup-capacity.md`](analytics-rollup-capacity.md).
 - [x] **DATA-002 — Snapshot coherente de exportación.** El presupuesto de filas
   y las doce secciones del export se leen dentro de una transacción PostgreSQL
   `REPEATABLE READ READ ONLY`. La transacción termina antes de serializar, cifrar,
@@ -355,11 +363,35 @@ implementación parcial.
   aislamiento de Nginx/PostgreSQL.
 - [ ] Configurar PostgreSQL con `sslmode=verify-full`, CA real, usuario de mínimo
   privilegio, backups cifrados y una restauración medida con RPO/RTO aprobados.
+- [ ] **AUTH-LIMIT-000 — Separación del limiter de credenciales (código y gate
+  listos; evidencia sobre la instancia real pendiente).** Los límites de
+  credenciales cuentan en un store único y compartido
+  (`CACHE_LIMITER_SECURITY=database`), nunca en la cadena *failover* ni en Redis,
+  de modo que una caída de Redis no reinicia la ventana de login/MFA/recuperación
+  y el login sigue funcionando; producción rechaza lo contrario. Cubierto por
+  `SecurityLimiterStoreTest`, `UvhLimitersTest` y `ProductionSecurityTest`. Falta
+  el ensayo del interruptor sobre el despliegue real y alertar por separado del
+  store si algún día no es la base de datos.
+- [ ] **EDGE-000 — Capa antiabuso por delante de Nginx.** El techo de volumen
+  por cliente (`limit_req`/`limit_conn`) está en la plantilla de Nginx, con la
+  IP real restaurada, rechazos distinguibles de los `429` de Laravel y el
+  contrato de tasas sostenido por `EdgeLimitContractTest`. Falta lo que decide si
+  es suficiente: el ensayo de ráfaga sobre la pila de producción y la capa de
+  CDN/WAF por delante, que es un requisito de despliegue verificable, no código.
 - [ ] Supervisar `app`, `scheduler`, Caddy, Nginx y por separado `queue-mail`,
-  `queue-webhooks`, `queue-domains`, `queue-exports`, `queue-analytics` y
-  `queue-legacy`. El código ya expone profundidad, antigüedad y heartbeat por
-  pool; faltan alertas externas ensayadas. El reinicio automático por sí solo
-  no acredita salud funcional.
+  `queue-webhooks`, `queue-domains`, `queue-exports`, `queue-analytics`,
+  `queue-security` y `queue-legacy`. El código ya expone profundidad, antigüedad
+  y heartbeat por pool; faltan alertas externas ensayadas. El reinicio
+  automático por sí solo no acredita salud funcional.
+- [ ] **ABUSE-000 — Reputación de URLs y moderación de destinos.** La denylist
+  local, la apelación con retirada de entradas y el adaptador opcional de
+  reputación (pool `security`, con auto-bloqueo desactivado por defecto) existen
+  y tienen pruebas. Faltan las decisiones humanas y la medición real: proveedor
+  elegido y evaluado (coste, cobertura, retención de datos), umbrales de
+  auto-bloqueo acordados, tasa de falsos positivos observada y prueba de que el
+  propio dominio deja de aparecer en listas. Runbook:
+  [`url-reputation-runbook.md`](url-reputation-runbook.md). Es riesgo existencial
+  para un acortador público: no cerrar con mocks.
 - [ ] Ejecutar E2E con correo y hCaptcha reales: alta, verificación, login, MFA,
   recuperación, intención de URL, logout y caducidad/revocación de sesión.
 - [ ] Revisar manualmente todos los módulos en móvil/escritorio, claro/oscuro,

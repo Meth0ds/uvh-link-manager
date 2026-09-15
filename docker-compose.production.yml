@@ -28,6 +28,10 @@ x-php-service: &php-service
     CACHE_STORE: redis
     CACHE_LIMITER: failover
     CACHE_FAILOVER_STORES: redis,database
+    # Credential limiters count on their own single store, never the chain
+    # above: for them a second backend is a second, empty window rather than a
+    # fallback. Production refuses an empty value, Redis and failover here.
+    CACHE_LIMITER_SECURITY: database
     QUEUE_CONNECTION: redis
     REDIS_CLIENT: phpredis
     REDIS_HOST: redis
@@ -128,6 +132,17 @@ services:
       UVH_QUEUE_POOL: analytics
     command: ["php", "artisan", "queue:work", "--queue=analytics", "--sleep=1", "--tries=5", "--timeout=45", "--max-time=3600"]
 
+  # Destination-reputation checks call a third party with a hard timeout, so
+  # they get their own pool: a slow or unreachable provider cannot delay mail,
+  # webhooks, analytics or anything else. With no provider configured the check
+  # is still dispatched, records an `unknown` verdict and returns.
+  queue-security:
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: security
+    command: ["php", "artisan", "queue:work", "--queue=security", "--sleep=1", "--tries=3", "--timeout=60", "--max-time=3600"]
+
   # Drain pre-deployment jobs that were serialized onto Laravel's default
   # queue. New application code never targets this compatibility pool.
   queue-legacy:
@@ -193,7 +208,11 @@ services:
     env_file:
       - ${UVH_ENV_FILE:-./backend-laravel/.env.production}
     environment:
-      NGINX_ENVSUBST_FILTER: "^(APP_HOST|PUBLIC_HOST|EDGE_ASK_SECRET|METRICS_BEARER_TOKEN)$"
+      # Every `${...}` the Nginx template uses must be listed here, or the
+      # container starts with a literal placeholder in its configuration. The
+      # EDGE_* values themselves come from the deployment file (`env_file`
+      # above) and fall back to the entrypoint's documented defaults.
+      NGINX_ENVSUBST_FILTER: "^(APP_HOST|PUBLIC_HOST|EDGE_ASK_SECRET|METRICS_BEARER_TOKEN|EDGE_PUBLIC_RATE|EDGE_APP_RATE|EDGE_BURST|EDGE_CONN|EDGE_DRY_RUN)$"
       EDGE_ASK_SECRET_FILE: /run/secrets/uvh_edge_ask_secret
       METRICS_BEARER_TOKEN_FILE: /run/secrets/uvh_metrics_token
     secrets:

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Cache\UvhRateLimiter;
 use App\Support\OperationalMetrics;
 use App\Support\ProductionSecurity;
 use App\Support\UvhRequest;
@@ -23,13 +24,44 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Rebind the limiter to a subclass able to produce a copy of itself
+        // against another store, sharing the named limiter registry that is
+        // populated immediately below. `UvhThrottleRequests` uses that copy for
+        // the credential surfaces, so their budget cannot be reset by the
+        // availability store degrading.
+        //
+        // This lives in `boot()` on purpose, and it resolves `cache` first:
+        // `Illuminate\Cache\CacheServiceProvider` is a deferred provider, so its
+        // `register()` — which binds the framework's plain `RateLimiter` — runs
+        // lazily on the first resolution of anything it provides. Binding ours
+        // before that would be overwritten the moment the limiters below are
+        // first resolved, which is exactly when they are registered. Touching
+        // `cache` here forces that provider to register first, so ours lands
+        // last and wins.
+        //
+        // The concrete class, not `RateLimiter::class`: that name is imported
+        // here as the *facade*, and binding the facade name would leave the real
+        // singleton — the one `throttle` resolves — untouched.
+        // `SecurityLimiterStoreTest` asserts the resolved class, because losing
+        // this race would otherwise be silent: the middleware would fall back to
+        // the availability store and the split simply would not apply.
+        $this->app->make('cache');
+        $this->app->singleton(\Illuminate\Cache\RateLimiter::class, function ($app) {
+            return new UvhRateLimiter($app->make('cache')->driver(
+                $app['config']->get('cache.limiter')
+            ));
+        });
+
         $this->assertProductionSecurityConfiguration();
 
-        // Rate limiting counts its attempts on the configured limiter store,
-        // which production points at a failover store (Redis, then PostgreSQL).
+        // Availability limiters count on the configured limiter store, which
+        // production points at a failover store (Redis, then PostgreSQL).
         // Degrading keeps public redirects served during a Redis outage, but a
         // silent degradation would hide a failing dependency, so every actual
-        // fallback is counted and exported as a time series.
+        // fallback is counted and exported as a time series. Credential
+        // limiters do not use that chain — see `UvhLimiters` and
+        // `UvhThrottleRequests` — because for them a second backend is a second
+        // window rather than a fallback.
         Event::listen(CacheFailedOver::class, function (): void {
             OperationalMetrics::increment('cache.failed_over');
         });
@@ -162,6 +194,20 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute((int) config('uvh.rate_limits.resolve'))
                 ->by($request->ip())
                 ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas resoluciones de enlaces.'], 429)->withHeaders($headers));
+        });
+
+        RateLimiter::for('uvh-appeal', function (Request $request) {
+            // Contesting a block is a human action on a decision already taken.
+            // Very few of them, per session and per address: the queue is
+            // reviewed by people.
+            $session = UvhRequest::sessionId($request) ?? $request->ip();
+
+            return [
+                Limit::perHour(5)->by('appeal-session:'.$session)->response(
+                    fn ($request, $headers) => response()->json(['error' => 'Demasiadas apelaciones. Espera antes de enviar otra.'], 429)->withHeaders($headers),
+                ),
+                Limit::perHour(10)->by('appeal-ip:'.$request->ip()),
+            ];
         });
 
         RateLimiter::for('uvh-report', function (Request $request) {
@@ -357,6 +403,7 @@ class AppServiceProvider extends ServiceProvider
             'cache_store' => config('cache.default'),
             'cache_limiter_driver' => self::cacheStoreDriver(config('cache.limiter')),
             'cache_failover_drivers' => self::cacheStoreDrivers(config('cache.stores.failover.stores')),
+            'cache_limiter_security_driver' => self::cacheStoreDriver(config('cache.limiter_security')),
             'redis_connections' => self::redisConnectionsInUse(),
             'queue_connection' => config('queue.default'),
             'queue_retry_after' => config('queue.connections.'.config('queue.default').'.retry_after'),

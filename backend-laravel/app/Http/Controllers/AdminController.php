@@ -6,6 +6,8 @@ use App\Models\AccountRecoveryRequest;
 use App\Models\User;
 use App\Support\AccountRecoveryLifecycle;
 use App\Support\Audit;
+use App\Support\DestinationDenylist;
+use App\Support\DestinationReputationService;
 use App\Support\Ids;
 use App\Support\LinkIntentRegistry;
 use App\Support\MailAdmissionException;
@@ -19,6 +21,7 @@ use App\Support\QueueBacklog;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -1167,6 +1170,249 @@ class AdminController
         }
 
         return min($value, $max);
+    }
+
+    /**
+     * Appeals from owners of blocked links.
+     *
+     * These are the only way a false positive reaches a human: an automatic
+     * block would otherwise be a decision nobody can contest.
+     */
+    public function appeals(Request $request): JsonResponse
+    {
+        [$page, $perPage] = $this->pagination($request);
+        $status = UvhRequest::queryString($request, 'status');
+        if (! in_array($status, ['', 'open', 'upheld', 'restored'], true)) {
+            return response()->json(['error' => 'Filtro de apelación inválido'], 422);
+        }
+
+        $query = DB::table('link_appeals as a')
+            ->join('links as l', 'l.id', '=', 'a.link_id')
+            ->select(
+                'a.id',
+                'a.link_id',
+                'a.message',
+                'a.status',
+                'a.created_at',
+                'a.decided_at',
+                'a.decision_note',
+                'l.alias',
+                'l.destination',
+                'l.state as link_state',
+                'l.workspace_id',
+            );
+        if ($status !== '') {
+            $query->where('a.status', $status);
+        }
+
+        $total = (clone $query)->count();
+        $rows = $query->orderByDesc('a.created_at')
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get();
+
+        return response()->json([
+            'appeals' => $rows,
+            'total' => $total,
+            'page' => $page,
+            'perPage' => $perPage,
+        ]);
+    }
+
+    /**
+     * Decide an appeal: restore the link, or uphold the block.
+     *
+     * Restoring also removes the denylist entries that apply to the link's
+     * destinations. Without that the next re-analysis would block it again and
+     * the appeal would be theatre. A provider-sourced entry can therefore be
+     * overridden by a human, and the audit trail records exactly which entries
+     * were removed.
+     */
+    public function resolveAppeal(Request $request, int $id): JsonResponse
+    {
+        $decision = UvhRequest::inputString($request, 'decision');
+        if (! in_array($decision, ['restore', 'uphold'], true)) {
+            return response()->json(['error' => 'Decisión inválida'], 422);
+        }
+        $note = trim(UvhRequest::inputString($request, 'note'));
+        if (! mb_check_encoding($note, 'UTF-8') || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $note) || mb_strlen($note) > 500) {
+            return response()->json(['error' => 'La nota contiene caracteres no válidos'], 422);
+        }
+
+        $actorId = UvhRequest::user($request)->id;
+        $sessionId = UvhRequest::sessionId($request);
+        $ip = UvhRequest::ip($request);
+        $result = DB::transaction(function () use ($id, $decision, $note, $actorId, $sessionId, $ip): ?array {
+            if (! $this->lockEligibleAdmin($actorId, $sessionId)) {
+                return ['status' => 'actor_changed'];
+            }
+            $appeal = DB::table('link_appeals')->where('id', $id)->lockForUpdate()->first();
+            if (! $appeal) {
+                return null;
+            }
+            if ((string) $appeal->status !== 'open') {
+                return ['status' => 'decided'];
+            }
+            $link = DB::table('links')->where('id', $appeal->link_id)->lockForUpdate()->first();
+            if (! $link) {
+                return null;
+            }
+
+            $removed = [];
+            $state = (string) $link->state;
+            if ($decision === 'restore') {
+                $state = $this->applyLinkUnblock($link);
+                foreach (DestinationReputationService::destinationsOf($link) as $destination) {
+                    foreach (DestinationDenylist::entriesFor($destination) as $entry) {
+                        if (DestinationDenylist::remove((int) $entry->id) === 1) {
+                            $removed[] = $entry->match_kind.':'.mb_substr((string) $entry->match_value, 0, 8);
+                        }
+                    }
+                }
+            }
+
+            DB::table('link_appeals')->where('id', $id)->update([
+                'status' => $decision === 'restore' ? 'restored' : 'upheld',
+                'decided_by' => $actorId,
+                'decided_at' => now(),
+                'decision_note' => $note === '' ? null : $note,
+                'updated_at' => now(),
+            ]);
+
+            Audit::write($actorId, 'admin.link_appeal_resolved', 'link', (int) $link->id, array_filter([
+                'appealId' => $id,
+                'decision' => $decision,
+                'state' => $state,
+                // Counts and kinds only; the values are hashed or truncated and
+                // belong to the denylist itself, not to the audit trail.
+                'removedEntries' => $removed === [] ? null : count($removed),
+                'note' => $note === '' ? null : $note,
+            ], fn ($value) => $value !== null), $ip, workspaceId: (int) $link->workspace_id);
+
+            return ['status' => 'ok', 'state' => $state, 'removed' => count($removed)];
+        });
+        if ($result === null) {
+            return response()->json(['error' => 'Apelación no encontrada'], 404);
+        }
+        if ($result['status'] === 'actor_changed') {
+            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+        }
+        if ($result['status'] === 'decided') {
+            return response()->json(['error' => 'Esta apelación ya fue resuelta'], 409);
+        }
+
+        return response()->json(['ok' => true, 'state' => $result['state'], 'removedEntries' => $result['removed']]);
+    }
+
+    /**
+     * Promote a moderation block from one link to the destination it points at.
+     *
+     * Blocking only the link left the abuse intact: the same URL came back as a
+     * new link minutes later, and could also be reached through a redirect rule.
+     */
+    public function blockDestination(Request $request, int $id): JsonResponse
+    {
+        $reason = trim(UvhRequest::inputString($request, 'reason'));
+        if (! mb_check_encoding($reason, 'UTF-8') || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $reason)
+            || mb_strlen($reason) < 3 || mb_strlen($reason) > 500) {
+            return response()->json(['error' => 'Motivo requerido'], 422);
+        }
+        $scope = UvhRequest::inputString($request, 'scope');
+        $scope = $scope === '' ? 'url' : $scope;
+        if (! in_array($scope, ['url', 'host'], true)) {
+            return response()->json(['error' => 'Alcance inválido'], 422);
+        }
+
+        $actorId = UvhRequest::user($request)->id;
+        $sessionId = UvhRequest::sessionId($request);
+        $ip = UvhRequest::ip($request);
+        $result = DB::transaction(function () use ($id, $scope, $reason, $actorId, $sessionId, $ip): ?array {
+            if (! $this->lockEligibleAdmin($actorId, $sessionId)) {
+                return ['status' => 'actor_changed'];
+            }
+            $row = DB::table('links')->where('id', $id)->lockForUpdate()->first();
+            if (! $row) {
+                return null;
+            }
+
+            $host = DestinationDenylist::normalizeHost((string) (parse_url((string) $row->destination, PHP_URL_HOST) ?? ''));
+            $entryId = $scope === 'host'
+                ? ($host === null ? null : DestinationDenylist::blockHost($host, $reason, DestinationDenylist::SOURCE_REPORT, $actorId))
+                : DestinationDenylist::blockUrl((string) $row->destination, $reason, DestinationDenylist::SOURCE_REPORT, $actorId);
+            if ($entryId === null) {
+                return ['status' => 'unsupported'];
+            }
+
+            Audit::write($actorId, 'admin.destination_block', 'link', (int) $row->id, [
+                'cause' => $scope,
+                'reason' => $reason,
+            ], $ip, workspaceId: (int) $row->workspace_id);
+
+            return ['status' => 'ok', 'host' => $host, 'entryId' => $entryId];
+        });
+        if ($result === null) {
+            return response()->json(['error' => 'Enlace no encontrado'], 404);
+        }
+        if ($result['status'] === 'actor_changed') {
+            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+        }
+        if ($result['status'] === 'unsupported') {
+            return response()->json(['error' => 'No se pudo interpretar el destino de este enlace'], 422);
+        }
+
+        // Every link that could already point at the same host is re-evaluated
+        // in the background; a new entry has to reach links that already exist.
+        $scheduled = $result['host'] === null ? 0 : DestinationReputationService::reanalyzeHost($result['host']);
+
+        return response()->json(['ok' => true, 'entryId' => $result['entryId'], 'linksScheduled' => $scheduled]);
+    }
+
+    /** The destinations the platform currently refuses to serve. */
+    public function denylist(Request $request): JsonResponse
+    {
+        [$page, $perPage] = $this->pagination($request);
+        $query = DB::table('destination_denylist')->orderByDesc('id');
+        $total = (clone $query)->count();
+        $rows = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
+
+        return response()->json([
+            'entries' => $rows,
+            'total' => $total,
+            'page' => $page,
+            'perPage' => $perPage,
+        ]);
+    }
+
+    /** Withdraw a destination block, for example after a successful appeal. */
+    public function removeDenylistEntry(Request $request, int $id): JsonResponse
+    {
+        $actorId = UvhRequest::user($request)->id;
+        $sessionId = UvhRequest::sessionId($request);
+        $ip = UvhRequest::ip($request);
+        $removed = DB::transaction(function () use ($id, $actorId, $sessionId, $ip): string {
+            if (! $this->lockEligibleAdmin($actorId, $sessionId)) {
+                return 'actor_changed';
+            }
+            $entry = DB::table('destination_denylist')->where('id', $id)->lockForUpdate()->first();
+            if (! $entry) {
+                return 'not_found';
+            }
+            DestinationDenylist::remove($id);
+            Audit::write($actorId, 'admin.destination_unblock', 'destination_denylist', $id, [
+                'cause' => (string) $entry->source,
+                'kind' => (string) $entry->match_kind,
+            ], $ip);
+
+            return 'ok';
+        });
+        if ($removed === 'actor_changed') {
+            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+        }
+        if ($removed === 'not_found') {
+            return response()->json(['error' => 'Entrada no encontrada'], 404);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     private function search(Request $request): string

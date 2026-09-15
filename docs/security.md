@@ -47,9 +47,64 @@ Implementación de seguridad y guía de endurecimiento (hardening).
 
 - Cuenta verificada para crear enlaces (`VERIFIED_REQUIRED_TO_CREATE`).
 - Rate limiting diferenciado: login, registro, recuperación, MFA, creación de enlaces, alias, API, tokens, webhooks, denuncias y acciones admin (`RateLimiter` de Laravel con los mismos valores que la referencia).
+- **Dos clases de límite, dos stores.** Los límites de *volumen* (redirects,
+  API, panel) toleran un backend degradado porque su propósito es mantener la
+  superficie servida: viven en la cadena `CACHE_LIMITER`, tipo *failover* en
+  producción. Los de *credenciales* (login, MFA, verificación, recuperación,
+  restablecimiento, reautenticación y registro) cuentan en
+  `CACHE_LIMITER_SECURITY`, un store único que producción exige compartido, no
+  `failover` y **no Redis**: para un límite de credenciales, un segundo backend
+  no es un respaldo sino una segunda ventana vacía, de modo que la caída del
+  primero regalaría presupuesto y, al volver, contadores antiguos podrían
+  bloquear a una cuenta legítima. Un contador que una dependencia puede poner a
+  cero no es una protección. La clasificación vive en `app/Support/UvhLimiters.php`.
 - Cuotas por workspace (con `lockForUpdate` para evitar carreras).
-- Denuncia pública, revisión administrativa, bloqueo con motivo, apelación, auditoría.
-- Adaptador opcional de reputación externa: si no está configurado se indica claramente y no se inventa un estado "seguro".
+- Denuncia pública, revisión administrativa, bloqueo con motivo, auditoría.
+- **Moderación a nivel de destino**, no de enlace: la denylist local
+  (`destination_denylist`) se aplica de forma síncrona en `LinkService` —también
+  al destino *fallback* y a las reglas de redirección— y empareja por etiqueta
+  (`evil.example` cubre sus subdominios, nunca `notevil.example`), guardando las
+  URLs como hash canónico. Sin ella, bloquear un enlace dejaba la misma URL a un
+  clic de distancia.
+- **Apelación real**: el propietario de un enlace bloqueado puede abrir una
+  apelación (una sola abierta por enlace) y un moderador restaurar o mantener.
+  Restaurar retira las entradas de denylist que aplicaban al destino, de modo
+  que una decisión automática puede anularse por una persona.
+- Adaptador opcional de reputación externa (pool `security`): si no está
+  configurado se indica claramente y **nunca** se inventa un estado "seguro".
+  `suspicious` abre un caso de moderación; `malicious` sólo bloquea con
+  `REPUTATION_AUTO_BLOCK=true`. Contrato y operación:
+  [`url-reputation-runbook.md`](url-reputation-runbook.md).
+
+## 5 bis. Límite de volumen en el borde
+
+El `throttle:uvh-*` de Laravel decide por propósito e identidad, pero se ejecuta
+**después** de Caddy, Nginx y PHP-FPM: un atacante ya ha llegado al proceso antes
+de que se le rechace. Nginx añade por ello un techo de volumen por cliente
+(`limit_req`/`limit_conn`) como último salto antes de PHP-FPM.
+
+Propiedades que lo hacen seguro de activar:
+
+- **Nunca es el primero en rechazar lo que Laravel habría admitido.** Sus tasas
+  se fijan por encima del límite equivalente (2× el más estricto por minuto) y
+  `EdgeLimitContractTest` compara template, ficheros de despliegue y
+  `config/uvh.php` para que esa relación no dependa de quien edite los números.
+- **La IP del cliente se restaura** desde `TRUSTED_PROXIES` (el mismo valor que
+  confía Laravel) con `real_ip_recursive`; una lista ausente, con comodín o con
+  hostname hace fallar el arranque. Sobre la dirección del par, todos los
+  clientes compartirían un cubo: un limitador que no limita.
+- **Un rechazo del borde es distinguible** de un `429` de Laravel: sólo el borde
+  añade `Retry-After` y sólo él deja `limit=$limit_req_status` en el access log.
+  El `429` de Laravel conserva su cuerpo JSON.
+- **Cubre también el `default_server`** de dominios personalizados: limitar sólo
+  los hosts con nombre dejaría sin protección justo los redirects que importan.
+- **`EDGE_DRY_RUN=on` es un interruptor de apagado**, no una medición: en nginx
+  1.27 deja `$limit_req_status` vacío, así que no informa de lo que habría
+  rechazado. Para dimensionar la tasa, agregar el acceso por cliente con la
+  aplicación desactivada.
+
+La capa de CDN/WAF por delante del borde es un requisito de despliegue, no
+código: se verifica en el checklist de release, no aquí.
 
 ## 6. Auditoría, logging y retención
 

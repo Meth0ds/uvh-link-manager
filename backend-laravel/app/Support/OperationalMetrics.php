@@ -51,6 +51,20 @@ final class OperationalMetrics
         'webhook.admission_failed',
         'housekeeping.stage_failed',
         'lock.unavailable',
+        // Destination reputation. A blocked link, a moderation case opened from
+        // a provider verdict and a failed lookup are three different operational
+        // facts, so they are three different series: an alert on
+        // `provider_unavailable` must not be satisfiable by blocking links.
+        'reputation.blocked',
+        'reputation.moderated',
+        'reputation.appeal_opened',
+        'reputation.check_failed',
+        'reputation.provider_unavailable',
+        'reputation.reanalysis_scheduled',
+        'reputation.domain_listed',
+        // Un job auxiliar que la cola no admite. Distinto de `check_failed`: la
+        // comprobación nunca llegó a intentarse.
+        'reputation.dispatch_failed',
         // Rate limiting counts on Redis first and falls back to PostgreSQL when
         // it is unreachable, so public traffic keeps being served. The fallback
         // is recorded because a silent one would hide a failing dependency.

@@ -28,7 +28,7 @@ final class QueueBacklogTest extends TestCase
         // The label is part of the Prometheus surface: renaming it silently
         // breaks alerts that are keyed on it.
         $this->assertSame(
-            ['mail', 'webhooks', 'domains', 'exports', 'analytics', 'legacy'],
+            ['mail', 'webhooks', 'domains', 'exports', 'analytics', 'security', 'legacy'],
             array_keys(QueueBacklog::pools()),
         );
         // The legacy worker drains Laravel's default queue.
@@ -65,6 +65,44 @@ final class QueueBacklogTest extends TestCase
             2,
             (int) DB::table('operational_metrics')->where('metric', 'queue.metrics_unavailable')->sum('count'),
         );
+    }
+
+    public function test_the_global_oldest_age_follows_the_oldest_pool(): void
+    {
+        // A stalled pool is exactly what this gauge exists to reveal, so the
+        // global series has to follow the oldest pool. Aggregating the newest
+        // one instead would report the 10s queue and hide a 300s backlog, which
+        // is how a blocked class of work goes unnoticed. Depth keeps the
+        // opposite aggregate: the sum is the real amount of pending work.
+        config(['queue.default' => 'database']);
+        $this->insertJob('mail', 10);
+        $this->insertJob('exports', 300);
+        $this->insertJob('analytics', 30);
+
+        $token = str_repeat('a', 48);
+        config(['uvh.metrics.bearer_token' => $token]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)->get('/internal/metrics');
+        $response->assertOk();
+        $body = (string) $response->getContent();
+
+        $this->assertSame(3, $this->gauge($body, 'uvh_queue_pending_jobs'));
+        $this->assertEqualsWithDelta(300, $this->gauge($body, 'uvh_queue_oldest_job_age_seconds'), 5);
+
+        // The per-pool gauges stay untouched: the global series must not
+        // flatten them into one number.
+        $this->assertEqualsWithDelta(10, $this->gauge($body, 'uvh_queue_mail_oldest_job_age_seconds'), 5);
+        $this->assertEqualsWithDelta(300, $this->gauge($body, 'uvh_queue_exports_oldest_job_age_seconds'), 5);
+        $this->assertEqualsWithDelta(30, $this->gauge($body, 'uvh_queue_analytics_oldest_job_age_seconds'), 5);
+    }
+
+    private function gauge(string $body, string $name): int
+    {
+        $this->assertMatchesRegularExpression('/^'.preg_quote($name, '/').' (\d+)$/m', $body);
+
+        preg_match('/^'.preg_quote($name, '/').' (\d+)$/m', $body, $matches);
+
+        return (int) $matches[1];
     }
 
     private function insertJob(string $queue, int $ageSeconds): void

@@ -35,6 +35,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Security Rate Limiter Cache Store
+    |--------------------------------------------------------------------------
+    |
+    | Credential surfaces —login, MFA, verificación, recuperación de cuenta,
+    | restablecimiento, reautenticación y registro— count on this second store
+    | instead of the one above.
+    |
+    | The reason is that the two limits do not trade the same thing. For a
+    | public redirect, availability wins: if the preferred backend is down, the
+    | attempt is counted on the second member of the chain and traffic keeps
+    | being served. For a credential surface a second backend is not a fallback
+    | but a *second window*: the counter starts at zero, so an outage grants
+    | the attacker a fresh budget, and when the first backend returns its older
+    | counters reappear and can block a legitimate account that had already
+    | forgotten the attempt.
+    |
+    | This store therefore must be a single shared backend, never a failover
+    | chain, and production rejects Redis here: Redis is the dependency whose
+    | outage this separation exists to survive, and login must keep working when
+    | it falls. `CACHE_LIMITER_SECURITY=database` is the shipped value. Leaving
+    | it empty — the default outside production — keeps the store above, which
+    | is the behaviour this deployment had before the split.
+    |
+    */
+
+    'limiter_security' => env('CACHE_LIMITER_SECURITY'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |

@@ -32,6 +32,10 @@ final class QueueBacklog
             'domains' => 'domains',
             'exports' => 'exports',
             'analytics' => 'analytics',
+            // Destination reputation talks to a third party with its own
+            // timeout, so it gets its own pool: a slow provider must not
+            // delay mail, webhooks or anything else.
+            'security' => 'security',
             // The legacy worker drains the default queue. The gauge label is
             // part of the published metric surface and must not be renamed.
             'legacy' => 'default',

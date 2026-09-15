@@ -8,6 +8,47 @@ map $http_x_forwarded_proto $uvh_forwarded_proto {
     ""      $scheme;
 }
 
+# ---------------------------------------------------------------------------
+# Volumetric safety net: the last hop before PHP-FPM.
+#
+# These zones are not the admission decision. Laravel keeps deciding per
+# purpose and per identity (`throttle:uvh-resolve`, `uvh-login`, `uvh-report`,
+# `uvh-link-create`, ...), with its own messages and its own contract. What this
+# layer adds is a ceiling in front of that code: a single source cannot spend
+# every PHP-FPM child before any of those limits is ever consulted. It has to
+# stay *looser* than the Laravel limit that covers the same surface — the
+# relationship is asserted by `EdgeLimitContractTest`, not left to whoever edits
+# these numbers — and it can be rolled out unenforced first with EDGE_DRY_RUN=on.
+#
+# EDGE_DRY_RUN=on is a kill switch, not a measurement: on nginx 1.27 it
+# disables rejection but leaves `$limit_req_status` empty, so it does not report
+# what it would have rejected. To size the rate before enforcing, aggregate the
+# per-client request rate from this access log with enforcement off.
+#
+# The key is the client address the entrypoint restores from TRUSTED_PROXIES
+# (see zz-uvh-realip.conf). Keying on the peer address instead would put
+# Caddy's address in every bucket: a limiter that looks configured and limits
+# nothing.
+limit_req_zone $binary_remote_addr zone=uvh_edge_public:8m rate=${EDGE_PUBLIC_RATE};
+limit_req_zone $binary_remote_addr zone=uvh_edge_app:8m rate=${EDGE_APP_RATE};
+limit_conn_zone $binary_remote_addr zone=uvh_edge_conn:8m;
+limit_req_status 429;
+limit_conn_status 429;
+
+# Retry-After is emitted only for this layer's own rejections. Laravel's 429
+# keeps its JSON body and gains no header it never promised: the two mean
+# different things and must stay distinguishable to a client and in a log.
+map $limit_req_status $uvh_edge_retry_after {
+    REJECTED 60;
+    default  "";
+}
+
+# `limit=` is what attributes a 429 to this layer instead of to Laravel.
+# Plain `$remote_addr` is the restored client address, which is also how a
+# spoofed forwarding header is caught in review.
+log_format uvh_edge '$remote_addr - [$time_local] "$request" $status limit=$limit_req_status';
+access_log /var/log/nginx/access.log uvh_edge;
+
 server_tokens off;
 
 server {
@@ -29,11 +70,25 @@ server {
     # The SPA may frame only its own isolated hCaptcha wrapper. The wrapper's
     # separate CSP is the sole document allowed to contact/frame hCaptcha.
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types angular angular#bundler" always;
+    # The panel is a SPA: one page load fires several calls and a shared NAT
+    # presents dozens of users as one address. Only the two API surfaces below
+    # are capped here — never the static shell, and never the health probe.
+    add_header Retry-After $uvh_edge_retry_after always;
 
     location ^~ /internal/ { return 404; }
     location = /health { try_files "" @laravel; }
-    location ^~ /api/ { try_files "" @laravel; }
-    location ^~ /r/ { try_files "" @laravel; }
+    location ^~ /api/ {
+        limit_req zone=uvh_edge_app burst=${EDGE_BURST} nodelay;
+        limit_req_dry_run ${EDGE_DRY_RUN};
+        limit_conn uvh_edge_conn ${EDGE_CONN};
+        try_files "" @laravel;
+    }
+    location ^~ /r/ {
+        limit_req zone=uvh_edge_app burst=${EDGE_BURST} nodelay;
+        limit_req_dry_run ${EDGE_DRY_RUN};
+        limit_conn uvh_edge_conn ${EDGE_CONN};
+        try_files "" @laravel;
+    }
 
     # hCaptcha runs in an isolated, sandboxed same-site wrapper so the vendor
     # script cannot inspect Angular's credential fields. This one document has
@@ -78,6 +133,14 @@ server {
     root /usr/share/nginx/html;
     index index.html;
     client_max_body_size 2m;
+
+    # The public surface is anonymous by definition: the landing page, the
+    # status page, alias resolution and the abuse form. Every one of them is
+    # covered here, including the SPA shell a first visit needs.
+    limit_req zone=uvh_edge_public burst=${EDGE_BURST} nodelay;
+    limit_req_dry_run ${EDGE_DRY_RUN};
+    limit_conn uvh_edge_conn ${EDGE_CONN};
+    add_header Retry-After $uvh_edge_retry_after always;
 
     add_header X-Content-Type-Options nosniff always;
     add_header X-Frame-Options DENY always;
@@ -143,6 +206,15 @@ server {
     listen 8080 default_server;
     server_name _;
     client_max_body_size 64k;
+
+    # Customer hostnames arrive here (Caddy authorises them per request before
+    # proxying). A limiter that covered only the two named hosts would leave the
+    # whole custom-domain surface — and the redirects that actually matter —
+    # unprotected, so this block carries the same zone as the public host.
+    limit_req zone=uvh_edge_public burst=${EDGE_BURST} nodelay;
+    limit_req_dry_run ${EDGE_DRY_RUN};
+    limit_conn uvh_edge_conn ${EDGE_CONN};
+    add_header Retry-After $uvh_edge_retry_after always;
 
     location ^~ /internal/ { return 404; }
     location / {

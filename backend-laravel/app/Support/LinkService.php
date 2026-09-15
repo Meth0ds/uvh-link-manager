@@ -13,6 +13,13 @@ use Illuminate\Support\Facades\DB;
 class LinkService
 {
     /**
+     * A destination the platform refuses to serve, refused at the only gate
+     * every write goes through — including the API-token surface, which never
+     * touches the panel controller.
+     */
+    public const BLOCKED_DESTINATION = 'Ese destino está bloqueado por moderación y no puede acortarse';
+
+    /**
      * @return array{ok: bool, error?: string}
      */
     public static function validate(array $input): array
@@ -24,6 +31,12 @@ class LinkService
         if (! $dest['ok']) {
             return ['ok' => false, 'error' => $dest['error']];
         }
+        // The denylist decides here, synchronously, because it is a decision
+        // already taken and needs no provider, no queue and no threshold. The
+        // asynchronous half (reputation, re-analysis) never gates a write.
+        if (DestinationDenylist::reason($input['destination']) !== null) {
+            return ['ok' => false, 'error' => self::BLOCKED_DESTINATION];
+        }
 
         $fallback = $input['fallback_destination'] ?? null;
         if ($fallback !== null && ! is_string($fallback)) {
@@ -33,6 +46,9 @@ class LinkService
             $fb = UrlUtil::validateDestination($fallback);
             if (! $fb['ok']) {
                 return ['ok' => false, 'error' => "Destino fallback: {$fb['error']}"];
+            }
+            if (DestinationDenylist::reason($fallback) !== null) {
+                return ['ok' => false, 'error' => 'Destino fallback: '.self::BLOCKED_DESTINATION];
             }
         }
 
@@ -122,6 +138,12 @@ class LinkService
                 if (! $result['ok']) {
                     return ['ok' => false, 'error' => "Regla inválida: {$result['error']}"];
                 }
+                // A blocked primary destination is trivial to bypass with a
+                // redirect rule pointing at the same URL, so rules are held to
+                // the same rule as the destination itself.
+                if (DestinationDenylist::reason($normalized['destination']) !== null) {
+                    return ['ok' => false, 'error' => 'Regla inválida: '.self::BLOCKED_DESTINATION];
+                }
             }
         }
 
@@ -152,7 +174,7 @@ class LinkService
         $state = self::deriveState($input);
         $utm = $input['utm'] ?? [];
 
-        return DB::transaction(function () use ($workspaceId, $userId, $domainId, $alias, $state, $utm, $input, $apiTokenContext, $actorSecurityVersion) {
+        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $alias, $state, $utm, $input, $apiTokenContext, $actorSecurityVersion) {
             if (! WorkspaceAccess::getMembershipLocked(
                 $userId,
                 $workspaceId,
@@ -217,6 +239,15 @@ class LinkService
 
             return ['id' => $link->id, 'alias' => $alias, 'state' => $state];
         });
+
+        // Destination analysis is dispatched after the commit, never inside it:
+        // it may call a third party, and a link that already exists must not
+        // wait for that. The denylist half of the decision was applied
+        // synchronously in `validate()`, so a refused queue admission cannot
+        // change whether the link was allowed — only when it gets re-analysed.
+        DestinationReputationService::dispatchCheck((int) $created['id']);
+
+        return $created;
     }
 
     /**
@@ -231,7 +262,7 @@ class LinkService
         ?array $apiTokenContext = null,
         ?int $actorSecurityVersion = null,
     ): array {
-        return DB::transaction(function () use ($linkId, $workspaceId, $userId, $input, $expectedVersion, $apiTokenContext, $actorSecurityVersion): array {
+        $updated = DB::transaction(function () use ($linkId, $workspaceId, $userId, $input, $expectedVersion, $apiTokenContext, $actorSecurityVersion): array {
             if (! WorkspaceAccess::getMembershipLocked(
                 $userId,
                 $workspaceId,
@@ -317,6 +348,13 @@ class LinkService
 
             return ['id' => $linkId, 'alias' => $alias, 'state' => $nextState];
         });
+
+        // A destination or a rule may have changed, so the cached verdict for
+        // the new destinations has to be produced (or refreshed) rather than
+        // inherited from the previous ones.
+        DestinationReputationService::dispatchCheck((int) $updated['id']);
+
+        return $updated;
     }
 
     /**

@@ -279,6 +279,12 @@ services:
 
   # One worker per queue class, mirroring the production topology. A long DNS
   # or export job therefore cannot starve mail or webhook delivery.
+  #
+  # No service here pins `container_name`, which is what keeps
+  # `docker compose up -d --scale queue-analytics=N` available: the rollup
+  # contention drill in `frontend/e2e/async-stack.mjs` uses it to put more than
+  # one consumer behind the same daily rollup row. Production intentionally
+  # stays at one worker per pool.
   queue-mail:
     <<: *queue-service
     command: ["php", "artisan", "queue:work", "--queue=mail", "--sleep=1", "--tries=3", "--timeout=120"]
@@ -294,6 +300,11 @@ services:
   queue-analytics:
     <<: *queue-service
     command: ["php", "artisan", "queue:work", "--queue=analytics", "--sleep=1", "--tries=5", "--timeout=45"]
+  # Destination-reputation checks. The suite asserts every monitored queue
+  # drains to zero, so this pool needs a real consumer here too.
+  queue-security:
+    <<: *queue-service
+    command: ["php", "artisan", "queue:work", "--queue=security", "--sleep=1", "--tries=3", "--timeout=60"]
   # Compatibility pool for jobs that predate the per-class workers.
   queue-default:
     <<: *queue-service

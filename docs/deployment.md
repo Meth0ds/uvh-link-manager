@@ -8,7 +8,7 @@ Documento de despliegue del stack actual: Laravel 13 + PostgreSQL 16 (local en c
 | -------------- | -------------------------------------------- | ----------------------- |
 | API            | Laravel 13 (PHP 8.4)                         | Servidor PHP integrado local; PHP-FPM en producción |
 | Base de datos  | PostgreSQL 16 (`postgres:16-alpine`)         | Contenedor `postgres` local, solo `127.0.0.1` |
-| Colas          | `QUEUE_CONNECTION=redis` (broker dedicado)   | Workers `queue-mail`, `queue-webhooks`, `queue-domains`, `queue-exports`, `queue-analytics` y drenaje `queue-legacy` |
+| Colas          | `QUEUE_CONNECTION=redis` (broker dedicado)   | Workers `queue-mail`, `queue-webhooks`, `queue-domains`, `queue-exports`, `queue-analytics`, `queue-security` y drenaje `queue-legacy` |
 | Caché y límites | `CACHE_STORE=redis`, limitador `failover` (Redis → PostgreSQL) | Redis sin puerto publicado, dentro de `uvh-internal` |
 | Scheduler      | `php artisan schedule:work`                  | Contenedor `scheduler`  |
 | Frontend       | Angular 22 SPA (`dist/uvh`)                  | `ng serve` en desarrollo; estáticos en producción |
@@ -108,7 +108,8 @@ otros motivos:
   pruebas, TLS de base de datos degradado o coste bcrypt fuera de rango: no
   arranca;
 - Redis sin contraseña, apuntando a loopback, con un `CACHE_LIMITER` que no sea
-  compartido, o con una ventana de reintento de cola por debajo de 200 s: no
+  compartido, con un `CACHE_LIMITER_SECURITY` vacío, de tipo `failover`, `redis`
+  o por proceso, o con una ventana de reintento de cola por debajo de 200 s: no
   arranca. La última es la trampa que más cuesta ver: el driver de Redis **no**
   hereda `DB_QUEUE_RETRY_AFTER`, así que sin `REDIS_QUEUE_RETRY_AFTER` toma el
   valor del framework (90 s) y un worker podría reclamar un job que otro todavía
@@ -165,7 +166,13 @@ secreto (`UVH_REDIS_PASSWORD_FILE` → `REDIS_PASSWORD_FILE`), nunca como valor
 literal del `.env`, y el arranque rechaza un host de loopback o una credencial
 ausente o de ejemplo. `CACHE_LIMITER=failover` con
 `CACHE_FAILOVER_STORES=redis,database` es lo que mantiene servida la superficie
-pública si Redis no responde; los locks no usan ese store y fallan cerrado. Si
+pública si Redis no responde; los locks no usan ese store y fallan cerrado.
+`CACHE_LIMITER_SECURITY=database` es un segundo store, único y compartido, donde
+cuentan los límites de credenciales (login, MFA, verificación, recuperación,
+restablecimiento, reautenticación, registro): no puede ser la cadena anterior ni
+Redis, porque para ellos un segundo backend sería una segunda ventana vacía y
+una caída de Redis reiniciaría la protección. El login por tanto sigue
+funcionando con Redis caído. Si
 prefieres una instancia gestionada, apunta `REDIS_URL` (admite `rediss://`)
 en lugar de `REDIS_HOST`/`REDIS_PORT`; el gate acepta ambos. `database` sigue
 siendo un valor válido para `CACHE_STORE`/`QUEUE_CONNECTION` en un despliegue de

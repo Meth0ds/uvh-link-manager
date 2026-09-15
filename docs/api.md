@@ -136,11 +136,12 @@ estricta con el hostname esperado.
 | GET | `/` | viewer | Listado con `q, state, tag, sort, page, perPage` → `{ links, total, page, perPage }`. |
 | POST | `/` | editor | Crear enlace (destino, alias, dominio, UTM, notas, programación, expiración, contraseña, máx. clics, uso único, fallback, reglas, tags). |
 | POST | `/check-alias` | viewer | `{ alias, domainId }` → `{ available, reason? }`. |
-| GET | `/:id` | viewer | `{ link, rules[] }`. |
+| GET | `/:id` | viewer | `{ link, rules[], appeal }`; `appeal` es `null` o `{ status, createdAt, decidedAt }` de la última apelación. |
 | PATCH | `/:id` | editor | Editar enlace. |
 | POST | `/:id/state` | editor | `{ state }` (active/paused/archived). |
 | DELETE | `/:id` | editor | Soft delete. |
 | POST | `/:id/restore` | editor | Restaura. |
+| POST | `/:id/appeal` | editor | `{ message? }` → `{ ok, appealId }`. Solo si el enlace está bloqueado y una sola apelación abierta por enlace (`409` si ya existe, `409` si no está bloqueado). Rate limit por sesión e IP. |
 | GET | `/:id/activity` | viewer | `{ events[] }` (auditoría del enlace). |
 
 ## Analítica — `/api/v1/analytics`
@@ -344,13 +345,18 @@ de reautenticación y vuelve a la ruta interna original tras confirmar.
 | GET | `/operations` | Estado no sensible de entorno, cola, trabajos fallidos, webhooks, sesiones y dominios. No sustituye al sistema externo de monitorización. |
 | POST | `/links/:id/block` | `{ reason }` → bloquea. |
 | POST | `/links/:id/unblock` | Desbloquea. |
+| POST | `/links/:id/block-destination` | `{ reason, scope }`, con `scope=url|host` → bloquea el **destino** del enlace (no solo el enlace), lo añade a la denylist y reanaliza los enlaces que ya apuntaban a ese host. |
+| GET | `/destinations` | `q`, `page`, `perPage` → `{ entries[], total, page, perPage }`. Las entradas `url` se devuelven como hash, nunca en claro. |
+| DELETE | `/destinations/:id` | Retira una entrada de la denylist. |
+| GET | `/appeals` | `status` (`open|upheld|restored`), `page`, `perPage` → `{ appeals[], total, page, perPage }`. |
+| POST | `/appeals/:id/decision` | `{ decision: "restore"|"uphold", note? }` → `{ ok, state, removedEntries }`. Restaurar devuelve el enlace a su estado natural y retira las entradas de denylist que aplicaban a sus destinos. |
 
 ## Denuncias / público — `/api/v1`
 
 | Método | Ruta | Descripción |
 | ------ | ---- | ----------- |
 | POST | `/report` | `{ reportedUrl, reason, details?, email? }` (público, CSRF y rate limit). `reportedUrl` admite alias, URL de `uvh.es`, ruta legacy `/r/:alias` o un dominio personalizado registrado; la API sólo resuelve la referencia en base de datos y nunca visita el destino. `alias` se mantiene como compatibilidad interna, pero no se aceptan identificadores numéricos globales. |
-| GET | `/status` | Estado del módulo antiabuso. `externalAnalysis` separa `configured`, `enabled` y `operational`; permanece `not_implemented` aunque exista una URL candidata, por lo que nunca presenta configuración como análisis ejecutado. |
+| GET | `/status` | Estado del módulo antiabuso. `externalAnalysis` separa `configured` (¿hay URL?), `enabled` (¿hay adaptador?) y `operational` (¿ha respondido un veredicto utilizable recientemente?); `status` vale `not_configured`, `not_verified` u `operational`, de modo que nunca presenta configuración como análisis ejecutado. Incluye `denylistEntries` (un recuento; nunca las entradas). Contrato de reputación: `docs/url-reputation-runbook.md`. |
 
 ## Público
 

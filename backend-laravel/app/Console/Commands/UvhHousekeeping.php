@@ -8,6 +8,7 @@ use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\DestinationReputationService;
 use App\Support\DomainRevalidationSchedule;
 use App\Support\Ids;
 use App\Support\InvitationMailBudget;
@@ -16,6 +17,7 @@ use App\Support\MailOutboxCompensation;
 use App\Support\MailOutboxDispatcher;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifactCleanup;
+use App\Support\ReputationVerdict;
 use App\Support\UvhCrypto;
 use App\Support\WebhookService;
 use App\Support\WorkspaceLimits;
@@ -95,6 +97,8 @@ class UvhHousekeeping extends Command
         });
 
         $run('domain_revalidation', fn () => $this->queueDomainRevalidations());
+
+        $run('destination_reputation', fn () => $this->queueDestinationRechecks());
 
         $run('webhook_recovery', function (): void {
             // A worker may die after claiming a delivery. Release only stale
@@ -695,6 +699,52 @@ class UvhHousekeeping extends Command
      * Admit a bounded batch of periodic DNS checks. The worker owns the cache
      * lock and a database generation makes any delayed result harmless.
      */
+    /**
+     * Re-analyse destinations whose verdict is missing or stale, and refresh the
+     * reputation of the platform's own hosts.
+     *
+     * Both halves are skipped when no provider is configured: without one there
+     * is nothing to ask and nothing to refresh, and sweeping anyway would spin
+     * a job per link per tick for a verdict that cannot change. Applying a new
+     * denylist entry is not this sweep's job — that is dispatched the moment the
+     * entry is created, so existing links are reached immediately.
+     */
+    private function queueDestinationRechecks(): void
+    {
+        if (! DestinationReputationService::provider()->configured()) {
+            return;
+        }
+
+        $batch = max(1, min(500, (int) config('uvh.reputation.recheck_batch', 50)));
+        foreach (DestinationReputationService::staleLinkIds($batch) as $linkId) {
+            DestinationReputationService::dispatchCheck((int) $linkId);
+        }
+
+        if (! (bool) config('uvh.reputation.domain_monitor', true)) {
+            return;
+        }
+
+        // A short blocklist that can take the whole domain offline deserves a
+        // standing signal, not a manual check after the phone rings.
+        $hosts = [(string) config('uvh.public_host'), (string) config('uvh.app_host')];
+        $custom = DB::table('custom_domains')->where('state', 'active')->orderBy('id')->limit(25)->pluck('domain');
+        foreach ($custom as $domain) {
+            if (is_string($domain)) {
+                $hosts[] = $domain;
+            }
+        }
+
+        foreach (array_unique($hosts) as $host) {
+            if (trim($host) === '') {
+                continue;
+            }
+            $verdict = DestinationReputationService::monitorHost($host);
+            if (in_array($verdict->verdict(), [ReputationVerdict::MALICIOUS, ReputationVerdict::SUSPICIOUS], true)) {
+                OperationalMetrics::increment('reputation.domain_listed');
+            }
+        }
+    }
+
     private function queueDomainRevalidations(): void
     {
         $healthyCutoff = now()->subHours(max(1, (int) config('uvh.custom_domains.revalidation_hours', 24)));

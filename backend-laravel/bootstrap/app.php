@@ -9,6 +9,7 @@ use App\Http\Middleware\UvhAuth;
 use App\Http\Middleware\UvhCsrf;
 use App\Http\Middleware\UvhHostGuard;
 use App\Http\Middleware\UvhSession;
+use App\Http\Middleware\UvhThrottleRequests;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\OperationalMetrics;
 use App\Support\WebhookAdmissionUnavailable;
@@ -52,6 +53,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'uvh.workspace' => RequireWorkspace::class,
             'uvh.apitoken' => RequireApiToken::class,
             'uvh.mfa' => RequireMfa::class,
+            // Replaces the framework's `throttle` alias. Named limiters are
+            // unchanged; only the credential ones count on another store.
+            'throttle' => UvhThrottleRequests::class,
         ]);
 
         // Global: security headers, session hydration, host separation.

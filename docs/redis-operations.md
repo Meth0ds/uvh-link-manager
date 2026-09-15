@@ -10,9 +10,10 @@ qué se alerta y qué ocurre exactamente cuando no responde.
 | En Redis | En PostgreSQL |
 |---|---|
 | Caché de aplicación | Cuentas, enlaces, dominios, auditoría |
-| Rate limits (todos los `throttle:*`) | `mail_outbox`, `webhook_deliveries`, `data_export_requests` |
+| Rate limits de **volumen** (`uvh-resolve`, `uvh-status`, `uvh-report`, `uvh-api`, `uvh-link-create`, `uvh-analytics`, …) | Rate limits de **credenciales** (`uvh-login`, `uvh-mfa`, `uvh-email-verify`, `uvh-password-reset`, `uvh-account-recovery`, `uvh-security-incident`, `uvh-credential`, `uvh-register`) |
+| | `mail_outbox`, `webhook_deliveries`, `data_export_requests` |
 | Locks distribuidos (`Cache::lock`) | `failed_jobs` |
-| Colas `mail`, `webhooks`, `domains`, `exports`, `analytics`, `default` | Sesiones propias (`uvh_sessions`) |
+| Colas `mail`, `webhooks`, `domains`, `exports`, `analytics`, `security`, `default` | Sesiones propias (`uvh_sessions`) |
 
 Las **sesiones se quedan en PostgreSQL** a propósito: la sesión propia es la
 fuente de verdad de la revocación inmediata, y una caché intermedia debilitaría
@@ -52,6 +53,7 @@ Lo que hay que vigilar, y por qué:
 | Señal | Qué significa | Acción |
 |---|---|---|
 | `uvh_event_cache_failed_over_60m_total` | El rate limiter cayó a PostgreSQL. La superficie pública sigue servida y sigue contando intentos, pero contra la base de datos | Ver Redis: conectividad, memoria, autenticación |
+| Salud del store de credenciales (`CACHE_LIMITER_SECURITY`) | Con el valor desplegado (`database`) su disponibilidad es la de la base, que ya es requisito de todo el proceso: `SELECT 1` la cubre y `/health` falla con ella. Si un despliegue lo apunta a otro backend, ese backend **no** queda cubierto por la sonda: hay que alertar sobre él por separado, porque su caída impide iniciar sesión sin que el contenedor salga de rotación | Verificar el store y su latencia; volver a `database` si no hay una razón medida para lo contrario |
 | `uvh_event_queue_metrics_unavailable_60m_total` | Una lectura de profundidad o antigüedad no se pudo hacer. Las cifras de cola no son de fiar mientras aparezca | Ver Redis antes de creer ninguna cifra de cola |
 | `uvh_queue_*_pending_jobs`, `uvh_queue_*_oldest_job_age_seconds` | Profundidad y antigüedad **del broker configurado** (Redis en producción), por pool | Un pool con cola creciente y heartbeat sano apunta a un worker sobrecargado, no parado |
 | `uvh_queue_failed_jobs` | Jobs agotados; siguen en PostgreSQL | Inspección manual de `failed_jobs` |
@@ -71,6 +73,16 @@ Por partes, con el comportamiento real de la aplicación:
   que cuando Redis falla los intentos se cuentan en PostgreSQL y cada fallback
   incrementa `cache.failed_over`. El coste es que la base de datos vuelve a
   hacer el trabajo que el cambio a Redis le quitó, y sólo mientras dure.
+- **Login, MFA, recuperación y registro: no dependen de Redis en absoluto.**
+  Los limitadores de credenciales cuentan en su propio store
+  (`CACHE_LIMITER_SECURITY`, `database` por defecto), que no es una cadena: si
+  Redis cae, el login sigue funcionando y la ventana **no** se reinicia. Ésa es
+  la razón de la separación — con un único store de tipo *failover*, la caída
+  habría estrenado un contador vacío en PostgreSQL (presupuesto nuevo para el
+  atacante) y, al volver Redis, sus contadores viejos habrían reaparecido por
+  encima de los nuevos, pudiendo bloquear a una cuenta legítima que ya había
+  dejado de intentarlo. Ver `app/Support/UvhLimiters.php` para la clasificación
+  y `AppServiceProvider` para el contrato de configuración.
 - **Locks (MFA, verificación de dominios, configuración de webhooks, intents,
   rotación de secretos)**: fallan cerrado. La operación afectada devuelve error
   o no progresa; ninguna se ejecuta sin la exclusión mutua que necesita. No se
@@ -129,6 +141,14 @@ escribió exactamente **2 filas** en `cache` —el contador y su ancla `:timer`�
 porque la clave del limitador es por IP y todo el tráfico tras un NAT compite
 por la misma fila. Con el limiter en Redis esa tabla se queda vacía.
 
+Ese coste por intento es la razón por la que los limitadores de **volumen**
+siguen en Redis: son los que corren en cada redirect. Los de **credenciales** se
+quedaron deliberadamente en PostgreSQL porque su volumen es mínimo (unos pocos
+intentos por cuenta y ventana) y porque ahí está la garantía que se busca: un
+único contador compartido, sin segunda ventana y sin dependencia de Redis. Pagar
+~3,8 ms en un intento de login es irrelevante; resetear la ventana de bloqueo no
+lo es.
+
 Lo que esta medición **no** sostiene: el residuo de +17,1 ms del ensayo de
 contensión de alias ([`docs/redirect-and-webhook-availability-policy.md`](redirect-and-webhook-availability-policy.md))
 no queda explicado por el limitador. ~4 ms es una parte, no el todo. Tampoco se
@@ -146,6 +166,9 @@ configuración:
 |---|---|
 | Un redirect se sirve con el backend de rate limit inalcanzable, y el intento se cuenta en el segundo store | `backend-laravel/tests/Feature/RateLimitFailoverTest.php` |
 | La degradación queda registrada como evento operativo | `AppServiceProvider` (listener de `CacheFailedOver`) y la prueba anterior |
+| Los limitadores de credenciales cuentan en su propio store, y una caída del de disponibilidad **no** les reinicia la ventana | `backend-laravel/tests/Feature/SecurityLimiterStoreTest.php` |
+| Cada nombre clasificado como credencial está registrado y lo usa una ruta, y los de volumen no se mueven | `backend-laravel/tests/Unit/UvhLimitersTest.php` |
+| Producción rechaza un store de credenciales vacío, `redis`, `failover` o por proceso | `backend-laravel/tests/Unit/ProductionSecurityTest.php` |
 | Profundidad y antigüedad salen del broker, y una lectura fallida no se publica como cero | `backend-laravel/tests/Feature/QueueBacklogTest.php` |
 | Las cadenas asíncronas completas (correo, webhook con reintento, analítica, export, DNS) corren sobre Redis | `npm run e2e:async` |
 | Perder el contenido del broker no pierde trabajo: el reconciliador republica y el worker entrega | ensayo «broker loss» de `npm run e2e:async` |

@@ -122,11 +122,26 @@ efectarse en el mismo sitio que los consulta, sin caché intermedia. Además el
 stack de sesión de Laravel está desactivado (`bootstrap/app.php` retira
 `StartSession`), así que `SESSION_DRIVER` no interviene.
 
-El rate limiter tiene su propio store (`CACHE_LIMITER`) porque es el único
-consumidor de caché que no puede caer con su backend: apunta a un store
-`failover` (Redis y, si no responde, PostgreSQL). Se degrada con una métrica
-(`cache.failed_over`), no en silencio. Los locks no usan ese store: mover un
-lock a otro backend permitiría que dos procesos lo creyeran suyo.
+El rate limiter tiene stores propios porque es el único consumidor de caché que
+no puede caer con su backend, y no todas sus clases pueden degradarse igual.
+
+Los límites de **volumen** (redirects, API, panel) apuntan a `CACHE_LIMITER`, un
+store `failover` (Redis y, si no responde, PostgreSQL): la superficie pública
+sigue contando y sirviendo durante una caída. Se degrada con una métrica
+(`cache.failed_over`), no en silencio.
+
+Los límites de **credenciales** (login, MFA, verificación, recuperación,
+restablecimiento, reautenticación, registro) cuentan en `CACHE_LIMITER_SECURITY`,
+un store único que no puede ser la cadena `failover` ni Redis. Para ellos un
+segundo backend no es un respaldo sino una segunda ventana vacía: la caída del
+primero regalaría presupuesto al atacante y, al volver, sus contadores antiguos
+podrían bloquear a una cuenta legítima. La clasificación está en
+`app/Support/UvhLimiters.php` y la aplica `UvhThrottleRequests`; el gate de
+producción rechaza una configuración que reintroduzca cualquiera de las dos
+cosas, y el login sigue funcionando con Redis caído porque ese store no es Redis.
+
+Los locks no usan ninguno de los dos: mover un lock a otro backend permitiría que
+dos procesos lo creyeran suyo.
 
 ## 7. Trabajos programados (scheduler)
 
@@ -139,11 +154,50 @@ El backend ejecuta cada 60 s un job (`UvhHousekeeping`) que:
 5. limpia sesiones/tokens revocados y expirados.
 
 En local corre con `php artisan schedule:work` (contenedor `schedule` del
-Compose). Producción separa las cargas `mail`, `webhooks`, `domains`, `exports`
-y `analytics` en workers y heartbeats independientes; `default` queda sólo como
-cola de compatibilidad para drenar jobs serializados antes del despliegue. Esta
-separación evita que una exportación o una consulta DNS/TLS larga bloquee correo
-de cuenta o entregas webhook.
+Compose). Producción separa las cargas `mail`, `webhooks`, `domains`, `exports`,
+`analytics` y `security` en workers y heartbeats independientes; `default` queda
+sólo como cola de compatibilidad para drenar jobs serializados antes del
+despliegue. Esta separación evita que una exportación, una consulta DNS/TLS o
+una llamada a un proveedor de reputación con timeout propio bloquee correo de
+cuenta o entregas webhook.
+
+La purga por fecha de las dos tablas de analítica se apoya en índices por `day`
+propios (`metric_rollups`, `metric_unique_visitors`): sus claves
+(`link_id, day[, visitor_hash]`) nunca llevan `day` delante, así que sin ellos
+cada barrido de retención recorre la tabla entera, una vez por minuto y sobre las
+mismas tablas que escribe el camino del clic. Sobre una tabla con historia hay
+que crearlos con `CONCURRENTLY`; la migración es idempotente después. La
+contención de los rollups —una fila por enlace y día compartida por todos los
+workers de `analytics`— y su techo medido están en
+[`analytics-rollup-capacity.md`](analytics-rollup-capacity.md).
+
+El mismo tick reanaliza los destinos cuya valoración falta o está caducada y
+vigila la reputación de los hosts propios. Ese barrido es acotado y se omite por
+completo si no hay proveedor configurado: sin proveedor no hay nada que
+preguntar y barrer sólo gastaría un job por enlace y ciclo.
+
+## 7 bis. Moderación a nivel de destino
+
+La unidad de moderación es el **destino**, no el enlace. Bloquear sólo el enlace
+dejaba el abuso intacto: la misma URL volvía como otro enlace minutos después y
+también era alcanzable por una regla de redirección. Hay por tanto dos capas
+independientes:
+
+- **Denylist local** (`destination_denylist`): determinista y síncrona, sin red.
+  Se aplica en el único punto por el que pasa toda escritura (`LinkService`),
+  incluida la superficie de tokens de API que no toca el panel. Empareja por
+  etiqueta (`evil.example` cubre sus subdominios, nunca `notevil.example`) y
+  guarda las URLs como hash canónico, no en claro. Puede caducar y reactivarse.
+- **Proveedor de reputación opcional** (pool `security`): asíncrono, nunca
+  decide una escritura. `suspicious` abre un caso de moderación; `malicious`
+  sólo bloquea si el despliegue ha activado `REPUTATION_AUTO_BLOCK`. `unknown`
+  nunca se presenta como «seguro». Contrato y operación:
+  [`url-reputation-runbook.md`](url-reputation-runbook.md).
+
+Un enlace bloqueado automáticamente es auditable (`system.link_block`) y
+apelable: el propietario abre una apelación y un moderador decide restaurar o
+mantener. Restaurar retira las entradas de denylist que aplicaban al destino, de
+modo que una persona puede anular una decisión automática.
 
 ## 8. Decisiones de seguridad destacadas
 

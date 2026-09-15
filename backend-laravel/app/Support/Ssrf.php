@@ -186,6 +186,100 @@ final class Ssrf
         if ($ch === false) {
             throw new \RuntimeException('SSRF: transporte no disponible');
         }
+        $opts = self::hardenedOptions($info, $headers, $body, $timeoutMs);
+        // Never retain a receiver-controlled response body in PHP memory.
+        // Returning its length keeps curl streaming until the hard timeout.
+        $opts[CURLOPT_WRITEFUNCTION] = static function ($handle, string $chunk): int {
+            return strlen($chunk);
+        };
+
+        curl_setopt_array($ch, $opts);
+        $out = curl_exec($ch);
+        if ($out === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            throw new \RuntimeException('SSRF: '.($err !== '' ? $err : 'error de red'));
+        }
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        if ($status <= 0) {
+            throw new \RuntimeException('SSRF: sin respuesta HTTP');
+        }
+
+        return ['status' => $status, 'ok' => $status >= 200 && $status < 300];
+    }
+
+    /**
+     * Igual que `safeFetch`, pero devolviendo el cuerpo con una cota dura.
+     *
+     * Las respuestas con cuerpo acotado y conocido (una decisión de reputación)
+     * no pueden usar el descarte de `safeFetch`. El límite se aplica aquí y no
+     * en el llamante: cuando se supera, la conexión se corta y el resultado se
+     * marca como fallo, de modo que un proveedor comprometido no puede inundar
+     * la memoria del worker que lo está consultando.
+     *
+     * @param  array<int, string>  $headers
+     * @return array{status: int, ok: bool, body: string, error: string|null}
+     */
+    public static function safeFetchBody(
+        string $url,
+        array $headers,
+        string $body,
+        int $timeoutMs = 5000,
+        int $maxBytes = 65536,
+    ): array {
+        $maxBytes = max(1024, min(1_048_576, $maxBytes));
+        $info = self::assertSafeUrl($url);
+
+        $ch = curl_init();
+        if ($ch === false) {
+            throw new \RuntimeException('SSRF: transporte no disponible');
+        }
+
+        $buffer = '';
+        $overflow = false;
+        $opts = self::hardenedOptions($info, $headers, $body, $timeoutMs);
+        $opts[CURLOPT_WRITEFUNCTION] = static function ($handle, string $chunk) use (&$buffer, &$overflow, $maxBytes): int {
+            if (strlen($buffer) + strlen($chunk) > $maxBytes) {
+                $overflow = true;
+
+                return 0; // aborta la transferencia
+            }
+            $buffer .= $chunk;
+
+            return strlen($chunk);
+        };
+
+        curl_setopt_array($ch, $opts);
+        $out = curl_exec($ch);
+        $networkError = $out === false ? curl_error($ch) : '';
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+
+        if ($overflow) {
+            return ['status' => $status, 'ok' => false, 'body' => '', 'error' => 'body_too_large'];
+        }
+        if ($out === false) {
+            throw new \RuntimeException('SSRF: '.($networkError !== '' ? $networkError : 'error de red'));
+        }
+        if ($status <= 0) {
+            throw new \RuntimeException('SSRF: sin respuesta HTTP');
+        }
+
+        return ['status' => $status, 'ok' => $status >= 200 && $status < 300, 'body' => $buffer, 'error' => null];
+    }
+
+    /**
+     * Opciones comunes a todo fetch endurecido: sin redirecciones, con las IPs
+     * validadas fijadas en connect-time y con timeout duro.
+     *
+     * @param  array{scheme: string, host: string, port: int, path: string, ips: array<int, string>}  $info
+     * @param  array<int, string>  $headers  cabeceras crudas "Name: value"
+     * @return array<int, mixed>
+     */
+    private static function hardenedOptions(array $info, array $headers, string $body, int $timeoutMs): array
+    {
         // Los literales IPv6 requieren corchetes en la URL.
         $urlHost = str_contains($info['host'], ':') ? '['.$info['host'].']' : $info['host'];
         $opts = [
@@ -207,11 +301,6 @@ final class Ssrf
             // pinned destination with a proxy-side DNS lookup.
             CURLOPT_PROXY => '',
             CURLOPT_NOPROXY => '*',
-            // Never retain a receiver-controlled response body in PHP memory.
-            // Returning its length keeps curl streaming until the hard timeout.
-            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk): int {
-                return strlen($chunk);
-            },
         ];
 
         // Fijar las IPs ya validadas: curl no vuelve a resolver el host, con lo
@@ -226,21 +315,7 @@ final class Ssrf
             $opts[CURLOPT_RESOLVE] = $resolve;
         }
 
-        curl_setopt_array($ch, $opts);
-        $out = curl_exec($ch);
-        if ($out === false) {
-            $err = curl_error($ch);
-            curl_close($ch);
-
-            throw new \RuntimeException('SSRF: '.($err !== '' ? $err : 'error de red'));
-        }
-        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
-        if ($status <= 0) {
-            throw new \RuntimeException('SSRF: sin respuesta HTTP');
-        }
-
-        return ['status' => $status, 'ok' => $status >= 200 && $status < 300];
+        return $opts;
     }
 
     /**

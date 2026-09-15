@@ -53,6 +53,12 @@ Este documento es un gate de lanzamiento, no una declaración de que el entorno 
   cadenas asíncronas sobre Redis. **Falta la evidencia sobre la instancia
   real**: memoria frente al límite, latencia observada y persistencia tras un
   reinicio real no se acreditan con un contenedor efímero.
+- [ ] Los límites de credenciales cuentan en su propio store
+  (`CACHE_LIMITER_SECURITY`), compartido y **no** dependiente de Redis, y se ha
+  comprobado sobre el despliegue real que un Redis inalcanzable no reinicia la
+  ventana de login ni bloquea el inicio de sesión. Sí se ha comprobado en
+  contenedor (`SecurityLimiterStoreTest`); la prueba sobre la instancia real
+  sigue pendiente.
 - [ ] PostgreSQL usa `sslmode=verify-full` con una cadena de confianza válida.
 - [ ] Existe backup automático cifrado, política de retención y alerta de fallo.
   El mecanismo está implementado y probado (`docker/backup/`, `docs/backup-and-restore.md`,
@@ -72,8 +78,8 @@ Este documento es un gate de lanzamiento, no una declaración de que el entorno 
 
 ## Procesos y observabilidad
 
-- [ ] Cada pool (`mail`, `webhooks`, `domains`, `exports`, `analytics` y
-  `legacy`) y el scheduler están supervisados; detener uno genera una alerta
+- [ ] Cada pool (`mail`, `webhooks`, `domains`, `exports`, `analytics`,
+  `security` y `legacy`) y el scheduler están supervisados; detener uno genera una alerta
   diferenciada sin que el heartbeat genérico o el de otro pool la oculte.
 - [ ] Cada timeout de job es menor que el timeout de su worker y éste es menor
   que el `retry_after` de la cola (`REDIS_QUEUE_RETRY_AFTER` con Redis,

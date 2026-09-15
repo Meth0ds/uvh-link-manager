@@ -177,6 +177,9 @@ final class ProductionSecurity
         if (! self::validLimiterStore($settings)) {
             $errors[] = 'CACHE_LIMITER debe usar uno o más stores compartidos entre procesos en producción';
         }
+        if (! self::validSecurityLimiterStore($settings)) {
+            $errors[] = 'CACHE_LIMITER_SECURITY debe usar un store compartido propio, ni la cadena de failover ni Redis';
+        }
         foreach (self::redisErrors($settings) as $redisError) {
             $errors[] = $redisError;
         }
@@ -255,6 +258,37 @@ final class ProductionSecurity
         }
 
         return $errors;
+    }
+
+    /**
+     * The credential limiters must count where every process can see them *and*
+     * where the counter cannot restart.
+     *
+     * Three things are refused, each for its own reason:
+     *
+     *  - **Empty.** Without it the credential limiters silently keep using the
+     *    availability store, which in production is a failover chain: the very
+     *    discontinuity this setting exists to remove would remain, invisible.
+     *  - **A failover chain.** Its second member is a second, empty counter, so
+     *    an outage of the first grants a fresh budget for as long as it lasts.
+     *  - **Redis.** It is the dependency whose outage this separation exists to
+     *    survive, and `login` must keep working when it falls. A deployment that
+     *    wants credential counters on a shared Redis is choosing to trade that
+     *    property away, and has to say so by changing this rule.
+     *
+     * `database` is the shipped value: it is already a hard requirement of every
+     * request, so its availability adds no new dependency.
+     *
+     * @param  array<string, mixed>  $settings
+     */
+    private static function validSecurityLimiterStore(array $settings): bool
+    {
+        $driver = $settings['cache_limiter_security_driver'] ?? null;
+        if (! is_string($driver) || $driver === '') {
+            return false;
+        }
+
+        return in_array($driver, ['database', 'memcached', 'dynamodb'], true);
     }
 
     /**

@@ -189,3 +189,41 @@ autenticado con los cuatro roles, producción, DNS/TLS, webhooks reales ni E2E.
   Es otro entry point, no una ruta sin auth en la aplicación. No se despliega.
 - No depender de procesos o pestañas del chat: comprobar handles/puertos vivos
   antes de abrir otro servidor. No arrancar colas ni scheduler para mirar CSS.
+
+## Actualización: flujos protegidos de Ajustes (15-09-2026)
+
+- Cambio de contraseña, cambio/cancelación de email, exportación de datos y
+  cierre de cuenta usan diálogos guiados. Cuando hay MFA, el código se solicita en un paso exclusivo,
+  sin repetir en pantalla la contraseña ni los datos del paso anterior.
+- Los secretos sólo viven en la instancia del diálogo, se limpian al cerrar,
+  retroceder o fallar y nunca se devuelven mediante `afterClosed`. Un cambio de
+  generación de sesión invalida el envío; el backend conserva la autoridad.
+- El foco inicial cae en el campo pertinente o en el encabezado de revisión y,
+  al avanzar, pasa al encabezado del nuevo paso. El movimiento respeta
+  `prefers-reduced-motion`.
+- Verificación de este lote: TypeScript de aplicación y preview, ESLint
+  focalizado y `git diff --check`, todos correctos. Las suites automatizadas se
+  mantienen pausadas por petición del usuario.
+- Vista aislada oscura: recorridos de contraseña, email, exportación y cierre comprobados
+  con datos ficticios y detenidos antes del envío. Sin errores de consola. A
+  320 px, documento 320/320 y diálogo 300,8 px, sin desbordamiento.
+
+## Actualización: Analítica y navegación activa (15-09-2026)
+
+- Analítica cambia el selector desplegable por cuatro periodos directos,
+  incorpora una explicación de privacidad y ordena la información como un
+  registro: resumen, serie, lectura del periodo, desgloses y ranking.
+- La serie compartida añade pico, media diaria y último dato sin inventar
+  conversiones ni usuarios únicos. Conserva la tabla accesible y sustituye la
+  cuadrícula CSS degradada por reglas reales basadas en tokens.
+- Las respuestas válidas sin actividad muestran una sola explicación de
+  desglose vacío. Error y carga permanecen como estados independientes.
+- El ranking utiliza enlaces semánticos y métricas formateadas. El indicador
+  activo del menú lateral ya no depende de una ligadura que podía mostrarse
+  recortada como texto; ahora es un chevrón CSS decorativo estable.
+- La vista aislada incorpora `/app/analytics` con datos ficticios y API
+  bloqueada. Verificación: typecheck de aplicación y preview, ESLint focalizado
+  y `git diff --check`, todos correctos. No se ejecutaron suites automatizadas.
+- Navegador: claro/escritorio y oscuro/320 px revisados; estados con datos,
+  vacío, error y carga son distinguibles. Documento 320/320, contenido 310/310
+  y sin errores de consola. No se realizó ninguna escritura.

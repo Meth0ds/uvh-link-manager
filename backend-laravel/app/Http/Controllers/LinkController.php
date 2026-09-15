@@ -11,11 +11,13 @@ use App\Support\IsoDate;
 use App\Support\LinkService;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\MfaStepUp;
+use App\Support\OperationalMetrics;
 use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
 use App\Support\WorkspaceAccess;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -235,7 +237,23 @@ class LinkController
             'createdAt' => $this->iso($r->created_at),
         ]);
 
-        return response()->json(['link' => LinkService::dto($link), 'rules' => $rules]);
+        // Whether an appeal is already open is part of the link's state for its
+        // owner: without it the panel can only offer an action that would be
+        // refused.
+        $appeal = DB::table('link_appeals')
+            ->where('link_id', $id)
+            ->orderByDesc('id')
+            ->first(['status', 'created_at', 'decided_at']);
+
+        return response()->json([
+            'link' => LinkService::dto($link),
+            'rules' => $rules,
+            'appeal' => $appeal === null ? null : [
+                'status' => (string) $appeal->status,
+                'createdAt' => $this->iso($appeal->created_at),
+                'decidedAt' => $this->iso($appeal->decided_at),
+            ],
+        ]);
     }
 
     public function update(Request $request, int $id)
@@ -375,6 +393,72 @@ class LinkController
         ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true, 'state' => $transition['to']]);
+    }
+
+    /**
+     * Contest a block.
+     *
+     * One open appeal per link, enforced by a partial unique index rather than
+     * by this check alone: editing a block is the only way a false positive
+     * reaches a human, and it must not be possible to turn the queue into a
+     * mailbox. Deciding it is an administrative action.
+     */
+    public function appeal(Request $request, int $id): JsonResponse
+    {
+        $workspaceId = UvhRequest::workspaceId($request);
+        $user = UvhRequest::user($request);
+
+        $message = $request->input('message');
+        if ($message !== null && (! is_string($message) || ! mb_check_encoding($message, 'UTF-8')
+            || mb_strlen($message) > 2000 || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $message))) {
+            return response()->json(['error' => 'Datos inválidos'], 422);
+        }
+
+        try {
+            $apiTokenContext = UvhRequest::apiToken($request);
+            $appealId = DB::transaction(function () use ($workspaceId, $user, $id, $message, $apiTokenContext): int {
+                if (! WorkspaceAccess::getMembershipLocked(
+                    $user->id,
+                    $workspaceId,
+                    'editor',
+                    $apiTokenContext,
+                    'links:write',
+                    (int) $user->security_version,
+                )) {
+                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                }
+                $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
+                    ->whereNull('deleted_at')->lockForUpdate()->first();
+                if (! $link) {
+                    throw new LinkException('Enlace no encontrado', 404);
+                }
+                if ((string) $link->state !== 'blocked') {
+                    throw new LinkException('Este enlace no está bloqueado', 409);
+                }
+                $inserted = DB::table('link_appeals')->insertOrIgnore([
+                    'link_id' => $id,
+                    'workspace_id' => $workspaceId,
+                    'actor_user_id' => $user->id,
+                    'message' => is_string($message) && $message !== '' ? $message : null,
+                    'status' => 'open',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                if ($inserted !== 1) {
+                    throw new LinkException('Ya hay una apelación abierta para este enlace', 409);
+                }
+
+                return (int) DB::table('link_appeals')
+                    ->where('link_id', $id)->where('status', 'open')->value('id');
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
+        }
+
+        Audit::write($user->id, 'link.appeal', 'link', $id, ['appealId' => $appealId], UvhRequest::ip($request), workspaceId: $workspaceId);
+        OperationalMetrics::increment('reputation.appeal_opened');
+
+        return response()->json(['ok' => true, 'appealId' => $appealId], 201);
     }
 
     public function destroy(Request $request, int $id)

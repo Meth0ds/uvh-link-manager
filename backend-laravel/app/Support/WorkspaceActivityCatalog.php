@@ -42,5 +42,12 @@ final class WorkspaceActivityCatalog
         'workspace.invitation_delivery_failed' => ['workspace', 'Admisión de invitación fallida', 'failed'],
         'admin.link_block' => ['link', 'Enlace bloqueado por moderación', 'completed'],
         'admin.link_unblock' => ['link', 'Bloqueo de moderación retirado', 'completed'],
+        // An automatic block has to be as visible to the workspace as a manual
+        // one: the owner did not press anything, and would otherwise find a link
+        // silently stopped.
+        'system.link_block' => ['link', 'Enlace bloqueado automáticamente', 'completed'],
+        'system.link_reputation_signal' => ['link', 'Señal de reputación registrada', 'pending'],
+        'link.appeal' => ['link', 'Apelación enviada', 'pending'],
+        'admin.link_appeal_resolved' => ['link', 'Apelación resuelta', 'completed'],
     ];
 }

@@ -78,7 +78,7 @@ forma concreta de evitar pérdida de servicio depende del balanceador; este
 comando provoca sustitución de contenedores y no acredita alta disponibilidad:
 
 ```powershell
-docker compose -f docker-compose.production.yml -f docker-compose.rotation.yml up -d --no-deps --force-recreate app queue-mail queue-webhooks queue-domains queue-exports queue-analytics queue-legacy scheduler
+docker compose -f docker-compose.production.yml -f docker-compose.rotation.yml up -d --no-deps --force-recreate app queue-mail queue-webhooks queue-domains queue-exports queue-analytics queue-security queue-legacy scheduler
 ```
 
 Comprobar health/heartbeats y un flujo controlado de MFA, firma de webhook y

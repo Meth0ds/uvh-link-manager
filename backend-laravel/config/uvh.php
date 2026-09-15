@@ -62,7 +62,26 @@ return [
     'hsts_enabled' => filter_var(env('HSTS_ENABLED', 'false'), FILTER_VALIDATE_BOOLEAN),
     'trust_country_header' => filter_var(env('TRUST_COUNTRY_HEADER', 'false'), FILTER_VALIDATE_BOOLEAN),
     'country_header' => env('COUNTRY_HEADER', 'cf-ipcountry'),
-    'reputation_provider_url' => env('REPUTATION_PROVIDER_URL'),
+    // Reputación de destinos. El adaptador es opcional y su ausencia se
+    // publica como capacidad no verificada; nunca como destino "seguro".
+    // El bloqueo automático está desactivado por defecto: un veredicto que este
+    // despliegue no ha recibido no puede bloquear a nadie.
+    'reputation' => [
+        'provider_url' => env('REPUTATION_PROVIDER_URL'),
+        'provider_token' => env('REPUTATION_PROVIDER_TOKEN'),
+        // Timeout duro de la consulta. También es el de conexión: el transporte
+        // endurecido usa el mismo valor para ambos y nunca reintenta.
+        'timeout_seconds' => (int) env('REPUTATION_TIMEOUT_SECONDS', 5),
+        'max_body_bytes' => (int) env('REPUTATION_MAX_BODY_BYTES', 65536),
+        // Cuánto vale un veredicto antes de volver a preguntar. El proveedor
+        // puede acortarlo en su respuesta, nunca alargarlo.
+        'cache_ttl_hours' => (int) env('REPUTATION_CACHE_TTL_HOURS', 24),
+        // Reanálisis por ciclo del scheduler. Acotado: es un barrido de fondo,
+        // no un recorrido de todos los enlaces.
+        'recheck_batch' => (int) env('REPUTATION_RECHECK_BATCH', 50),
+        'auto_block' => filter_var(env('REPUTATION_AUTO_BLOCK', false), FILTER_VALIDATE_BOOLEAN),
+        'domain_monitor' => filter_var(env('REPUTATION_DOMAIN_MONITOR', true), FILTER_VALIDATE_BOOLEAN),
+    ],
     'public_status' => [
         // This must point to a monitor outside the UVH deployment. The API
         // never derives public health from its own /health endpoint.

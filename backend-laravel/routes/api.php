@@ -122,6 +122,9 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::post('{id}/state', [LinkController::class, 'state'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
         Route::delete('{id}', [LinkController::class, 'destroy'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
         Route::post('{id}/restore', [LinkController::class, 'restore'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
+        // An owner has to be able to contest a block, including an automatic
+        // one. Previously the documentation claimed a path existed and none did.
+        Route::post('{id}/appeal', [LinkController::class, 'appeal'])->middleware(['uvh.workspace:editor', 'throttle:uvh-appeal'])->where('id', '[0-9]+');
         Route::post('{id}/purge', [LinkController::class, 'purge'])->middleware(['uvh.workspace:admin', 'throttle:uvh-credential'])->where('id', '[0-9]+');
     });
 
@@ -196,6 +199,13 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::post('reports/{id}/moderate', [AdminController::class, 'moderateReport'])->where('id', '[0-9]+');
         Route::post('links/{id}/block', [AdminController::class, 'blockLink'])->where('id', '[0-9]+');
         Route::post('links/{id}/unblock', [AdminController::class, 'unblockLink'])->where('id', '[0-9]+');
+        // Blocking the link leaves the destination one click away; this is the
+        // action that makes the decision stick.
+        Route::post('links/{id}/block-destination', [AdminController::class, 'blockDestination'])->where('id', '[0-9]+');
+        Route::get('destinations', [AdminController::class, 'denylist']);
+        Route::delete('destinations/{id}', [AdminController::class, 'removeDenylistEntry'])->where('id', '[0-9]+');
+        Route::get('appeals', [AdminController::class, 'appeals']);
+        Route::post('appeals/{id}/decision', [AdminController::class, 'resolveAppeal'])->where('id', '[0-9]+');
         Route::get('domains', [AdminController::class, 'domains']);
         Route::get('audit', [AdminController::class, 'audit']);
         Route::get('operations', [AdminController::class, 'operations']);

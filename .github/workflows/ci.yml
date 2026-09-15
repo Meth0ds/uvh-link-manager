@@ -260,7 +260,11 @@ jobs:
   async-e2e:
     name: Runtime / asynchronous queue contract
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The suite now also runs the rollup contention drill, which scales the
+    # analytics pool and measures twelve interleaved passes. Its knobs default
+    # to a CI-sized volume, but the job still needs headroom over the previous
+    # 30 minutes so the measurement does not turn into a flaky timeout.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
