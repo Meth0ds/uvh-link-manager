@@ -160,6 +160,13 @@ reintentos, conservación y alertas está en
 
 Partir de `backend-laravel/.env.production.example`, almacenarlo fuera del repositorio y limitar su lectura a la cuenta de despliegue. Claves requeridas: `APP_KEY` (generada con `php artisan key:generate`), `APP_SECRET` independiente y aleatorio, credenciales PostgreSQL, claves reales de hCaptcha, `RESEND_API_KEY`, hosts públicos y proxies concretos. También son obligatorios titular legal, identificador fiscal, domicilio, datos registrales, proveedor de alojamiento y región reales; el proceso **rechaza el arranque** si falta una invariante crítica o se conserva un marcador de ejemplo. Mantener `COOKIE_DOMAIN` vacío. La ceremonia de cambio de `APP_SECRET`, su keyring temporal y rollback están en [`docs/app-secret-rotation-runbook.md`](app-secret-rotation-runbook.md); tener el archivo no acredita que se haya ensayado.
 
+La referencia **exhaustiva** —variable por variable, con su obligatoriedad, su
+valor por defecto, qué se rompe si falta y qué interruptores cambian garantías—
+es [`docs/configuration.md`](configuration.md). Esta sección se queda con lo que
+sólo tiene sentido al desplegar; para cualquier duda del tipo «¿es obligatorio?,
+¿qué pasa si lo dejo vacío?, ¿cómo sé que no he roto nada?», la respuesta está
+allí.
+
 **Redis** es el store compartido de caché, rate limits, locks y colas
 (`CACHE_STORE=redis`, `QUEUE_CONNECTION=redis`). Su contraseña se entrega como
 secreto (`UVH_REDIS_PASSWORD_FILE` → `REDIS_PASSWORD_FILE`), nunca como valor

@@ -5,6 +5,9 @@ Este documento describe el contrato, la operación y —explícitamente— lo qu
 todavía no está acreditado. No cierra por sí solo el requisito de abrir el
 servicio al público.
 
+Las siete variables `REPUTATION_*`, con su obligatoriedad y su valor por
+defecto, están en [`configuration.md` §15](configuration.md#15-reputación-de-destinos-y-moderación).
+
 ## Por qué esto existe
 
 Para un acortador abierto, el riesgo no es sólo un compromiso técnico. También
