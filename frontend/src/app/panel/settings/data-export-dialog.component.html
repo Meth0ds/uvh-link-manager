@@ -1,0 +1,36 @@
+<h2 mat-dialog-title><span class="title-mark" aria-hidden="true"><mat-icon>archive</mat-icon></span><span><small>Tus datos</small><b>Preparar una exportación</b></span></h2>
+<mat-dialog-content>
+  <ol class="steps" aria-label="Progreso de la solicitud de exportación">
+    <li [attr.aria-current]="step() === 1 ? 'step' : null" [class.done]="step() > 1"><span>1</span>Contraseña</li>
+    @if (requiresMfa) { <li [attr.aria-current]="step() === 2 ? 'step' : null" [class.done]="step() > 2"><span>2</span>Segundo factor</li> }
+    <li [attr.aria-current]="isDone() ? 'step' : null"><span>{{ requiresMfa ? 3 : 2 }}</span>Correo</li>
+  </ol>
+
+  <h3 #stepHeading tabindex="-1">{{ step() === 1 ? 'Confirma la solicitud' : step() === 2 && requiresMfa ? 'Introduce tu segundo factor' : 'Revisa tu correo' }}</h3>
+
+  @if (step() === 1) {
+    <p class="intro">El archivo se prepara en almacenamiento privado. Te enviaremos un enlace de confirmación y la descarga final sólo podrá utilizarse una vez.</p>
+    <form id="export-password-step" [formGroup]="passwordForm" (ngSubmit)="continueFromPassword()">
+      <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" [readonly]="busy()" /><mat-icon matPrefix>lock_outline</mat-icon>@if (passwordForm.controls.password.invalid && passwordForm.controls.password.touched) { <mat-error>Introduce tu contraseña actual.</mat-error> }</mat-form-field>
+    </form>
+  } @else if (step() === 2 && requiresMfa) {
+    <div class="factor-intro"><span class="factor-mark" aria-hidden="true"><mat-icon>phonelink_lock</mat-icon></span><p>Este paso sólo verifica tu segundo factor. La contraseña ya no se muestra en pantalla.</p></div>
+    <form id="export-factor-step" [formGroup]="factorForm" (ngSubmit)="submit()">
+      <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" inputmode="numeric" maxlength="24" [readonly]="busy()" /><mat-icon matPrefix>key</mat-icon><mat-hint>6 dígitos o un código de recuperación.</mat-hint>@if (factorForm.controls.factorCode.invalid && factorForm.controls.factorCode.touched) { <mat-error>Introduce un código válido.</mat-error> }</mat-form-field>
+    </form>
+  } @else {
+    <div class="result" role="status"><mat-icon aria-hidden="true">mark_email_unread</mat-icon><p><b>La solicitud está preparada.</b> Revisa tu correo para confirmarla. La página de Ajustes mostrará después su estado.</p></div>
+  }
+  @if (error(); as message) { <div class="error" role="alert">{{ message }}</div> }
+</mat-dialog-content>
+<mat-dialog-actions>
+  @if (!isDone()) {
+    <button mat-button type="button" (click)="ref.close(false)" [disabled]="busy()">Cancelar</button>
+    @if (step() === 1) {
+      <button mat-flat-button type="submit" form="export-password-step" [disabled]="passwordForm.invalid || busy()">{{ requiresMfa ? 'Continuar a 2FA' : (busy() ? 'Solicitando…' : 'Solicitar mi archivo') }}</button>
+    } @else {
+      <button mat-stroked-button type="button" (click)="back()" [disabled]="busy()">Atrás</button>
+      <button mat-flat-button type="submit" form="export-factor-step" [disabled]="factorForm.invalid || busy()" [attr.aria-busy]="busy()">{{ busy() ? 'Verificando…' : 'Verificar y solicitar' }}</button>
+    }
+  } @else { <button mat-flat-button type="button" (click)="ref.close(true)">Entendido</button> }
+</mat-dialog-actions>

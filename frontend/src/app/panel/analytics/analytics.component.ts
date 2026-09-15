@@ -1,10 +1,8 @@
 import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
-import { Router, RouterLink } from "@angular/router";
+import { RouterLink } from "@angular/router";
 
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
-import { MatSelectModule } from "@angular/material/select";
-import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { ChartsComponent } from "./charts.component";
@@ -21,8 +19,6 @@ import { decodeAnalyticsOverview } from "../../core/services/link-response-decod
   imports: [
     MatButtonModule,
     MatIconModule,
-    MatSelectModule,
-    MatFormFieldModule,
     MatProgressBarModule,
     RouterLink,
     ChartsComponent,
@@ -34,15 +30,20 @@ import { decodeAnalyticsOverview } from "../../core/services/link-response-decod
   styleUrl: "./analytics.component.scss",
 })
 export class AnalyticsComponent {
+  private readonly numberFormatter = new Intl.NumberFormat("es-ES");
   private api = inject(ApiService);
   private workspaces = inject(WorkspaceService);
   private readonly requests = new LatestRequest(inject(DestroyRef));
-  readonly router = inject(Router);
-
   readonly overview = signal<AnalyticsOverview | null>(null);
   readonly period = signal("7d");
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly periodOptions = [
+    { value: "24h", short: "24 h", label: "Últimas 24 horas" },
+    { value: "7d", short: "7 d", label: "Últimos 7 días" },
+    { value: "30d", short: "30 d", label: "Últimos 30 días" },
+    { value: "90d", short: "90 d", label: "Últimos 90 días" },
+  ] as const;
 
   private loadedWorkspaceId: number | null | undefined;
 
@@ -100,13 +101,11 @@ export class AnalyticsComponent {
     await this.load();
   }
 
-  openLink(id: number): void {
-    void this.router.navigate(["/app/links", id]);
+  periodLabel(): string {
+    return this.periodOptions.find((option) => option.value === this.period())?.label ?? "Periodo seleccionado";
   }
 
-  openLinkFromKeyboard(event: KeyboardEvent, id: number): void {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    this.openLink(id);
+  formatCount(value: number): string {
+    return this.numberFormatter.format(value);
   }
 }

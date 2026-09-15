@@ -53,11 +53,9 @@
   <div class="email-management">
     <div class="email-management-heading">
       <div><h3>Email de acceso</h3><p class="current-email">{{ user()?.email }}</p><p>Tu dirección para iniciar sesión y recibir avisos de seguridad. El cambio requiere confirmar el nuevo buzón.</p></div>
-      @if (!emailChangeOpen()) {
-        <button mat-stroked-button type="button" (click)="beginEmailChange()" [disabled]="emailBusy()">
+        <button mat-stroked-button type="button" (click)="openEmailDialog('change')">
           <mat-icon>alternate_email</mat-icon>{{ user()?.pendingEmail ? 'Usar otro email' : 'Cambiar email' }}
         </button>
-      }
     </div>
 
     @if (user()?.pendingEmail; as pendingEmail) {
@@ -68,29 +66,7 @@
           <p>Hemos enviado un enlace a <strong>{{ pendingEmail }}</strong>. Caduca {{ formatDate(user()?.pendingEmailExpiresAt ?? '') }}.</p>
         </div>
       </section>
-      <details class="email-cancel">
-        <summary>Cancelar la solicitud pendiente</summary>
-        <form class="stack inset-form" [formGroup]="emailCancelForm" (ngSubmit)="cancelEmailChange()">
-          <p>Confirma tu identidad para invalidar el enlace enviado.</p>
-          <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
-          @if (user()?.mfaEnabled) {
-            <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon>@if (emailCancelForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> }</mat-form-field>
-          }
-          <div class="row-actions"><button mat-stroked-button class="danger" type="submit" [disabled]="emailBusy()">{{ emailBusy() ? 'Cancelando…' : 'Invalidar enlace' }}</button></div>
-        </form>
-      </details>
-    }
-
-    @if (emailChangeOpen()) {
-      <form class="stack inset-form email-change-form" [formGroup]="emailChangeForm" (ngSubmit)="requestEmailChange()">
-        <div><b>{{ user()?.pendingEmail ? 'Sustituir email pendiente' : 'Cambiar email de acceso' }}</b><p>Enviaremos una confirmación al nuevo buzón y un aviso al actual. Al confirmar se cerrarán todas tus sesiones.</p></div>
-        <mat-form-field appearance="outline"><mat-label>Nuevo email</mat-label><input matInput type="email" formControlName="newEmail" autocomplete="email" maxlength="254" /><mat-icon matPrefix>mail_outline</mat-icon>@if (emailChangeForm.controls.newEmail.invalid && emailChangeForm.controls.newEmail.touched) { <mat-error>Introduce un email válido.</mat-error> }</mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
-        @if (user()?.mfaEnabled) {
-          <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon>@if (emailChangeForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> } @if (emailChangeForm.controls.factorCode.hasError('pattern')) { <mat-error>El código no tiene un formato válido.</mat-error> }</mat-form-field>
-        }
-        <div class="row-actions"><button mat-stroked-button type="button" (click)="closeEmailChange()" [disabled]="emailBusy()">Volver</button><button mat-flat-button color="primary" type="submit" [disabled]="emailChangeForm.invalid || emailBusy()">{{ emailBusy() ? 'Enviando…' : 'Enviar confirmación' }}</button></div>
-      </form>
+      <button mat-button type="button" class="cancel-email-link" (click)="openEmailDialog('cancel')"><mat-icon aria-hidden="true">link_off</mat-icon>Invalidar enlace pendiente</button>
     }
   </div>
 </div>
@@ -116,41 +92,11 @@
 <!-- Password -->
 <div class="card-block password-card">
   <div class="card-heading"><span class="card-icon"><mat-icon>password</mat-icon></span><div><h3>Contraseña</h3><p>Actualiza tu credencial y mantén una combinación única.</p></div></div>
-  <form class="stack" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
-    <mat-form-field appearance="outline">
-      <mat-label>Contraseña actual</mat-label>
-      <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="current" autocomplete="current-password" maxlength="72" />
-      <mat-icon matPrefix>lock_outline</mat-icon>
-    </mat-form-field>
-    <div class="grid-2">
-      <mat-form-field appearance="outline">
-        <mat-label>Nueva contraseña</mat-label>
-        <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="next" autocomplete="new-password" maxlength="72" />
-        <mat-hint>Mínimo 10 caracteres</mat-hint>
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Confirmar contraseña</mat-label>
-        <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
-      </mat-form-field>
-    </div>
-    @if (user()?.mfaEnabled) {
-      <mat-form-field appearance="outline">
-        <mat-label>Código de autenticación o recuperación</mat-label>
-        <input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" aria-describedby="password-factor-hint" />
-        <mat-icon matPrefix>key</mat-icon>
-        <mat-hint id="password-factor-hint">Esta operación requiere un código actual de tu aplicación o un código de recuperación.</mat-hint>
-        @if (passwordForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> }
-        @if (passwordForm.controls.factorCode.hasError('pattern')) { <mat-error>El código no tiene un formato válido.</mat-error> }
-      </mat-form-field>
-    }
-    <div class="row-actions">
-      <button mat-stroked-button type="button" (click)="hidePassword.set(!hidePassword())">
-        <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
-        {{ hidePassword() ? 'Mostrar' : 'Ocultar' }}
-      </button>
-      <button mat-flat-button color="primary" type="submit" [disabled]="passwordForm.invalid || passwordBusy()">{{ passwordBusy() ? 'Actualizando…' : 'Actualizar contraseña' }}</button>
-    </div>
-  </form>
+  <div class="security-entry">
+    <span class="security-entry-mark" aria-hidden="true"><mat-icon>encrypted</mat-icon></span>
+    <p><b>Proceso protegido</b><span>La contraseña y el segundo factor se solicitan en pasos separados.</span></p>
+    <button mat-stroked-button type="button" (click)="openPasswordDialog()">Cambiar contraseña<mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
+  </div>
 </div>
 
 <!-- MFA -->
@@ -301,14 +247,11 @@
     @if (exportIsActive()) {
       <div class="row-actions"><button mat-stroked-button class="danger" type="button" (click)="cancelDataExport()" [disabled]="exportBusy()">{{ exportBusy() ? 'Cancelando…' : 'Cancelar exportación' }}</button><button mat-stroked-button type="button" (click)="loadExportStatus()" [disabled]="exportBusy()"><mat-icon>refresh</mat-icon>Actualizar estado</button></div>
     } @else {
-      <form class="stack export-form" [formGroup]="exportForm" (ngSubmit)="requestDataExport()">
-        <p class="muted compact">Por seguridad, confirmaremos la solicitud por email. El archivo se cifra en almacenamiento privado y el enlace final sólo funciona una vez.</p>
-        <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
-        @if (user()?.mfaEnabled) {
-          <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon>@if (exportForm.controls.factorCode.hasError('required')) { <mat-error>Introduce tu segundo factor.</mat-error> } @if (exportForm.controls.factorCode.hasError('pattern')) { <mat-error>El código no tiene un formato válido.</mat-error> }</mat-form-field>
-        }
-        <div class="row-actions"><button mat-flat-button color="primary" type="submit" [disabled]="exportForm.invalid || exportBusy()">{{ exportBusy() ? 'Solicitando…' : 'Solicitar mi archivo' }}</button></div>
-      </form>
+      <div class="security-entry export-entry">
+        <span class="security-entry-mark" aria-hidden="true"><mat-icon>encrypted</mat-icon></span>
+        <p><b>Archivo privado y de un solo uso</b><span>Confirmaremos por email y separaremos la contraseña del segundo factor.</span></p>
+        <button mat-stroked-button type="button" (click)="openDataExportDialog()"><mat-icon aria-hidden="true">download</mat-icon>Solicitar mi archivo</button>
+      </div>
     }
   }
 </div>

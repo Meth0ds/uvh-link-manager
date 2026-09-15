@@ -140,16 +140,17 @@ describe("SettingsComponent async safety", () => {
     expect(auth.updateProfile).not.toHaveBeenCalled();
   });
 
-  it("keeps all sensitive sections mounted and account deletion behind disclosure", () => {
+  it("keeps sensitive sections mounted while credentials stay outside the settings page", () => {
     const fixture = TestBed.createComponent(SettingsComponent);
     fixture.componentInstance.deletionLoading.set(false);
     fixture.componentInstance.deletionImpact.set({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null });
     fixture.detectChanges();
     const element: HTMLElement = fixture.nativeElement;
     expect(element.querySelectorAll('.settings-section[tabindex="-1"]')).toHaveSize(4);
-    const disclosure = element.querySelector<HTMLDetailsElement>(".account-danger");
-    expect(disclosure?.open).toBeFalse();
-    expect(element.querySelector<HTMLButtonElement>('.deletion-form button[type="submit"]')?.disabled).toBeTrue();
+    expect(element.querySelector<HTMLButtonElement>(".deletion-entry button")).not.toBeNull();
+    expect(element.querySelector(".deletion-entry input")).toBeNull();
+    expect(element.querySelector(".password-card input")).toBeNull();
+    expect(element.querySelector(".data-card input")).toBeNull();
   });
 
   it("does not report zero sessions as a successful result when the read fails", () => {
@@ -234,15 +235,13 @@ describe("SettingsComponent async safety", () => {
     );
   });
 
-  it("keeps a confirmed password change distinct from a failed refresh", async () => {
-    auth.refreshUser.and.rejectWith(new Error("offline"));
-    component.passwordForm.setValue({ current: "old-password", next: "new-password", confirm: "new-password", factorCode: "" });
+  it("does not ask for a password or factor before opening the protected flow", () => {
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
 
-    await component.changePassword();
-
-    const messages = snackbar.open.calls.allArgs().map((args) => args[0]);
-    expect(messages).toContain("Contraseña actualizada");
-    expect(messages).toContain("El cambio se aplicó, pero no se pudo actualizar toda la vista. Recárgala antes de repetir la operación.");
+    expect(element.querySelector<HTMLButtonElement>(".password-card button")?.textContent).toContain("Cambiar contraseña");
+    expect(element.querySelector(".password-card input")).toBeNull();
+    expect(auth.changePassword).not.toHaveBeenCalled();
   });
 
   it("restores the previous workspace when navigation is cancelled", async () => {

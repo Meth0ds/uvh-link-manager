@@ -16,6 +16,7 @@ export class ChartsComponent {
   // breakdowns. This is presentation only, never a different metric query.
   readonly showBreakdowns = input(true);
   private readonly numberFormatter = new Intl.NumberFormat("es-ES");
+  private readonly decimalFormatter = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
 
   readonly maxClicks = computed(() => {
     const m = Math.max(0, ...this.overview().series.map((s) => s.clicks));
@@ -48,6 +49,19 @@ export class ChartsComponent {
     return coordinates.length === 1 ? coordinates[0] : null;
   });
 
+  readonly peak = computed(() => {
+    const series = this.overview().series;
+    return series.length ? series.reduce((best, row) => row.clicks > best.clicks ? row : best) : null;
+  });
+
+  readonly latest = computed(() => this.overview().series.at(-1) ?? null);
+
+  readonly dailyAverage = computed(() => {
+    const series = this.overview().series;
+    if (!series.length) return 0;
+    return series.reduce((sum, row) => sum + row.clicks, 0) / series.length;
+  });
+
   readonly areaPoints = computed(() => {
     const coordinates = this.plotPoints();
     if (coordinates.length === 0) return "";
@@ -70,6 +84,12 @@ export class ChartsComponent {
 
   readonly breakdownKeys = ["countries", "devices", "browsers", "os", "referrers", "campaigns"] as const;
 
+  readonly hasBreakdownData = computed(() => {
+    // A valid zero-activity response should not repeat the same empty message
+    // for every dimension. One consolidated explanation is easier to scan.
+    return this.breakdownKeys.some((key) => this.overview()[key].length > 0);
+  });
+
   breakdown(key: (typeof this.breakdownKeys)[number]) {
     const items = this.overview()[key];
     const max = Math.max(1, ...items.map((i) => i.value));
@@ -83,6 +103,14 @@ export class ChartsComponent {
 
   formatCount(value: number): string {
     return this.numberFormatter.format(value);
+  }
+
+  formatAverage(value: number): string {
+    return this.decimalFormatter.format(value);
+  }
+
+  dimensionCount(key: (typeof this.breakdownKeys)[number]): number {
+    return this.overview().dimensionTotals[key];
   }
 
   dayLabel(day: string): string {

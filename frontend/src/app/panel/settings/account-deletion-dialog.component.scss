@@ -1,6 +1,7 @@
 @use "../dialog-identity";
 :host { container-type: inline-size; }
-.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; list-style: none; padding: 0 0 20px; margin: 0 0 24px; border-bottom: 1px solid var(--line); }
+.steps { display: flex; gap: 10px; list-style: none; padding: 0 0 20px; margin: 0 0 24px; border-bottom: 1px solid var(--line); }
+.steps li { flex: 1 1 0; min-width: 0; }
 .steps li { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .steps span { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid var(--line); border-radius: 3px; }
 .steps [aria-current] { color: var(--ink); font-weight: 800; }
@@ -13,8 +14,16 @@ h3:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .consequences b { color: var(--ink); }
 .credentials { display: grid; gap: 18px; }
 .credentials mat-form-field { width: 100%; min-width: 0; }
+.factor-intro { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 22px; }
+.factor-intro p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.75; }
+.factor-mark { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid var(--line); border-radius: 3px; color: var(--accent); }
+.factor-form input { font-size: 18px; font-weight: 800; letter-spacing: .12em; font-variant-numeric: tabular-nums; }
 .email-next { display: flex; gap: 12px; padding: 16px; margin-bottom: 20px; background: var(--soft); border-left: 2px solid var(--accent); }
 .email-next p { margin: 0; font-size: 13px; line-height: 1.7; }
 .email-next mat-icon { flex-shrink: 0; color: var(--accent); }
 mat-dialog-actions { border-top: 1px solid var(--line); padding-block: 16px; }
 @container (max-width: 400px) { mat-dialog-actions { flex-wrap: wrap; } mat-dialog-actions button { flex: 1 1 auto; } }
+@media (prefers-reduced-motion: no-preference) {
+  .intro, .consequences, .credentials, .factor-intro, .email-next { animation: deletion-step-in 180ms ease both; }
+}
+@keyframes deletion-step-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }

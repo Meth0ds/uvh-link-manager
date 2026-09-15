@@ -1,0 +1,48 @@
+<h2 mat-dialog-title><span class="title-mark" [class.danger]="data.mode === 'cancel'" aria-hidden="true"><mat-icon>{{ data.mode === 'change' ? 'alternate_email' : 'link_off' }}</mat-icon></span><span><small>Email de acceso</small><b>{{ title() }}</b></span></h2>
+<mat-dialog-content>
+  <ol class="steps" aria-label="Progreso del cambio de email">
+    <li [attr.aria-current]="step() === 1 ? 'step' : null" [class.done]="step() > 1"><span>1</span>{{ data.mode === 'change' ? 'Dirección' : 'Revisar' }}</li>
+    <li [attr.aria-current]="step() === 2 ? 'step' : null" [class.done]="step() > 2"><span>2</span>Contraseña</li>
+    @if (requiresMfa) { <li [attr.aria-current]="step() === 3 ? 'step' : null" [class.done]="step() > 3"><span>3</span>Segundo factor</li> }
+    <li [attr.aria-current]="isDone() ? 'step' : null"><span>{{ requiresMfa ? 4 : 3 }}</span>Resultado</li>
+  </ol>
+  <h3 #stepHeading tabindex="-1">{{ step() === 1 ? (data.mode === 'change' ? '¿Qué dirección quieres usar?' : 'Invalida el enlace enviado') : step() === 2 ? 'Confirma con tu contraseña' : step() === 3 && requiresMfa ? 'Introduce tu segundo factor' : 'Operación preparada' }}</h3>
+
+  @if (step() === 1) {
+    @if (data.mode === 'change') {
+      <p class="intro">Enviaremos una confirmación al nuevo buzón y un aviso al actual. El acceso no cambia hasta confirmar el enlace.</p>
+      <form id="email-address-step" [formGroup]="emailForm" (ngSubmit)="nextFromEmail()">
+        <mat-form-field appearance="outline"><mat-label>Nuevo email</mat-label><input matInput type="email" formControlName="newEmail" autocomplete="email" maxlength="254" /><mat-icon matPrefix>mail_outline</mat-icon><mat-hint>Comprueba que puedes recibir correo en esta dirección.</mat-hint>@if (emailForm.controls.newEmail.invalid && emailForm.controls.newEmail.touched) { <mat-error>Introduce un email válido.</mat-error> }</mat-form-field>
+      </form>
+    } @else {
+      <div class="pending-summary"><mat-icon aria-hidden="true">mark_email_unread</mat-icon><p>El enlace enviado a <b>{{ data.pendingEmail }}</b> dejará de funcionar. Tu email actual seguirá siendo el de acceso.</p></div>
+    }
+  } @else if (step() === 2) {
+    <p class="intro">Introduce sólo tu contraseña. Si tienes 2FA activo, te pediremos el código en el paso siguiente.</p>
+    <form id="email-password-step" [formGroup]="passwordForm" (ngSubmit)="nextFromPassword()">
+      <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" [readonly]="busy()" /><mat-icon matPrefix>lock_outline</mat-icon>@if (passwordForm.controls.password.invalid && passwordForm.controls.password.touched) { <mat-error>Introduce tu contraseña actual.</mat-error> }</mat-form-field>
+    </form>
+  } @else if (step() === 3 && requiresMfa) {
+    <div class="factor-intro"><span class="factor-mark" aria-hidden="true"><mat-icon>phonelink_lock</mat-icon></span><p>Abre tu aplicación autenticadora. También puedes usar un código de recuperación.</p></div>
+    <form id="email-factor-step" [formGroup]="factorForm" (ngSubmit)="submit()">
+      <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" inputmode="numeric" maxlength="24" [readonly]="busy()" /><mat-icon matPrefix>key</mat-icon><mat-hint>6 dígitos o un código de recuperación.</mat-hint>@if (factorForm.controls.factorCode.invalid && factorForm.controls.factorCode.touched) { <mat-error>Introduce un código válido.</mat-error> }</mat-form-field>
+    </form>
+  } @else {
+    <div class="result" role="status"><mat-icon aria-hidden="true">{{ data.mode === 'change' ? 'mark_email_read' : 'link_off' }}</mat-icon><p>{{ data.mode === 'change' ? 'Hemos enviado la confirmación al nuevo email. Tu dirección actual seguirá funcionando hasta que confirmes el enlace.' : 'El enlace pendiente ha quedado invalidado. Tu email de acceso no ha cambiado.' }}</p></div>
+  }
+  @if (error(); as message) { <div class="error" role="alert">{{ message }}</div> }
+</mat-dialog-content>
+<mat-dialog-actions>
+  @if (!isDone()) {
+    <button mat-button type="button" (click)="ref.close(false)" [disabled]="busy()">Cancelar</button>
+    @if (step() === 1) {
+      <button mat-flat-button type="button" (click)="nextFromEmail()" [disabled]="data.mode === 'change' && emailForm.invalid">Continuar</button>
+    } @else if (step() === 2) {
+      <button mat-stroked-button type="button" (click)="back()" [disabled]="busy()">Atrás</button>
+      <button mat-flat-button type="submit" form="email-password-step" [disabled]="passwordForm.invalid || busy()">{{ requiresMfa ? 'Continuar a 2FA' : (busy() ? 'Confirmando…' : 'Confirmar') }}</button>
+    } @else {
+      <button mat-stroked-button type="button" (click)="back()" [disabled]="busy()">Atrás</button>
+      <button mat-flat-button type="submit" form="email-factor-step" [disabled]="factorForm.invalid || busy()" [attr.aria-busy]="busy()">{{ busy() ? 'Verificando…' : 'Verificar y confirmar' }}</button>
+    }
+  } @else { <button mat-flat-button type="button" (click)="ref.close(true)">Entendido</button> }
+</mat-dialog-actions>

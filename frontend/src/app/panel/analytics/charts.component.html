@@ -1,10 +1,18 @@
 <div class="chart-block">
-  <div class="chart-title"><b>Clics por día</b><span class="chart-legend"><i aria-hidden="true"></i>Clics registrados</span></div>
-  <div class="chart-summary">{{ formatCount(overview().totals.clicks) }} clics en el periodo · {{ overview().series.length }} días con datos en la serie</div>
+  <div class="chart-title"><div><span>Serie diaria</span><h2>Clics por día</h2></div><span class="chart-legend"><i aria-hidden="true"></i>Clics registrados</span></div>
+  <div class="chart-summary">{{ formatCount(overview().totals.clicks) }} clics repartidos en {{ overview().series.length }} días devueltos por la consulta.</div>
   @if (points()) {
+    @if (showBreakdowns()) {
+      <dl class="chart-insights" aria-label="Lectura rápida de la serie">
+        <div><dt>Pico del periodo</dt><dd>{{ formatCount(peak()?.clicks ?? 0) }}</dd><span>{{ dayLabel(peak()?.day ?? '') }}</span></div>
+        <div><dt>Media diaria</dt><dd>{{ formatAverage(dailyAverage()) }}</dd><span>clics por día con datos</span></div>
+        <div><dt>Último dato</dt><dd>{{ formatCount(latest()?.clicks ?? 0) }}</dd><span>{{ dayLabel(latest()?.day ?? '') }}</span></div>
+      </dl>
+    }
     <div class="plot" aria-hidden="true">
       <div class="y-labels"><span>{{ formatCount(maxClicks()) }}</span><span>{{ formatCount(maxClicks() / 2) }}</span><span>0</span></div>
       <div class="series-wrap">
+        <span class="plot-grid"><i></i><i></i><i></i><i></i></span>
         <svg viewBox="0 0 720 220" preserveAspectRatio="none" class="series">
           <!-- A flat wash avoids document-global gradient IDs when two charts
                are rendered together. The stroke carries the actual values. -->
@@ -33,19 +41,27 @@
 </div>
 
 @if (showBreakdowns()) {
-  <div class="breakdowns">
-    @for (b of breakdownKeys; track b) {
-      <section class="breakdown" [attr.aria-label]="label(b)">
-        <h3>{{ label(b) }}</h3>
-        <ul>
-          @for (item of breakdown(b).items; track item.key) {
-            <li class="bar-row"><span class="bar-label">{{ item.key }}</span><span class="bar-value">{{ formatCount(item.value) }} <small>clics</small></span>
-              <div class="bar-track" aria-hidden="true"><div class="bar-fill" [style.width.%]="pct(item.value, breakdown(b).max)"></div></div>
-            </li>
-          }
-        </ul>
-        @if (!breakdown(b).items.length) { <p class="bar-empty">Sin datos para este periodo.</p> }
-      </section>
-    }
-  </div>
+  @if (hasBreakdownData()) {
+    <div class="breakdowns">
+      @for (b of breakdownKeys; track b) {
+        <section class="breakdown" [attr.aria-label]="label(b)">
+          <div class="breakdown-title"><h3>{{ label(b) }}</h3><span>{{ dimensionCount(b) }} valores distintos</span></div>
+          <ul>
+            @for (item of breakdown(b).items; track item.key) {
+              <li class="bar-row"><span class="bar-label">{{ item.key }}</span><span class="bar-value">{{ formatCount(item.value) }} <small>clics</small></span>
+                <div class="bar-track" aria-hidden="true"><div class="bar-fill" [style.width.%]="pct(item.value, breakdown(b).max)"></div></div>
+              </li>
+            }
+          </ul>
+          @if (!breakdown(b).items.length) { <p class="bar-empty">Sin datos para este periodo.</p> }
+        </section>
+      }
+    </div>
+  } @else {
+    <div class="breakdowns-empty" role="status">
+      <span>Desglose del periodo</span>
+      <b>Aún no hay señales que comparar.</b>
+      <p>Cuando lleguen clics, aquí podrás contrastar países, dispositivos, navegadores, sistemas, referentes y campañas.</p>
+    </div>
+  }
 }

@@ -7,6 +7,9 @@ También disponibles:
 - `/app/webhooks/9001`: inspector real con cuatro estados de entrega, errores
   e identificadores largos. Cambia al workspace Archivo editorial para revisar
   solo lectura. Las acciones de escritura están bloqueadas; no hay receptor real.
+- `/app/analytics`: pantalla real de analítica con serie temporal, seis
+  dimensiones y ranking ficticio. Los periodos solo cambian la fixture local;
+  no hay consultas ni escritura contra un backend.
 
 Desde `frontend`:
 

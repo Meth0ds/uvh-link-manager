@@ -2,6 +2,9 @@ import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRe
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { AccountDeletionDialogComponent } from "./account-deletion-dialog.component";
+import { EmailAccessDialogComponent, type EmailAccessDialogData } from "./email-access-dialog.component";
+import { PasswordChangeDialogComponent } from "./password-change-dialog.component";
+import { DataExportDialogComponent } from "./data-export-dialog.component";
 
 import { Router } from "@angular/router";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
@@ -66,6 +69,9 @@ export class SettingsComponent {
   private readonly dialogs = inject(MatDialog);
   private readonly injector = inject(Injector);
   private deletionDialog?: MatDialogRef<AccountDeletionDialogComponent, boolean>;
+  private emailDialog?: MatDialogRef<EmailAccessDialogComponent, boolean>;
+  private passwordDialog?: MatDialogRef<PasswordChangeDialogComponent, boolean>;
+  private exportDialog?: MatDialogRef<DataExportDialogComponent, boolean>;
   private sessionsRequest = new LatestRequest(this.destroyRef);
   private exportRequest = new LatestRequest(this.destroyRef);
   private deletionRequest = new LatestRequest(this.destroyRef);
@@ -95,30 +101,6 @@ export class SettingsComponent {
   profileForm = this.fb.nonNullable.group({
     name: [this.user()?.name ?? "", [Validators.required, Validators.minLength(2), Validators.maxLength(80)]],
   });
-  readonly emailBusy = signal(false);
-  readonly emailChangeOpen = signal(false);
-  emailChangeForm = this.fb.nonNullable.group({
-    newEmail: ["", [Validators.required, Validators.email, Validators.maxLength(254)]],
-    password: ["", [Validators.required, Validators.maxLength(72)]],
-    factorCode: ["", [Validators.pattern(/^(?:\d{6}|[A-Za-z2-9\s-]{16,24})$/)]],
-  });
-  emailCancelForm = this.fb.nonNullable.group({
-    password: ["", [Validators.required, Validators.maxLength(72)]],
-    factorCode: ["", [Validators.pattern(/^(?:\d{6}|[A-Za-z2-9\s-]{16,24})$/)]],
-  });
-
-  // ---------------- Password ----------------
-  readonly passwordBusy = signal(false);
-  readonly hidePassword = signal(true);
-  passwordForm = this.fb.nonNullable.group(
-    {
-      current: ["", [Validators.required]],
-      next: ["", [Validators.required, Validators.minLength(10), Validators.maxLength(72)]],
-      confirm: ["", [Validators.required]],
-      factorCode: ["", [Validators.pattern(/^(?:\d{6}|[A-Za-z2-9\s-]{16,24})$/)]],
-    },
-    { validators: (g) => (g.get("next")?.value === g.get("confirm")?.value ? null : { mismatch: true }) },
-  );
 
   // ---------------- Sessions ----------------
   readonly sessions = signal<Session[]>([]);
@@ -129,11 +111,6 @@ export class SettingsComponent {
   readonly exportStatus = signal<DataExportStatus | null>(null);
   readonly exportLoading = signal(true);
   readonly exportBusy = signal(false);
-  exportForm = this.fb.nonNullable.group({
-    password: ["", [Validators.required, Validators.maxLength(72)]],
-    factorCode: ["", [Validators.pattern(/^(?:\d{6}|[A-Za-z2-9\s-]{16,24})$/)]],
-  });
-
   // ---------------- Account deletion ----------------
   readonly deletionImpact = signal<AccountDeletionImpact | null>(null);
   readonly deletionLoading = signal(true);
@@ -194,7 +171,12 @@ export class SettingsComponent {
   ];
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.deletionDialog?.close());
+    this.destroyRef.onDestroy(() => {
+      this.deletionDialog?.close();
+      this.emailDialog?.close();
+      this.passwordDialog?.close();
+      this.exportDialog?.close();
+    });
     void this.loadSessions();
     void this.loadExportStatus();
     void this.loadDeletionImpact();
@@ -229,102 +211,34 @@ export class SettingsComponent {
     }
   }
 
-  beginEmailChange(): void {
-    if (this.emailBusy()) return;
-    this.emailChangeOpen.set(true);
-    this.emailChangeForm.reset();
-  }
-
-  closeEmailChange(): void {
-    if (this.emailBusy()) return;
-    this.emailChangeOpen.set(false);
-    this.emailChangeForm.reset();
-  }
-
-  async requestEmailChange(): Promise<void> {
-    const factor = this.emailChangeForm.controls.factorCode;
-    if (this.user()?.mfaEnabled && !factor.value.trim()) {
-      factor.setErrors({ required: true });
-      factor.markAsTouched();
-    }
-    if (this.emailChangeForm.invalid || this.emailBusy()) {
-      this.emailChangeForm.markAllAsTouched();
-      return;
-    }
-
-    this.emailBusy.set(true);
-    try {
-      await this.auth.requestEmailChange(
-        this.emailChangeForm.controls.newEmail.value.trim(),
-        this.emailChangeForm.controls.password.value,
-        factor.value.trim() || undefined,
-      );
-      this.emailChangeForm.reset();
-      this.emailCancelForm.reset();
-      this.emailChangeOpen.set(false);
-      this.snackbar.open("Confirmación enviada al nuevo email", "Cerrar", { duration: 3500 });
-    } catch (err) {
-      this.toast(err, "");
-    } finally {
-      this.emailBusy.set(false);
-    }
-  }
-
-  async cancelEmailChange(): Promise<void> {
-    const factor = this.emailCancelForm.controls.factorCode;
-    if (this.user()?.mfaEnabled && !factor.value.trim()) {
-      factor.setErrors({ required: true });
-      factor.markAsTouched();
-    }
-    if (this.emailCancelForm.invalid || this.emailBusy()) {
-      this.emailCancelForm.markAllAsTouched();
-      return;
-    }
-    const confirmed = await this.actions.confirm({
-      title: "Cancelar cambio de email",
-      message: "El enlace enviado al nuevo buzón dejará de funcionar.",
-      confirmLabel: "Cancelar cambio",
-      destructive: true,
+  openEmailDialog(mode: EmailAccessDialogData["mode"]): void {
+    if (this.emailDialog) return;
+    const data: EmailAccessDialogData = { mode, pendingEmail: this.user()?.pendingEmail };
+    this.emailDialog = this.dialogs.open(EmailAccessDialogComponent, {
+      data, width: "min(560px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
+      autoFocus: mode === "change" ? "#email-address-step input" : "first-heading", restoreFocus: true, injector: this.injector,
+      ariaLabel: mode === "change" ? "Cambiar el email de acceso" : "Cancelar el cambio de email pendiente",
     });
-    if (!confirmed) return;
-
-    this.emailBusy.set(true);
-    try {
-      await this.auth.cancelEmailChange(
-        this.emailCancelForm.controls.password.value,
-        factor.value.trim() || undefined,
-      );
-      this.emailCancelForm.reset();
-      this.snackbar.open("Cambio de email cancelado", "Cerrar", { duration: 2500 });
-    } catch (err) {
-      this.toast(err, "");
-    } finally {
-      this.emailBusy.set(false);
-    }
+    this.emailDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
+      this.emailDialog = undefined;
+      if (!completed) return;
+      this.snackbar.open(mode === "change" ? "Confirmación enviada al nuevo email" : "Cambio de email cancelado", "Cerrar", { duration: 3500 });
+    });
   }
 
-  async changePassword(): Promise<void> {
-    const factorControl = this.passwordForm.controls.factorCode;
-    if (this.user()?.mfaEnabled && !factorControl.value.trim()) {
-      factorControl.setErrors({ required: true });
-      factorControl.markAsTouched();
-    }
-    if (this.passwordForm.invalid || this.passwordBusy()) return;
-    this.passwordBusy.set(true);
-    try {
-      await this.auth.changePassword(
-        this.passwordForm.controls.current.value,
-        this.passwordForm.controls.next.value,
-        factorControl.value.trim() || undefined,
-      );
-      this.passwordForm.reset();
+  openPasswordDialog(): void {
+    if (this.passwordDialog) return;
+    this.passwordDialog = this.dialogs.open(PasswordChangeDialogComponent, {
+      width: "min(610px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
+      autoFocus: "#password-credentials-step input", restoreFocus: true, injector: this.injector,
+      ariaLabel: "Cambiar la contraseña de acceso",
+    });
+    this.passwordDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
+      this.passwordDialog = undefined;
+      if (!completed) return;
       this.snackbar.open("Contraseña actualizada", "Cerrar", { duration: 2500 });
-      await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
-    } catch (err) {
-      this.toast(err, "");
-    } finally {
-      this.passwordBusy.set(false);
-    }
+      void this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
+    });
   }
 
   async loadSessions(): Promise<void> {
@@ -363,32 +277,19 @@ export class SettingsComponent {
     }
   }
 
-  async requestDataExport(): Promise<void> {
-    const factor = this.exportForm.controls.factorCode;
-    if (this.user()?.mfaEnabled && !factor.value.trim()) {
-      factor.setErrors({ required: true });
-      factor.markAsTouched();
-    }
-    if (this.exportForm.invalid || this.exportBusy()) {
-      this.exportForm.markAllAsTouched();
-      return;
-    }
-    this.exportBusy.set(true);
-    try {
-      const status = await this.auth.requestDataExport(
-        this.exportForm.controls.password.value,
-        factor.value.trim() || undefined,
-      );
-      this.exportStatus.set(status);
-      this.exportForm.reset();
+  openDataExportDialog(): void {
+    if (this.exportDialog || this.exportBusy()) return;
+    this.exportDialog = this.dialogs.open(DataExportDialogComponent, {
+      width: "min(560px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
+      autoFocus: "#export-password-step input", restoreFocus: true, injector: this.injector,
+      ariaLabel: "Solicitar una exportación de datos",
+    });
+    this.exportDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
+      this.exportDialog = undefined;
+      if (!completed) return;
       this.snackbar.open("Revisa tu email para confirmar la exportación", "Cerrar", { duration: 3500 });
-      await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
-    } catch (err) {
-      this.toast(err, "");
-      void this.loadExportStatus();
-    } finally {
-      this.exportBusy.set(false);
-    }
+      void this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.auth.refreshUser()]);
+    });
   }
 
   async cancelDataExport(): Promise<void> {
@@ -437,7 +338,7 @@ export class SettingsComponent {
     if (this.deletionDialog || this.deletionLoading() || !this.deletionImpact()?.canDelete) return;
     this.deletionDialog = this.dialogs.open(AccountDeletionDialogComponent, {
       width: "min(580px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
-      autoFocus: "button", restoreFocus: true, injector: this.injector,
+      autoFocus: "first-heading", restoreFocus: true, injector: this.injector,
       ariaLabel: "Solicitar el cierre de cuenta",
     });
     this.deletionDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {

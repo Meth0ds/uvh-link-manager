@@ -75,6 +75,7 @@ void bootstrapApplication(DesignPreviewRootComponent, {
       { path: "app", component: PanelComponent, children: [
         { path: "settings", component: SettingsPreviewComponent },
         { path: "dashboard", component: WorkspacePreviewComponent, data: { page: "dashboard" } },
+        { path: "analytics", component: WorkspacePreviewComponent, data: { page: "analytics" } },
         { path: "getting-started", component: WorkspacePreviewComponent, data: { page: "getting-started" } },
         { path: "tokens", component: WorkspacePreviewComponent, data: { page: "tokens" } },
         { path: "webhooks", component: WorkspacePreviewComponent, data: { page: "webhooks" } },

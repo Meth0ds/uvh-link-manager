@@ -34,8 +34,12 @@ function sampleOverview(period: unknown, empty: boolean): AnalyticsOverview {
     totals: { clicks, visitors: series.reduce((sum, row) => sum + row.visitors, 0) }, visitorMetric: "daily_pseudonyms", series,
     topLinks: empty ? [] : links.slice(0, 4).map((link, i) => ({ id: link.id, alias: link.alias, destination: link.destination, clicks: Math.floor(clicks / (i + 2)), visitors: 4 })),
     countries: empty ? [] : [{ key: "ES", value: Math.floor(clicks * .7) }, { key: "MX", value: Math.floor(clicks * .2) }, { key: "AR", value: clicks - Math.floor(clicks * .7) - Math.floor(clicks * .2) }],
-    devices: [], browsers: [], os: [], referrers: [], campaigns: [],
-    dimensionTotals: { countries: empty ? 0 : 3, devices: 0, browsers: 0, os: 0, referrers: 0, campaigns: 0 },
+    devices: empty ? [] : [{ key: "Móvil", value: Math.floor(clicks * .61) }, { key: "Escritorio", value: Math.floor(clicks * .34) }, { key: "Tablet", value: clicks - Math.floor(clicks * .61) - Math.floor(clicks * .34) }],
+    browsers: empty ? [] : [{ key: "Chrome", value: Math.floor(clicks * .55) }, { key: "Safari", value: Math.floor(clicks * .3) }, { key: "Firefox", value: clicks - Math.floor(clicks * .55) - Math.floor(clicks * .3) }],
+    os: empty ? [] : [{ key: "Android", value: Math.floor(clicks * .42) }, { key: "iOS", value: Math.floor(clicks * .31) }, { key: "Windows", value: clicks - Math.floor(clicks * .42) - Math.floor(clicks * .31) }],
+    referrers: empty ? [] : [{ key: "Directo / desconocido", value: Math.floor(clicks * .58) }, { key: "newsletter.example.invalid", value: Math.floor(clicks * .27) }, { key: "revista.example.invalid", value: clicks - Math.floor(clicks * .58) - Math.floor(clicks * .27) }],
+    campaigns: empty ? [] : [{ key: "lanzamiento-septiembre", value: Math.floor(clicks * .63) }, { key: "boletin-del-estudio", value: clicks - Math.floor(clicks * .63) }],
+    dimensionTotals: { countries: empty ? 0 : 3, devices: empty ? 0 : 3, browsers: empty ? 0 : 3, os: empty ? 0 : 3, referrers: empty ? 0 : 3, campaigns: empty ? 0 : 2 },
   };
 }
 

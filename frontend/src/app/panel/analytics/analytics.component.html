@@ -1,13 +1,16 @@
-<app-page-header icon="query_stats" eyebrow="Rendimiento" title="Analítica" description="Métricas agregadas de todos los enlaces del workspace.">
-  <mat-form-field appearance="outline" class="period">
-    <mat-select [value]="period()" (selectionChange)="onPeriod($event.value)" aria-label="Periodo">
-      <mat-option value="24h">Últimas 24 horas</mat-option>
-      <mat-option value="7d">7 días</mat-option>
-      <mat-option value="30d">30 días</mat-option>
-      <mat-option value="90d">90 días</mat-option>
-    </mat-select>
-  </mat-form-field>
+<app-page-header icon="query_stats" eyebrow="Rendimiento" title="Analítica" description="Lee el recorrido real de tus enlaces sin confundir actividad con personas.">
+  <div class="period-switch" role="group" aria-label="Periodo de la analítica">
+    @for (option of periodOptions; track option.value) {
+      <button type="button" [class.active]="period() === option.value" [attr.aria-pressed]="period() === option.value" [attr.aria-label]="option.label" (click)="onPeriod(option.value)">{{ option.short }}</button>
+    }
+  </div>
 </app-page-header>
+
+<aside class="reading-note" aria-label="Cómo interpretar estas métricas">
+  <mat-icon aria-hidden="true">privacy_tip</mat-icon>
+  <p><b>Una lectura respetuosa con la privacidad.</b> “Pseudónimos diarios” no significa personas únicas: una misma visita puede contarse de nuevo otro día.</p>
+  <a routerLink="/help" fragment="analytics">Cómo leer la analítica<mat-icon aria-hidden="true">arrow_outward</mat-icon></a>
+</aside>
 
 @if (loading() && overview()) {
   <mat-progress-bar mode="indeterminate" aria-label="Cargando analítica" />
@@ -24,40 +27,38 @@
   <div class="empty-state">
     <mat-icon>query_stats</mat-icon>
     <b>Aún no hay analítica</b>
-    <p>Comparte un enlace para empezar a medir clics, visitantes y campañas.</p>
+    <p>Comparte un enlace para empezar a observar clics, actividad diaria y campañas.</p>
     <button mat-flat-button color="primary" routerLink="/app/links">Ver enlaces</button>
   </div>
 }
 
 @if (overview(); as o) {
   <dl class="metric-strip" aria-label="Resumen del periodo seleccionado">
-    <div class="metric primary-metric"><dt>Clics</dt><dd>{{ o.totals.clicks }}</dd><span>{{ o.series.length }} días de datos</span></div>
-    <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ o.totals.visitors }}</dd><span>Privados; una visita puede repetirse entre días.</span></div>
-    <div class="metric"><dt>Países</dt><dd>{{ o.dimensionTotals.countries }}</dd><span>Orígenes distintos del tráfico.</span></div>
-    <div class="metric"><dt>Referentes</dt><dd>{{ o.dimensionTotals.referrers }}</dd><span>Fuentes distintas de entrada.</span></div>
+    <div class="metric primary-metric"><dt>Clics registrados</dt><dd>{{ formatCount(o.totals.clicks) }}</dd><span>{{ periodLabel() }}</span></div>
+    <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ formatCount(o.totals.visitors) }}</dd><span>Actividad privada; no son personas únicas.</span></div>
+    <div class="metric"><dt>Días en la serie</dt><dd>{{ formatCount(o.series.length) }}</dd><span>Intervalos con datos devueltos.</span></div>
+    <div class="metric"><dt>Enlaces destacados</dt><dd>{{ formatCount(o.topLinks.length) }}</dd><span>Los que concentran más clics.</span></div>
   </dl>
   <app-charts [overview]="o" />
-  <div class="section-heading"><div><span>Rendimiento</span><h2>Enlaces con más clics</h2></div><small>{{ period() === '24h' ? 'Últimas 24 horas' : period() === '7d' ? 'Últimos 7 días' : period() === '30d' ? 'Últimos 30 días' : 'Últimos 90 días' }}</small></div>
-  <div class="top-links">
-    @for (l of o.topLinks; track l; let i = $index) {
-      <article
+  <div class="section-heading"><div><span>Rendimiento</span><h2>Enlaces con más actividad</h2></div><small>{{ periodLabel() }}</small></div>
+  <ol class="top-links">
+    @for (l of o.topLinks; track l.id; let i = $index) {
+      <li><a
         class="top-link"
-        role="link"
-        tabindex="0"
+        [routerLink]="['/app/links', l.id]"
         [attr.aria-label]="'Abrir enlace ' + l.alias"
-        (click)="openLink(l.id)"
-        (keydown)="openLinkFromKeyboard($event, l.id)"
       >
-        <span class="rank tnum">{{ i + 1 }}</span>
+        <span class="rank tnum" aria-hidden="true">{{ i + 1 < 10 ? '0' : '' }}{{ i + 1 }}</span>
         <div class="top-main">
           <b class="tnum">{{ l.alias }}</b>
           <span>{{ l.destination }}</span>
         </div>
-        <div class="top-clicks tnum">{{ l.clicks }} clics</div>
-      </article>
+        <dl class="top-values"><div><dt>Clics</dt><dd>{{ formatCount(l.clicks) }}</dd></div><div><dt>Pseudónimos</dt><dd>{{ formatCount(l.visitors) }}</dd></div></dl>
+        <mat-icon class="row-arrow" aria-hidden="true">arrow_outward</mat-icon>
+      </a></li>
     }
     @if (!o.topLinks.length) {
-      <p class="none">Aún no hay datos de clics.</p>
+      <li class="none"><b>Todavía no hay enlaces destacados.</b><span>Cuando se registren clics, aparecerán aquí ordenados por actividad.</span></li>
     }
-  </div>
+  </ol>
 }

@@ -74,9 +74,13 @@ export class PanelComponent {
   readonly workspaceRole = computed(() => this.workspaces.list().find(w => w.id === this.workspaces.currentId())?.role);
   readonly canCreate = computed(() => ["owner", "admin", "editor"].includes(this.workspaceRole() ?? ""));
   readonly roleLabel = computed(() => {
-    const role = this.workspaceRole();
-    return role ? ({ owner: "Propietario", admin: "Administrador", editor: "Editor", viewer: "Solo lectura" })[role] : "Sin rol asignado";
+    return this.roleLabelFor(this.workspaceRole());
   });
+
+  roleLabelFor(role: string | null | undefined): string {
+    const labels: Record<string, string> = { owner: "Propietario", admin: "Administrador", editor: "Editor", viewer: "Solo lectura" };
+    return role ? labels[role] ?? "Rol personalizado" : "Sin rol asignado";
+  }
   // Derive the breadcrumb from known routes only; never echo URL parameters.
   private readonly currentUrl = toSignal(this.router.events.pipe(
     filter(event => event instanceof NavigationEnd),
