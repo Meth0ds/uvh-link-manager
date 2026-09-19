@@ -3,8 +3,10 @@
 API REST bajo `/api/v1` (panel en `app.uvh.es`). Las mutaciones realizadas
 desde navegador requieren `X-CSRF-Token`; las rutas protegidas además requieren
 cookie de sesión. La API de integración bajo `/api/v1/public/*` usa
-`Authorization: Bearer` y no depende de cookies ni de CSRF. Las rutas de
-workspace requieren `X-Workspace-Id` y autorizan por rol en backend.
+`Authorization: Bearer` y no depende de cookies ni de CSRF. El esquema se
+acepta en cualquier caja (`bearer`, `BEARER`), como manda RFC 9110 §11.1; el
+token en sí se compara carácter a carácter. Las rutas de workspace requieren
+`X-Workspace-Id` y autorizan por rol en backend.
 
 - Roles: `owner` > `admin` > `editor` > `viewer`.
 - `requireVerified` = email verificado.
@@ -126,8 +128,42 @@ estricta con el hostname esperado.
 | Método | Ruta | Auth | Descripción |
 | ------ | ---- | ---- | ----------- |
 | POST | `/` | — | `{ destination }` → `{ intent, expiresAt }`. Guarda temporalmente el destino y devuelve sólo un token opaco. |
-| POST | `/claim` | sesión verificada | `{ intent }` → `{ destination, expiresAt }`. La primera reclamación vincula la intención al usuario; el índice de revocación no guarda destino ni bearer y limita a 100 pendientes por cuenta. |
-| POST | `/complete` | sesión verificada | `{ intent }` → `{ ok: true }`. Invalida la intención después de crear o descartar el enlace. |
+| POST | `/claim` | sesión verificada | `{ intent }` → `{ destination, expiresAt }`. La primera reclamación vincula la intención al usuario; el índice de revocación no guarda destino ni bearer y limita a 100 pendientes por cuenta. Sin `intent` en el cuerpo se lee la cookie del aparcadero (ver más abajo). |
+| POST | `/complete` | sesión verificada | `{ intent }` → `{ ok: true }`. Invalida la intención después de crear o descartar el enlace. Sin `intent` en el cuerpo se lee la cookie del aparcadero, y una respuesta terminal la retira. |
+
+## Aparcadero de credenciales — `/api/v1/pending`
+
+El panel **no guarda ningún bearer en `localStorage`**. Un enlace de invitación
+vive 7 días y un link intent 1 día; sostenerlos en almacenamiento legible por
+script los expone a cualquier JavaScript del origen. En su lugar el navegador los
+entrega una vez y recibe una cookie `HttpOnly` firmada por el servidor
+(`PendingHandoff`), y a partir de ahí sólo pregunta si hay una aparcada.
+
+| Método | Ruta | Auth | Descripción |
+| ------ | ---- | ---- | ----------- |
+| POST | `/pending/invitation`<br>`/pending/link-intent` | — | `{ token, expiresAt? }` → `201 { pending: true, expiresAt }` y cookie del aparcadero. `422` si el token no tiene la forma que emite la aplicación o si la caducidad anunciada ya pasó. |
+| GET | `/pending` | — | `{ invitation: { pending, expiresAt }, linkIntent: { pending, expiresAt } }`. Sólo un booleano y una fecha: nunca el bearer. |
+| DELETE | `/pending/invitation`<br>`/pending/link-intent` | — | `{ pending: false }` y cookie borrada. |
+
+Propiedades del aparcadero, todas medidas por `PendingHandoffTest`:
+
+- **Forma, no existencia.** El aparcado nunca consulta la base de datos ni
+  pregunta si el bearer existe: un `404` para una invitación real y un `201` para
+  una inventada convertirían un endpoint público en un oráculo. El mismo `201`
+  para un token vivo, gastado o inventado.
+- **El cliente acorta, nunca alarga.** `expiresAt` sólo puede reducir el techo del
+  servidor (7 días para la invitación, 24 h para el intent); un valor imposible o
+  malformado cae al techo, y uno ya pasado responde `422` sin aparcar nada.
+- **La firma cubre el tipo.** Copiar la cookie de invitación al nombre de la de
+  intent no produce nada utilizable.
+- **Host-only.** Sin atributo `Domain`, igual que la sesión: la cookie pertenece al
+  origen que la va a consumir.
+- **Un final terminal desaparca.** Aceptar, rechazar, reclamar o completar deja el
+  aparcadero limpio; un fallo transitorio (`503`, `429`) lo deja intacto para que
+  un reintento siga siendo posible. Un bearer del cuerpo nunca toca la cookie.
+
+Sólo se activa el limitador de volumen `uvh-pending` (escritura) y
+`uvh-pending-read` (lectura); ver `docs/configuration.md`.
 
 ## Enlaces — `/api/v1/links` (workspace)
 
@@ -165,8 +201,8 @@ estricta con el hostname esperado.
 | POST | `/:id/leave` | Abandonar (no owner). |
 | DELETE | `/:id` | Eliminar (owner) con body `{ confirmation, password, factorCode? }`; `confirmation` debe coincidir exactamente con el nombre. |
 | POST | `/:id/invitations` | Invitar `{ email, role }`. |
-| POST | `/invitations/accept` | Aceptar invitación (token). |
-| POST | `/invitations/reject` | Rechazar invitación (token). |
+| POST | `/invitations/accept` | Aceptar invitación. El bearer llega en el cuerpo (`{ token }`) **o**, si el cuerpo no trae ninguno, en la cookie del aparcadero: es lo que envía el panel. Una aceptación terminal la borra. |
+| POST | `/invitations/reject` | Rechazar invitación. Mismas dos fuentes de bearer que `accept`. |
 | DELETE | `/:id/invitations/:invitationId` | Cancelar invitación. |
 | POST | `/:id/invitations/:invitationId/resend` | Reenviar invitación. |
 

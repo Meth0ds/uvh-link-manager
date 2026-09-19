@@ -70,6 +70,27 @@ implementación parcial.
   contenedor. Detecta migraciones pendientes, esquema de presupuesto ausente y
   límites inválidos; no aplica migraciones y deja disponible el job `migrate`.
   BAF-137; revisión estática, no acredita despliegue ni el conjunto del esquema.
+- [ ] **HANDOFF-001 — Aparcadero de credenciales en cookie `HttpOnly`
+  (implementado en código; sólo falta el E2E real).** El bearer de
+  invitación (7 días) y el de link intent (24 h) dejan de vivir en
+  `localStorage`: `PendingHandoff` los firma en dos cookies
+  `HttpOnly`/`Secure`/host-only cuyo techo de caducidad decide el servidor (el
+  cliente puede acortarlo, nunca alargarlo), `/api/v1/pending/*` los aparca,
+  consulta y olvida sin revelar si el bearer existe —mismo `201` para un token
+  vivo, gastado o inventado—, y `invitations/accept|reject` y
+  `link-intents/claim|complete` leen la cookie cuando el cuerpo no trae bearer,
+  retirándola sólo en un final terminal. La API documentada no cambia. El panel
+  ya no escribe en `localStorage`: `PendingHandoffService` es el único cliente,
+  los dos servicios exponen señales en vez de un bearer, el link intent viaja en
+  el fragmento de la URL (no en la query) y una regla de ESLint prohíbe volver a
+  tocar almacenamiento web en los ficheros que sostienen un bearer. Evidencia
+  ejecutada: suite backend completa 505/3613 OK y `PendingHandoffTest` 18/18,
+  con los fallos «antes» capturados neutralizando la lectura de la cookie;
+  frontend 367/367, `typecheck`, `eslint` y build de producción. Falta E2E real
+  y la validación en un despliegue de dos hosts distintos. Nota: el spec E2E de
+  invitación busca los rótulos «Revisar invitación» e «Invitación aceptada», que
+  el componente ya no usa; esa desincronización es anterior a este cambio y no se
+  tocó porque el E2E no se ejecuta en esta pasada.
 - [x] **INVITATION-UI-001 — Espera de reenvío visible.** `ApiRequestError`
   conserva `Retry-After`; Equipo muestra espera por workspace/destinatario tras
   `429`, bloquea crear/reenviar/Enter durante ese plazo y permite cancelar.
@@ -217,6 +238,33 @@ implementación parcial.
   SockJS sólo invoca `uuid.v4()` (el advisory afecta v3/v5/v6) y UVH liga `ng
   serve` a `127.0.0.1`. No forzar `uuid@11`: esperar una actualización compatible
   de Webpack/SockJS y repetir `npm audit` al actualizar el lockfile.
+- [x] **DEPENDENCY-002 — `hono` en el árbol de dependencias de desarrollo.**
+  Trivy encontró tres avisos moderados sobre `hono@4.13.3` —cadena
+  `@angular/cli → @modelcontextprotocol/sdk → hono`— con parche en 4.13.5. El
+  lockfile del frontend quedó en 4.13.8 y `npm audit --audit-level=moderate`
+  pasó de rojo a verde sin tocar `package.json`. No llega al paquete que se
+  despliega: es una dependencia de desarrollo del servidor MCP del CLI, y el
+  artefacto del frontend es el `dist` compilado.
+- [ ] **SCAN-001 — La imagen de copias y restauración corre como root.**
+  Trivy marca `DS-0002` sobre `docker/backup/Dockerfile` y la supresión está
+  declarada en `.trivyignore.yaml`. Parte de `postgres:16` porque `pg_dump`
+  tiene que coincidir con la versión del servidor, y los scripts montan el
+  volumen de copias y el directorio de claves antes de cifrar. Bajarla a un
+  usuario sin privilegios exige reescribir el montaje y volver a medir el
+  simulacro de restauración completo (`npm run e2e:backup`), que es lo que hoy
+  lo mantiene abierto.
+- [ ] **SCAN-002 — Las imágenes locales de PHP corren como root.**
+  `docker/php/Dockerfile` (desarrollo) y `docker/php/Dockerfile.drill-fpm`
+  (ensayos de capacidad) lo hacen a propósito, para no pelear con los permisos
+  de los volúmenes montados, y no se despliegan: el artefacto de producción es
+  `docker/php/Dockerfile.production`, que declara `USER www-data`. Si algún día
+  se publica la imagen de desarrollo, esta supresión deja de valer.
+- [ ] **SCAN-003 — El generador de certificados del ensayo corre como root.**
+  `docker/release-boot/certs/Dockerfile` escribe la clave privada con permisos
+  600 y la lee el contenedor de Nginx como uid 101. Bajarlo de usuario obligaría
+  a compartir uid entre generador y lector, y el ensayo dejaría de representar
+  un reparto real de permisos; por eso la supresión está declarada con ese
+  motivo en lugar de resuelta.
 - [ ] **OPS-UI-001 — Consola local de servicios (implementación inicial;
   cierre pendiente).** Validar y documentar `UVH Control` como interfaz para
   iniciar, detener y comprobar backend/frontend sin privilegios elevados ni
@@ -351,9 +399,99 @@ implementación parcial.
 
 - [ ] Desplegar las migraciones `000016` a `000031` sobre una copia
   representativa, medir bloqueo y preparar rollback compatible.
-- [ ] Ejecutar el release con imágenes identificadas por digest, SBOM, análisis
-  de dependencias y firma/verificación de artefactos; las bases actuales aún se
-  fijan por etiqueta y los paquetes del sistema no están pinneados por versión.
+- [ ] **IMAGE-000 — Promocionar el artefacto, no la receta.** Ejecutar un
+  release con las imágenes identificadas por digest, SBOM y firma/verificación.
+  La mitad ya está hecha y medida: las 12 imágenes base están fijadas por digest
+  con la etiqueta conservada (31 referencias en 6 Dockerfiles y 8 ficheros de
+  compose), Dependabot mantiene los pines, el trabajo `digest-integrity`
+  comprueba que cada digest siga resolviendo, y `release-e2e` genera el SBOM
+  CycloneDX y el informe de las dos imágenes reales que construye, con la puerta
+  sobre CRITICAL con parche. Falta lo que no depende del repositorio: registro de
+  imágenes, promoción desde él y verificación de firma/procedencia en el
+  servidor. Procedimiento y piezas no ejecutadas:
+  [`image-provenance-runbook.md`](image-provenance-runbook.md).
+- [x] **IMAGE-001 — Sustituir la base del web por una con openssl parcheado.**
+  Hecho el **2026-09-18**, por la vía que estaba acordada: sustituir la base, no
+  parchear en la aplicación. La base fijada del web es ahora
+  `nginxinc/nginx-unprivileged:1.31-alpine` (Alpine 3.24.1, openssl `3.5.8-r0`)
+  y la aceptación de `CVE-2026-31789` desapareció de `.trivyignore.yaml`, cuya
+  sección `vulnerabilities:` queda vacía y declarada como tal en el propio
+  fichero. Medición con Trivy 0.74.0 sobre las dos bases: `1.27-alpine` daba 2
+  hallazgos CRITICAL con parche (el mismo CVE en `libcrypto3` y `libssl3`) y 33
+  HIGH con parche, y el gate fallaba sin la excepción; `1.31-alpine` deja 0
+  CRITICAL y 0 HIGH con parche. La del API (`php:8.4-fpm-bookworm`) sigue en 0
+  CRITICAL con parche y 69 HIGH con parche, todas de paquetes del sistema.
+- [x] **IMAGE-002 — La imagen del web no arrancaba y nada lo decía.** Verificado
+  el **2026-09-18**, al arrancar el artefacto para comprobar la sustitución de la
+  base: `docker/nginx/Dockerfile.production` declaraba `ENTRYPOINT` sin `CMD`, y
+  declarar `ENTRYPOINT` en una imagen hija vacía el `CMD` heredado de la base.
+  Resultado: la imagen no tenía comando, `/docker-entrypoint.sh` terminaba en un
+  `exec` vacío y el contenedor salía con código 0 en **143 ms**
+  (`State=exited exit=0`). No lo veía ni Compose —un contenedor que sale «bien» no
+  es un error, y `restart: unless-stopped` lo habría reintentado en bucle— ni la
+  puerta de imagen, que sólo mira paquetes. La imagen del API ya declaraba su
+  `CMD`; a la del web se le había quedado sin él. Arreglado declarando
+  `CMD ["nginx", "-g", "daemon off;"]`, con una prueba de contrato que exige un
+  `CMD` a todo Dockerfile que declare `ENTRYPOINT` (excepción razonada: el
+  generador de certificados, que no usa argumentos y termina a propósito) y con el
+  arranque comprobado: responde 404 en `/internal/`, sirve la shell de la SPA en
+  `/help` y el dry run del borde registra `limit=REJECTED_DRY_RUN` sin rechazar.
+- [x] **IMAGE-003 — Escanear también las bases que el repositorio no construye.**
+  Hecho el **2026-09-18**. La puerta de imagen juzgaba sólo `uvh-api` y `uvh-web`,
+  así que Caddy (el borde de producción), PostgreSQL, Redis y las bases de
+  compilación no las miraba nadie. El trabajo `image-bases` recorre cada base
+  fijada —la lista sale de `check-image-digests.mjs --references`, no de una copia
+  en el guion— y aplica la misma puerta: CRITICAL con parche publicado bloquea,
+  `unresolved` bloquea, y `unavailable` (límite de tasa del registro) se informa
+  sin bloquear salvo con `--fail-on-unavailable`. Medido con Trivy 0.74.0 sobre
+  las once bases: **44 s** con la caché caliente, 0 hallazgos tras el triaje.
+  Tres hallazgos, uno arreglado y dos aceptados con ámbito de ruta, motivo y
+  caducidad (`CVE-2025-68121` de `gosu` hasta 2027-03-31; `CVE-2026-59873` del
+  `tar` de npm hasta 2026-12-31); el detalle está en
+  [`static-analysis.md`](static-analysis.md) y en
+  [`image-provenance-runbook.md`](image-provenance-runbook.md). La lección de la
+  primera corrida fue del propio verificador: leer la tabla de Trivy clasificó
+  como «no se pudo consultar» una imagen con doce CRITICAL, porque el último
+  objetivo de la tabla mostraba cero; el veredicto se decide sobre el JSON.
+  Queda abierto lo que la puerta no puede hacer en CI: escanear una base **por
+  etiqueta que aún no existe**, que es el caso de un proveedor que publica el
+  arreglo sin subirla a la etiqueta que el árbol fija.
+- [x] **IMAGE-004 — El veredicto de supresiones, por entrada y sólo con medición.**
+  Corregido el **2026-09-19**, después de la ronda que preguntaba qué faltaba, y
+  con las tres piezas medidas ejecutando la puerta:
+  1. *Por sección no basta.* El veredicto miraba el total: con dos entradas vivas
+     y una tercera señuelo (`CVE-2099-0001`, ámbito que no existe en ninguna
+     imagen) el resultado era `in-use` y la puerta callaba, así que cada
+     excepción añadida volvía la comprobación más ciega. Ahora cada entrada se
+     atribuye por su `Finding.VulnerabilityID` —que el parser leía en el nivel
+     equivocado, de ahí que los ids salieran vacíos— con el enunciado como
+     segunda vía, y el señuelo bloquea nombrando la entrada.
+  2. *Sin informe no hay conclusión.* Con el daemon inalcanzable, once escaneos
+     sin informe y ningún hallazgo suprimido, el veredicto era `stale` y salía
+     **exit 1** acusando de obsoletas las dos excepciones válidas: exactamente
+     la clase de fallo que la puerta existe para evitar —concluir desde lo que no
+     se miró—, y encima presionando para retirar una protección vigente. Ahora
+     la entrada queda `unchecked` (se declara, no bloquea; bloquea con
+     `--fail-on-unavailable` nombrando cada una).
+  Cinco casos ejecutados: señuelo con entradas vivas → `stale`/exit 1; estado
+  real (11 bases, ambas usadas por `gosu` y el `tar` de npm) → `in-use`/exit 0;
+  daemon inalcanzable → `unchecked`/exit 0 con aviso; el mismo con
+  `--fail-on-unavailable` → exit 1 nombrando cada entrada; y la sustitución de la
+  lógica por la versión de sección para comprobar que el contrato cae (mutación
+  en `scan-pinned-images.mjs` → test en rojo, restaurado idéntico). Guardas en
+  `SecurityScanContractTest`: el veredicto nombra cada entrada y sólo un escaneo
+  con informe puede juzgarla.
+- [x] **Copia y restauración sobre la base Alpine.** El imagen de copias venía de
+  `postgres:16` de Debian, que arrastraba tres CVE CRITICAL con parche en cuatro
+  paquetes de Perl (`deb13u1`): la etiqueta es la más reciente, así que ningún pin
+  lo cerraba y `apt-get upgrade` habría dejado la puerta en rojo sobre la base
+  fijada, que es lo que se escanea. Pasó a `postgres:16-alpine` —la misma variante
+  que ya usaba el resto del árbol— con `openssl` añadido en el Dockerfile porque
+  el cifrado de `backup.sh` lo necesita. Verificado ejecutando clave, `pg_dump`
+  16.15, cifrado AES-256-CBC con verificación descifrando el criptograma y
+  restauración en una base vacía con las 250 filas de prueba. El ensayo de copia
+  de CI (`backup-drills`, `npm run e2e:backup`) es la comprobación autoritativa y
+  corre con el imagen nuevo.
 - [ ] Cargar `APP_KEY`, `APP_SECRET`, PostgreSQL, hCaptcha, Resend y edge desde
   un gestor de secretos. Evitar valores sensibles permanentes en `env_file` y
   desplegar la rotación documentada sin invalidar MFA, webhooks o datos
@@ -391,7 +529,24 @@ implementación parcial.
   auto-bloqueo acordados, tasa de falsos positivos observada y prueba de que el
   propio dominio deja de aparecer en listas. Runbook:
   [`url-reputation-runbook.md`](url-reputation-runbook.md). Es riesgo existencial
-  para un acortador público: no cerrar con mocks.
+  para un acortador público: no cerrar con mocks. La parte reversible ya está
+  cerrada: un bloqueo automático se retira al desaparecer su causa (entrada
+  retirada o caducada, veredicto que mejora, auto-bloqueo apagado) y un bloqueo
+  de moderador nunca se libera solo.
+- [ ] **SUFFIX-000 — Revisar el subconjunto de sufijos públicos.**
+  `app/Support/PublicSuffixes.php` es una lista curada y fechada
+  (`REVISED_AT=2026-09-15`), no la Public Suffix List completa: impide que un
+  dedazo en la consola bloquee `co.uk` o `github.io` enteros, y un sufijo no
+  listado se comporta como antes. Revisarla periódicamente (y cada vez que
+  aparezca un caso real) es trabajo de operación, no de código.
+- [ ] **ROLLUP-000 — Medir la admisión con el pool dimensionado.**
+  `docker-compose.analytics-drill.yml` ya admite los pases `arrival` por
+  php-fpm detrás de nginx, pero el pool usa el `www.conf` por defecto
+  (`pm.max_children = 5`), así que la admisión se queda en ~12 peticiones/s y
+  esos pases siguen sin saturar. Fijar el pool, generar carga desde otro proceso
+  y repetir: hasta entonces la afirmación sostenible es «no hay evidencia de
+  contención de rollup», no «no hay contención». Números y comandos en
+  [`analytics-rollup-capacity.md`](analytics-rollup-capacity.md).
 - [ ] Ejecutar E2E con correo y hCaptcha reales: alta, verificación, login, MFA,
   recuperación, intención de URL, logout y caducidad/revocación de sesión.
 - [ ] Revisar manualmente todos los módulos en móvil/escritorio, claro/oscuro,

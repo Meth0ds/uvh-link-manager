@@ -94,6 +94,8 @@ Tablas (PostgreSQL, con claves foráneas, índices y constraints):
 
 Las fechas se almacenan siempre en UTC (ISO 8601). La zona horaria solo se aplica al presentar o interpretar la entrada.
 
+Al **serializar**, esa regla es una sola forma para todos los endpoints: `IsoDate::format()` responde `YYYY-MM-DDTHH:MM:SS.sssZ` tanto si el valor llegó como objeto de fecha (un modelo o `now()`) como si llegó como cadena ISO, y convierte —no reenvía— la forma de PostgreSQL (`2026-09-16 12:00:00+00`) con la que el *query builder* devuelve una columna `timestamptz` sin modelo que la caste. Antes se reenviaba tal cual, así que dos endpoints contestaban el mismo campo en dos formatos y uno de ellos no era ISO: los decodificadores del panel exigen `T`. Un valor que no es un instante (un entero, un booleano, una palabra) devuelve `null` en lugar de escribirse como texto.
+
 ## 6. Autenticación y autorización
 
 - **Sesión SPA:** cookie `HttpOnly` + `SameSite` + `Secure` en producción (implementación propia en `SessionManager`, hash SHA-256 del token en BD), CSRF de doble envío en mutaciones, regeneración de sesión tras login, reautenticación para operaciones sensibles y MFA (TOTP + códigos de recuperación).

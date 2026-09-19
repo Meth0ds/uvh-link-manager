@@ -22,6 +22,7 @@ Implementación de seguridad y guía de endurecimiento (hardening).
 - El token de sesión se almacena **hasheado** (SHA-256, `SessionManager`); el valor en claro solo existe en la cookie. El `last_used_at` se actualiza como mucho una vez por minuto por sesión (menos escrituras en el hot path).
 - Separación por host en producción (`UvhHostGuard`): panel/API solo en `app.uvh.es`; landing y resolución solo en `uvh.es` o dominios personalizados.
 - CSRF de doble envío (`uvh_csrf` + `X-CSRF-Token`, `UvhCsrf`) acotado a la API (`/api/v1`) y a los formularios públicos que mutan; la resolución de enlaces no emite cookies CSRF.
+- **Ningún bearer de handoff en `localStorage`.** El enlace de invitación (7 días) y el link intent preparado antes de autenticar (24 h) vivían en almacenamiento legible por script. Ahora los aparca el servidor en dos cookies `HttpOnly`/`Secure`/host-only firmadas (`PendingHandoff`, endpoints `/api/v1/pending/*`): el navegador entrega el bearer una vez, nunca lo vuelve a leer, y sólo pregunta si hay uno aparcado. El techo de caducidad lo fija el servidor — el cliente puede acortarlo, nunca alargarlo — y el aparcado no revela si el bearer existe. Detalle en `docs/api.md`.
 - Login solo para cuentas con email verificado; el registro no crea sesión hasta consumir el token de verificación.
 - Revocación de sesiones al cambiar o resetear contraseña; listado y revocación de sesiones desde Ajustes.
 - Las redirecciones 302 llevan `Cache-Control: no-store`: cada visita llega al backend (conteo de clics, uso único, máx. clics, caducidad) y ninguna caché intermedia sirve destinos obsoletos.
@@ -40,8 +41,9 @@ Implementación de seguridad y guía de endurecimiento (hardening).
 - Validación estricta en todos los endpoints (reglas de validación de Laravel).
 - Destinos: solo `http`/`https`, parseo estructurado con `URL`, rechazo de `javascript:`, `data:`, `file:`, `ftp:`, credenciales, control chars, CR/LF y hosts inválidos (`app/Support/UrlUtil.php`).
 - SSRF (`app/Support/Ssrf.php`): bloqueo de loopback (`127.0.0.0/8`, `::1`), RFC1918, link-local, multicast, rangos reservados y metadata cloud (incluidas formas IPv6 de transición); las IPs validadas se **fijan** con `CURLOPT_RESOLVE` (sin DNS rebinding), sin redirecciones y con timeouts de conexión/total.
+- Búsquedas: `q` **no es un lenguaje de patrones**. Los listados de la consola de administración y del panel construyen `ILIKE` con el término del operador, y `%`/`_` son comodines para PostgreSQL: sin escaparlos, `q=%` devolvía la tabla entera —incluido el `count()` de la paginación, que es coste de moderación— y `q=a_b` casaba con `axb`. `app/Support/SearchTerm.php` aplica una única regla (recorte, tope de 200 caracteres y escapado de `\`, `%` y `_`) en los siete endpoints que buscan, y el patrón viaja **como parámetro ligado**, nunca interpolado.
 - La redirección normal de UVH **no visita** el destino.
-- Analítica: `from`/`to`/`period` validados (422 en vez de 500 con fechas inválidas); la cabecera de país (`cf-ipcountry` por defecto) **solo se confía si `TRUST_COUNTRY_HEADER=1`** (por defecto se ignora, para que un cliente no pueda falsear la analítica por país); las rutas con API token tienen rate limit.
+- Analítica: `from`/`to`/`period` validados (422 en vez de 500 con fechas inválidas); la cabecera de país (`cf-ipcountry` por defecto) **solo se confía si `TRUST_COUNTRY_HEADER=1`** (por defecto se ignora, para que un cliente no pueda falsear la analítica por país); las rutas con API token tienen rate limit. La cabecera de país se acepta en cualquier caja y se normaliza a mayúsculas: es dato de proveedor, y exigir una caja concreta hacía que un borde que la envía en minúsculas perdiera país en las reglas y en la analítica **sin decirlo**.
 
 ## 5. Antiabuso
 
@@ -70,6 +72,15 @@ Implementación de seguridad y guía de endurecimiento (hardening).
   apelación (una sola abierta por enlace) y un moderador restaurar o mantener.
   Restaurar retira las entradas de denylist que aplicaban al destino, de modo
   que una decisión automática puede anularse por una persona.
+- Un bloqueo automático es **reversible por diseño**, y sólo eso: el enlace
+  guarda de dónde vino el bloqueo y a qué estado debe volver, de modo que
+  retirar o dejar caducar una entrada libera los enlaces que había bloqueado,
+  mientras que un bloqueo de moderador no lleva marcador y no puede retirarse
+  solo. Sin ese marcador, `state = blocked` era una decisión sin autor.
+- El recorrido de etiquetas de la denylist **se detiene por encima del sufijo
+  público** (`co.uk`, `github.io`): un dedazo en la consola no puede apagar todos
+  los sitios alojados bajo uno, y una página concreta de esas plataformas se
+  sigue bloqueando con una entrada de URL.
 - Adaptador opcional de reputación externa (pool `security`): si no está
   configurado se indica claramente y **nunca** se inventa un estado "seguro".
   `suspicious` abre un caso de moderación; `malicious` sólo bloquea con
@@ -94,14 +105,19 @@ Propiedades que lo hacen seguro de activar:
   hostname hace fallar el arranque. Sobre la dirección del par, todos los
   clientes compartirían un cubo: un limitador que no limita.
 - **Un rechazo del borde es distinguible** de un `429` de Laravel: sólo el borde
-  añade `Retry-After` y sólo él deja `limit=$limit_req_status` en el access log.
-  El `429` de Laravel conserva su cuerpo JSON.
+  añade `Retry-After` y sólo él deja `limit=$limit_req_status` (y
+  `conn=$limit_conn_status`, que atribuye el rechazo al tope de conexiones). El
+  `429` de Laravel conserva su cuerpo JSON.
 - **Cubre también el `default_server`** de dominios personalizados: limitar sólo
   los hosts con nombre dejaría sin protección justo los redirects que importan.
-- **`EDGE_DRY_RUN=on` es un interruptor de apagado**, no una medición: en nginx
-  1.27 deja `$limit_req_status` vacío, así que no informa de lo que habría
-  rechazado. Para dimensionar la tasa, agregar el acceso por cliente con la
-  aplicación desactivada.
+- **`EDGE_DRY_RUN=on` es un interruptor de apagado completo y, a la vez, una
+  medición**: desactiva el rechazo de `limit_req` **y** de `limit_conn` — con
+  sólo el primero, un despliegue que creía haber apagado el rechazo seguía
+  recibiendo `429` del tope de conexiones, medido en la imagen de producción — y
+  en la misma pasada deja en el access log `limit=REJECTED_DRY_RUN` y
+  `conn=REJECTED_DRY_RUN` para lo que habría rechazado. Dimensionar la tasa no
+  necesita un segundo despliegue: agregar `limit=`/`conn=` de este log con el
+  interruptor puesto.
 
 La capa de CDN/WAF por delante del borde es un requisito de despliegue, no
 código: se verifica en el checklist de release, no aquí.
@@ -122,6 +138,15 @@ código: se verifica en el checklist de release, no aquí.
   temporal de lectura, con deadline de producción y recifrado reanudable. El
   procedimiento, drenaje y rollback se documentan en
   [`app-secret-rotation-runbook.md`](app-secret-rotation-runbook.md).
+- Gitleaks comprueba en CI que no se cuele una credencial: el árbol en cada
+  cambio y el historial completo en la ejecución semanal. Las excepciones son
+  rutas con datos de prueba (`.gitleaks.toml`) y hallazgos históricos ya
+  revisados, fijados al commit (`.gitleaksignore`); ninguna alcanza el código de
+  la aplicación. El detalle está en
+  [`static-analysis.md`](static-analysis.md#escaneo-de-seguridad).
+- Un secreto publicado se rota aunque se borre del árbol: seguiría en el
+  historial y en cualquier copia. El escaneo detecta; la rotación es una
+  decisión, y su procedimiento es el del runbook citado arriba.
 
 ## 8. Checklist de release
 
@@ -133,3 +158,8 @@ código: se verifica en el checklist de release, no aquí.
 - [ ] CSP revisada para los assets reales servidos.
 - [ ] `APP_HOST=app.uvh.es` y `PUBLIC_HOST=uvh.es` definidos en producción (separación por host).
 - [ ] Límites de cuota por plan definidos.
+- [ ] El flujo `Security scans` en verde en el commit que se despliega: Semgrep
+  sin hallazgos ERROR, Gitleaks sin hallazgos, y Trivy sin HIGH/CRITICAL con
+  parche. Las excepciones vigentes están en `.trivyignore.yaml`, `.gitleaks.toml`
+  y `.gitleaksignore`, cada una con su motivo y su deuda en `todos.md`;
+  `Tests\Unit\SecurityScanContractTest` comprueba que sigan siéndolo.

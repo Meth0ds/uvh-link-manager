@@ -33,6 +33,18 @@ comprueba `App\Support\ProductionSecurity`); para todo lo demás, ausente
 significa «aplica el valor por defecto del código», que es el que documenta este
 fichero.
 
+Esa precedencia se sostiene con dos reglas mecánicas, no con cuidado al editar.
+Para cada clave que **sí** está en la plantilla, el valor que trae tiene que ser
+el mismo que el del código: copiar la plantilla sin tocar nada nunca cambia el
+comportamiento respecto a no tener la variable. Y toda clave leída por
+`config/uvh.php` está **o en la plantilla o declarada como omitida a propósito**,
+con su motivo, dentro del propio test. Las pocas diferencias que existen son
+intencionales y están enumeradas allí mismo, así que añadir un knob nuevo obliga
+a decidir en qué lado cae en vez de olvidarlo en ninguno de los dos. Lo comprueba
+`EnvTemplateContractTest`, que también detecta lo contrario: una clave de la
+plantilla que no lee nadie (un nombre mal escrito se ve idéntico a un ajuste sin
+efecto).
+
 ---
 
 ## 2. Cómo comprobar antes de desplegar
@@ -104,6 +116,10 @@ Ceremonia de rotación: [`app-secret-rotation-runbook.md`](app-secret-rotation-r
 | `COOKIE_SECURE` | ⚑ | `true` | En producción debe ser `true`. |
 | `HSTS_ENABLED` | ⚑ | `false` | Actívalo **sólo** cuando el entorno sirva HTTPS de verdad; si no, rompe la navegación. |
 | `SESSION_TTL_DAYS` | \* | `30` | Rango 1–30. |
+| `PENDING_INVITATION_COOKIE` | \* | `uvh_pending_invitation` | Cookie del aparcadero para la invitación (plantilla: `__Host-uvh_pending_invitation`). Mismo prefijo `__Host-` y host-only que la sesión; debe ser distinta de las otras tres. |
+| `PENDING_INTENT_COOKIE` | \* | `uvh_pending_intent` | Cookie del aparcadero para el link intent (plantilla: `__Host-uvh_pending_intent`). |
+| `INVITATION_TTL_DAYS` | \* | `7` | Rango 1–30. Vida de una invitación **y** techo de la cookie que la aparca: el navegador nunca la guarda más tiempo que la invitación. |
+| `INTENT_TTL_HOURS` | \* | `24` | Rango 1–168. Vida de un link intent y techo de su cookie. |
 | `ADMIN_MFA_FRESH_MINUTES` | \* | `15` | Rango 5–60. Antigüedad máxima del segundo factor en acciones administrativas. |
 | `TRUST_COUNTRY_HEADER` | ⚑ | `false` | **Déjalo en `false`** salvo que un borde de confianza (Cloudflare) escriba la cabecera: con `true` y sin esa capa, un cliente falsifica la analítica por país. |
 
@@ -215,6 +231,8 @@ Cada timeout de job es menor que el de su worker, y éste menor que el
 | `LINK_CREATE_LIMIT` | \* | `30` | 1–300 | creación de enlaces (por IP) |
 | `RESOLVE_LIMIT` | \* | `600` | 60–10 000 | resolución de enlaces (por IP) |
 | `API_TOKEN_LIMIT` | \* | `600` | 60–10 000 | API con token (por token) |
+| `PENDING_LIMIT` | \* | `20` | 1–300 | aparcado de credenciales pendientes, escritura (por IP) |
+| `PENDING_READ_LIMIT` | \* | `120` | 1–1 000 | consulta del aparcadero (por IP) |
 
 Nunca pongas `0` para «desactivar» un límite: no existe ese significado.
 
@@ -245,6 +263,8 @@ Nunca pongas `0` para «desactivar» un límite: no existe ese significado.
 | `uvh-invitation` | invitaciones | volumen | 15 min · 20/identidad+workspace |
 | `uvh-webhook-action` | pruebas/reenvíos de webhook | volumen | 15 min · 30/sesión+workspace |
 | `uvh-appeal` | apelación de bloqueo | volumen | 60 min · 5/sesión + 10/IP |
+| `uvh-pending` | aparcado de credenciales pendientes (escritura) | volumen | 1 min · `PENDING_LIMIT`/IP |
+| `uvh-pending-read` | consulta del aparcadero | volumen | 1 min · `PENDING_READ_LIMIT`/IP |
 
 La clasificación es deliberada: `uvh-api-token` o `uvh-privacy-admin` son
 sensibles pero **limitan volumen**, no adivinación, así que se quedan en el
@@ -265,7 +285,7 @@ variables añaden un techo por cliente en el último salto.
 | `EDGE_APP_RATE` | ⚑ | `20r/s` | Tasa por cliente en `/api/` y `/r/` del panel. |
 | `EDGE_BURST` | † | `100` | Ráfaga permitida sin espera (`nodelay`). |
 | `EDGE_CONN` | † | `64` | Conexiones simultáneas por cliente. |
-| `EDGE_DRY_RUN` | ⚑ | `off` | `on` **desactiva el rechazo**. Es un interruptor de apagado, no una medición: en nginx 1.27 deja `$limit_req_status` vacío, así que no informa de lo que habría rechazado. |
+| `EDGE_DRY_RUN` | ⚑ | `off` | `on` **desactiva el rechazo** en los dos limitadores (`limit_req_dry_run` y `limit_conn_dry_run`). También es una medición: medido en la imagen de producción, el access log registra `limit=REJECTED_DRY_RUN` y `conn=REJECTED_DRY_RUN` para lo que el limitador habría rechazado, así que se puede dimensionar la tasa sin desplegar dos veces. |
 | `TRUSTED_PROXIES` | \* | — | Lista de IP/CIDR del borde. **Un solo contrato, dos consumidores**: Laravel confía en estas cabeceras y Nginx restaura desde aquí la IP real. Sin él, todos los clientes compartirían un cubo y el limitador no limitaría. Comodines, hostnames o `/0` hacen fallar el arranque. |
 | `EDGE_ASK_SECRET` | \* | — | Secreto compartido del *ask* de Caddy (TLS on-demand). Base64URL aleatorio de 43–128 caracteres, distinto de `APP_SECRET`. |
 | `METRICS_BEARER_TOKEN` | \* | — | Bearer del endpoint interno `/internal/metrics`, sólo alcanzable por la red interna. |
@@ -340,20 +360,37 @@ capacidad como no verificada y **no inventa** un estado «seguro». La moderaci�
 | `REPUTATION_PROVIDER_TOKEN` | ∅ | vacío | Se envía como `Authorization: Bearer`. Vacío = sin cabecera. Rótalo como cualquier credencial. |
 | `REPUTATION_TIMEOUT_SECONDS` | † | `5` | Timeout **duro, también de conexión**. Un proveedor lento no bloquea a nadie indefinidamente; nunca reintenta. |
 | `REPUTATION_MAX_BODY_BYTES` | † | `65536` | Cota del cuerpo de respuesta (1 KiB–1 MiB). Al superarse, se corta la conexión y se trata como fallo. |
-| `REPUTATION_CACHE_TTL_HOURS` | † | `24` | Techo de validez de un veredicto (1 h–30 d). El proveedor puede **acortarlo**, nunca alargarlo. |
-| `REPUTATION_RECHECK_BATCH` | † | `50` | Enlaces reanalizados por ciclo del scheduler (1–500). Barrido de fondo, no un recorrido de todos los enlaces. |
+| `REPUTATION_CACHE_TTL_HOURS` | † | `24` | Techo de validez de un veredicto (1 h–30 d). El proveedor puede **acortarlo** — nunca alargarlo, y nunca por debajo de **5 minutos** (suelo fijo, para que «vuelve a preguntarme pronto» no se convierta en una consulta por evaluación). |
+| `REPUTATION_RECHECK_BATCH` | † | `50` | Enlaces reanalizados por ciclo del scheduler (1–500). Barrido de fondo, no un recorrido de todos los enlaces: los candidatos se ordenan por `links.reputation_checked_at` (los nunca examinados primero) y **toda** la ventana leída se marca como examinada, así que cada ciclo avanza en lugar de releer las mismas filas. |
+| `REPUTATION_RELEASE_BATCH` | † | `50` | Enlaces **autobloqueados** re-evaluados por ciclo para retirar un bloqueo cuya causa desapareció (1–500). Acotado por el mismo motivo que el anterior, en la dirección contraria. |
+| `REPUTATION_REANALYSIS_BUDGET` | † | `500` | Enlaces que un bloqueo de destino **nuevo** reanaliza de una vez, contando enlaces y reglas juntos (1–2000). Si el host tenía más, el barrido se detiene y **lo dice** (`linksSweepTruncated: true` + `reputation.reanalysis_truncated`), y el resto **continúa solo**: el servicio encola `ContinueDestinationSweepJob` con el cursor devuelto en `linksSweepCursor` y el job repite tandas acotadas hasta terminar, sin depender de que haya proveedor de reputación ni de que el scheduler llegue. |
 | `REPUTATION_AUTO_BLOCK` | ⚑ | `false` | **Con `false`, un veredicto `malicious` no bloquea a nadie.** Sólo con `true` un veredicto `malicious` de un proveedor configurado puede bloquear. |
 | `REPUTATION_DOMAIN_MONITOR` | ⚑ | `true` | Vigila la reputación de los hosts propios y emite `reputation.domain_listed` si aparecen mal valorados. |
+
 
 Consecuencias que conviene tener presentes:
 
 - **`unknown` nunca es `safe`.** Proveedor ausente, lento, caído o respondiendo
   algo fuera de contrato se registra como `unknown` y se reintenta en una ventana
   corta; no se cachea como decisión.
+- **El veredicto se lee sin distinguir mayúsculas ni espacios** (`"MALICIOUS"`,
+  `" Malicious "`), porque el caso contrario es el único que apaga en silencio la
+  retirada automática de abuso. Lo que no es `safe`/`suspicious`/`malicious` se
+  registra como `provider_verdict_unusable` **y suma
+  `reputation.verdict_unusable`**: una integración que contesta en otra forma es
+  una avería que hay que mirar, no una tarde tranquila.
+- **Un bloqueo nuevo avisa si no llegó a todos los enlaces.** El barrido que
+  reencola los enlaces que ya apuntaban al host está acotado
+  (`REPUTATION_REANALYSIS_BUDGET`); la respuesta del endpoint distingue «hecho» de
+  «me detuve en el tope» en vez de presentar un bloqueo parcial como completo.
 - **La reputación no decide ninguna escritura.** Se aplica en segundo plano,
   sobre enlaces que ya existen, en el pool `security`. La denylist local sí
   decide, de forma síncrona, en el alta (incluidos el destino *fallback* y las
   reglas de redirección).
+- **Sólo se retira lo que la plataforma decidió por sí misma.** Un bloqueo
+  automático lleva marcador en el enlace y se libera al desaparecer su causa
+  (entrada retirada o caducada, veredicto que mejora, `REPUTATION_AUTO_BLOCK`
+  apagado). Un bloqueo de moderador no lleva marcador y **nunca** se libera solo.
 - **Un enlace bloqueado automáticamente es apelable** y restaurar retira las
   entradas de denylist que aplicaban al destino.
 - **Marcha atrás:** `REPUTATION_AUTO_BLOCK=false` recupera de inmediato el
@@ -420,6 +457,16 @@ del ciclo, que además reanaliza destinos, drena exportaciones y reconcilia cola
 | `AUDIT_PURGE_DAYS` | `365` | 30–3650 | auditoría |
 | `ANALYTICS_RETENTION_DAYS` | `180` | 1–730 | eventos de clic y rollups |
 
+Una variable de esta área no es de retención sino de forma: `ANALYTICS_MAX_MAP_KEYS`
+(† , `200`) limita cuántos valores distintos se conservan **por dimensión y día**
+en el rollup (`countries`, `devices`, `browsers`, `os`, `referrers`, `campaigns`).
+`referrers` lo controla quien visita —cualquier cabecera `Referer`—, así que el
+tope es necesario; lo que importa es **cuál** se descarta: al alcanzarlo se retira
+el valor menos frecuente (empate: el más antiguo), nunca el último en llegar, y
+cada descarte suma `analytics.map_keys_dropped`. Está acotado en el código entre
+10 y 5000, así que un valor pequeño no puede convertir el rollup en un resumen de
+dos entradas.
+
 Los rangos y las políticas deben coincidir con lo declarado en la política de
 privacidad; el gate impide valores fuera de rango, no decisiones incoherentes.
 La retención de analítica se apoya en índices por `day` propios de cada tabla
@@ -481,6 +528,11 @@ controlados.
 - **Pool `security`** (`queue-security`) para las comprobaciones que llaman a un
   tercero.
 - Los **índices de retención** de analítica (migración, sin variable).
+- **Bloque del aparcadero de credenciales** (6 variables):
+  `PENDING_INVITATION_COOKIE`, `PENDING_INTENT_COOKIE`, `INVITATION_TTL_DAYS`,
+  `INTENT_TTL_HOURS`, `PENDING_LIMIT`, `PENDING_READ_LIMIT`. Sustituye el
+  `localStorage` donde vivían el bearer de invitación y el del link intent; ver
+  `docs/api.md` y `docs/security.md`.
 
 Los cambios de esquema se aplican con `php artisan migrate`; las migraciones son
 idempotentes donde importa y los índices de tablas con historia se crean antes
@@ -493,6 +545,7 @@ con `CONCURRENTLY`.
 | Qué | Dónde |
 |---|---|
 | Cada variable de la plantilla llega a Nginx | `EdgeLimitContractTest` |
+| La plantilla de producción no contradice `config/uvh.php`, y ninguna clave suya queda sin lector | `EnvTemplateContractTest` |
 | El borde nunca es más estricto que Laravel | `EdgeLimitContractTest` |
 | El limiter de credenciales cuenta en su store y no se reinicia | `SecurityLimiterStoreTest` |
 | Cada limiter clasificado está registrado y se usa | `UvhLimitersTest` |
