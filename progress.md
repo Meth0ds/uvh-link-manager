@@ -1,5 +1,21 @@
 # Progress Log
 
+## Remaining-page redesign continuation — 2026-09-15
+- Resumed from the repository planning files and current dirty worktree; unrelated CI, backend, E2E and operational-document edits remain out of scope and must be preserved.
+- Started a route-level audit rather than assuming that inherited tokens mean a page is fully redesigned. Automated suites remain paused per the user's standing instruction.
+- Selected Analítica because its shared chart also improves Dashboard and link detail. Rebuilt its period control, privacy framing, summary, derived series reading, breakdown ledger and semantic top-link navigation.
+- Application typecheck, isolated-preview typecheck, focused ESLint and `git diff --check` pass. Desktop and 320 px dark-mode previews are visually coherent; remaining fixture states and console/overflow measurements are in progress.
+- Mobile overflow measurement passed (`document 320/320`, main `310/310`) with no console errors. Empty, error and loading states remain distinct; the zero-activity breakdown was condensed after visual review. Scenario changes retain the known preview-only NG0956 recreation warning.
+- Final light desktop measurement passed (`document 1440/1440`, main `1166/1166`) with no console errors. Replaced the clipped active-navigation ligature discovered during review with a stable CSS chevron; the active row now exposes only its icon and label as text.
+- Re-ran both TypeScript checks, focused ESLint and `git diff --check` after the final fixes: all exit 0. Preview viewport was reset, temporary tab closed and local server stopped.
+
+## Settings protected flows — 2026-09-15
+- Replaced the long inline password and data-export forms with guided dialogs. Credentials, optional 2FA and result are separate steps; email change/cancellation and account deletion use the same factor-only 2FA rule.
+- Dialogs freeze the MFA requirement and session generation at open, retain credentials only inside the overlay, clear secrets on close/back/error and cannot be dismissed during an in-flight mutation. The server remains authoritative.
+- Improved dialog focus, restrained step transitions, responsive actions and the workspace menu's name/role hierarchy. Initial email/password focus now lands on the first relevant field; each step change focuses its heading.
+- Application and design-preview TypeScript, focused ESLint and diff whitespace check pass. Automated suites stayed paused as requested.
+- Isolated dark-mode browser review used fictional values and stopped before every final submission. Password/email/export/account-deletion 2FA screens contain only the factor field; no console errors. At 320px the document is 320/320 and the password dialog is 300.8px wide.
+
 ## Navigation and dashboard implementation — 2026-09-14
 - User explicitly paused tests and reprioritized navigation plus panel homepage. No new test/build/browser run for this batch.
 - Navigation now follows shared theme tokens, places creation near the workspace, exposes workspace role and current route label, and has a dedicated profile footer. Creation affordances are hidden and entry point guarded for read-only roles.

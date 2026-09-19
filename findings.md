@@ -1,5 +1,21 @@
 # Findings & Decisions
 
+## Protected Settings dialogs — 2026-09-15
+- The password card still embedded current/new/confirm password and MFA on the settings page. It now opens a short-lived Material dialog and asks for the factor in a dedicated second step.
+- Email change/cancellation, data export and account deletion follow the same interaction grammar. Their MFA requirement is snapshotted when opened; a changed session aborts submission, and no password or factor is returned through `afterClosed`.
+- Material's generic `autoFocus: "button"` selected secondary controls (Mostrar/Cancelar). Password and email-change dialogs now target their first field explicitly; cancel-email and account-deletion review start at a heading. Step transitions focus the updated task heading.
+- The workspace selector now shows each workspace role and uses a CSS chevron instead of decorative Material glyph ordering. Desktop and 320px dark-mode screenshots are coherent.
+- Browser inspection did not submit any security operation. The preview rejects mutations; fictional fields were used only to reach the four factor screens. Console error log was empty.
+
+## Remaining-page audit — 2026-09-15
+- Every current panel route has received at least one editorial-design commit, so commit presence is not enough to choose the next page. A source scan found legacy visual signals only in the analytics chart stylesheet; analytics is the next high-impact candidate for a deeper information/interaction review.
+- The worktree also contains concurrent CI, backend, E2E and operations-document edits. They are unrelated to this UI batch and remain untouched.
+- The reusable chart is consumed by analytics, the dashboard and link detail, so a disciplined improvement reaches three user journeys. Its data table and timezone-safe labels are already sound, but it still paints grid rules with a prohibited CSS gradient and offers no concise peak/latest-period interpretation.
+- The analytics API exposes clicks, daily pseudonyms, six dimensions and top links only. Improvements must derive explanations from those fields rather than invent conversion or unique-person metrics.
+- Desktop dark-mode preview confirms the new hierarchy reads in one pass: direct period controls, the privacy note, four ruled metrics and the start of the daily series all fit above the fold at 1280 px. The surface is visibly marked as fictional and has no API connection.
+- At 320 px in dark mode, the scenario controls wrap without clipping, all four periods remain one-tap choices, the privacy note becomes a readable vertical callout and the metric ledger begins as a balanced two-column grid. The mobile navigation remains operable.
+- Measured mobile widths are exact (`document 320/320`, panel main `310/310`), with four period buttons and no browser errors. Scenario switching still emits the preview-only NG0956 warning caused by its intentional component recreation. A valid all-zero response now shows one consolidated breakdown explanation instead of six repeated empty messages; transport failure exposes only an alert/retry, and loading exposes a dedicated status.
+
 ## Settings redesign — 2026-09-14
 - Rebuilt identity masthead, profile/name form, email row and three visual theme choices; flattened nested panels into ruled sections. Current tokens and user commits preserved.
 - Local fragment links were resolving against the root base href. Local jump handler now keeps the settings route and moves keyboard focus without unmounting security forms.

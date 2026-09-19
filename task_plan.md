@@ -4,10 +4,10 @@
 Continue the full UI redesign, preserving user progress and verifying each page, component, subpage and modal. Tokens and 403/404 are completed batches, not the end of this goal.
 
 ## Next Step
-Implement account-deletion multistep modal and refine topbar; inspect theme animation in browser as now requested. Automated suites remain paused.
+Continue the route-level UX audit with Activity and Usage, prioritizing scanability, honest empty/error states and narrow-screen controls. Automated suites remain paused.
 
 ## Current Phase
-Phase 6
+Phase 8
 
 ## Phases
 ### Phase 1: Current-state review
@@ -40,6 +40,24 @@ Phase 6
 - [ ] Refine and verify without issuing credentials or changing accounts.
 - **Status:** in_progress
 
+### Phase 7: Settings sensitive-action flows
+- [x] Move account deletion, email access, password change and data export into guided dialogs.
+- [x] Separate password and 2FA into distinct steps and clear secrets on every exit/error path.
+- [x] Polish workspace-menu hierarchy, focus management, motion and 320px layouts.
+- **Status:** complete
+
+### Phase 8: Remaining page UX audit and redesign
+- [x] Inventory current panel routes and identify the least-refined high-impact page.
+- [x] Rebuild its information architecture, responsive states and interactions.
+- [x] Validate statically and in the isolated preview without real mutations.
+- **Status:** complete
+
+### Phase 9: Activity and usage refinement
+- [ ] Audit the real data contracts and existing interaction states.
+- [ ] Refine the highest-value shared or route-level UX gaps.
+- [ ] Validate statically and in the isolated preview without real mutations.
+- **Status:** pending
+
 ## Decisions Made
 - Settings: account identity masthead, dedicated profile/email rows, visual theme choices and readable ruled security/privacy sections. Preserve all forms and security contracts; no real account changes.
 - Preserve user commits, 3px geometry, current colors, Manrope and security logic.
@@ -54,7 +72,17 @@ Phase 6
 - Preview first navigation timed out during Vite initialization; fresh DOM verified the target page loaded.
 - Initial combined skill read truncated; reread selected content before implementation.
 - agent-browser is not on PATH; use existing supported browser integration, without installing packages.
+- One settings focus patch could not acquire the file on its first write attempt; it made no partial change and the immediate scoped retry succeeded.
 - Typecheck found pre-existing nullable currentId in preview getting-started fixture. Narrow explicitly and fail closed when null; corrected.
 - A search used frontend-prefixed paths while cwd was frontend; reran with relative paths.
 - Browser locator evaluation timeout after a successful checkbox action; fresh AX confirmed state, no repeated action.
 - Karma warned about slow Chrome shutdown after 13 successful tests, but eventually returned exit 0.
+- The first PowerShell route/style inventory used a double-quoted regex containing pipes and was parsed as an empty pipeline. No files changed; reran with single-quoted patterns successfully.
+- A model-location search included a nonexistent `core/models/*.ts` path after already finding `core/models.ts`; the valid file returned the needed contract, so the bad glob was dropped.
+- The first isolated-preview typecheck referenced `design-preview/tsconfig.app.json`, which does not exist. The Angular target points to `design-preview/tsconfig.json`; rerun uses that file. No source files were affected.
+- A findings update used an earlier sentence wording and failed context matching; `apply_patch` made no partial change. Reapplied against the current text.
+- A combined browser-findings update used earlier progress-log wording and failed context matching; it made no partial change. Reapplied with the current checkpoint text.
+- The first preview scenario locator searched for a labelled form control, but the toolbar exposes semantic buttons. It timed out without acting; a DOM snapshot identified the correct button role and the single retry succeeded.
+- The first post-edit empty-state wait ran while the unusually slow preview HMR rebuild was still active, so the new node was not present. Waited for the rebuild completion and then verified the state once; no source change was needed.
+- Two broad source searches included nonexistent optional paths (`frontend/src/app/shared` and root-level `frontend/styles.scss`). Each still returned the valid panel or `frontend/src/styles.scss` match needed; no file changed and the bad paths were dropped.
+- The final line-number lookup used a PowerShell double-quoted regex and escaped quotes were parsed incorrectly. Repeated only that read-only lookup with a single-quoted pattern; no files were affected.
