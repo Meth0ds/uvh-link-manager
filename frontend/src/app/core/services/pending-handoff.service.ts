@@ -19,6 +19,8 @@ export interface ParkReceipt {
 
 const NOT_PARKED: HandoffState = { pending: false, expiresAt: null };
 
+const HANDOFF_KINDS: readonly HandoffKind[] = ["invitation", "link-intent"];
+
 /** Same shape the server accepts: 32 random bytes in unpadded base64url. */
 const BEARER_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -169,11 +171,22 @@ export class PendingHandoffService {
    */
   refresh(): Promise<void> {
     if (this.refreshing) return this.refreshing;
+    // The answer describes the world as it was when the request left, and a
+    // caller can easily change that world before it comes back: the panel boots
+    // without awaiting this read, so a bearer that arrives in the URL in the
+    // meantime is parked while the request is still on the wire. An answer that
+    // says "nothing parked" must therefore not undo it — per kind, because the
+    // two handoffs are parked independently.
+    const issued: Record<HandoffKind, number> = {
+      invitation: this.revision("invitation"),
+      "link-intent": this.revision("link-intent"),
+    };
     this.refreshing = this.api
       .get<ParkedHandoffs>("/api/v1/pending", undefined, decodeParkedHandoffs)
       .then((parked) => {
-        this.adopt("invitation", parked.invitation);
-        this.adopt("link-intent", parked["link-intent"]);
+        for (const kind of HANDOFF_KINDS) {
+          if (!this.superseded(kind, issued[kind])) this.adopt(kind, parked[kind]);
+        }
       })
       .catch(() => undefined)
       .finally(() => {

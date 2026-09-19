@@ -1,9 +1,17 @@
 import { TestBed } from "@angular/core/testing";
 import { ApiService } from "./api.service";
+import type { HandoffState } from "./pending-handoff.service";
 import { PendingHandoffService } from "./pending-handoff.service";
 
 const BEARER = "a".repeat(43);
 const SOON = () => new Date(Date.now() + 60_000).toISOString();
+
+// The stubs answer in the shape the service sees, which is the decoded one: the
+// real `ApiService` runs `decodeParkedHandoffs` before the service is called, so
+// the wire name (`linkIntent`) never reaches it.
+function parked(invitation: HandoffState, linkIntent: HandoffState) {
+  return { invitation, "link-intent": linkIntent } as never;
+}
 
 /** A promise the test resolves by hand, to keep a request in flight. */
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (reason: unknown) => void } {
@@ -21,10 +29,7 @@ describe("PendingHandoffService", () => {
     api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post", "delete"]);
     api.post.and.resolveTo({ pending: true, expiresAt: SOON() } as never);
     api.delete.and.resolveTo({ pending: false } as never);
-    api.get.and.resolveTo({
-      invitation: { pending: false, expiresAt: null },
-      linkIntent: { pending: false, expiresAt: null },
-    } as never);
+    api.get.and.resolveTo(parked({ pending: false, expiresAt: null }, { pending: false, expiresAt: null }));
     TestBed.configureTestingModule({ providers: [{ provide: ApiService, useValue: api }] });
     service = TestBed.inject(PendingHandoffService);
   });
@@ -95,10 +100,7 @@ describe("PendingHandoffService", () => {
 
   it("adopts what the server says is parked, without ever holding a bearer", async () => {
     const expiresAt = SOON();
-    api.get.and.resolveTo({
-      invitation: { pending: true, expiresAt },
-      linkIntent: { pending: false, expiresAt: null },
-    } as never);
+    api.get.and.resolveTo(parked({ pending: true, expiresAt }, { pending: false, expiresAt: null }));
 
     await service.refresh();
 
@@ -110,7 +112,7 @@ describe("PendingHandoffService", () => {
 
   it("keeps the previous answer when the park cannot be reached", async () => {
     const expiresAt = SOON();
-    api.get.and.resolveTo({ invitation: { pending: true, expiresAt }, linkIntent: { pending: false, expiresAt: null } } as never);
+    api.get.and.resolveTo(parked({ pending: true, expiresAt }, { pending: false, expiresAt: null }));
     await service.refresh();
     api.get.and.rejectWith(new Error("offline"));
 
@@ -125,10 +127,50 @@ describe("PendingHandoffService", () => {
 
     const first = service.refresh();
     const second = service.refresh();
-    response.resolve({ invitation: { pending: false, expiresAt: null }, linkIntent: { pending: false, expiresAt: null } });
+    response.resolve(parked({ pending: false, expiresAt: null }, { pending: false, expiresAt: null }));
     await Promise.all([first, second]);
 
     expect(api.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let a start-up read undo a handoff parked while it was in flight", async () => {
+    const read = deferred<unknown>();
+    const write = deferred<unknown>();
+    api.get.and.returnValue(read.promise as never);
+    api.post.and.returnValue(write.promise as never);
+
+    // The panel boots without awaiting `refresh()`, so this is the real order:
+    // the read leaves, the bearer arrives in the URL and is parked, and only
+    // then does the read answer with the world it saw on the way out.
+    const refreshing = service.refresh();
+    service.park("invitation", BEARER);
+    read.resolve(parked({ pending: false, expiresAt: null }, { pending: false, expiresAt: null }));
+    await refreshing;
+
+    expect(service.parked("invitation")).toBeTrue();
+
+    // The park itself is still the caller's latest word, so its own answer is
+    // not discarded as superseded and the panel learns the true outcome.
+    write.resolve({ pending: true, expiresAt: SOON() });
+    expect(await service.confirmed("invitation")).toBeTrue();
+    expect(service.invitationOutcome()).toBeTrue();
+  });
+
+  it("adopts the other kind even when one was parked during the read", async () => {
+    const read = deferred<unknown>();
+    const expiresAt = SOON();
+    api.get.and.returnValue(read.promise as never);
+
+    const refreshing = service.refresh();
+    service.park("invitation", BEARER);
+    read.resolve(parked({ pending: false, expiresAt: null }, { pending: true, expiresAt }));
+    await refreshing;
+
+    // Only the kind the caller changed is protected; the other one is still
+    // taken from the server instead of being frozen by an unrelated park.
+    expect(service.parked("invitation")).toBeTrue();
+    expect(service.parked("link-intent")).toBeTrue();
+    expect(service.expiresAt("link-intent")).toBe(expiresAt);
   });
 
   it("moves the revision whenever the caller changes the park", () => {
