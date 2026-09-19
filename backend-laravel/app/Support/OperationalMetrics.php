@@ -38,6 +38,9 @@ final class OperationalMetrics
         'export.queue_unavailable',
         'export.too_large',
         'analytics.record_failed',
+        // Valores distintos descartados al alcanzar el tope del mapa diario. Un
+        // mapa recortado sin contador es un sesgo que nadie puede ver.
+        'analytics.map_keys_dropped',
         'audit.write_failed',
         'privacy.decrypt_failed',
         'dns.verified',
@@ -56,11 +59,32 @@ final class OperationalMetrics
         // facts, so they are three different series: an alert on
         // `provider_unavailable` must not be satisfiable by blocking links.
         'reputation.blocked',
+        // A block the platform applied to itself and then withdrew. Separate
+        // from `blocked` on purpose: block and release churning on the same link
+        // is a provider whose verdicts are flapping, and that is a different
+        // alert from "we are blocking more abuse than usual".
+        'reputation.released',
         'reputation.moderated',
         'reputation.appeal_opened',
         'reputation.check_failed',
         'reputation.provider_unavailable',
+        // El proveedor contestó algo que este contrato no entiende. No es lo
+        // mismo que `provider_unavailable`: aquí sí hubo respuesta, y una
+        // respuesta ilegible es un cambio de integración que hay que mirar.
+        'reputation.verdict_unusable',
         'reputation.reanalysis_scheduled',
+        // El barrido de reanálisis dejó candidatos sin encolar. Sin esta serie,
+        // un bloqueo aplicado a medias se lee como un bloqueo completo.
+        'reputation.reanalysis_truncated',
+        // Una continuación del barrido que la cola no admitió. El bloqueo
+        // quedó, por tanto, incompleto más allá del cursor: se vigila aparte
+        // para que un fallo al terminar no se lea como "ya terminó".
+        'reputation.sweep_continuation_failed',
+        // Un veredicto descartado porque el enlace cambió mientras se calculaba
+        // (o porque la fila ya no existe). No es un fallo del proveedor ni un
+        // bloqueo: es una carrera que se resolvió del lado seguro, y una tasa
+        // alta sí es una señal — significa que el trabajo llega tarde.
+        'reputation.decision_discarded',
         'reputation.domain_listed',
         // Un job auxiliar que la cola no admite. Distinto de `check_failed`: la
         // comprobación nunca llegó a intentarse.

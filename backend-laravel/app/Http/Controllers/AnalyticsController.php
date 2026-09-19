@@ -241,21 +241,6 @@ class AnalyticsController
         return $out;
     }
 
-    private function top(array $map, int $n = 8): array
-    {
-        arsort($map);
-        $out = [];
-        $i = 0;
-        foreach ($map as $key => $value) {
-            if ($i++ >= $n) {
-                break;
-            }
-            $out[] = ['key' => $key, 'value' => (int) $value];
-        }
-
-        return $out;
-    }
-
     /** @return array{ok: bool, value: ?int} */
     private function parseLinkId(mixed $value): array
     {

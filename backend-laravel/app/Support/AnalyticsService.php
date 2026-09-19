@@ -9,7 +9,25 @@ use Illuminate\Support\Str;
 
 class AnalyticsService
 {
+    /**
+     * Distinct values kept per dimension per day, unless overridden.
+     *
+     * The daily row is bounded on purpose: `referrers` is attacker-controlled
+     * (any visitor can send any Referer) and an unbounded map would grow the row
+     * without limit. What the cap must not do is decide *which* values survive
+     * by arrival order — see `bump()`.
+     */
     private const MAX_MAP_KEYS = 200;
+
+    /**
+     * Hard bounds on the configured cap. The default is generous for the one
+     * dimension that can realistically reach it (`countries` has roughly 250
+     * possible values) and the ceiling keeps a mistaken setting from turning the
+     * daily row into the unbounded one the cap exists to prevent.
+     */
+    private const MAX_MAP_KEYS_FLOOR = 10;
+
+    private const MAX_MAP_KEYS_CEILING = 5000;
 
     /**
      * @param  array{country: ?string, device: ?string, browser: ?string, os: ?string, referrer_domain: ?string, campaign: ?string, visitor_hash: ?string}  $meta
@@ -81,11 +99,51 @@ class AnalyticsService
         if (! $key) {
             return $m;
         }
-        if (! isset($m[$key]) && count($m) >= self::MAX_MAP_KEYS) {
-            return $m; // drop new distinct keys beyond the cap
+        if (isset($m[$key])) {
+            $m[$key]++;
+
+            return $m;
         }
-        $m[$key] = ($m[$key] ?? 0) + 1;
+        $cap = self::mapCap();
+        if (count($m) < $cap) {
+            $m[$key] = 1;
+
+            return $m;
+        }
+
+        // The cap is reached. Keeping the first values that arrived made the map
+        // an artefact of ordering: a referrer that became dominant late in the
+        // day stayed invisible for the rest of it, while a value seen once held
+        // its slot forever. The trade below keeps the map about the traffic
+        // instead of about its timing, and every drop is counted, so the loss is
+        // a monitoring signal rather than a silent bias.
+        $minimum = min($m);
+        $victim = array_search($minimum, $m, true);
+        if ($minimum >= 2 || ! is_string($victim)) {
+            // Every value already held has been seen more than once, so the
+            // newcomer is genuinely the least frequent one: dropping it is the
+            // top-N rule, and it is counted.
+            OperationalMetrics::increment('analytics.map_keys_dropped');
+
+            return $m;
+        }
+        // A tie at one occurrence: the oldest of the least frequent values gives
+        // its slot to the newcomer, so nothing is frozen in by arrival order.
+        unset($m[$victim]);
+        $m[$key] = 1;
+        OperationalMetrics::increment('analytics.map_keys_dropped');
 
         return $m;
+    }
+
+    /** The configured cap, clamped to a range the daily row can afford. */
+    private static function mapCap(): int
+    {
+        $configured = config('uvh.analytics.max_map_keys', self::MAX_MAP_KEYS);
+        if (! is_numeric($configured)) {
+            return self::MAX_MAP_KEYS;
+        }
+
+        return max(self::MAX_MAP_KEYS_FLOOR, min(self::MAX_MAP_KEYS_CEILING, (int) $configured));
     }
 }
