@@ -1833,7 +1833,10 @@ class AuthController
         // retained temporarily for incident review, but an old account must
         // not turn this endpoint into an unbounded memory/query response.
         $total = $user->sessions()->count();
-        $query = $user->sessions()->orderByDesc('last_used_at');
+        // Two sessions touched in the same second are otherwise ordered
+        // arbitrarily, so the hundred rows kept by the bound (and described by
+        // `truncated`) would change between identical requests.
+        $query = $user->sessions()->orderByDesc('last_used_at')->orderByDesc('id');
         $rows = $query->limit(100)->get()->map(fn ($s) => [
             'id' => $s->id,
             'user_agent' => $s->user_agent,

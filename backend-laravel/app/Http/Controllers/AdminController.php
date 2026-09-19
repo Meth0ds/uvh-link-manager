@@ -73,7 +73,10 @@ class AdminController
         };
 
         $total = (clone $query)->count();
-        $rows = $query->orderByDesc('u.created_at')
+        // Deterministic tiebreaker: rows created in the same second must not
+        // reorder between pages, or a page boundary would repeat one and skip
+        // another.
+        $rows = $query->orderByDesc('u.created_at')->orderByDesc('u.id')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
@@ -287,7 +290,7 @@ class AdminController
         }
 
         $total = (clone $query)->count();
-        $rows = $query->orderByDesc('r.created_at')
+        $rows = $query->orderByDesc('r.created_at')->orderByDesc('r.id')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
@@ -701,7 +704,7 @@ class AdminController
         }
 
         $total = (clone $query)->count();
-        $rows = $query->orderByDesc('d.created_at')
+        $rows = $query->orderByDesc('d.created_at')->orderByDesc('d.id')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
@@ -737,7 +740,7 @@ class AdminController
         }
 
         $total = (clone $query)->count();
-        $rows = $query->orderByDesc('created_at')
+        $rows = $query->orderByDesc('created_at')->orderByDesc('id')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
@@ -1207,7 +1210,7 @@ class AdminController
         }
 
         $total = (clone $query)->count();
-        $rows = $query->orderByDesc('a.created_at')
+        $rows = $query->orderByDesc('a.created_at')->orderByDesc('a.id')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();

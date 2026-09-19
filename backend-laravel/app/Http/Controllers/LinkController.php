@@ -114,7 +114,11 @@ class LinkController
             'alias_asc' => ['alias', 'asc'],
         ];
         [$col, $dir] = $orderMap[$sort] ?? $orderMap['created_at_desc'];
-        $query->orderBy($col, $dir);
+        // Ties on the visible column are common (a bulk import shares one
+        // timestamp, most links have zero clicks). Without a deterministic
+        // tiebreaker PostgreSQL is free to return them in any order per page,
+        // so paging forward could repeat one link and drop another.
+        $query->orderBy($col, $dir)->orderBy('id', $dir);
 
         $total = (clone $query)->count();
         $rows = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();

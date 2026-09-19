@@ -27,7 +27,10 @@ class TokenController
     {
         $workspaceId = UvhRequest::workspaceId($request);
         $total = ApiToken::where('workspace_id', $workspaceId)->count();
-        $query = ApiToken::where('workspace_id', $workspaceId)->orderByDesc('created_at');
+        // Tokens issued in the same second share a timestamp. Without a
+        // tiebreaker the hundred rows that survive the bound, and that the
+        // `truncated` flag describes, are an arbitrary subset.
+        $query = ApiToken::where('workspace_id', $workspaceId)->orderByDesc('created_at')->orderByDesc('id');
         $tokens = $query->limit(100)->get()->map(fn ($t) => $this->dto($t));
 
         return response()->json(['tokens' => $tokens, 'truncated' => $total > 100]);
