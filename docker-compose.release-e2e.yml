@@ -6,7 +6,7 @@ name: uvh-release-e2e
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     environment:
       POSTGRES_DB: uvh_release_e2e_test
       POSTGRES_USER: uvh_release_e2e
@@ -120,7 +120,7 @@ services:
       - /var/run:size=1m,noexec,nosuid,nodev,mode=1777
 
   edge:
-    image: caddy:2.11.4-alpine
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     read_only: true
     init: true
     security_opt:

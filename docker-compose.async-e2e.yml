@@ -117,7 +117,7 @@ services:
     profiles: [tools]
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     environment:
       POSTGRES_DB: uvh_e2e_test
       POSTGRES_USER: uvh_e2e
@@ -136,7 +136,7 @@ services:
   # exists to prove the chains, and durability across a Redis restart is proven
   # by the reconciler drill in the same harness.
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     init: true
     security_opt:
       - no-new-privileges:true

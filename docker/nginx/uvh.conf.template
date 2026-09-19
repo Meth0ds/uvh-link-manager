@@ -20,10 +20,20 @@ map $http_x_forwarded_proto $uvh_forwarded_proto {
 # relationship is asserted by `EdgeLimitContractTest`, not left to whoever edits
 # these numbers — and it can be rolled out unenforced first with EDGE_DRY_RUN=on.
 #
-# EDGE_DRY_RUN=on is a kill switch, not a measurement: on nginx 1.27 it
-# disables rejection but leaves `$limit_req_status` empty, so it does not report
-# what it would have rejected. To size the rate before enforcing, aggregate the
-# per-client request rate from this access log with enforcement off.
+# EDGE_DRY_RUN=on is a complete kill switch, and it is also a measurement: it
+# has to reach *both* limiters. `limit_req_dry_run` alone left the connection
+# cap rejecting while the deployment believed it had turned rejection off.
+#
+# Measured on the production image (nginx 1.31, `nginx -v` in
+# Dockerfile.production) rather than assumed: with the switch on the access log
+# records `limit=PASSED` then `limit=REJECTED_DRY_RUN` for requests the limiter
+# would have refused, and `conn=REJECTED_DRY_RUN` for the connection cap. The
+# request half was re-measured on 2026-09-18, when the base stopped being nginx
+# 1.27 and its Alpine 3.21; the connection half is still the 1.27 measurement.
+# So the
+# dry run does report what it would have rejected, and sizing the rate before
+# enforcing needs no second deployment: keep `EDGE_DRY_RUN=on`, aggregate
+# `limit=`/`conn=` from this log, then flip the switch.
 #
 # The key is the client address the entrypoint restores from TRUSTED_PROXIES
 # (see zz-uvh-realip.conf). Keying on the peer address instead would put
@@ -38,15 +48,17 @@ limit_conn_status 429;
 # Retry-After is emitted only for this layer's own rejections. Laravel's 429
 # keeps its JSON body and gains no header it never promised: the two mean
 # different things and must stay distinguishable to a client and in a log.
+# `REJECTED` is matched exactly, so a dry-run rejection announces nothing.
 map $limit_req_status $uvh_edge_retry_after {
     REJECTED 60;
     default  "";
 }
 
-# `limit=` is what attributes a 429 to this layer instead of to Laravel.
-# Plain `$remote_addr` is the restored client address, which is also how a
-# spoofed forwarding header is caught in review.
-log_format uvh_edge '$remote_addr - [$time_local] "$request" $status limit=$limit_req_status';
+# `limit=`/`conn=` are what attribute a 429 to this layer instead of to Laravel,
+# and which of the two limiters answered. Plain `$remote_addr` is the restored
+# client address, which is also how a spoofed forwarding header is caught in
+# review.
+log_format uvh_edge '$remote_addr - [$time_local] "$request" $status limit=$limit_req_status conn=$limit_conn_status';
 access_log /var/log/nginx/access.log uvh_edge;
 
 server_tokens off;
@@ -81,12 +93,14 @@ server {
         limit_req zone=uvh_edge_app burst=${EDGE_BURST} nodelay;
         limit_req_dry_run ${EDGE_DRY_RUN};
         limit_conn uvh_edge_conn ${EDGE_CONN};
+        limit_conn_dry_run ${EDGE_DRY_RUN};
         try_files "" @laravel;
     }
     location ^~ /r/ {
         limit_req zone=uvh_edge_app burst=${EDGE_BURST} nodelay;
         limit_req_dry_run ${EDGE_DRY_RUN};
         limit_conn uvh_edge_conn ${EDGE_CONN};
+        limit_conn_dry_run ${EDGE_DRY_RUN};
         try_files "" @laravel;
     }
 
@@ -140,6 +154,7 @@ server {
     limit_req zone=uvh_edge_public burst=${EDGE_BURST} nodelay;
     limit_req_dry_run ${EDGE_DRY_RUN};
     limit_conn uvh_edge_conn ${EDGE_CONN};
+    limit_conn_dry_run ${EDGE_DRY_RUN};
     add_header Retry-After $uvh_edge_retry_after always;
 
     add_header X-Content-Type-Options nosniff always;
@@ -214,6 +229,7 @@ server {
     limit_req zone=uvh_edge_public burst=${EDGE_BURST} nodelay;
     limit_req_dry_run ${EDGE_DRY_RUN};
     limit_conn uvh_edge_conn ${EDGE_CONN};
+    limit_conn_dry_run ${EDGE_DRY_RUN};
     add_header Retry-After $uvh_edge_retry_after always;
 
     location ^~ /internal/ { return 404; }

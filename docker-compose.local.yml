@@ -49,7 +49,7 @@ services:
   # bloque de Redis del .env con REDIS_HOST=redis (desde dentro del contenedor
   # `127.0.0.1` es el propio contenedor de PHP, no este servicio).
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "no", "--maxmemory-policy", "noeviction"]
     ports:
@@ -61,7 +61,7 @@ services:
       retries: 20
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
     env_file:
       - .env.docker.local

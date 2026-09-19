@@ -1,0 +1,46 @@
+# php-fpm for the capacity drill, and only for it.
+#
+# The asynchronous stack serves HTTP with PHP's built-in server (`php -S`),
+# which is a ceiling on the *harness*: a throughput number measured behind it
+# says nothing about a deployment that runs php-fpm behind a web server, and the
+# arrival passes of the rollup drill were being limited by exactly that. This
+# image exists so those passes can be driven through the same kind of web tier
+# production uses.
+#
+# It is not the production image on purpose: `docker/php/Dockerfile.production`
+# copies the application in at build time (so it cannot measure a working tree),
+# drops privileges, runs read-only and expects mounted secrets. The drill needs
+# the working tree mounted and plain environment variables.
+# Fijada por digest como las demás: este ensayo mide sobre la misma base que
+# producción usa para PHP-FPM, y una etiqueta móvil movería el techo medido sin
+# que nadie lo decidiera.
+FROM php:8.4-fpm@sha256:c27f0d1c15968d17f40cd6f2755fbaca234474899583611afab46ae869da0c0e
+
+WORKDIR /app
+
+# Same extensions the drill stack needs, minus the ones only the production
+# image's heavier surfaces use. `intl` is required by the application itself
+# (IDN hosts), not just by the drill.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libicu-dev \
+        libpq-dev \
+        libzip-dev \
+        $PHPIZE_DEPS \
+    && docker-php-ext-install -j"$(nproc)" \
+        bcmath \
+        intl \
+        opcache \
+        pdo_pgsql \
+        pgsql \
+        zip \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && pecl clear-cache \
+    && apt-get purge -y --auto-remove $PHPIZE_DEPS \
+    && rm -rf /var/lib/apt/lists/* /tmp/pear \
+    # php-fpm clears the environment of its workers by default, which would hide
+    # every variable this stack is configured with. The drill passes its
+    # configuration through the environment exactly like the rest of the stack.
+    && printf 'clear_env = no\n' > /usr/local/etc/php-fpm.d/zz-drill.conf
+
+CMD ["php-fpm", "-F"]

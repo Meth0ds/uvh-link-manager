@@ -1,4 +1,8 @@
-FROM node:22-bookworm-slim AS frontend
+# Bases fijadas por digest conservando la etiqueta: el artefacto que se
+# despliega tiene que ser el revisado, no «lo que esa etiqueta signifique hoy».
+# Dependabot mantiene la etiqueta al día y `scripts/check-image-digests.mjs`
+# comprueba en CI que el digest sigue resolviendo.
+FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS frontend
 
 WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
@@ -6,10 +10,25 @@ RUN npm ci --no-audit --no-fund
 COPY frontend ./
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine@sha256:b54ac358b83fc6c965793fd271839b4ea4cdb6e99895bb19618cbc2ca152d972
 
 COPY docker/nginx/uvh.conf.template /etc/nginx/templates/default.conf.template
 COPY --chmod=755 docker/nginx/production-entrypoint.sh /usr/local/bin/uvh-nginx-entrypoint
 COPY --from=frontend /build/dist/uvh/browser /usr/share/nginx/html
 
+# La imagen base es `nginx-unprivileged`, que ya arranca como uid 101. Se
+# declara aquí de forma explícita para que el usuario no dependa de un detalle
+# de la imagen base: si una versión futura volviera a root, el cambio se vería
+# en la revisión en lugar de aparecer en producción.
+USER 101:101
+
 ENTRYPOINT ["/usr/local/bin/uvh-nginx-entrypoint"]
+
+# La base declara `CMD ["nginx", "-g", "daemon off;"]`, pero declarar un
+# `ENTRYPOINT` en una imagen hija vacía el `CMD` heredado: sin esta línea el
+# contenedor no recibía ningún argumento, el entrypoint terminaba en un `exec`
+# vacío y el proceso salía con código 0 en menos de un segundo. Ni Compose ni la
+# puerta de CI lo notaban, porque un contenedor que sale «bien» no es un fallo
+# para ninguno de los dos. Se repite aquí de forma explícita, en vez de
+# heredarla, para que la imagen no dependa de lo que declare la base.
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,5 +1,13 @@
 name: uvh-production
 
+# Las imágenes de terceros van fijadas por digest y conservan la etiqueta: la
+# etiqueta dice qué release es y el digest qué bytes son, así que un `up` no
+# puede sustituir en silencio la base revisada por la que publique esa etiqueta
+# ese día. Dependabot propone la actualización y el trabajo `digest-integrity`
+# de CI comprueba que cada digest sigue resolviendo y avisa si la etiqueta ya
+# apunta a otro sitio. Lo que se promociona a producción es el digest, no la
+# etiqueta: `docs/image-provenance-runbook.md`.
+
 x-php-service: &php-service
   build:
     context: .
@@ -172,7 +180,7 @@ services:
   # Redis refuses the write instead and the operator is alerted by the
   # `CacheFailedOver`/error signal rather than by lost work.
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     restart: unless-stopped
     command:
       - sh
@@ -244,7 +252,7 @@ services:
       - uvh-internal
 
   edge:
-    image: caddy:2.11.4-alpine
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     env_file:
       - ${UVH_ENV_FILE:-./backend-laravel/.env.production}
     restart: unless-stopped

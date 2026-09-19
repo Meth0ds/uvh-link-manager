@@ -79,6 +79,15 @@ La producción reproducible del repositorio usa `docker-compose.production.yml`:
   propio heartbeat; `queue-legacy` sólo drena la cola histórica `default`.
 - La resolución `uvh.es/{alias}` y la API `/api/v1` deben enrutarse al backend; el panel (`app.uvh.es`) sirve la SPA.
 
+Las imágenes base de terceros están fijadas por digest con la etiqueta conservada:
+un `up` no puede sustituir en silencio la base revisada por la que publique esa
+etiqueta ese día. Un despliegue real **no construye en el servidor**: arranca las
+dos piezas con la referencia `nombre@sha256:…` que se promociona desde el registro,
+que es lo que hace que el digest sea la identidad del artefacto. Los pasos que
+faltan para cerrar esa cadena —registro, firma y verificación en destino— están
+descritos y marcados como no ejecutados en
+[`image-provenance-runbook.md`](image-provenance-runbook.md).
+
 Secuencia de release recomendada:
 
 ```bash

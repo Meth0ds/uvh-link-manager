@@ -23,10 +23,28 @@ import { promisify } from "node:util";
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const project = "uvh-async-e2e";
 const composeFile = "docker-compose.async-e2e.yml";
-const compose = ["compose", "-p", project, "-f", composeFile];
+// Optional overlays. The capacity drill adds php-fpm behind nginx
+// (`docker-compose.analytics-drill.yml`) so its arrival passes measure a real web
+// tier instead of PHP's built-in server, which is a ceiling on the harness.
+// CI never sets this and keeps the default topology.
+const extraComposeFiles = (process.env.UVH_ASYNC_EXTRA_COMPOSE ?? "")
+  .split(",")
+  .map((file) => file.trim())
+  .filter((file) => file !== "");
+const compose = [
+  "compose",
+  "-p",
+  project,
+  ...[composeFile, ...extraComposeFiles].flatMap((file) => ["-f", file]),
+];
 
 const backendPort = process.env.UVH_ASYNC_BACKEND_PORT ?? "8011";
 const backend = `http://127.0.0.1:${backendPort}`;
+// Where admitted redirect traffic is sent. With `UVH_ASYNC_EDGE=1` it goes through
+// the nginx + php-fpm overlay, which is the only way an arrival pass can reach a
+// regime where the rollup row has a backlog behind it on a laptop-shaped stack.
+const edgePort = process.env.UVH_ASYNC_EDGE_PORT ?? "8012";
+const redirectOrigin = process.env.UVH_ASYNC_EDGE === "1" ? `http://127.0.0.1:${edgePort}` : backend;
 const control = {
   webhook: `http://127.0.0.1:${process.env.UVH_ASYNC_WEBHOOK_CONTROL_PORT ?? "8090"}`,
   dns: `http://127.0.0.1:${process.env.UVH_ASYNC_DNS_CONTROL_PORT ?? "8091"}`,
@@ -712,11 +730,15 @@ async function brokerLossDrill() {
  * Two load sources, because they answer different halves of the question:
  *
  *   arrival  clicks admitted by the public redirect path, which is what
- *            production sees. Its ceiling is the intake rate of the stack the
- *            drill runs on: on the ephemeral stack the redirect request itself
- *            is several times slower than the analytics worker's cost per
- *            click, so no backlog ever forms and those passes are a fidelity
- *            check, not a saturation one.
+ *            production sees. Its ceiling is the intake rate of whatever is
+ *            serving HTTP: against the stack's built-in server (`php -S`) the
+ *            redirect request alone is several times slower than the worker's
+ *            cost per click, so no backlog forms and those passes are a
+ *            fidelity check rather than a saturation one. `UVH_ASYNC_EDGE=1`
+ *            with `UVH_ASYNC_EXTRA_COMPOSE=docker-compose.analytics-drill.yml`
+ *            admits them through php-fpm behind nginx instead, which is the
+ *            only configuration in which a `hot` arrival pass can build a
+ *            backlog on the single row it is about.
  *   flood    jobs queued directly for a chosen link, which is the only way a
  *            laptop-shaped stack reaches the regime where one row has a real
  *            backlog behind it.
@@ -910,7 +932,9 @@ async function runRollupPass(label, links, { source, mode, workers, fillfactor }
         const link = fanout[index];
         cursor += 1;
         try {
-          const response = await api("GET", `/r/${link.alias}`, {
+          // Against the public path as a visitor reaches it: no session cookie
+          // and no CSRF token, and through the web tier when the drill has one.
+          const response = await fetch(`${redirectOrigin}/r/${link.alias}`, {
             redirect: "manual",
             headers: { "User-Agent": drillUserAgents[index % drillUserAgents.length] },
           });
@@ -997,6 +1021,7 @@ async function runRollupPass(label, links, { source, mode, workers, fillfactor }
     label,
     source,
     mode,
+    origin: source === "flood" ? "queue" : redirectOrigin,
     workers,
     fillfactor: fillfactor ?? 100,
     rows: targets.length,
@@ -1068,6 +1093,7 @@ async function analyticsContentionDrill(context) {
   console.table(passes.map((pass) => ({
     pass: pass.label,
     source: pass.source,
+    origin: pass.origin,
     workers: pass.workers,
     rows: pass.rows,
     fill: pass.fillfactor,
