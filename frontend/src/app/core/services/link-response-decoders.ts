@@ -218,8 +218,13 @@ export function decodeAnalyticsOverview(value: unknown): AnalyticsOverview {
   };
 }
 
-export function decodeLinkActivityResponse(value: unknown): { events: AuditEvent[] } {
+export function decodeLinkActivityResponse(value: unknown): { events: AuditEvent[]; truncated: boolean } {
   const source = record(value, "link activity");
+  // The view is bounded server-side; the flag says whether the bound was hit,
+  // so the panel can stop presenting the last page as the whole history. A
+  // response without the flag (an older backend) reads as "not truncated",
+  // which is the behaviour the panel had before the flag existed.
+  const truncated = source["truncated"] === true;
   const events = boundedArray(source["events"], "link activity", 50).map((item): AuditEvent => {
     const event = record(item, "link activity event");
     const metadata = event["metadata"];
@@ -235,5 +240,5 @@ export function decodeLinkActivityResponse(value: unknown): { events: AuditEvent
       created_at: text(event["created_at"], "link activity event", 64),
     };
   });
-  return { events };
+  return { events, truncated };
 }

@@ -4,7 +4,7 @@ import { BreakpointObserver } from "@angular/cdk/layout";
 import { MatDialog } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { Router } from "@angular/router";
-import { of } from "rxjs";
+import { Subject, of } from "rxjs";
 import type { AuthUser, Workspace } from "../core/models";
 import { AuthService } from "../core/services/auth.service";
 import { WorkspaceService } from "../core/services/workspace.service";
@@ -28,7 +28,14 @@ describe("Panel activity navigation", () => {
     TestBed.configureTestingModule({ providers: [
       { provide: AuthService, useValue: { user: identity } },
       { provide: WorkspaceService, useValue: { list, currentId: selected } },
-      { provide: Router, useValue: {} }, { provide: LinkDialogService, useValue: {} },
+      // The panel derives its breadcrumb from the router stream, so the stub
+      // has to be a router-shaped object, not `{}`: an empty one failed on
+      // `undefined.pipe`, which is what this suite spent its time reporting
+      // instead of the navigation projection it exists to check.
+      { provide: Router, useValue: {
+        events: new Subject<unknown>(), url: "/app/links", navigate: () => Promise.resolve(true),
+      } },
+      { provide: LinkDialogService, useValue: {} },
       { provide: MatDialog, useValue: {} }, { provide: MatSnackBar, useValue: {} },
       { provide: BreakpointObserver, useValue: { observe: () => of({ matches: false, breakpoints: {} }) } },
     ] });

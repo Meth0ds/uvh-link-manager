@@ -119,6 +119,16 @@ describe("resource response decoders", () => {
     expect(() => decodeLinkActivityResponse({ events: [{ id: 1, action: "link.update", metadata: [], created_at: "now" }] })).toThrow();
   });
 
+  it("keeps the link activity truncation flag instead of assuming a full history", () => {
+    const events = [{ id: 1, action: "link.update", metadata: null, created_at: "2026-09-06T10:00:00Z" }];
+    expect(decodeLinkActivityResponse({ events, truncated: true }).truncated).toBe(true);
+    expect(decodeLinkActivityResponse({ events, truncated: false }).truncated).toBe(false);
+    // An older backend without the flag must not make the panel claim the list
+    // was cut; `true` is the only value that raises the notice.
+    expect(decodeLinkActivityResponse({ events }).truncated).toBe(false);
+    expect(decodeLinkActivityResponse({ events, truncated: "yes" }).truncated).toBe(false);
+  });
+
   it("decodes domain lists, creation and state transitions", () => {
     expect(decodeDomainsResponse({ domains: [domain] })).toEqual({ domains: [domain] });
     expect(decodeCreatedDomainResponse({ domain })).toEqual({ domain });

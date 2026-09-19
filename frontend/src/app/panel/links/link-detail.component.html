@@ -104,6 +104,9 @@
         <time class="tnum">{{ ev.created_at.slice(0, 16).replace("T", " ") }}</time>
       </div>
     }
+    @if (activityTruncated()) {
+      <p class="none">Se muestran los 50 eventos más recientes. Hay actividad anterior que no cabe aquí.</p>
+    }
     @if (!activity().length) {
       <p class="none">Sin actividad registrada.</p>
     }

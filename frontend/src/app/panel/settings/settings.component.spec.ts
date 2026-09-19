@@ -236,6 +236,7 @@ describe("SettingsComponent async safety", () => {
   });
 
   it("does not ask for a password or factor before opening the protected flow", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
     fixture.detectChanges();
     const element: HTMLElement = fixture.nativeElement;
 

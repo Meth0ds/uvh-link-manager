@@ -70,6 +70,8 @@ export class LinkDetailComponent {
   readonly actionBusy = signal(false);
   readonly analyticsError = signal<string | null>(null);
   readonly activityError = signal<string | null>(null);
+  /** The activity view is bounded server-side; this says whether it was cut. */
+  readonly activityTruncated = signal(false);
   readonly canWrite = computed(() => {
     const role = this.workspaces.currentRole();
     return role === "owner" || role === "admin" || role === "editor";
@@ -100,6 +102,7 @@ export class LinkDetailComponent {
       this.error.set(null);
       this.analyticsError.set(null);
       this.activityError.set(null);
+      this.activityTruncated.set(false);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -167,12 +170,13 @@ export class LinkDetailComponent {
     if (workspaceId === null) {
       this.activityRequests.invalidate();
       this.activity.set([]);
+      this.activityTruncated.set(false);
       return;
     }
     const request = this.activityRequests.begin(workspaceId);
     this.activityError.set(null);
     try {
-      const { events } = await this.api.get<{ events: AuditEvent[] }>(
+      const { events, truncated } = await this.api.get<{ events: AuditEvent[]; truncated: boolean }>(
         `/api/v1/links/${this.linkId}/activity`,
         undefined,
         decodeLinkActivityResponse,
@@ -180,9 +184,11 @@ export class LinkDetailComponent {
       );
       if (!this.activityRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.activity.set(events);
+      this.activityTruncated.set(truncated);
     } catch (err) {
       if (!this.activityRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.activity.set([]);
+      this.activityTruncated.set(false);
       this.activityError.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la actividad");
     }
   }
