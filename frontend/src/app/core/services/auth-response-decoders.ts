@@ -1,4 +1,4 @@
-import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, Workspace, WorkspaceRole } from "../models";
+import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, SessionList, Workspace, WorkspaceRole } from "../models";
 import type { LoginOutcome, LoginResponse, MfaSessionStatus } from "./auth.service";
 
 type JsonRecord = Record<string, unknown>;
@@ -214,10 +214,16 @@ function session(value: unknown): Session {
   };
 }
 
-export function decodeSessionsResponse(value: unknown): { sessions: Session[] } {
+export function decodeSessionsResponse(value: unknown): SessionList {
   const source = record(value, "sessions");
   if (!Array.isArray(source["sessions"])) invalid("sessions");
-  return { sessions: source["sessions"].map(session) };
+  // The registry is bounded server-side and this flag says whether that bound
+  // was hit, so an incomplete list is never presented as every device. A
+  // response without the flag (an older backend) reads as "not truncated",
+  // which is how the view behaved before the flag existed; a flag that is
+  // present must be a real boolean so a truthy string cannot hide the bound.
+  const truncated = source["truncated"] === undefined ? false : boolean(source["truncated"], "sessions");
+  return { sessions: source["sessions"].map(session), truncated };
 }
 
 export function decodeSessionRevocation(value: unknown): { ok: true; current?: boolean } {

@@ -13,6 +13,7 @@ describe("decodeSecurityCenter", () => {
       lastPasswordEventAt: "2026-09-05T11:00:00Z",
     },
     activity: [{ id: 12, action: "auth.mfa_enable", createdAt: "2026-09-06T12:00:00Z" }],
+    activityTruncated: false,
   };
 
   it("copies the bounded account posture contract", () => {
@@ -22,6 +23,14 @@ describe("decodeSecurityCenter", () => {
   it("rejects unknown activity and invalid counters atomically", () => {
     expect(() => decodeSecurityCenter({ ...snapshot, activity: [{ id: 1, action: "link.view", createdAt: "2026-09-06T12:00:00Z" }] })).toThrow();
     expect(() => decodeSecurityCenter({ ...snapshot, summary: { ...snapshot.summary, activeSessions: -1 } })).toThrow();
+  });
+
+  it("reports whether the bounded activity panel was cut short", () => {
+    expect(decodeSecurityCenter({ ...snapshot, truncated: true }).activityTruncated).toBeTrue();
+    // Absent reads as complete, as it did before the flag existed; a present
+    // flag has to be a real boolean, not a truthy string.
+    expect(decodeSecurityCenter(snapshot).activityTruncated).toBeFalse();
+    expect(() => decodeSecurityCenter({ ...snapshot, truncated: "yes" })).toThrow();
   });
 
   it("rejects malformed timestamps and oversized activity", () => {

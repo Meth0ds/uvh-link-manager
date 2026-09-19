@@ -29,8 +29,10 @@ const webhook = {
 
 describe("credential response decoders", () => {
   it("decodes complete API-token lists and rejects an invalid nested scope atomically", () => {
-    expect(decodeApiTokensResponse({ tokens: [token], truncated: false })).toEqual({ tokens: [token] });
+    expect(decodeApiTokensResponse({ tokens: [token], truncated: false })).toEqual({ tokens: [token], truncated: false });
+    expect(decodeApiTokensResponse({ tokens: [token], truncated: true })).toEqual({ tokens: [token], truncated: true });
     expect(() => decodeApiTokensResponse({ tokens: [token, { ...token, scopes: ["admin:all"] }] })).toThrow();
+    expect(() => decodeApiTokensResponse({ tokens: [token], truncated: 1 })).toThrow();
   });
 
   it("accepts only the exact one-time bearer format emitted by the backend", () => {

@@ -66,8 +66,11 @@
       <mat-tab aria-label="Usuarios">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">group</mat-icon><span class="tab-label-text">Usuarios</span></ng-template>
         <section class="tab-panel">
+          <!-- A failed read leaves the previous page on screen for context, but
+               nothing on it may act and no total may claim to describe it. -->
+          @let usersRead = usersLoading() || !!usersError();
           <header class="section-heading">
-            <div><h2>Directorio de usuarios</h2><p>{{ usersTotal() }} cuentas coinciden con los filtros.</p></div>
+            <div><h2>Directorio de usuarios</h2>@if (!usersError()) { <p>{{ usersTotal() }} cuentas coinciden con los filtros.</p> }</div>
           </header>
           <div class="filters">
             <mat-form-field appearance="outline" class="filter-search">
@@ -110,10 +113,10 @@
                 <div class="usage" data-label="Actividad"><b>{{ user.links }}</b><small>enlaces</small><b>{{ user.workspaces }}</b><small>workspaces</small></div>
                 <time data-label="Alta">{{ formatDate(user.created_at) }}</time>
                 <div class="row-actions">
-                  <button mat-stroked-button type="button" (click)="toggleAdmin(user)" [disabled]="usersLoading() || actionKey() !== null">
+                  <button mat-stroked-button type="button" (click)="toggleAdmin(user)" [disabled]="usersRead || actionKey() !== null">
                     {{ isAdminUser(user) ? 'Retirar admin' : 'Hacer admin' }}
                   </button>
-                  <button mat-stroked-button type="button" [class.danger-button]="!user.deleted_at" (click)="toggleBlock(user)" [disabled]="usersLoading() || actionKey() !== null">
+                  <button mat-stroked-button type="button" [class.danger-button]="!user.deleted_at" (click)="toggleBlock(user)" [disabled]="usersRead || actionKey() !== null">
                     {{ user.deleted_at ? 'Restaurar' : 'Bloquear' }}
                   </button>
                 </div>
@@ -121,15 +124,16 @@
             }
           </div>
           @if (!usersLoading() && !usersError() && !users().length) { <div class="empty"><mat-icon>person_search</mat-icon><b>No hay resultados</b><span>Prueba con otro término o filtro.</span></div> }
-          <mat-paginator [length]="usersTotal()" [pageIndex]="usersPage()" [pageSize]="usersPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons (page)="onUsersPage($event)" aria-label="Paginación de usuarios" />
+          @if (!usersError()) { <mat-paginator [length]="usersTotal()" [pageIndex]="usersPage()" [pageSize]="usersPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons (page)="onUsersPage($event)" aria-label="Paginación de usuarios" /> }
         </section>
       </mat-tab>
 
       <mat-tab aria-label="Recuperación de cuentas">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">support_agent</mat-icon><span class="tab-label-text">Recuperación</span></ng-template>
         <section class="tab-panel">
+          @let recoveriesRead = recoveriesLoading() || !!recoveriesError();
           <header class="section-heading">
-            <div><h2>Recuperación reforzada</h2><p>{{ recoveriesTotal() }} expedientes. Cada aprobación exige verificación de identidad externa y queda auditada.</p></div>
+            <div><h2>Recuperación reforzada</h2><p>@if (!recoveriesError()) { {{ recoveriesTotal() }} expedientes. } Cada aprobación exige verificación de identidad externa y queda auditada.</p></div>
           </header>
           <div class="policy-note"><mat-icon aria-hidden="true">policy</mat-icon><span>UVH no almacena documentos de identidad en estos expedientes. Dos administradores distintos, ambos con MFA activo, deben comprobar el procedimiento externo por separado.</span></div>
           <div class="filters">
@@ -162,22 +166,23 @@
                 <dl><div><dt>Email confirmado</dt><dd>{{ recovery.emailConfirmedAt ? formatDate(recovery.emailConfirmedAt) : 'Pendiente' }}</dd></div><div><dt>Solicitud</dt><dd>{{ formatDate(recovery.createdAt) }}</dd></div></dl>
                 @if (recovery.status === 'email_confirmed' || recovery.status === 'in_review') {
                   <footer>
-                    <button mat-flat-button type="button" (click)="approveRecovery(recovery)" [disabled]="recoveriesLoading() || actionKey() !== null"><mat-icon>verified_user</mat-icon>Registrar aprobación</button>
-                    <button mat-stroked-button class="danger-button" type="button" (click)="rejectRecovery(recovery)" [disabled]="recoveriesLoading() || actionKey() !== null">Rechazar</button>
+                    <button mat-flat-button type="button" (click)="approveRecovery(recovery)" [disabled]="recoveriesRead || actionKey() !== null"><mat-icon>verified_user</mat-icon>Registrar aprobación</button>
+                    <button mat-stroked-button class="danger-button" type="button" (click)="rejectRecovery(recovery)" [disabled]="recoveriesRead || actionKey() !== null">Rechazar</button>
                   </footer>
                 }
               </article>
             }
           </div>
           @if (!recoveriesLoading() && !recoveriesError() && !recoveries().length) { <div class="empty"><mat-icon>shield</mat-icon><b>Sin expedientes</b><span>No hay recuperaciones que coincidan con esta vista.</span></div> }
-          <mat-paginator [length]="recoveriesTotal()" [pageIndex]="recoveriesPage()" [pageSize]="recoveriesPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons (page)="onRecoveriesPage($event)" aria-label="Paginación de recuperaciones" />
+          @if (!recoveriesError()) { <mat-paginator [length]="recoveriesTotal()" [pageIndex]="recoveriesPage()" [pageSize]="recoveriesPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons (page)="onRecoveriesPage($event)" aria-label="Paginación de recuperaciones" /> }
         </section>
       </mat-tab>
 
       <mat-tab aria-label="Moderación">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">flag</mat-icon><span class="tab-label-text">Moderación</span></ng-template>
         <section class="tab-panel">
-          <header class="section-heading"><div><h2>Cola de moderación</h2><p>{{ reportsTotal() }} denuncias coinciden con los filtros.</p></div></header>
+          @let reportsRead = reportsLoading() || !!reportsError();
+          <header class="section-heading"><div><h2>Cola de moderación</h2>@if (!reportsError()) { <p>{{ reportsTotal() }} denuncias coinciden con los filtros.</p> }</div></header>
           <div class="filters">
             <mat-form-field appearance="outline" class="filter-search">
               <mat-label>Buscar alias, motivo o email</mat-label><mat-icon matPrefix>search</mat-icon>
@@ -203,23 +208,23 @@
                 <div class="report-copy"><span>Motivo</span><b>{{ report.reason }}</b>@if (report.details) { <p>{{ report.details }}</p> }</div>
                 <dl><div><dt>Remitente</dt><dd>{{ report.reporter_email ?? 'Anónimo' }}</dd></div><div><dt>Workspace</dt><dd>#{{ report.workspace_id }}</dd></div><div><dt>Enlace</dt><dd>{{ report.link_state }}</dd></div></dl>
                 <footer>
-                  @if (report.status !== 'reviewed') { <button mat-stroked-button type="button" (click)="reviewReport(report)" [disabled]="reportsLoading() || actionKey() !== null">Revisada</button> }
-                  @if (report.status !== 'dismissed') { <button mat-stroked-button type="button" (click)="dismissReport(report)" [disabled]="reportsLoading() || actionKey() !== null">Desestimar</button> }
-                  @if (report.link_state !== 'blocked') { <button mat-flat-button class="destructive" type="button" (click)="blockLink(report)" [disabled]="reportsLoading() || actionKey() !== null"><mat-icon>block</mat-icon>Bloquear</button> }
-                  @else { <button mat-flat-button type="button" (click)="unblockLink(report)" [disabled]="reportsLoading() || actionKey() !== null"><mat-icon>restart_alt</mat-icon>Desbloquear</button> }
+                  @if (report.status !== 'reviewed') { <button mat-stroked-button type="button" (click)="reviewReport(report)" [disabled]="reportsRead || actionKey() !== null">Revisada</button> }
+                  @if (report.status !== 'dismissed') { <button mat-stroked-button type="button" (click)="dismissReport(report)" [disabled]="reportsRead || actionKey() !== null">Desestimar</button> }
+                  @if (report.link_state !== 'blocked') { <button mat-flat-button class="destructive" type="button" (click)="blockLink(report)" [disabled]="reportsRead || actionKey() !== null"><mat-icon>block</mat-icon>Bloquear</button> }
+                  @else { <button mat-flat-button type="button" (click)="unblockLink(report)" [disabled]="reportsRead || actionKey() !== null"><mat-icon>restart_alt</mat-icon>Desbloquear</button> }
                 </footer>
               </article>
             }
           </div>
           @if (!reportsLoading() && !reportsError() && !reports().length) { <div class="empty"><mat-icon>task_alt</mat-icon><b>Sin denuncias</b><span>No hay casos que coincidan con esta vista.</span></div> }
-          <mat-paginator [length]="reportsTotal()" [pageIndex]="reportsPage()" [pageSize]="reportsPageSize()" [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons (page)="onReportsPage($event)" aria-label="Paginación de denuncias" />
+          @if (!reportsError()) { <mat-paginator [length]="reportsTotal()" [pageIndex]="reportsPage()" [pageSize]="reportsPageSize()" [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons (page)="onReportsPage($event)" aria-label="Paginación de denuncias" /> }
         </section>
       </mat-tab>
 
       <mat-tab aria-label="Dominios">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">language</mat-icon><span class="tab-label-text">Dominios</span></ng-template>
         <section class="tab-panel">
-          <header class="section-heading"><div><h2>Dominios de la plataforma</h2><p>{{ domainsTotal() }} dominios coinciden con los filtros.</p></div></header>
+          <header class="section-heading"><div><h2>Dominios de la plataforma</h2>@if (!domainsError()) { <p>{{ domainsTotal() }} dominios coinciden con los filtros.</p> }</div></header>
           <div class="filters">
             <mat-form-field appearance="outline" class="filter-search"><mat-label>Buscar dominio o workspace</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="domainQuery()" (keyup.enter)="searchDomains(domainSearch.value)" #domainSearch /><button mat-icon-button matSuffix type="button" (click)="searchDomains(domainSearch.value)" aria-label="Buscar dominios"><mat-icon>arrow_forward</mat-icon></button></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>Estado</mat-label><mat-select [value]="domainState()" (selectionChange)="filterDomains($event.value)"><mat-option value="">Todos</mat-option><mat-option value="pending">Pendiente</mat-option><mat-option value="verifying">Verificando</mat-option><mat-option value="verified">Verificado</mat-option><mat-option value="provisioning">Emitiendo certificado</mat-option><mat-option value="active">Activo</mat-option><mat-option value="error">Error</mat-option><mat-option value="disabled">Desactivado</mat-option></mat-select></mat-form-field>
@@ -233,14 +238,14 @@
             }
           </div>
           @if (!domainsLoading() && !domainsError() && !domains().length) { <div class="empty"><mat-icon>travel_explore</mat-icon><b>Sin dominios</b><span>No hay resultados para esta vista.</span></div> }
-          <mat-paginator [length]="domainsTotal()" [pageIndex]="domainsPage()" [pageSize]="domainsPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons (page)="onDomainsPage($event)" aria-label="Paginación de dominios" />
+          @if (!domainsError()) { <mat-paginator [length]="domainsTotal()" [pageIndex]="domainsPage()" [pageSize]="domainsPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons (page)="onDomainsPage($event)" aria-label="Paginación de dominios" /> }
         </section>
       </mat-tab>
 
       <mat-tab aria-label="Auditoría">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">history</mat-icon><span class="tab-label-text">Auditoría</span></ng-template>
         <section class="tab-panel">
-          <header class="section-heading"><div><h2>Registro de actividad</h2><p>{{ auditTotal() }} eventos disponibles.</p></div></header>
+          <header class="section-heading"><div><h2>Registro de actividad</h2>@if (!auditError()) { <p>{{ auditTotal() }} eventos disponibles.</p> }</div></header>
           <div class="filters"><mat-form-field appearance="outline" class="filter-search"><mat-label>Buscar acción o recurso</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="auditQuery()" (keyup.enter)="searchAudit(auditSearch.value)" #auditSearch /><button mat-icon-button matSuffix type="button" (click)="searchAudit(auditSearch.value)" aria-label="Buscar eventos"><mat-icon>arrow_forward</mat-icon></button></mat-form-field></div>
           @if (auditLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando auditoría" /> }
           @if (auditError(); as message) { <div class="alert error compact" role="alert"><mat-icon>error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadAudit()">Reintentar</button></div> }
@@ -250,13 +255,14 @@
             }
           </div>
           @if (!auditLoading() && !auditError() && !events().length) { <div class="empty"><mat-icon>manage_search</mat-icon><b>Sin eventos</b><span>No hay resultados para esta búsqueda.</span></div> }
-          <mat-paginator [length]="auditTotal()" [pageIndex]="auditPage()" [pageSize]="auditPageSize()" [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons (page)="onAuditPage($event)" aria-label="Paginación de auditoría" />
+          @if (!auditError()) { <mat-paginator [length]="auditTotal()" [pageIndex]="auditPage()" [pageSize]="auditPageSize()" [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons (page)="onAuditPage($event)" aria-label="Paginación de auditoría" /> }
         </section>
       </mat-tab>
 
       <mat-tab aria-label="Privacidad">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">policy</mat-icon><span class="tab-label-text">Privacidad</span></ng-template>
         <section class="tab-panel">
+          @let privacyRead = privacyLoading() || !!privacyError();
           <header class="section-heading"><div><h2>Ejercicio de derechos</h2><p>Expedientes trazables con plazo, respuesta cifrada y seguimiento del usuario.</p></div></header>
           <div class="filters"><mat-form-field appearance="outline"><mat-label>Estado</mat-label><mat-select [value]="privacyStatus()" (selectionChange)="filterPrivacyStatus($event.value)"><mat-option value="">Todos</mat-option><mat-option value="submitted">Registradas</mat-option><mat-option value="in_progress">En revisión</mat-option><mat-option value="waiting_user">Espera al usuario</mat-option><mat-option value="completed">Resueltas</mat-option><mat-option value="rejected">Cerradas</mat-option><mat-option value="cancelled">Canceladas</mat-option></mat-select></mat-form-field><mat-form-field appearance="outline"><mat-label>Derecho</mat-label><mat-select [value]="privacyType()" (selectionChange)="filterPrivacyType($event.value)"><mat-option value="">Todos</mat-option><mat-option value="access">Acceso</mat-option><mat-option value="rectification">Rectificación</mat-option><mat-option value="erasure">Supresión</mat-option><mat-option value="objection">Oposición</mat-option><mat-option value="restriction">Limitación</mat-option><mat-option value="portability">Portabilidad</mat-option></mat-select></mat-form-field></div>
           @if (privacyLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando solicitudes de privacidad" /> }
@@ -269,18 +275,18 @@
                 @if (request.messages.length) { <div class="privacy-thread">@for (message of request.messages; track message.id) { <div [class.admin]="message.authorRole === 'admin'"><span>{{ message.authorRole === 'admin' ? 'Equipo' : 'Usuario' }} · {{ formatDate(message.createdAt) }}</span><p>{{ message.body ?? 'Contenido cifrado no disponible' }}</p></div> }</div> }
                 @if (privacyActive(request.status)) {
                   <footer>
-                    @if (request.status === 'submitted') { <button mat-stroked-button type="button" (click)="startPrivacyReview(request)" [disabled]="privacyLoading() || actionKey() !== null">Tomar expediente</button> }
-                    @if (request.status !== 'waiting_user') { <button mat-stroked-button type="button" (click)="requestPrivacyInformation(request)" [disabled]="privacyLoading() || actionKey() !== null">Pedir información</button> }
-                    @if (!request.extendedUntil) { <button mat-stroked-button type="button" (click)="extendPrivacy(request, 'complexity')" [disabled]="privacyLoading() || actionKey() !== null">Ampliar: complejidad</button><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'request_volume')" [disabled]="privacyLoading() || actionKey() !== null">Ampliar: volumen</button> }
-                    <button mat-flat-button color="primary" type="button" (click)="completePrivacy(request)" [disabled]="privacyLoading() || actionKey() !== null">Resolver</button>
-                    <button mat-stroked-button class="danger-button" type="button" (click)="rejectPrivacy(request)" [disabled]="privacyLoading() || actionKey() !== null">Cerrar motivadamente</button>
+                    @if (request.status === 'submitted') { <button mat-stroked-button type="button" (click)="startPrivacyReview(request)" [disabled]="privacyRead || actionKey() !== null">Tomar expediente</button> }
+                    @if (request.status !== 'waiting_user') { <button mat-stroked-button type="button" (click)="requestPrivacyInformation(request)" [disabled]="privacyRead || actionKey() !== null">Pedir información</button> }
+                    @if (!request.extendedUntil) { <button mat-stroked-button type="button" (click)="extendPrivacy(request, 'complexity')" [disabled]="privacyRead || actionKey() !== null">Ampliar: complejidad</button><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'request_volume')" [disabled]="privacyRead || actionKey() !== null">Ampliar: volumen</button> }
+                    <button mat-flat-button color="primary" type="button" (click)="completePrivacy(request)" [disabled]="privacyRead || actionKey() !== null">Resolver</button>
+                    <button mat-stroked-button class="danger-button" type="button" (click)="rejectPrivacy(request)" [disabled]="privacyRead || actionKey() !== null">Cerrar motivadamente</button>
                   </footer>
                 }
               </article>
             }
           </div>
           @if (!privacyLoading() && !privacyError() && !privacyRequests().length) { <div class="empty"><mat-icon>fact_check</mat-icon><b>Sin expedientes</b><span>No hay solicitudes para los filtros seleccionados.</span></div> }
-          <mat-paginator [length]="privacyTotal()" [pageIndex]="privacyPage()" [pageSize]="privacyPageSize()" [pageSizeOptions]="[10, 20, 50]" showFirstLastButtons (page)="onPrivacyPage($event)" aria-label="Paginación de solicitudes de privacidad" />
+          @if (!privacyError()) { <mat-paginator [length]="privacyTotal()" [pageIndex]="privacyPage()" [pageSize]="privacyPageSize()" [pageSizeOptions]="[10, 20, 50]" showFirstLastButtons (page)="onPrivacyPage($event)" aria-label="Paginación de solicitudes de privacidad" /> }
         </section>
       </mat-tab>
 
@@ -298,6 +304,7 @@
             </div>
           }
           <section class="outbox-card" aria-labelledby="mail-outbox-title">
+            @let mailRead = mailLoading() || !!mailError();
             <header class="section-heading">
               <div><h2 id="mail-outbox-title">Correo transaccional</h2><p>Metadatos operativos únicamente. Destinatarios, contenido y enlaces permanecen cifrados.</p></div>
               <mat-form-field appearance="outline"><mat-label>Estado</mat-label><mat-select [value]="mailStatus()" (selectionChange)="filterMail($event.value)"><mat-option value="">Todos</mat-option><mat-option value="failed">Fallidos</mat-option><mat-option value="comp_pending">Compensación pendiente</mat-option><mat-option value="compensating">Compensando</mat-option><mat-option value="compensated">Compensados</mat-option><mat-option value="pending">Pendientes</mat-option><mat-option value="queued">En cola</mat-option><mat-option value="processing">Procesando</mat-option><mat-option value="sent">Enviados</mat-option><mat-option value="obsolete">Obsoletos</mat-option></mat-select></mat-form-field>
@@ -312,12 +319,12 @@
                   <span class="badge" [class.success]="message.status === 'sent' || message.status === 'compensated'" [class.warning]="message.status === 'pending' || message.status === 'queued' || message.status === 'processing' || message.status === 'comp_pending' || message.status === 'compensating'" [class.danger]="message.status === 'failed'" [class.neutral]="message.status === 'obsolete'">{{ mailStatusLabel(message.status) }}</span>
                   <div class="outbox-attempts"><span>Intentos</span><b>{{ message.attempts }} + {{ message.manualRetryCount }} manuales</b></div>
                   <time>{{ formatDate(message.updatedAt) }}</time>
-                  <button mat-stroked-button type="button" (click)="retryMail(message)" [disabled]="mailLoading() || !message.retryable || actionKey() !== null"><mat-icon>replay</mat-icon>{{ message.retryable ? 'Reintentar' : 'No disponible' }}</button>
+                  <button mat-stroked-button type="button" (click)="retryMail(message)" [disabled]="mailRead || !message.retryable || actionKey() !== null"><mat-icon>replay</mat-icon>{{ message.retryable ? 'Reintentar' : 'No disponible' }}</button>
                 </article>
               }
             </div>
             @if (!mailLoading() && !mailError() && !mailMessages().length) { <div class="empty compact-empty"><mat-icon>mark_email_read</mat-icon><b>Sin correos en este estado</b><span>No hay incidencias que requieran intervención.</span></div> }
-            <mat-paginator [length]="mailTotal()" [pageIndex]="mailPage()" [pageSize]="mailPageSize()" [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons (page)="onMailPage($event)" aria-label="Paginación del correo transaccional" />
+            @if (!mailError()) { <mat-paginator [length]="mailTotal()" [pageIndex]="mailPage()" [pageSize]="mailPageSize()" [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons (page)="onMailPage($event)" aria-label="Paginación del correo transaccional" /> }
           </section>
         </section>
       </mat-tab>

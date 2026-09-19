@@ -17,7 +17,7 @@ import {
   decodeSessionsResponse,
   decodeWorkspacesResponse,
 } from "./auth-response-decoders";
-import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, Workspace } from "../models";
+import type { AccountDeletionImpact, AuthUser, DataExportStatus, SessionList, Workspace } from "../models";
 
 const AUTH_INVALIDATION_KEY = "uvh.auth.invalidated";
 
@@ -430,11 +430,16 @@ export class AuthService {
     return result;
   }
 
-  async listSessions(options?: ApiReadOptions): Promise<Session[]> {
+  /**
+   * The session registry is bounded server-side. `truncated` travels with the
+   * rows so a caller can tell a complete registry from a window onto it, which
+   * matters here: an omitted active session cannot be revoked from the panel.
+   */
+  async listSessions(options?: ApiReadOptions): Promise<SessionList> {
     const generation = this.generation;
-    const { sessions } = await this.api.get<{ sessions: Session[] }>("/api/v1/auth/sessions", undefined, decodeSessionsResponse, options);
+    const decoded = await this.api.get<SessionList>("/api/v1/auth/sessions", undefined, decodeSessionsResponse, options);
     this.assertCurrent(generation);
-    return sessions;
+    return decoded;
   }
 
   async revokeSession(id: string, current = false): Promise<boolean> {

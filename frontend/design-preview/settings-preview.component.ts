@@ -3,7 +3,7 @@ import { MatButtonModule } from "@angular/material/button";
 import { SettingsComponent } from "../src/app/panel/settings/settings.component";
 import { AuthService } from "../src/app/core/services/auth.service";
 import { ApiService } from "../src/app/core/services/api.service";
-import type { AccountDeletionImpact, AuthUser, Session } from "../src/app/core/models";
+import type { AccountDeletionImpact, AuthUser, SessionList } from "../src/app/core/models";
 import { blocked } from "./workspace-fixture";
 
 // This provider is compiled only into design-preview. All mutation methods reject;
@@ -11,7 +11,7 @@ import { blocked } from "./workspace-fixture";
 const user = signal<AuthUser>({ id: 900001, name: "Marina del Río", email: "marina@example.invalid", isAdmin: false, emailVerified: true, mfaEnabled: true, recoveryCodesRemaining: 8 });
 const previewAuth = {
   user, sessionGeneration: () => 1,
-  listSessions: async (): Promise<Session[]> => [{ id: "fictional-session", user_agent: "Chrome · Windows · Dispositivo de ejemplo", created_at: "2026-09-14T10:00:00Z", last_used_at: "2026-09-14T10:00:00Z", expires_at: "2099-01-01T00:00:00Z", revoked_at: null, mfa_verified_at: "2026-09-14T10:00:00Z", current: true }],
+  listSessions: async (): Promise<SessionList> => ({ truncated: false, sessions: [{ id: "fictional-session", user_agent: "Chrome · Windows · Dispositivo de ejemplo", created_at: "2026-09-14T10:00:00Z", last_used_at: "2026-09-14T10:00:00Z", expires_at: "2099-01-01T00:00:00Z", revoked_at: null, mfa_verified_at: "2026-09-14T10:00:00Z", current: true }] }),
   dataExportStatus: async () => null,
   accountDeletionImpact: async (): Promise<AccountDeletionImpact> => ({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null }),
   updateProfile: blocked, requestEmailChange: blocked, cancelEmailChange: blocked,

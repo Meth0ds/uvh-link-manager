@@ -58,6 +58,8 @@ export class TokensComponent {
   private readonly mutations = new LatestRequest(inject(DestroyRef));
 
   readonly tokens = signal<ApiTokenDto[]>([]);
+  /** The server held token rows back, so this list is not the whole registry. */
+  readonly truncated = signal(false);
   readonly loading = signal(true);
   readonly creating = signal(false);
   readonly revokingId = signal<number | null>(null);
@@ -82,6 +84,7 @@ export class TokensComponent {
       this.requests.invalidate();
       this.mutations.invalidate();
       this.tokens.set([]);
+      this.truncated.set(false);
       this.error.set(null);
       // Plain tokens and authentication factors must never cross workspaces.
       this.plainToken.set(null);
@@ -109,11 +112,18 @@ export class TokensComponent {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const { tokens } = await this.api.get<{ tokens: ApiTokenDto[] }>("/api/v1/tokens", undefined, decodeApiTokensResponse, { signal: request.signal });
+      const { tokens, truncated } = await this.api.get<{ tokens: ApiTokenDto[]; truncated: boolean }>(
+        "/api/v1/tokens", undefined, decodeApiTokensResponse, { signal: request.signal });
       if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
       this.tokens.set(tokens);
+      this.truncated.set(truncated);
     } catch (err) {
       if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
+      // The last known registry stays on screen for context, exactly as the
+      // links and domains registries behave; the view disarms its revoke
+      // buttons while this error is showing, so nothing acts on a row whose
+      // read did not come back. The truncated flag keeps describing the rows
+      // that are actually displayed.
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los tokens");
     } finally {
       if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
@@ -171,7 +181,9 @@ export class TokensComponent {
   }
 
   async revoke(t: ApiTokenDto): Promise<void> {
-    if (this.revokingId() !== null) return;
+    // A registry read that failed leaves the previous rows visible; they are
+    // not proof that this credential is still there to revoke.
+    if (this.revokingId() !== null || this.error()) return;
     // A confirmation belongs to the workspace it was opened in: answering it
     // after switching tenants would remove a row from the wrong registry.
     const target = targetWorkspace(this.workspaces);

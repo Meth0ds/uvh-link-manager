@@ -133,10 +133,15 @@ function delivery(value: unknown): WebhookDelivery {
 }
 
 /** Decode the whole list before replacing workspace-scoped credential metadata. */
-export function decodeApiTokensResponse(value: unknown): { tokens: ApiTokenDto[] } {
+export function decodeApiTokensResponse(value: unknown): { tokens: ApiTokenDto[]; truncated: boolean } {
   const source = record(value, "API tokens");
   if (!Array.isArray(source["tokens"]) || source["tokens"].length > 100) invalid("API tokens");
-  return { tokens: source["tokens"].map(apiToken) };
+  // The registry is bounded server-side. Revoked tokens are kept as history, so
+  // an account that rotated credentials for long enough reaches the bound and
+  // the panel must say so instead of presenting the page as the registry. A
+  // missing flag reads as "not truncated", like the link activity panel.
+  const truncated = source["truncated"] === undefined ? false : boolean(source["truncated"]);
+  return { tokens: source["tokens"].map(apiToken), truncated };
 }
 
 /**

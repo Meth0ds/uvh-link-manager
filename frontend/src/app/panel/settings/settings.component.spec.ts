@@ -3,7 +3,7 @@ import { TestBed } from "@angular/core/testing";
 import { Router } from "@angular/router";
 import { FormBuilder } from "@angular/forms";
 import { MatSnackBar } from "@angular/material/snack-bar";
-import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session } from "../../core/models";
+import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, SessionList } from "../../core/models";
 import { ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { ThemeService } from "../../core/services/theme.service";
@@ -56,7 +56,7 @@ describe("SettingsComponent async safety", () => {
       emailVerified: true, mfaEnabled: false,
     }) });
     auth.sessionGeneration.and.returnValue(1);
-    auth.listSessions.and.resolveTo([]);
+    auth.listSessions.and.resolveTo({ sessions: [], truncated: false });
     auth.dataExportStatus.and.resolveTo(null);
     auth.accountDeletionImpact.and.resolveTo({
       canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null,
@@ -94,19 +94,32 @@ describe("SettingsComponent async safety", () => {
   });
 
   it("keeps the newest sessions response when an older request finishes last", async () => {
-    const older = deferred<Session[]>();
-    const newer = deferred<Session[]>();
+    const older = deferred<SessionList>();
+    const newer = deferred<SessionList>();
     auth.listSessions.and.returnValues(older.promise, newer.promise);
 
     const firstLoad = component.loadSessions();
     const secondLoad = component.loadSessions();
-    newer.resolve([session("new")]);
+    newer.resolve({ sessions: [session("new")], truncated: false });
     await secondLoad;
-    older.resolve([session("old")]);
+    older.resolve({ sessions: [session("old")], truncated: true });
     await firstLoad;
 
     expect(component.sessions().map((item) => item.id)).toEqual(["new"]);
+    expect(component.sessionsTruncated()).toBeFalse();
     expect(component.sessionsLoading()).toBeFalse();
+  });
+
+  it("states that a bounded session registry is not every device", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.componentInstance.sessionsLoading.set(false);
+    fixture.componentInstance.sessions.set([session("a")]);
+    fixture.componentInstance.sessionsTruncated.set(true);
+    fixture.detectChanges();
+    const card = fixture.nativeElement.querySelector(".sessions-card") as HTMLElement;
+
+    expect(card.querySelector(".count-badge")?.textContent?.trim()).toBe("1+");
+    expect(card.textContent).toContain("Hay más registros");
   });
 
   it("keeps section jumps local and moves keyboard focus without clearing MFA setup", () => {

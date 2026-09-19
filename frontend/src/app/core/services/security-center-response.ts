@@ -31,6 +31,9 @@ export function decodeSecurityCenter(value: unknown): SecurityCenterSnapshot {
       pendingEmailExpiresAt: timestamp(summary["pendingEmailExpiresAt"], "security center timestamp"),
       lastPasswordEventAt: timestamp(summary["lastPasswordEventAt"], "security center timestamp"),
     },
+    // The activity panel is bounded server-side; without this the last twenty
+    // events read as the whole personal audit trail.
+    activityTruncated: source["truncated"] === undefined ? false : boolean(source["truncated"], "security center truncation"),
     activity: boundedArray(source["activity"], "security center activity", 20).map((item) => {
       const event = record(item, "security center event");
       return {

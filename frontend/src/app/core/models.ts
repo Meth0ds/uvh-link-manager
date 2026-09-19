@@ -320,6 +320,13 @@ export interface Session {
   current: boolean;
 }
 
+/** One page of the account session registry, not necessarily all of it. */
+export interface SessionList {
+  sessions: Session[];
+  /** The server held rows back, so this list is a window on recent activity. */
+  truncated: boolean;
+}
+
 export interface SecurityCenterSnapshot {
   summary: {
     mfaEnabled: boolean;
@@ -331,6 +338,8 @@ export interface SecurityCenterSnapshot {
     lastPasswordEventAt: string | null;
   };
   activity: Array<{ id: number; action: string; createdAt: string }>;
+  /** More activity exists than the bounded panel returned. */
+  activityTruncated: boolean;
 }
 
 export type PublicServiceStatus = "operational" | "degraded" | "major_outage" | "maintenance" | "unknown";

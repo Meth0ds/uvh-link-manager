@@ -336,6 +336,33 @@ describe("AdminComponent", () => {
     expect(component.usersLoading()).toBeTrue();
   });
 
+  it("disarms a failed page instead of acting on the one it replaced", () => {
+    component.users.set([{
+      id: 1,
+      email: "operator@example.test",
+      name: "Operator",
+      is_admin: false,
+      email_verified_at: "2026-09-05T10:00:00Z",
+      mfa_enabled: true,
+      created_at: "2026-09-05T10:00:00Z",
+      deleted_at: null,
+      workspaces: 1,
+      links: 2,
+    }]);
+    component.usersTotal.set(1);
+    component.usersError.set("No se pudieron cargar los usuarios");
+    fixture.detectChanges();
+
+    const element: HTMLElement = fixture.nativeElement;
+    const buttons = Array.from(element.querySelectorAll("button")) as HTMLButtonElement[];
+    const userButtons = buttons.filter((button) => ["Hacer admin", "Bloquear"].includes(button.textContent?.trim() ?? ""));
+    expect(userButtons.length).toBe(2);
+    expect(userButtons.every((button) => button.disabled)).toBeTrue();
+    // Neither the count nor the pager may describe a page that never arrived.
+    expect(element.querySelector("mat-paginator")).toBeNull();
+    expect(element.textContent).not.toContain("cuentas coinciden con los filtros");
+  });
+
   it("disables user actions while their rows may be stale", () => {
     component.users.set([{
       id: 1,

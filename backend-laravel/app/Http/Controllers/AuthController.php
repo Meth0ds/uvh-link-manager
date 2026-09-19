@@ -1870,13 +1870,17 @@ class AuthController
             'auth.email_change_requested', 'auth.email_change_cancelled', 'auth.email_change_confirmed',
             'auth.emergency_access_revoked', 'auth.account_recovery_completed',
         ];
-        $activity = AuditEvent::where('user_id', $user->id)->whereIn('action', $visibleActions)
-            ->orderByDesc('created_at')->orderByDesc('id')->limit(20)->get(['id', 'action', 'created_at'])
-            ->map(fn (AuditEvent $event) => [
-                'id' => (int) $event->id,
-                'action' => $event->action,
-                'createdAt' => $this->iso($event->created_at),
-            ]);
+        $activityRows = AuditEvent::where('user_id', $user->id)->whereIn('action', $visibleActions)
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(21)->get(['id', 'action', 'created_at']);
+        // One row past the bound is what tells a full panel from a truncated
+        // one, so the last twenty events are never read as the whole personal
+        // audit trail. Same contract as the per-link activity panel.
+        $activityTruncated = $activityRows->count() > 20;
+        $activity = $activityRows->take(20)->map(fn (AuditEvent $event) => [
+            'id' => (int) $event->id,
+            'action' => $event->action,
+            'createdAt' => $this->iso($event->created_at),
+        ]);
 
         return response()->json([
             'summary' => [
@@ -1889,6 +1893,7 @@ class AuthController
                 'lastPasswordEventAt' => $this->iso($lastPasswordEvent?->created_at),
             ],
             'activity' => $activity,
+            'truncated' => $activityTruncated,
         ]);
     }
 

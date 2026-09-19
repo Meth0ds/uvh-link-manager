@@ -180,7 +180,7 @@
 
 <!-- Sessions -->
 <div class="card-block sessions-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>devices</mat-icon></span><div><h3>Sesiones activas</h3><p>Revisa y revoca accesos que ya no reconozcas.</p></div>@if (!sessionsLoading() && !sessionsError()) { <span class="count-badge tnum">{{ sessions().length }}</span> }</div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>devices</mat-icon></span><div><h3>Sesiones activas</h3><p>Revisa y revoca accesos que ya no reconozcas.</p></div>@if (!sessionsLoading() && !sessionsError()) { <span class="count-badge tnum">{{ sessions().length }}{{ sessionsTruncated() ? '+' : '' }}</span> }</div>
   @if (sessionsLoading()) {
     <app-panel-skeleton variant="list" label="Cargando sesiones" />
   }
@@ -208,6 +208,11 @@
         {{ s.current ? 'Cerrar esta sesión' : 'Revocar' }}
       </button>
     </div>
+  }
+  <!-- An incomplete registry is not an empty one, and it is not the whole set
+       either: revoked rows are retained and can push an idle session out. -->
+  @if (!sessionsLoading() && !sessionsError() && sessionsTruncated()) {
+    <p class="muted">Se muestran las sesiones con actividad más reciente. Hay más registros: revoca las que no reconozcas y vuelve a abrir esta sección para ver el resto.</p>
   }
   @if (!sessionsLoading() && !sessionsError() && !sessions().length) {
     <p class="muted">No hay sesiones activas.</p>

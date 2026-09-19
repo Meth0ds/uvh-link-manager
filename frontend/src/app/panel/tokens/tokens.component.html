@@ -97,9 +97,14 @@
           </span>
         </div>
         <div class="token-actions">
-          <button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="!!t.revokedAt || revokingId() !== null" [attr.aria-label]="(t.revokedAt ? 'Token revocado: ' : 'Revocar token: ') + t.name"><mat-icon aria-hidden="true">block</mat-icon> {{ t.revokedAt ? "Revocado" : "Revocar" }}</button>
+          <button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="!!t.revokedAt || revokingId() !== null || !!error()" [attr.aria-label]="(t.revokedAt ? 'Token revocado: ' : 'Revocar token: ') + t.name"><mat-icon aria-hidden="true">block</mat-icon> {{ t.revokedAt ? "Revocado" : "Revocar" }}</button>
         </div>
       </article>
+    }
+    <!-- A bounded registry is not a complete one: revoked credentials are kept
+         as history and eventually push older rows out of the response. -->
+    @if (truncated() && !error()) {
+      <p class="registry-window" role="status">Se muestran los tokens más recientes. El workspace ha emitido más credenciales de las que caben en esta página: revoca las que ya no uses y vuelve a cargar para ver las siguientes.</p>
     }
     @if (!tokens().length && !error()) {
       <div class="empty-state">

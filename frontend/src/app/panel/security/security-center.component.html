@@ -19,11 +19,14 @@
 
   <div class="security-columns">
     <section class="panel" aria-labelledby="sessions-title">
-      <header><div><span class="eyebrow">Accesos actuales</span><h2 id="sessions-title">Sesiones activas</h2></div><span class="count">{{ sessions().length }}</span></header>
+      <header><div><span class="eyebrow">Accesos actuales</span><h2 id="sessions-title">Sesiones activas</h2></div><span class="count">{{ sessions().length }}{{ sessionsTruncated() ? '+' : '' }}</span></header>
       @for (session of sessions(); track session.id) {
         <article class="session"><mat-icon>devices</mat-icon><div><b>{{ agent(session.user_agent) }}</b><span>Último uso: {{ formatDate(session.last_used_at) }}</span><small>{{ session.current ? 'Esta sesión' : 'Otra sesión' }}{{ session.mfa_verified_at ? ' · MFA verificado' : '' }}</small></div><button mat-stroked-button type="button" (click)="revoke(session)" [disabled]="revokingId() !== null">{{ session.current ? 'Cerrar' : 'Revocar' }}</button></article>
       }
       @if (!sessions().length) { <p class="empty">No hay sesiones activas visibles.</p> }
+      <!-- The registry is bounded server-side, so an omitted device must not be
+           read as "this account has no other sessions". -->
+      @if (sessionsTruncated()) { <p class="bounded-note">Se muestran las sesiones con actividad más reciente. La cuenta tiene más registros de los que caben aquí: revoca las que no reconozcas y actualiza para ver las siguientes.</p> }
     </section>
 
     <section class="panel" aria-labelledby="activity-title">
@@ -32,6 +35,7 @@
         <article class="activity"><span class="dot"></span><div><b>{{ actionLabel(event.action) }}</b><span>{{ formatDate(event.createdAt) }}</span></div></article>
       }
       @if (!data.activity.length) { <p class="empty">Todavía no hay actividad sensible registrada.</p> }
+      @if (data.activityTruncated) { <p class="bounded-note">Se muestran los últimos eventos. El historial de seguridad de tu cuenta es más largo.</p> }
       <p class="privacy-note">Esta vista omite metadatos internos, hashes de IP y material de credenciales.</p>
     </section>
   </div>

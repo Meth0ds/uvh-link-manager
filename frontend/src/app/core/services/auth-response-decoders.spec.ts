@@ -105,9 +105,12 @@ describe("authentication response decoders", () => {
       mfa_verified_at: null,
       current: true,
     };
-    expect(decodeSessionsResponse({ sessions: [session] })).toEqual({ sessions: [session] });
+    expect(decodeSessionsResponse({ sessions: [session] })).toEqual({ sessions: [session], truncated: false });
+    expect(decodeSessionsResponse({ sessions: [session], truncated: true })).toEqual({ sessions: [session], truncated: true });
     expect(decodeSessionRevocation({ ok: true, current: true })).toEqual({ ok: true, current: true });
     expect(() => decodeSessionsResponse({ sessions: [{ ...session, current: 1 }] })).toThrow();
+    // A flag that is present but not a boolean must not be read as "complete".
+    expect(() => decodeSessionsResponse({ sessions: [session], truncated: "yes" })).toThrow();
   });
 
   it("validates MFA setup URIs and every recovery code", () => {

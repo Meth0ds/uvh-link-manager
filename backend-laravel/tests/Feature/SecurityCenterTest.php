@@ -39,6 +39,7 @@ final class SecurityCenterTest extends TestCase
             ->assertJsonPath('summary.recoveryCodesRemaining', 3)
             ->assertJsonPath('summary.activeSessions', 1)
             ->assertJsonPath('activity.0.action', 'auth.password_change')
+            ->assertJsonPath('truncated', false)
             ->assertJsonCount(1, 'activity');
         foreach (['private-metadata', 'private-ip-hash', 'foreign-private', 'link.update', 'resource_id', 'metadata'] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $response->getContent());
@@ -53,11 +54,26 @@ final class SecurityCenterTest extends TestCase
             AuditEvent::create(['user_id' => $user->id, 'action' => 'auth.login', 'resource_type' => 'user',
                 'resource_id' => (string) $user->id, 'created_at' => now()->addSeconds($index)]);
         }
-        $response = $this->getJson('/api/v1/auth/security-center')->assertOk()->assertJsonCount(20, 'activity');
+        $response = $this->getJson('/api/v1/auth/security-center')->assertOk()
+            ->assertJsonPath('truncated', true)
+            ->assertJsonCount(20, 'activity');
         $ids = collect($response->json('activity'))->pluck('id')->all();
         $sorted = $ids;
         rsort($sorted);
         $this->assertSame($sorted, $ids);
+    }
+
+    public function test_exactly_the_bound_is_not_reported_as_truncated(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $this->signIn($user);
+        for ($index = 0; $index < 20; $index++) {
+            AuditEvent::create(['user_id' => $user->id, 'action' => 'auth.login', 'resource_type' => 'user',
+                'resource_id' => (string) $user->id, 'created_at' => now()->addSeconds($index)]);
+        }
+        $this->getJson('/api/v1/auth/security-center')->assertOk()
+            ->assertJsonPath('truncated', false)
+            ->assertJsonCount(20, 'activity');
     }
 
     public function test_security_center_requires_a_live_session(): void

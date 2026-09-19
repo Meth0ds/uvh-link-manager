@@ -104,6 +104,8 @@ export class SettingsComponent {
 
   // ---------------- Sessions ----------------
   readonly sessions = signal<Session[]>([]);
+  /** The server held session rows back, so this list is not the whole registry. */
+  readonly sessionsTruncated = signal(false);
   readonly sessionsLoading = signal(true);
   readonly sessionsError = signal<string | null>(null);
 
@@ -248,12 +250,14 @@ export class SettingsComponent {
     this.sessionsError.set(null);
     try {
       const now = Date.now();
-      const sessions = await this.auth.listSessions({ signal: request.signal });
+      const { sessions, truncated } = await this.auth.listSessions({ signal: request.signal });
       if (!this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.sessions.set(sessions.filter((session) => !session.revoked_at && new Date(session.expires_at).getTime() > now));
+      this.sessionsTruncated.set(truncated);
     } catch (err) {
       if (!this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.sessions.set([]);
+      this.sessionsTruncated.set(false);
       this.sessionsError.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las sesiones");
     } finally {
       if (this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) this.sessionsLoading.set(false);
@@ -300,7 +304,9 @@ export class SettingsComponent {
       confirmLabel: "Cancelar exportación",
       destructive: true,
     });
-    if (!confirmed) return;
+    // The answer can arrive after another attempt started; the dialog is not a
+    // lock on the operation it describes.
+    if (!confirmed || this.exportBusy()) return;
     this.exportBusy.set(true);
     try {
       await this.auth.cancelDataExport();
@@ -570,7 +576,7 @@ export class SettingsComponent {
       confirmLabel: "Desactivar MFA",
       destructive: true,
     });
-    if (!confirmed) return;
+    if (!confirmed || this.mfaBusy()) return;
     this.mfaBusy.set(true);
     try {
       await this.auth.mfaDisable(
@@ -654,7 +660,7 @@ export class SettingsComponent {
       confirmLabel: "Regenerar códigos",
       destructive: true,
     });
-    if (!confirmed) return;
+    if (!confirmed || this.mfaBusy()) return;
 
     this.mfaBusy.set(true);
     try {

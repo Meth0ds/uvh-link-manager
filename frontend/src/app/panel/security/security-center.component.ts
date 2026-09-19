@@ -50,6 +50,8 @@ export class SecurityCenterComponent {
 
   readonly snapshot = signal<SecurityCenterSnapshot | null>(null);
   readonly sessions = signal<Session[]>([]);
+  /** The server held session rows back: this list is a window, not the registry. */
+  readonly sessionsTruncated = signal(false);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly revokingId = signal<string | null>(null);
@@ -62,18 +64,20 @@ export class SecurityCenterComponent {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [snapshot, sessions] = await Promise.all([
+      const [snapshot, listed] = await Promise.all([
         this.api.get<SecurityCenterSnapshot>("/api/v1/auth/security-center", undefined, decodeSecurityCenter, { signal: request.signal }),
         this.auth.listSessions({ signal: request.signal }),
       ]);
       if (!this.requests.isCurrent(request, this.auth.sessionGeneration())) return;
       const now = Date.now();
       this.snapshot.set(snapshot);
-      this.sessions.set(sessions.filter((item) => item.revoked_at === null && Date.parse(item.expires_at) > now));
+      this.sessions.set(listed.sessions.filter((item) => item.revoked_at === null && Date.parse(item.expires_at) > now));
+      this.sessionsTruncated.set(listed.truncated);
     } catch (err) {
       if (!this.requests.isCurrent(request, this.auth.sessionGeneration())) return;
       this.snapshot.set(null);
       this.sessions.set([]);
+      this.sessionsTruncated.set(false);
       this.error.set(err instanceof ApiRequestError && err.status === 401 ? "Tu sesión ya no está activa." : err instanceof ApiRequestError ? err.message : "No se pudo cargar el centro de seguridad");
     } finally {
       if (this.requests.isCurrent(request, this.auth.sessionGeneration())) this.loading.set(false);
