@@ -17,7 +17,9 @@ use App\Support\MailTransportPolicy;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\ProductionSecurity;
+use App\Support\PublicSuffixes;
 use App\Support\QueueBacklog;
+use App\Support\SearchTerm;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Carbon\Carbon;
@@ -58,8 +60,7 @@ class AdminController
                 (SELECT COUNT(*) FROM links l WHERE l.created_by = u.id AND l.deleted_at IS NULL) AS links');
 
         if ($search !== '') {
-            $like = "%{$search}%";
-            $query->where(fn ($q) => $q->where('u.email', 'ilike', $like)->orWhere('u.name', 'ilike', $like));
+            $query->where(fn ($q) => $q->where('u.email', 'ilike', $search)->orWhere('u.name', 'ilike', $search));
         }
 
         match ($status) {
@@ -278,11 +279,10 @@ class AdminController
             $query->where('r.status', $status);
         }
         if ($search !== '') {
-            $like = "%{$search}%";
-            $query->where(function ($q) use ($like) {
-                $q->where('l.alias', 'ilike', $like)
-                    ->orWhere('r.reason', 'ilike', $like)
-                    ->orWhere('r.reporter_email', 'ilike', $like);
+            $query->where(function ($q) use ($search) {
+                $q->where('l.alias', 'ilike', $search)
+                    ->orWhere('r.reason', 'ilike', $search)
+                    ->orWhere('r.reporter_email', 'ilike', $search);
             });
         }
 
@@ -486,7 +486,10 @@ class AdminController
             ->leftJoin('users as au', 'au.id', '=', 'a.admin_user_id')
             ->when($status !== '', fn ($q) => $q->where('r.status', $status))
             ->when($search !== '', function ($q) use ($search) {
-                $needle = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], mb_strtolower($search)).'%';
+                // `$search` is already an escaped, bound pattern; lowercasing it
+                // leaves the escape characters untouched and matches the two
+                // `lower(...)` columns this join has to compare against.
+                $needle = mb_strtolower($search);
                 $q->where(function ($nested) use ($needle) {
                     $nested->whereRaw("lower(u.email) LIKE ? ESCAPE '\\\\'", [$needle])
                         ->orWhereRaw("lower(u.name) LIKE ? ESCAPE '\\\\'", [$needle]);
@@ -694,8 +697,7 @@ class AdminController
             $query->where('d.state', $state);
         }
         if ($search !== '') {
-            $like = "%{$search}%";
-            $query->where(fn ($q) => $q->where('d.domain', 'ilike', $like)->orWhere('w.name', 'ilike', $like));
+            $query->where(fn ($q) => $q->where('d.domain', 'ilike', $search)->orWhere('w.name', 'ilike', $search));
         }
 
         $total = (clone $query)->count();
@@ -721,11 +723,10 @@ class AdminController
 
         $query = DB::table('audit_events');
         if ($search !== '') {
-            $like = "%{$search}%";
-            $query->where(function ($q) use ($like) {
-                $q->where('action', 'ilike', $like)
-                    ->orWhere('resource_type', 'ilike', $like)
-                    ->orWhere('resource_id', 'ilike', $like);
+            $query->where(function ($q) use ($search) {
+                $q->where('action', 'ilike', $search)
+                    ->orWhere('resource_type', 'ilike', $search)
+                    ->orWhere('resource_id', 'ilike', $search);
             });
         }
         if ($action !== '') {
@@ -1336,6 +1337,13 @@ class AdminController
             }
 
             $host = DestinationDenylist::normalizeHost((string) (parse_url((string) $row->destination, PHP_URL_HOST) ?? ''));
+            // A public suffix is not a registrable host: an entry for one would
+            // take every site under it offline, which is never the intent of
+            // blocking one link. Refused here, with a message that says so
+            // instead of the generic "could not interpret the destination".
+            if ($scope === 'host' && $host !== null && PublicSuffixes::isPublicSuffix($host)) {
+                return ['status' => 'public_suffix'];
+            }
             $entryId = $scope === 'host'
                 ? ($host === null ? null : DestinationDenylist::blockHost($host, $reason, DestinationDenylist::SOURCE_REPORT, $actorId))
                 : DestinationDenylist::blockUrl((string) $row->destination, $reason, DestinationDenylist::SOURCE_REPORT, $actorId);
@@ -1359,12 +1367,24 @@ class AdminController
         if ($result['status'] === 'unsupported') {
             return response()->json(['error' => 'No se pudo interpretar el destino de este enlace'], 422);
         }
+        if ($result['status'] === 'public_suffix') {
+            return response()->json(['error' => 'Ese destino es un sufijo público (por ejemplo co.uk o github.io): bloquearlo afectaría a todos los sitios alojados bajo él'], 422);
+        }
 
         // Every link that could already point at the same host is re-evaluated
         // in the background; a new entry has to reach links that already exist.
-        $scheduled = $result['host'] === null ? 0 : DestinationReputationService::reanalyzeHost($result['host']);
+        // The sweep is bounded, and it says so when the bound was reached: the
+        // operator has to be able to tell a propagated block from a partial one.
+        $sweep = $result['host'] === null
+            ? ['scheduled' => 0, 'truncated' => false]
+            : DestinationReputationService::reanalyzeHost($result['host']);
 
-        return response()->json(['ok' => true, 'entryId' => $result['entryId'], 'linksScheduled' => $scheduled]);
+        return response()->json([
+            'ok' => true,
+            'entryId' => $result['entryId'],
+            'linksScheduled' => $sweep['scheduled'],
+            'linksSweepTruncated' => $sweep['truncated'],
+        ]);
     }
 
     /** The destinations the platform currently refuses to serve. */
@@ -1412,12 +1432,22 @@ class AdminController
             return response()->json(['error' => 'Entrada no encontrada'], 404);
         }
 
-        return response()->json(['ok' => true]);
+        // Outside the transaction: withdrawing an entry has to reach the links it
+        // blocked. A URL entry stores only a hash, so the links cannot be looked
+        // up from it — but they do not need to be, because every self-applied
+        // denylist block is re-evaluated and only the ones with no remaining
+        // ground are released. Bounded, and free of provider traffic.
+        $released = DestinationReputationService::releaseUnlistedBlocks(
+            max(1, min(500, (int) config('uvh.reputation.release_batch', 50)))
+        );
+
+        return response()->json(['ok' => true, 'releasedLinks' => $released]);
     }
 
+    /** The `q` parameter as a bound ILIKE pattern, metacharacters escaped. */
     private function search(Request $request): string
     {
-        return mb_substr(trim(UvhRequest::queryString($request, 'q')), 0, 100);
+        return SearchTerm::contains(UvhRequest::queryString($request, 'q'), 100);
     }
 
     private function restoredLinkState(object $link): string
@@ -1436,6 +1466,13 @@ class AdminController
     /** Preserve an administrative block across the soft-delete/restore flow. */
     private function applyLinkBlock(object $link): string
     {
+        // A human decision is not a machine one: the marker is cleared so the
+        // platform's own withdrawal path can never lift this block later.
+        $cleared = [
+            'reputation_blocked_at' => null,
+            'reputation_block_source' => null,
+            'reputation_block_prior_state' => null,
+        ];
         if ($link->deleted_at !== null) {
             if ((string) $link->state !== 'deleted' || (string) $link->state_before_delete !== 'blocked') {
                 DB::table('links')->where('id', $link->id)->update([
@@ -1443,7 +1480,7 @@ class AdminController
                     'state_before_delete' => 'blocked',
                     'version' => DB::raw('version + 1'),
                     'updated_at' => now(),
-                ]);
+                ] + $cleared);
             }
 
             return 'deleted';
@@ -1454,7 +1491,7 @@ class AdminController
                 'state' => 'blocked',
                 'version' => DB::raw('version + 1'),
                 'updated_at' => now(),
-            ]);
+            ] + $cleared);
         }
 
         return 'blocked';
@@ -1476,6 +1513,12 @@ class AdminController
             'state_before_delete' => $deleted ? $restored : $link->state_before_delete,
             'version' => DB::raw('version + 1'),
             'updated_at' => now(),
+            // The block is gone, so its marker must not outlive it: a stale
+            // marker on a live link would let a later sweep "withdraw" a block
+            // that is no longer there, or read a human decision as a machine one.
+            'reputation_blocked_at' => null,
+            'reputation_block_source' => null,
+            'reputation_block_prior_state' => null,
         ]);
 
         return $deleted ? 'deleted' : $restored;

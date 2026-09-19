@@ -70,12 +70,26 @@ class UrlUtil
         if ($asciiHost === 'localhost') {
             return ['ok' => true];
         }
-        if (strlen($asciiHost) > 253
-            || ! preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $asciiHost)) {
+        if (! self::isValidHostname($asciiHost)) {
             return ['ok' => false, 'error' => 'Host inválido'];
         }
 
         return ['ok' => true];
+    }
+
+    /**
+     * Shape of a registrable hostname, in ASCII form.
+     *
+     * Shared with the destination denylist: an entry is only useful if it can
+     * equal a host this class was willing to accept, and two copies of a rule
+     * that decides what a host is would drift apart. IP literals and
+     * `localhost` are settled by the callers, because the two need different
+     * answers for them.
+     */
+    public static function isValidHostname(string $host): bool
+    {
+        return strlen($host) <= 253
+            && preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $host) === 1;
     }
 
     public static function normalizeAlias(string $raw): string

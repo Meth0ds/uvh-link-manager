@@ -224,7 +224,13 @@ class VerifyDomainDnsJob implements ShouldQueue
             }
             foreach ($records as $record) {
                 $txt = $this->txtValue($record);
-                if ($txt !== '' && hash_equals($this->verificationToken, $txt)) {
+                // Case-insensitive on purpose: the token is copied into a DNS
+                // panel by a person and some providers normalise the case of a
+                // TXT value. Comparing byte by byte made activation depend on a
+                // detail the operator cannot see, and a failed comparison here
+                // is reported as absent ownership, not as a case mismatch.
+                // The CNAME check below compares provider data the same way.
+                if ($txt !== '' && hash_equals(strtolower($this->verificationToken), strtolower($txt))) {
                     return true;
                 }
             }

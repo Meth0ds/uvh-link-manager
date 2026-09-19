@@ -710,6 +710,42 @@ class ApiParityTest extends TestCase
         $otherRegion->assertRedirect('https://language.example.test/fallback');
     }
 
+    public function test_redirect_country_rules_accept_the_provider_header_in_any_case(): void
+    {
+        // The country header is provider data, and HTTP header values are not
+        // normalised for us: Cloudflare sends `ES`, another edge may send `es`.
+        // The rule comparison already lowercases both sides, so the only place
+        // the case could matter is where the header is read — and there it used
+        // to demand one specific casing, which silently dropped the country and
+        // sent every such visitor to the fallback.
+        config()->set('uvh.trust_country_header', true);
+
+        $sessionToken = $this->registerVerifiedLogin('country-header@example.com');
+        $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://country.example.test/default',
+            'fallbackDestination' => 'https://country.example.test/fallback',
+            'alias' => 'country-case',
+            'rules' => [[
+                'priority' => 0,
+                'country' => 'ES',
+                'destination' => 'https://country.example.test/spain',
+            ]],
+        ])->assertCreated();
+
+        $this->withHeader('CF-IPCountry', 'ES')->get('http://uvh.es/country-case')
+            ->assertRedirect('https://country.example.test/spain');
+        $this->withHeader('CF-IPCountry', 'es')->get('http://uvh.es/country-case')
+            ->assertRedirect('https://country.example.test/spain');
+
+        // Accepting any case must not turn into accepting any value.
+        $this->withHeader('CF-IPCountry', 'PT')->get('http://uvh.es/country-case')
+            ->assertRedirect('https://country.example.test/fallback');
+        $this->withHeader('CF-IPCountry', 'ESX')->get('http://uvh.es/country-case')
+            ->assertRedirect('https://country.example.test/fallback');
+        $this->withHeader('CF-IPCountry', '1E')->get('http://uvh.es/country-case')
+            ->assertRedirect('https://country.example.test/fallback');
+    }
+
     public function test_rules_round_trip_and_partial_patch_preserves_nested_data(): void
     {
         $sessionToken = $this->registerVerifiedLogin('rules@example.com');
@@ -758,6 +794,55 @@ class ApiParityTest extends TestCase
             ])
             ->assertUnprocessable()
             ->assertJson(['error' => 'La caducidad debe ser posterior a la fecha de activación']);
+    }
+
+    public function test_link_activity_says_when_it_was_cut_instead_of_presenting_the_last_page_as_the_history(): void
+    {
+        $sessionToken = $this->registerVerifiedLogin('link-activity@example.com');
+        $created = $this->withCookie('uvh_session', $sessionToken)->postJson('/api/v1/links', [
+            'destination' => 'https://activity.example.test/one',
+            'alias' => 'activity-cap',
+        ]);
+        $created->assertCreated();
+        $id = (int) $created->json('link.id');
+
+        $row = fn (string $action, int $minutesAgo): array => [
+            'action' => $action,
+            'resource_type' => 'link',
+            'resource_id' => (string) $id,
+            'created_at' => now()->subMinutes($minutesAgo),
+        ];
+
+        // Creating the link already wrote its own audit event, so the baseline
+        // is counted rather than assumed. `resource_id` is shared across
+        // resource types — the registration wrote events for user 1 — so the
+        // count has to carry the type, exactly like the endpoint does.
+        $baseline = (int) DB::table('audit_events')
+            ->where('resource_type', 'link')
+            ->where('resource_id', (string) $id)
+            ->count();
+        DB::table('audit_events')->insert([$row('link.update', 20), $row('link.update', 10)]);
+        $short = $this->withCookie('uvh_session', $sessionToken)->getJson("/api/v1/links/{$id}/activity");
+        $short->assertOk()->assertJsonPath('truncated', false);
+        $this->assertCount($baseline + 2, $short->json('events'));
+
+        // 60 events against a view bounded to the newest 50: the panel used to
+        // render 50 rows under the heading "Actividad" with nothing saying the
+        // history continued, which reads as "this is everything that happened to
+        // this link". The list endpoints that bound a result already say so.
+        $rows = [];
+        for ($i = 1; $i <= 60; $i++) {
+            $rows[] = $row('link.update', 60 - $i);
+        }
+        DB::table('audit_events')->insert($rows);
+
+        $long = $this->withCookie('uvh_session', $sessionToken)->getJson("/api/v1/links/{$id}/activity");
+        $long->assertOk()->assertJsonPath('truncated', true);
+        $this->assertCount(50, $long->json('events'));
+
+        // Newest first: the truncation must drop the oldest rows, not the ones
+        // the operator is looking for.
+        $this->assertSame('link.update', $long->json('events.0.action'));
     }
 
     public function test_processing_webhook_delivery_cannot_be_rewound_by_manual_resend(): void

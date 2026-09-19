@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Link;
 use App\Models\User;
 use App\Support\DestinationDenylist;
+use App\Support\DestinationReputationService;
 use App\Support\Ids;
 use App\Support\SessionManager;
 use Illuminate\Http\Request;
@@ -119,6 +120,43 @@ final class LinkAppealTest extends TestCase
         $this->assertSame('blocked', (string) DB::table('links')->where('id', $link->id)->value('state'));
         $this->assertSame(1, DB::table('destination_denylist')->count());
         $this->assertDatabaseHas('link_appeals', ['id' => $appealId, 'status' => 'upheld']);
+    }
+
+    public function test_withdrawing_an_entry_from_the_console_releases_the_links_it_blocked(): void
+    {
+        $entryId = DestinationDenylist::blockHost('evil.example', 'Phishing confirmado');
+        $link = $this->link('console-release', 'active', 'https://evil.example/login');
+        $this->assertSame(
+            DestinationReputationService::OUTCOME_BLOCKED,
+            DestinationReputationService::evaluate($link->id),
+        );
+
+        $this->signInAdmin();
+        // The response says what happened instead of leaving the operator to
+        // discover that the links stayed blocked until the next sweep.
+        $this->deleteJson("/api/v1/admin/destinations/{$entryId}")
+            ->assertOk()
+            ->assertJsonPath('releasedLinks', 1);
+
+        $this->assertSame('active', (string) DB::table('links')->where('id', $link->id)->value('state'));
+    }
+
+    public function test_the_console_refuses_to_block_a_public_suffix(): void
+    {
+        // A link whose host is the shared platform itself: an entry for
+        // `github.io` would take down every site hosted there, not one page.
+        $link = $this->link('suffix-block', 'active', 'https://github.io/login');
+        $this->signInAdmin();
+
+        $this->postJson("/api/v1/admin/links/{$link->id}/block-destination", ['scope' => 'host', 'reason' => 'Prueba'])
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'Ese destino es un sufijo público (por ejemplo co.uk o github.io): bloquearlo afectaría a todos los sitios alojados bajo él');
+
+        // The exact page remains blockable, which is the action the operator
+        // actually wanted.
+        $this->postJson("/api/v1/admin/links/{$link->id}/block-destination", ['scope' => 'url', 'reason' => 'Prueba'])
+            ->assertOk();
+        $this->assertSame(1, DB::table('destination_denylist')->where('match_kind', 'url')->count());
     }
 
     public function test_an_appeal_cannot_be_decided_twice(): void

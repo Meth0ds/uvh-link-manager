@@ -17,9 +17,12 @@ use Illuminate\Support\Facades\DB;
  *
  * Matching is by label, never by substring: an entry for `evil.example` covers
  * `evil.example` and its subdomains, because an abuser rotates subdomains, and
- * it can never cover `notevil.example`. URLs are compared as a canonical form
- * (lowercased scheme/host, default port and fragment removed) hashed with
- * SHA-256, so the denylist never stores a browsing target in clear text.
+ * it can never cover `notevil.example`. The walk stops above the public suffix
+ * (`co.uk`, `github.io`): see `PublicSuffixes` for why the last label is the
+ * wrong place to stop. URLs are compared as a canonical form — lowercased
+ * scheme/host, default port, empty query and fragment removed, dot segments
+ * resolved, unreserved escapes decoded — hashed with SHA-256, so the denylist
+ * never stores a browsing target in clear text.
  */
 final class DestinationDenylist
 {
@@ -65,8 +68,24 @@ final class DestinationDenylist
     }
 
     /**
-     * Canonical form of a destination. The fragment is dropped because it never
-     * reaches a server: keeping it would let `#anything` walk past an entry.
+     * Canonical form of a destination: the URL as a browser would send it.
+     *
+     * Every rule here exists because the alternative lets an entry be walked
+     * past by a URL that reaches the same page:
+     *
+     *  - the fragment is dropped, because it never reaches a server;
+     *  - dot segments are resolved (RFC 3986 §5.2.4), because a browser sends
+     *    `/x/../blocked` as `/blocked` — an entry for `/blocked` that ignores
+     *    this is an entry that does not protect the page it names;
+     *  - unreserved percent-escapes are decoded and the rest are upper-cased,
+     *    so `%7E` and `~`, `%2e%2e` and `..`, `%2F` and `%2f` compare equal;
+     *    a *reserved* escape is never decoded, because doing so would change
+     *    what the server receives (`%2F` is a path segment, `/` is not);
+     *  - the default port and an empty query are removed.
+     *
+     * Embedding credentials (`https://user:pass@host/`) is not normalised here
+     * because `UrlUtil::validateDestination` refuses such a URL outright: it can
+     * neither be stored as a destination nor as an entry.
      */
     public static function normalizeUrl(string $raw): ?string
     {
@@ -87,13 +106,72 @@ final class DestinationDenylist
         $scheme = strtolower((string) $parts['scheme']);
         $port = isset($parts['port']) ? (int) $parts['port'] : null;
         $defaultPort = ($scheme === 'https' && $port === 443) || ($scheme === 'http' && $port === 80);
-        $path = (string) ($parts['path'] ?? '');
-        $query = isset($parts['query']) ? '?'.$parts['query'] : '';
+        // Decode before resolving dot segments, so `%2e%2e` becomes `..` and is
+        // then removed exactly like the literal form.
+        $path = self::removeDotSegments(self::normalizeEscapes((string) ($parts['path'] ?? '')));
+        $rawQuery = (string) ($parts['query'] ?? '');
+        $query = $rawQuery === '' ? '' : '?'.self::normalizeEscapes($rawQuery);
 
         return $scheme.'://'.(str_contains($host, ':') ? '['.$host.']' : $host)
             .($defaultPort || $port === null ? '' : ':'.$port)
             .($path === '' ? '/' : $path)
             .$query;
+    }
+
+    /**
+     * Decode what RFC 3986 calls unreserved, upper-case every other escape.
+     *
+     * `%2F` and `%2f` name the same octet, but that octet is a reserved
+     * character: decoding it would turn an encoded slash into a separator and
+     * merge two different paths into one.
+     */
+    private static function normalizeEscapes(string $value): string
+    {
+        return (string) preg_replace_callback('/%([0-9A-Fa-f]{2})/', function (array $match): string {
+            $character = chr((int) hexdec($match[1]));
+            if (preg_match('/[A-Za-z0-9\-._~]/', $character) === 1) {
+                return $character;
+            }
+
+            return '%'.strtoupper($match[1]);
+        }, $value);
+    }
+
+    /** RFC 3986 §5.2.4: the path as a browser resolves it before sending. */
+    private static function removeDotSegments(string $path): string
+    {
+        $input = $path;
+        $output = '';
+        while ($input !== '') {
+            if (str_starts_with($input, '../')) {
+                $input = substr($input, 3);
+            } elseif (str_starts_with($input, './')) {
+                $input = substr($input, 2);
+            } elseif (str_starts_with($input, '/./')) {
+                $input = '/'.substr($input, 3);
+            } elseif ($input === '/.') {
+                $input = '/';
+            } elseif (str_starts_with($input, '/../')) {
+                $input = '/'.substr($input, 4);
+                $output = substr($output, 0, (int) strrpos($output, '/'));
+            } elseif ($input === '/..') {
+                $input = '/';
+                $output = substr($output, 0, (int) strrpos($output, '/'));
+            } elseif ($input === '.' || $input === '..') {
+                $input = '';
+            } else {
+                $slash = strpos($input, '/', str_starts_with($input, '/') ? 1 : 0);
+                if ($slash === false) {
+                    $output .= $input;
+                    $input = '';
+                } else {
+                    $output .= substr($input, 0, $slash);
+                    $input = substr($input, $slash);
+                }
+            }
+        }
+
+        return $output;
     }
 
     /**
@@ -157,9 +235,16 @@ final class DestinationDenylist
     }
 
     /**
-     * The host and each of its parent suffixes, which is what makes an entry
-     * cover subdomains without a substring match: `evil.example` yields
-     * `evil.example` and `example`+`evil.example`, never `notevil.example`.
+     * The host and each of its parent names down to — but not including — its
+     * public suffix. That is what makes an entry cover subdomains without a
+     * substring match: `evil.example` yields `evil.example` and stops, never
+     * `notevil.example`; `a.b.evil.example` also yields `b.evil.example`.
+     *
+     * The floor is one label above the public suffix rather than one label above
+     * the end, so `evil.co.uk` yields `evil.co.uk` and not `co.uk`, and
+     * `x.github.io` never yields `github.io`. A host that *is* a public suffix
+     * yields only itself: nothing can be registered under it, and a legacy entry
+     * for it should still match the exact string it names.
      *
      * @return list<string>
      */
@@ -171,17 +256,19 @@ final class DestinationDenylist
         }
 
         $labels = explode('.', $normalized);
+        $floor = PublicSuffixes::suffixLabels($normalized);
         $candidates = [];
         for ($i = 0; $i < count($labels); $i++) {
-            // A single trailing label (`example`) is not a registrable host on
-            // its own; keeping it would turn one entry into a TLD-wide block.
-            if ($i === count($labels) - 1 && count($labels) > 1) {
-                continue;
+            // Stop before the public suffix (or, without one, before the last
+            // label): a single trailing label is not a registrable host, and
+            // keeping it would turn one entry into a TLD-wide block.
+            if (count($labels) - $i <= max(1, $floor)) {
+                break;
             }
             $candidates[] = implode('.', array_slice($labels, $i));
         }
 
-        return $candidates;
+        return $candidates === [] ? [$normalized] : $candidates;
     }
 
     public static function blockHost(string $host, string $reason, string $source = self::SOURCE_MANUAL, ?int $createdBy = null, ?Carbon $expiresAt = null): ?int
@@ -198,15 +285,39 @@ final class DestinationDenylist
         return $key === null ? null : self::add(self::KIND_URL, $key['url_hash'], $reason, $source, $createdBy, $expiresAt);
     }
 
+    /**
+     * Store one entry, or refuse it.
+     *
+     * What lands in `match_value` is what the matcher compares against, so it
+     * has to be the canonical form of its kind. Anything else is a row that the
+     * moderation console shows as active protection and that no destination can
+     * ever match: `evil.com.`, `evil.com:8080`, `[::1]` or an IDN left in UTF-8
+     * never equal the host derived from a link, and a `KIND_URL` entry holding
+     * a pasted link instead of the hash the matcher computes is dead the moment
+     * it is written. Refusing here is the only honest answer; the callers that
+     * matter (`blockHost`, `blockUrl`) already canonicalise and only ever see
+     * the refusal when the input genuinely cannot be a destination.
+     */
     public static function add(string $kind, string $value, string $reason, string $source, ?int $createdBy = null, ?Carbon $expiresAt = null): ?int
     {
         if (! in_array($kind, [self::KIND_HOST, self::KIND_URL], true)
-            || ! in_array($source, [self::SOURCE_MANUAL, self::SOURCE_PROVIDER, self::SOURCE_REPORT], true)
-            || trim($value) === '') {
+            || ! in_array($source, [self::SOURCE_MANUAL, self::SOURCE_PROVIDER, self::SOURCE_REPORT], true)) {
             return null;
         }
 
-        $matchValue = strtolower(trim($value));
+        $matchValue = match ($kind) {
+            self::KIND_HOST => self::canonicalHostEntry($value),
+            self::KIND_URL => self::canonicalUrlHash($value),
+        };
+        if ($matchValue === null) {
+            return null;
+        }
+        // A host entry for a public suffix is refused, not stored disabled: it
+        // would come back as a match for *every* site under it. `KIND_URL`
+        // carries a hash, so the rule only applies to hosts.
+        if ($kind === self::KIND_HOST && PublicSuffixes::isPublicSuffix($matchValue)) {
+            return null;
+        }
         // The unique index covers (kind, value) without the expiry filter, so an
         // expired entry is revived and re-reasoned instead of colliding with it.
         // A repeated moderation action must not fail just because it already
@@ -240,6 +351,53 @@ final class DestinationDenylist
             ->value('id');
 
         return is_numeric($id) ? (int) $id : null;
+    }
+
+    /**
+     * Canonical host for an entry, from what a human or a job hands over.
+     *
+     * A pasted URL contributes its host, `host:port` loses the port (a host
+     * entry is compared against hosts, which never carry one), and the result
+     * must have the shape a validated destination could produce — otherwise the
+     * entry would be dead on arrival.
+     */
+    private static function canonicalHostEntry(string $value): ?string
+    {
+        $candidate = trim($value);
+        if (str_contains($candidate, '://')) {
+            $host = parse_url($candidate, PHP_URL_HOST);
+            if (! is_string($host) || $host === '') {
+                return null;
+            }
+            $candidate = $host;
+        }
+        // One colon and a numeric tail is `host:port`; an IPv6 literal has more
+        // colons than that (or arrives bracketed and is settled by
+        // `normalizeHost` below).
+        if (! str_starts_with($candidate, '[') && substr_count($candidate, ':') === 1) {
+            [$host, $port] = explode(':', $candidate, 2);
+            if ($host !== '' && ctype_digit($port)) {
+                $candidate = $host;
+            }
+        }
+
+        $host = self::normalizeHost($candidate);
+        if ($host === null) {
+            return null;
+        }
+        if ($host === 'localhost' || filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return $host;
+        }
+
+        return UrlUtil::isValidHostname($host) ? $host : null;
+    }
+
+    /** A `KIND_URL` entry only ever holds the hash `key()` computes. */
+    private static function canonicalUrlHash(string $value): ?string
+    {
+        $hash = strtolower(trim($value));
+
+        return preg_match('/^[0-9a-f]{64}$/D', $hash) === 1 ? $hash : null;
     }
 
     public static function blockHostId(string $host): ?int
@@ -293,19 +451,16 @@ final class DestinationDenylist
     }
 
     /**
-     * @param  bool  $forWrite  a write also matches an expired entry, so reviving
-     *                          it updates the existing row instead of colliding
-     *                          with the unique index
+     * Entries that are in force right now.
+     *
+     * A write deliberately does not come through here: `add()` matches the row
+     * directly so that reviving an expired entry updates it in place instead of
+     * colliding with the unique index, which does not carry the expiry filter.
      */
-    private static function active(bool $forWrite = false): Builder
+    private static function active(): Builder
     {
-        $query = DB::table('destination_denylist');
-        if (! $forWrite) {
-            $query->where(function ($inner) {
-                $inner->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            });
-        }
-
-        return $query;
+        return DB::table('destination_denylist')->where(function ($inner) {
+            $inner->whereNull('expires_at')->orWhere('expires_at', '>', now());
+        });
     }
 }

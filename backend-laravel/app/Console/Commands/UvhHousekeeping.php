@@ -100,6 +100,13 @@ class UvhHousekeeping extends Command
 
         $run('destination_reputation', fn () => $this->queueDestinationRechecks());
 
+        // The mirror of the sweep above: withdrawing a self-applied block whose
+        // ground disappeared. It has no event to hang from when the entry simply
+        // expires, and it runs whether or not a provider is configured, because
+        // the question it answers — "is this destination still listed?" — is
+        // local and needs no network call.
+        $run('destination_release', fn () => $this->releaseUnlistedBlocks());
+
         $run('webhook_recovery', function (): void {
             // A worker may die after claiming a delivery. Release only stale
             // claims; live jobs retain exclusive ownership of their attempt.
@@ -743,6 +750,21 @@ class UvhHousekeeping extends Command
                 OperationalMetrics::increment('reputation.domain_listed');
             }
         }
+    }
+
+    /**
+     * Release a bounded batch of self-applied destination blocks that no longer
+     * have a reason.
+     *
+     * A denylist entry can stop applying without anyone acting: `expires_at`
+     * passes while the links it blocked stay blocked, and a temporary block that
+     * outlives its entry is a permanent one. Moderator decisions carry no marker
+     * and are not part of the batch.
+     */
+    private function releaseUnlistedBlocks(): void
+    {
+        $batch = max(1, min(500, (int) config('uvh.reputation.release_batch', 50)));
+        DestinationReputationService::releaseUnlistedBlocks($batch);
     }
 
     private function queueDomainRevalidations(): void

@@ -23,6 +23,16 @@ final class HttpReputationProvider implements ReputationProvider
 {
     public const LABEL_FALLBACK = 'external';
 
+    /**
+     * Shortest window a provider's own expiry can ask for.
+     *
+     * Without a floor, `expiresAt: now` would mean a fresh lookup on every
+     * evaluation, which turns a provider's "ask me again soon" into load. Five
+     * minutes is short enough to honour the intent and long enough not to hammer
+     * a third party.
+     */
+    private const MIN_TTL_MINUTES = 5;
+
     /** @param array{url: string, token: string, timeout_ms: int, max_body_bytes: int, ttl_hours: int} $settings */
     public function __construct(private readonly array $settings) {}
 
@@ -89,14 +99,24 @@ final class HttpReputationProvider implements ReputationProvider
             return ReputationVerdict::unknown($this->label(), 'provider_not_json');
         }
 
-        $verdict = $decoded['verdict'] ?? null;
-        if (! is_string($verdict) || ! in_array($verdict, [
+        // The comparison is case-insensitive and trimmed. A provider answering
+        // `"MALICIOUS"` — a serialisation change on their side, a proxy adding
+        // strtoupper, a hand-written integration — used to be degraded to
+        // `unknown` in silence, which is the one outcome that turns the auto
+        // block off without anybody being told: the only path that withdraws
+        // abusive links stopped firing and nothing pointed at why.
+        $verdict = is_string($decoded['verdict'] ?? null) ? strtolower(trim($decoded['verdict'])) : null;
+        if ($verdict === null || ! in_array($verdict, [
             ReputationVerdict::SAFE,
             ReputationVerdict::SUSPICIOUS,
             ReputationVerdict::MALICIOUS,
         ], true)) {
             // `unknown` from a provider is accepted as such, but it is not a
-            // claim about the destination and never becomes one.
+            // claim about the destination and never becomes one. It is still
+            // counted: an integration that answers with something this contract
+            // does not know is a deployment problem, not a quiet afternoon.
+            OperationalMetrics::increment('reputation.verdict_unusable');
+
             return ReputationVerdict::unknown($this->label(), 'provider_verdict_unusable');
         }
 
@@ -117,6 +137,9 @@ final class HttpReputationProvider implements ReputationProvider
      * A provider cannot extend its own cache indefinitely: the TTL is bounded by
      * configuration, so a compromised or buggy provider cannot freeze a verdict
      * forever.
+     *
+     * It can shorten it, and that is the direction a provider actually needs:
+     * knowing a verdict is about to change and asking to be consulted again.
      */
     private function expiry(mixed $raw): Carbon
     {
@@ -131,6 +154,15 @@ final class HttpReputationProvider implements ReputationProvider
             return $ceiling;
         }
 
-        return $parsed->lessThan(now()->addMinutes(5)) || $parsed->greaterThan($ceiling) ? $ceiling : $parsed;
+        // Between the two bounds the provider is obeyed. Answering a short
+        // expiry with the full ceiling inverted the documented contract: a
+        // two-minute window became a day, and a verdict the provider had already
+        // called stale stayed authoritative for the rest of it.
+        $floor = now()->addMinutes(self::MIN_TTL_MINUTES);
+        if ($parsed->lessThan($floor)) {
+            return $floor;
+        }
+
+        return $parsed->greaterThan($ceiling) ? $ceiling : $parsed;
     }
 }

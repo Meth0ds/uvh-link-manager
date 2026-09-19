@@ -70,6 +70,49 @@ class AdminConsoleTest extends TestCase
             ->assertJson(['error' => 'Filtro de usuario inválido']);
     }
 
+    /**
+     * The search box feeds `ILIKE` directly, so the term has to be a term.
+     *
+     * Every one of these cases was wrong before the escaping landed: `a_b` also
+     * matched `axb`, a lone `%` selected the whole table — and with it turned the
+     * pagination `count()` into a full scan — and a trailing backslash made
+     * PostgreSQL reject an incomplete escape sequence.
+     */
+    public function test_a_search_term_is_escaped_before_it_reaches_ilike(): void
+    {
+        [, $token] = $this->adminSession();
+        $this->user('a_b@example.test');
+        $this->user('axb@example.test');
+        $this->user('100%@example.test');
+
+        $underscore = $this->withCookie('uvh_session', $token)
+            ->getJson('/api/v1/admin/users?q='.urlencode('a_b@example.test'));
+        $underscore->assertOk();
+        $this->assertSame(1, $underscore->json('total'));
+        $this->assertSame(['a_b@example.test'], array_column($underscore->json('users'), 'email'));
+
+        // A lone `%` is a percent sign, so it matches the one account whose
+        // address contains one — not every row in the table, which is what an
+        // unescaped term selected.
+        $wildcard = $this->withCookie('uvh_session', $token)
+            ->getJson('/api/v1/admin/users?q='.urlencode('%'));
+        $wildcard->assertOk();
+        $this->assertSame(1, $wildcard->json('total'));
+        $this->assertSame(['100%@example.test'], array_column($wildcard->json('users'), 'email'));
+
+        $literal = $this->withCookie('uvh_session', $token)
+            ->getJson('/api/v1/admin/users?q='.urlencode('100%'));
+        $literal->assertOk();
+        $this->assertSame(1, $literal->json('total'));
+
+        foreach (['back\\slash', 'back\\'] as $term) {
+            $this->withCookie('uvh_session', $token)
+                ->getJson('/api/v1/admin/users?q='.urlencode($term))
+                ->assertOk()
+                ->assertJson(['total' => 0]);
+        }
+    }
+
     public function test_blocking_an_account_revokes_every_access_and_pending_email_token(): void
     {
         [, $adminToken] = $this->adminSession();

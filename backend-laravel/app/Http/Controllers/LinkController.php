@@ -12,6 +12,7 @@ use App\Support\LinkService;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
+use App\Support\SearchTerm;
 use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
@@ -24,10 +25,20 @@ use Illuminate\Support\Facades\Hash;
 
 class LinkController
 {
+    /**
+     * How much of a link's audit trail the detail view loads at once.
+     *
+     * The view is bounded, so the answer has to say whether it was bounded: a
+     * cut list rendered under the heading "Actividad" reads as the whole
+     * history of the link, and an operator auditing an incident has no way to
+     * tell a quiet link from one whose earlier events were dropped.
+     */
+    private const ACTIVITY_LIMIT = 50;
+
     public function trash(Request $request)
     {
         $workspaceId = UvhRequest::workspaceId($request);
-        $search = mb_substr(trim(UvhRequest::queryString($request, 'q')), 0, 200);
+        $search = SearchTerm::contains(UvhRequest::queryString($request, 'q'));
         $page = $this->positiveQueryInteger($request->query('page'), 1, 10_000);
         $perPage = $this->positiveQueryInteger($request->query('perPage'), 20, 100);
         $retentionDays = max(1, (int) config('uvh.housekeeping.link_trash_days', 30));
@@ -35,8 +46,7 @@ class LinkController
         $query = Link::withTrashed()->with(['domain', 'tags'])
             ->where('workspace_id', $workspaceId)->whereNotNull('deleted_at');
         if ($search !== '') {
-            $like = "%{$search}%";
-            $query->where(fn ($q) => $q->where('alias', 'ilike', $like)->orWhere('destination', 'ilike', $like));
+            $query->where(fn ($q) => $q->where('alias', 'ilike', $search)->orWhere('destination', 'ilike', $search));
         }
         $query->orderByDesc('deleted_at')->orderByDesc('id');
         $total = (clone $query)->count();
@@ -59,7 +69,7 @@ class LinkController
     {
         $workspaceId = UvhRequest::workspaceId($request);
 
-        $search = mb_substr(trim(UvhRequest::queryString($request, 'q')), 0, 200);
+        $search = SearchTerm::contains(UvhRequest::queryString($request, 'q'));
         $state = UvhRequest::queryString($request, 'state');
         $tag = UvhRequest::queryString($request, 'tag');
         $domainId = UvhRequest::queryString($request, 'domainId');
@@ -82,11 +92,10 @@ class LinkController
             ->whereNull('deleted_at');
 
         if ($search !== '') {
-            $like = "%{$search}%";
             $query->where(fn ($q) => $q
-                ->where('alias', 'ilike', $like)
-                ->orWhere('destination', 'ilike', $like)
-                ->orWhere('notes', 'ilike', $like));
+                ->where('alias', 'ilike', $search)
+                ->orWhere('destination', 'ilike', $search)
+                ->orWhere('notes', 'ilike', $search));
         }
         if ($state !== '') {
             $query->where('state', $state);
@@ -652,15 +661,29 @@ class LinkController
             return response()->json(['error' => 'Enlace no encontrado'], 404);
         }
 
+        // One row past the bound is what tells a full page from a truncated
+        // one, without a second count over the same rows. `id` breaks ties in
+        // the timestamp: two events in the same second are ordered by the only
+        // thing that is actually ordered, and the newest ones are the ones that
+        // survive the cut.
         $events = DB::table('audit_events')
             ->select(['id', 'action', 'metadata', 'created_at'])
             ->where('resource_type', 'link')
             ->where('resource_id', (string) $id)
             ->orderByDesc('created_at')
-            ->limit(50)
+            ->orderByDesc('id')
+            ->limit(self::ACTIVITY_LIMIT + 1)
             ->get();
 
-        return response()->json(['events' => $events]);
+        $truncated = $events->count() > self::ACTIVITY_LIMIT;
+        if ($truncated) {
+            $events = $events->take(self::ACTIVITY_LIMIT)->values();
+        }
+
+        return response()->json([
+            'events' => $events,
+            'truncated' => $truncated,
+        ]);
     }
 
     public function role(Request $request)

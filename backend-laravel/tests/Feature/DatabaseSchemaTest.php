@@ -66,7 +66,7 @@ class DatabaseSchemaTest extends TestCase
             'invitation_mail_budgets' => ['budget_key', 'used', 'expires_at_epoch'],
             'quotas' => ['workspace_id', 'links_limit'],
             'custom_domains' => ['workspace_id', 'domain', 'verification_token', 'state', 'verified_at'],
-            'links' => ['workspace_id', 'created_by', 'domain_id', 'alias', 'destination', 'state', 'state_before_delete', 'password_hash', 'password_version', 'version', 'max_clicks', 'click_count', 'single_use', 'expires_at', 'deleted_at'],
+            'links' => ['workspace_id', 'created_by', 'domain_id', 'alias', 'destination', 'state', 'state_before_delete', 'password_hash', 'password_version', 'version', 'max_clicks', 'click_count', 'single_use', 'expires_at', 'deleted_at', 'reputation_blocked_at', 'reputation_block_source', 'reputation_block_prior_state', 'reputation_checked_at'],
             'tags' => ['workspace_id', 'name'],
             'link_tags' => ['link_id', 'tag_id'],
             'redirect_rules' => ['link_id', 'priority', 'destination'],
@@ -113,9 +113,22 @@ class DatabaseSchemaTest extends TestCase
         foreach ([
             'metric_rollups' => 'metric_rollups_day_index',
             'metric_unique_visitors' => 'metric_unique_visitors_day_index',
+            // Every release query filters on the marker, and it is present on a
+            // handful of rows: partial, so the index stays small.
+            'links' => 'links_reputation_blocked_index',
         ] as $table => $index) {
             $this->assertTrue(Schema::hasIndex($table, $index), "Missing index: {$index}");
         }
+    }
+
+    #[Test]
+    public function it_indexes_the_reputation_sweep_cursor(): void
+    {
+        // The sweep orders by this column and takes the least recently examined
+        // rows, so without the index every tick sorts the whole table — the
+        // table the redirect path writes on.
+        $this->assertTrue(Schema::hasColumn('links', 'reputation_checked_at'));
+        $this->assertTrue(Schema::hasIndex('links', 'links_reputation_checked_index'));
     }
 
     #[Test]
