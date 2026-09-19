@@ -239,12 +239,11 @@ export class LandingComponent {
     try {
       const receipt = await this.intents.create(destination);
       const app = this.appUrl() || this.currentOrigin();
-      const params = new URLSearchParams({
-        mode: "register",
-        returnTo: "/app/links",
-        intent: receipt.intent,
-      });
-      this.handoffToAuth(`${app}/auth?${params.toString()}`);
+      // The opaque token travels in the fragment, not the query string: this
+      // handoff crosses to another host, and the fragment is the one part of a
+      // URL that no server, access log or `Referer` header ever sees.
+      const params = new URLSearchParams({ mode: "register", returnTo: "/app/links" });
+      this.handoffToAuth(`${app}/auth?${params.toString()}#intent=${encodeURIComponent(receipt.intent)}`);
     } catch (error) {
       this.demoError.set(error instanceof ApiRequestError ? error.message : "No se pudo preparar tu enlace. Inténtalo de nuevo.");
       this.submitting.set(false);

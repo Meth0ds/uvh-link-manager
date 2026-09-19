@@ -26,7 +26,7 @@ import { LatestRequest } from "../core/services/latest-request";
         <p class="sub">Utiliza una frase larga y exclusiva para UVH. No necesitas recordar la contraseña anterior.</p>
         @if (pendingLink()) {
           <p class="sub">Tu URL seguirá guardada cuando vuelvas a iniciar sesión.</p>
-        } @else if (pendingInvitation) {
+        } @else if (pendingInvitation()) {
           <p class="sub">Tu invitación seguirá preparada cuando vuelvas a iniciar sesión.</p>
         }
 
@@ -92,10 +92,10 @@ export class ResetPasswordComponent {
   readonly error = signal<string | null>(null);
   readonly hide = signal(true);
   readonly pendingLink = this.intents.pending;
-  readonly pendingInvitation = this.invitations.hasPending();
+  readonly pendingInvitation = this.invitations.pending;
   readonly loginQueryParams = computed(() => this.pendingLink()
     ? { returnTo: "/app/links" }
-    : (this.pendingInvitation ? { returnTo: "/invitations/accept" } : {}));
+    : (this.pendingInvitation() ? { returnTo: "/invitations/accept" } : {}));
 
   form = this.fb.nonNullable.group(
     {

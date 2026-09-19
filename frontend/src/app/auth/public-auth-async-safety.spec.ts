@@ -50,7 +50,7 @@ function sharedProviders(api: jasmine.SpyObj<ApiService>, fragment: string | nul
     { provide: ActivatedRoute, useValue: route(fragment) },
     { provide: Location, useValue: { replaceState: jasmine.createSpy("replaceState") } },
     { provide: PendingLinkIntentService, useValue: { pending: signal(null) } },
-    { provide: PendingInvitationService, useValue: { hasPending: () => false } },
+    { provide: PendingInvitationService, useValue: { pending: signal(false) } },
   ];
 }
 

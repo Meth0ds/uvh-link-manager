@@ -11,6 +11,13 @@ import { PendingInvitationService } from "../core/services/pending-invitation.se
 import { authBearer } from "./auth-bearer";
 import { LatestRequest } from "../core/services/latest-request";
 
+/**
+ * Shown when the server never took the park. The credentials live in a HttpOnly
+ * cookie now, so a refusal is not "the browser blocked storage": nothing was
+ * stored, and the link in the email is the way back in.
+ */
+const NOT_PARKED = "No hemos podido guardar la invitación en este navegador. Vuelve a abrir el enlace del correo.";
+
 @Component({
   selector: "app-invitation-accept",
   standalone: true,
@@ -58,7 +65,9 @@ export class InvitationAcceptComponent {
   private location = inject(Location);
   private invitations = inject(PendingInvitationService);
   private readonly operations = new LatestRequest(inject(DestroyRef));
-  private readonly token: string;
+  /** Whether this browser is holding an invitation, and which park it was. */
+  private parked = false;
+  private revision = 0;
 
   readonly busy = signal(true);
   readonly done = signal(false);
@@ -72,25 +81,43 @@ export class InvitationAcceptComponent {
   constructor() {
     const incoming = authBearer(this.route);
     const fragmentExpiry = new URLSearchParams(this.route.snapshot.fragment ?? "").get("expiresAt");
-    if (incoming) this.invitations.capture(incoming, fragmentExpiry);
+    // Parking is optimistic: the bearer leaves the URL immediately and the
+    // server still has to take it. `initialize()` waits for that before the
+    // component offers to spend it.
+    this.parked = incoming ? this.invitations.capture(incoming, fragmentExpiry) : false;
+    this.revision = this.invitations.revision();
     this.location.replaceState("/invitations/accept");
-    this.token = this.invitations.token();
-    void this.initialize();
+    // This async setup is the only path to a usable screen: an unexpected
+    // failure has to end in a message, never in a view stuck on "Procesando".
+    void this.initialize().catch((error: unknown) => {
+      this.busy.set(false);
+      this.ready.set(false);
+      this.done.set(true);
+      this.message.set(error instanceof ApiRequestError
+        ? error.message
+        : "No se pudo preparar la invitación. Vuelve a abrir el enlace del correo.");
+    });
   }
 
   async reject(): Promise<void> {
-    if (!this.token || !this.auth.authenticated() || !this.ready() || this.busy()) return;
+    if (!this.parked || !this.auth.authenticated() || !this.ready() || this.busy()) return;
     const generation = this.auth.sessionGeneration();
-    const context = `${this.token}:${generation}`;
+    const context = this.context(generation);
     const request = this.operations.begin(context);
     this.busy.set(true);
     this.ready.set(false);
     try {
-      await this.api.post("/api/v1/workspaces/invitations/reject", { token: this.token });
+      if (!await this.parkIsSpendable()) {
+        this.message.set(NOT_PARKED);
+        return;
+      }
+      // The bearer is in the server's cookie now, so the body carries none.
+      await this.api.post("/api/v1/workspaces/invitations/reject", {});
       if (!this.operations.isCurrent(request, context)
         || this.auth.sessionGeneration() !== generation
-        || this.invitations.token() !== this.token) return;
-      this.invitations.clear();
+        || !this.stillParked()) return;
+      // A terminal answer drops the cookie on the server side as well.
+      this.invitations.hide();
       this.ok.set(false);
       this.rejected.set(true);
       this.needsLogin.set(false);
@@ -109,41 +136,48 @@ export class InvitationAcceptComponent {
 
   async switchAccount(): Promise<void> {
     if (this.busy()) return;
-    const request = this.operations.begin(this.token);
+    const context = this.context();
+    const request = this.operations.begin(context);
     this.busy.set(true);
     try {
       await this.auth.logout();
-      if (!this.operations.isCurrent(request, this.token)) return;
+      if (!this.operations.isCurrent(request, context)) return;
       await this.router.navigate(["/auth"], { queryParams: { returnTo: this.returnTo } });
     } catch (error) {
-      if (this.operations.isCurrent(request, this.token)) {
+      if (this.operations.isCurrent(request, context)) {
         this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo cerrar la sesión actual.");
       }
     } finally {
-      if (this.operations.isCurrent(request, this.token)) this.busy.set(false);
+      if (this.operations.isCurrent(request, context)) this.busy.set(false);
     }
   }
 
   discard(): void {
     if (this.busy()) return;
     this.operations.invalidate();
-    this.invitations.clear();
+    // `forget`, not `hide`: this browser is holding a live park, so the server
+    // has to drop the cookie too.
+    void this.invitations.forget();
     void this.router.navigate(["/app"]);
   }
 
   async accept(): Promise<void> {
-    if (!this.token || !this.auth.authenticated() || !this.ready() || this.busy()) return;
+    if (!this.parked || !this.auth.authenticated() || !this.ready() || this.busy()) return;
     const generation = this.auth.sessionGeneration();
-    const context = `${this.token}:${generation}`;
+    const context = this.context(generation);
     const request = this.operations.begin(context);
     this.busy.set(true);
     this.ready.set(false);
     try {
-      await this.api.post<{ workspaceId: number }>("/api/v1/workspaces/invitations/accept", { token: this.token });
+      if (!await this.parkIsSpendable()) {
+        this.message.set(NOT_PARKED);
+        return;
+      }
+      await this.api.post<{ workspaceId: number }>("/api/v1/workspaces/invitations/accept", {});
       if (!this.operations.isCurrent(request, context)
         || this.auth.sessionGeneration() !== generation
-        || this.invitations.token() !== this.token) return;
-      this.invitations.clear();
+        || !this.stillParked()) return;
+      this.invitations.hide();
       this.ok.set(true);
       this.message.set("Te has unido al workspace. Ya puedes colaborar en sus enlaces.");
       try {
@@ -159,6 +193,8 @@ export class InvitationAcceptComponent {
     } catch (err) {
       if (this.operations.isCurrent(request, context)) {
         this.ok.set(false);
+        // 400 is the server's terminal answer, and it drops the cookie with it.
+        if (err instanceof ApiRequestError && err.status === 400) this.invitations.hide();
         this.message.set(err instanceof ApiRequestError ? err.message : "La invitación no es válida o ha caducado.");
       }
     } finally {
@@ -170,18 +206,43 @@ export class InvitationAcceptComponent {
   }
 
   private async initialize(): Promise<void> {
-    const request = this.operations.begin(this.token);
-    if (!this.token) {
+    if (!this.parked) {
+      // No bearer in the URL: this visit is the login round-trip, and the park
+      // made on the first visit is what brought the visitor back. Only the
+      // server can say whether it is still there.
+      await this.invitations.refresh();
+      this.parked = this.invitations.pending();
+      this.revision = this.invitations.revision();
+    }
+    if (!this.parked) {
       this.busy.set(false);
       this.done.set(true);
       this.message.set("La invitación no está disponible o ha caducado.");
+      return;
+    }
+    // A park made moments ago may still be in flight, and the server may cap
+    // the deadline it confirms. Both settle here, and the ordering key is taken
+    // afterwards: adopting the confirmed park is the point of waiting, not a
+    // handoff that changed under the request.
+    if (!await this.invitations.confirmed()) {
+      this.busy.set(false);
+      this.done.set(true);
+      this.message.set(NOT_PARKED);
+      return;
+    }
+    this.revision = this.invitations.revision();
+    const request = this.operations.begin(this.context());
+    if (!this.stillParked()) {
+      this.busy.set(false);
+      this.done.set(true);
+      this.message.set(NOT_PARKED);
       return;
     }
     if (!this.auth.loaded()) {
       try {
         await this.auth.init();
       } catch (error) {
-        if (this.operations.isCurrent(request, this.token)) {
+        if (this.operations.isCurrent(request, this.context())) {
           this.busy.set(false);
           this.done.set(true);
           this.message.set(error instanceof ApiRequestError
@@ -191,20 +252,36 @@ export class InvitationAcceptComponent {
         return;
       }
     }
-    if (!this.operations.isCurrent(request, this.token) || this.invitations.token() !== this.token) return;
+    if (!this.operations.isCurrent(request, this.context()) || !this.stillParked()) return;
     if (!this.auth.authenticated()) {
       this.busy.set(false);
       this.done.set(true);
       this.ok.set(false);
       this.needsLogin.set(true);
-      this.message.set(this.invitations.persistent()
-        ? "Necesitas iniciar sesión para aceptar la invitación. Volveremos aquí automáticamente después del login."
-        : "Necesitas iniciar sesión. Mantén esta pestaña abierta: el navegador ha bloqueado el almacenamiento persistente.");
+      this.message.set(this.invitations.persistent() === false
+        ? "Necesitas iniciar sesión, y este navegador no ha podido guardar la invitación. Inicia sesión y vuelve a abrir el enlace del correo."
+        : "Necesitas iniciar sesión para aceptar la invitación. Volveremos aquí automáticamente después del login.");
       return;
     }
     this.busy.set(false);
     this.done.set(false);
     this.ready.set(true);
     this.message.set("Acepta para añadir tu cuenta al workspace o rechaza para invalidar este enlace.");
+  }
+
+  /** Ordering key of a request: which park, under which session generation. */
+  private context(generation = this.auth.sessionGeneration()): string {
+    return `${this.parked}:${this.revision}:${generation}`;
+  }
+
+  /** True when the server has taken the park and nothing about it moved since. */
+  private async parkIsSpendable(): Promise<boolean> {
+    if (!await this.invitations.confirmed()) return false;
+
+    return this.stillParked();
+  }
+
+  private stillParked(): boolean {
+    return this.invitations.pending() && this.invitations.revision() === this.revision;
   }
 }

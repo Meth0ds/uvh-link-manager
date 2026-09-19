@@ -237,7 +237,7 @@ export class LinksComponent {
       destructive: true,
     });
     if (!confirmed) return;
-    this.intents.complete();
+    void this.intents.complete();
     this.snackbar.open("URL guardada descartada", "Cerrar", { duration: 2500 });
   }
 
@@ -327,7 +327,7 @@ export class LinksComponent {
       this.linkDialog.openCreate(pending.destination).subscribe((created) => {
         this.pendingDialogOpen = false;
         if (!created) return;
-        this.intents.complete();
+        void this.intents.complete();
         void this.router.navigate(["/app/links", created.id]);
       });
     } catch (err) {

@@ -63,7 +63,11 @@ describe("LandingComponent URL console", () => {
     expect(targetUrl.origin).toBe(window.location.origin);
     expect(targetUrl.searchParams.get("mode")).toBe("register");
     expect(targetUrl.searchParams.get("returnTo")).toBe("/app/links");
-    expect(targetUrl.searchParams.get("intent")).toBe("a".repeat(43));
+    // The opaque token travels in the fragment: the handoff crosses to the app
+    // host, and a query parameter is the part of a URL that servers and access
+    // logs do see.
+    expect(targetUrl.hash).toBe(`#intent=${encodeURIComponent("a".repeat(43))}`);
+    expect(targetUrl.searchParams.get("intent")).toBeNull();
     expect(target).not.toContain(encodeURIComponent(destination));
     expect(target).not.toContain("destination=");
   });

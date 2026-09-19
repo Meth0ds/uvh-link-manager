@@ -1,121 +1,140 @@
 import { TestBed } from "@angular/core/testing";
-import { ApiService } from "./api.service";
-import { PendingLinkIntentService } from "./pending-link-intent.service";
+import { ApiRequestError, ApiService } from "./api.service";
 import { decodeClaimedLinkIntent, decodeLinkIntentReceipt } from "./link-intent-response-decoders";
+import { PendingLinkIntentService } from "./pending-link-intent.service";
 
-const TOKEN = "a".repeat(43);
-const STORAGE_KEY = "uvh.pending-link-intent.v1";
+const BEARER = "a".repeat(43);
+const SOON = () => new Date(Date.now() + 60_000).toISOString();
+const PARKED = () => ({ pending: true as const, expiresAt: SOON() });
+const CLAIMED = () => ({ destination: "https://example.test/campaign", expiresAt: SOON() });
 
 describe("PendingLinkIntentService", () => {
   let api: jasmine.SpyObj<ApiService>;
   let service: PendingLinkIntentService;
 
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(STORAGE_KEY);
-    api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post", "delete"]);
+    api.post.and.resolveTo(PARKED() as never);
+    api.delete.and.resolveTo({ pending: false } as never);
+    api.get.and.resolveTo({
+      invitation: { pending: false, expiresAt: null },
+      linkIntent: { pending: false, expiresAt: null },
+    } as never);
     TestBed.configureTestingModule({ providers: [{ provide: ApiService, useValue: api }] });
     service = TestBed.inject(PendingLinkIntentService);
   });
 
-  afterEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(STORAGE_KEY);
+  it("parks the handoff token instead of keeping it in the browser", async () => {
+    const local = spyOn(localStorage, "setItem");
+    const session = spyOn(sessionStorage, "setItem");
+
+    expect(service.capture(BEARER, SOON())).toBeTrue();
+    expect(service.hasPending()).toBeTrue();
+    expect(await service.confirmed()).toBeTrue();
+
+    expect(local).not.toHaveBeenCalled();
+    expect(session).not.toHaveBeenCalled();
   });
 
-  it("stores only an opaque token and expiry on the app origin", () => {
-    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+  it("claims without sending a bearer: the server reads its own cookie", async () => {
+    api.post.and.returnValues(Promise.resolve(PARKED()), Promise.resolve(CLAIMED()));
+    service.capture(BEARER, SOON());
 
-    expect(service.capture(TOKEN, expiresAt)).toBeTrue();
-    expect(service.pending()).toEqual(jasmine.objectContaining({ intent: TOKEN, expiresAt }));
-    expect(localStorage.getItem(STORAGE_KEY)).toContain(TOKEN);
-    expect(localStorage.getItem(STORAGE_KEY)).not.toContain("example.com");
+    const claimed = await service.claim();
+
+    expect(claimed).toEqual({ destination: "https://example.test/campaign", expiresAt: jasmine.any(String) });
+    expect(api.post).toHaveBeenCalledWith("/api/v1/link-intents/claim", {}, jasmine.any(Function));
   });
 
-  it("rejects malformed or already expired handoff tokens", () => {
-    expect(service.capture("not-a-token")).toBeFalse();
-    expect(service.capture(TOKEN, new Date(Date.now() - 1_000).toISOString())).toBeFalse();
+  it("waits for the park before claiming, so the cookie is actually there", async () => {
+    let releasePark!: (value: unknown) => void;
+    api.post.and.returnValues(
+      new Promise((resolve) => { releasePark = resolve; }),
+      Promise.resolve(CLAIMED()),
+    );
+    service.capture(BEARER, SOON());
+
+    const claiming = service.claim();
+    await Promise.resolve();
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    releasePark(PARKED());
+    await claiming;
+
+    expect(api.post).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not claim an intent the server refused to park", async () => {
+    api.post.and.rejectWith(new Error("offline"));
+    service.capture(BEARER, SOON());
+
+    expect(await service.claim()).toBeNull();
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops offering an intent the server says is gone", async () => {
+    api.post.and.returnValues(
+      Promise.resolve(PARKED()),
+      Promise.reject(new ApiRequestError("La URL guardada ya no está disponible", 404)),
+    );
+    service.capture(BEARER, SOON());
+
+    await expectAsync(service.claim()).toBeRejected();
     expect(service.hasPending()).toBeFalse();
   });
 
-  it("claims the destination only after a token is present", async () => {
-    const expiresAt = new Date(Date.now() + 60_000).toISOString();
-    api.post.and.resolveTo({ destination: "https://example.com/campaign", expiresAt });
-    service.capture(TOKEN, expiresAt);
+  it("releases the intent on the server once the link exists", async () => {
+    api.post.and.resolveTo({ ok: true } as never);
+    service.capture(BEARER, SOON());
 
-    await expectAsync(service.claim()).toBeResolvedTo({ destination: "https://example.com/campaign", expiresAt });
-    expect(api.post).toHaveBeenCalledWith("/api/v1/link-intents/claim", { intent: TOKEN }, decodeClaimedLinkIntent);
+    await service.complete();
+
+    expect(service.hasPending()).toBeFalse();
+    expect(api.post).toHaveBeenCalledWith("/api/v1/link-intents/complete", {});
   });
 
-  it("validates the opaque bearer and bounded server expiry", () => {
-    const expiresAt = new Date(Date.now() + 60_000).toISOString();
-    expect(decodeLinkIntentReceipt({ intent: TOKEN, expiresAt })).toEqual({ intent: TOKEN, expiresAt });
+  it("stops offering the intent even when the server cannot release it", async () => {
+    api.post.and.rejectWith(new Error("offline"));
+    service.capture(BEARER, SOON());
+
+    await service.complete();
+
+    expect(service.hasPending()).toBeFalse();
+    expect(api.delete).toHaveBeenCalledOnceWith("/api/v1/pending/link-intent");
+  });
+
+  it("rejects malformed or already expired handoff tokens without parking", () => {
+    expect(service.capture("not-a-token")).toBeFalse();
+    expect(service.capture(BEARER, new Date(Date.now() - 1_000).toISOString())).toBeFalse();
+    expect(service.hasPending()).toBeFalse();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("keeps the public create() contract the landing page depends on", async () => {
+    const expiresAt = SOON();
+    api.post.and.resolveTo({ intent: BEARER, expiresAt } as never);
+
+    await expectAsync(service.create("https://example.test/x")).toBeResolvedTo({ intent: BEARER, expiresAt });
+    expect(api.post).toHaveBeenCalledOnceWith(
+      "/api/v1/link-intents",
+      { destination: "https://example.test/x" },
+      decodeLinkIntentReceipt,
+    );
+  });
+
+  it("validates the opaque bearer and the bounded expiry it accepts", () => {
+    const expiresAt = SOON();
+    expect(decodeLinkIntentReceipt({ intent: BEARER, expiresAt })).toEqual({ intent: BEARER, expiresAt });
     expect(() => decodeLinkIntentReceipt({ intent: "short", expiresAt })).toThrow();
-    expect(() => decodeLinkIntentReceipt({ intent: TOKEN, expiresAt: new Date(Date.now() + 48 * 60 * 60_000).toISOString() })).toThrow();
+    expect(() => decodeLinkIntentReceipt({ intent: BEARER, expiresAt: new Date(Date.now() + 48 * 60 * 60_000).toISOString() })).toThrow();
   });
 
   it("rejects unsafe or malformed claimed destinations", () => {
-    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    const expiresAt = SOON();
     expect(decodeClaimedLinkIntent({ destination: "https://example.test/path", expiresAt })).toEqual({
       destination: "https://example.test/path", expiresAt,
     });
     expect(() => decodeClaimedLinkIntent({ destination: "javascript:alert(1)", expiresAt })).toThrow();
     expect(() => decodeClaimedLinkIntent({ destination: "https://user:pass@example.test", expiresAt })).toThrow();
-  });
-
-  it("does not downgrade a successful local write when session cleanup is denied", () => {
-    api.post.and.returnValue(new Promise(() => undefined));
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-      intent: TOKEN, expiresAt: new Date(Date.now() + 60_000).toISOString(), state: "active",
-    }));
-    const remove = spyOn(sessionStorage, "removeItem").and.throwError("Fixture: denied cleanup");
-
-    expect(service.capture(TOKEN, new Date(Date.now() + 60_000).toISOString())).toBeTrue();
-    service.complete();
-    const restored = TestBed.runInInjectionContext(() => new PendingLinkIntentService());
-
-    expect(restored.hasPending()).toBeFalse();
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}").state).toBe("completing");
-    remove.and.callThrough();
-  });
-
-  it("rejects coercible non-string tokens loaded from storage", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      intent: [TOKEN], expiresAt: new Date(Date.now() + 60_000).toISOString(), state: "active",
-    }));
-
-    const restored = TestBed.runInInjectionContext(() => new PendingLinkIntentService());
-
-    expect(restored.hasPending()).toBeFalse();
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
-  });
-
-  it("does not retain an attacker-supplied expiry beyond the browser TTL", () => {
-    expect(service.capture(TOKEN, new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())).toBeFalse();
-    expect(service.hasPending()).toBeFalse();
-  });
-
-  it("restores the newer session token when a quota failure leaves an older local token", () => {
-    const oldToken = "c".repeat(43);
-    const expiresAt = new Date(Date.now() + 60_000).toISOString();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      intent: oldToken, expiresAt, state: "active", savedAt: Date.now() - 1_000,
-    }));
-    const set = spyOn(localStorage, "setItem").and.throwError("Fixture: quota exceeded");
-
-    expect(service.capture(TOKEN, expiresAt)).toBeTrue();
-    const restored = TestBed.runInInjectionContext(() => new PendingLinkIntentService());
-
-    expect(restored.pending()?.intent).toBe(TOKEN);
-    expect(restored.usingSessionFallback()).toBeTrue();
-    set.and.callThrough();
-  });
-
-  it("rejects unknown persisted states instead of treating them as active", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      intent: TOKEN, expiresAt: new Date(Date.now() + 60_000).toISOString(), state: "completed",
-    }));
-    const restored = TestBed.runInInjectionContext(() => new PendingLinkIntentService());
-    expect(restored.hasPending()).toBeFalse();
   });
 });

@@ -53,10 +53,14 @@ describe("AuthComponent registration flow", () => {
   }
 
   beforeEach(async () => {
-    api = jasmine.createSpyObj<ApiService>("ApiService", ["get"]);
+    api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post", "delete"]);
     api.get.and.resolveTo({
       hcaptcha: { enabled: true, siteKey: "10000000-ffff-ffff-ffff-000000000001" },
     });
+    // The optional handoff park: a spec that captures a link intent must not
+    // trip over an unstubbed client, and nothing here depends on its answer.
+    api.post.and.resolveTo({ pending: true, expiresAt: new Date(Date.now() + 60_000).toISOString() } as never);
+    api.delete.and.resolveTo({ pending: false } as never);
     auth = jasmine.createSpyObj<AuthService>("AuthService", [
       "register",
       "changeRegistrationEmail",
@@ -106,7 +110,7 @@ describe("AuthComponent registration flow", () => {
       })
       .compileComponents();
 
-    TestBed.inject(PendingLinkIntentService).clear();
+    void TestBed.inject(PendingLinkIntentService).clear();
 
     fixture = TestBed.createComponent(AuthComponent);
     component = fixture.componentInstance;
@@ -501,6 +505,7 @@ describe("AuthComponent registration flow", () => {
     const intents = TestBed.inject(PendingLinkIntentService);
     intents.capture("a".repeat(43), new Date(Date.now() + 60_000).toISOString());
     fixture.detectChanges();
+
 
     expect(fixture.nativeElement.textContent).toContain("Tu URL está guardada");
     expect(fixture.nativeElement.textContent).toContain("Accede para retomar el enlace");

@@ -45,12 +45,12 @@ export class ForgotPasswordComponent {
   readonly hcaptchaSiteKey = signal("");
   readonly captchaToken = signal("");
   readonly pendingLink = this.intents.pending;
-  readonly pendingInvitation = this.invitations.hasPending();
+  readonly pendingInvitation = this.invitations.pending;
   readonly loginQueryParams = computed(() => {
     const returnTo = this.route.snapshot.queryParamMap.get("returnTo");
     if (returnTo) return { returnTo };
     if (this.pendingLink()) return { returnTo: "/app/links" };
-    return this.pendingInvitation ? { returnTo: "/invitations/accept" } : {};
+    return this.pendingInvitation() ? { returnTo: "/invitations/accept" } : {};
   });
 
   form = this.fb.nonNullable.group({

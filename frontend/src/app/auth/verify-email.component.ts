@@ -34,7 +34,7 @@ import { LatestRequest } from "../core/services/latest-request";
         }
         @if (done() && (ok() || !token)) {
           <a mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">
-            {{ pendingLink() ? 'Iniciar sesión y crear mi enlace' : (pendingInvitation ? 'Iniciar sesión y revisar invitación' : 'Iniciar sesión') }}
+            {{ pendingLink() ? 'Iniciar sesión y crear mi enlace' : (pendingInvitation() ? 'Iniciar sesión y revisar invitación' : 'Iniciar sesión') }}
           </a>
         }
       </div>
@@ -57,11 +57,11 @@ export class VerifyEmailComponent {
   readonly attempted = signal(false);
   readonly message = signal("Confirma que tú creaste la cuenta. Si no reconoces este registro, no continúes.");
   readonly pendingLink = this.intents.pending;
-  readonly pendingInvitation = this.invitations.hasPending();
+  readonly pendingInvitation = this.invitations.pending;
   readonly token: string;
   readonly loginQueryParams = computed(() => this.pendingLink()
     ? { returnTo: "/app/links" }
-    : (this.pendingInvitation ? { returnTo: "/invitations/accept" } : {}));
+    : (this.pendingInvitation() ? { returnTo: "/invitations/accept" } : {}));
 
   constructor() {
     this.token = authBearer(this.route);
@@ -86,7 +86,7 @@ export class VerifyEmailComponent {
       this.message.set(
         this.pendingLink()
           ? "Tu email quedó confirmado. Inicia sesión para crear el enlace que has guardado."
-          : this.pendingInvitation
+          : this.pendingInvitation()
             ? "Tu email quedó confirmado. Inicia sesión para revisar la invitación pendiente."
             : "Tu email quedó confirmado. Ya puedes iniciar sesión y crear enlaces.",
       );

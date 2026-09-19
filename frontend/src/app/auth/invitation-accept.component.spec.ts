@@ -3,7 +3,7 @@ import { signal, type WritableSignal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute, Router } from "@angular/router";
 
-import { ApiService } from "../core/services/api.service";
+import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { AuthService } from "../core/services/auth.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { InvitationAcceptComponent } from "./invitation-accept.component";
@@ -24,9 +24,11 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
+/** Let the park confirmation and the session checks settle. */
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe("InvitationAcceptComponent async safety", () => {
   const tokenA = "a".repeat(43);
-  const tokenB = "b".repeat(43);
   let fixture: ComponentFixture<InvitationAcceptComponent> | undefined;
   let component: InvitationAcceptComponent;
   let api: jasmine.SpyObj<ApiService>;
@@ -35,12 +37,19 @@ describe("InvitationAcceptComponent async safety", () => {
   let loaded: WritableSignal<boolean>;
   let authenticated: WritableSignal<boolean>;
   let generation: number;
-  let currentToken: string;
+  let parked: WritableSignal<boolean>;
+  let revision: WritableSignal<number>;
+  let persistent: WritableSignal<boolean | null>;
   let invitations: {
-    persistent: WritableSignal<boolean>;
+    pending: WritableSignal<boolean>;
+    revision: WritableSignal<number>;
+    persistent: WritableSignal<boolean | null>;
+    expiresAt: WritableSignal<string | null>;
     capture: jasmine.Spy;
-    token: jasmine.Spy;
-    clear: jasmine.Spy;
+    confirmed: jasmine.Spy;
+    refresh: jasmine.Spy;
+    forget: jasmine.Spy;
+    hide: jasmine.Spy;
   };
 
   beforeEach(() => {
@@ -59,12 +68,30 @@ describe("InvitationAcceptComponent async safety", () => {
     auth.sessionGeneration.and.callFake(() => generation);
     router = jasmine.createSpyObj<Router>("Router", ["navigate"]);
     router.navigate.and.resolveTo(true);
-    currentToken = tokenA;
+    parked = signal(false);
+    revision = signal(0);
+    persistent = signal<boolean | null>(null);
     invitations = {
-      persistent: signal(true),
-      capture: jasmine.createSpy("capture").and.callFake((token: string) => { currentToken = token; }),
-      token: jasmine.createSpy("token").and.callFake(() => currentToken),
-      clear: jasmine.createSpy("clear").and.callFake(() => { currentToken = ""; }),
+      pending: parked,
+      revision,
+      persistent,
+      expiresAt: signal(null),
+      capture: jasmine.createSpy("capture").and.callFake(() => {
+        parked.set(true);
+        revision.update((value) => value + 1);
+        persistent.set(true);
+        return true;
+      }),
+      confirmed: jasmine.createSpy("confirmed").and.callFake(async () => parked()),
+      refresh: jasmine.createSpy("refresh").and.callFake(async () => undefined),
+      forget: jasmine.createSpy("forget").and.callFake(async () => {
+        parked.set(false);
+        revision.update((value) => value + 1);
+      }),
+      hide: jasmine.createSpy("hide").and.callFake(() => {
+        parked.set(false);
+        revision.update((value) => value + 1);
+      }),
     };
 
     TestBed.configureTestingModule({
@@ -92,18 +119,60 @@ describe("InvitationAcceptComponent async safety", () => {
     if (fixture && !fixture.componentRef.hostView.destroyed) fixture.destroy();
   });
 
-  function create(): InvitationAcceptComponent {
+  async function create(): Promise<InvitationAcceptComponent> {
     fixture = TestBed.createComponent(InvitationAcceptComponent);
     component = fixture.componentInstance;
+    await settle();
     return component;
   }
+
+  it("parks the bearer from the fragment and offers the decision once it landed", async () => {
+    await create();
+
+    expect(invitations.capture).toHaveBeenCalledOnceWith(tokenA, null);
+    expect(component.ready()).toBeTrue();
+    expect(component.busy()).toBeFalse();
+  });
+
+  it("offers nothing until the server has actually taken the park", async () => {
+    const confirmation = deferred<boolean>();
+    invitations.confirmed.and.returnValue(confirmation.promise);
+    fixture = TestBed.createComponent(InvitationAcceptComponent);
+    component = fixture.componentInstance;
+    await settle();
+
+    expect(component.ready()).toBeFalse();
+    await component.accept();
+    expect(api.post).not.toHaveBeenCalled();
+
+    confirmation.resolve(true);
+    await settle();
+    expect(component.ready()).toBeTrue();
+  });
+
+  it("says the invitation could not be kept when the server refuses the park", async () => {
+    invitations.confirmed.and.resolveTo(false);
+    await create();
+
+    expect(component.ready()).toBeFalse();
+    expect(component.done()).toBeTrue();
+    expect(component.message()).toContain("No hemos podido guardar la invitación");
+  });
+
+  it("sends no bearer of its own: the server reads the cookie it set", async () => {
+    await create();
+
+    await component.accept();
+
+    expect(api.post).toHaveBeenCalledWith("/api/v1/workspaces/invitations/accept", {});
+    expect(invitations.hide).toHaveBeenCalled();
+    expect(component.ok()).toBeTrue();
+  });
 
   it("shows a recoverable error when session initialization fails", async () => {
     loaded.set(false);
     auth.init.and.rejectWith(new Error("offline"));
-    create();
-    await Promise.resolve();
-    await Promise.resolve();
+    await create();
 
     expect(component.busy()).toBeFalse();
     expect(component.done()).toBeTrue();
@@ -113,46 +182,60 @@ describe("InvitationAcceptComponent async safety", () => {
   it("does not clear a newer invitation when an older acceptance finishes", async () => {
     const response = deferred<{ workspaceId: number }>();
     api.post.and.returnValue(response.promise);
-    create();
+    await create();
 
     const accepting = component.accept();
-    currentToken = tokenB;
+    // Another park took this browser's place while the request was in flight.
+    revision.update((value) => value + 1);
     response.resolve({ workspaceId: 9 });
     await accepting;
 
-    expect(invitations.clear).not.toHaveBeenCalled();
+    expect(invitations.hide).not.toHaveBeenCalled();
     expect(component.ok()).toBeFalse();
   });
 
   it("ignores acceptance UI updates after the authenticated session changes", async () => {
     const response = deferred<{ workspaceId: number }>();
     api.post.and.returnValue(response.promise);
-    create();
+    await create();
 
     const accepting = component.accept();
     generation = 2;
     response.resolve({ workspaceId: 9 });
     await accepting;
 
-    expect(invitations.clear).not.toHaveBeenCalled();
+    expect(invitations.hide).not.toHaveBeenCalled();
     expect(auth.refreshWorkspaces).not.toHaveBeenCalled();
   });
 
   it("keeps acceptance confirmed when the workspace refresh cannot complete", async () => {
     auth.refreshWorkspaces.and.resolveTo(false);
-    create();
+    await create();
 
     await component.accept();
 
-    expect(invitations.clear).toHaveBeenCalled();
+    expect(invitations.hide).toHaveBeenCalled();
     expect(component.ok()).toBeTrue();
     expect(component.message()).toContain("La invitación se ha aceptado");
+  });
+
+  it("drops the parked invitation when the server answers that it is unusable", async () => {
+    api.post.and.rejectWith(new ApiRequestError("Invitación inválida, cancelada o caducada", 400));
+    await create();
+
+    await component.accept();
+
+    // The server cleared the cookie with that answer, so the panel must stop
+    // offering the same dead end on the next visit.
+    expect(invitations.hide).toHaveBeenCalled();
+    expect(component.ok()).toBeFalse();
+    expect(component.message()).toContain("Invitación inválida");
   });
 
   it("does not navigate after a destroyed switch-account view finishes logout", async () => {
     const response = deferred<void>();
     auth.logout.and.returnValue(response.promise);
-    create();
+    await create();
     component.ready.set(false);
     component.done.set(true);
     component.busy.set(false);

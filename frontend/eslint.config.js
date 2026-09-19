@@ -35,6 +35,40 @@ module.exports = tseslint.config(
     },
   },
   {
+    // A handoff bearer is a credential: an invitation link works for seven days
+    // and a prepared destination for one, and both used to live in
+    // `localStorage`, where any script on the origin can read them. They are
+    // held in HttpOnly cookies now, so reaching for web storage in these files
+    // again is a regression, not a preference. The rule is scoped to the files
+    // that hold a bearer rather than to `src/**`, because the theme and the
+    // selected workspace are non-secret preferences and legitimately use it.
+    files: [
+      "src/app/core/services/pending-*.ts",
+      "src/app/core/services/handoff-*.ts",
+      "src/app/auth/invitation-accept.component.ts",
+    ],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "localStorage",
+          message: "Los bearers de handoff viven en una cookie HttpOnly del servidor (PendingHandoffService); no los guardes en el navegador.",
+        },
+        {
+          name: "sessionStorage",
+          message: "Los bearers de handoff viven en una cookie HttpOnly del servidor (PendingHandoffService); no los guardes en el navegador.",
+        },
+      ],
+    },
+  },
+  {
+    // The specs of those files assert the opposite — that nothing was written
+    // to web storage — so they are the one place allowed to name the globals
+    // they check.
+    files: ["src/**/*.spec.ts"],
+    rules: { "no-restricted-globals": "off" },
+  },
+  {
     files: ["src/**/*.html", "design-preview/**/*.html"],
     extends: [
       ...angular.configs.templateRecommended,

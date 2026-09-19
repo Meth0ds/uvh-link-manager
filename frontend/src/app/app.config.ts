@@ -1,8 +1,9 @@
-import { ApplicationConfig } from "@angular/core";
+import { ApplicationConfig, inject, provideAppInitializer } from "@angular/core";
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling, withViewTransitions, type Routes } from "@angular/router";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
 import { apiInterceptor } from "./core/interceptors/api.interceptor";
+import { PendingHandoffService } from "./core/services/pending-handoff.service";
 
 export const routes: Routes = [
   {
@@ -69,5 +70,13 @@ export const appConfig: ApplicationConfig = {
     ),
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),
     provideAnimationsAsync(),
+    // Ask which handoffs this browser is holding, once, before the first route
+    // renders. The promise is deliberately not returned: a slow or unreachable
+    // answer must not delay the first paint, and a screen that has not heard
+    // back yet shows the neutral option (no pending handoff) instead of a CTA
+    // that may not work.
+    provideAppInitializer(() => {
+      void inject(PendingHandoffService).refresh();
+    }),
   ],
 };

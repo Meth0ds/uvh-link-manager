@@ -16,6 +16,7 @@ import { PendingLinkIntentService } from "../core/services/pending-link-intent.s
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { LatestRequest } from "../core/services/latest-request";
 import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
+import { intentBearer } from "./auth-bearer";
 
 type Step = "login" | "register" | "mfa" | "recovery" | "verify-pending";
 type RegisterStep = 1 | 2;
@@ -139,7 +140,6 @@ export class AuthComponent {
   readonly hidePassword = signal(true);
   readonly tabIndex = signal(0);
   readonly pendingLink = this.intents.pending;
-  readonly intentStorageFallback = this.intents.usingSessionFallback;
 
   /**
    * Hold the card back until the startup probe has answered. A visitor arriving
@@ -229,10 +229,14 @@ export class AuthComponent {
 
   constructor() {
     void this.loadCaptchaConfiguration();
-    const routeIntent = this.route.snapshot.queryParamMap.get("intent");
+    const routeIntent = intentBearer(this.route);
     const registerMode = this.route.snapshot.queryParamMap.get("mode") === "register";
     const capturedIntent = routeIntent ? this.intents.capture(routeIntent) : false;
     if (routeIntent) {
+      // Drop the bearer from the address bar. The server holds it now, and a
+      // URL that still carries it is the thing this change removes; the
+      // navigate also clears the fragment, which `queryParams: {intent: null}`
+      // alone would leave in place.
       void this.router.navigate([], {
         relativeTo: this.route,
         queryParams: { intent: null },
@@ -746,7 +750,7 @@ export class AuthComponent {
       return rt;
     }
     if (this.intents.hasPending()) return "/app/links";
-    if (this.invitations.hasPending()) return "/invitations/accept";
+    if (this.invitations.pending()) return "/invitations/accept";
     return "/app";
   }
 }
