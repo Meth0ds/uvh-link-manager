@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Support\Ids;
 use App\Support\LinkIntentRegistry;
 use App\Support\OperationalMetrics;
+use App\Support\PendingHandoff;
 use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use Illuminate\Http\Request;
@@ -19,7 +20,8 @@ use Illuminate\Support\Facades\Cache;
  */
 class LinkIntentController
 {
-    private const TTL_HOURS = 24;
+    /** Shape of every intent this application issues: `Ids::randomToken(32)`. */
+    private const INTENT_PATTERN = '/^[A-Za-z0-9_-]{43}$/D';
 
     private const MAX_ACTIVE_PER_IP = 20;
 
@@ -34,7 +36,8 @@ class LinkIntentController
         }
 
         $intent = Ids::randomToken(32);
-        $expiresAt = now()->addHours(self::TTL_HOURS);
+        $ttlHours = $this->ttlHours();
+        $expiresAt = now()->addHours($ttlHours);
         $counterBaseKey = $this->counterKey((string) ($request->ip() ?? ''));
         $bucketAt = now()->startOfHour();
         $counterKey = $this->counterBucketKey($counterBaseKey, $bucketAt);
@@ -42,7 +45,7 @@ class LinkIntentController
         $ipCounterIncremented = false;
         $globalCounterIncremented = false;
         try {
-            $accepted = $this->withCounterLocks($counterBaseKey, function () use ($counterBaseKey, $counterKey, $globalCounterKey, $bucketAt, &$ipCounterIncremented, &$globalCounterIncremented): bool {
+            $accepted = $this->withCounterLocks($counterBaseKey, function () use ($counterBaseKey, $counterKey, $globalCounterKey, $bucketAt, $ttlHours, &$ipCounterIncremented, &$globalCounterIncremented): bool {
                 $active = $this->bucketTotal($counterBaseKey, $bucketAt);
                 $global = $this->bucketTotal($this->globalCounterKey(), $bucketAt);
                 if ($active >= self::MAX_ACTIVE_PER_IP || $global >= self::MAX_ACTIVE_GLOBAL) {
@@ -50,11 +53,11 @@ class LinkIntentController
                 }
                 // Buckets keep rolling-window admission bounded without a shared
                 // TTL that can be extended indefinitely by newer intentions.
-                if (! Cache::put($counterKey, (int) Cache::get($counterKey, 0) + 1, now()->addHours(self::TTL_HOURS + 2))) {
+                if (! Cache::put($counterKey, (int) Cache::get($counterKey, 0) + 1, now()->addHours($ttlHours + 2))) {
                     throw new \RuntimeException('Intent IP counter rejected write');
                 }
                 $ipCounterIncremented = true;
-                if (! Cache::put($globalCounterKey, (int) Cache::get($globalCounterKey, 0) + 1, now()->addHours(self::TTL_HOURS + 2))) {
+                if (! Cache::put($globalCounterKey, (int) Cache::get($globalCounterKey, 0) + 1, now()->addHours($ttlHours + 2))) {
                     throw new \RuntimeException('Intent global counter rejected write');
                 }
                 $globalCounterIncremented = true;
@@ -105,11 +108,12 @@ class LinkIntentController
 
     public function claim(Request $request)
     {
-        $intent = $this->intentFrom($request);
+        $source = $this->intentSource($request);
         $user = UvhRequest::user($request);
-        if ($intent === null || $user === null) {
+        if ($source === null || $user === null) {
             return $this->unavailable();
         }
+        $intent = $source['intent'];
 
         try {
             $record = $this->withLock($intent, function () use ($intent, $user): ?array {
@@ -149,7 +153,13 @@ class LinkIntentController
         }
 
         if ($record === null) {
-            return $this->unavailable();
+            $missing = $this->unavailable();
+
+            // Gone, expired or claimed by somebody else: none of those become
+            // true on a retry, so a parked intent that reached this answer is a
+            // dead end and its cookie goes with it. The 429 and 503 paths above
+            // return earlier and deliberately leave it parked.
+            return $source['parked'] ? PendingHandoff::clearOn($missing, PendingHandoff::INTENT) : $missing;
         }
 
         return response()->json([
@@ -160,11 +170,12 @@ class LinkIntentController
 
     public function complete(Request $request)
     {
-        $intent = $this->intentFrom($request);
+        $source = $this->intentSource($request);
         $user = UvhRequest::user($request);
-        if ($intent === null || $user === null) {
+        if ($source === null || $user === null) {
             return $this->unavailable();
         }
+        $intent = $source['intent'];
 
         $intentHash = Ids::sha256Hex($intent);
         try {
@@ -195,17 +206,53 @@ class LinkIntentController
             return $this->temporarilyUnavailable();
         }
 
-        return $completed ? response()->json(['ok' => true]) : $this->unavailable();
+        $response = $completed ? response()->json(['ok' => true]) : $this->unavailable();
+
+        // Same reasoning as `claim`: the record is gone either way, so a parked
+        // cookie is spent. A body bearer belongs to the caller and is untouched.
+        return $source['parked'] ? PendingHandoff::clearOn($response, PendingHandoff::INTENT) : $response;
     }
 
-    private function intentFrom(Request $request): ?string
+    /**
+     * The intent this request carries, and where it came from.
+     *
+     * A body copy always wins when a client sends one — `POST /link-intents`
+     * documents `intent` in the payload, and every consumer that is not this
+     * panel uses it. When the body is empty the parked cookie is read instead:
+     * the panel keeps no bearer in `localStorage`, so the authenticated calls
+     * arrive without one.
+     *
+     * @return array{intent: string, parked: bool}|null
+     */
+    private function intentSource(Request $request): ?array
+    {
+        $body = $this->bodyIntent($request);
+        if ($body !== null) {
+            return ['intent' => $body, 'parked' => false];
+        }
+
+        $parked = PendingHandoff::bearer($request, PendingHandoff::INTENT);
+        if ($parked === null) {
+            return null;
+        }
+
+        return ['intent' => $parked, 'parked' => true];
+    }
+
+    private function bodyIntent(Request $request): ?string
     {
         $intent = $request->input('intent');
-        if (! is_string($intent) || ! preg_match('/^[A-Za-z0-9_-]{43}$/D', $intent)) {
+        if (! is_string($intent) || preg_match(self::INTENT_PATTERN, $intent) !== 1) {
             return null;
         }
 
         return $intent;
+    }
+
+    /** Hours an intent lives, and the ceiling of the cookie that parks it. */
+    private function ttlHours(): int
+    {
+        return max(1, (int) config('uvh.intent_ttl_hours'));
     }
 
     /**
@@ -281,7 +328,7 @@ class LinkIntentController
     private function bucketTotal(string $base, Carbon $hour): int
     {
         $total = 0;
-        for ($offset = 0; $offset <= self::TTL_HOURS; $offset++) {
+        for ($offset = 0; $offset <= $this->ttlHours(); $offset++) {
             $total += (int) Cache::get($this->counterBucketKey($base, $hour->copy()->subHours($offset)), 0);
         }
 
@@ -323,11 +370,12 @@ class LinkIntentController
     ): void {
         try {
             $this->withCounterLocks($counterBaseKey, function () use ($counterKey, $globalCounterKey, $decrementIp, $decrementGlobal): bool {
+                $ttlHours = $this->ttlHours();
                 if ($decrementIp) {
-                    Cache::put($counterKey, max(0, (int) Cache::get($counterKey, 0) - 1), now()->addHours(self::TTL_HOURS + 2));
+                    Cache::put($counterKey, max(0, (int) Cache::get($counterKey, 0) - 1), now()->addHours($ttlHours + 2));
                 }
                 if ($decrementGlobal) {
-                    Cache::put($globalCounterKey, max(0, (int) Cache::get($globalCounterKey, 0) - 1), now()->addHours(self::TTL_HOURS + 2));
+                    Cache::put($globalCounterKey, max(0, (int) Cache::get($globalCounterKey, 0) - 1), now()->addHours($ttlHours + 2));
                 }
 
                 return true;
@@ -350,13 +398,14 @@ class LinkIntentController
                 ? $record['counter_lock_key']
                 : $record['counter_key'];
             $this->withCounterLocks($counterLockKey, function () use ($record): bool {
+                $ttlHours = $this->ttlHours();
                 $active = max(0, (int) Cache::get($record['counter_key'], 0) - 1);
                 $globalKey = is_string($record['global_counter_key'] ?? null)
                     ? $record['global_counter_key']
                     : $this->globalCounterKey();
                 $global = max(0, (int) Cache::get($globalKey, 0) - 1);
-                if (! Cache::put($record['counter_key'], $active, now()->addHours(self::TTL_HOURS))
-                    || ! Cache::put($globalKey, $global, now()->addHours(self::TTL_HOURS))) {
+                if (! Cache::put($record['counter_key'], $active, now()->addHours($ttlHours))
+                    || ! Cache::put($globalKey, $global, now()->addHours($ttlHours))) {
                     throw new \RuntimeException('Intent counter store rejected cleanup');
                 }
 

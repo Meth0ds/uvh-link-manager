@@ -16,6 +16,7 @@ use App\Support\IsoDate;
 use App\Support\MailAdmissionException;
 use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
+use App\Support\PendingHandoff;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
@@ -660,7 +661,10 @@ class WorkspaceController
                     'token' => $tokenHash,
                     'invited_by' => $user->id,
                     'status' => 'pending',
-                    'expires_at' => now()->addDays(7),
+                    // The parked handoff cookie caps itself at this same value,
+                    // so a browser never holds a bearer for longer than the
+                    // invitation behind it can live.
+                    'expires_at' => now()->addDays((int) config('uvh.invitation_ttl_days')),
                 ];
                 if ($existing) {
                     $existing->update($values);
@@ -715,7 +719,15 @@ class WorkspaceController
     public function acceptInvitation(Request $request)
     {
         $user = UvhRequest::user($request);
+        // The panel ships no bearer of its own any more: it parks the invitation
+        // and the authenticated call arrives with an empty body. A body bearer
+        // still wins when present — that is the documented API, and it is what
+        // every client that is not this panel uses.
         $token = UvhRequest::inputString($request, 'token');
+        $fromParked = $token === '';
+        if ($fromParked) {
+            $token = PendingHandoff::bearer($request, PendingHandoff::INVITATION) ?? '';
+        }
         if ($token === '' || strlen($token) > 256) {
             return response()->json(['error' => 'Token inválido'], 422);
         }
@@ -768,18 +780,31 @@ class WorkspaceController
             return $locked->fresh();
         }) : null;
         if (! $inv) {
-            return response()->json(['error' => 'Invitación inválida, cancelada o caducada'], 400);
+            $rejected = response()->json(['error' => 'Invitación inválida, cancelada o caducada'], 400);
+
+            // Terminal: a parked bearer that reached a final state will not
+            // become valid on a retry. Leaving it parked would put the same
+            // dead end in front of the user on every visit.
+            return $fromParked ? PendingHandoff::clearOn($rejected, PendingHandoff::INVITATION) : $rejected;
         }
 
         Audit::write($user->id, 'workspace.invitation_accepted', 'workspace', $inv->workspace_id, null, UvhRequest::ip($request));
 
-        return response()->json(['ok' => true, 'workspaceId' => $inv->workspace_id]);
+        $accepted = response()->json(['ok' => true, 'workspaceId' => $inv->workspace_id]);
+
+        return $fromParked ? PendingHandoff::clearOn($accepted, PendingHandoff::INVITATION) : $accepted;
     }
 
     public function rejectInvitation(Request $request)
     {
         $user = UvhRequest::user($request);
+        // Same two sources as `acceptInvitation`: the parked cookie when the
+        // request carries no bearer, the body when it does.
         $token = UvhRequest::inputString($request, 'token');
+        $fromParked = $token === '';
+        if ($fromParked) {
+            $token = PendingHandoff::bearer($request, PendingHandoff::INVITATION) ?? '';
+        }
         if ($token === '' || strlen($token) > 256) {
             return response()->json(['error' => 'Token inválido'], 422);
         }
@@ -808,12 +833,16 @@ class WorkspaceController
             return $locked;
         }) : null;
         if (! $inv) {
-            return response()->json(['error' => 'Invitación inválida'], 400);
+            $rejected = response()->json(['error' => 'Invitación inválida'], 400);
+
+            return $fromParked ? PendingHandoff::clearOn($rejected, PendingHandoff::INVITATION) : $rejected;
         }
 
         Audit::write($user->id, 'workspace.invitation_rejected', 'workspace', $inv->workspace_id, null, UvhRequest::ip($request));
 
-        return response()->json(['ok' => true]);
+        $ok = response()->json(['ok' => true]);
+
+        return $fromParked ? PendingHandoff::clearOn($ok, PendingHandoff::INVITATION) : $ok;
     }
 
     public function cancelInvitation(Request $request, int $id, int $invitationId)
@@ -908,7 +937,7 @@ class WorkspaceController
                     'status' => 'pending',
                     'token' => $newTokenHash,
                     'invited_by' => $user->id,
-                    'expires_at' => now()->addDays(7),
+                    'expires_at' => now()->addDays((int) config('uvh.invitation_ttl_days')),
                 ]);
                 $workspaceName = Workspace::where('id', $id)->value('name');
                 if (! is_string($workspaceName) || ! UvhMail::invitation(

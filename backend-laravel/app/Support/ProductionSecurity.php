@@ -23,6 +23,31 @@ final class ProductionSecurity
     private const LOOPBACK_REDIS_HOSTS = ['127.0.0.1', 'localhost', '::1', '0.0.0.0'];
 
     /**
+     * Capabilities of the PHP the deployment runs, as opposed to settings a
+     * deployer writes.
+     *
+     * These live in the same release gate because both fail the same way: the
+     * process starts and then misbehaves. `intl` is the one that matters here.
+     * Without it an IDN host cannot be converted to its ASCII form, so an
+     * internationalised domain can neither be validated as a destination nor
+     * matched against the denylist — an entry for `münchen.example` would simply
+     * never match. It is declared in `composer.json` and compiled into the image
+     * (`docker/php/Dockerfile.production`); this check is what turns a forgotten
+     * layer into a refused boot instead of a hole nobody sees.
+     *
+     * @return list<string>
+     */
+    public static function capabilityErrors(?bool $idnAvailable = null): array
+    {
+        $idnAvailable ??= function_exists('idn_to_ascii');
+        if ($idnAvailable) {
+            return [];
+        }
+
+        return ['La extensión intl de PHP es obligatoria: sin idn_to_ascii los destinos con host internacional no se pueden validar ni comparar con la denylist de destinos'];
+    }
+
+    /**
      * Validate invariants that must hold before a production worker serves a
      * request. Values are passed explicitly so the rules remain unit-testable
      * and work with Laravel's config cache.
@@ -101,20 +126,39 @@ final class ProductionSecurity
         if ((string) ($settings['cookie_domain'] ?? '') !== '') {
             $errors[] = 'COOKIE_DOMAIN debe permanecer vacío para aislar app.uvh.es';
         }
-        if (! str_starts_with((string) ($settings['session_cookie'] ?? ''), '__Host-')) {
-            $errors[] = 'SESSION_COOKIE debe usar el prefijo __Host- en producción';
+        // Every cookie this deployment sets on the panel origin carries the
+        // __Host- prefix — Secure, Path=/ and no Domain — which is what keeps a
+        // sibling host from shadowing it. The two parked-handoff cookies joined
+        // the session and CSRF cookies, so the rule is applied to the set: a
+        // name added later is checked by being listed here, not by remembering
+        // to write a fifth `if`.
+        $cookieNames = [
+            'SESSION_COOKIE' => (string) ($settings['session_cookie'] ?? ''),
+            'CSRF_COOKIE' => (string) ($settings['csrf_cookie'] ?? ''),
+            'PENDING_INVITATION_COOKIE' => (string) ($settings['invitation_cookie'] ?? ''),
+            'PENDING_INTENT_COOKIE' => (string) ($settings['intent_cookie'] ?? ''),
+        ];
+        foreach ($cookieNames as $key => $name) {
+            if (! str_starts_with($name, '__Host-')) {
+                $errors[] = "{$key} debe usar el prefijo __Host- en producción";
+            }
         }
-        if (! str_starts_with((string) ($settings['csrf_cookie'] ?? ''), '__Host-')) {
-            $errors[] = 'CSRF_COOKIE debe usar el prefijo __Host- en producción';
-        }
-        if ((string) ($settings['session_cookie'] ?? '') === (string) ($settings['csrf_cookie'] ?? '')) {
-            $errors[] = 'SESSION_COOKIE y CSRF_COOKIE deben tener nombres distintos';
+        if (count(array_unique(array_values($cookieNames))) !== count($cookieNames)) {
+            $errors[] = 'Las cookies de sesión, CSRF y aparcadero deben tener nombres distintos';
         }
         if (! (bool) ($settings['hsts_enabled'] ?? false)) {
             $errors[] = 'HSTS_ENABLED debe estar activado en producción';
         }
         if (! self::inRange($settings['session_ttl_days'] ?? null, 1, 30)) {
             $errors[] = 'SESSION_TTL_DAYS debe estar entre 1 y 30 en producción';
+        }
+        // Both bounds are also the ceiling of the cookie that parks the bearer,
+        // so an absurd value would keep a browser holding it for that long.
+        if (! self::inRange($settings['invitation_ttl_days'] ?? null, 1, 30)) {
+            $errors[] = 'INVITATION_TTL_DAYS debe estar entre 1 y 30 en producción';
+        }
+        if (! self::inRange($settings['intent_ttl_hours'] ?? null, 1, 168)) {
+            $errors[] = 'INTENT_TTL_HOURS debe estar entre 1 y 168 en producción';
         }
         if (! self::inRange($settings['admin_mfa_fresh_minutes'] ?? null, 5, 60)) {
             $errors[] = 'ADMIN_MFA_FRESH_MINUTES debe estar entre 5 y 60 en producción';
@@ -147,7 +191,9 @@ final class ProductionSecurity
             && self::inRange($settings['register_limit'] ?? null, 1, 100)
             && self::inRange($settings['link_create_limit'] ?? null, 1, 300)
             && self::inRange($settings['resolve_limit'] ?? null, 60, 10_000)
-            && self::inRange($settings['api_token_limit'] ?? null, 60, 10_000);
+            && self::inRange($settings['api_token_limit'] ?? null, 60, 10_000)
+            && self::inRange($settings['pending_limit'] ?? null, 1, 300)
+            && self::inRange($settings['pending_read_limit'] ?? null, 1, 1_000);
         if (! $rateLimitsValid) {
             $errors[] = 'Los límites de frecuencia deben permanecer dentro de rangos operativos seguros';
         }

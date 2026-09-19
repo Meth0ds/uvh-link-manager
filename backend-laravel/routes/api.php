@@ -7,6 +7,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkIntentController;
+use App\Http\Controllers\PendingHandoffController;
 use App\Http\Controllers\PrivacyRightsController;
 use App\Http\Controllers\PublicController;
 use App\Http\Controllers\TokenController;
@@ -55,6 +56,15 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('report', [PublicController::class, 'report'])->middleware('throttle:uvh-report');
     Route::post('create', [PublicController::class, 'create'])->middleware('throttle:uvh-link-create');
     Route::post('link-intents', [LinkIntentController::class, 'issue'])->middleware('throttle:uvh-link-create');
+
+    // Handoff parking. Public on purpose: an invitation arrives before there is
+    // an account, and a prepared link is issued by the anonymised flow. Neither
+    // endpoint touches a stored credential or the database.
+    Route::post('pending/{kind}', [PendingHandoffController::class, 'park'])
+        ->middleware('throttle:uvh-pending')->where('kind', 'invitation|link-intent');
+    Route::delete('pending/{kind}', [PendingHandoffController::class, 'forget'])
+        ->middleware('throttle:uvh-pending')->where('kind', 'invitation|link-intent');
+    Route::get('pending', [PendingHandoffController::class, 'show'])->middleware('throttle:uvh-pending-read');
 
     // Auth.
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:uvh-register');

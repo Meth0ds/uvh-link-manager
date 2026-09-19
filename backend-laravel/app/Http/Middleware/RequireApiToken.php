@@ -20,8 +20,16 @@ class RequireApiToken
 
     public function handle(Request $request, Closure $next, string ...$required): Response
     {
-        $header = $request->header('authorization', '');
-        $token = str_starts_with($header, 'Bearer ') ? substr($header, 7) : null;
+        // RFC 9110 §11.1 makes the auth scheme a case-insensitive token, so
+        // `bearer`, `BEARER` and `Bearer` are the same header — and the same
+        // header was already accepted elsewhere in this application, because
+        // the metrics endpoint goes through Laravel's own `bearerToken()`,
+        // which matches case-insensitively. Comparing the literal string here
+        // meant the two disagreed: a client sending `bearer` was told its token
+        // was missing, which is the one explanation that hides the real one.
+        // Only the scheme is case-insensitive; the token is compared exactly.
+        $header = trim((string) $request->header('authorization', ''));
+        $token = preg_match('/^Bearer[ \t]+(\S+)$/i', $header, $matches) === 1 ? $matches[1] : null;
 
         if (! $token) {
             return response()->json(['error' => 'Token de API requerido'], 401);

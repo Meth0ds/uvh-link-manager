@@ -13,6 +13,32 @@ class ProductionSecurityTest extends TestCase
         $this->assertSame([], ProductionSecurity::errors($this->validSettings()));
     }
 
+    public function test_a_php_without_intl_is_refused_at_boot(): void
+    {
+        // Without idn_to_ascii an internationalised host cannot be converted, so
+        // a denylist entry for it would simply never match. That is a hole, not
+        // a degraded feature, so it has to stop a deployment rather than warn.
+        $this->assertSame([], ProductionSecurity::capabilityErrors(true));
+        $this->assertCount(1, ProductionSecurity::capabilityErrors(false));
+        $this->assertStringContainsString('intl', ProductionSecurity::capabilityErrors(false)[0]);
+    }
+
+    public function test_intl_is_a_declared_dependency_and_the_image_installs_it(): void
+    {
+        $composer = json_decode(
+            (string) file_get_contents(dirname(__DIR__, 2).'/composer.json'),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+        $this->assertArrayHasKey('ext-intl', $composer['require']);
+
+        // The gate above is only actionable if the image satisfies it.
+        $dockerfile = (string) file_get_contents(dirname(__DIR__, 3).'/docker/php/Dockerfile.production');
+        $this->assertStringContainsString('docker-php-ext-install', $dockerfile);
+        $this->assertStringContainsString('intl \\', $dockerfile);
+    }
+
     public function test_development_captcha_fallback_prevents_production_startup(): void
     {
         $settings = $this->validSettings();
@@ -43,6 +69,8 @@ class ProductionSecurityTest extends TestCase
         $settings['app_key'] = 'short';
         $settings['session_cookie'] = 'uvh_session';
         $settings['csrf_cookie'] = 'uvh_csrf';
+        $settings['invitation_cookie'] = 'uvh_pending_invitation';
+        $settings['intent_cookie'] = 'uvh_pending_intent';
         $settings['cache_store'] = 'array';
         $settings['queue_connection'] = 'sync';
 
@@ -51,6 +79,10 @@ class ProductionSecurityTest extends TestCase
         $this->assertContains('APP_KEY debe ser una clave válida para el cifrado configurado', $errors);
         $this->assertContains('SESSION_COOKIE debe usar el prefijo __Host- en producción', $errors);
         $this->assertContains('CSRF_COOKIE debe usar el prefijo __Host- en producción', $errors);
+        // A parked handoff is a bearer too: a cookie that a sibling host can
+        // shadow is a cookie a sibling host can read.
+        $this->assertContains('PENDING_INVITATION_COOKIE debe usar el prefijo __Host- en producción', $errors);
+        $this->assertContains('PENDING_INTENT_COOKIE debe usar el prefijo __Host- en producción', $errors);
         $this->assertContains('CACHE_STORE debe ser compartido entre procesos en producción', $errors);
         $this->assertContains('QUEUE_CONNECTION debe usar una cola persistente en producción', $errors);
     }
@@ -305,8 +337,12 @@ class ProductionSecurityTest extends TestCase
             'cookie_domain' => '',
             'session_cookie' => '__Host-uvh_session',
             'csrf_cookie' => '__Host-uvh_csrf',
+            'invitation_cookie' => '__Host-uvh_pending_invitation',
+            'intent_cookie' => '__Host-uvh_pending_intent',
             'hsts_enabled' => true,
             'session_ttl_days' => 30,
+            'invitation_ttl_days' => 7,
+            'intent_ttl_hours' => 24,
             'admin_mfa_fresh_minutes' => 15,
             'bcrypt_rounds' => 12,
             'hcaptcha_site_key' => '6f42dd45-49e8-4bb4-9aa7-production-sitekey',
@@ -320,6 +356,8 @@ class ProductionSecurityTest extends TestCase
             'link_create_limit' => 30,
             'resolve_limit' => 600,
             'api_token_limit' => 600,
+            'pending_limit' => 20,
+            'pending_read_limit' => 120,
             'trusted_proxies' => '10.0.0.10,172.16.0.0/12,2001:db8::1',
             'db_connection' => 'pgsql',
             'db_sslmode' => 'verify-full',
