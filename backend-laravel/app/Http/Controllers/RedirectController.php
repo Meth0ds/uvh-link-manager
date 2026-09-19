@@ -168,9 +168,16 @@ class RedirectController
         if (! (bool) config('uvh.trust_country_header')) {
             return null;
         }
+        // Provider data, and HTTP does not normalise its casing for us: one
+        // edge sends `ES`, another sends `es`. The rule comparison lowercases
+        // both sides, so the only place the case decided anything was here:
+        // demanding one specific casing silently dropped the country, which
+        // sent those visitors to the fallback and lost that slice of the
+        // country analytics. The stored form is what a country code is, upper
+        // case; anything that is not two ASCII letters is still no country.
         $value = $request->header((string) config('uvh.country_header'));
-        if (is_string($value) && preg_match('/^[A-Z]{2}$/', $value)) {
-            return $value;
+        if (is_string($value) && preg_match('/^[A-Za-z]{2}$/', $value)) {
+            return strtoupper($value);
         }
 
         return null;
