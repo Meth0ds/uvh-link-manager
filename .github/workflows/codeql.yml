@@ -8,6 +8,7 @@ on:
   schedule:
     # El análisis semanal detecta nuevas reglas incluso sin cambios de código.
     - cron: "17 3 * * 1"
+  workflow_dispatch:
 
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.ref }}
@@ -19,13 +20,26 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze JavaScript and TypeScript
+    name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     # GitHub no concede security-events:write a PRs procedentes de forks. En
     # ese caso CI sigue ejecutándose, pero CodeQL espera a una revisión interna.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # `actions` analiza los flujos de trabajo del propio repositorio
+        # (`.github/workflows/*.yml`), es decir, el código que tiene permiso
+        # para publicar, desplegar y usar secretos. Es la superficie con más
+        # consecuencias que no está escrita en PHP ni en TypeScript.
+        #
+        # PHP no aparece porque CodeQL no lo soporta: esa parte la cubre
+        # Semgrep en `security.yml`. CodeQL sigue siendo el único análisis que
+        # publica en la pestaña Security para JavaScript y TypeScript.
+        language: [javascript-typescript, actions]
 
     steps:
       - name: Checkout repository
@@ -36,11 +50,11 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5ba2889ada762081db2c4f32a729827dce632c7b # v3
         with:
-          languages: javascript-typescript
+          languages: ${{ matrix.language }}
           build-mode: none
           queries: security-extended
 
       - name: Analyze
         uses: github/codeql-action/analyze@5ba2889ada762081db2c4f32a729827dce632c7b # v3
         with:
-          category: /language:javascript-typescript
+          category: /language:${{ matrix.language }}

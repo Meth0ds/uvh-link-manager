@@ -1,0 +1,204 @@
+name: Security scans
+
+# Tres analizadores que no ven lo mismo: Semgrep lee el código (PHP, TypeScript
+# y los Dockerfiles), Gitleaks busca credenciales, y Trivy revisa el árbol de
+# dependencias y la infraestructura como código. Ninguno sustituye a PHPStan o
+# a ESLint, que siguen siendo puertas de regresión en `ci.yml`; lo que añaden es
+# la clase de defecto que un analizador de tipos no puede ver.
+#
+# La ejecución semanal no es decorativa: las bases de datos de
+# vulnerabilidades y los conjuntos de reglas cambian sin que el repositorio
+# cambie. Un hallazgo nuevo sobre código quieto sólo aparece si algo vuelve a
+# mirar.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Necesario para publicar el SARIF de Trivy en la pestaña Security. GitHub no
+  # lo concede a los PRs de forks; ese caso queda cubierto por el mismo guard
+  # que usa CodeQL.
+  security-events: write
+
+env:
+  # Versiones fijadas de las herramientas. No son artefactos desplegables (eso
+  # es `docker-compose.production.yml`, con digests): son analizadores, y lo que
+  # se fija es la versión del analizador para que un cambio de reglas no altere
+  # el veredicto sin que nadie lo revise. Las bases de datos que descargan sí se
+  # actualizan en cada ejecución, que es lo que da sentido al cron semanal.
+  SEMGREP_IMAGE: semgrep/semgrep:1.176.1
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1
+  TRIVY_IMAGE: aquasec/trivy:0.74.0
+
+jobs:
+  sast:
+    name: SAST / Semgrep (PHP, TypeScript, Docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # El conjunto de reglas es el mismo que documenta
+      # `docs/static-analysis.md`: se ejecuta igual en local, para que un
+      # hallazgo se reproduzca antes de abrir el PR. La puerta es ERROR: los
+      # avisos se publican en el informe pero no bloquean, porque ninguno de
+      # ellos es una vulnerabilidad demostrada.
+      - name: Scan with Semgrep
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" -w /src \
+            "$SEMGREP_IMAGE" \
+            semgrep scan \
+              --config p/php \
+              --config p/security-audit \
+              --config p/owasp-top-ten \
+              --config p/php-laravel \
+              --config p/sql-injection \
+              --config p/xss \
+              --config p/jwt \
+              --config p/insecure-transport \
+              --config p/command-injection \
+              --severity ERROR \
+              --error \
+              --metrics=off \
+              --json --output semgrep.json \
+              /src
+
+      # `always()` porque el informe sirve precisamente cuando la puerta falla.
+      - name: Preserve the Semgrep report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-${{ github.run_id }}-${{ github.run_attempt }}
+          path: semgrep.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  secrets:
+    name: Secrets / Gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # El escaneo histórico necesita los commits, no sólo el árbol.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # En un PR o un push se escanea el árbol que se va a fusionar: un secreto
+      # añadido está en él, y así la puerta no arrastra hallazgos antiguos ya
+      # revisados. La ejecución programada sí recorre el historial completo,
+      # que es la única forma de ver un secreto que se borró del árbol pero
+      # sigue en un commit publicado.
+      - name: Scan the working tree
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" -w /repo \
+            "$GITLEAKS_IMAGE" \
+            dir /repo \
+              --config /repo/.gitleaks.toml \
+              --redact --no-banner --verbose \
+              --report-format json --report-path gitleaks-tree.json
+
+      - name: Scan the whole history
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" -w /repo \
+            "$GITLEAKS_IMAGE" \
+            git /repo \
+              --log-opts=--all \
+              --config /repo/.gitleaks.toml \
+              --redact --no-banner --verbose \
+              --report-format json --report-path gitleaks-history.json
+
+      - name: Preserve the Gitleaks reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gitleaks-${{ github.run_id }}-${{ github.run_attempt }}
+          path: gitleaks-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  iac-and-dependencies:
+    name: Dependencies and IaC / Trivy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Igual que en CodeQL: sin `security-events: write`, la subida del SARIF
+    # falla. El escaneo se sigue ejecutando y bloqueando; lo que se omite en un
+    # PR de fork es publicar el informe.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Prepare a shared scanner cache
+        run: mkdir -p "$RUNNER_TEMP/trivy-cache"
+
+      # Sólo bloquean las vulnerabilidades con parche publicado: exigir un
+      # arreglo que no existe convierte la puerta en una lista de excepciones.
+      # Las que no tienen parche siguen apareciendo en el informe, donde se
+      # pueden decidir (aislar la dependencia, sustituirla o aceptar el riesgo
+      # por escrito).
+      - name: Scan dependency lockfiles
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" -w /repo \
+            -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" \
+            fs --scanners vuln \
+              --severity HIGH,CRITICAL \
+              --ignore-unfixed \
+              --exit-code 1 \
+              --format sarif --output trivy-vulnerabilities.sarif \
+              /repo
+
+      - name: Upload the dependency report
+        if: always()
+        uses: github/codeql-action/upload-sarif@5ba2889ada762081db2c4f32a729827dce632c7b # v3
+        with:
+          sarif_file: trivy-vulnerabilities.sarif
+          category: trivy-vulnerabilities
+
+      # Las infracciones de configuración no tienen parche que esperar: o se
+      # corrigen o están en `.trivyignore.yaml` con motivo y ámbito.
+      - name: Scan Dockerfiles and compose files
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" -w /repo \
+            -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" \
+            config \
+              --severity HIGH,CRITICAL \
+              --ignorefile /repo/.trivyignore.yaml \
+              --exit-code 1 \
+              --format sarif --output trivy-misconfigurations.sarif \
+              /repo
+
+      - name: Upload the IaC report
+        if: always()
+        uses: github/codeql-action/upload-sarif@5ba2889ada762081db2c4f32a729827dce632c7b # v3
+        with:
+          sarif_file: trivy-misconfigurations.sarif
+          category: trivy-misconfigurations

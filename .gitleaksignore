@@ -1,0 +1,30 @@
+# Gitleaks — hallazgos históricos ya revisados
+#
+# Huellas `commit:ruta:regla:línea`. Cada una se revisó a mano el 2026-09-17
+# leyendo el contenido exacto del commit: las ocho son datos de prueba, no
+# credenciales. Se fijan al commit porque el archivo puede cambiar: si alguien
+# vuelve a introducir el mismo patrón en una revisión nueva, la huella no
+# coincide y la puerta lo señala de nuevo.
+#
+# Este archivo sólo hace falta para el escaneo del historial completo
+# (programado). El escaneo del árbol, que es el que corre en cada PR, no ve
+# ninguna de estas líneas: seis pertenecen al backend Express que se eliminó en
+# la migración a Laravel, y las dos del frontend son constantes de clave de
+# almacenamiento en versiones antiguas del servicio de invitaciones.
+
+# `backend/tests/api.test.ts` — suite del backend Express, borrada en la
+# migración a Laravel. Los valores eran `test-secret-0123456789`,
+# `a-very-long-secret-0123456789`, `clave-123456789` y `clave-bind-123`.
+ee799b99f33ab7bd6b6cf94cd44170cb67966fcf:backend/tests/api.test.ts:generic-api-key:10
+ee799b99f33ab7bd6b6cf94cd44170cb67966fcf:backend/tests/api.test.ts:generic-api-key:414
+07d348ddf58cab5802e23c52be8a64a294deb9c9:backend/tests/api.test.ts:generic-api-key:1100
+2932e88fc66da30f14d19cfb2583999dbf1e15ee:backend/tests/api.test.ts:generic-api-key:1133
+2932e88fc66da30f14d19cfb2583999dbf1e15ee:backend/tests/api.test.ts:generic-api-key:1139
+2932e88fc66da30f14d19cfb2583999dbf1e15ee:backend/tests/api.test.ts:generic-api-key:1145
+
+# `frontend/src/app/core/services/pending-invitation.service.ts` (y su spec) en
+# sus versiones antiguas: la regla señaló la constante
+# `STORAGE_KEY = "uvh.pending-invitation.v1"`, un nombre de clave de
+# almacenamiento, no un secreto. Falso positivo de la heurística de entropía.
+308674d60d9435891cbf8f07f1b36dc6923e40d9:frontend/src/app/core/services/pending-invitation.service.ts:generic-api-key:3
+6a73c51078f10db56ddcf3c7fc254e94ec09d5ad:frontend/src/app/core/services/pending-invitation.service.spec.ts:generic-api-key:4

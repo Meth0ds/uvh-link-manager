@@ -1,0 +1,113 @@
+# Trivy — supresiones razonadas
+#
+# Formato `.trivyignore.yaml`, con dos secciones y reglas distintas en cada una:
+#
+#   `misconfigurations:` — hallazgos sobre ficheros del repositorio. Cada entrada
+#   lleva `paths` acotado a ficheros reales y un `statement`. El contrato de
+#   escaneo comprueba que esos ficheros existan, para que una excepción no
+#   sobreviva a lo que la justificaba.
+#
+#   `vulnerabilities:` — hallazgos dentro de una imagen. El ámbito puede ser el
+#   propio identificador o una ruta **dentro de la imagen** (`paths`), y en ambos
+#   casos lo que se exige es una **caducidad**: el arreglo de una vulnerabilidad
+#   siempre es una decisión con fecha, y Trivy vuelve a reportar el hallazgo
+#   cuando la entrada caduca, sin que nadie tenga que acordarse. Una ruta interna
+#   no se puede comprobar desde el repositorio —el fichero no está aquí—, así que
+#   el contrato exige que nombre un fichero concreto sin comodines, y que el
+#   escaneo de `scan-pinned-images.mjs` demuestre en cada corrida que sigue
+#   casando con un hallazgo real: una entrada que ya no suprime nada bloquea la
+#   puerta en vez de quedarse ahí pareciendo aprobada. La comprobación es
+#   **entrada por entrada**, no de la sección: con un total, una entrada muerta se
+#   esconde detrás de una viva. Y sólo concluye cuando hubo informe de todas las
+#   imágenes: una entrada que ningún escaneo pudo mirar queda **sin comprobar**
+#   —no se declara obsoleta por un daemon caído o un 429 ajeno— y bloquea sólo
+#   con `--fail-on-unavailable`.
+#
+# La puerta de CI evalúa HIGH y CRITICAL. Lo que se suprime aquí es deuda
+# registrada, no una lista de excepciones permanentes: si el motivo deja de ser
+# cierto, la entrada se borra, y una entrada sin motivo escrito es una supresión
+# que nadie puede revisar.
+
+misconfigurations:
+  # Imagen de desarrollo (`php:8.4-cli`) y su variante para los ensayos de
+  # capacidad. No se despliegan: el artefacto de producción es
+  # `docker/php/Dockerfile.production`, que sí declara `USER www-data` y no
+  # aparece aquí. El proceso maestro de php-fpm necesita además escribir en
+  # `storage/` montado por el desarrollador.
+  - id: DS-0002
+    paths:
+      - "docker/php/Dockerfile"
+      - "docker/php/Dockerfile.drill-fpm"
+    statement: "Imágenes locales, nunca desplegadas; la de producción sí declara USER."
+  - id: AVD-DS-0002
+    paths:
+      - "docker/php/Dockerfile"
+      - "docker/php/Dockerfile.drill-fpm"
+    statement: "Imágenes locales, nunca desplegadas; la de producción sí declara USER."
+
+  # Imagen de utilidades de copia y restauración. Parte de `postgres:16` porque
+  # `pg_dump` debe coincidir con la versión del servidor, y los scripts montan el
+  # volumen de copias y el directorio de claves como root antes de cifrar. Bajar
+  # a un usuario sin privilegios exige reescribir el montaje y volver a medir el
+  # simulacro de restauración completo; queda como deuda, no como descuido.
+  - id: DS-0002
+    paths:
+      - "docker/backup/Dockerfile"
+    statement: "Los scripts de copia montan y cifran como root; cambiarlo exige repetir el simulacro."
+  - id: AVD-DS-0002
+    paths:
+      - "docker/backup/Dockerfile"
+    statement: "Los scripts de copia montan y cifran como root; cambiarlo exige repetir el simulacro."
+
+  # Certificados autofirmados del contrato de arranque. La clave privada se
+  # escribe con permisos 600 y la lee el contenedor de Nginx, que corre como uid
+  # 101: si esta imagen bajara de usuario, el lector tendría que compartir uid y
+  # el ensayo dejaría de representar un reparto real de permisos.
+  - id: DS-0002
+    paths:
+      - "docker/release-boot/certs/Dockerfile"
+    statement: "Escribe la clave TLS que luego lee Nginx como uid 101; es material de ensayo aislado."
+  - id: AVD-DS-0002
+    paths:
+      - "docker/release-boot/certs/Dockerfile"
+    statement: "Escribe la clave TLS que luego lee Nginx como uid 101; es material de ensayo aislado."
+
+# Vacía a propósito, y no borrada: la sección existe para que añadir una
+# excepción sea una decisión visible con su `expired_at`, no para que una vacía
+# parezca un descuido.
+#
+# Tuvo una entrada, y se cerró como estaba previsto: `CVE-2026-31789` (openssl
+# `3.3.3-r0` en `nginxinc/nginx-unprivileged:1.27-alpine`, el arreglo `3.3.7-r0`
+# publicado en la rama 3.21 de Alpine, dos hallazgos porque `libcrypto3` y
+# `libssl3` son el mismo paquete origen) se cerró sustituyendo la base del web
+# por `1.31-alpine` (Alpine 3.24.1, openssl `3.5.8-r0`) el 2026-09-18, no
+# parcheando en la aplicación. Medido con Trivy 0.74.0: esa base deja 0 CRITICAL
+# y 0 HIGH con parche, contra 1 CRITICAL (2 hallazgos) y 33 HIGH de la anterior.
+#
+# Las entradas vivas de esta sección llegaron el 2026-09-18, al ampliar la puerta
+# a las bases que no construimos: hasta entonces sólo se escaneaban las dos
+# imágenes del repositorio. Ese día la puerta encontró tres cosas, y dos se
+# arreglaron en vez de aceptarse: `postgres:16` de Debian traía el reparto de Perl
+# cuatro versiones por detrás —tres CVE CRITICAL con parche en `deb13u1`— y el
+# imagen de copias pasó a la variante Alpine, la misma que ya usaba el resto del
+# árbol; y las dos entradas que quedan son hallazgos que un cambio de pin no
+# cierra, porque están dentro de un binario o de un paquete que publica el
+# autor de la imagen.
+vulnerabilities:
+  # `gosu` es el ayudante que usa la imagen oficial de PostgreSQL para bajar de
+  # usuario antes de arrancar el servidor. Viene compilado por quien publica la
+  # imagen, y su `stdlib` de Go está por detrás del parche: reemplazar la base no
+  # lo arregla, porque la etiqueta de hoy trae el mismo binario.
+  - id: CVE-2025-68121
+    paths:
+      - "usr/local/bin/gosu"
+    statement: "`gosu` sólo cambia de usuario y hace `exec`: no abre conexiones TLS, así que la reanudación de sesión vulnerable es inalcanzable en él. La imagen es de ensayo, no se despliega, y se cierra cuando el registro publique una `postgres:16-alpine` con gosu reconstruido. Mientras tanto la puerta sigue vigilando el resto de la imagen y de las demás bases."
+    expired_at: 2027-03-31
+
+  # Fase de compilación del frontend de `uvh-web`: esta base compila la SPA y no
+  # llega al artefacto que se despliega. El hallazgo sí es real dentro de ella.
+  - id: CVE-2026-59873
+    paths:
+      - "usr/local/lib/node_modules/npm/node_modules/tar/package.json"
+    statement: "Es el `tar` que npm lleva dentro de la imagen de Node, no una dependencia del proyecto: `frontend/package-lock.json` no lo resuelve y ninguna etapa posterior lo conserva. La etiqueta publicada el 2026-08-25 —la más reciente— sigue trayendo 7.5.11, así que cambiar el pin no lo cierra; se cierra cuando Node publique una imagen con npm sobre tar 7.5.19, y la fecha obliga a comprobarlo. Un `tar` vulnerable en un proceso que sólo descomprime lo que pide el `package-lock.json` es denegación de servicio en la compilación, no ejecución en el artefacto."
+    expired_at: 2026-12-31

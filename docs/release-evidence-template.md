@@ -20,7 +20,29 @@ ni cuerpos de correo/webhook.
 - [ ] E2E funcional desde checkout limpio y base efímera terminada en `_test`.
 - [ ] E2E de imágenes: Caddy → Nginx → PHP-FPM, rutas directas, CSP, HSTS y hosts.
 - [ ] `uvh:release-check` positivo y pruebas negativas de configuración/esquema.
+- [ ] Digests base verificados: `digest-integrity` en verde, con la deriva que
+  haya aparecido revisada (no silenciada).
+- [ ] SAST, secretos y dependencias: trabajo `Security scans` en verde sobre este
+  commit.
 - Enlaces a artefactos y logs saneados:
+
+## Artefacto de imagen
+
+Lo que se promociona es el digest, no la etiqueta: anotar aquí el digest exacto
+que se va a desplegar y el `image-evidence.json` del trabajo `release-e2e`
+("Trivy" y "SBOM" de cada imagen, con el sha256 de cada informe).
+
+- [ ] `image-evidence` del commit descargado y guardado fuera del árbol.
+- [ ] **SBOM CycloneDX** de `uvh-api` y de `uvh-web` adjunto, con su sha256.
+- [ ] Informe de **Trivy** (SARIF) de las dos imágenes adjunto, con su sha256.
+- [ ] CRITICAL con parche: ninguno, o excepción vigente declarada en
+  `.trivyignore.yaml` con fecha.
+- [ ] Lo que se va a desplegar es la referencia con digest; el servidor no
+  construye. Procedimiento y piezas no ejecutadas:
+  [`image-provenance-runbook.md`](image-provenance-runbook.md).
+- [ ] Procedencia y firma (si el registro las emite), verificadas en destino.
+- Id de imagen `uvh-api`, id de imagen `uvh-web`, y digests de las bases:
+- Enlaces al SBOM, al informe y a la evidencia:
 
 ## Proveedores y recorridos reales controlados
 

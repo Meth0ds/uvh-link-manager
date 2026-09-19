@@ -143,6 +143,97 @@ jobs:
         working-directory: backend-laravel
         run: composer test
 
+  digest-integrity:
+    name: Supply chain / pinned image digests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      # Un digest fijado resuelve hoy; que siga resolviendo dentro de seis meses
+      # no lo garantiza nadie, y una imagen retirada del registro rompe la
+      # compilación. Sin esta puerta, quien se entera de eso es el despliegue.
+      #
+      # Las dos condiciones no pesan igual y por eso no fallan igual: un digest
+      # que ya no existe rompe la compilación y bloquea; una etiqueta que ha
+      # avanzado sólo se avisa, porque no falta nada, falta aprobar una
+      # actualización. `--strict-drift` convertiría ese aviso en puerta para
+      # quien quiera una revisión obligatoria en cada deriva.
+      #
+      # El script usa el CLI de Docker para preguntar al registro y el API de
+      # Docker Hub como segunda vía, porque ambas limitan la tasa por separado:
+      # en una IP de runner compartida, una sola vía da 429 y deja la puerta sin
+      # contenido. Lo que no pudo comprobar lo declara en vez de callarlo.
+      - name: Verify that every pinned base image still resolves
+        run: node scripts/check-image-digests.mjs --json=image-digests.json
+
+      - name: Preserve the digest report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-digests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: image-digests.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # La puerta de `release-e2e` juzga las dos imágenes que este repositorio
+  # construye. Caddy —el borde de producción—, PostgreSQL y Redis —los ensayos— y
+  # las bases de compilación no las miraba nadie, así que un CRITICAL con parche
+  # publicado podía estar ahí durante meses sin que ningún trabajo se enterara.
+  # Este trabajo escanea cada base fijada del árbol con la misma puerta: CRITICAL
+  # con parche, y la excepción sólo con motivo y caducidad escritos.
+  #
+  # La lista de imágenes no se escribe aquí: sale de `check-image-digests.mjs
+  # --references`, que es quien recorre el repositorio. Una copia propia se
+  # quedaría atrás sin fallar, que es la peor forma de perder cobertura.
+  #
+  # Se leen desde el registro en vez de desde el daemon (`--image-src remote`),
+  # porque estas imágenes no se compilan en este trabajo. Cada escaneo declara su
+  # final: `clean`, `findings`, `unresolved` o `unavailable`. Un límite de tasa
+  # del registro compartido se informa como `unavailable` y no bloquea —un 429
+  # ajeno no es un defecto del repositorio, y una puerta que se dispara por eso se
+  # aprende a ignorar—; quien prefiera que una comprobación incompleta detenga la
+  # ejecución tiene `--fail-on-unavailable`.
+  image-bases:
+    name: Supply chain / third-party base image gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    env:
+      TRIVY_IMAGE: aquasec/trivy:0.74.0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Scan every pinned base image and gate on CRITICAL with a fix
+        run: node scripts/scan-pinned-images.mjs --json=image-bases.json
+
+      - name: Preserve the base image scan report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-bases-${{ github.run_id }}-${{ github.run_attempt }}
+          path: image-bases.json
+          if-no-files-found: ignore
+          retention-days: 30
+
   e2e:
     name: Browser / critical Playwright journeys
     runs-on: ubuntu-latest
@@ -191,7 +282,16 @@ jobs:
   release-e2e:
     name: Browser / production-image proxy smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
+
+    # El analizador se fija por versión, no por digest, y es deliberado: los
+    # ficheros de `.github/workflows/` no están al alcance de Dependabot (viven
+    # en un directorio oculto), así que un digest aquí envejecería sin que nadie
+    # lo proponga. Lo que se fija es la versión del analizador; sus bases de
+    # datos sí se actualizan en cada ejecución, que es lo que da valor al
+    # escaneo. Misma decisión que en `security.yml`.
+    env:
+      TRIVY_IMAGE: aquasec/trivy:0.74.0
 
     steps:
       - name: Checkout repository
@@ -220,6 +320,94 @@ jobs:
       - name: Smoke-test production images and proxy contracts
         working-directory: frontend
         run: npm run release:e2e
+
+      # El smoke deja las dos imágenes construidas en el daemon del runner. Se
+      # escanean aquí, y no en otro trabajo, porque el artefacto que hay que
+      # juzgar es el que se acaba de construir desde estos Dockerfiles: un
+      # análisis en otro sitio mediría una reconstrucción parecida, no esto.
+      - name: Generate the CycloneDX SBOM of both production images
+        run: |
+          mkdir -p image-evidence
+          for image in uvh-api:release-e2e uvh-web:release-e2e; do
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/image-evidence:/out" \
+              "$TRIVY_IMAGE" image \
+                --format cyclonedx \
+                --output "/out/sbom-${image%%:*}.cdx.json" \
+                --no-progress \
+                "$image"
+          done
+
+      # El informe se publica completo y nunca bloquea: es el documento, no la
+      # decisión. Se genera sin el ignorefile a propósito, porque Trivy no
+      # incluye en el SARIF lo que se ha suprimido, ni con `--show-suppressed`
+      # (comprobado): un informe que oculta una excepción no deja revisarla.
+      - name: Publish the full HIGH and CRITICAL report of both images
+        run: |
+          for image in uvh-api:release-e2e uvh-web:release-e2e; do
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/image-evidence:/out" \
+              "$TRIVY_IMAGE" image \
+                --scanners vuln \
+                --severity HIGH,CRITICAL \
+                --ignore-unfixed \
+                --format sarif \
+                --output "/out/vuln-${image%%:*}.sarif" \
+                --no-progress \
+                "$image"
+          done
+
+      # La puerta sólo bloquea lo que tiene arreglo publicado y es CRITICAL. Los
+      # HIGH con parche se publican y no bloquean: en las bases fijadas de hoy
+      # son 0 en la del web y 69 en la del API, todas de paquetes del sistema, y
+      # bloquear por eso convertiría la puerta en una lista de excepciones.
+      # Un CRITICAL con parche es otra cosa: es un parche que alguien no aplicó.
+      #
+      # Hoy la sección `vulnerabilities:` de `.trivyignore.yaml` está vacía: la
+      # única aceptación que hubo (CVE-2026-31789, openssl 3.3.3-r0 de la base
+      # del web) se cerró sustituyendo esa base por Alpine 3.24.1, que trae
+      # openssl 3.5.8-r0. Una excepción nueva se escribe en ese fichero con su
+      # `expired_at`, de modo que Trivy vuelve a reportar el hallazgo al caducar
+      # y la aceptación no puede sobrevivir en silencio.
+      - name: Gate on CRITICAL vulnerabilities that already have a fix
+        run: |
+          for image in uvh-api:release-e2e uvh-web:release-e2e; do
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD:/repo:ro" \
+              "$TRIVY_IMAGE" image \
+                --scanners vuln \
+                --severity CRITICAL \
+                --ignore-unfixed \
+                --ignorefile /repo/.trivyignore.yaml \
+                --exit-code 1 \
+                --no-progress \
+                "$image"
+          done
+
+      # El expediente ata el artefacto al informe: id de contenido de la imagen,
+      # bases fijadas de las que salió y sha256 de cada SBOM y cada SARIF. Sin
+      # eso, «se escaneó la imagen» no permite comprobar que lo promocionado es
+      # lo escaneado.
+      - name: Write the scanned image evidence
+        if: always()
+        run: |
+          node scripts/image-evidence.mjs \
+            --dir=image-evidence \
+            --out=image-evidence/image-evidence.json \
+            --image=uvh-api:release-e2e --dockerfile=docker/php/Dockerfile.production \
+            --image=uvh-web:release-e2e --dockerfile=docker/nginx/Dockerfile.production
+
+      - name: Preserve the image evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: image-evidence
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Preserve release-smoke failure diagnostics
         if: failure()

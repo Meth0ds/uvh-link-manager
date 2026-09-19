@@ -1,0 +1,75 @@
+# Gitleaks — política de UVH
+#
+# No se relaja ninguna detección: `useDefault` conserva el conjunto completo de
+# reglas y sus umbrales. Lo único que se declara aquí son las rutas donde un
+# valor con forma de credencial es, por construcción, un dato de prueba.
+#
+# Cada excepción lleva su motivo y su alcance. Ninguna excepción es global: una
+# clave real pegada por error en `app/`, `src/` o `docker/` fuera de las rutas
+# de abajo sigue haciendo fallar la puerta.
+#
+# El escaneo local se ejecuta exactamente como en CI:
+#
+#   docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:latest \
+#     dir /repo --config /repo/.gitleaks.toml --redact --verbose
+#
+# En CI el trabajo `secrets` escanea además el historial (`gitleaks git`), que
+# es lo que detecta un secreto ya publicado aunque después se borre del árbol.
+
+title = "UVH"
+
+[extend]
+useDefault = true
+
+# Las suites declaran credenciales ficticias a propósito: contraseñas de
+# política, secretos de rotación y tokens de verificación que sólo valen dentro
+# de una base efímera `uvh_test`. Son entradas de casos, no material de acceso,
+# y el archivo que las contiene es también el que documenta la invariante que
+# prueban. Fuera de `tests/` la misma cadena sí se señala.
+[[allowlists]]
+description = "Fixtures sintéticos de la suite backend (uvh_test, sin autoridad fuera del caso)."
+paths = [
+  '''backend-laravel/tests/''',
+]
+
+# El arranque asíncrono y el contrato de release hablan con una pila local:
+# hosts 127.0.0.1, un secreto de fixture y una URL de webhook en 11.0.0.10
+# (rango reservado) que existe para probar el rechazo de destinos internos.
+[[allowlists]]
+description = "Fixtures sintéticos de las pilas de ensayo del frontend (hosts de bucle, rango reservado)."
+paths = [
+  '''frontend/e2e/''',
+]
+
+# `production.env` alimenta el contrato de arranque de producción en un stack
+# aislado: cada host termina en .localhost o .invalid y ningún valor da acceso a
+# una cuenta, base de datos o proveedor real. Está versionado a propósito porque
+# es la única fuente del caso positivo y de los negativos. Las credenciales del
+# despliegue real viven en el gestor de secretos del servidor, nunca aquí.
+[[allowlists]]
+description = "Variables ficticias del contrato de arranque; el despliegue real lee del gestor de secretos."
+paths = [
+  '''docker/release-boot/production.env''',
+]
+
+# Lo que no forma parte del artefacto versionado: dependencias instaladas y
+# cachés de ejecución (PHPStan guarda copias de archivos analizados bajo
+# `storage/`). CI no las descarga en el trabajo `secrets`, y permitirlas aquí
+# hace que el comando de arriba dé localmente el mismo veredicto que CI.
+# El archivo de huellas contiene por construcción identificadores de commits y
+# de reglas, y describe los valores de prueba que ya se revisaron. Señalarlo a
+# sí mismo convertiría cada supresión nueva en un hallazgo nuevo.
+[[allowlists]]
+description = "El propio archivo de huellas: contiene identificadores ya revisados, no credenciales."
+paths = [
+  '''\.gitleaksignore$''',
+]
+
+[[allowlists]]
+description = "Dependencias instaladas y cachés de ejecución locales; no son el árbol versionado que evalúa CI."
+paths = [
+  '''node_modules/''',
+  '''/vendor/''',
+  '''/.angular/''',
+  '''backend-laravel/storage/''',
+]

@@ -12,6 +12,11 @@ updates:
       timezone: Europe/Madrid
     open-pull-requests-limit: 5
     rebase-strategy: auto
+    # Un paquete comprometido suele retirarse en cuestión de días. La espera
+    # convierte esa ventana en una versión que nunca llega a proponerse, sin
+    # renunciar a las actualizaciones: sólo las retrasa.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: deps(frontend)
     groups:
@@ -28,12 +33,91 @@ updates:
       timezone: Europe/Madrid
     open-pull-requests-limit: 5
     rebase-strategy: auto
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: deps(backend)
     groups:
       minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+
+  # Mantiene los digests con los que se construyen las imágenes. Cada
+  # directorio que contiene un Dockerfile tiene su entrada, y la raíz cubre los
+  # ficheros de compose: Dependabot lee cualquier YAML cuyo nombre no empiece
+  # por punto y actualiza los `image:` que encuentre dentro. Sin esto, un digest
+  # fijado deja de recibir parches en cuanto se escribe, que es la forma más
+  # silenciosa de envejecer. Dependabot conserva la etiqueta y mueve el digest,
+  # así que la revisión sigue leyendo el release, no un número opaco.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps(images)
+
+  - package-ecosystem: docker
+    directory: /docker/php
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps(images)
+
+  - package-ecosystem: docker
+    directory: /docker/nginx
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps(images)
+
+  - package-ecosystem: docker
+    directory: /docker/backup
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps(images)
+
+  - package-ecosystem: docker
+    directory: /docker/release-boot/certs
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps(images)
 
   # También mantiene los SHA fijados de las acciones. Las revisiones siguen
   # mostrando de forma explícita qué código externo cambiará.
@@ -46,5 +130,7 @@ updates:
       timezone: Europe/Madrid
     open-pull-requests-limit: 5
     rebase-strategy: auto
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: deps(actions)
