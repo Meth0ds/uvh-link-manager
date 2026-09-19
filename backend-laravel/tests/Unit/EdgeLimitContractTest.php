@@ -150,8 +150,10 @@ class EdgeLimitContractTest extends TestCase
         $this->assertSame(3, substr_count($template, 'add_header Retry-After $uvh_edge_retry_after always;'));
 
         // `$limit_req_status` in the access log is what attributes a 429 to this
-        // layer instead of to Laravel.
+        // layer instead of to Laravel, and `$limit_conn_status` which of the two
+        // limiters answered.
         $this->assertMatchesRegularExpression('/log_format uvh_edge .*\$limit_req_status/m', $template);
+        $this->assertMatchesRegularExpression('/log_format uvh_edge .*\$limit_conn_status/m', $template);
         $this->assertMatchesRegularExpression('/^\s*access_log \S+ uvh_edge;/m', $template);
 
         // Intercepting 429 with `error_page` would discard the JSON body of
@@ -257,9 +259,26 @@ class EdgeLimitContractTest extends TestCase
         $this->assertStringContainsString('EDGE_DRY_RUN', $compose);
 
         // The switch exists so a first deployment can be observed with the
-        // rejection disabled, but the template has to say what it really is.
+        // rejection disabled, and it has to reach both limiters: measured on the
+        // production image, `limit_req_dry_run` alone turned the request limiter
+        // off while the connection cap kept answering 429 — a deployment that
+        // believed it had disabled rejection and had not.
         $template = $this->read(self::TEMPLATE);
-        $this->assertMatchesRegularExpression('/limit_req_dry_run \$\{EDGE_DRY_RUN\};/', $template);
-        $this->assertStringContainsString('kill switch, not a measurement', $template);
+        $this->assertSame(
+            substr_count($template, 'limit_conn uvh_edge_conn'),
+            substr_count($template, 'limit_conn_dry_run ${EDGE_DRY_RUN};'),
+            'every limit_conn needs its own dry run, or EDGE_DRY_RUN is not a kill switch',
+        );
+        $this->assertSame(
+            substr_count($template, 'limit_req zone='),
+            substr_count($template, 'limit_req_dry_run ${EDGE_DRY_RUN};'),
+            'every limit_req needs its own dry run',
+        );
+        $this->assertStringContainsString('complete kill switch, and it is also a measurement', $template);
+        // The claim that a dry run cannot be measured was wrong on the pinned
+        // image, and a deployment plan built on it would have skipped the run
+        // that sizes the limit. The template must not carry it again.
+        $this->assertStringNotContainsString('kill switch, not a measurement', $template);
+        $this->assertStringContainsString('REJECTED_DRY_RUN', $template);
     }
 }

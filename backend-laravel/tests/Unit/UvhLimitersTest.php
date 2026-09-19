@@ -48,9 +48,26 @@ final class UvhLimitersTest extends TestCase
         // These bound traffic, not guessing, and their whole purpose is to keep
         // the public surface and the panel served during a backend outage.
         // Moving them to the durable store would trade that away for nothing.
-        foreach (['uvh-resolve', 'uvh-status', 'uvh-report', 'uvh-api', 'uvh-link-create'] as $name) {
+        foreach (['uvh-resolve', 'uvh-status', 'uvh-report', 'uvh-api', 'uvh-link-create', 'uvh-pending', 'uvh-pending-read'] as $name) {
             $this->assertFalse(UvhLimiters::isSecurity($name), "{$name} must keep counting on the availability store");
         }
+    }
+
+    /**
+     * `throttle:a,b` is one declaration with two limiters, and Laravel applies
+     * both. Comparing the raw string answered "not security" for any such pair,
+     * so adding a second limiter to a credential route — the most natural edit
+     * there is — would have moved the login budget back onto the failover chain
+     * without a single test or log line noticing.
+     */
+    public function test_a_comma_separated_declaration_is_classified_by_its_members(): void
+    {
+        $this->assertTrue(UvhLimiters::isSecurity('uvh-login,uvh-mfa'));
+        $this->assertTrue(UvhLimiters::isSecurity('uvh-api,uvh-login'));
+        $this->assertTrue(UvhLimiters::isSecurity(' uvh-login , uvh-api '));
+        $this->assertFalse(UvhLimiters::isSecurity('uvh-api,uvh-status'));
+        $this->assertFalse(UvhLimiters::isSecurity(''));
+        $this->assertFalse(UvhLimiters::isSecurity('not-a-limiter'));
     }
 
     public function test_the_throttle_alias_is_replaced_so_the_split_actually_applies(): void

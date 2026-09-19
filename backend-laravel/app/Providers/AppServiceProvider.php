@@ -190,6 +190,23 @@ class AppServiceProvider extends ServiceProvider
                 ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiados enlaces en poco tiempo.'], 429)->withHeaders($headers));
         });
 
+        // Parking a handoff mints a signed cookie and touches nothing else, so
+        // it stays on the availability store like the rest of the volume-bound
+        // surface: it bounds what a public, unauthenticated endpoint may write
+        // into a browser. The check is looser than the write, because the panel
+        // asks once per load while a write is a deliberate navigation.
+        RateLimiter::for('uvh-pending', function (Request $request) {
+            return Limit::perMinute((int) config('uvh.rate_limits.pending'))
+                ->by('pending:'.$request->ip())
+                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas credenciales aparcadas en poco tiempo. Espera un minuto.'], 429)->withHeaders($headers));
+        });
+
+        RateLimiter::for('uvh-pending-read', function (Request $request) {
+            return Limit::perMinute((int) config('uvh.rate_limits.pending_read'))
+                ->by('pending-read:'.$request->ip())
+                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de credenciales pendientes. Espera un minuto.'], 429)->withHeaders($headers));
+        });
+
         RateLimiter::for('uvh-resolve', function (Request $request) {
             return Limit::perMinute((int) config('uvh.rate_limits.resolve'))
                 ->by($request->ip())
@@ -377,8 +394,12 @@ class AppServiceProvider extends ServiceProvider
             'cookie_domain' => config('uvh.cookie_domain'),
             'session_cookie' => config('uvh.session_cookie'),
             'csrf_cookie' => config('uvh.csrf_cookie'),
+            'invitation_cookie' => config('uvh.invitation_cookie'),
+            'intent_cookie' => config('uvh.intent_cookie'),
             'hsts_enabled' => config('uvh.hsts_enabled'),
             'session_ttl_days' => config('uvh.session_ttl_days'),
+            'invitation_ttl_days' => config('uvh.invitation_ttl_days'),
+            'intent_ttl_hours' => config('uvh.intent_ttl_hours'),
             'admin_mfa_fresh_minutes' => config('uvh.admin_mfa_fresh_minutes'),
             'bcrypt_rounds' => config('hashing.bcrypt.rounds'),
             'hcaptcha_site_key' => config('uvh.hcaptcha.site_key'),
@@ -393,6 +414,8 @@ class AppServiceProvider extends ServiceProvider
             'link_create_limit' => config('uvh.rate_limits.link_create'),
             'resolve_limit' => config('uvh.rate_limits.resolve'),
             'api_token_limit' => config('uvh.rate_limits.api_token'),
+            'pending_limit' => config('uvh.rate_limits.pending'),
+            'pending_read_limit' => config('uvh.rate_limits.pending_read'),
             'trusted_proxies' => config('uvh.trusted_proxies'),
             'db_connection' => config('database.default'),
             'db_sslmode' => config('database.connections.pgsql.sslmode'),
@@ -435,6 +458,12 @@ class AppServiceProvider extends ServiceProvider
             'audit_purge_days' => config('uvh.housekeeping.audit_purge_days'),
             'analytics_retention_days' => config('uvh.housekeeping.analytics_retention_days'),
         ]);
+
+        // Capabilities of the running PHP are release gates too: a missing
+        // extension is as fatal as a missing setting, and quieter.
+        foreach (ProductionSecurity::capabilityErrors() as $capabilityError) {
+            $errors[] = $capabilityError;
+        }
 
         if ($errors !== []) {
             throw new \RuntimeException('Configuración de seguridad de producción inválida: '.implode('; ', $errors));

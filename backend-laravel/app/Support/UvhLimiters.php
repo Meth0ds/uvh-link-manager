@@ -8,7 +8,7 @@ namespace App\Support;
  * The two classes do not trade the same thing, so they must not share a store:
  *
  *  - **Availability** limiters (`uvh-resolve`, `uvh-report`, `uvh-status`,
- *    `uvh-api`, `uvh-link-create`, …) bound volume. Their whole point is to
+ *    `uvh-api`, `uvh-link-create`, `uvh-pending`, …) bound volume. Their whole point is to
  *    keep the public surface served, so they tolerate a degraded backend: the
  *    attempt is counted on the second member of the chain and the visitor gets
  *    their redirect.
@@ -46,9 +46,27 @@ final class UvhLimiters
         'uvh-register',
     ];
 
+    /**
+     * Whether a `throttle:` declaration bounds a credential.
+     *
+     * Laravel accepts a comma-separated list in one argument — `throttle:a,b`
+     * applies both — so the comparison cannot be a lookup of the raw string:
+     * `uvh-api,uvh-login` would answer "not security" and the login budget would
+     * silently go back to counting on the failover chain, which is the exact
+     * discontinuity this split removes. A declaration counts as security when
+     * *any* of its members is one: the security store is a single shared backend
+     * and never a fallback chain, so counting a mixed declaration there is the
+     * conservative direction.
+     */
     public static function isSecurity(string $name): bool
     {
-        return in_array($name, self::SECURITY, true);
+        foreach (explode(',', $name) as $candidate) {
+            if (in_array(trim($candidate), self::SECURITY, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

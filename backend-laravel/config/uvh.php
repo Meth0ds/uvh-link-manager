@@ -33,8 +33,20 @@ return [
     'app_host' => env('APP_HOST', parse_url((string) env('APP_URL', 'http://localhost:8000'), PHP_URL_HOST) ?: 'app.uvh.es'),
     'session_cookie' => env('SESSION_COOKIE', 'uvh_session'),
     'csrf_cookie' => env('CSRF_COOKIE', 'uvh_csrf'),
+    // Handoff bearers (an invitation link, a link prepared before signing in)
+    // are parked in HttpOnly cookies instead of localStorage. Same naming rules
+    // as the session cookie: host-only, `__Host-` in production, and never a
+    // shared parent domain.
+    'invitation_cookie' => env('PENDING_INVITATION_COOKIE', 'uvh_pending_invitation'),
+    'intent_cookie' => env('PENDING_INTENT_COOKIE', 'uvh_pending_intent'),
     'trusted_proxies' => env('TRUSTED_PROXIES', ''),
     'session_ttl_days' => (int) env('SESSION_TTL_DAYS', 30),
+    // Vida de una invitación, y techo de la cookie que la aparca: el aparcadero
+    // nunca dura más que la credencial que transporta. El mismo valor que usa
+    // el controlador al crear la invitación.
+    'invitation_ttl_days' => (int) env('INVITATION_TTL_DAYS', 7),
+    // Vida de un link intent en el servidor, y techo de su cookie.
+    'intent_ttl_hours' => (int) env('INTENT_TTL_HOURS', 24),
     // Privileged administration requires a recently presented second factor,
     // independently of the longer-lived authenticated session cookie.
     'admin_mfa_fresh_minutes' => (int) env('ADMIN_MFA_FRESH_MINUTES', 15),
@@ -79,8 +91,24 @@ return [
         // Reanálisis por ciclo del scheduler. Acotado: es un barrido de fondo,
         // no un recorrido de todos los enlaces.
         'recheck_batch' => (int) env('REPUTATION_RECHECK_BATCH', 50),
+        // Enlaces autobloqueados que se re-evalúan por ciclo para retirar un
+        // bloqueo cuya causa desapareció (entrada retirada o caducada). Es el
+        // mismo barrido acotado que `recheck_batch`, en la dirección contraria.
+        'release_batch' => (int) env('REPUTATION_RELEASE_BATCH', 50),
+        // Enlaces que un bloqueo de destino nuevo reanaliza de una vez. Acotado
+        // en el código entre 1 y 2000; la respuesta del endpoint dice si el
+        // barrido llegó al tope, en vez de presentar un bloqueo parcial como
+        // uno completo.
+        'reanalysis_budget' => (int) env('REPUTATION_REANALYSIS_BUDGET', 500),
         'auto_block' => filter_var(env('REPUTATION_AUTO_BLOCK', false), FILTER_VALIDATE_BOOLEAN),
         'domain_monitor' => filter_var(env('REPUTATION_DOMAIN_MONITOR', true), FILTER_VALIDATE_BOOLEAN),
+    ],
+    'analytics' => [
+        // Valores distintos conservados por dimensión y día en el rollup. Es un
+        // tope necesario (`referrers` lo controla quien visita, con cualquier
+        // cabecera Referer) y se aplica al recortar por frecuencia, no por orden
+        // de llegada. Acotado en el código entre 10 y 5000.
+        'max_map_keys' => (int) env('ANALYTICS_MAX_MAP_KEYS', 200),
     ],
     'public_status' => [
         // This must point to a monitor outside the UVH deployment. The API
@@ -139,6 +167,8 @@ return [
         'register' => (int) env('REGISTER_LIMIT', 10),
         'link_create' => (int) env('LINK_CREATE_LIMIT', 30),
         'resolve' => (int) env('RESOLVE_LIMIT', 600),
+        'pending' => (int) env('PENDING_LIMIT', 20),
+        'pending_read' => (int) env('PENDING_READ_LIMIT', 120),
         'api_token' => (int) env('API_TOKEN_LIMIT', 600),
     ],
 ];
