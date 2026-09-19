@@ -13,6 +13,7 @@ import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { decodeLinkTrashResponse } from "../../core/services/link-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
@@ -38,6 +39,7 @@ export class LinkTrashComponent {
   readonly total = signal(0);
   readonly retentionDays = signal<number | null>(null);
   readonly page = signal(0);
+  readonly pageSizeOptions = [20, 50, 100];
   readonly pageSize = signal(20);
   readonly q = signal("");
   readonly loading = signal(true);
@@ -90,14 +92,21 @@ export class LinkTrashComponent {
 
   async restore(row: TrashLinkDto): Promise<void> {
     if (!this.canRestore() || this.actionId() !== null) return;
+    // The trashed row belongs to one workspace, and its id is restored inside
+    // that tenant. Restoring after the header changed would revive the alias in
+    // another workspace's quota.
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionId.set(row.link.id);
     try {
       await this.api.post(`/api/v1/links/${row.link.id}/restore`);
+      if (!target.isCurrent()) return;
       this.snackbar.open("Enlace restaurado", "Cerrar", { duration: 2500 });
       await this.load();
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo restaurar", "Cerrar", { duration: 4500 });
-    } finally { this.actionId.set(null); }
+    } finally { if (target.isCurrent()) this.actionId.set(null); }
   }
 
   openPurge(row: TrashLinkDto): void {
@@ -114,8 +123,12 @@ export class LinkTrashComponent {
   async purge(row: TrashLinkDto): Promise<void> {
     if (!this.canPurge() || this.actionId() !== null || this.confirmation() !== `ELIMINAR ${row.link.alias}` || !this.password()) return;
     if (this.mfaEnabled() && !this.factorCode().trim()) return;
+    // The password and the typed alias name one row of one workspace. A
+    // permanent delete must not be sent after another workspace took over the
+    // screen, not even with a confirmation dialog in between.
+    const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({ title: "Borrar definitivamente", message: "Esta acción elimina el enlace y sus datos relacionados de forma irreversible.", confirmLabel: "Borrar definitivamente", destructive: true });
-    if (!confirmed) return;
+    if (!confirmed || !target.isCurrent()) return;
     this.actionId.set(row.link.id);
     try {
       await this.api.post(`/api/v1/links/${row.link.id}/purge`, { password: this.password(), factorCode: this.factorCode().trim(), confirmation: this.confirmation() });

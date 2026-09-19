@@ -18,6 +18,7 @@ import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import {
   decodeCreatedWebhookResponse,
   decodeWebhookDeliveriesResponse,
@@ -232,51 +233,61 @@ export class WebhooksComponent {
 
   async toggleActive(w: WebhookDto): Promise<void> {
     if (!this.canEdit() || this.actionId()) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionId.set(w.id);
     try {
       await this.api.patch(`/api/v1/webhooks/${w.id}`, { active: !w.active });
+      if (!target.isCurrent()) return;
       void this.load();
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.actionId.set(null);
+      if (target.isCurrent()) this.actionId.set(null);
     }
   }
 
   async test(w: WebhookDto): Promise<void> {
     if (!this.canEdit() || !w.active || this.actionId()) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionId.set(w.id);
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/test`);
+      if (!target.isCurrent()) return;
       this.snackbar.open("Ping admitido en la cola. Consulta el inspector para ver su entrega.", "Cerrar", { duration: 4500 });
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.actionId.set(null);
+      if (target.isCurrent()) this.actionId.set(null);
     }
   }
 
   async remove(w: WebhookDto): Promise<void> {
     if (!this.canEdit() || this.actionId()) return;
-    const sourceWorkspace = this.workspaces.currentId();
+    // A confirmation belongs to the workspace in which it was opened. Never
+    // apply it to a newly selected workspace or after capability was lost.
+    const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({
       title: "Eliminar webhook",
       message: `¿Eliminar el webhook ${w.url}? Se cancelarán las entregas pendientes. Si hay una entrega en curso, tendrás que reintentarlo al terminar.`,
       confirmLabel: "Eliminar webhook",
       destructive: true,
     });
-    // A confirmation belongs to the workspace in which it was opened. Never
-    // apply it to a newly selected workspace or after capability was lost.
-    if (!confirmed || !this.canEdit() || sourceWorkspace !== this.workspaces.currentId() || this.actionId()) return;
+    if (!confirmed || !this.canEdit() || !target.isCurrent() || this.actionId()) return;
     this.actionId.set(w.id);
     try {
       await this.api.delete(`/api/v1/webhooks/${w.id}`);
+      if (!target.isCurrent()) return;
       this.webhooks.update((list) => list.filter((x) => x.id !== w.id));
       this.snackbar.open("Webhook eliminado", "Cerrar", { duration: 2500 });
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.actionId.set(null);
+      if (target.isCurrent()) this.actionId.set(null);
     }
   }
 
@@ -316,15 +327,19 @@ export class WebhooksComponent {
 
   async resend(w: WebhookDto, deliveryId: number): Promise<void> {
     if (!this.canEdit() || this.actionId()) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionId.set(w.id);
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/deliveries/${deliveryId}/resend`);
+      if (!target.isCurrent()) return;
       this.snackbar.open("Reenvío programado", "Cerrar", { duration: 2500 });
       this.deliveries.update((d) => ({ ...d, [w.id]: [] }));
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.actionId.set(null);
+      if (target.isCurrent()) this.actionId.set(null);
     }
   }
 

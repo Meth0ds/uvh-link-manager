@@ -20,6 +20,7 @@ import { ChartsComponent } from "../analytics/charts.component";
 import type { LinkDetailResponse, AnalyticsOverview, AuditEvent, LinkDto, RedirectRule } from "../../core/models";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import {
   decodeAnalyticsOverview,
   decodeLinkActivityResponse,
@@ -233,28 +234,37 @@ export class LinkDetailComponent {
 
   async setState(state: "active" | "paused" | "archived"): Promise<void> {
     if (!this.canWrite() || this.actionBusy()) return;
+    // The state transition names a link of one workspace; its id means nothing
+    // in another one.
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionBusy.set(true);
     try {
       await this.api.post(`/api/v1/links/${this.linkId}/state`, { state });
+      if (!target.isCurrent()) return;
       this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
       void this.load();
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
-      this.actionBusy.set(false);
+      if (target.isCurrent()) this.actionBusy.set(false);
     }
   }
 
   async remove(): Promise<void> {
     const l = this.link();
     if (!l || !this.canWrite()) return;
+    // The dialog names a link from one workspace. Never apply its answer to a
+    // newer selection, or the delete would land on another tenant's row.
+    const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({
       title: "Eliminar enlace",
       message: `¿Quieres eliminar ${l.shortUrl}? Dejará de estar disponible de inmediato.`,
       confirmLabel: "Eliminar enlace",
       destructive: true,
     });
-    if (!confirmed || this.actionBusy()) return;
+    if (!confirmed || this.actionBusy() || !target.isCurrent()) return;
     this.actionBusy.set(true);
     try {
       await this.api.delete(`/api/v1/links/${this.linkId}`);

@@ -26,6 +26,7 @@ import type { LinksResponse, LinkDto, LinkState } from "../../core/models";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeLinksResponse } from "../../core/services/link-response-decoders";
 
 type StateFilter = "" | LinkState;
@@ -89,6 +90,7 @@ export class LinksComponent {
   readonly tag = signal("");
   readonly sort = signal("created_at_desc");
   readonly page = signal(0);
+  readonly pageSizeOptions = [20, 50, 100];
   readonly pageSize = signal(20);
   private readonly legacyDestination = this.route.snapshot.queryParamMap.get("destination")?.trim() ?? "";
   private pendingClaimInFlight = false;
@@ -249,26 +251,35 @@ export class LinksComponent {
 
   async setState(link: LinkDto, state: "active" | "paused" | "archived"): Promise<void> {
     if (this.actionId()) return;
+    // The listed row was read from one workspace. Its id is only meaningful
+    // there, so the mutation must not be sent after the header changed.
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionId.set(link.id);
     try {
       await this.api.post(`/api/v1/links/${link.id}/state`, { state });
+      if (!target.isCurrent()) return;
       this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
       void this.reload();
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
-      this.actionId.set(null);
+      if (target.isCurrent()) this.actionId.set(null);
     }
   }
 
   async remove(link: LinkDto): Promise<void> {
+    // Bind the decision to the workspace that listed the link: answering the
+    // dialog after switching tenants must not delete from the new one.
+    const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({
       title: "Eliminar enlace",
       message: `¿Quieres eliminar ${link.shortUrl}? Podrás restaurarlo desde una integración, pero dejará de estar disponible ahora.`,
       confirmLabel: "Eliminar enlace",
       destructive: true,
     });
-    if (!confirmed || this.actionId()) return;
+    if (!confirmed || this.actionId() || !target.isCurrent()) return;
     this.actionId.set(link.id);
     try {
       await this.api.delete(`/api/v1/links/${link.id}`);

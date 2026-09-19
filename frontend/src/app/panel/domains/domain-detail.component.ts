@@ -9,6 +9,7 @@ import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { decodeDomainDetailResponse, decodeDomainStateResponse } from "../../core/services/domain-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 
@@ -126,8 +127,8 @@ export class DomainDetailComponent {
   async startDnsCheck(): Promise<void> {
     const current = this.domain();
     if (!current || !this.canEdit() || this.actionBusy()) return;
-    const workspaceId = this.workspaces.currentId();
-    if (workspaceId === null) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     const revalidate = current.state === "active" || current.state === "verified" || current.state === "disabled";
     this.actionBusy.set(true);
     try {
@@ -136,33 +137,33 @@ export class DomainDetailComponent {
         undefined,
         decodeDomainStateResponse,
       );
-      if (this.workspaces.currentId() !== workspaceId) return;
+      if (!target.isCurrent()) return;
       this.snackbar.open("Comprobación DNS iniciada", "Cerrar", { duration: 3000 });
       await this.load();
     } catch (err) {
-      if (this.workspaces.currentId() !== workspaceId) return;
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo iniciar la comprobación", "Cerrar", { duration: 5000 });
     } finally {
-      if (this.workspaces.currentId() === workspaceId) this.actionBusy.set(false);
+      if (target.isCurrent()) this.actionBusy.set(false);
     }
   }
 
   async activate(): Promise<void> {
     const current = this.domain();
     if (!current || current.state !== "verified" || !this.canEdit() || this.actionBusy()) return;
-    const workspaceId = this.workspaces.currentId();
-    if (workspaceId === null) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionBusy.set(true);
     try {
       await this.api.post<{ state: DomainState }>(`/api/v1/domains/${current.id}/activate`, undefined, decodeDomainStateResponse);
-      if (this.workspaces.currentId() !== workspaceId) return;
+      if (!target.isCurrent()) return;
       this.snackbar.open("Preparación HTTPS iniciada", "Cerrar", { duration: 3000 });
       await this.load();
     } catch (err) {
-      if (this.workspaces.currentId() !== workspaceId) return;
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo activar el dominio", "Cerrar", { duration: 5000 });
     } finally {
-      if (this.workspaces.currentId() === workspaceId) this.actionBusy.set(false);
+      if (target.isCurrent()) this.actionBusy.set(false);
     }
   }
 

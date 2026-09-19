@@ -26,4 +26,4 @@
   }
   @if (!loading() && !rows().length && !error()) { <div class="empty-state"><mat-icon>recycling</mat-icon><b>La papelera está vacía</b><p>No hay enlaces pendientes de purga.</p></div> }
 </div>
-@if (total() > pageSize()) { <mat-paginator [length]="total()" [pageIndex]="page()" [pageSize]="pageSize()" [pageSizeOptions]="[20, 50, 100]" (page)="paginate($event)" showFirstLastButtons aria-label="Paginación de la papelera" /> }
+@if (total() > pageSizeOptions[0]) { <mat-paginator [length]="total()" [pageIndex]="page()" [pageSize]="pageSize()" [pageSizeOptions]="pageSizeOptions" (page)="paginate($event)" showFirstLastButtons aria-label="Paginación de la papelera" /> }

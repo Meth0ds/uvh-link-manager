@@ -17,6 +17,7 @@ import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeApiTokensResponse, decodeCreatedApiTokenResponse } from "../../core/services/credential-response-decoders";
 
 const SCOPES = [
@@ -59,6 +60,7 @@ export class TokensComponent {
   readonly tokens = signal<ApiTokenDto[]>([]);
   readonly loading = signal(true);
   readonly creating = signal(false);
+  readonly revokingId = signal<number | null>(null);
   readonly plainToken = signal<string | null>(null);
   readonly error = signal<string | null>(null);
 
@@ -86,6 +88,7 @@ export class TokensComponent {
       this.password.set("");
       this.factorCode.set("");
       this.creating.set(false);
+      this.revokingId.set(null);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -132,7 +135,7 @@ export class TokensComponent {
       const { token, plainToken } = await this.api.post<{ token: ApiTokenDto; plainToken: string }>("/api/v1/tokens", {
         name: this.name().trim(),
         scopes: this.selectedScopes(),
-        expiresAt: this.expiresAt() ? new Date(this.expiresAt()).toISOString() : null,
+        expiresAt: this.expiresAtIso(),
         password: this.password(),
         ...(this.factorCode().trim() ? { factorCode: this.factorCode().trim() } : {}),
       }, decodeCreatedApiTokenResponse);
@@ -157,20 +160,39 @@ export class TokensComponent {
     }
   }
 
+  /** The chosen expiry as an instant, or null when there is none to send. */
+  private expiresAtIso(): string | null {
+    const raw = this.expiresAt().trim();
+    if (!raw) return null;
+    const parsed = new Date(raw);
+    // An unparsable control value used to throw a RangeError that surfaced as
+    // "no se pudo crear el token", hiding the real cause from the operator.
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
+
   async revoke(t: ApiTokenDto): Promise<void> {
+    if (this.revokingId() !== null) return;
+    // A confirmation belongs to the workspace it was opened in: answering it
+    // after switching tenants would remove a row from the wrong registry.
+    const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({
       title: "Revocar token",
       message: `¿Revocar el token “${t.name}”? Las integraciones que lo usen dejarán de autenticarse y esta acción no se puede deshacer.`,
       confirmLabel: "Revocar token",
       destructive: true,
     });
-    if (!confirmed) return;
+    if (!confirmed || this.revokingId() !== null || !target.isCurrent()) return;
+    this.revokingId.set(t.id);
     try {
       await this.api.delete(`/api/v1/tokens/${t.id}`);
+      if (!target.isCurrent()) return;
       this.tokens.update((list) => list.filter((x) => x.id !== t.id));
       this.snackbar.open("Token revocado", "Cerrar", { duration: 2500 });
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.revokingId.set(null);
     }
   }
 

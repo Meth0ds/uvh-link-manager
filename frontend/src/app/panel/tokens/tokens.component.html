@@ -97,7 +97,7 @@
           </span>
         </div>
         <div class="token-actions">
-          <button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="!!t.revokedAt" [attr.aria-label]="(t.revokedAt ? 'Token revocado: ' : 'Revocar token: ') + t.name"><mat-icon aria-hidden="true">block</mat-icon> {{ t.revokedAt ? "Revocado" : "Revocar" }}</button>
+          <button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="!!t.revokedAt || revokingId() !== null" [attr.aria-label]="(t.revokedAt ? 'Token revocado: ' : 'Revocar token: ') + t.name"><mat-icon aria-hidden="true">block</mat-icon> {{ t.revokedAt ? "Revocado" : "Revocar" }}</button>
         </div>
       </article>
     }

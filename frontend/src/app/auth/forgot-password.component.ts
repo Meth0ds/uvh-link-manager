@@ -8,6 +8,7 @@ import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { AuthShellComponent } from "./auth-shell.component";
 import { ApiService, ApiRequestError } from "../core/services/api.service";
+import { safeReturnTo } from "../core/guards/auth.guard";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
@@ -47,7 +48,9 @@ export class ForgotPasswordComponent {
   readonly pendingLink = this.intents.pending;
   readonly pendingInvitation = this.invitations.pending;
   readonly loginQueryParams = computed(() => {
-    const returnTo = this.route.snapshot.queryParamMap.get("returnTo");
+    // The incoming value is attacker-controllable. Validate it with the same
+    // rule every other entry point uses instead of forwarding it verbatim.
+    const returnTo = safeReturnTo(this.route.snapshot.queryParamMap.get("returnTo") ?? "", "");
     if (returnTo) return { returnTo };
     if (this.pendingLink()) return { returnTo: "/app/links" };
     return this.pendingInvitation() ? { returnTo: "/invitations/accept" } : {};

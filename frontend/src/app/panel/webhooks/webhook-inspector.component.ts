@@ -97,7 +97,13 @@ export class WebhookInspectorComponent {
       this.page.set(deliveryPage.page);
     } catch (err) {
       if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}:${targetPage}`)) return;
+      // A failed read is not an empty history, and it is not a disappearance
+      // either: drop the delivery rows and the count, but keep the last known
+      // endpoint so the page still says which webhook failed. Every action on
+      // that card is disabled while an error is shown, so stale metadata can
+      // never be acted upon.
       this.deliveries.set([]);
+      this.total.set(0);
       this.error.set(err instanceof ApiRequestError && (err.status === 401 || err.status === 403)
         ? "Ya no tienes acceso a este inspector."
         : err instanceof ApiRequestError ? err.message : "No se pudo cargar el inspector");

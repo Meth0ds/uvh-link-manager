@@ -35,8 +35,14 @@ export const adminGuard: CanActivateFn = async (_route, state) => {
   }
 };
 
-/** Never allow a guard to turn a URL query parameter into an open redirect. */
-export function safeReturnTo(value: string): string {
+/**
+ * Never allow a URL query parameter to become an open redirect.
+ *
+ * `fallback` lets a caller that only wants to know whether the value is usable
+ * ask for "" instead of a default destination; the validation rule itself stays
+ * in one place.
+ */
+export function safeReturnTo(value: string, fallback = "/app"): string {
   if (
     value &&
     value.startsWith("/") &&
@@ -47,5 +53,5 @@ export function safeReturnTo(value: string): string {
   ) {
     return value;
   }
-  return "/app";
+  return fallback;
 }

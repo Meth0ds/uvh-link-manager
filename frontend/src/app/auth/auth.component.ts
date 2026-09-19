@@ -277,8 +277,11 @@ export class AuthComponent {
 
   onAuthTabKeydown(event: KeyboardEvent, currentIndex: number): void {
     let nextIndex: number | null = null;
+    // Two tabs make forward and backward land on the same tab, but the
+    // direction is still the WAI-ARIA contract: moving left must not read as
+    // moving right once a third tab exists.
     if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (currentIndex + 1) % 2;
-    if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (currentIndex + 1) % 2;
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (currentIndex - 1 + 2) % 2;
     if (event.key === "Home") nextIndex = 0;
     if (event.key === "End") nextIndex = 1;
     if (nextIndex === null) return;

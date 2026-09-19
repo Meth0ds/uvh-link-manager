@@ -15,6 +15,7 @@ import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import {
   decodeCreatedDomainResponse,
   decodeDomainsResponse,
@@ -121,6 +122,9 @@ export class DomainsComponent {
       this.error.set(null);
       this.actionId.set(null);
       this.verifyingId.set(null);
+      // A create still in flight belongs to the workspace that left the screen;
+      // its busy flag must not stay stuck in the new one.
+      this.adding.set(false);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -155,6 +159,8 @@ export class DomainsComponent {
   async add(): Promise<void> {
     const domain = this.newDomain().trim();
     if (!domain || this.adding() || !this.canEdit()) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.adding.set(true);
     try {
       const { domain: created } = await this.api.post<{ domain: DomainDto }>(
@@ -162,10 +168,15 @@ export class DomainsComponent {
         { domain },
         decodeCreatedDomainResponse,
       );
+      // The created row carries a one-time ownership TXT token. Publish it only
+      // into the workspace it was created for: a selection change while the
+      // request was in flight must not move it into another tenant's list.
+      if (!target.isCurrent()) return;
       this.newDomain.set("");
       this.snackbar.open("Dominio añadido. Añade el registro TXT para verificar.", "Cerrar", { duration: 4000 });
       this.domains.update((d) => [created, ...d]);
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo añadir el dominio", "Cerrar", { duration: 4000 });
     } finally {
       this.adding.set(false);
@@ -174,20 +185,20 @@ export class DomainsComponent {
 
   async verify(d: DomainDto): Promise<void> {
     if (this.actionId() || !this.canEdit()) return;
-    const workspaceId = this.workspaces.currentId();
-    if (workspaceId === null) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionId.set(d.id);
     this.verifyingId.set(d.id);
     try {
       const revalidation = d.state === "active" || d.state === "verified" || d.state === "disabled";
       const path = `/api/v1/domains/${d.id}/${revalidation ? "revalidate" : "verify"}`;
       const result = await this.api.post<{ state: DomainState }>(path, undefined, decodeDomainStateResponse);
-      if (this.workspaces.currentId() !== workspaceId) return;
+      if (!target.isCurrent()) return;
       this.snackbar.open("Verificación DNS iniciada. Actualizaremos el estado automáticamente.", "Cerrar", { duration: 4000 });
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       void this.pollVerification(d.id);
     } catch (err) {
-      if (this.workspaces.currentId() !== workspaceId) return;
+      if (!target.isCurrent()) return;
       this.snackbar.open(
         err instanceof ApiRequestError ? err.message : "No se pudo verificar el dominio",
         "Cerrar",
@@ -195,7 +206,7 @@ export class DomainsComponent {
       );
       void this.load();
     } finally {
-      if (this.workspaces.currentId() === workspaceId && this.actionId() === d.id) {
+      if (target.isCurrent() && this.actionId() === d.id) {
         this.verifyingId.set(null);
         this.actionId.set(null);
       }
@@ -228,8 +239,8 @@ export class DomainsComponent {
 
   async activate(d: DomainDto): Promise<void> {
     if (this.actionId() || !this.canEdit()) return;
-    const workspaceId = this.workspaces.currentId();
-    if (workspaceId === null) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionId.set(d.id);
     try {
       const result = await this.api.post<{ state: DomainState }>(
@@ -237,7 +248,7 @@ export class DomainsComponent {
         undefined,
         decodeDomainStateResponse,
       );
-      if (this.workspaces.currentId() !== workspaceId) return;
+      if (!target.isCurrent()) return;
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       if (result.state === "provisioning") {
         this.snackbar.open("Emitiendo y validando el certificado…", "Cerrar", { duration: 3500 });
@@ -246,10 +257,10 @@ export class DomainsComponent {
         this.snackbar.open("Dominio activado", "Cerrar", { duration: 2500 });
       }
     } catch (err) {
-      if (this.workspaces.currentId() !== workspaceId) return;
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      if (this.workspaces.currentId() === workspaceId && this.actionId() === d.id) this.actionId.set(null);
+      if (target.isCurrent() && this.actionId() === d.id) this.actionId.set(null);
     }
   }
 
@@ -277,12 +288,16 @@ export class DomainsComponent {
 
   async disable(d: DomainDto): Promise<void> {
     if (this.actionId() || !this.canEdit()) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
     this.actionId.set(d.id);
     try {
       await this.api.post(`/api/v1/domains/${d.id}/disable`);
+      if (!target.isCurrent()) return;
       this.snackbar.open("Dominio desactivado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.actionId.set(null);
@@ -291,13 +306,14 @@ export class DomainsComponent {
 
   async remove(d: DomainDto): Promise<void> {
     if (!this.canEdit()) return;
+    const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({
       title: "Eliminar dominio",
       message: `¿Quieres eliminar ${d.domain}? Antes debes haber reasignado todos sus enlaces, incluidos los que estén en la papelera.`,
       confirmLabel: "Eliminar dominio",
       destructive: true,
     });
-    if (!confirmed || this.actionId()) return;
+    if (!confirmed || this.actionId() || !target.isCurrent()) return;
     this.actionId.set(d.id);
     try {
       await this.api.delete(`/api/v1/domains/${d.id}`);

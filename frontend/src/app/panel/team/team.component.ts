@@ -19,6 +19,7 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { InvitationRetryService } from "./invitation-retry.service";
 import { LatestRequest } from "../../core/services/latest-request";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeWorkspaceDetail } from "../../core/services/workspace-response-decoders";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -158,15 +159,21 @@ export class TeamComponent {
   }
 
   async rename(): Promise<void> {
-    const wid = this.detail()?.workspace.id;
-    if (!wid || !this.renameValue().trim() || this.saving()) return;
+    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const { workspaceId } = target;
+    if (workspaceId === null || !this.renameValue().trim() || this.saving()) return;
     this.saving.set(true);
     try {
-      await this.api.patch(`/api/v1/workspaces/${wid}`, { name: this.renameValue().trim() });
-      this.snackbar.open("Workspace renombrado", "Cerrar", { duration: 2500 });
+      await this.api.patch(`/api/v1/workspaces/${workspaceId}`, { name: this.renameValue().trim() });
+      // The navigation list is account-wide, so it is refreshed even when the
+      // selection moved on: the new name must not be lost with the view that
+      // asked for it.
       await this.auth.refreshWorkspaces();
+      if (!target.isCurrent()) return;
+      this.snackbar.open("Workspace renombrado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.saving.set(false);
@@ -174,36 +181,41 @@ export class TeamComponent {
   }
 
   async invite(): Promise<void> {
-    const wid = this.detail()?.workspace.id;
+    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const { workspaceId } = target;
     const email = this.inviteEmail().trim();
-    if (!wid || wid !== this.workspaces.currentId() || !email || this.saving()
-      || this.invitationRetry.remaining(wid, email) > 0) return;
+    if (workspaceId === null || !target.isCurrent() || !email || this.saving()
+      || this.invitationRetry.remaining(workspaceId, email) > 0) return;
     this.saving.set(true);
     try {
-      await this.api.post(`/api/v1/workspaces/${wid}/invitations`, {
+      await this.api.post(`/api/v1/workspaces/${workspaceId}/invitations`, {
         email,
         role: this.inviteRole(),
       });
+      if (!target.isCurrent()) return;
       this.inviteEmail.set("");
       this.invitationPageIndex.set(0);
       this.snackbar.open("Invitación enviada", "Cerrar", { duration: 3000 });
       void this.load();
     } catch (err) {
-      this.showInvitationError(err, wid, email);
+      this.showInvitationError(err, workspaceId, email);
     } finally {
       this.saving.set(false);
     }
   }
 
   async changeRole(m: Member, role: WorkspaceRole): Promise<void> {
-    const wid = this.detail()?.workspace.id;
-    if (!wid || this.saving()) return;
+    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const { workspaceId } = target;
+    if (workspaceId === null || !target.isCurrent() || this.saving()) return;
     this.saving.set(true);
     try {
-      await this.api.patch(`/api/v1/workspaces/${wid}/members/${m.id}`, { role });
+      await this.api.patch(`/api/v1/workspaces/${workspaceId}/members/${m.id}`, { role });
+      if (!target.isCurrent()) return;
       this.snackbar.open("Rol actualizado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.saving.set(false);
@@ -211,18 +223,21 @@ export class TeamComponent {
   }
 
   async removeMember(m: Member): Promise<void> {
-    const wid = this.detail()?.workspace.id;
-    if (!wid) return;
+    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const { workspaceId } = target;
+    if (workspaceId === null) return;
     const confirmed = await this.actions.confirm({
       title: "Eliminar miembro",
       message: `¿Eliminar a ${m.name} del workspace? Perderá el acceso a sus enlaces y analítica, y se desactivarán los webhooks que creó. Si hay una entrega en curso, podrás reintentar al terminar.`,
       confirmLabel: "Eliminar miembro",
       destructive: true,
     });
-    if (!confirmed || this.saving()) return;
+    // The confirmation names a member of one workspace. Never apply it to a
+    // newer selection or once another mutation is already running.
+    if (!confirmed || this.saving() || !target.isCurrent()) return;
     this.saving.set(true);
     try {
-      await this.api.delete(`/api/v1/workspaces/${wid}/members/${m.id}`);
+      await this.api.delete(`/api/v1/workspaces/${workspaceId}/members/${m.id}`);
       this.snackbar.open("Miembro eliminado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
@@ -233,13 +248,15 @@ export class TeamComponent {
   }
 
   async cancelInvite(inv: Invitation): Promise<void> {
-    const wid = this.detail()?.workspace.id;
-    if (!wid || this.saving()) return;
+    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const { workspaceId } = target;
+    if (workspaceId === null || !target.isCurrent() || this.saving()) return;
     this.saving.set(true);
     try {
-      await this.api.delete(`/api/v1/workspaces/${wid}/invitations/${inv.id}`);
+      await this.api.delete(`/api/v1/workspaces/${workspaceId}/invitations/${inv.id}`);
       void this.load();
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.saving.set(false);
@@ -247,12 +264,14 @@ export class TeamComponent {
   }
 
   async resendInvite(inv: Invitation): Promise<void> {
-    const wid = this.detail()?.workspace.id;
-    if (!wid || wid !== this.workspaces.currentId() || this.saving()
-      || this.invitationRetry.remaining(wid, inv.email) > 0) return;
+    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const { workspaceId } = target;
+    if (workspaceId === null || !target.isCurrent() || this.saving()
+      || this.invitationRetry.remaining(workspaceId, inv.email) > 0) return;
     this.saving.set(true);
     try {
-      await this.api.post(`/api/v1/workspaces/${wid}/invitations/${inv.id}/resend`);
+      await this.api.post(`/api/v1/workspaces/${workspaceId}/invitations/${inv.id}/resend`);
+      if (!target.isCurrent()) return;
       this.snackbar.open("Invitación reenviada", "Cerrar", { duration: 2500 });
       // Refresh expiry/status after rotation. A refresh failure must not imply
       // that the already-admitted mail failed and encourage another resend.
@@ -261,7 +280,7 @@ export class TeamComponent {
         this.snackbar.open("Invitación reenviada. Recarga para actualizar su estado.", "Cerrar", { duration: 4000 });
       }
     } catch (err) {
-      this.showInvitationError(err, wid, inv.email);
+      this.showInvitationError(err, workspaceId, inv.email);
     } finally {
       this.saving.set(false);
     }
@@ -282,21 +301,25 @@ export class TeamComponent {
   }
 
   async leave(): Promise<void> {
-    const wid = this.detail()?.workspace.id;
-    if (!wid) return;
+    // Leaving is irreversible from the panel, so it must target the workspace
+    // the confirmation was opened for, not whichever one is selected now.
+    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const { workspaceId } = target;
+    if (workspaceId === null) return;
     const confirmed = await this.actions.confirm({
       title: "Abandonar workspace",
       message: "Dejarás de tener acceso a este workspace y necesitarás una nueva invitación para volver.",
       confirmLabel: "Abandonar workspace",
       destructive: true,
     });
-    if (!confirmed || this.saving()) return;
+    if (!confirmed || this.saving() || !target.isCurrent()) return;
     this.saving.set(true);
     try {
-      await this.api.post(`/api/v1/workspaces/${wid}/leave`);
+      await this.api.post(`/api/v1/workspaces/${workspaceId}/leave`);
       await this.auth.refreshWorkspaces();
       this.router.navigate(["/app/dashboard"]);
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.saving.set(false);
@@ -305,7 +328,9 @@ export class TeamComponent {
 
   async deleteWorkspace(): Promise<void> {
     const workspace = this.detail()?.workspace;
-    if (!workspace || this.deleteConfirmation() !== workspace.name || !this.deletePassword()
+    const target = targetWorkspace(this.workspaces, workspace?.id ?? null);
+    if (!workspace || !target.isCurrent() || this.deleteConfirmation() !== workspace.name
+      || !this.deletePassword()
       || (this.user()?.mfaEnabled && !this.deleteFactorCode().trim())) return;
     const confirmed = await this.actions.confirm({
       title: "Eliminar workspace definitivamente",
@@ -314,6 +339,11 @@ export class TeamComponent {
       destructive: true,
     });
     if (!confirmed || this.saving()) return;
+    if (!target.isCurrent()) {
+      // The panel below belongs to a workspace this decision no longer names.
+      this.cancelWorkspaceDeletion();
+      return;
+    }
     this.saving.set(true);
     try {
       await this.api.delete(`/api/v1/workspaces/${workspace.id}`, {
@@ -332,6 +362,7 @@ export class TeamComponent {
         this.snackbar.open("Workspace eliminado. Recarga el panel para actualizar la navegación.", "Cerrar", { duration: 4000 });
       }
     } catch (err) {
+      if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.saving.set(false);
@@ -371,22 +402,31 @@ export class TeamComponent {
 
   async transferOwnership(): Promise<void> {
     const detail = this.detail();
+    const scope = targetWorkspace(this.workspaces, detail?.workspace.id ?? null);
     const targetId = this.transferTargetId();
-    const target = detail?.members.find((member) => member.id === targetId && member.role !== "owner");
-    if (!detail || !target || !this.transferPassword() || (this.user()?.mfaEnabled && !this.transferFactorCode()) || this.saving()) return;
+    const recipient = detail?.members.find((member) => member.id === targetId && member.role !== "owner");
+    if (!detail || !recipient || !this.transferPassword()
+      || (this.user()?.mfaEnabled && !this.transferFactorCode()) || this.saving()) return;
 
     const confirmed = await this.actions.confirm({
       title: "Transferir propiedad",
-      message: `${target.name} pasará a controlar el workspace. Tu rol cambiará a administrador y sólo el nuevo propietario podrá eliminarlo o volver a transferirlo. Las invitaciones pendientes de administrador que enviaste quedarán canceladas.`,
+      message: `${recipient.name} pasará a controlar el workspace. Tu rol cambiará a administrador y sólo el nuevo propietario podrá eliminarlo o volver a transferirlo. Las invitaciones pendientes de administrador que enviaste quedarán canceladas.`,
       confirmLabel: "Transferir propiedad",
       destructive: true,
     });
     if (!confirmed) return;
+    if (!scope.isCurrent()) {
+      // A different workspace is selected now; this recipient and password
+      // belong to the previous one, so drop the panel instead of transferring
+      // blindly.
+      this.cancelOwnershipTransfer();
+      return;
+    }
 
     this.saving.set(true);
     try {
       await this.api.post(`/api/v1/workspaces/${detail.workspace.id}/transfer-ownership`, {
-        targetUserId: target.id,
+        targetUserId: recipient.id,
         password: this.transferPassword(),
         ...(this.transferFactorCode().trim() ? { factorCode: this.transferFactorCode().trim() } : {}),
       });
@@ -402,6 +442,7 @@ export class TeamComponent {
         this.snackbar.open("Propiedad transferida. Recarga el panel para actualizar permisos.", "Cerrar", { duration: 4000 });
       }
     } catch (err) {
+      if (!scope.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo transferir la propiedad", "Cerrar", { duration: 4000 });
     } finally {
       this.saving.set(false);
