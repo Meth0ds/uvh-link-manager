@@ -32,10 +32,22 @@ permissions:
 
 env:
   # Versiones fijadas de las herramientas. No son artefactos desplegables (eso
-  # es `docker-compose.production.yml`, con digests): son analizadores, y lo que
-  # se fija es la versión del analizador para que un cambio de reglas no altere
-  # el veredicto sin que nadie lo revise. Las bases de datos que descargan sí se
-  # actualizan en cada ejecución, que es lo que da sentido al cron semanal.
+  # es `docker-compose.production.yml`, con digests): son analizadores, y aquí se
+  # fija la **etiqueta**, no el digest. Es deliberado y está razonado en `ci.yml`:
+  # `.github/workflows/` queda fuera del alcance de Dependabot, así que un digest
+  # envejecería sin que nadie propusiera revisarlo, que es peor que una etiqueta
+  # que alguien actualiza.
+  #
+  # Lo que eso fija es la versión del analizador, no el veredicto. Una etiqueta
+  # puede moverse, y buena parte de estas herramientas descarga su material del
+  # registro en cada ejecución: Semgrep trae los conjuntos `p/...` y Trivy su base
+  # de vulnerabilidades. Un hallazgo nuevo sobre código que nadie tocó es, por
+  # tanto, esperado — y el cron semanal es lo que lo saca a la luz en vez de
+  # dejarlo aparecer en un despliegue.
+  #
+  # El volumen del repositorio se monta con escritura a propósito: los informes
+  # (`semgrep.json`, `gitleaks-*.json`, `trivy-*.sarif`) se escriben dentro y son
+  # el artefacto que se publica unas líneas más abajo.
   SEMGREP_IMAGE: semgrep/semgrep:1.176.1
   GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1
   TRIVY_IMAGE: aquasec/trivy:0.74.0
