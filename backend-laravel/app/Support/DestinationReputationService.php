@@ -304,11 +304,22 @@ final class DestinationReputationService
     }
 
     /**
-     * Links this platform blocked by itself, oldest block first.
+     * Links this platform blocked by itself, least recently examined first.
      *
      * The marker is the filter, so a moderator's block can never appear here.
      * Bounded like every other sweep: withdrawing a block is a background
      * correction, not a traversal of the table.
+     *
+     * The order is the queue cursor — `reputation_checked_at`, the same column
+     * the re-analysis sweep advances — and not the age of the block, which is
+     * what this used to be. Ordering by `reputation_blocked_at` looked stable
+     * and was: reading does not touch that column, so the oldest rows came back
+     * on every tick. With a hundred blocks still correctly listed ahead of it,
+     * a temporary entry that expired on the hundred-and-first was never looked
+     * at again, and the sweep reported nothing wrong while the block it should
+     * have withdrawn stood for ever. Ordering by the cursor makes each tick
+     * start where the previous one stopped, so every self-applied block is
+     * examined within a bounded number of passes.
      *
      * @return list<int>
      */
@@ -324,7 +335,7 @@ final class DestinationReputationService
         }
 
         return $query
-            ->orderBy('reputation_blocked_at')
+            ->orderByRaw('reputation_checked_at NULLS FIRST')
             ->orderBy('id')
             ->limit($limit)
             ->pluck('id')
@@ -342,6 +353,13 @@ final class DestinationReputationService
      * Only denylist-sourced blocks are walked, and for those the denylist is
      * consulted before any provider, so this path answers a local question with
      * local data and never spends a network call.
+     *
+     * The batch advances even when it releases nothing, because `evaluate()`
+     * moves each link it examines to the back of the queue (`markExamined`) —
+     * exactly the rule the re-analysis sweep relies on. A batch that found every
+     * entry still listed therefore cannot be the head of the next one, which is
+     * what keeps a block at the end of the table from waiting behind the same
+     * unchanged rows for ever.
      *
      * @return int blocks released
      */
@@ -851,7 +869,7 @@ final class DestinationReputationService
             return;
         }
 
-        DB::table('abuse_reports')->insertOrIgnore([
+        $inserted = DB::table('abuse_reports')->insertOrIgnore([
             'link_id' => (int) $link->id,
             'reporter_email' => null,
             'reporter_hash' => null,
@@ -862,6 +880,13 @@ final class DestinationReputationService
             'status' => 'open',
             'created_at' => now(),
         ]);
+        if ($inserted !== 1) {
+            // The check above is a read, so two workers can both pass it; the
+            // unique index is what decides, and only the worker whose row came
+            // into existence may count the case and write it to the log. Without
+            // this, one open case would be reported as two.
+            return;
+        }
 
         OperationalMetrics::increment('reputation.moderated');
         Audit::write(

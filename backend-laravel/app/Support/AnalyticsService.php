@@ -16,6 +16,14 @@ class AnalyticsService
      * (any visitor can send any Referer) and an unbounded map would grow the row
      * without limit. What the cap must not do is decide *which* values survive
      * by arrival order — see `bump()`.
+     *
+     * The map is read by the data export, so a bounded estimate is not enough:
+     * the counts are what a person reads about their own traffic, and the input
+     * is a header the visitor chooses. That is why `bump()` takes
+     * `Space-Saving`'s admission rule — a newcomer always takes the least
+     * frequent slot — and deliberately not its estimate, which is an upper
+     * bound: an over-estimating rule would let a visitor write clicks that never
+     * happened into somebody else's export.
      */
     private const MAX_MAP_KEYS = 200;
 
@@ -111,25 +119,45 @@ class AnalyticsService
             return $m;
         }
 
-        // The cap is reached. Keeping the first values that arrived made the map
-        // an artefact of ordering: a referrer that became dominant late in the
-        // day stayed invisible for the rest of it, while a value seen once held
-        // its slot forever. The trade below keeps the map about the traffic
-        // instead of about its timing, and every drop is counted, so the loss is
-        // a monitoring signal rather than a silent bias.
+        // The cap is reached and this value has not been recorded before — but
+        // "not recorded here" is a statement about the past, and refusing the
+        // value turned it into a statement about the rest of the day. A slot only
+        // came free when some value had been seen exactly once, so a map whose
+        // slots were all held by values seen twice was frozen: every visit of the
+        // newcomer was read as a first occurrence and turned away, so it could
+        // not reach the second occurrence that would have admitted it, and the
+        // value that arrived early and then stopped was never displaced either.
+        // Both halves of "the map is about the traffic, not about its timing"
+        // failed there.
+        //
+        // The newcomer is therefore always admitted, and the slot it takes is
+        // the least frequent one. Two properties follow, and they are what the
+        // tests pin:
+        //
+        //  - a count is exactly the number of times the value was recorded while
+        //    it held a slot: never an estimate, never decayed, and never filled
+        //    in from the slot it took. `Space-Saving`'s admission rule is kept
+        //    but its estimate is not, because that estimate is an upper bound and
+        //    this map is read by the person it describes;
+        //  - a value is evicted only as one of the least frequent values in the
+        //    map at that moment, so a newcomer can never displace a value already
+        //    seen more often than it.
+        //
+        // The price is stated rather than hidden: a bounded table cannot remember
+        // what it evicted, so a value evicted between two visits starts again
+        // from one. Two of its visits have to fall either side of an eviction for
+        // that to matter, and the eviction only ever takes from the minimum, so a
+        // value that keeps arriving climbs above that tie on its own instead of
+        // being locked out of the map for the rest of the day.
         $minimum = min($m);
+        // Among values that are equally frequent there is nothing to choose
+        // between: the store does not preserve insertion order (jsonb reorders
+        // keys), so the slot is given up by whichever the map orders first and
+        // no claim is made that it is the oldest arrival.
         $victim = array_search($minimum, $m, true);
-        if ($minimum >= 2 || ! is_string($victim)) {
-            // Every value already held has been seen more than once, so the
-            // newcomer is genuinely the least frequent one: dropping it is the
-            // top-N rule, and it is counted.
-            OperationalMetrics::increment('analytics.map_keys_dropped');
-
-            return $m;
+        if (is_string($victim)) {
+            unset($m[$victim]);
         }
-        // A tie at one occurrence: the oldest of the least frequent values gives
-        // its slot to the newcomer, so nothing is frozen in by arrival order.
-        unset($m[$victim]);
         $m[$key] = 1;
         OperationalMetrics::increment('analytics.map_keys_dropped');
 

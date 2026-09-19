@@ -88,7 +88,7 @@ REPUTATION_DOMAIN_MONITOR=true
 | `REPUTATION_MAX_BODY_BYTES` | Cota del cuerpo de respuesta. |
 | `REPUTATION_CACHE_TTL_HOURS` | Techo de validez de un veredicto (el proveedor puede acortarlo, nunca alargarlo, y nunca por debajo de 5 minutos). |
 | `REPUTATION_RECHECK_BATCH` | Enlaces reanalizados por ciclo del scheduler (barrido de fondo acotado). |
-| `REPUTATION_RELEASE_BATCH` | Enlaces autobloqueados re-evaluados por ciclo para retirar un bloqueo sin causa. Acotado por el mismo motivo, en la dirección contraria. |
+| `REPUTATION_RELEASE_BATCH` | Enlaces autobloqueados re-evaluados por ciclo para retirar un bloqueo sin causa. Acotado por el mismo motivo, en la dirección contraria, y con el mismo cursor (`links.reputation_checked_at`): cada tanda deja atrás lo que examinó, así que un bloqueo detrás de muchos permanentes acaba alcanzándose en lugar de esperar a que los de delante cambien. |
 | `REPUTATION_AUTO_BLOCK` | **Interruptor principal.** Sólo con `true` un veredicto `malicious` bloquea. |
 | `REPUTATION_DOMAIN_MONITOR` | Vigila la reputación de los hosts propios (`uvh.public_host`, `uvh.app_host`, dominios personalizados activos). |
 

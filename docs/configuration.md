@@ -362,7 +362,7 @@ capacidad como no verificada y **no inventa** un estado «seguro». La moderaci�
 | `REPUTATION_MAX_BODY_BYTES` | † | `65536` | Cota del cuerpo de respuesta (1 KiB–1 MiB). Al superarse, se corta la conexión y se trata como fallo. |
 | `REPUTATION_CACHE_TTL_HOURS` | † | `24` | Techo de validez de un veredicto (1 h–30 d). El proveedor puede **acortarlo** — nunca alargarlo, y nunca por debajo de **5 minutos** (suelo fijo, para que «vuelve a preguntarme pronto» no se convierta en una consulta por evaluación). |
 | `REPUTATION_RECHECK_BATCH` | † | `50` | Enlaces reanalizados por ciclo del scheduler (1–500). Barrido de fondo, no un recorrido de todos los enlaces: los candidatos se ordenan por `links.reputation_checked_at` (los nunca examinados primero) y **toda** la ventana leída se marca como examinada, así que cada ciclo avanza en lugar de releer las mismas filas. |
-| `REPUTATION_RELEASE_BATCH` | † | `50` | Enlaces **autobloqueados** re-evaluados por ciclo para retirar un bloqueo cuya causa desapareció (1–500). Acotado por el mismo motivo que el anterior, en la dirección contraria. |
+| `REPUTATION_RELEASE_BATCH` | † | `50` | Enlaces **autobloqueados** re-evaluados por ciclo para retirar un bloqueo cuya causa desapareció (1–500). Acotado por el mismo motivo que el anterior, en la dirección contraria, y con el mismo cursor: la cola se ordena por `links.reputation_checked_at` (los nunca examinados primero) y `evaluate()` marca lo que examina, así que una tanda que no retira nada igualmente deja atrás a los mismos bloques en vez de releerlos cada ciclo. |
 | `REPUTATION_REANALYSIS_BUDGET` | † | `500` | Enlaces que un bloqueo de destino **nuevo** reanaliza de una vez, contando enlaces y reglas juntos (1–2000). Si el host tenía más, el barrido se detiene y **lo dice** (`linksSweepTruncated: true` + `reputation.reanalysis_truncated`), y el resto **continúa solo**: el servicio encola `ContinueDestinationSweepJob` con el cursor devuelto en `linksSweepCursor` y el job repite tandas acotadas hasta terminar, sin depender de que haya proveedor de reputación ni de que el scheduler llegue. |
 | `REPUTATION_AUTO_BLOCK` | ⚑ | `false` | **Con `false`, un veredicto `malicious` no bloquea a nadie.** Sólo con `true` un veredicto `malicious` de un proveedor configurado puede bloquear. |
 | `REPUTATION_DOMAIN_MONITOR` | ⚑ | `true` | Vigila la reputación de los hosts propios y emite `reputation.domain_listed` si aparecen mal valorados. |
@@ -461,11 +461,14 @@ Una variable de esta área no es de retención sino de forma: `ANALYTICS_MAX_MAP
 († , `200`) limita cuántos valores distintos se conservan **por dimensión y día**
 en el rollup (`countries`, `devices`, `browsers`, `os`, `referrers`, `campaigns`).
 `referrers` lo controla quien visita —cualquier cabecera `Referer`—, así que el
-tope es necesario; lo que importa es **cuál** se descarta: al alcanzarlo se retira
-el valor menos frecuente (empate: el más antiguo), nunca el último en llegar, y
-cada descarte suma `analytics.map_keys_dropped`. Está acotado en el código entre
-10 y 5000, así que un valor pequeño no puede convertir el rollup en un resumen de
-dos entradas.
+tope es necesario; lo que importa es **cuál** cede el hueco: lo hace el valor
+menos frecuente, y el recién llegado entra **siempre** (nadie queda fuera para
+siempre). Los contadores son exactamente lo observado: ni estimados ni inflados,
+porque el mapa viaja en la exportación de datos de quien los protagoniza. Entre
+valores igual de frecuentes no se afirma que ceda el más antiguo —el almacén no
+conserva el orden de inserción— y cada descarte suma
+`analytics.map_keys_dropped`. Está acotado en el código entre 10 y 5000, así que
+un valor pequeño no puede convertir el rollup en un resumen de dos entradas.
 
 Los rangos y las políticas deben coincidir con lo declarado en la política de
 privacidad; el gate impide valores fuera de rango, no decisiones incoherentes.

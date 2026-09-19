@@ -410,6 +410,49 @@ final class DestinationReputationTest extends TestCase
             ->where('action', 'system.link_release')->where('resource_id', (string) $link->id)->count());
     }
 
+    /**
+     * A pass that finds nothing left to do is not a pass that keeps its place.
+     *
+     * The release pass read the blocks in the order they were applied, and
+     * reading a row does not age that order, so the same rows led the queue on
+     * every tick: with a batch smaller than the number of still-listed blocks, a
+     * temporary entry that expired behind the window was never looked at again
+     * and its block outlived the reason for it. The pass now takes its order
+     * from the cursor it advances, exactly like the re-analysis sweep.
+     */
+    public function test_the_release_sweep_reaches_a_block_behind_a_permanent_one(): void
+    {
+        DestinationDenylist::blockHost('kept.example', 'Phishing confirmado');
+        foreach (range(0, 1) as $i) {
+            $link = $this->link('https://kept.example/'.$i);
+            $this->assertSame(DestinationReputationService::OUTCOME_BLOCKED, DestinationReputationService::evaluate($link->id));
+        }
+
+        DestinationDenylist::blockHost('temp.example', 'Temporal', expiresAt: now()->addMinutes(5));
+        $expiring = $this->link('https://temp.example/a');
+        $this->assertSame(DestinationReputationService::OUTCOME_BLOCKED, DestinationReputationService::evaluate($expiring->id));
+
+        // Expiry has no event to hang from: time passing is the whole signal.
+        $this->travel(6)->minutes();
+
+        // Room for two, and the two blocks in front of the expiring one are all
+        // still listed, so this pass has nothing to release.
+        $this->assertSame(0, DestinationReputationService::releaseUnlistedBlocks(2));
+        $this->assertSame('blocked', (string) DB::table('links')->where('id', $expiring->id)->value('state'));
+        // The pass moved the queue cursor of the two blocks it examined, which
+        // is what puts the one it did not reach at the head of the next pass.
+        $this->assertTrue(
+            Carbon::parse(DB::table('links')->where('destination', 'https://kept.example/0')->value('reputation_checked_at'))
+                ->gt(Carbon::parse(DB::table('links')->where('id', $expiring->id)->value('reputation_checked_at')))
+        );
+
+        // The next pass starts after the previous one instead of at the same
+        // place, so the block behind them is reached without waiting for the
+        // other two to change.
+        $this->assertSame(1, DestinationReputationService::releaseUnlistedBlocks(2));
+        $this->assertSame('active', (string) DB::table('links')->where('id', $expiring->id)->value('state'));
+    }
+
     public function test_the_marker_cannot_be_written_half_way(): void
     {
         // A marker without its reason would be a block nobody can withdraw, and

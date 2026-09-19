@@ -194,17 +194,38 @@ descartaba y los primeros conservaban su hueco para siempre. Un referrer que
 empezaba a dominar a media tarde permanecía invisible el resto del día, mientras
 un valor visto una sola vez seguía ocupando plaza.
 
-Ahora el que cede su hueco es el **menos frecuente** (en caso de empate, el más
-antiguo), con dos consecuencias que importan:
+Un primer arreglo cambió el descarte por una regla de frecuencia y conservaba el
+mismo defecto una vuelta más tarde: el hueco sólo se liberaba si algún valor había
+sido visto **una vez**, así que un mapa con todos sus huecos en dos visitas
+quedaba congelado y el recién llegado era rechazado en cada visita —cada visita
+se leía como una primera aparición, así que no llegaba nunca a la segunda que lo
+habría admitido—.
 
-- el mapa describe el tráfico y no el momento en que llegó;
-- un valor que se repite ya no puede ser desplazado por un recién llegado de una
-  sola vez.
+Ahora el recién llegado **siempre entra** y el hueco lo cede el valor menos
+frecuente. Es la regla de admisión de `Space-Saving`, pero no su estimación: ese
+algoritmo inserta al recién llegado con el contador del hueco que ocupa, y eso es
+una **cota superior**. Estos contadores los lee quien los protagoniza —el mapa va
+en la exportación de datos— y la entrada la elige quien visita, así que un
+contador inflado serían clics que no existieron escritos en la exportación de
+otro. Aquí un contador es exactamente lo observado.
+
+Dos consecuencias que importan:
+
+- el mapa describe el tráfico y no el momento en que llegó: ningún valor puede
+  quedarse fuera para siempre, y uno que se repita se coloca por delante solo;
+- un valor sólo cede su hueco como uno de los **menos frecuentes**, así que un
+  recién llegado no puede desplazar a otro ya visto más veces. Entre valores
+  igual de frecuentes no hay nada que elegir: el almacén no conserva el orden de
+  inserción (jsonb reordena las claves), así que no se afirma que ceda el más
+  antiguo.
+
+El precio se dice en vez de esconderse: una tabla acotada no recuerda lo que
+expulsó, así que un valor expulsado entre dos visitas vuelve a empezar en uno.
 
 Cada descarte suma `analytics.map_keys_dropped`, así que el recorte deja de ser
 invisible. `ANALYTICS_MAX_MAP_KEYS` permite ajustar el tope y está acotado en el
 código entre 10 y 5000: un valor demasiado bajo no puede convertir el rollup en
-un resumen de dos entradas. `AnalyticsRollupMapTest` fija las tres propiedades.
+un resumen de dos entradas. `AnalyticsRollupMapTest` fija esas propiedades.
 
 ## Cambio aplicado: los rastreadores dejan de contar como personas
 

@@ -38,8 +38,9 @@ final class OperationalMetrics
         'export.queue_unavailable',
         'export.too_large',
         'analytics.record_failed',
-        // Valores distintos descartados al alcanzar el tope del mapa diario. Un
-        // mapa recortado sin contador es un sesgo que nadie puede ver.
+        // Huecos cedidos al alcanzar el tope del mapa diario: el valor menos
+        // frecuente deja su sitio a uno nuevo, que siempre entra. Un mapa
+        // recortado sin contador es un sesgo que nadie puede ver.
         'analytics.map_keys_dropped',
         'audit.write_failed',
         'privacy.decrypt_failed',
