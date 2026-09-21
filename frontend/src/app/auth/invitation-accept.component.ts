@@ -8,7 +8,7 @@ import { AuthShellComponent } from "./auth-shell.component";
 import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { AuthService } from "../core/services/auth.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
-import { authBearer } from "./auth-bearer";
+import { authBearer, bearerExpiry } from "./auth-bearer";
 import { LatestRequest } from "../core/services/latest-request";
 
 /**
@@ -80,7 +80,7 @@ export class InvitationAcceptComponent {
 
   constructor() {
     const incoming = authBearer(this.route);
-    const fragmentExpiry = new URLSearchParams(this.route.snapshot.fragment ?? "").get("expiresAt");
+    const fragmentExpiry = bearerExpiry(this.route);
     // Parking is optimistic: the bearer leaves the URL immediately and the
     // server still has to take it. `initialize()` waits for that before the
     // component offers to spend it.

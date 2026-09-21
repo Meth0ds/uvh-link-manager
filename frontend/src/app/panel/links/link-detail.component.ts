@@ -1,4 +1,5 @@
 import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 
 import { MatButtonModule } from "@angular/material/button";
@@ -26,6 +27,7 @@ import {
   decodeLinkActivityResponse,
   decodeLinkDetailResponse,
 } from "../../core/services/link-response-decoders";
+import { linkStateLabel } from "../../core/link-state-label";
 
 @Component({
   selector: "app-link-detail",
@@ -78,20 +80,28 @@ export class LinkDetailComponent {
     return role === "owner" || role === "admin" || role === "editor";
   });
 
-  private linkId = Number(this.route.snapshot.paramMap.get("id"));
+  /**
+   * The route's `:id`, kept reactive.
+   *
+   * Angular reuses this component when only the parameter changes, so an id
+   * captured once from the snapshot would keep addressing the link the view was
+   * first opened with: it would show one link's data, and act on that link,
+   * while the URL names another one.
+   */
+  private readonly linkId = signal(this.paramId());
 
-  private loadedWorkspaceId: number | null | undefined;
+  /** `workspace:link` the current view belongs to; null while unresolved. */
+  private loadedContext: string | null = null;
 
   constructor() {
-    if (!Number.isSafeInteger(this.linkId) || this.linkId < 1) {
-      this.error.set("El identificador del enlace no es válido");
-      this.loading.set(false);
-      return;
-    }
+    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => this.linkId.set(this.paramId()));
+
     effect(() => {
       const workspaceId = this.workspaces.currentId();
-      if (workspaceId === this.loadedWorkspaceId) return;
-      this.loadedWorkspaceId = workspaceId;
+      const linkId = this.linkId();
+      const context = workspaceId === null ? null : `${workspaceId}:${linkId}`;
+      if (context === this.loadedContext) return;
+      this.loadedContext = context;
       this.loadRequests.invalidate();
       this.analyticsRequests.invalidate();
       this.activityRequests.invalidate();
@@ -104,6 +114,11 @@ export class LinkDetailComponent {
       this.analyticsError.set(null);
       this.activityError.set(null);
       this.activityTruncated.set(false);
+      if (!Number.isSafeInteger(linkId) || linkId < 1) {
+        this.error.set("El identificador del enlace no es válido");
+        this.loading.set(false);
+        return;
+      }
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -112,8 +127,13 @@ export class LinkDetailComponent {
     });
   }
 
+  private paramId(): number {
+    return Number(this.route.snapshot.paramMap.get("id"));
+  }
+
   async load(): Promise<void> {
     const workspaceId = this.workspaces.currentId();
+    const linkId = this.linkId();
     if (workspaceId === null) {
       this.loadRequests.invalidate();
       this.link.set(null);
@@ -121,46 +141,49 @@ export class LinkDetailComponent {
       this.loading.set(false);
       return;
     }
-    const request = this.loadRequests.begin(workspaceId);
+    const context = `${workspaceId}:${linkId}`;
+    const request = this.loadRequests.begin(context);
     this.loading.set(true);
     this.error.set(null);
     try {
       const detail = await this.api.get<LinkDetailResponse>(
-        `/api/v1/links/${this.linkId}`,
+        `/api/v1/links/${linkId}`,
         undefined,
-        (value) => decodeLinkDetailResponse(value, this.linkId),
+        (value) => decodeLinkDetailResponse(value, linkId),
         { signal: request.signal },
       );
-      if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.loadRequests.isCurrent(request, this.currentContext())) return;
       this.link.set(detail.link);
       this.rules.set(detail.rules);
       await Promise.all([this.loadAnalytics(), this.loadActivity()]);
     } catch (err) {
-      if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.loadRequests.isCurrent(request, this.currentContext())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar el enlace");
     } finally {
-      if (this.loadRequests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
+      if (this.loadRequests.isCurrent(request, this.currentContext())) this.loading.set(false);
     }
   }
 
   async loadAnalytics(): Promise<void> {
     const workspaceId = this.workspaces.currentId();
+    const linkId = this.linkId();
     if (workspaceId === null) {
       this.analyticsRequests.invalidate();
       this.analytics.set(null);
       return;
     }
-    const request = this.analyticsRequests.begin(workspaceId);
+    const context = `${workspaceId}:${linkId}`;
+    const request = this.analyticsRequests.begin(context);
     this.analyticsError.set(null);
     try {
       const a = await this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", {
-        linkId: this.linkId,
+        linkId,
         period: this.period(),
       }, decodeAnalyticsOverview, { signal: request.signal });
-      if (!this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.analyticsRequests.isCurrent(request, this.currentContext())) return;
       this.analytics.set(a);
     } catch (err) {
-      if (!this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.analyticsRequests.isCurrent(request, this.currentContext())) return;
       this.analytics.set(null);
       this.analyticsError.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la analítica");
     }
@@ -174,24 +197,31 @@ export class LinkDetailComponent {
       this.activityTruncated.set(false);
       return;
     }
-    const request = this.activityRequests.begin(workspaceId);
+    const context = `${workspaceId}:${this.linkId()}`;
+    const request = this.activityRequests.begin(context);
     this.activityError.set(null);
     try {
       const { events, truncated } = await this.api.get<{ events: AuditEvent[]; truncated: boolean }>(
-        `/api/v1/links/${this.linkId}/activity`,
+        `/api/v1/links/${this.linkId()}/activity`,
         undefined,
         decodeLinkActivityResponse,
         { signal: request.signal },
       );
-      if (!this.activityRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.activityRequests.isCurrent(request, this.currentContext())) return;
       this.activity.set(events);
       this.activityTruncated.set(truncated);
     } catch (err) {
-      if (!this.activityRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.activityRequests.isCurrent(request, this.currentContext())) return;
       this.activity.set([]);
       this.activityTruncated.set(false);
       this.activityError.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la actividad");
     }
+  }
+
+  /** The identity a request must still match to be applied to this view. */
+  private currentContext(): string | null {
+    const workspaceId = this.workspaces.currentId();
+    return workspaceId === null ? null : `${workspaceId}:${this.linkId()}`;
   }
 
   retryAnalytics(): void {
@@ -240,7 +270,7 @@ export class LinkDetailComponent {
     if (target.workspaceId === null) return;
     this.actionBusy.set(true);
     try {
-      await this.api.post(`/api/v1/links/${this.linkId}/state`, { state });
+      await this.api.post(`/api/v1/links/${this.linkId()}/state`, { state });
       if (!target.isCurrent()) return;
       this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
       void this.load();
@@ -267,7 +297,7 @@ export class LinkDetailComponent {
     if (!confirmed || this.actionBusy() || !target.isCurrent()) return;
     this.actionBusy.set(true);
     try {
-      await this.api.delete(`/api/v1/links/${this.linkId}`);
+      await this.api.delete(`/api/v1/links/${this.linkId()}`);
       this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
       await this.router.navigate(["/app/links"]);
     } catch (err) {
@@ -307,4 +337,6 @@ export class LinkDetailComponent {
   displayUrl(url: string): string {
     return url.replace(/^https?:\/\//, "");
   }
+
+  readonly stateLabel = linkStateLabel;
 }

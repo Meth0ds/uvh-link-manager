@@ -72,14 +72,26 @@ function localDateTimeValidator(control: AbstractControl): ValidationErrors | nu
   if (!match) return { localDateTime: true };
 
   const [, year, month, day, hour, minute] = match.map(Number);
+  if (hour > 23 || minute > 59) return { localDateTime: true };
+
+  // Calendar validity is resolved in UTC: a local parse would move the date
+  // itself around a DST shift and turn a real day into a rejected one.
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  if (calendar.getUTCFullYear() !== year || calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== day) {
+    return { localDateTime: true };
+  }
+
+  // A wall clock inside a spring-forward gap does not exist in local time, and
+  // the runtime answers `new Date(2026, 2, 29, 2, 30)` in Europe/Madrid with
+  // 03:30 rather than with the value that was asked for. The hour is skipped by
+  // the zone, not rejected by the calendar — and it is a value the browser's own
+  // datetime-local input produces — so the drift it causes is accepted. Every
+  // other difference means the field does not name the moment it displays.
   const parsed = new Date(year, month - 1, day, hour, minute);
-  return parsed.getFullYear() === year
-    && parsed.getMonth() === month - 1
-    && parsed.getDate() === day
-    && parsed.getHours() === hour
-    && parsed.getMinutes() === minute
-    ? null
-    : { localDateTime: true };
+  const asked = Date.UTC(year, month - 1, day, hour, minute);
+  const answered = Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), parsed.getHours(), parsed.getMinutes());
+  const driftMinutes = Math.round((answered - asked) / 60_000);
+  return driftMinutes >= 0 && driftMinutes <= 180 ? null : { localDateTime: true };
 }
 
 function lifecycleOrderValidator(control: AbstractControl): ValidationErrors | null {

@@ -1,6 +1,21 @@
 import type { ActivatedRoute } from "@angular/router";
 
 /**
+ * Credentials handed over in the URL fragment, as the router already decoded
+ * them.
+ *
+ * The router decodes the fragment before this sees it, so a `+` here is a plus.
+ * `URLSearchParams` reads form encoding, where `+` means a space, and would
+ * turn the deadline of an invitation link (`2026-09-28T14:00:54+00:00`) into an
+ * unparseable value — which is exactly how an invitation ended up refused as
+ * "not available". Re-encoding the plus before parsing keeps the decoded value
+ * intact.
+ */
+function fragmentParams(route: ActivatedRoute): URLSearchParams {
+  return new URLSearchParams((route.snapshot.fragment ?? "").replace(/\+/g, "%2B"));
+}
+
+/**
  * A bearer handed over in the URL.
  *
  * The fragment is the right place for one: it never reaches the server, the
@@ -9,8 +24,7 @@ import type { ActivatedRoute } from "@angular/router";
  * delivered before the change.
  */
 function fragmentBearer(route: ActivatedRoute, key: string): string {
-  const fragment = route.snapshot.fragment ?? "";
-  const current = new URLSearchParams(fragment).get(key);
+  const current = fragmentParams(route).get(key);
   if (current) return current;
 
   // Temporary compatibility for links emitted before bearer fragments were
@@ -21,6 +35,11 @@ function fragmentBearer(route: ActivatedRoute, key: string): string {
 /** Read new fragment bearers while retaining compatibility with old query links. */
 export function authBearer(route: ActivatedRoute): string {
   return fragmentBearer(route, "token");
+}
+
+/** Deadline the link declares next to its bearer, if it declares one. */
+export function bearerExpiry(route: ActivatedRoute): string | null {
+  return fragmentParams(route).get("expiresAt") ?? route.snapshot.queryParamMap.get("expiresAt");
 }
 
 /**

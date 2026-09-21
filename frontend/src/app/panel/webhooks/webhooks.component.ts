@@ -19,6 +19,7 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { targetWorkspace } from "../../core/services/workspace-target";
+import { webhookDeliveryLabel, webhookStateLabel } from "../../core/webhook-label";
 import {
   decodeCreatedWebhookResponse,
   decodeWebhookDeliveriesResponse,
@@ -347,7 +348,8 @@ export class WebhooksComponent {
     return w.id;
   }
 
-  deliveryLabel(status: WebhookDelivery["status"]): string {
-    return { pending: "En cola", processing: "Enviando", success: "Entregada", failed: "Fallida" }[status];
-  }
+  // Receiver and delivery wording belongs to the entity, not to each surface that
+  // prints it: the inspector shows the same states.
+  readonly stateLabel = webhookStateLabel;
+  readonly deliveryLabel = webhookDeliveryLabel;
 }

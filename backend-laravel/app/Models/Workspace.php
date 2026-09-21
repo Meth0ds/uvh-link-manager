@@ -29,22 +29,10 @@ class Workspace extends Model
         return $this->hasMany(Link::class);
     }
 
-    /** @return HasMany<CustomDomain, $this> */
-    public function customDomains(): HasMany
-    {
-        return $this->hasMany(CustomDomain::class);
-    }
-
     /** @return HasOne<Quota, $this> */
     public function quota(): HasOne
     {
         return $this->hasOne(Quota::class);
-    }
-
-    /** @return HasMany<ApiToken, $this> */
-    public function apiTokens(): HasMany
-    {
-        return $this->hasMany(ApiToken::class);
     }
 
     /** @return HasMany<Webhook, $this> */

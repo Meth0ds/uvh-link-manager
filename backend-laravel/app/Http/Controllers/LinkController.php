@@ -690,13 +690,6 @@ class LinkController
         ]);
     }
 
-    public function role(Request $request)
-    {
-        $role = UvhRequest::role($request);
-
-        return response()->json(['role' => $role, 'canWrite' => WorkspaceAccess::roleAtLeast((string) $role, 'editor')]);
-    }
-
     // ---------------- helpers ----------------
 
     private function validLinkBody(Request $request, bool $partial = false): bool

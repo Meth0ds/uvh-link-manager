@@ -17,7 +17,7 @@ marcos finos en lugar de tarjetas redondeadas con sombra. Los tokens viven en
 | `--ink` | `#262821` | `#f4f0e4` | Texto principal |
 | `--muted` | `#626357` | `#b9bbae` | Texto secundario |
 | `--line` | `#cecec0` | `#4d5145` | Filetes y bordes |
-| `--accent` | `#c44324` | `#f79573` | Acento (terracota) |
+| `--accent` | `#c14022` | `#f79573` | Acento (terracota) |
 | `--accent-ink` | `#fffaf0` | `#25251e` | Tinta sobre relleno de acento |
 | `--soft` | `#eae7dd` | `#30352b` | Pistas y carriles |
 | `--guide` | `#e5e8dc` | `#2a3025` | Superficie de guías |
@@ -110,7 +110,17 @@ confirmado.
   `replace`/`160–240ms`.
 - `prefers-reduced-motion: reduce` desactiva animaciones y transiciones.
 - El cambio de tema usa View Transitions cuando el navegador lo soporta y se
-  degrada a un cambio directo.
+  degrada a un cambio directo. Es la única transición de vista de la aplicación:
+  su dueño es `PublicThemeTransitionService`, que se queda con el snapshot, lo
+  limpia y absorbe sus rechazos.
+- **La navegación entre rutas no usa View Transitions.** No hay estilos de
+  `::view-transition-*` para rutas ni estaba documentada, y un navegador que
+  expone `startViewTransition` puede saltarse la transición igualmente (ventana
+  ocluida, pestaña oculta, `prefers-reduced-motion`, dos navegaciones seguidas)
+  rechazando `ready` con `InvalidStateError`; el helper del router registra ese
+  rechazo como error de consola y no ofrece gancho para tratarlo como lo que es
+  —un salto normal—. Por eso `withViewTransitions` no está en `routerFeatures`,
+  y una prueba fija que un cambio de ruta no arranca ninguna transición.
 - Sin animaciones permanentes de fondo.
 
 ## 8. Accesibilidad (WCAG 2.2 AA)
@@ -121,14 +131,16 @@ Contraste medido sobre los tokens reales:
 | --- | ----- | ------ |
 | `--ink` sobre `--paper` | 13,32:1 | 13,79:1 |
 | `--muted` sobre `--paper` | 5,45:1 | 8,07:1 |
-| `--accent` sobre `--paper-raised` | 4,91:1 | 7,11:1 |
-| `--accent-ink` sobre `--accent` | 4,83:1 | — |
+| `--accent` sobre `--paper-raised` | 5,09:1 | 7,11:1 |
+| `--accent-ink` sobre `--accent` | 5,02:1 | — |
 | `--uvh-danger` sobre `--paper` | 5,68:1 | 9,01:1 |
 
-Aviso medido: **`--accent` sobre `--paper` da 4,49:1**, ligeramente por debajo
-del `4,5:1` que exige AA para texto normal. Sobre `--paper-raised` cumple. Usa el
-acento para texto sobre placas elevadas, o ajusta el token (por ejemplo
-`#c14022` alcanza `4,66:1` sobre `--paper` con un cambio imperceptible).
+El acento también es texto sobre `--paper` (etiquetas de botones contorneados, enlaces
+de la barra lateral). El valor anterior medía **4,49:1** ahí, ligeramente por
+debajo del `4,5:1` que exige AA para texto normal, así que el token se ajustó a
+`#c14022`: **4,66:1** sobre `--paper` y 5,09:1 sobre `--paper-raised`, con un
+cambio imperceptible. Si vuelve a tocarse el acento, mide los dos pares: el
+texto sobre placa elevada no acredita el texto sobre el fondo de página.
 
 Además: elementos nativos siempre que sea posible, `aria-label` en botones de
 icono, foco visible con `outline` de 2–3px y `outline-offset`, y verificación en

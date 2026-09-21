@@ -45,9 +45,7 @@
           @if (isAdmin() && m.role !== 'owner') {
             <mat-form-field appearance="outline">
               <mat-select [value]="m.role" (selectionChange)="changeRole(m, $event.value)" aria-label="Rol" [disabled]="saving()">
-                <mat-option value="admin">Administrador</mat-option>
-                <mat-option value="editor">Editor</mat-option>
-                <mat-option value="viewer">Visor</mat-option>
+                @for (role of assignableRoles; track role) { <mat-option [value]="role">{{ roleLabel(role) }}</mat-option> }
               </mat-select>
             </mat-form-field>
           }
@@ -76,9 +74,7 @@
         </mat-form-field>
         <mat-form-field appearance="outline" class="role">
           <mat-select [(ngModel)]="inviteRole" aria-label="Rol">
-            <mat-option value="admin">Administrador</mat-option>
-            <mat-option value="editor">Editor</mat-option>
-            <mat-option value="viewer">Visor</mat-option>
+            @for (role of assignableRoles; track role) { <mat-option [value]="role">{{ roleLabel(role) }}</mat-option> }
           </mat-select>
         </mat-form-field>
         <button mat-flat-button color="primary" (click)="invite()" [disabled]="!inviteEmail().trim() || saving() || invitationRetry.remaining(d.workspace.id, inviteEmail()) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inviteEmail()) > 0 ? 'invite-retry-wait' : null">
@@ -94,7 +90,7 @@
             <span class="avatar muted">&#64;</span>
             <div>
               <b>{{ inv.email }}</b>
-              <span>Invitado como {{ roleLabel(inv.role) }} · {{ inv.status }}</span>
+              <span>Invitado como {{ roleLabel(inv.role) }} · {{ invitationLabel(inv.status) }}</span>
               @if (invitationRetry.remaining(d.workspace.id, inv.email); as seconds) {
                 <span class="retry-wait" [id]="'invite-retry-' + inv.id">Espera: <span role="timer" aria-live="off">{{ invitationRetry.label(seconds) }}</span>. Reenvío manual.</span>
               }

@@ -86,6 +86,41 @@ final class SecurityLimiterStoreTest extends TestCase
     }
 
     /**
+     * An empty value inherits the default store, as `.env.example` documents it.
+     *
+     * The key ships *present but empty* there, and the cache manager falls back
+     * on the default for `null` alone — Laravel 13 resolves it with
+     * `enum_value($name) ??`, not `?:`. The empty string therefore reached
+     * `resolve('')`, which throws `Cache store [] is not defined` while
+     * `AppServiceProvider::boot()` is still registering the named limiters. The
+     * application did not boot at all: `artisan` was unusable and
+     * `composer install` failed in its own `post-autoload-dump` script.
+     *
+     * CI never saw it because it runs *without* a `.env`, where the key is
+     * absent — and absent is `null`, which the manager does fall back on. The
+     * documented local flow, `cp .env.example .env`, is the one that always hit
+     * it: with the shipped value this whole suite fails to boot before the fix,
+     * which is the reproduction. The assertions below pin the translation that
+     * stops it, and they have to be assertions rather than another
+     * `#[WithEnvironmentVariable]` case: PHPUnit treats an empty value as
+     * "unset", and unset is precisely the shape that never failed.
+     */
+    public function test_an_empty_limiter_store_inherits_the_default_one(): void
+    {
+        config(['cache.default' => 'database', 'cache.limiter' => '']);
+
+        $this->assertSame('database', UvhLimiters::availabilityStore());
+
+        // A line holding only spaces is the same accident as an empty one.
+        config(['cache.limiter' => '   ']);
+        $this->assertSame('database', UvhLimiters::availabilityStore());
+
+        // And a configured store always wins over the default.
+        config(['cache.limiter' => 'array']);
+        $this->assertSame('array', UvhLimiters::availabilityStore());
+    }
+
+    /**
      * The property that motivated the split, exercised end to end: the
      * availability chain goes down and the credential budget is exactly where
      * it was.

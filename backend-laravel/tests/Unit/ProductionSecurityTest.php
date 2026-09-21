@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Support\ProductionSecurity;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\RepositoryRoot;
 
 class ProductionSecurityTest extends TestCase
 {
@@ -26,7 +27,7 @@ class ProductionSecurityTest extends TestCase
     public function test_intl_is_a_declared_dependency_and_the_image_installs_it(): void
     {
         $composer = json_decode(
-            (string) file_get_contents(dirname(__DIR__, 2).'/composer.json'),
+            RepositoryRoot::read('backend-laravel/composer.json'),
             true,
             512,
             JSON_THROW_ON_ERROR,
@@ -34,7 +35,7 @@ class ProductionSecurityTest extends TestCase
         $this->assertArrayHasKey('ext-intl', $composer['require']);
 
         // The gate above is only actionable if the image satisfies it.
-        $dockerfile = (string) file_get_contents(dirname(__DIR__, 3).'/docker/php/Dockerfile.production');
+        $dockerfile = RepositoryRoot::read('docker/php/Dockerfile.production');
         $this->assertStringContainsString('docker-php-ext-install', $dockerfile);
         $this->assertStringContainsString('intl \\', $dockerfile);
     }

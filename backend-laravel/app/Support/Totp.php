@@ -10,6 +10,10 @@ class Totp
 {
     private const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
+    /** Seconds per counter step, defined once: the verifier and any caller that
+     *  shows a code have to agree on where an interval starts and ends. */
+    public const PERIOD = 30;
+
     public static function generateSecret(): string
     {
         // 20 random bytes => 32 base32 chars.
@@ -41,12 +45,12 @@ class Totp
     public static function matchingCounter(string $code, string $secret, int $window = 1): ?int
     {
         if (! preg_match('/^\d{6}$/D', $code)
-            || ! preg_match('/^[A-Z2-7]{16,128}$/D', strtoupper($secret))
+            || ! self::isUsableSecret($secret)
             || $window < 0 || $window > 5) {
             return null;
         }
         $key = self::base32Decode($secret);
-        $counter = intdiv((int) floor(microtime(true)), 30);
+        $counter = self::counter();
         for ($i = -$window; $i <= $window; $i++) {
             if (hash_equals(self::hotp($key, $counter + $i), $code)) {
                 return $counter + $i;
@@ -54,6 +58,40 @@ class Totp
         }
 
         return null;
+    }
+
+    /**
+     * The code this secret produces at this instant, or null when the secret
+     * cannot yield one.
+     *
+     * Verification belongs to `matchingCounter`, which also returns the accepted
+     * counter so a caller can refuse a replay. This method exists for the other
+     * side of the exchange: showing an operator the code the server expects.
+     */
+    public static function currentCode(string $secret): ?string
+    {
+        if (! self::isUsableSecret($secret)) {
+            return null;
+        }
+
+        return self::hotp(self::base32Decode($secret), self::counter());
+    }
+
+    /** Seconds left in the current interval, so a caller can warn before it rolls. */
+    public static function secondsRemaining(): int
+    {
+        return self::PERIOD - ((int) floor(microtime(true)) % self::PERIOD);
+    }
+
+    /** Whether the verifier would even attempt this secret. */
+    public static function isUsableSecret(string $secret): bool
+    {
+        return preg_match('/^[A-Z2-7]{16,128}$/D', strtoupper($secret)) === 1;
+    }
+
+    private static function counter(): int
+    {
+        return intdiv((int) floor(microtime(true)), self::PERIOD);
     }
 
     public static function provisioningUri(string $account, string $issuer, string $secret): string
@@ -66,7 +104,7 @@ class Totp
             'issuer' => $issuer,
             'algorithm' => 'SHA1',
             'digits' => 6,
-            'period' => 30,
+            'period' => self::PERIOD,
         ]);
 
         return 'otpauth://totp/'.$label.'?'.$query;

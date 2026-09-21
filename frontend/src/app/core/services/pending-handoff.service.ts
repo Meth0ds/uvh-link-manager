@@ -67,7 +67,6 @@ export class PendingHandoffService {
   readonly linkIntent = computed(() => this.states()["link-intent"]);
   /** Latest park outcome per kind, `null` until one has been attempted here. */
   readonly invitationOutcome = computed(() => this.outcomes().invitation);
-  readonly intentOutcome = computed(() => this.outcomes()["link-intent"]);
 
   state(kind: HandoffKind): HandoffState {
     return this.states()[kind];

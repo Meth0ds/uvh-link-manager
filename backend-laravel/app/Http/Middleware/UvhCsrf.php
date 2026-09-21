@@ -22,7 +22,11 @@ class UvhCsrf
         $token = $this->issue($request);
 
         if (! $this->verify($request)) {
-            return response()->json(['error' => 'Token CSRF inválido'], 403);
+            // `reason` is a machine-readable discriminator: a client cannot tell
+            // this rejection from an authorization 403 by status alone, and only
+            // this one may be answered by fetching a fresh token and repeating
+            // the mutation once.
+            return response()->json(['error' => 'Token CSRF inválido', 'reason' => 'csrf_rejected'], 403);
         }
 
         $response = $next($request);
@@ -39,7 +43,15 @@ class UvhCsrf
 
     private function issue(Request $request): string
     {
-        $existing = $request->cookies->get((string) config('uvh.csrf_cookie'));
+        // The bootstrap endpoint always mints a new token, and only it does.
+        // Otherwise a client that believes its token is stale has no way to
+        // replace it: reusing the cookie would hand back the same value, and a
+        // browser will not let script delete a `__Host-` cookie (nor write
+        // `Secure` from a plain HTTP origin), so deletion is not a rotation
+        // mechanism. Every other route keeps reusing the cookie it was sent.
+        $existing = $request->is('api/v1/csrf')
+            ? null
+            : $request->cookies->get((string) config('uvh.csrf_cookie'));
         if (is_string($existing) && $existing !== '') {
             $request->attributes->set(UvhRequest::CSRF_TOKEN, $existing);
 

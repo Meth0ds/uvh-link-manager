@@ -24,7 +24,13 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { ThemeService, type ThemePreference } from "../../core/services/theme.service";
 import { downloadBlob } from "../../core/services/browser-download";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
-import type { AccountDeletionImpact, DataExportStatus, PrivacyRightRequest, PrivacyRightStatus, PrivacyRightType, Session } from "../../core/models";
+import type { AccountDeletionImpact, DataExportStatus, PrivacyRightRequest, PrivacyRightType, Session } from "../../core/models";
+import {
+  privacyRightIsActive,
+  privacyRightStatusLabel,
+  privacyRightTypeLabel,
+  PRIVACY_RIGHT_TYPE_ORDER,
+} from "../../core/privacy-right-label";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
@@ -465,17 +471,10 @@ export class SettingsComponent {
     }
   }
 
-  privacyTypeLabel(type: PrivacyRightType): string {
-    return ({ access: "Acceso", rectification: "Rectificación", erasure: "Supresión", objection: "Oposición", restriction: "Limitación", portability: "Portabilidad" })[type];
-  }
-
-  privacyStatusLabel(status: PrivacyRightStatus): string {
-    return ({ submitted: "Registrada", in_progress: "En revisión", waiting_user: "Requiere respuesta", completed: "Resuelta", rejected: "Cerrada", cancelled: "Cancelada" })[status];
-  }
-
-  privacyIsActive(status: PrivacyRightStatus): boolean {
-    return ["submitted", "in_progress", "waiting_user"].includes(status);
-  }
+  readonly privacyTypeLabel = privacyRightTypeLabel;
+  readonly privacyStatusLabel = privacyRightStatusLabel;
+  readonly privacyIsActive = privacyRightIsActive;
+  readonly privacyTypeOptions = PRIVACY_RIGHT_TYPE_ORDER;
 
   async openOwnedWorkspace(id: number): Promise<void> {
     const previous = this.workspaces.currentId();

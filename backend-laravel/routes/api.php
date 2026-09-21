@@ -121,7 +121,6 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
 
     // Links.
     Route::prefix('links')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
-        Route::get('meta/role', [LinkController::class, 'role'])->middleware('uvh.workspace:viewer');
         Route::get('trash', [LinkController::class, 'trash'])->middleware('uvh.workspace:viewer');
         Route::get('/', [LinkController::class, 'index'])->middleware('uvh.workspace:viewer');
         Route::post('check-alias', [LinkController::class, 'checkAlias'])->middleware(['uvh.workspace:viewer', 'throttle:uvh-link-create']);

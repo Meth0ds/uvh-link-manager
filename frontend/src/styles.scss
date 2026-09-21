@@ -13,7 +13,7 @@
   @include mat.select-overrides((panel-background-color: light-dark(#fffcf5, #2c3028)));
   @include mat.option-overrides((
     label-text-color: light-dark(#262821, #f4f0e4),
-    selected-state-label-text-color: light-dark(#c44324, #f79573),
+    selected-state-label-text-color: light-dark(#c14022, #f79573),
     selected-state-layer-color: light-dark(#eae7dd, #30352b),
     hover-state-layer-color: light-dark(#eae7dd, #30352b),
     focus-state-layer-color: light-dark(#e5e8dc, #3d4436),
@@ -69,7 +69,7 @@ html, html.dark {
     on-surface: var(--ink), on-surface-variant: var(--muted),
     outline: var(--muted), outline-variant: var(--line),
     inverse-surface: var(--ink), inverse-on-surface: var(--paper),
-    inverse-primary: light-dark(#f79573, #c44324),
+    inverse-primary: light-dark(#f79573, #c14022),
     surface-tint: var(--accent),
   ));
   @include mat.button-overrides((

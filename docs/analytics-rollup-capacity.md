@@ -29,7 +29,7 @@ Dos hechos que acotan el problema antes de medirlo:
 
 ## Método
 
-El ensayo vive en `frontend/e2e/async-stack.mjs` (`analyticsContentionDrill`) y
+El ensayo vive en `frontend/e2e/async/analytics-contention.mjs` (`analyticsContentionDrill`) y
 corre dentro de `npm run e2e:async` sobre la topología real de colas (Redis,
 PostgreSQL, un worker por clase). Cada pase:
 

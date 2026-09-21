@@ -6,7 +6,16 @@ FROM composer:2@sha256:aaeab4b6b031e0a88efb907f0f26b563532a644fc2f4ea0d000ecf865
 
 WORKDIR /build
 COPY backend-laravel/composer.json backend-laravel/composer.lock ./
-RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts
+# `ext-intl` is deliberately exempted here, and only here: the composer base is an
+# Alpine PHP build without intl and without a toolchain to compile it, while the
+# runtime image below does compile it and the entrypoint refuses to boot when it
+# is missing. Without this exemption the lockfile cannot be installed at all — the
+# stage aborted with "requires PHP extension ext-intl * but it is missing", and
+# every production build (compose, release smoke, boot contract) failed with it.
+# The gate that matters is the entrypoint's extension assertion, which runs
+# before the framework serves anything.
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts \
+        --ignore-platform-req=ext-intl
 COPY backend-laravel ./
 RUN APP_ENV=local \
     APP_DEBUG=false \

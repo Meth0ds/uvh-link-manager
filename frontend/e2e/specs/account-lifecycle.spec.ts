@@ -14,13 +14,18 @@ test("cambiar email cierra la sesión y traslada el acceso al buzón confirmado"
   const newEmail = `email-changed-${Date.now()}@example.test`;
 
   await page.goto("/app/settings");
+  // The change of email is a two-step dialog: address, then the current
+  // password (plus the second factor when the account has one).
   await page.getByRole("button", { name: "Cambiar email" }).click();
-  const emailForm = page.locator(".email-change-form");
-  await emailForm.getByLabel("Nuevo email").fill(newEmail);
-  await emailForm.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
+  const emailDialog = page.getByRole("dialog");
+  await expect(emailDialog.getByRole("heading", { name: "¿Qué dirección quieres usar?" })).toBeVisible();
+  await emailDialog.getByLabel("Nuevo email").fill(newEmail);
+  await emailDialog.getByRole("button", { name: "Continuar" }).click();
+  await emailDialog.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
   const requestPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/change-email"));
-  await page.getByRole("button", { name: "Enviar confirmación" }).click();
+  await emailDialog.getByRole("button", { name: "Confirmar", exact: true }).click();
   expect((await requestPromise).status()).toBe(200);
+  await emailDialog.getByRole("button", { name: "Entendido" }).click();
   await expect(page.getByText(newEmail, { exact: true })).toBeVisible();
 
   const confirmationUrl = await readMailLink(newEmail, "email_change_verification");
@@ -81,10 +86,15 @@ test("una exportación pendiente puede cancelarse e invalida su confirmación", 
   test.setTimeout(360_000);
   const { email } = await registerVerifyAndLogin(page, "export-cancel");
   await page.goto("/app/settings#privacy");
-  await page.locator(".export-form").getByLabel("Contraseña actual").fill(E2E_PASSWORD);
-  const requestPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/data-export") && response.request().method() === "POST");
+  // The request is a dialog too: password (plus the second factor when the
+  // account has one) before the confirmation mail is admitted.
   await page.getByRole("button", { name: "Solicitar mi archivo" }).click();
+  const exportDialog = page.getByRole("dialog");
+  await exportDialog.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
+  const requestPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/data-export") && response.request().method() === "POST");
+  await exportDialog.getByRole("button", { name: "Solicitar mi archivo", exact: true }).click();
   expect((await requestPromise).status()).toBe(202);
+  await exportDialog.getByRole("button", { name: "Entendido" }).click();
   await expect(page.getByText("Esperando confirmación", { exact: true })).toBeVisible();
   const confirmationUrl = await readMailLink(email, "data_export_confirmation");
 

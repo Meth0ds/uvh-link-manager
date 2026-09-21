@@ -1,6 +1,7 @@
 import { signal } from "@angular/core";
 import { TestBed, type ComponentFixture } from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, provideRouter } from "@angular/router";
+import { of } from "rxjs";
 import { WebhookInspectorComponent } from "./webhook-inspector.component";
 import { ApiService } from "../../core/services/api.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
@@ -19,7 +20,13 @@ describe("WebhookInspectorComponent presentation safety", () => {
       return decoder(path === "/api/v1/webhooks" ? { webhooks: [webhook] } : { deliveries: [], total: 0, page: 1, perPage: 20 });
     });
     await TestBed.configureTestingModule({ imports: [WebhookInspectorComponent], providers: [provideRouter([]),
-      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: "1" }) } } },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { paramMap: convertToParamMap({ id: "1" }) },
+          paramMap: of(convertToParamMap({ id: "1" })),
+        },
+      },
       { provide: ApiService, useValue: api }, { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: role } },
     ] }).compileComponents();
     fixture = TestBed.createComponent(WebhookInspectorComponent);

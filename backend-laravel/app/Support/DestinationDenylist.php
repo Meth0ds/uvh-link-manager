@@ -64,7 +64,103 @@ final class DestinationDenylist
             return null;
         }
 
+        // A host that names an address must be stored in the single spelling
+        // every other spelling of that address reaches. `filter_var` accepts
+        // only the dotted quad and a full IPv6 form, while a browser resolves
+        // `127.1`, `0177.0.0.1`, `0x7f000001` and `2130706433` to the very same
+        // loopback address: an entry written for `127.0.0.1` would be walked
+        // around with a shorter spelling of the address it names.
+        $address = self::canonicalAddress($host);
+        if ($address !== null) {
+            return $address;
+        }
+
         return $host;
+    }
+
+    /**
+     * Canonical spelling of an IP literal, or null when the host is not one.
+     *
+     * `inet_pton` is strict and refuses the legacy IPv4 forms a browser still
+     * resolves; those are parsed here with `inet_aton` semantics and printed
+     * back by `inet_ntop`, which also normalises IPv6 (`0:0:0:0:0:0:0:1` and
+     * `::1` are one address, and so are `::ffff:127.0.0.1` and its full form).
+     */
+    private static function canonicalAddress(string $host): ?string
+    {
+        $packed = @inet_pton($host);
+        if (! is_string($packed)) {
+            $packed = self::packLegacyIpv4($host);
+        }
+        if (! is_string($packed)) {
+            return null;
+        }
+        $printed = @inet_ntop($packed);
+
+        return is_string($printed) && $printed !== '' ? strtolower($printed) : null;
+    }
+
+    /**
+     * Pack the IPv4 spellings `inet_pton` rejects but a resolver accepts.
+     *
+     * `inet_aton` reads up to four dot-separated parts left to right and gives
+     * the last one every byte that remains, so `127.1` is 127.0.0.1 and so is
+     * `127.0.1`; a single part is the whole 32-bit address (`2130706433`). Each
+     * part is hexadecimal with a `0x` prefix, octal with a leading zero, or
+     * decimal.
+     */
+    private static function packLegacyIpv4(string $host): ?string
+    {
+        if ($host === '' || preg_match('/^[0-9a-fx.]+$/D', $host) !== 1) {
+            return null;
+        }
+
+        $parts = explode('.', $host);
+        $count = count($parts);
+        if ($count > 4) {
+            return null;
+        }
+        $values = [];
+        foreach ($parts as $part) {
+            $value = self::legacyIpv4Part($part);
+            if ($value === null) {
+                return null;
+            }
+            $values[] = $value;
+        }
+
+        $address = match ($count) {
+            1 => $values[0] > 0xFFFFFFFF ? null : $values[0],
+            2 => $values[0] > 0xFF || $values[1] > 0xFFFFFF
+                ? null
+                : ($values[0] << 24) | $values[1],
+            3 => $values[0] > 0xFF || $values[1] > 0xFF || $values[2] > 0xFFFF
+                ? null
+                : ($values[0] << 24) | ($values[1] << 16) | $values[2],
+            default => $values[0] > 0xFF || $values[1] > 0xFF || $values[2] > 0xFF || $values[3] > 0xFF
+                ? null
+                : ($values[0] << 24) | ($values[1] << 16) | ($values[2] << 8) | $values[3],
+        };
+        if ($address === null) {
+            return null;
+        }
+
+        return pack('N', $address & 0xFFFFFFFF);
+    }
+
+    private static function legacyIpv4Part(string $part): ?int
+    {
+        if ($part === '') {
+            return null;
+        }
+        if (preg_match('/^0x[0-9a-f]+$/D', $part) === 1) {
+            return (int) hexdec(substr($part, 2));
+        }
+        if (preg_match('/^0[0-7]+$/D', $part) === 1) {
+            return (int) octdec($part);
+        }
+
+        return ctype_digit($part) ? (int) $part : null;
     }
 
     /**
@@ -398,20 +494,6 @@ final class DestinationDenylist
         $hash = strtolower(trim($value));
 
         return preg_match('/^[0-9a-f]{64}$/D', $hash) === 1 ? $hash : null;
-    }
-
-    public static function blockHostId(string $host): ?int
-    {
-        $normalized = self::normalizeHost($host);
-        if ($normalized === null) {
-            return null;
-        }
-        $id = DB::table('destination_denylist')
-            ->where('match_kind', self::KIND_HOST)
-            ->where('match_value', $normalized)
-            ->value('id');
-
-        return is_numeric($id) ? (int) $id : null;
     }
 
     /** @return int number of entries removed */

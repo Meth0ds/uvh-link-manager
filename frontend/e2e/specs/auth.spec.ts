@@ -18,7 +18,8 @@ test("registro, verificación por email y login crean una sesión real", async (
   await expect(page.getByRole("heading", { name: "Email verificado" })).toBeVisible();
 
   await page.getByRole("link", { name: "Iniciar sesión", exact: true }).click();
-  await page.getByLabel("Email").fill(email);
+  await expect(page.getByRole("heading", { name: "Vuelve a tus enlaces." })).toBeVisible();
+  await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Entrar en mi panel" }).click();
   await expect(page).toHaveURL(/\/app\/(dashboard|getting-started)$/);

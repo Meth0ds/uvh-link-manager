@@ -137,7 +137,10 @@
 }
 
 .user-row, .user-list .data-head { grid-template-columns: minmax(245px, 1.7fr) minmax(200px, 1.25fr) minmax(130px, .8fr) minmax(150px, .9fr) minmax(250px, 1.4fr); }
-.domain-row, .domain-list .data-head { grid-template-columns: minmax(230px, 1.45fr) minmax(190px, 1.1fr) minmax(120px, .7fr) minmax(145px, .9fr) minmax(145px, .9fr); }
+// The state column keeps room for the longest domain state label: the badge is
+// nowrap, so a floor below its width would push it over the neighbouring cell
+// while the table sits at its minimum width.
+.domain-row, .domain-list .data-head { grid-template-columns: minmax(230px, 1.45fr) minmax(190px, 1.1fr) minmax(160px, .7fr) minmax(145px, .9fr) minmax(145px, .9fr); }
 
 .data-head {
   min-height: 40px;

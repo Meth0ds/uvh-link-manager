@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -12,16 +13,7 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
-
-const STATE_LABEL: Record<DomainState, string> = {
-  pending: "Pendiente de verificación",
-  verifying: "Comprobando DNS",
-  verified: "DNS verificado",
-  provisioning: "Preparando HTTPS",
-  active: "Activo",
-  error: "Requiere atención",
-  disabled: "Desactivado",
-};
+import { domainStateLabel } from "../../core/domain-state-label";
 
 const DNS_ERROR: Record<string, string> = {
   ownership_and_routing_missing: "No encontramos ni el TXT de propiedad ni el CNAME de tráfico.",
@@ -64,25 +56,34 @@ export class DomainDetailComponent {
     return role === "owner" || role === "admin" || role === "editor";
   });
 
-  private readonly domainId = Number(this.route.snapshot.paramMap.get("id"));
+  /**
+   * The route's `:id`, kept reactive.
+   *
+   * Angular reuses this component when only the parameter changes, so an id
+   * captured once from the snapshot would keep showing — and acting on — the
+   * domain the view was first opened with while the URL names another one.
+   */
+  private readonly domainId = signal(this.paramId());
   private loadedContext: string | null = null;
 
   constructor() {
-    if (!Number.isSafeInteger(this.domainId) || this.domainId < 1) {
-      this.error.set("El identificador del dominio no es válido");
-      this.loading.set(false);
-      return;
-    }
+    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => this.domainId.set(this.paramId()));
 
     effect(() => {
       const workspaceId = this.workspaces.currentId();
       const role = this.workspaces.currentRole();
-      const context = workspaceId === null || role === null ? null : `${workspaceId}:${role}`;
+      const domainId = this.domainId();
+      const context = workspaceId === null || role === null ? null : `${workspaceId}:${role}:${domainId}`;
       if (context === this.loadedContext) return;
       this.loadedContext = context;
       this.requests.invalidate();
       this.domain.set(null);
       this.error.set(null);
+      if (!Number.isSafeInteger(domainId) || domainId < 1) {
+        this.error.set("El identificador del dominio no es válido");
+        this.loading.set(false);
+        return;
+      }
       if (context === null) {
         this.loading.set(false);
         return;
@@ -91,9 +92,21 @@ export class DomainDetailComponent {
     });
   }
 
+  private paramId(): number {
+    return Number(this.route.snapshot.paramMap.get("id"));
+  }
+
+  /** The identity a request must still match to be applied to this view. */
+  private currentContext(): string | null {
+    const workspaceId = this.workspaces.currentId();
+    const role = this.workspaces.currentRole();
+    return workspaceId === null || role === null ? null : `${workspaceId}:${role}:${this.domainId()}`;
+  }
+
   async load(): Promise<void> {
     const workspaceId = this.workspaces.currentId();
     const role = this.workspaces.currentRole();
+    const domainId = this.domainId();
     if (workspaceId === null || role === null) {
       this.requests.invalidate();
       this.domain.set(null);
@@ -101,26 +114,26 @@ export class DomainDetailComponent {
       return;
     }
 
-    const request = this.requests.begin(`${workspaceId}:${role}`);
+    const request = this.requests.begin(`${workspaceId}:${role}:${domainId}`);
     this.loading.set(true);
     this.error.set(null);
     try {
       const response = await this.api.get<DomainDetailResponse>(
-        `/api/v1/domains/${this.domainId}`,
+        `/api/v1/domains/${domainId}`,
         undefined,
-        (value) => decodeDomainDetailResponse(value, this.domainId, this.canEdit()),
+        (value) => decodeDomainDetailResponse(value, domainId, this.canEdit()),
         { signal: request.signal },
       );
-      if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}`)) return;
+      if (!this.requests.isCurrent(request, this.currentContext())) return;
       this.domain.set(response.domain);
     } catch (err) {
-      if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}`)) return;
+      if (!this.requests.isCurrent(request, this.currentContext())) return;
       this.domain.set(null);
       this.error.set(err instanceof ApiRequestError && (err.status === 401 || err.status === 403)
         ? "Ya no tienes acceso a este diagnóstico. Recarga tu sesión o selecciona otro workspace."
         : err instanceof ApiRequestError ? err.message : "No se pudo cargar el diagnóstico del dominio");
     } finally {
-      if (this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}`)) this.loading.set(false);
+      if (this.requests.isCurrent(request, this.currentContext())) this.loading.set(false);
     }
   }
 
@@ -167,7 +180,7 @@ export class DomainDetailComponent {
     }
   }
 
-  stateLabel(state: DomainState): string { return STATE_LABEL[state]; }
+  readonly stateLabel = domainStateLabel;
   dnsErrorLabel(error: string | null): string | null { return error ? (DNS_ERROR[error] ?? "No se pudo confirmar la configuración DNS.") : null; }
   tlsErrorLabel(error: string | null): string | null { return error ? (TLS_ERROR[error] ?? "No se pudo completar la preparación HTTPS.") : null; }
 

@@ -113,14 +113,6 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
   readonly challengeOpen = signal(false);
   readonly compact = signal(typeof window !== "undefined" && window.matchMedia("(max-width: 380px)").matches);
   readonly stateLabel = () => ({ loading: "Cargando", ready: "Pendiente", verifying: "Verificando", verified: "Verificado", expired: "Caducado", error: "Reintentar" })[this.state()];
-  readonly stateCopy = () => ({
-    loading: "Cargando…",
-    ready: "Completa el control para continuar.",
-    verifying: "Verificando la protección antiabuso…",
-    verified: "Completado.",
-    expired: "Ha caducado; complétalo de nuevo.",
-    error: "No se pudo cargar. Reinténtalo.",
-  })[this.state()];
 
   constructor() {
     effect(() => {

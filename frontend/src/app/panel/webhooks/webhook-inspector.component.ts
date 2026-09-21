@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -11,6 +12,7 @@ import { LatestRequest } from "../../core/services/latest-request";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
+import { webhookDeliveryIcon, webhookDeliveryLabel, webhookStateLabel } from "../../core/webhook-label";
 
 @Component({
   selector: "app-webhook-inspector",
@@ -41,19 +43,25 @@ export class WebhookInspectorComponent {
   });
   readonly pages = computed(() => Math.max(1, Math.ceil(this.total() / this.perPage)));
 
-  private readonly webhookId = Number(this.route.snapshot.paramMap.get("id"));
+  /**
+   * The route's `:id`, kept reactive.
+   *
+   * Angular reuses this component when only the parameter changes, so an id
+   * captured once from the snapshot would keep showing — and re-sending — the
+   * deliveries of the webhook the view was first opened with, while the URL
+   * names another one.
+   */
+  private readonly webhookId = signal(this.paramId());
   private loadedContext: string | null = null;
 
   constructor() {
-    if (!Number.isSafeInteger(this.webhookId) || this.webhookId < 1) {
-      this.error.set("El identificador del webhook no es válido");
-      this.loading.set(false);
-      return;
-    }
+    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => this.webhookId.set(this.paramId()));
+
     effect(() => {
       const workspaceId = this.workspaces.currentId();
       const role = this.workspaces.currentRole();
-      const context = workspaceId === null || role === null ? null : `${workspaceId}:${role}`;
+      const webhookId = this.webhookId();
+      const context = workspaceId === null || role === null ? null : `${workspaceId}:${role}:${webhookId}`;
       if (context === this.loadedContext) return;
       this.loadedContext = context;
       this.requests.invalidate();
@@ -62,6 +70,11 @@ export class WebhookInspectorComponent {
       this.total.set(0);
       this.page.set(1);
       this.error.set(null);
+      if (!Number.isSafeInteger(webhookId) || webhookId < 1) {
+        this.error.set("El identificador del webhook no es válido");
+        this.loading.set(false);
+        return;
+      }
       if (context === null) {
         this.loading.set(false);
         return;
@@ -70,33 +83,46 @@ export class WebhookInspectorComponent {
     });
   }
 
+  private paramId(): number {
+    return Number(this.route.snapshot.paramMap.get("id"));
+  }
+
+  /** The identity a request must still match to be applied to this view. */
+  private currentContext(targetPage: number): string | null {
+    const workspaceId = this.workspaces.currentId();
+    const role = this.workspaces.currentRole();
+    return workspaceId === null || role === null
+      ? null
+      : `${workspaceId}:${role}:${this.webhookId()}:${targetPage}`;
+  }
+
   async load(targetPage = this.page()): Promise<void> {
     const workspaceId = this.workspaces.currentId();
     const role = this.workspaces.currentRole();
+    const webhookId = this.webhookId();
     if (workspaceId === null || role === null) return;
-    const context = `${workspaceId}:${role}:${targetPage}`;
-    const request = this.requests.begin(context);
+    const request = this.requests.begin(`${workspaceId}:${role}:${webhookId}:${targetPage}`);
     this.loading.set(true);
     this.error.set(null);
     try {
       const [webhooksResponse, deliveryPage] = await Promise.all([
         this.api.get<{ webhooks: WebhookDto[] }>("/api/v1/webhooks", undefined, decodeWebhooksResponse, { signal: request.signal }),
         this.api.get<WebhookDeliveryPage>(
-          `/api/v1/webhooks/${this.webhookId}/deliveries`,
+          `/api/v1/webhooks/${webhookId}/deliveries`,
           { page: targetPage, perPage: this.perPage },
-          (value) => decodeWebhookDeliveriesResponse(value, { webhookId: this.webhookId, page: targetPage, perPage: this.perPage }),
+          (value) => decodeWebhookDeliveriesResponse(value, { webhookId, page: targetPage, perPage: this.perPage }),
           { signal: request.signal },
         ),
       ]);
-      if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}:${targetPage}`)) return;
-      const webhook = webhooksResponse.webhooks.find((item) => item.id === this.webhookId) ?? null;
+      if (!this.requests.isCurrent(request, this.currentContext(targetPage))) return;
+      const webhook = webhooksResponse.webhooks.find((item) => item.id === webhookId) ?? null;
       if (!webhook) throw new ApiRequestError("Webhook no encontrado", 404);
       this.webhook.set(webhook);
       this.deliveries.set(deliveryPage.deliveries);
       this.total.set(deliveryPage.total);
       this.page.set(deliveryPage.page);
     } catch (err) {
-      if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}:${targetPage}`)) return;
+      if (!this.requests.isCurrent(request, this.currentContext(targetPage))) return;
       // A failed read is not an empty history, and it is not a disappearance
       // either: drop the delivery rows and the count, but keep the last known
       // endpoint so the page still says which webhook failed. Every action on
@@ -108,7 +134,7 @@ export class WebhookInspectorComponent {
         ? "Ya no tienes acceso a este inspector."
         : err instanceof ApiRequestError ? err.message : "No se pudo cargar el inspector");
     } finally {
-      if (this.requests.isCurrent(request, `${this.workspaces.currentId()}:${this.workspaces.currentRole()}:${targetPage}`)) this.loading.set(false);
+      if (this.requests.isCurrent(request, this.currentContext(targetPage))) this.loading.set(false);
     }
   }
 
@@ -147,14 +173,11 @@ export class WebhookInspectorComponent {
   }
 
   // Translate only presentation labels; queue states and action guards retain
-  // their server meaning. A queued event is not a confirmed delivery.
-  deliveryLabel(status: WebhookDelivery["status"]): string {
-    return { pending: "En cola", processing: "Enviando", success: "Entregada", failed: "Fallida" }[status];
-  }
-
-  deliveryIcon(status: WebhookDelivery["status"]): string {
-    return { pending: "schedule", processing: "sync", success: "check", failed: "error_outline" }[status];
-  }
+  // their server meaning. A queued event is not a confirmed delivery. The wording
+  // and the icons are the entity's own, shared with the webhook list.
+  readonly stateLabel = webhookStateLabel;
+  readonly deliveryLabel = webhookDeliveryLabel;
+  readonly deliveryIcon = webhookDeliveryIcon;
 
   formatDate(value: string | null): string {
     return value ? new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";

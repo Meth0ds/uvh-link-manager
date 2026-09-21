@@ -10,12 +10,19 @@ import { createWorkspaceFromBrowser } from "../support/workspace";
 
 type InvitableRole = "admin" | "editor" | "viewer";
 
+// The same words the panel uses for a role: the usage page and the sidebar read
+// one shared vocabulary, so the projection has to be asserted with it.
 const ROLE_LABELS: Record<"owner" | InvitableRole, string> = {
   owner: "Propietario",
   admin: "Administrador",
   editor: "Editor",
-  viewer: "Visualizador",
+  viewer: "Visor",
 };
+
+/** The guide names the workspace it belongs to in its region label. */
+function guideRegion(page: Page, workspaceName: string) {
+  return page.getByRole("region", { name: `Primeros pasos de ${workspaceName}` });
+}
 
 async function expectUsageProjection(page: Page, workspaceName: string, role: keyof typeof ROLE_LABELS): Promise<void> {
   const usageResponse = page.waitForResponse((response) =>
@@ -30,7 +37,9 @@ async function expectUsageProjection(page: Page, workspaceName: string, role: ke
   // workspace role before exposing any of these headings.
   await expect(page.getByRole("heading", { name: "Uso y límites" })).toBeVisible();
   await expect(page.getByRole("heading", { name: workspaceName })).toBeVisible();
-  await expect(page.getByText(ROLE_LABELS[role], { exact: true })).toBeVisible();
+  // The shell names the current role in the sidebar too, so assert the page's
+  // own projection of it: that one is what the usage payload drives.
+  await expect(page.locator("#panel-content").getByText(ROLE_LABELS[role], { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Enlaces" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Dominios" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Miembros" })).toBeVisible();
@@ -91,7 +100,26 @@ async function changeMemberRole(page: Page, email: string, role: InvitableRole):
   expect((await response).status()).toBe(200);
 }
 
+/**
+ * Panel routes fade their content in. A scan that races that entry motion
+ * measures text blended towards the background and reports contrast failures
+ * for a state nobody has to read, so finish the running animations first: the
+ * scan then judges the colours the page settles on, which is what AA is about.
+ */
+async function settleEntryAnimations(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) {
+      try {
+        animation.finish();
+      } catch {
+        // Infinite animations (shimmer, spinners) have no end state to reach.
+      }
+    }
+  });
+}
+
 async function expectNoWcagAAIssues(page: Page): Promise<void> {
+  await settleEntryAnimations(page);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -167,7 +195,8 @@ test("primeros pasos aísla omisión por cuenta y workspace y reacciona al rol r
 
   const firstWorkspace = await createWorkspaceFromBrowser(page, "Guía aislada A");
   await page.goto("/app/getting-started");
-  await expect(page.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Primeros pasos" })).toBeVisible();
+  await expect(guideRegion(page, firstWorkspace)).toBeVisible();
   await page.getByRole("button", { name: "Omitir por ahora" }).click();
   await expect(page.getByRole("heading", { name: "Has omitido esta guía" })).toBeVisible();
   await page.reload();
@@ -175,12 +204,12 @@ test("primeros pasos aísla omisión por cuenta y workspace y reacciona al rol r
 
   const secondWorkspace = await createWorkspaceFromBrowser(page, "Guía aislada B");
   await page.goto("/app/getting-started");
-  await expect(page.getByRole("heading", { name: `Primeros pasos de ${secondWorkspace}` })).toBeVisible();
+  await expect(guideRegion(page, secondWorkspace)).toBeVisible();
   await selectWorkspace(page, firstWorkspace);
   await page.goto("/app/getting-started");
   await expect(page.getByRole("heading", { name: "Has omitido esta guía" })).toBeVisible();
   await page.getByRole("button", { name: "Reanudar guía" }).click();
-  await expect(page.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+  await expect(guideRegion(page, firstWorkspace)).toBeVisible();
 
   await page.goto("/app/team");
   const invitationUrl = await inviteMember(page, memberEmail, "viewer");
@@ -194,7 +223,7 @@ test("primeros pasos aísla omisión por cuenta y workspace y reacciona al rol r
     await acceptInvitation(memberPage, memberEmail, invitationUrl, firstWorkspace);
     await memberPage.goto("/app/getting-started");
     // The owner's local preference must never hide another account's guide.
-    await expect(memberPage.getByRole("heading", { name: `Primeros pasos de ${firstWorkspace}` })).toBeVisible();
+    await expect(guideRegion(memberPage, firstWorkspace)).toBeVisible();
     await expect(memberPage.getByRole("link", { name: "Ver enlaces" })).toBeVisible();
     await expect(memberPage.getByRole("link", { name: "Ver dominios" })).toBeVisible();
     await expect(memberPage.getByRole("link", { name: "Ver equipo" })).toBeVisible();
@@ -315,7 +344,7 @@ test("estado público falla cerrado sin monitor y conserva accesibilidad", async
   expect((await initialStatus).status()).toBe(503);
   await expect(page.getByRole("heading", { name: "Estado del servicio" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
-  await expect(page.getByText("No asumimos que el servicio esté operativo.")).toBeVisible();
+  await expect(page.getByText("No asumimos que el servicio esté operativo ni que esté caído.")).toBeVisible();
 
   // A manual refresh must preserve fail-closed semantics when the independent
   // feed is absent; the fact that this page loads is never treated as health.
@@ -326,11 +355,16 @@ test("estado público falla cerrado sin monitor y conserva accesibilidad", async
   expect((await refreshedStatus).status()).toBe(503);
   await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
 
+  // Backwards from the refresh control: the public theme switch sits between it
+  // and the header links, and the header links to "Ayuda" ("Ayuda técnica" is
+  // the name of the help page itself, not of this link).
   await page.getByRole("button", { name: "Actualizar" }).focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("switch", { name: "Modo oscuro" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("link", { name: "Iniciar sesión" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
-  await expect(page.getByRole("link", { name: "Ayuda técnica" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Ayuda", exact: true })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("link", { name: "UVH, inicio" })).toBeFocused();
   await expectNoWcagAAIssues(page);
@@ -498,7 +532,9 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   await page.getByLabel("Alias (opcional)").fill(alias);
   const createResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/v1/links") && response.request().method() === "POST");
-  await page.getByRole("button", { name: "Crear enlace", exact: true }).click();
+  // "Crear enlace" also names the sidebar and shell actions; the one this form
+  // submits is the dialog's.
+  await page.getByRole("dialog").getByRole("button", { name: "Crear enlace", exact: true }).click();
   expect((await createResponse).status()).toBe(201);
 
   await page.getByRole("button", { name: "Más acciones" }).click();

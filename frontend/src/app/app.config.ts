@@ -1,8 +1,10 @@
 import { ApplicationConfig, inject, provideAppInitializer } from "@angular/core";
-import { provideRouter, withComponentInputBinding, withInMemoryScrolling, withViewTransitions, type Routes } from "@angular/router";
+import { provideRouter, withComponentInputBinding, withInMemoryScrolling, type RouterFeatures, type Routes } from "@angular/router";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
+import { MatPaginatorIntl } from "@angular/material/paginator";
 import { apiInterceptor } from "./core/interceptors/api.interceptor";
+import { SpanishPaginatorIntl } from "./core/paginator-intl";
 import { PendingHandoffService } from "./core/services/pending-handoff.service";
 
 export const routes: Routes = [
@@ -57,19 +59,35 @@ export const routes: Routes = [
   },
 ];
 
+/**
+ * Router features, exported so navigation policy is one readable list that a
+ * test can exercise without booting the application shell.
+ *
+ * Deliberately absent: `withViewTransitions`. Navigation is not a view
+ * transition owner in this application. A browser that exposes
+ * `startViewTransition` can still skip every transition — a frame that is not
+ * being composited (an occluded or offscreen window), a hidden tab, reduced
+ * motion, two navigations in flight — and it reports the skip by rejecting
+ * `ViewTransition.ready` with `InvalidStateError`. Angular's helper attaches its
+ * own `.catch(console.error)` to all three transition promises in development
+ * and offers no hook to treat that skip as the normal outcome it is, so every
+ * route change left an error in the console with no application defect behind
+ * it. The designed transition is the theme change, which owns its snapshot in
+ * `PublicThemeTransitionService` and already swallows those rejections itself.
+ */
+export const routerFeatures: RouterFeatures[] = [
+  withComponentInputBinding(),
+  withInMemoryScrolling({ scrollPositionRestoration: "enabled", anchorScrolling: "enabled" }),
+];
+
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideRouter(
-      routes,
-      withComponentInputBinding(),
-      withInMemoryScrolling({ scrollPositionRestoration: "enabled", anchorScrolling: "enabled" }),
-      // The first route must paint immediately.  Applying a document view
-      // transition to initial navigation can leave a blank snapshot visible
-      // while lazy chunks and the session probe are still resolving.
-      withViewTransitions({ skipInitialTransition: true }),
-    ),
+    provideRouter(routes, ...routerFeatures),
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),
     provideAnimationsAsync(),
+    // Material ships the paginator in English; the panel is in Spanish, so its
+    // labels are replaced once instead of per screen.
+    { provide: MatPaginatorIntl, useClass: SpanishPaginatorIntl },
     // Ask which handoffs this browser is holding, once, before the first route
     // renders. The promise is deliberately not returned: a slow or unreachable
     // answer must not delay the first paint, and a screen that has not heard

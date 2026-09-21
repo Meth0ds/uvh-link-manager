@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Cache\UvhRateLimiter;
 use App\Support\OperationalMetrics;
 use App\Support\ProductionSecurity;
+use App\Support\UvhLimiters;
 use App\Support\UvhRequest;
 use Illuminate\Cache\Events\CacheFailedOver;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -48,7 +49,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->make('cache');
         $this->app->singleton(\Illuminate\Cache\RateLimiter::class, function ($app) {
             return new UvhRateLimiter($app->make('cache')->driver(
-                $app['config']->get('cache.limiter')
+                UvhLimiters::availabilityStore()
             ));
         });
 

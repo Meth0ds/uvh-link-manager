@@ -8,6 +8,7 @@ import type { WorkspaceRole, WorkspaceUsage, WorkspaceUsageQuota } from "../../c
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { WORKSPACE_ROLE_LABEL } from "../../core/workspace-role-label";
 import { PageHeaderComponent } from "../page-header.component";
 import { decodeWorkspaceUsage } from "./usage-response";
 import { LatestRequest } from "../../core/services/latest-request";
@@ -53,9 +54,7 @@ export class UsageComponent {
   private readonly state = signal<UsageState | null>(null);
   private wait: { userId: number; until: number } | null = null;
 
-  readonly roleLabels: Record<WorkspaceRole, string> = {
-    owner: "Propietario", admin: "Administrador", editor: "Editor", viewer: "Visualizador",
-  };
+  readonly roleLabels = WORKSPACE_ROLE_LABEL;
   readonly context = computed<UsageContext | null>(() => {
     const user = this.auth.user();
     const workspace = this.workspaces.list().find((item) => item.id === this.workspaces.currentId());

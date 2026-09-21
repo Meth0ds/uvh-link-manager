@@ -175,24 +175,6 @@ parameters:
 			path: app/Http/Controllers/AnalyticsController.php
 
 		-
-			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:mergeMaps\(\) has parameter \$list with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Http/Controllers/AnalyticsController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:mergeMaps\(\) is unused\.$#'
-			identifier: method.unused
-			count: 1
-			path: app/Http/Controllers/AnalyticsController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:mergeMaps\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Http/Controllers/AnalyticsController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:overview\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -602,12 +584,6 @@ parameters:
 
 		-
 			message: '#^Method App\\Http\\Controllers\\LinkController\:\:restore\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/LinkController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\LinkController\:\:role\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/LinkController.php

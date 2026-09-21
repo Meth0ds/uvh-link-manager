@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Support\RepositoryRoot;
 
 /**
  * Contract between the deployment artifacts and the supply chain around them.
@@ -49,28 +50,6 @@ class ImageSupplyChainContractTest extends TestCase
 
     private const DIGEST = '/^sha256:[0-9a-f]{64}$/';
 
-    private function repositoryRoot(): string
-    {
-        return dirname(__DIR__, 3);
-    }
-
-    /**
-     * A whole-file read with normalized line endings, or a failure that names
-     * the missing file. A contract test that silently checks an empty string is
-     * worse than no test.
-     */
-    private function read(string $relative): string
-    {
-        $path = $this->repositoryRoot().'/'.$relative;
-        $this->assertFileExists($path, "{$relative} is part of the supply chain and must exist");
-
-        $contents = file_get_contents($path);
-        $this->assertIsString($contents, "{$relative} could not be read");
-        $this->assertNotSame('', trim($contents), "{$relative} is empty");
-
-        return str_replace("\r\n", "\n", $contents);
-    }
-
     /**
      * Relative paths of every regular file whose name matches the pattern,
      * reported sorted so a failure reads the same twice.
@@ -79,7 +58,7 @@ class ImageSupplyChainContractTest extends TestCase
      */
     private function filesMatching(string $pattern, ?string $directory = null): array
     {
-        $root = $this->repositoryRoot();
+        $root = RepositoryRoot::path();
         $matches = [];
         $pending = [$directory === null ? $root : $root.'/'.$directory];
 
@@ -145,7 +124,7 @@ class ImageSupplyChainContractTest extends TestCase
      */
     private function dockerfileReferences(string $file): array
     {
-        $lines = explode("\n", $this->read($file));
+        $lines = explode("\n", RepositoryRoot::read($file));
 
         $stages = [];
         foreach ($lines as $line) {
@@ -190,7 +169,7 @@ class ImageSupplyChainContractTest extends TestCase
     {
         $references = [];
 
-        foreach (explode("\n", $this->read($file)) as $offset => $line) {
+        foreach (explode("\n", RepositoryRoot::read($file)) as $offset => $line) {
             if (preg_match('/^\s*image:\s*(\S+)\s*$/', $line, $image) !== 1) {
                 continue;
             }
@@ -237,15 +216,6 @@ class ImageSupplyChainContractTest extends TestCase
         ];
     }
 
-    /**
-     * The registry path of a reference without its tag, for messages and for
-     * grouping the same image across files.
-     */
-    private function imagePath(string $reference): string
-    {
-        return preg_split('/[:@]/', $reference)[0];
-    }
-
     public function test_every_dockerfile_builds_from_a_pinned_base_image(): void
     {
         $dockerfiles = $this->dockerfiles();
@@ -290,7 +260,7 @@ class ImageSupplyChainContractTest extends TestCase
         $pinned = 0;
 
         foreach ($files as $file) {
-            $contents = $this->read($file);
+            $contents = RepositoryRoot::read($file);
 
             foreach ($this->composeReferences($file) as $entry) {
                 $parts = $this->split($entry);
@@ -380,7 +350,7 @@ class ImageSupplyChainContractTest extends TestCase
         $seen = 0;
 
         foreach ($this->dockerfiles() as $file) {
-            $lines = explode("\n", $this->read($file));
+            $lines = explode("\n", RepositoryRoot::read($file));
 
             $entrypoint = array_filter(
                 $lines,
@@ -418,7 +388,7 @@ class ImageSupplyChainContractTest extends TestCase
 
     public function test_dependabot_maintains_every_directory_that_holds_a_dockerfile(): void
     {
-        $config = $this->read(self::DEPENDABOT);
+        $config = RepositoryRoot::read(self::DEPENDABOT);
 
         preg_match_all(
             '/- package-ecosystem: docker\n\s+directory: (\S+)/',
@@ -460,8 +430,8 @@ class ImageSupplyChainContractTest extends TestCase
 
     public function test_the_digest_integrity_gate_resolves_every_pin_in_ci(): void
     {
-        $script = $this->read(self::DIGEST_SCRIPT);
-        $workflow = $this->read(self::CI_WORKFLOW);
+        $script = RepositoryRoot::read(self::DIGEST_SCRIPT);
+        $workflow = RepositoryRoot::read(self::CI_WORKFLOW);
 
         // What the script has to do, stated as the three outcomes it can report:
         // a pin that resolves, a tag that moved on, and a pin that no longer
@@ -483,7 +453,7 @@ class ImageSupplyChainContractTest extends TestCase
 
     public function test_the_production_images_get_an_sbom_and_a_scan_where_they_are_built(): void
     {
-        $workflow = $this->read(self::CI_WORKFLOW);
+        $workflow = RepositoryRoot::read(self::CI_WORKFLOW);
 
         // Both production images are built by the release smoke job. Scanning
         // them anywhere else would scan a reconstruction, not the artifact.
@@ -529,8 +499,8 @@ class ImageSupplyChainContractTest extends TestCase
 
     public function test_the_evidence_template_and_the_runbook_ask_for_the_artifact_not_the_recipe(): void
     {
-        $evidence = $this->read(self::RELEASE_EVIDENCE);
-        $runbook = $this->read(self::PROVENANCE_RUNBOOK);
+        $evidence = RepositoryRoot::read(self::RELEASE_EVIDENCE);
+        $runbook = RepositoryRoot::read(self::PROVENANCE_RUNBOOK);
 
         foreach (['Digest `uvh-api`', 'Digest `uvh-web`'] as $field) {
             $this->assertStringContainsString($field, $evidence, "the evidence template no longer asks for {$field}, which is what makes a candidate immutable");

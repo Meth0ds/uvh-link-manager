@@ -141,6 +141,14 @@ jobs:
 
       - name: Run test suite against uvh_test
         working-directory: backend-laravel
+        # Los contratos de tests/Unit describen ficheros de la raíz del
+        # repositorio (Compose, Dockerfiles, workflows...). Se declara aquí en
+        # vez de dejarlo a la heurística de `Tests\Support\RepositoryRoot`: el
+        # job comprueba el repositorio completo, así que la raíz es el
+        # workspace, y nombrarlo hace que un checkout parcial falle en vez de
+        # verificar otro árbol.
+        env:
+          UVH_REPO_ROOT: ${{ github.workspace }}
         run: composer test
 
   digest-integrity:

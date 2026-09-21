@@ -222,25 +222,6 @@ class AnalyticsController
         ];
     }
 
-    private function mergeMaps(array $list): array
-    {
-        $out = [];
-        foreach ($list as $raw) {
-            if ($raw === null || $raw === '') {
-                continue;
-            }
-            $map = is_array($raw) ? $raw : json_decode((string) $raw, true);
-            if (! is_array($map)) {
-                continue;
-            }
-            foreach ($map as $k => $v) {
-                $out[$k] = ($out[$k] ?? 0) + (int) $v;
-            }
-        }
-
-        return $out;
-    }
-
     /** @return array{ok: bool, value: ?int} */
     private function parseLinkId(mixed $value): array
     {

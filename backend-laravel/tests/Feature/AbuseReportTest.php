@@ -17,7 +17,6 @@ class AbuseReportTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['uvh.public_host' => 'uvh.es']);
         DB::statement('TRUNCATE users, sessions, workspaces, memberships, invitations, quotas, custom_domains, links, tags, link_tags, redirect_rules, click_events, metric_rollups, metric_unique_visitors, api_tokens, webhooks, webhook_deliveries, abuse_reports, audit_events, email_tokens, jobs, failed_jobs RESTART IDENTITY CASCADE');
         $this->disableCookieEncryption();
         $this->withCredentials();

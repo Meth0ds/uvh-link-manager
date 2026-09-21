@@ -21,13 +21,8 @@ import { InvitationRetryService } from "./invitation-retry.service";
 import { LatestRequest } from "../../core/services/latest-request";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeWorkspaceDetail } from "../../core/services/workspace-response-decoders";
-
-const ROLE_LABEL: Record<string, string> = {
-  owner: "Propietario",
-  admin: "Administrador",
-  editor: "Editor",
-  viewer: "Visor",
-};
+import { isWorkspaceRole, workspaceRoleLabel } from "../../core/workspace-role-label";
+import { invitationStatusLabel } from "../../core/invitation-status-label";
 
 @Component({
   selector: "app-team",
@@ -81,7 +76,10 @@ export class TeamComponent {
   readonly invitationPageIndex = signal(0);
   readonly invitationPageSize = signal(25);
 
-  readonly roleLabel = (r: string) => ROLE_LABEL[r] ?? r;
+  readonly roleLabel = (r: string) => (isWorkspaceRole(r) ? workspaceRoleLabel(r) : r);
+  readonly invitationLabel = invitationStatusLabel;
+  /** The roles an admin hands out here; ownership is transferred, never assigned. */
+  readonly assignableRoles = ["admin", "editor", "viewer"] as const;
 
   readonly isOwner = computed(() => this.detail()?.workspace.role === "owner");
   readonly isAdmin = computed(() => {

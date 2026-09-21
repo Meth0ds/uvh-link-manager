@@ -5,8 +5,8 @@ export const E2E_PASSWORD = "Glass-Falcon_Orbit-742!";
 
 export async function registerFromBrowser(page: Page, email: string, name = "Persona E2E"): Promise<void> {
   await page.goto("/auth?mode=register");
-  await expect(page.getByRole("heading", { name: "Crea tu espacio de trabajo" })).toBeVisible();
-  await page.getByLabel("Nombre").fill(name);
+  await expect(page.getByRole("heading", { name: "Crea tu cuenta en UVH" })).toBeVisible();
+  await page.getByLabel("Nombre completo").fill(name);
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
@@ -18,7 +18,12 @@ export async function registerFromBrowser(page: Page, email: string, name = "Per
 
 export async function loginFromBrowser(page: Page, email: string, password = E2E_PASSWORD): Promise<void> {
   await page.goto("/auth");
-  await page.getByLabel("Email").fill(email);
+  // The sign-in panel is the state that owns the credential fields. Waiting for
+  // its heading keeps this helper from filling a field that is still mounted
+  // from the screen the caller came from, and `exact` keeps the field apart
+  // from any labelled region whose name merely contains "Email".
+  await expect(page.getByRole("heading", { name: "Vuelve a tus enlaces." })).toBeVisible();
+  await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Contraseña", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Entrar en mi panel" }).click();
 }

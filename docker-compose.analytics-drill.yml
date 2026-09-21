@@ -7,7 +7,7 @@
 # question the drill exists for — many workers competing for one daily row —
 # cannot be reproduced with real admitted traffic.
 #
-# Used only with `UVH_ASYNC_EXTRA_COMPOSE` (see `frontend/e2e/async-stack.mjs`)
+# Used only with `UVH_ASYNC_EXTRA_COMPOSE` (see `frontend/e2e/async/topology.mjs`)
 # and never by CI. The rest of the stack is untouched:
 #
 #   docker compose -p uvh-async-e2e \

@@ -18,11 +18,6 @@ class Ids
         return hash('sha256', $input);
     }
 
-    public static function randomCode(): string
-    {
-        return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-    }
-
     public static function randomAlias(int $length = 8): string
     {
         $out = '';

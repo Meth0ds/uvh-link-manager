@@ -27,6 +27,20 @@ import type {
   PrivacyRightType,
 } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
+import { accountRecoveryStateLabel, ACCOUNT_RECOVERY_REVIEW_FILTER } from "../../core/account-recovery-state-label";
+import { resourceTypeLabel } from "../../core/resource-type-label";
+import { ADMIN_ACCOUNT_FLAG_LABEL, ADMIN_USER_FILTERS, adminAccountStateLabel, type AdminUserFilterValue } from "../../core/admin-user-label";
+import { DOMAIN_STATE_ORDER, domainStateLabel } from "../../core/domain-state-label";
+import { isLinkState, linkStateLabel } from "../../core/link-state-label";
+import { mailOutboxStateLabel, MAIL_OUTBOX_STATE_ORDER } from "../../core/mail-outbox-state-label";
+import {
+  privacyRightIsActive,
+  privacyRightStatusLabel,
+  privacyRightTypeLabel,
+  PRIVACY_RIGHT_STATUS_ORDER,
+  PRIVACY_RIGHT_TYPE_ORDER,
+} from "../../core/privacy-right-label";
+import { reportStatusLabel, REPORT_STATUS_ORDER } from "../../core/report-status-label";
 import {
   decodeAccountRecoveryDecision,
   decodeAdminAuditPage,
@@ -57,41 +71,13 @@ interface PageResponse<T> {
   requests?: T[];
 }
 
-type UserStatus = "" | "active" | "blocked" | "unverified" | "admin" | "mfa";
+type UserStatus = "" | AdminUserFilterValue;
 type ReportStatus = "" | AdminReport["status"];
 type RecoveryStatus = "" | AccountRecoveryStatus;
 type DomainFilter = "" | DomainState;
 type MailStatusFilter = "" | MailOutboxStatus;
 type PrivacyStatusFilter = "" | PrivacyRightStatus;
 type PrivacyTypeFilter = "" | PrivacyRightType;
-
-const DOMAIN_LABELS: Record<DomainState, string> = {
-  pending: "Pendiente",
-  verifying: "Verificando",
-  verified: "Verificado",
-  provisioning: "Emitiendo certificado",
-  active: "Activo",
-  error: "Error",
-  disabled: "Desactivado",
-};
-
-const REPORT_LABELS: Record<AdminReport["status"], string> = {
-  open: "Abierta",
-  reviewed: "Revisada",
-  actioned: "Resuelta",
-  dismissed: "Desestimada",
-};
-
-const RECOVERY_LABELS: Record<AccountRecoveryStatus, string> = {
-  requested: "Email pendiente",
-  email_confirmed: "Lista para revisar",
-  in_review: "En revisión",
-  approved: "Aprobada",
-  rejected: "Rechazada",
-  completed: "Completada",
-  expired: "Caducada",
-  cancelled: "Cancelada",
-};
 
 @Component({
   selector: "app-admin",
@@ -205,9 +191,31 @@ export class AdminComponent {
   readonly privacyPage = signal(0);
   readonly privacyPageSize = signal(20);
 
-  readonly domainLabel = (state: DomainState) => DOMAIN_LABELS[state] ?? state;
-  readonly reportLabel = (status: AdminReport["status"]) => REPORT_LABELS[status] ?? status;
-  readonly recoveryLabel = (status: AccountRecoveryStatus) => RECOVERY_LABELS[status] ?? status;
+  // Every state label and every filter option this console prints comes from the
+  // vocabulary of the entity it describes, so a badge and the filter that selects
+  // it cannot name the same state differently. The fallbacks the report and
+  // recovery maps used to carry are gone: the admin decoders validate both status
+  // sets before the value reaches them, so an unmapped key cannot occur.
+  readonly domainLabel = domainStateLabel;
+  readonly reportLabel = reportStatusLabel;
+  readonly recoveryLabel = accountRecoveryStateLabel;
+  readonly mailStatusLabel = mailOutboxStateLabel;
+  readonly privacyStatusLabel = privacyRightStatusLabel;
+  readonly privacyTypeLabel = privacyRightTypeLabel;
+  readonly privacyActive = privacyRightIsActive;
+  readonly accountStateLabel = adminAccountStateLabel;
+
+  /** A report carries the state of its link as plain text; print it as a state. */
+  readonly reportLinkStateLabel = (state: string) => (isLinkState(state) ? linkStateLabel(state) : state);
+
+  readonly accountFlags = ADMIN_ACCOUNT_FLAG_LABEL;
+  readonly userFilters = ADMIN_USER_FILTERS;
+  readonly domainStateOptions = DOMAIN_STATE_ORDER;
+  readonly reportStatusOptions = REPORT_STATUS_ORDER;
+  readonly recoveryStatusOptions = ACCOUNT_RECOVERY_REVIEW_FILTER;
+  readonly mailStatusOptions = MAIL_OUTBOX_STATE_ORDER;
+  readonly privacyStatusOptions = PRIVACY_RIGHT_STATUS_ORDER;
+  readonly privacyTypeOptions = PRIVACY_RIGHT_TYPE_ORDER;
 
   countLabel(count: number, singular: string, plural: string): string {
     return `${count} ${count === 1 ? singular : plural}`;
@@ -684,20 +692,6 @@ export class AdminComponent {
     }
   }
 
-  mailStatusLabel(status: MailOutboxStatus): string {
-    return ({
-      pending: "Pendiente",
-      queued: "En cola",
-      processing: "Procesando",
-      sent: "Enviado",
-      failed: "Fallido",
-      obsolete: "Obsoleto",
-      comp_pending: "Compensación pendiente",
-      compensating: "Compensando",
-      compensated: "Compensado",
-    })[status];
-  }
-
   async loadPrivacyRequests(): Promise<void> {
     const status = this.privacyStatus();
     const type = this.privacyType();
@@ -767,18 +761,6 @@ export class AdminComponent {
     if (message) await this.runPrivacyAction(request, "extend", message, reasonCode);
   }
 
-  privacyTypeLabel(type: PrivacyRightType): string {
-    return ({ access: "Acceso", rectification: "Rectificación", erasure: "Supresión", objection: "Oposición", restriction: "Limitación", portability: "Portabilidad" })[type];
-  }
-
-  privacyStatusLabel(status: PrivacyRightStatus): string {
-    return ({ submitted: "Registrada", in_progress: "En revisión", waiting_user: "Espera al usuario", completed: "Resuelta", rejected: "Cerrada", cancelled: "Cancelada" })[status];
-  }
-
-  privacyActive(status: PrivacyRightStatus): boolean {
-    return ["submitted", "in_progress", "waiting_user"].includes(status);
-  }
-
   private async privacyMessage(title: string, message: string, confirmLabel: string, destructive = false): Promise<string | null> {
     return this.actions.prompt({
       title,
@@ -812,8 +794,24 @@ export class AdminComponent {
     return map[key] ?? 0;
   }
 
+  /**
+   * The trail identifies an action by its code, and this tab's own search
+   * matches that code verbatim. Stood in for a translation it used to be
+   * rewritten as `link · create`, which looked like a label and was not one:
+   * pasting back what you read returned nothing. Print the identifier intact.
+   */
   auditLabel(action: string): string {
-    return action.replace(/\./g, " · ");
+    return action;
+  }
+
+  /** Same vocabulary as the workspace activity list, for the same trail. */
+  resourceLabel(type: string | null): string {
+    return resourceTypeLabel(type);
+  }
+
+  /** Which deployment this process is running in, said in the panel's language. */
+  environmentLabel(value: string): string {
+    return ({ local: "Desarrollo local", testing: "Pruebas", staging: "Preproducción", production: "Producción" } as Record<string, string>)[value] ?? value;
   }
 
   formatDate(iso: string): string {

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Support\RepositoryRoot;
 
 /**
  * Contract between the shipped production template and the code that reads it.
@@ -83,21 +84,6 @@ class EnvTemplateContractTest extends TestCase
     /** Variables the edge consumes; no PHP file reads them. */
     private const EDGE_PREFIX = 'EDGE_';
 
-    private function read(string $relative): string
-    {
-        $root = dirname(__DIR__, 3);
-        $this->assertDirectoryExists(
-            $root.'/backend-laravel',
-            "This contract describes files outside backend-laravel/ and needs the repository root, which is not present at {$root}.",
-        );
-
-        $contents = file_get_contents($root.'/'.$relative);
-        $this->assertIsString($contents, "{$relative} could not be read from the repository root");
-        $this->assertNotSame('', trim($contents), "{$relative} is empty");
-
-        return $contents;
-    }
-
     /**
      * The template as `KEY => value`, ignoring comments and blank lines.
      *
@@ -106,7 +92,7 @@ class EnvTemplateContractTest extends TestCase
     private function template(): array
     {
         $values = [];
-        foreach (explode("\n", $this->read(self::PRODUCTION_ENV)) as $line) {
+        foreach (explode("\n", RepositoryRoot::read(self::PRODUCTION_ENV)) as $line) {
             if (preg_match('/^([A-Z0-9_]+)=(.*)$/', trim($line), $matches)) {
                 $values[$matches[1]] = trim($matches[2]);
             }
@@ -132,7 +118,7 @@ class EnvTemplateContractTest extends TestCase
     {
         preg_match_all(
             "/env\\(\\s*'([A-Z0-9_]+)'\\s*,\\s*(\\d+|true|false|null|'[^']*')\\s*\\)/",
-            $this->read(self::UVH_CONFIG),
+            RepositoryRoot::read(self::UVH_CONFIG),
             $matches,
             PREG_SET_ORDER,
         );
@@ -205,7 +191,7 @@ class EnvTemplateContractTest extends TestCase
 
     public function test_every_name_the_template_ships_is_read_by_something(): void
     {
-        $configDirectory = dirname(__DIR__, 3).'/'.dirname(self::UVH_CONFIG);
+        $configDirectory = RepositoryRoot::path().'/'.dirname(self::UVH_CONFIG);
         $phpConfigurations = '';
         foreach (glob($configDirectory.'/*.php') ?: [] as $file) {
             $phpConfigurations .= (string) file_get_contents($file);

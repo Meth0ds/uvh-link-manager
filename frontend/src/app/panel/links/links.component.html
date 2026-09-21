@@ -28,7 +28,17 @@
 <section class="filter-plate" aria-label="Buscar y filtrar enlaces">
   <div class="filter-bar">
     <div class="filter-meta"><mat-icon aria-hidden="true">filter_list</mat-icon>Explorar enlaces</div>
-    <b class="filter-count tnum">{{ total() }} resultados</b>
+    <div class="filter-summary">
+      @if (tag()) {
+        <button
+          type="button"
+          class="tag-filter"
+          [attr.aria-label]="'Quitar el filtro por la etiqueta ' + tag()"
+          (click)="toggleTag(tag())"
+        ><mat-icon aria-hidden="true">sell</mat-icon>#{{ tag() }}<mat-icon aria-hidden="true">close</mat-icon></button>
+      }
+      <b class="filter-count tnum">{{ total() }} resultados</b>
+    </div>
   </div>
   <div class="filters">
     <mat-form-field appearance="outline" class="search">
@@ -94,7 +104,14 @@
           @if (link.tags.length) {
             <div class="meta">
               @for (t of link.tags; track t) {
-                <span class="tag">#{{ t }}</span>
+                <button
+                  type="button"
+                  class="tag"
+                  [class.tag-on]="tag() === t"
+                  [attr.aria-pressed]="tag() === t"
+                  [attr.aria-label]="tag() === t ? 'Quitar el filtro por la etiqueta ' + t : 'Filtrar los enlaces por la etiqueta ' + t"
+                  (click)="$event.stopPropagation(); toggleTag(t)"
+                >#{{ t }}</button>
               }
             </div>
           }

@@ -18,6 +18,7 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 
 import { AuthService } from "../core/services/auth.service";
 import { WorkspaceService } from "../core/services/workspace.service";
+import { isWorkspaceRole, workspaceRoleLabel } from "../core/workspace-role-label";
 import { LinkDialogService } from "./links/link-dialog.service";
 import { WorkspaceDialogComponent, type WorkspaceDialogResult } from "./workspace-dialog.component";
 import { PublicThemeToggleComponent } from "../core/public-theme-toggle.component";
@@ -78,8 +79,8 @@ export class PanelComponent {
   });
 
   roleLabelFor(role: string | null | undefined): string {
-    const labels: Record<string, string> = { owner: "Propietario", admin: "Administrador", editor: "Editor", viewer: "Solo lectura" };
-    return role ? labels[role] ?? "Rol personalizado" : "Sin rol asignado";
+    if (!role) return "Sin rol asignado";
+    return isWorkspaceRole(role) ? workspaceRoleLabel(role) : "Rol personalizado";
   }
   // Derive the breadcrumb from known routes only; never echo URL parameters.
   private readonly currentUrl = toSignal(this.router.events.pipe(

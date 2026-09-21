@@ -81,28 +81,10 @@ class User extends Authenticatable
         return $this->hasMany(Workspace::class, 'owner_user_id');
     }
 
-    /** @return HasMany<ApiToken, $this> */
-    public function apiTokens(): HasMany
-    {
-        return $this->hasMany(ApiToken::class, 'created_by');
-    }
-
-    /** @return HasMany<AuditEvent, $this> */
-    public function auditEvents(): HasMany
-    {
-        return $this->hasMany(AuditEvent::class);
-    }
-
     /** @return HasMany<PrivacyRightsRequest, $this> */
     public function privacyRightsRequests(): HasMany
     {
         return $this->hasMany(PrivacyRightsRequest::class);
-    }
-
-    /** @return HasMany<PrivacyRightsRequest, $this> */
-    public function assignedPrivacyRightsRequests(): HasMany
-    {
-        return $this->hasMany(PrivacyRightsRequest::class, 'assigned_admin_id');
     }
 
     /** @return HasMany<LegalAcceptance, $this> */

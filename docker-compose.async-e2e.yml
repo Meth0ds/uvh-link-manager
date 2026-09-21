@@ -21,6 +21,10 @@ x-php-service: &php-service
   working_dir: /app
   volumes:
     - ./backend-laravel:/app
+    # The export path sizes its work against the production worker ceiling, so
+    # this stack runs with the same one. Without it a maximum-size export is
+    # refused by its own memory guard before a crash drill can reach it.
+    - ./docker/php/uvh-worker-ceiling.ini:/usr/local/etc/php/conf.d/zz-uvh-worker-ceiling.ini:ro
   environment: &php-environment
     APP_ENV: testing
     APP_DEBUG: "false"
@@ -282,7 +286,7 @@ services:
   #
   # No service here pins `container_name`, which is what keeps
   # `docker compose up -d --scale queue-analytics=N` available: the rollup
-  # contention drill in `frontend/e2e/async-stack.mjs` uses it to put more than
+  # contention drill in `frontend/e2e/async/analytics-contention.mjs` uses it to put more than
   # one consumer behind the same daily rollup row. Production intentionally
   # stays at one worker per pool.
   queue-mail:

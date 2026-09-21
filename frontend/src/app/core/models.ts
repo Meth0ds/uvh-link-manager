@@ -551,4 +551,6 @@ export interface AuditEvent {
 export interface ApiError {
   error: string;
   details?: unknown;
+  /** Stable discriminator for rejections whose status code is overloaded. */
+  reason?: string;
 }

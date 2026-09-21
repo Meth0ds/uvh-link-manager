@@ -95,10 +95,4 @@ class Link extends Model
     {
         return $this->hasMany(RedirectRule::class);
     }
-
-    /** @return HasMany<ClickEvent, $this> */
-    public function clickEvents(): HasMany
-    {
-        return $this->hasMany(ClickEvent::class);
-    }
 }

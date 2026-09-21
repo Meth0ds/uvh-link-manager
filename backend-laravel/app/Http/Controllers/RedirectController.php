@@ -261,8 +261,11 @@ class RedirectController
 
     private function page(string $title, string $body, int $status): string
     {
+        // The heading and the document title are escaped separately: `<title>`
+        // is raw text, so an unescaped interpolation there is an injection even
+        // when the body is escaped.
         return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            .'<title>'.$title.' · UVH</title><style>'
+            .'<title>'.htmlspecialchars($title, ENT_QUOTES, 'UTF-8').' · UVH</title><style>'
             .'body{font-family:Manrope,Segoe UI,Arial,sans-serif;background:#F6F8FC;color:#07111F;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}'
             .'.card{background:#fff;border:1px solid #E3E8F0;border-radius:16px;padding:40px;max-width:420px;text-align:center}'
             .'h1{font-size:22px;margin:0 0 8px} p{color:#33415C;line-height:1.6;margin:0}'

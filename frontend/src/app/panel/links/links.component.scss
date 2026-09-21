@@ -33,6 +33,40 @@
   letter-spacing: .04em;
 }
 
+.filter-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+// The active tag filter sits next to the count it explains and carries its own
+// way out. The chips on the rows toggle it; this one only clears it.
+.tag-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--uvh-electric);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--uvh-ink);
+  font: 11px/1.6 "Courier New", monospace;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+
+  mat-icon {
+    width: 15px;
+    height: 15px;
+    font-size: 15px;
+    color: var(--uvh-electric);
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--uvh-electric) 12%, transparent);
+  }
+}
+
 .filters {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(150px, 1fr) minmax(150px, 1fr);
@@ -233,8 +267,23 @@
     padding: 2px 7px;
     border: 1px solid var(--uvh-border);
     border-radius: 3px;
+    background: transparent;
     color: var(--uvh-muted);
     font: 10.5px/1.6 "Courier New", monospace;
+    cursor: pointer;
+    transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+
+    &:hover {
+      color: var(--uvh-ink);
+      border-color: var(--uvh-muted);
+    }
+
+    // Filled like the dashboard's selected period: same meaning, same look.
+    &.tag-on {
+      border-color: var(--uvh-electric);
+      background: var(--uvh-electric);
+      color: var(--accent-ink);
+    }
   }
 }
 

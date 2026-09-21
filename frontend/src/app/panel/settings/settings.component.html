@@ -273,7 +273,7 @@
     <form class="stack privacy-form" [formGroup]="privacyForm" (ngSubmit)="submitPrivacyRequest()">
       <h3>Nueva solicitud</h3>
       <p>El plazo ordinario empieza al registrarla. No incluyas contraseñas, códigos MFA ni documentos de identidad en el texto.</p>
-      <mat-form-field appearance="outline"><mat-label>Derecho que quieres ejercer</mat-label><mat-select formControlName="type"><mat-option value="access">Acceso</mat-option><mat-option value="rectification">Rectificación</mat-option><mat-option value="erasure">Supresión</mat-option><mat-option value="objection">Oposición</mat-option><mat-option value="restriction">Limitación del tratamiento</mat-option><mat-option value="portability">Portabilidad</mat-option></mat-select><mat-icon matPrefix>rule</mat-icon></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Derecho que quieres ejercer</mat-label><mat-select formControlName="type">@for (type of privacyTypeOptions; track type) { <mat-option [value]="type">{{ privacyTypeLabel(type) }}</mat-option> }</mat-select><mat-icon matPrefix>rule</mat-icon></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>Alcance o datos concretos</mat-label><textarea matInput formControlName="details" rows="4" maxlength="2000"></textarea><mat-hint align="end">{{ privacyForm.controls.details.value.length }}/2000</mat-hint>@if (privacyForm.controls.details.hasError('detailRequired')) { <mat-error>Describe el alcance en al menos 10 caracteres.</mat-error> }</mat-form-field>
       <div class="row-actions"><button mat-flat-button color="primary" type="submit" [disabled]="privacyBusy()">{{ privacyBusy() ? 'Registrando…' : 'Registrar solicitud' }}</button></div>
     </form>

@@ -36,7 +36,7 @@ ilustrativos; no representan clientes, métricas ni enlaces reales publicados.
 | Papel elevado | `#fffcf5` | `#2c3028` |
 | Tinta | `#262821` | `#f4f0e4` |
 | Texto secundario | `#626357` | `#b9bbae` |
-| Acento | `#c44324` | `#f79573` |
+| Acento | `#c14022` | `#f79573` |
 | Líneas | `#cecec0` | `#4d5145` |
 
 Manrope local para cuerpo y titulares; Georgia cursiva para énfasis editorial;

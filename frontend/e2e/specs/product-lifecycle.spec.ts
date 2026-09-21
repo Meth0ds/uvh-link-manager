@@ -26,7 +26,9 @@ test("workspace y enlace recorren creación, edición, pausa, papelera y restaur
   // uniqueness check is the transactional create endpoint asserted below.
   const createResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/v1/links") && response.request().method() === "POST");
-  await page.getByRole("button", { name: "Crear enlace", exact: true }).click();
+  // "Crear enlace" also names the sidebar and shell actions; the one this form
+  // submits is the dialog's.
+  await page.getByRole("dialog").getByRole("button", { name: "Crear enlace", exact: true }).click();
   expect((await createResponse).status()).toBe(201);
   await expect(page.getByRole("heading", { name: new RegExp(alias) })).toBeVisible();
 
@@ -35,7 +37,7 @@ test("workspace y enlace recorren creación, edición, pausa, papelera y restaur
     /\/api\/v1\/links\/\d+\/state$/.test(response.url()));
   await page.getByRole("menuitem", { name: "Pausar" }).click();
   expect((await pauseResponse).status()).toBe(200);
-  await expect(page.locator(".state-chip")).toContainText("paused");
+  await expect(page.locator(".state-chip")).toContainText("En pausa");
 
   await page.getByRole("button", { name: "Editar" }).click();
   await page.getByLabel("URL de destino").fill(updatedDestination);

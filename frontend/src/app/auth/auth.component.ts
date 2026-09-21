@@ -638,15 +638,6 @@ export class AuthComponent {
     this.loginCaptchaWidget?.reset();
   }
 
-  backToLogin(): void {
-    this.invalidateFlow();
-    this.tabIndex.set(0);
-    this.step.set("login");
-    this.changeEmailMode.set(false);
-    this.error.set(null);
-    this.info.set(null);
-  }
-
   onLoginCaptchaToken(token: string): void {
     this.loginCaptchaToken.set(token);
     if (token && this.error() === "Completa hCaptcha para continuar.") this.error.set(null);

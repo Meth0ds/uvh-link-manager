@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Support\RepositoryRoot;
 
 /**
  * Contract between the security scans and the files that configure them.
@@ -69,36 +70,6 @@ class SecurityScanContractTest extends TestCase
         'p/insecure-transport',
         'p/command-injection',
     ];
-
-    private function repositoryRoot(): string
-    {
-        return dirname(__DIR__, 3);
-    }
-
-    /**
-     * A whole-file read with normalized line endings, or a failure that names
-     * the missing file. A contract test that silently checks an empty string is
-     * worse than no test.
-     *
-     * The scanned files live outside `backend-laravel/`, so this needs the
-     * repository root. CI checks out the whole repository and runs the suite from
-     * `backend-laravel/`, which is the layout this expects; a run against a copy
-     * of `backend-laravel/` alone cannot check it and is reported as such.
-     */
-    private function read(string $relative): string
-    {
-        $path = $this->repositoryRoot().'/'.$relative;
-        $this->assertFileExists(
-            $path,
-            "{$relative} is part of the security gate and must exist; running the suite without the repository root cannot check it.",
-        );
-
-        $contents = file_get_contents($path);
-        $this->assertIsString($contents, "{$relative} could not be read");
-        $this->assertNotSame('', trim($contents), "{$relative} is empty");
-
-        return str_replace("\r\n", "\n", $contents);
-    }
 
     /**
      * Every `[[allowlists]]` block of the Gitleaks policy.
@@ -182,7 +153,7 @@ class SecurityScanContractTest extends TestCase
     private function trivySuppressionsIn(string $section): array
     {
         return array_values(array_filter(
-            $this->trivySuppressions($this->read(self::TRIVY_IGNORES)),
+            $this->trivySuppressions(RepositoryRoot::read(self::TRIVY_IGNORES)),
             static fn (array $suppression): bool => $suppression['section'] === $section,
         ));
     }
@@ -195,7 +166,7 @@ class SecurityScanContractTest extends TestCase
      */
     private function filesMentioning(string $needle): array
     {
-        $root = $this->repositoryRoot();
+        $root = RepositoryRoot::path();
         $matches = [];
         $pending = [$root];
 
@@ -233,7 +204,7 @@ class SecurityScanContractTest extends TestCase
 
     public function test_gitleaks_keeps_the_default_rules_and_only_excepts_synthetic_values(): void
     {
-        $policy = $this->read(self::GITLEAKS_POLICY);
+        $policy = RepositoryRoot::read(self::GITLEAKS_POLICY);
 
         $this->assertMatchesRegularExpression(
             '/\[extend\]\nuseDefault = true/',
@@ -281,7 +252,7 @@ class SecurityScanContractTest extends TestCase
 
     public function test_every_historical_fingerprint_is_a_reviewed_finding_with_its_reason(): void
     {
-        $contents = $this->read(self::GITLEAKS_FINGERPRINTS);
+        $contents = RepositoryRoot::read(self::GITLEAKS_FINGERPRINTS);
 
         $fingerprints = 0;
         $commented = 0;
@@ -353,7 +324,7 @@ class SecurityScanContractTest extends TestCase
                     "suppression {$suppression['id']} covers the directory {$path}: a file added inside would inherit it",
                 );
                 $this->assertFileExists(
-                    $this->repositoryRoot().'/'.$path,
+                    RepositoryRoot::path().'/'.$path,
                     "suppression {$suppression['id']} names {$path}, which no longer exists: an exception that outlives its file hides the next one",
                 );
             }
@@ -433,7 +404,7 @@ class SecurityScanContractTest extends TestCase
             // entry that already covers nothing reads as approved.
             $this->assertStringContainsString(
                 'scan-pinned-images.mjs',
-                $this->read(self::CI_WORKFLOW),
+                RepositoryRoot::read(self::CI_WORKFLOW),
                 'a path-scoped acceptance is only verifiable while the base image gate runs in CI',
             );
         }
@@ -450,8 +421,8 @@ class SecurityScanContractTest extends TestCase
      */
     public function test_the_base_image_gate_scans_every_pinned_base(): void
     {
-        $workflow = $this->read(self::CI_WORKFLOW);
-        $script = $this->read('scripts/scan-pinned-images.mjs');
+        $workflow = RepositoryRoot::read(self::CI_WORKFLOW);
+        $script = RepositoryRoot::read('scripts/scan-pinned-images.mjs');
 
         $this->assertStringContainsString(
             'node scripts/scan-pinned-images.mjs',
@@ -535,7 +506,7 @@ class SecurityScanContractTest extends TestCase
         $this->assertNotSame([], $files, 'the two Dockerfile suppressions are part of the measured result; losing them silently reopens the finding');
 
         foreach ($files as $relative) {
-            $lines = explode("\n", $this->read($relative));
+            $lines = explode("\n", RepositoryRoot::read($relative));
 
             foreach ($lines as $offset => $line) {
                 // Only a comment can suppress a finding. A file that merely
@@ -565,7 +536,7 @@ class SecurityScanContractTest extends TestCase
 
     public function test_the_security_workflow_keeps_the_gates_the_documentation_promises(): void
     {
-        $workflow = $this->read(self::SECURITY_WORKFLOW);
+        $workflow = RepositoryRoot::read(self::SECURITY_WORKFLOW);
 
         // A new advisory on unchanged code only appears if something looks
         // again, which is what the weekly run is for.
@@ -613,7 +584,7 @@ class SecurityScanContractTest extends TestCase
 
     public function test_the_scanners_are_pinned_to_a_version_and_the_reports_survive_a_failure(): void
     {
-        $workflow = $this->read(self::SECURITY_WORKFLOW);
+        $workflow = RepositoryRoot::read(self::SECURITY_WORKFLOW);
 
         $this->assertStringNotContainsString(':latest', $workflow, 'a floating tag makes a failing gate indistinguishable from a new release');
 
@@ -641,7 +612,7 @@ class SecurityScanContractTest extends TestCase
             // `uses:` carries a trailing comment with the human-readable tag,
             // so the pattern stops at the first space rather than at the end of
             // the line.
-            preg_match_all('/^\s+uses: (\S+)/m', $this->read($file), $matches);
+            preg_match_all('/^\s+uses: (\S+)/m', RepositoryRoot::read($file), $matches);
             $this->assertNotSame([], $matches[1], "{$file} uses no actions at all, which means it is not the workflow it claims to be");
 
             foreach ($matches[1] as $uses) {
@@ -656,7 +627,7 @@ class SecurityScanContractTest extends TestCase
 
     public function test_codeql_analyzes_the_workflows_themselves(): void
     {
-        $codeql = $this->read(self::CODEQL_WORKFLOW);
+        $codeql = RepositoryRoot::read(self::CODEQL_WORKFLOW);
 
         // The workflows are the code that holds deploy tokens and secrets, and
         // they are neither PHP nor TypeScript. PHP has no CodeQL support, which
@@ -674,7 +645,7 @@ class SecurityScanContractTest extends TestCase
 
     public function test_the_static_analysis_document_names_every_gate(): void
     {
-        $doc = $this->read(self::STATIC_ANALYSIS_DOC);
+        $doc = RepositoryRoot::read(self::STATIC_ANALYSIS_DOC);
 
         foreach (['semgrep', 'gitleaks', 'trivy'] as $tool) {
             $this->assertStringContainsString($tool, strtolower($doc), "docs/static-analysis.md no longer documents {$tool}");

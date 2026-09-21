@@ -21,7 +21,7 @@
         @for (event of events(); track event.id) {
           <li data-activity-event>
             <div class="event-heading"><h3>{{ event.label }}</h3><span class="outcome" [attr.data-outcome]="event.outcome">{{ outcomeLabels[event.outcome] }}</span></div>
-            <p>{{ event.actor.label }} · {{ resourceLabels[event.resource.type] }}@if (event.resource.id !== null) { <span> #{{ event.resource.id }}</span> }</p>
+            <p>{{ event.actor.label }} · {{ resourceLabel(event.resource.type) }}@if (event.resource.id !== null) { <span> #{{ event.resource.id }}</span> }</p>
             <time [attr.datetime]="event.createdAt">{{ event.createdAt | date:'dd/MM/yyyy HH:mm:ss':'UTC' }} UTC</time>
           </li>
         }

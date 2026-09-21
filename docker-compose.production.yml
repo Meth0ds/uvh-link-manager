@@ -149,7 +149,12 @@ services:
     environment:
       <<: *php-environment
       UVH_QUEUE_POOL: security
-    command: ["php", "artisan", "queue:work", "--queue=security", "--sleep=1", "--tries=3", "--timeout=60", "--max-time=3600"]
+    # 90 s, not 60: the sweep job that continues a destination sweep declares its
+    # own 60 s budget, and the job's timeout has to fire before the worker's so it
+    # can release its lease and report the failure instead of being killed
+    # mid-write. Both stay under REDIS_QUEUE_RETRY_AFTER (240 s).
+    # `QueueTimeoutContractTest` holds the three values together.
+    command: ["php", "artisan", "queue:work", "--queue=security", "--sleep=1", "--tries=3", "--timeout=90", "--max-time=3600"]
 
   # Drain pre-deployment jobs that were serialized onto Laravel's default
   # queue. New application code never targets this compatibility pool.

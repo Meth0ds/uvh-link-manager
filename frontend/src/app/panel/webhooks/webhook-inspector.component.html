@@ -8,7 +8,7 @@
 @if (webhook(); as w) {
   <section class="endpoint-card" aria-labelledby="endpoint-title">
     <div class="endpoint-address"><span class="eyebrow">Destino configurado</span><h2 id="endpoint-title">{{ w.url }}</h2></div>
-    <dl class="configuration"><div><dt>Recepción de eventos</dt><dd>{{ w.active ? 'Activa' : 'Pausada' }}</dd></div><div><dt>Suscripciones</dt><dd>{{ w.events.length }} eventos</dd></div><div><dt>Secreto de firma</dt><dd>{{ w.hasSecret ? 'Configurado' : 'No configurado' }}</dd></div></dl>
+    <dl class="configuration"><div><dt>Estado</dt><dd>{{ stateLabel(w.active) }}</dd></div><div><dt>Suscripciones</dt><dd>{{ w.events.length }} eventos</dd></div><div><dt>Secreto de firma</dt><dd>{{ w.hasSecret ? 'Configurado' : 'No configurado' }}</dd></div></dl>
     @if (canEdit()) {
       <div class="test-action"><button mat-flat-button type="button" (click)="sendTest()" [disabled]="actionId() !== null || !w.active || loading() || !!error()" [attr.aria-busy]="actionId() === 0"><mat-icon aria-hidden="true">send</mat-icon>{{ actionId() === 0 ? 'Encolando…' : 'Enviar ping' }}</button><p>{{ w.active ? 'Se añade a la cola. Consulta aquí el resultado de la entrega.' : 'Activa el webhook desde su configuración antes de enviar un ping.' }}</p></div>
     }

@@ -147,6 +147,52 @@ Por encima de la suite de navegador hay dos puertas que no miran pantallas:
   sobre el volumen sin pagar el resto de la suite (CI nunca lo fija). Los números
   de la corrida de referencia y lo que el ensayo **no** acredita están en
   [`analytics-rollup-capacity.md`](analytics-rollup-capacity.md).
+  Dentro de la misma suite corren tres **ensayos de caída y recuperación**, que
+  son los que ejercitan procedimientos y no caminos felices: se mata al worker de
+  exportaciones a mitad de un export de tamaño máximo y se comprueba que la
+  reejecución publica un único artefacto —y que una solicitud abandonada termina
+  terminal sin huérfanos—; se para el planificador y se comprueba que el reintento
+  retenido no se mueve hasta que vuelve y que entonces llega exactamente una vez;
+  y se pone al proveedor de correo en rechazo para recorrer el agotamiento del
+  outbox, el reintento administrativo (`202`, y `409` cuando ya no procede), la
+  compensación que cancela la invitación atada y la retención que purga lo
+  terminal sin tocar el trabajo abierto. `UVH_ASYNC_ONLY=export,scheduler,outbox`
+  ejecuta sólo esos ensayos (o `=1` para los tres), para iterar sobre ellos sin
+  pagar el resto de la suite; CI nunca lo fija y corre todo.
+  El arnés está partido por concern, no por tamaño, y la entrada es fina:
+  `frontend/e2e/async-stack.mjs` sólo decide qué escenarios corren, los conduce
+  en orden y publica el veredicto. `e2e/async/topology.mjs` es el dueño de la
+  pila (compose, puertos, endpoints de los proveedores y el único `docker()`);
+  `expect.mjs` es el dueño del veredicto (`check`, `until` y la lista de
+  resultados, una sola para todo el run); `session.mjs` convierte el arnés en
+  usuario; `fixtures.mjs` lee lo que el proveedor recibió, que es lo que permite
+  afirmar recepción y no sólo aceptación del transporte; `chains.mjs` son los
+  caminos felices; `analytics-contention.mjs` es la parte que mide; y `drills/`
+  tiene un fichero por escenario de caída —`export-crash.mjs`,
+  `scheduler-recovery.mjs` y `outbox-outage.mjs`— más `support.mjs` con las
+  palancas y diagnósticos que comparten. Del otro lado,
+  `backend-laravel/tests/E2E/async-inspect.php` es el registro: bootstrap, guarda
+  de entorno y contrato de salida (un JSON por subcomando, código 64 si el
+  nombre no existe o la propia validación lo rechaza), con los subcomandos
+  repartidos por entidad en `tests/E2E/inspect/` (`infrastructure`, `mail`,
+  `webhooks`, `analytics`, `exports`, `domains`, `accounts`), cada fichero
+  devolviendo su mapa de nombre a manejador. Añadir un ensayo son dos sitios:
+  un módulo en `drills/` y, sólo si necesita una palanca nueva, el subcomando en
+  el módulo de su entidad. Los símbolos que cada módulo ofrece son exactamente
+  los que otros importan: el resto no se exporta, de modo que la superficie de
+  cada fichero dice qué promete y qué guarda para sí.
+
+  Una política se declara una vez y se lee donde se aplica. El tope de 12 MiB
+  del export automático vive en `GenerateDataExportJob::MAX_JSON_BYTES`, y ni el
+  semillero del ensayo ni sus aserciones lo repiten: el inspector lo lee del
+  propio job por reflexión y lo publica como `cap_bytes`, así que el volumen
+  sembrado y la banda «cerca del tope» se calculan contra el techo real. Lo
+  mismo con la forma de una fila: cada módulo del inspector tiene un único
+  descriptor (`$describe`) que usan todos sus lectores, de modo que añadir un
+  campo no puede dejar a un lector publicando menos que otro —el ensayo lee eso
+  como una diferencia del producto—. Cuando
+  el semillero lo llevaba escrito a mano, el ensayo se saboteaba —sembraba más
+  bytes de los que el job acepta y medía su negativa—.
 - `npm run e2e:backup` destruye una base a propósito, restaura la copia cifrada
   en una instancia aislada, compara la huella del contenido, rechaza una copia
   manipulada y mide el RPO/RTO logrados. Detalles en `backup-and-restore.md`.

@@ -19,8 +19,18 @@ x-php-service: &php-service
   working_dir: /app
   volumes:
     - ./backend-laravel:/app
+    # Los contratos de tests/Unit describen ficheros que viven FUERA de
+    # backend-laravel/: las topologías de Compose, los Dockerfiles, los
+    # workflows de CI, la configuración del edge, la plantilla de entorno. Sin
+    # la raíz del repositorio no pueden comprobar nada, y los que recorren el
+    # árbol no fallan: recorren el sistema de ficheros del contenedor, que es
+    # como `composer test` dejó de terminar. Sólo se lee de aquí.
+    - ./:/repo:ro
   environment:
     COMPOSER_ALLOW_SUPERUSER: "1"
+    # Dónde encuentra `Tests\Support\RepositoryRoot` el repositorio cuando la
+    # suite corre dentro de este contenedor.
+    UVH_REPO_ROOT: /repo
     APP_ENV: local
     APP_URL: http://localhost:8000
     DB_CONNECTION: pgsql

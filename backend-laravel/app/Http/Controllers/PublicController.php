@@ -333,9 +333,23 @@ class PublicController
             return response()->json(['error' => 'Enlace no encontrado'], 404);
         }
 
-        $day = now()->format('Y-m-d');
+        // A public report is only stored when the client address is known.
+        // Both abuse rules of this endpoint are keyed by it: the per-minute
+        // throttle shares one bucket for every request without an address, and
+        // the reporter identity is a daily-salted hash of it. With no address
+        // the row would carry a null `reporter_hash`, which the partial unique
+        // index deliberately ignores — that is how automated reputation signals
+        // coexist with human reports — so "one report per reporter and day"
+        // would silently disappear and a single reporter could consume the
+        // daily budget of the whole link. An absent client address means the
+        // deployment is misconfigured, so this fails closed like the captcha.
         $ip = (string) ($request->ip() ?? '');
-        $reporterHash = $ip !== '' ? UvhCrypto::visitorHash($day, $ip, 'abuse-report') : null;
+        if ($ip === '') {
+            return response()->json(['error' => 'La verificación antiabuso no está disponible. Inténtalo de nuevo en unos instantes.'], 503);
+        }
+
+        $day = now()->format('Y-m-d');
+        $reporterHash = UvhCrypto::visitorHash($day, $ip, 'abuse-report');
         $result = DB::transaction(function () use ($resolvedLinkId, $day, $reporterHash, $email, $reason, $details): string {
             $link = DB::table('links')->where('id', $resolvedLinkId)->whereNull('deleted_at')->lockForUpdate()->first();
             if (! $link) {

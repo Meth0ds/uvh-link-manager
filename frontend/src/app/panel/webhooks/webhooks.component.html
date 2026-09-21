@@ -80,7 +80,7 @@
             <mat-panel-title>
               <span class="wh-icon" aria-hidden="true"><mat-icon>webhook</mat-icon></span>
               <span class="wh-title"><small>Endpoint</small><span class="wh-url tnum">{{ w.url }}</span></span>
-              <span class="state-chip" [class.on]="w.active">{{ w.active ? "Activo" : "Pausado" }}</span>
+              <span class="state-chip" [class.on]="w.active">{{ stateLabel(w.active) }}</span>
             </mat-panel-title>
           </mat-expansion-panel-header>
           <div class="wh-body">

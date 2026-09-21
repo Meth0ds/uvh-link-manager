@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Support\RepositoryRoot;
 
 /**
  * Contract between the edge limiter and the two layers it sits between.
@@ -36,7 +37,7 @@ class EdgeLimitContractTest extends TestCase
     /** Nginx substitutions the template asks for: `${NAME}` and `$NAME` forms. */
     private function templateVariables(): array
     {
-        preg_match_all('/\$\{([A-Z0-9_]+)\}/', $this->read(self::TEMPLATE), $matches);
+        preg_match_all('/\$\{([A-Z0-9_]+)\}/', RepositoryRoot::read(self::TEMPLATE), $matches);
 
         return array_values(array_unique($matches[1]));
     }
@@ -48,7 +49,7 @@ class EdgeLimitContractTest extends TestCase
      */
     private function envsubstFilter(string $composeFile): array
     {
-        preg_match('/NGINX_ENVSUBST_FILTER: "([^"]+)"/', $this->read($composeFile), $matches);
+        preg_match('/NGINX_ENVSUBST_FILTER: "([^"]+)"/', RepositoryRoot::read($composeFile), $matches);
         $this->assertNotSame('', $matches[1] ?? '', "{$composeFile} does not declare NGINX_ENVSUBST_FILTER");
 
         $filter = trim($matches[1], '^$');
@@ -69,24 +70,9 @@ class EdgeLimitContractTest extends TestCase
      * tests against a copy of `backend-laravel/` alone cannot check it, and is
      * reported as such instead of passing silently.
      */
-    private function read(string $relative): string
-    {
-        $root = dirname(__DIR__, 3);
-        $this->assertDirectoryExists(
-            $root.'/docker/nginx',
-            "This contract describes files outside backend-laravel/ and needs the repository root, which is not present at {$root}.",
-        );
-
-        $contents = file_get_contents($root.'/'.$relative);
-        $this->assertIsString($contents, "{$relative} could not be read from the repository root");
-        $this->assertNotSame('', trim($contents), "{$relative} is empty");
-
-        return $contents;
-    }
-
     private function envTemplateValue(string $key): string
     {
-        preg_match('/^'.preg_quote($key, '/').'=(.*)$/m', $this->read(self::PRODUCTION_ENV), $matches);
+        preg_match('/^'.preg_quote($key, '/').'=(.*)$/m', RepositoryRoot::read(self::PRODUCTION_ENV), $matches);
 
         return trim($matches[1] ?? '');
     }
@@ -110,7 +96,7 @@ class EdgeLimitContractTest extends TestCase
 
     public function test_the_template_defines_a_zone_for_each_public_surface(): void
     {
-        $template = $this->read(self::TEMPLATE);
+        $template = RepositoryRoot::read(self::TEMPLATE);
 
         foreach (['uvh_edge_public', 'uvh_edge_app', 'uvh_edge_conn'] as $zone) {
             $this->assertMatchesRegularExpression(
@@ -141,7 +127,7 @@ class EdgeLimitContractTest extends TestCase
 
     public function test_a_rejection_is_attributable_and_never_rewrites_laravels_own_answer(): void
     {
-        $template = $this->read(self::TEMPLATE);
+        $template = RepositoryRoot::read(self::TEMPLATE);
 
         // Retry-After only on this layer's rejections, and only there: the map
         // value is empty for every other outcome, so an admitted request and
@@ -169,7 +155,7 @@ class EdgeLimitContractTest extends TestCase
      */
     private function laravelPerMinuteLimits(): array
     {
-        $config = $this->read(self::UVH_CONFIG);
+        $config = RepositoryRoot::read(self::UVH_CONFIG);
         $limits = [];
         foreach (['auth', 'register', 'link_create', 'resolve', 'api_token'] as $key) {
             preg_match("/'".preg_quote($key, '/')."' => \(int\) env\('[A-Z_]+', (\d+)\)/", $config, $matches);
@@ -220,7 +206,7 @@ class EdgeLimitContractTest extends TestCase
 
     public function test_the_client_address_is_restored_from_the_same_list_laravel_trusts(): void
     {
-        $entrypoint = $this->read(self::ENTRYPOINT);
+        $entrypoint = RepositoryRoot::read(self::ENTRYPOINT);
 
         // Keying the zones on the peer address would put the proxy container's
         // address in every bucket, which is a limiter that limits nothing.
@@ -246,7 +232,7 @@ class EdgeLimitContractTest extends TestCase
 
     public function test_the_edge_runs_on_the_production_image_with_its_own_deployment_file(): void
     {
-        $compose = $this->read(self::PRODUCTION_COMPOSE);
+        $compose = RepositoryRoot::read(self::PRODUCTION_COMPOSE);
 
         // The production Nginx reads its tuning from the deployment file, so a
         // value set there has to win over the entrypoint defaults rather than be
@@ -263,7 +249,7 @@ class EdgeLimitContractTest extends TestCase
         // production image, `limit_req_dry_run` alone turned the request limiter
         // off while the connection cap kept answering 429 — a deployment that
         // believed it had disabled rejection and had not.
-        $template = $this->read(self::TEMPLATE);
+        $template = RepositoryRoot::read(self::TEMPLATE);
         $this->assertSame(
             substr_count($template, 'limit_conn uvh_edge_conn'),
             substr_count($template, 'limit_conn_dry_run ${EDGE_DRY_RUN};'),

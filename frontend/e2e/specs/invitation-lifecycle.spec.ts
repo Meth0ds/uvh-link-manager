@@ -37,11 +37,11 @@ test("una invitación sólo concede acceso tras aceptarla con el destinatario ve
   // invitation; navigating earlier can legitimately reach the login gate.
   await expect(page).toHaveURL(/\/app\/(dashboard|getting-started)$/);
   await page.goto(invitationUrl);
-  await expect(page.getByRole("heading", { name: "Revisar invitación" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tú decides si te unes" })).toBeVisible();
   const acceptPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/workspaces/invitations/accept"));
   await page.getByRole("button", { name: "Aceptar invitación" }).click();
   expect((await acceptPromise).status()).toBe(200);
-  await expect(page.getByRole("heading", { name: "Invitación aceptada" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ya formas parte del equipo" })).toBeVisible();
   await page.getByRole("link", { name: "Ir a mi panel" }).click();
   // Acceptance adds the workspace but deliberately preserves the user's
   // current workspace. Select the new membership explicitly before asserting.

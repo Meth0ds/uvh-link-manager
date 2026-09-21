@@ -20,7 +20,7 @@
           <span class="link-eyebrow">Detalle operativo</span>
           <div class="link-title-line">
             <h1 class="tnum">{{ displayUrl(link.shortUrl) }}</h1>
-            <span class="state-chip" [class]="'st-' + link.state">{{ link.state === "active" ? "Activo" : link.state }}</span>
+            <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
           </div>
           <p class="dest" [title]="link.destination">{{ link.destination }}</p>
         </div>
@@ -51,7 +51,7 @@
   <dl class="metric-strip" aria-label="Resumen del enlace">
     <div class="metric primary-metric"><dt>Clics</dt><dd>{{ link.clickCount }}</dd><span>Actividad acumulada</span></div>
     <div class="metric"><dt>Límite</dt><dd>{{ link.maxClicks ?? "∞" }}</dd><span>Máximo configurado</span></div>
-    <div class="metric"><dt>Estado</dt><dd>{{ link.state === "active" ? "Activo" : link.state }}</dd><span>Situación actual</span></div>
+    <div class="metric"><dt>Estado</dt><dd>{{ stateLabel(link.state) }}</dd><span>Situación actual</span></div>
     <div class="metric"><dt>Creado</dt><dd>{{ link.createdAt.slice(0, 10) }}</dd><span>Fecha de alta</span></div>
   </dl>
   <div class="period-row">

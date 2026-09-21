@@ -140,6 +140,33 @@ o revierte únicamente su programación vigente. Una compensación antigua no de
 modificar una generación posterior. `email_token` no tiene esta compensación:
 su entrega agotada queda `failed`, sujeta a vigencia y al reintento anterior.
 
+## Ensayo con el proveedor caído — 2026-09-20
+
+`UVH_ASYNC_ONLY=outbox npm run e2e:async` ejecuta este runbook contra una pila
+real (PostgreSQL, Redis, worker de correo, planificador y un proveedor SMTP
+propio) al que se le ordena rechazar. Lo que se ejerció, con el sobre cifrado y
+el contador durable como únicos testigos:
+
+- el alta se **admite** con el proveedor caído y la negativa queda registrada sin
+  perder el mensaje (`attempts` sube, la fila sigue `pending`,
+  `last_error=transport_unavailable`) y con el sobre cifrado intacto;
+- el ciclo durable **se agota** hasta `failed` tras cinco intentos, sin que el
+  sobre se vacíe por el camino;
+- el reintento administrativo se admite (`202`) sólo sobre un fallo reintentable,
+  reinicia el ciclo sin tocar el bearer y se **rechaza con `409`** cuando la fila
+  ya no está `failed`; el proveedor acepta el mensaje reintentado exactamente una
+  vez y su bearer sigue siendo válido;
+- un correo de ciclo de vida (invitación) que agota sus intentos pasa a
+  compensación y **cancela la invitación** a la que estaba atado;
+- la retención purga una fila terminal pasada de plazo y **no** toca el trabajo
+  abierto de la misma pasada;
+- el log del worker no contiene ni bearer, ni cookie, ni contraseña;
+- el mensaje aceptado conserva sus dos alternativas HTML y texto.
+
+Lo que este ensayo **no** acredita es el proveedor real: la reputación del
+dominio, la recepción en un buzón de verdad y el comportamiento de Resend ante
+una caída sostenida. Eso sigue en «Bloqueos externos».
+
 ## Señales y evidencia de cierre pendientes
 
 La edad `uvh_mail_outbox_oldest_pending_age_seconds` incluye pendientes, en cola,
@@ -163,9 +190,13 @@ Antes de cerrar `MAIL-002`, quedan por acreditar:
 - Token/workspace: no entregar secreto ni cambiar propiedad/borrar sin admisión;
   webhook ocupado sin gastar recovery code. Cancelación de cuenta: conservarla
   ante fallo PHP/SQL del aviso sin dejar un sobre parcial o la transacción abortada.
-- Proveedor caído, mensaje cancelado, transporte sin confirmación, recuperación
-  y preservación de las dos partes HTML/texto; ausencia de contenido en logs.
-- Obsolescencia, agotamiento, compensación repetida y generación sustituida;
+- ~~Proveedor caído, mensaje cancelado, transporte sin confirmación, recuperación
+  y preservación de las dos partes HTML/texto; ausencia de contenido en logs.~~
+  Acreditado el 2026-09-20 por el ensayo de la sección anterior. Lo que falta de
+  este punto es el proveedor real, que es externo.
+- Obsolescencia, agotamiento y compensación: agotamiento y compensación quedaron
+  ejercitados el 2026-09-20 (incluida la cancelación de la invitación atada);
+  quedan pendientes la compensación repetida, la generación sustituida y la
   carrera entre reintentos administrativos y caducidad del bearer.
 - Purga terminal, no purga de trabajo activo y retención aprobada para DB/backups.
 

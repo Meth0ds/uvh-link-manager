@@ -16,6 +16,7 @@ import { GettingStartedComponent } from "../getting-started/getting-started.comp
 import type { AnalyticsOverview, LinksResponse, LinkDto } from "../../core/models";
 import { LatestRequest } from "../../core/services/latest-request";
 import { decodeAnalyticsOverview, decodeLinksResponse } from "../../core/services/link-response-decoders";
+import { linkStateLabel } from "../../core/link-state-label";
 
 type DashboardPeriod = "24h" | "7d" | "30d" | "90d";
 
@@ -167,10 +168,7 @@ export class DashboardComponent {
     return this.numberFormatter.format(value);
   }
 
-  stateLabel(state: LinkDto["state"]): string {
-    return { active: "Activo", paused: "Pausado", scheduled: "Programado", expired: "Caducado",
-      blocked: "Bloqueado", archived: "Archivado", deleted: "En papelera" }[state];
-  }
+  readonly stateLabel = linkStateLabel;
 
   /** Percentage a country value represents of the total clicks (for bars). */
   geoPct(value: number, o: AnalyticsOverview): number {

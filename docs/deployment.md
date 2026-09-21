@@ -83,7 +83,11 @@ Las imágenes base de terceros están fijadas por digest con la etiqueta conserv
 un `up` no puede sustituir en silencio la base revisada por la que publique esa
 etiqueta ese día. Un despliegue real **no construye en el servidor**: arranca las
 dos piezas con la referencia `nombre@sha256:…` que se promociona desde el registro,
-que es lo que hace que el digest sea la identidad del artefacto. Los pasos que
+que es lo que hace que el digest sea la identidad del artefacto. La referencia se
+entrega escribiendo el digest en la referencia `image:` del fichero de despliegue
+(la referencia es literal a propósito: `ImageSupplyChainContractTest` prohíbe que
+llegue por variable para que cada imagen se pueda auditar y escanear), de modo que
+el fichero del release es el que dice qué bytes se despliegan. Los pasos que
 faltan para cerrar esa cadena —registro, firma y verificación en destino— están
 descritos y marcados como no ejecutados en
 [`image-provenance-runbook.md`](image-provenance-runbook.md).
@@ -101,6 +105,45 @@ docker compose -f docker-compose.production.yml --profile tools run --rm migrate
 docker compose -f docker-compose.production.yml up -d --remove-orphans
 docker compose -f docker-compose.production.yml ps
 ```
+
+### 4.1 Volver atrás un release, y por qué a veces no se puede
+
+Volver atrás es sustituir el digest por el del release anterior y recrear los
+procesos. La migración **no** se deshace: el arranque no la revierte y no existe
+un `migrate:rollback` de release. Lo que sí sostiene la mecánica es la puerta de
+arranque, y tiene una consecuencia que conviene tener escrita antes de necesitarla:
+`ReleaseReadiness` rechaza un esquema **pendiente o ausente** —la imagen exige
+migraciones que la base no tiene— y en cambio **acepta** una base por delante de
+la imagen, que es exactamente la situación de una vuelta atrás.
+
+De ahí la regla, y no hay otra que valga en caliente:
+
+- Si las migraciones del release que se abandona fueron **expansivas** (añadir
+tablas, columnas, índices; nada borrado ni reescrito), la vuelta atrás es segura:
+  ```bash
+  # Etiquetar el digest anterior con la etiqueta que el fichero declara (la
+  # referencia de imagen es literal a propósito: `ImageSupplyChainContractTest`
+  # prohíbe que llegue por variable para que cada imagen se pueda auditar y
+  # escanear).
+  docker pull …@sha256:<digest-anterior>
+  docker tag  …@sha256:<digest-anterior> uvh-api:production
+  docker compose -f docker-compose.production.yml up -d --remove-orphans
+  ```
+  Alternativa equivalente, y la que deja traza en el repositorio: volver el
+  fichero de despliegue del release anterior y recrear con él.
+  La imagen anterior ve sus propias migraciones como aplicadas, la puerta de
+  arranque pasa y los procesos se recrean. Comprobar después `/health` y las
+  señales operativas del panel de admin.
+- Si el release abandonado **retiró o reescribió** algo (columna borrada, índice
+  único nuevo, tabla reemplazada), la vuelta atrás no es posible sin restaurar:
+  se restaura la última copia cifrada anterior al release, se verifica su
+  manifiesto y se deja la base en el esquema que la imagen espera
+  (`docs/backup-and-restore.md`). Es una restauración, no un rollback, y por eso
+  el objetivo de recuperación es el RPO/RTO medido, no el tiempo de un `up -d`.
+
+Antes de desplegar, comprobar cuál de los dos casos es: revisar las migraciones
+nuevas del release y anotar si alguna es destructiva. Un release que sólo añade
+es reversible; uno que retira, no.
 
 ### Contrato de arranque
 

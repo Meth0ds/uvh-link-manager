@@ -9,6 +9,7 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { readActivityPage } from "./activity-page";
 import { LatestRequest } from "../../core/services/latest-request";
+import { resourceTypeLabel } from "../../core/resource-type-label";
 
 type Context = { workspaceId: number; userId: number; name: string };
 type State = { context: Context; events: WorkspaceActivityEvent[]; cursor: string | null; loading: boolean; error: string | null };
@@ -32,7 +33,7 @@ export class ActivityComponent {
   readonly maximumEvents = 500;
   readonly pageSize = 25;
   readonly outcomeLabels = { completed: "Completado", pending: "Solicitud admitida", failed: "Fallido", unknown: "Resultado no confirmado" };
-  readonly resourceLabels = { link: "Enlace", domain: "Dominio", api_token: "Token API", webhook: "Webhook", workspace: "Workspace" };
+  readonly resourceLabel = resourceTypeLabel;
   readonly context = computed<Context | null>(() => {
     const user = this.auth.user();
     const workspace = this.workspaces.list().find((w) => w.id === this.workspaces.currentId());

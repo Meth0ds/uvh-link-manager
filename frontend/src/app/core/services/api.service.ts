@@ -6,6 +6,9 @@ import { retryAfterSeconds } from "./retry-after";
 
 const CSRF_COOKIES = ["__Host-uvh_csrf", "uvh_csrf"] as const;
 
+/** Value the API sends as `reason` when it rejects the double-submit token. */
+const CSRF_REJECTED = "csrf_rejected";
+
 /** Runtime contract applied before an HTTP value reaches application state. */
 export type ApiDecoder<T> = (value: unknown) => T;
 
@@ -29,13 +32,16 @@ export class ApiRequestError extends Error {
   status: number;
   details?: unknown;
   readonly retryAfterSeconds?: number;
+  /** Machine-readable discriminator the server sent, when it sent one. */
+  readonly reason?: string;
 
-  constructor(message: string, status: number, details?: unknown, retryAfterSeconds?: number) {
+  constructor(message: string, status: number, details?: unknown, retryAfterSeconds?: number, reason?: string) {
     super(message);
     this.name = "ApiRequestError";
     this.status = status;
     this.details = details;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.reason = reason;
   }
 }
 
@@ -66,6 +72,17 @@ export class ApiService {
   /** Ensure the CSRF cookie exists before a mutation, coalescing concurrent calls. */
   private ensureCsrf(): Promise<void> {
     if (this.csrfToken()) return Promise.resolve();
+    return this.fetchCsrf();
+  }
+
+  /**
+   * Fetch the bootstrap token, coalescing concurrent calls.
+   *
+   * Unlike {@link ensureCsrf} this never short-circuits on a cookie that already
+   * exists, which is what makes it usable to replace a token the server just
+   * rejected: the endpoint always mints a new one.
+   */
+  private fetchCsrf(): Promise<void> {
     if (this.csrfRequest) return this.csrfRequest;
 
     this.csrfRequest = this.request(this.http.get<{ csrfToken: string }>("/api/v1/csrf"))
@@ -79,6 +96,39 @@ export class ApiService {
         this.csrfRequest = undefined;
       });
     return this.csrfRequest;
+  }
+
+  /**
+   * Repeat one mutation once when the API rejected its CSRF token.
+   *
+   * The retry is deliberately single: a mutation is not idempotent, so a second
+   * attempt could apply its effect twice. Any other rejection (authorization,
+   * conflict, validation) is never repeated — 403 carries all of them, which is
+   * why the decision reads the `reason` the middleware sends instead of the
+   * status alone.
+   */
+  private async retryOnRejectedCsrf<T>(attempt: () => Promise<T>): Promise<T> {
+    try {
+      return await attempt();
+    } catch (err) {
+      if (!(err instanceof ApiRequestError) || err.reason !== CSRF_REJECTED) throw err;
+      try {
+        await this.fetchCsrf();
+        return await attempt();
+      } catch (retryErr) {
+        // The fresh token was rejected too: retrying again would only repeat a
+        // write the server keeps refusing, so say what the user must do instead.
+        throw retryErr instanceof ApiRequestError && retryErr.reason === CSRF_REJECTED
+          ? new ApiRequestError("No se pudo confirmar la protección de la sesión. Recarga la página e inténtalo de nuevo.", 403)
+          : retryErr;
+      }
+    }
+  }
+
+  /** One CSRF-protected mutation, re-issued once if its token is rejected. */
+  private async mutate<T>(build: () => Observable<T>, decoder?: ApiDecoder<T>): Promise<T> {
+    await this.ensureCsrf();
+    return this.retryOnRejectedCsrf(() => this.request(build(), decoder, "mutation"));
   }
 
   private assertApiPath(path: string): void {
@@ -98,12 +148,23 @@ export class ApiService {
 
   private errorOf(err: HttpErrorResponse): ApiRequestError {
     const body = err.error as ApiError | undefined;
-    const message = typeof body?.error === "string"
-      ? body.error
+    const serverMessage = typeof body?.error === "string" ? body.error.trim() : "";
+    // Only our own JSON error envelope carries a server-written message. A proxy
+    // can answer with HTML, an empty body, or — for a blob request — a Blob, and
+    // collapsing every one of those into a generic sentence hid the status that
+    // says which of them actually happened.
+    const message = serverMessage !== ""
+      ? serverMessage
       : err.status === 0
         ? "No se pudo conectar con el servidor"
-        : "Error del servidor";
-    return new ApiRequestError(message, err.status, body?.details, retryAfterSeconds(err.headers.get("Retry-After")));
+        : `El servidor devolvió un error inesperado (HTTP ${err.status}). Reinténtalo en unos segundos.`;
+    return new ApiRequestError(
+      message,
+      err.status,
+      body?.details,
+      retryAfterSeconds(err.headers.get("Retry-After")),
+      body?.reason,
+    );
   }
 
   private decodeResponse<T>(value: unknown, decoder?: ApiDecoder<T>): T {
@@ -170,14 +231,18 @@ export class ApiService {
   /** POST (mutation — requires CSRF). */
   async post<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
-    await this.ensureCsrf();
-    return this.request(this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }), decoder, "mutation");
+    return this.mutate(() => this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
   }
 
   /** POST returning a private binary artifact while preserving JSON errors. */
   async postBlob(path: string, body?: unknown): Promise<Blob> {
     this.assertApiPath(path);
     await this.ensureCsrf();
+    return this.retryOnRejectedCsrf(() => this.artifactRequest(path, body));
+  }
+
+  /** One artifact POST, translating a JSON error envelope returned as a Blob. */
+  private async artifactRequest(path: string, body?: unknown): Promise<Blob> {
     try {
       return await firstValueFrom(this.http.post(path, body ?? {}, {
         headers: this.headers(true),
@@ -192,6 +257,7 @@ export class ApiService {
             error.status,
             parsed.details,
             retryAfterSeconds(error.headers.get("Retry-After")),
+            parsed.reason,
           );
         } catch (parsedError) {
           if (parsedError instanceof ApiRequestError) throw parsedError;
@@ -207,15 +273,13 @@ export class ApiService {
   /** PATCH (mutation — requires CSRF). */
   async patch<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
-    await this.ensureCsrf();
-    return this.request(this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }), decoder, "mutation");
+    return this.mutate(() => this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
   }
 
   /** DELETE (mutation — requires CSRF). */
   async delete<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
-    await this.ensureCsrf();
-    return this.request(this.http.delete<T>(path, { headers: this.headers(true), body }), decoder, "mutation");
+    return this.mutate(() => this.http.delete<T>(path, { headers: this.headers(true), body }), decoder);
   }
 
   /** Raw observable for callers that need streaming/loading states. */

@@ -70,6 +70,32 @@ final class UvhLimiters
     }
 
     /**
+     * Store the availability limiters count on.
+     *
+     * `CACHE_LIMITER=` ships *present but empty* in `.env.example`, documented
+     * as "inherit the default store". The cache manager does not read it that
+     * way: Laravel 13 resolves the default with `enum_value($name) ??`, so it
+     * falls back on `null` alone, while the empty string reaches `resolve('')`
+     * and throws `Cache store [] is not defined`. That throw happens while
+     * `AppServiceProvider::boot()` is still registering the named limiters, so
+     * the application does not start at all: `artisan` is unusable and
+     * `composer install` fails in its own `post-autoload-dump` script.
+     *
+     * This mirrors `securityStore()`, which normalises the same way for the
+     * other side of the split; the difference is that the availability side has
+     * a store to fall back on, so it hands the manager a name it can resolve
+     * rather than `null`.
+     */
+    public static function availabilityStore(): string
+    {
+        $store = config('cache.limiter');
+
+        return is_string($store) && trim($store) !== ''
+            ? trim($store)
+            : (string) config('cache.default');
+    }
+
+    /**
      * Store the security limiters must count on.
      *
      * Returns null when no dedicated store is configured, which means the

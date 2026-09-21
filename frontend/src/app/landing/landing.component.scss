@@ -8,7 +8,7 @@
   --ink: #262821;
   --muted: #626357;
   --line: #cecec0;
-  --accent: #c44324;
+  --accent: #c14022;
   --accent-ink: #fffaf0;
   --soft: #eae7dd;
   --guide: #e5e8dc;
@@ -227,7 +227,7 @@ h2 em { letter-spacing: -.045em; }
 .faq-list .mat-expansion-panel-header-title { color: var(--ink); line-height: 1.6; }
 .faq-list .mat-expansion-panel p { margin: 0; padding: 0 10px 0 10px; font-size: 12px; line-height: 1.9; }
 .faq-plus.expanded { transform: rotate(45deg); color: var(--accent); }
-.closing-section { background: #c44324; color: #fff6e8; }
+.closing-section { background: var(--accent); color: #fff6e8; }
 .closing-inner { padding-block: 66px; }
 .closing-inner > div { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-top: 28px; }
 .closing-inner h2 { font-size: clamp(54px, 6vw, 86px); }

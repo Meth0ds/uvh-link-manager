@@ -19,6 +19,12 @@ import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeApiTokensResponse, decodeCreatedApiTokenResponse } from "../../core/services/credential-response-decoders";
+import {
+  tokenActionAriaLabel,
+  tokenActionLabel,
+  tokenStateIcon,
+  tokenStateLabel,
+} from "../../core/api-token-label";
 
 const SCOPES = [
   { value: "links:read", label: "Consultar enlaces" },
@@ -225,4 +231,11 @@ export class TokensComponent {
   trackByToken(_i: number, t: ApiTokenDto): number {
     return t.id;
   }
+
+  // The registry row prints the same state twice — as a chip and as the label of
+  // the revoke control — so both readings, and the icon, come from one place.
+  readonly stateLabel = (t: ApiTokenDto) => tokenStateLabel(!!t.revokedAt);
+  readonly stateIcon = (t: ApiTokenDto) => tokenStateIcon(!!t.revokedAt);
+  readonly actionLabel = (t: ApiTokenDto) => tokenActionLabel(!!t.revokedAt);
+  readonly actionAriaLabel = (t: ApiTokenDto) => tokenActionAriaLabel(!!t.revokedAt, t.name);
 }

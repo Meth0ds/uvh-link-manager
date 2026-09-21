@@ -228,6 +228,7 @@ el [modelo de amenazas](docs/threat-model.md).
 
 | Documento | Contenido |
 | --- | --- |
+| [Incidente e indisponibilidad](docs/incident-runbook.md) | Detección, triaje por superficie, recuperación y cierre. |
 | [Rotación de `APP_KEY`](docs/app-secret-rotation-runbook.md) | Procedimiento de rotación de secretos. |
 | [Outbox de correo](docs/mail-outbox-runbook.md) | Cola, reintentos y diagnóstico de envíos. |
 | [Presupuesto de invitaciones](docs/invitation-mail-budget-runbook.md) | Límites y comportamiento ante agotamiento. |

@@ -28,18 +28,9 @@ import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeLinksResponse } from "../../core/services/link-response-decoders";
+import { linkStateLabel } from "../../core/link-state-label";
 
 type StateFilter = "" | LinkState;
-
-const STATE_LABEL: Record<LinkState, string> = {
-  scheduled: "Programado",
-  active: "Activo",
-  paused: "En pausa",
-  expired: "Caducado",
-  blocked: "Bloqueado",
-  archived: "Archivado",
-  deleted: "Eliminado",
-};
 
 @Component({
   selector: "app-links",
@@ -103,7 +94,7 @@ export class LinksComponent {
   });
   readonly pendingLink = this.intents.pending;
 
-  readonly stateLabel = (s: LinkState) => STATE_LABEL[s];
+  readonly stateLabel = linkStateLabel;
 
   private loadedWorkspaceId: number | null | undefined;
 
@@ -187,8 +178,13 @@ export class LinksComponent {
     void this.reload();
   }
 
-  onTag(value: string): void {
-    this.tag.set(value);
+  /**
+   * The tag chips are the tag filter: pressing the chip of a tag that is
+   * already filtering is how you undo it. The signal they write has always
+   * been sent to the API (and documented there); nothing used to write it.
+   */
+  toggleTag(name: string): void {
+    this.tag.set(this.tag() === name ? "" : name);
     this.page.set(0);
     void this.reload();
   }

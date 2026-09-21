@@ -57,10 +57,4 @@ class PrivacyRightsRequest extends Model
     {
         return $this->belongsTo(User::class);
     }
-
-    /** @return BelongsTo<User, $this> */
-    public function assignedAdmin(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'assigned_admin_id');
-    }
 }

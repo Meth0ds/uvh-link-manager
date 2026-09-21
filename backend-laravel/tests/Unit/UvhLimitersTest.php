@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Support\UvhLimiters;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\RepositoryRoot;
 
 /**
  * Holds the three ends of the limiter split together.
@@ -24,8 +25,8 @@ final class UvhLimitersTest extends TestCase
 
     public function test_every_credential_limiter_is_registered_and_used_by_a_route(): void
     {
-        $provider = $this->read(self::PROVIDER);
-        $routes = $this->read(self::ROUTES);
+        $provider = RepositoryRoot::read(self::PROVIDER);
+        $routes = RepositoryRoot::read(self::ROUTES);
 
         $this->assertNotSame([], UvhLimiters::SECURITY);
 
@@ -77,21 +78,7 @@ final class UvhLimitersTest extends TestCase
         // the availability store no matter what `UvhLimiters` says.
         $this->assertMatchesRegularExpression(
             "/'throttle' => UvhThrottleRequests::class/",
-            $this->read(self::BOOTSTRAP),
+            RepositoryRoot::read(self::BOOTSTRAP),
         );
-    }
-
-    private function read(string $relative): string
-    {
-        $root = dirname(__DIR__, 3);
-        $this->assertDirectoryExists(
-            $root.'/backend-laravel/app',
-            "This contract describes files outside backend-laravel/ and needs the repository root, which is not present at {$root}.",
-        );
-
-        $contents = file_get_contents($root.'/'.$relative);
-        $this->assertIsString($contents, "{$relative} could not be read from the repository root");
-
-        return $contents;
     }
 }

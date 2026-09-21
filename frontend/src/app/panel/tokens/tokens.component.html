@@ -84,9 +84,9 @@
   <section class="token-list" aria-labelledby="token-registry-title">
     @for (t of tokens(); track trackByToken($index, t)) {
       <article class="token-row">
-        <span class="token-icon" aria-hidden="true"><mat-icon>{{ t.revokedAt ? 'key_off' : 'key' }}</mat-icon></span>
+        <span class="token-icon" aria-hidden="true"><mat-icon>{{ stateIcon(t) }}</mat-icon></span>
         <div class="token-main">
-          <div class="token-title"><b>{{ t.name }}</b><span class="state-chip" [class.st-disabled]="t.revokedAt" [class.st-active]="!t.revokedAt">{{ t.revokedAt ? "Revocado" : "Activo" }}</span></div>
+          <div class="token-title"><b>{{ t.name }}</b><span class="state-chip" [class.st-disabled]="t.revokedAt" [class.st-active]="!t.revokedAt">{{ stateLabel(t) }}</span></div>
           <div class="scope-chips">
             @for (s of t.scopes; track s) {
               <span class="scope-chip"><code>{{ s }}</code></span>
@@ -97,7 +97,7 @@
           </span>
         </div>
         <div class="token-actions">
-          <button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="!!t.revokedAt || revokingId() !== null || !!error()" [attr.aria-label]="(t.revokedAt ? 'Token revocado: ' : 'Revocar token: ') + t.name"><mat-icon aria-hidden="true">block</mat-icon> {{ t.revokedAt ? "Revocado" : "Revocar" }}</button>
+          <button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="!!t.revokedAt || revokingId() !== null || !!error()" [attr.aria-label]="actionAriaLabel(t)"><mat-icon aria-hidden="true">block</mat-icon> {{ actionLabel(t) }}</button>
         </div>
       </article>
     }

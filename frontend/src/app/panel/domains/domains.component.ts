@@ -16,21 +16,12 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { targetWorkspace } from "../../core/services/workspace-target";
+import { domainStateLabel } from "../../core/domain-state-label";
 import {
   decodeCreatedDomainResponse,
   decodeDomainsResponse,
   decodeDomainStateResponse,
 } from "../../core/services/domain-response-decoders";
-
-const STATE_LABEL: Record<DomainState, string> = {
-  pending: "Pendiente",
-  verifying: "Verificando…",
-  verified: "Verificado",
-  provisioning: "Emitiendo certificado…",
-  active: "Activo",
-  error: "Error",
-  disabled: "Desactivado",
-};
 
 const TLS_ERROR_LABEL: Record<string, string> = {
   certificate_provisioning_failed: "No se pudo emitir o validar el certificado. Revisa DNS y CAA antes de reintentar.",
@@ -90,9 +81,9 @@ export class DomainsComponent {
   };
 
   readonly stateLabel = (d: DomainDto): string => {
-    if (this.isChecking(d)) return "Comprobando…";
+    if (this.isChecking(d)) return "Comprobando DNS…";
     if (d.state === "active" && !d.edgeEligible) return "Revalidación necesaria";
-    return STATE_LABEL[d.state];
+    return domainStateLabel(d.state);
   };
 
   readonly dnsErrorLabel = (error: string | null): string | null => error
