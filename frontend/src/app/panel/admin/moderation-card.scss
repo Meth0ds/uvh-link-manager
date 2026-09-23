@@ -1,0 +1,70 @@
+// The card the two moderation queues render: a report and an appeal are the
+// same object to the eye — one case, its target, what it says and the decision
+// that closes it — so the grammar lives here once and each queue adds only what
+// is its own (the appeal's verdict, the report's destination actions).
+//
+// The names are neutral on purpose: `report-card` in one template and
+// `appeal-card` in the other was the same rule written twice.
+
+.moderation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 13px;
+}
+
+.moderation-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 18px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface-raised);
+  transition: border-color 160ms ease;
+  // A denser edge is the affordance; nothing lifts off the paper.
+  &:hover { border-color: var(--uvh-border-strong); }
+  > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; time { color: var(--uvh-muted); font-size: 10.5px; font-variant-numeric: tabular-nums; } }
+  footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--uvh-border); button { font-size: 11px; } }
+  .destructive { background: var(--uvh-danger); color: var(--accent-ink); }
+  dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0 0 14px;
+    div { min-width: 0; }
+    dt { color: var(--uvh-muted); font-family: "Courier New", monospace; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+    dd { overflow: hidden; margin: 3px 0 0; color: var(--uvh-ink); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+  }
+}
+
+.moderation-target {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  margin: 14px 0;
+  b { font-family: "Courier New", monospace; font-size: 14px; }
+  span { overflow: hidden; color: var(--uvh-muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+.moderation-copy {
+  padding: 12px 0;
+  border-block: 1px solid var(--uvh-border);
+  span { display: block; margin-bottom: 4px; color: var(--uvh-muted); font-family: "Courier New", monospace; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  b { font-size: 12px; }
+  p { margin: 8px 0 0; color: var(--uvh-muted); font-size: 11.5px; line-height: 1.6; white-space: pre-wrap; }
+}
+
+@media (max-width: 850px) {
+  .moderation-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 650px) {
+  .moderation-card dl { grid-template-columns: 1fr 1fr; }
+  .moderation-card footer button { flex: 1 1 calc(50% - 7px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moderation-card { transition: none; }
+}

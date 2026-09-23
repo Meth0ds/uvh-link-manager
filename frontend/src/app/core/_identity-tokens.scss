@@ -3,9 +3,11 @@
 @mixin light {
   color-scheme: light;
   --paper: #f5f2e9; --paper-raised: #fffcf5; --ink: #262821;
-  // The accent is also text on `--paper`: `#c14022` keeps that pair at 4,66:1
-  // (AA for normal text) where the previous value measured 4,49:1.
-  --muted: #626357; --line: #cecec0; --accent: #c14022;
+  // The accent is text on every warm surface, not only `--paper`: `#b53c20`
+  // keeps the worst pair (the trash row's composited `#f1e4d9`) at 4,64:1 and
+  // `--paper` at 5,17:1. The previous `#c14022` measured 4,18:1 there and on
+  // `--soft`/`--guide`, below the AA minimum for normal text.
+  --muted: #626357; --line: #cecec0; --accent: #b53c20;
   --accent-ink: #fffaf0; --soft: #eae7dd; --guide: #e5e8dc;
   --uvh-teal: #486344; --uvh-teal-strong: #354f31;
   --uvh-danger: #b12e30; --uvh-danger-soft: #f9e6df;

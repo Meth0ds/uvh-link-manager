@@ -8,6 +8,7 @@ import { MatInputModule } from "@angular/material/input";
 import { MatPaginatorModule, type PageEvent } from "@angular/material/paginator";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
+import { dateTimeMediumLabel } from "../../core/date-time-label";
 import type { LinkTrashResponse, TrashLinkDto } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
@@ -140,5 +141,5 @@ export class LinkTrashComponent {
     } finally { this.actionId.set(null); }
   }
 
-  formatDate(value: string): string { return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
+  formatDate(value: string): string { return dateTimeMediumLabel(value); }
 }

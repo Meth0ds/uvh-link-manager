@@ -1,4 +1,4 @@
-import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -19,6 +19,7 @@ import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeApiTokensResponse, decodeCreatedApiTokenResponse } from "../../core/services/credential-response-decoders";
+import { localDateTimeIso } from "../../core/strict-wire";
 import {
   tokenActionAriaLabel,
   tokenActionLabel,
@@ -74,6 +75,8 @@ export class TokensComponent {
 
   readonly name = signal("");
   readonly expiresAt = signal("");
+  /** A non-empty expiry that names no moment must block, never be dropped. */
+  readonly expiryInvalid = computed(() => this.expiresAt().trim() !== "" && localDateTimeIso(this.expiresAt().trim()) === null);
   readonly selectedScopes = signal<string[]>([]);
   readonly password = signal("");
   readonly factorCode = signal("");
@@ -142,7 +145,7 @@ export class TokensComponent {
 
   async create(): Promise<void> {
     if (!this.name().trim() || !this.selectedScopes().length || !this.password()
-      || (this.user()?.mfaEnabled && !this.factorCode().trim()) || this.creating()) return;
+      || (this.user()?.mfaEnabled && !this.factorCode().trim()) || this.expiryInvalid() || this.creating()) return;
     const workspaceId = this.workspaces.currentId();
     if (workspaceId === null) return;
     const request = this.mutations.begin(workspaceId);
@@ -179,11 +182,10 @@ export class TokensComponent {
   /** The chosen expiry as an instant, or null when there is none to send. */
   private expiresAtIso(): string | null {
     const raw = this.expiresAt().trim();
-    if (!raw) return null;
-    const parsed = new Date(raw);
-    // An unparsable control value used to throw a RangeError that surfaced as
-    // "no se pudo crear el token", hiding the real cause from the operator.
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    if (raw === "") return null;
+    // `create()` blocks on `expiryInvalid()` first, so a value that reaches
+    // here names the moment it displays.
+    return localDateTimeIso(raw);
   }
 
   async revoke(t: ApiTokenDto): Promise<void> {

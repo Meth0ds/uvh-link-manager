@@ -1,0 +1,33 @@
+<app-queue-section
+  title="Destinos bloqueados"
+  [paging]="entries"
+  [spaced]="true"
+  loadingLabel="Cargando destinos bloqueados"
+  pagerLabel="Paginación de destinos bloqueados"
+  emptyIcon="verified_user"
+  emptyTitle="Sin destinos bloqueados"
+  emptyHint="Ninguna entrada en la lista: nada se está rechazando por destino."
+  [showPagerWhenEmpty]="false"
+  [pageSizes]="pageSizes"
+>
+  <p queue-summary>Lo que la plataforma se niega a servir, al margen del enlace que apuntara ahí. Retirar una entrada reanaliza los enlaces y devuelve los que ya no tengan otro motivo. Las entradas de URL exacta se guardan como huella: la lista no conserva la dirección que bloquea, sólo con qué casarla.</p>
+
+  <div class="entry-list" queue-rows>
+    <div class="entry-row entry-head" aria-hidden="true">
+      <span>Destino</span><span>Alcance</span><span>Origen</span><span>Motivo</span><span>Alta</span><span>Caduca</span><span></span>
+    </div>
+    @for (entry of entries.rows(); track entry.id) {
+      <article class="entry-row">
+        <b class="entry-value" [title]="entry.match_value">{{ entry.match_value }}</b>
+        <span data-label="Alcance"><span class="badge" [class.danger]="entry.match_kind === 'host'" [class.neutral]="entry.match_kind === 'url'">{{ kindLabel(entry.match_kind) }}</span></span>
+        <span data-label="Origen">{{ sourceLabel(entry.source) }}</span>
+        <span data-label="Motivo" class="entry-reason">{{ entry.reason }}</span>
+        <time data-label="Alta">{{ formatDate(entry.created_at) }}</time>
+        <time data-label="Caduca">{{ entry.expires_at ? formatDate(entry.expires_at) : "Sin caducidad" }}</time>
+        <button mat-stroked-button class="danger-button" type="button" (click)="withdraw(entry)" [disabled]="busy()" [attr.aria-label]="'Retirar el bloqueo de ' + entry.match_value">
+          <mat-icon aria-hidden="true">delete_outline</mat-icon>Retirar
+        </button>
+      </article>
+    }
+  </div>
+</app-queue-section>

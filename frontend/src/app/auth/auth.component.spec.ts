@@ -347,6 +347,21 @@ describe("AuthComponent registration flow", () => {
     expect(component.passwordsMatch()).toBeTrue();
   });
 
+  it("renders a visible alert for a diverging confirmation instead of only disabling the button", () => {
+    component.tabIndex.set(1);
+    component.step.set("register");
+    component.registerStep.set(2);
+    component.registerForm.controls.password.setValue("Órbita-Mango-Cobre-47!");
+    component.registerForm.controls.confirmPassword.setValue("otra-clave-distinta");
+    component.registerForm.controls.confirmPassword.markAsTouched();
+    fixture.detectChanges();
+
+    // The mismatch is a group-level error: a <mat-error> bound to the (valid)
+    // confirm control never renders, so the feedback must survive on its own.
+    const alert = fixture.nativeElement.querySelector(".alert.error") as HTMLElement | null;
+    expect(alert?.textContent ?? "").toContain("Las contraseñas no coinciden");
+  });
+
   it("executes invisible hCaptcha at submit time and sends its fresh login token", async () => {
     component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
     const captcha = captchaWidget("app-hcaptcha-widget");

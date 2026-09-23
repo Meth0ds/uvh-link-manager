@@ -1,10 +1,12 @@
 import { TestBed, type ComponentFixture } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { provideNoopAnimations } from "@angular/platform-browser/animations";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { AdminComponent } from "./admin.component";
+import { AdminReportsComponent } from "./admin-reports.component";
 import { ApiService } from "../../core/services/api.service";
 import { ActionDialogService } from "../action-dialog.service";
-import type { AdminOperations, AdminOverview, AdminReport } from "../../core/models";
+import type { AdminOperations, AdminOverview } from "../../core/models";
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -53,20 +55,6 @@ const operations: AdminOperations = {
   },
 };
 
-const report: AdminReport = {
-  id: 7,
-  link_id: 12,
-  reporter_email: "reporter@example.test",
-  reason: "Phishing",
-  details: "Detalle del caso",
-  status: "open",
-  created_at: "2026-08-30T11:00:00Z",
-  alias: "campaign",
-  destination: "https://example.test",
-  link_state: "active",
-  workspace_id: 4,
-};
-
 describe("AdminComponent", () => {
   let fixture: ComponentFixture<AdminComponent>;
   let component: AdminComponent;
@@ -79,7 +67,6 @@ describe("AdminComponent", () => {
       if (path.endsWith("/overview")) return Promise.resolve(overview as T);
       if (path.endsWith("/operations")) return Promise.resolve(operations as T);
       if (path.endsWith("/users")) return Promise.resolve({ users: [], total: 0, page: 1, perPage: 25 } as T);
-      if (path.endsWith("/reports")) return Promise.resolve({ reports: [report], total: 1, page: 1, perPage: 25 } as T);
       if (path.endsWith("/domains")) return Promise.resolve({ domains: [], total: 0, page: 1, perPage: 25 } as T);
       return Promise.resolve({ events: [], total: 0, page: 1, perPage: 50 } as T);
     });
@@ -108,19 +95,18 @@ describe("AdminComponent", () => {
   it("loads every operator data source using server pagination", () => {
     expect(component.overview()).toEqual(overview);
     expect(component.operations()).toEqual(operations);
-    expect(component.reports()).toEqual([report]);
     expect(api.get).toHaveBeenCalledWith("/api/v1/admin/users", jasmine.objectContaining({ page: 1, perPage: 25 }), jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
     expect(api.get).toHaveBeenCalledWith("/api/v1/admin/audit", jasmine.objectContaining({ page: 1, perPage: 50 }), jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
   });
 
   it("resets pagination when applying a user filter", async () => {
-    component.usersPage.set(3);
+    component.users.page.set(3);
     api.get.calls.reset();
 
     component.filterUsers("blocked");
     await fixture.whenStable();
 
-    expect(component.usersPage()).toBe(0);
+    expect(component.users.page()).toBe(0);
     expect(api.get).toHaveBeenCalledWith("/api/v1/admin/users", jasmine.objectContaining({ status: "blocked", page: 1 }), jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
   });
 
@@ -144,102 +130,115 @@ describe("AdminComponent", () => {
     expect(component.countLabel(0, "trabajo fallido", "trabajos fallidos")).toBe("0 trabajos fallidos");
   });
 
-  it("blocks a reported link through the atomic moderation endpoint", async () => {
-    api.post.calls.reset();
+  it("tells every moderation view to re-read when one of its queues decides something", async () => {
+    spyOn(component, "loadOverview").and.resolveTo();
+    spyOn(component, "loadOperations").and.resolveTo();
+    spyOn(component.audit, "load").and.resolveTo();
+    const revision = component.moderationRevision();
 
-    await component.blockLink(report);
+    component.onModerationChanged();
+    await fixture.whenStable();
 
-    expect(actions.prompt).toHaveBeenCalled();
-    expect(api.post).toHaveBeenCalledWith("/api/v1/admin/reports/7/moderate", {
-      action: "block",
-      reason: "Contenido fraudulento confirmado",
-    });
+    // One revision is what the three queues of the tab listen to, so bumping it
+    // is what makes them all re-read; the summary views are re-read too.
+    expect(component.moderationRevision()).toBe(revision + 1);
+    expect(component.loadOverview).toHaveBeenCalled();
+    expect(component.audit.load).toHaveBeenCalled();
+  });
+
+  it("wires a queue's decisions back to the console", async () => {
+    spyOn(component, "loadOverview").and.resolveTo();
+    spyOn(component, "loadOperations").and.resolveTo();
+    spyOn(component.audit, "load").and.resolveTo();
+    // A tab's content exists once the tab is open, so the queues are reached the
+    // way an operator reaches them.
+    fixture.detectChanges();
+    const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]');
+    (tabs[2] as HTMLElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const queue = fixture.debugElement.query(By.directive(AdminReportsComponent))?.componentInstance as AdminReportsComponent | undefined;
+    expect(queue).toBeDefined();
+    const revision = component.moderationRevision();
+
+    queue!.changed.emit();
+    await fixture.whenStable();
+
+    expect(component.moderationRevision()).toBe(revision + 1);
   });
 
   const latestListCases = [
     {
       name: "account recoveries",
       select: (value: string) => component.recoveryQuery.set(value),
-      load: () => component.loadRecoveries(),
-      loading: () => component.recoveriesLoading(),
+      load: () => component.recoveries.load(),
+      loading: () => component.recoveries.loading(),
       firstResponse: { recoveries: [{ id: 101 }], total: 1 },
       secondResponse: { recoveries: [{ id: 102 }], total: 2 },
       olderId: 101,
       newerId: 102,
-      firstId: () => component.recoveries()[0]?.id,
-      total: () => component.recoveriesTotal(),
+      firstId: () => component.recoveries.rows()[0]?.id,
+      total: () => component.recoveries.total(),
     },
     {
       name: "users",
       select: (value: string) => component.userQuery.set(value),
-      load: () => component.loadUsers(),
-      loading: () => component.usersLoading(),
+      load: () => component.users.load(),
+      loading: () => component.users.loading(),
       firstResponse: { users: [{ id: 201 }], total: 1 },
       secondResponse: { users: [{ id: 202 }], total: 2 },
       olderId: 201,
       newerId: 202,
-      firstId: () => component.users()[0]?.id,
-      total: () => component.usersTotal(),
-    },
-    {
-      name: "reports",
-      select: (value: string) => component.reportQuery.set(value),
-      load: () => component.loadReports(),
-      loading: () => component.reportsLoading(),
-      firstResponse: { reports: [{ ...report, id: 301 }], total: 1 },
-      secondResponse: { reports: [{ ...report, id: 302 }], total: 2 },
-      olderId: 301,
-      newerId: 302,
-      firstId: () => component.reports()[0]?.id,
-      total: () => component.reportsTotal(),
+      firstId: () => component.users.rows()[0]?.id,
+      total: () => component.users.total(),
     },
     {
       name: "domains",
       select: (value: string) => component.domainQuery.set(value),
-      load: () => component.loadDomains(),
-      loading: () => component.domainsLoading(),
+      load: () => component.domains.load(),
+      loading: () => component.domains.loading(),
       firstResponse: { domains: [{ id: 401 }], total: 1 },
       secondResponse: { domains: [{ id: 402 }], total: 2 },
       olderId: 401,
       newerId: 402,
-      firstId: () => component.domains()[0]?.id,
-      total: () => component.domainsTotal(),
+      firstId: () => component.domains.rows()[0]?.id,
+      total: () => component.domains.total(),
     },
     {
       name: "audit events",
       select: (value: string) => component.auditQuery.set(value),
-      load: () => component.loadAudit(),
-      loading: () => component.auditLoading(),
+      load: () => component.audit.load(),
+      loading: () => component.audit.loading(),
       firstResponse: { events: [{ id: 501 }], total: 1 },
       secondResponse: { events: [{ id: 502 }], total: 2 },
       olderId: 501,
       newerId: 502,
-      firstId: () => component.events()[0]?.id,
-      total: () => component.auditTotal(),
+      firstId: () => component.audit.rows()[0]?.id,
+      total: () => component.audit.total(),
     },
     {
       name: "mail outbox",
       select: (value: string) => component.mailStatus.set(value === "older" ? "failed" : "sent"),
-      load: () => component.loadMailOutbox(),
-      loading: () => component.mailLoading(),
+      load: () => component.mail.load(),
+      loading: () => component.mail.loading(),
       firstResponse: { messages: [{ id: 601 }], total: 1 },
       secondResponse: { messages: [{ id: 602 }], total: 2 },
       olderId: 601,
       newerId: 602,
-      firstId: () => component.mailMessages()[0]?.id,
-      total: () => component.mailTotal(),
+      firstId: () => component.mail.rows()[0]?.id,
+      total: () => component.mail.total(),
     },
     {
       name: "privacy requests",
       select: (value: string) => component.privacyStatus.set(value === "older" ? "submitted" : "completed"),
-      load: () => component.loadPrivacyRequests(),
-      loading: () => component.privacyLoading(),
+      load: () => component.privacy.load(),
+      loading: () => component.privacy.loading(),
       firstResponse: { requests: [{ id: 701 }], total: 1 },
       secondResponse: { requests: [{ id: 702 }], total: 2 },
       olderId: 701,
       newerId: 702,
-      firstId: () => component.privacyRequests()[0]?.id,
-      total: () => component.privacyTotal(),
+      firstId: () => component.privacy.rows()[0]?.id,
+      total: () => component.privacy.total(),
     },
   ];
 
@@ -302,13 +301,12 @@ describe("AdminComponent", () => {
     const newer = deferred<void>();
     spyOn(component, "loadOverview").and.returnValues(older.promise, newer.promise);
     spyOn(component, "loadOperations").and.resolveTo();
-    spyOn(component, "loadUsers").and.resolveTo();
-    spyOn(component, "loadRecoveries").and.resolveTo();
-    spyOn(component, "loadReports").and.resolveTo();
-    spyOn(component, "loadDomains").and.resolveTo();
-    spyOn(component, "loadAudit").and.resolveTo();
-    spyOn(component, "loadMailOutbox").and.resolveTo();
-    spyOn(component, "loadPrivacyRequests").and.resolveTo();
+    spyOn(component.users, "load").and.resolveTo();
+    spyOn(component.recoveries, "load").and.resolveTo();
+    spyOn(component.domains, "load").and.resolveTo();
+    spyOn(component.audit, "load").and.resolveTo();
+    spyOn(component.mail, "load").and.resolveTo();
+    spyOn(component.privacy, "load").and.resolveTo();
 
     const first = component.reloadAll();
     const second = component.reloadAll();
@@ -326,18 +324,18 @@ describe("AdminComponent", () => {
     const response = deferred<unknown>();
     api.get.and.returnValue(response.promise as never);
     component.userQuery.set("pending");
-    const request = component.loadUsers();
+    const request = component.users.load();
 
     fixture.destroy();
     response.resolve({ users: [{ id: 999 }], total: 1 });
     await request;
 
-    expect(component.users()[0]?.id).not.toBe(999);
-    expect(component.usersLoading()).toBeTrue();
+    expect(component.users.rows()[0]?.id).not.toBe(999);
+    expect(component.users.loading()).toBeTrue();
   });
 
   it("disarms a failed page instead of acting on the one it replaced", () => {
-    component.users.set([{
+    component.users.rows.set([{
       id: 1,
       email: "operator@example.test",
       name: "Operator",
@@ -349,8 +347,8 @@ describe("AdminComponent", () => {
       workspaces: 1,
       links: 2,
     }]);
-    component.usersTotal.set(1);
-    component.usersError.set("No se pudieron cargar los usuarios");
+    component.users.total.set(1);
+    component.users.error.set("No se pudieron cargar los usuarios");
     fixture.detectChanges();
 
     const element: HTMLElement = fixture.nativeElement;
@@ -364,7 +362,7 @@ describe("AdminComponent", () => {
   });
 
   it("disables user actions while their rows may be stale", () => {
-    component.users.set([{
+    component.users.rows.set([{
       id: 1,
       email: "operator@example.test",
       name: "Operator",
@@ -376,7 +374,7 @@ describe("AdminComponent", () => {
       workspaces: 1,
       links: 2,
     }]);
-    component.usersLoading.set(true);
+    component.users.loading.set(true);
     fixture.detectChanges();
 
     const buttons = Array.from(fixture.nativeElement.querySelectorAll("button")) as HTMLButtonElement[];

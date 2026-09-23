@@ -1,0 +1,29 @@
+// La gramática de la tarjeta de caso y la de cola son compartidas; lo particular
+// de una apelación es el bloque del veredicto. Esta hoja incluye además lo que la
+// cola dibuja: su barra de filtros, su resumen proyectado y los chips y botones
+// de sus tarjetas.
+@use "../queue-primitives.scss" as primitives;
+@use "./moderation-card.scss";
+
+:host { display: block; }
+
+@include primitives.filters;
+@include primitives.projected-paragraph;
+@include primitives.badge;
+@include primitives.danger-button;
+
+.appeal-verdict {
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--uvh-border);
+  span { color: var(--uvh-muted); font-family: "Courier New", monospace; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+  p { margin: 5px 0 0; color: var(--uvh-ink); font-size: 11.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+}
+
+.appeal-settled {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--uvh-muted);
+  font-size: 11px;
+  mat-icon { width: 16px; height: 16px; font-size: 16px; }
+}

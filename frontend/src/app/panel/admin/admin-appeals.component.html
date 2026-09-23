@@ -1,0 +1,54 @@
+<app-queue-section
+  title="Apelaciones"
+  [paging]="appeals"
+  [spaced]="true"
+  loadingLabel="Cargando apelaciones"
+  pagerLabel="Paginación de apelaciones"
+  emptyIcon="inbox"
+  emptyTitle="Sin apelaciones"
+  emptyHint="No hay casos que coincidan con esta vista."
+  [compactEmpty]="true"
+  [pageSizes]="pageSizes"
+>
+  <p queue-summary>
+    Un enlace bloqueado no tiene otra salida: aquí se decide si el bloqueo se mantiene o se levanta.@if (!appeals.error()) { {{ countLabel(appeals.total(), "caso coincide", "casos coinciden") }} con los filtros. }
+  </p>
+
+  <div class="filters" queue-filters>
+    <mat-form-field appearance="outline">
+      <mat-label>Estado de la apelación</mat-label>
+      <mat-select [value]="status()" (selectionChange)="filter($event.value)" aria-label="Estado de la apelación">
+        <mat-option value="">Todas</mat-option>
+        @for (option of appealStatusOptions; track option) { <mat-option [value]="option">{{ appealLabel(option) }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="moderation-grid" queue-rows>
+    @for (appeal of appeals.rows(); track appeal.id) {
+      <article class="moderation-card">
+        <header>
+          <span class="badge" [class.warning]="appeal.status === 'open'" [class.success]="appeal.status === 'restored'" [class.muted-badge]="appeal.status === 'upheld'">{{ appealLabel(appeal.status) }}</span>
+          <time>{{ formatDate(appeal.created_at) }}</time>
+        </header>
+        <div class="moderation-target"><b>/{{ appeal.alias }}</b><span [title]="appeal.destination">{{ appeal.destination }}</span></div>
+        <div class="moderation-copy">
+          <span>Lo que alega el propietario</span>
+          @if (appeal.message) { <p>{{ appeal.message }}</p> } @else { <p>Sin comentario.</p> }
+        </div>
+        <dl><div><dt>Workspace</dt><dd>#{{ appeal.workspace_id }}</dd></div><div><dt>Enlace</dt><dd>{{ linkStateLabel(appeal.link_state) }}</dd></div><div><dt>Solicitada</dt><dd>{{ formatDate(appeal.created_at) }}</dd></div></dl>
+        @if (appeal.decided_at) {
+          <div class="appeal-verdict"><span>Resuelta {{ formatDate(appeal.decided_at) }}</span>@if (appeal.decision_note) { <p>{{ appeal.decision_note }}</p> }</div>
+        }
+        <footer>
+          @if (appeal.status === "open") {
+            <button mat-flat-button type="button" (click)="resolve(appeal, 'restore')" [disabled]="appeals.stale() || busy()"><mat-icon>restart_alt</mat-icon>Restaurar enlace</button>
+            <button mat-stroked-button class="danger-button" type="button" (click)="resolve(appeal, 'uphold')" [disabled]="appeals.stale() || busy()"><mat-icon>gavel</mat-icon>Confirmar bloqueo</button>
+          } @else {
+            <span class="appeal-settled"><mat-icon aria-hidden="true">done_all</mat-icon>Ya resuelta</span>
+          }
+        </footer>
+      </article>
+    }
+  </div>
+</app-queue-section>

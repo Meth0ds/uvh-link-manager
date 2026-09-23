@@ -76,14 +76,14 @@ async function acceptInvitation(page: Page, email: string, invitationUrl: string
   await page.getByRole("button", { name: "Aceptar invitación" }).click();
   expect((await acceptResponse).status()).toBe(200);
   await page.getByRole("link", { name: "Ir a mi panel" }).click();
-  await page.getByRole("combobox", { name: "Workspace" }).click();
-  await page.getByRole("option", { name: workspaceName, exact: true }).click();
+  await page.getByRole("button", { name: "Cambiar workspace" }).click();
+  await page.getByRole("menuitem", { name: workspaceName }).click();
   await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
 }
 
 async function selectWorkspace(page: Page, workspaceName: string): Promise<void> {
-  await page.getByRole("combobox", { name: "Workspace" }).click();
-  await page.getByRole("option", { name: workspaceName, exact: true }).click();
+  await page.getByRole("button", { name: "Cambiar workspace" }).click();
+  await page.getByRole("menuitem", { name: workspaceName }).click();
   await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
 }
 
@@ -107,6 +107,16 @@ async function changeMemberRole(page: Page, email: string, role: InvitableRole):
  * scan then judges the colours the page settles on, which is what AA is about.
  */
 async function settleEntryAnimations(page: Page): Promise<void> {
+  // Focus-driven popups (Material tooltips) outlive the keyboard walk with a
+  // fade, and their half-transparent text is a state no reader reads. Blur and
+  // wait for the overlay to settle out before judging any colour.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.waitForFunction(() => {
+    const tip = document.querySelector(".mat-mdc-tooltip-surface");
+    if (tip === null) return true;
+    const style = getComputedStyle(tip);
+    return style.display === "none" || style.visibility !== "visible" || Number(style.opacity) < 0.1;
+  }, undefined, { timeout: 5000 });
   await page.evaluate(() => {
     for (const animation of document.getAnimations()) {
       try {
@@ -364,7 +374,7 @@ test("estado público falla cerrado sin monitor y conserva accesibilidad", async
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("link", { name: "Iniciar sesión" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
-  await expect(page.getByRole("link", { name: "Ayuda", exact: true })).toBeFocused();
+  await expect(page.getByRole("navigation", { name: "Navegación pública" }).getByRole("link", { name: "Ayuda", exact: true })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("link", { name: "UVH, inicio" })).toBeFocused();
   await expectNoWcagAAIssues(page);
@@ -520,6 +530,15 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   const enableMfaResponse = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/mfa/enable"));
   await page.getByRole("button", { name: "Verificar y continuar" }).click();
   expect((await enableMfaResponse).status()).toBe(200);
+  // The purge step-up refuses a replayed TOTP counter and enabling MFA already
+  // spent this window's one, so a second TOTP here would race the 30-second
+  // rollover. A single-use recovery code keeps the irreversible step exact.
+  const recoveryCodes = await page.locator("[aria-label='Códigos de recuperación'] code").evaluateAll((codes) =>
+    codes.slice(0, 1).map((code) => code.textContent?.trim() ?? ""));
+  // `.every(Boolean)` on an empty capture is vacuously true; assert the length
+  // so a failed capture fails here and not as a confusing fill(undefined).
+  expect(recoveryCodes).toHaveLength(1);
+  expect(recoveryCodes[0]).not.toBe("");
   await page.getByRole("checkbox", { name: /He guardado los códigos/ }).check();
   await page.getByRole("button", { name: "Finalizar configuración" }).click();
 
@@ -563,7 +582,7 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   await expect(purgeButton).toBeDisabled();
   await confirmation.getByLabel("Frase exacta").fill(`ELIMINAR ${alias}`);
   await confirmation.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
-  await confirmation.getByLabel("Código MFA o recuperación").fill(currentTotp(mfaSecret));
+  await confirmation.getByLabel("Código MFA o recuperación").fill(recoveryCodes[0]);
   await expect(purgeButton).toBeEnabled();
 
   const purgeResponse = page.waitForResponse((response) =>

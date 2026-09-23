@@ -175,11 +175,11 @@
                     <mat-label>Repite la contraseña</mat-label>
                     <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="confirmPassword" autocomplete="new-password" maxlength="72" />
                     <mat-icon matPrefix aria-hidden="true">check_circle_outline</mat-icon>
-                    @if (!passwordsMatch() && registerForm.controls.confirmPassword.touched) {
-                      <mat-error>Las contraseñas no coinciden.</mat-error>
-                    }
                   </mat-form-field>
                 </div>
+                @if (!passwordsMatch() && registerForm.controls.confirmPassword.touched) {
+                  <div class="alert error" role="alert">Las contraseñas no coinciden. Revisa el segundo campo.</div>
+                }
                 <div class="password-strength" [class]="passwordClass()" aria-live="polite">
                   <div class="strength-head"><span>Fortaleza estimada</span><b>{{ passwordStrength() }}</b></div>
                   <div class="strength-track" role="meter" aria-label="Fortaleza estimada de la contraseña" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="passwordScore()"><span [style.width.%]="passwordScore()"></span></div>
@@ -227,39 +227,37 @@
     }
 
     @if (step() === 'mfa') {
-      <section class="auth-step compact-step mfa-stage" aria-labelledby="mfa-title">
-        <div class="mfa-stepper" aria-label="Paso 2 de 2">
-          <span class="done"><mat-icon aria-hidden="true">check</mat-icon><b>Credenciales</b></span>
-          <i aria-hidden="true"></i>
-          <span class="current"><em>2</em><b>Verificación</b></span>
-        </div>
-        <span class="mode-illustration"><mat-icon aria-hidden="true">phonelink_lock</mat-icon></span>
-        <span class="mode-kicker">Segundo paso</span>
-        <h2 class="card-title" id="mfa-title">Confirma que eres tú</h2>
-        <p class="card-sub">Abre tu aplicación de autenticación e introduce el código temporal.</p>
-        <div class="mfa-account"><mat-icon aria-hidden="true">account_circle</mat-icon><span><small>Accediendo como</small><b>{{ loginForm.controls.email.value }}</b></span></div>
-        <form class="form" [formGroup]="mfaForm" (ngSubmit)="onMfa()">
-          <mat-form-field appearance="outline" class="otp-field">
-            <mat-label>Código de autenticación</mat-label>
-            <input matInput formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-describedby="totp-help" />
-            <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
-            <mat-hint id="totp-help">6 dígitos · cambia cada 30 segundos</mat-hint>
-          </mat-form-field>
-          @if (error()) {
-            <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
-          }
-          @if (info()) {
-            <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
-          }
-          <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="mfaForm.invalid || busy()">
-            <span>{{ busy() ? 'Verificando…' : 'Confirmar y entrar' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
-          </button>
-          @if (mfaRecoveryAvailable()) {
-            <button mat-button type="button" class="method-link" (click)="goRecovery()"><mat-icon aria-hidden="true">key</mat-icon>Usar un código de recuperación</button>
-          }
-          <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()">Volver al inicio de sesión</button>
-        </form>
-      </section>
+      <div class="otp-modal-scrim" role="presentation" (keydown)="onOtpModalKeydown($event)">
+        <section class="otp-modal" role="dialog" aria-modal="true" aria-labelledby="mfa-title" aria-describedby="mfa-lead">
+          <div class="mfa-stepper" aria-label="Paso 2 de 2">
+            <span class="done"><mat-icon aria-hidden="true">check</mat-icon><b>Credenciales</b></span>
+            <i aria-hidden="true"></i>
+            <span class="current"><em>2</em><b>Verificación</b></span>
+          </div>
+          <span class="mode-illustration"><mat-icon aria-hidden="true">phonelink_lock</mat-icon></span>
+          <span class="mode-kicker">Segundo paso</span>
+          <h2 class="card-title" id="mfa-title">Confirma que eres tú</h2>
+          <p class="card-sub" id="mfa-lead">Abre tu aplicación de autenticación e introduce el código temporal.</p>
+          <div class="mfa-account"><mat-icon aria-hidden="true">account_circle</mat-icon><span><small>Accediendo como</small><b>{{ loginForm.controls.email.value }}</b></span></div>
+          <form class="form" [formGroup]="mfaForm" (ngSubmit)="onMfa()">
+            <app-otp-code-input [control]="mfaForm.controls.code" [disabled]="busy()" (completed)="onOtpCompleted()" />
+            <p class="otp-help" id="totp-help">6 dígitos · cambia cada 30 segundos</p>
+            @if (error()) {
+              <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
+            }
+            @if (info()) {
+              <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
+            }
+            <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="mfaForm.invalid || busy()">
+              <span>{{ busy() ? 'Verificando…' : 'Confirmar y entrar' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+            </button>
+            @if (mfaRecoveryAvailable()) {
+              <button mat-button type="button" class="method-link" (click)="goRecovery()"><mat-icon aria-hidden="true">key</mat-icon>Usar un código de recuperación</button>
+            }
+            <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()">Volver al inicio de sesión</button>
+          </form>
+        </section>
+      </div>
     }
 
     @if (step() === 'recovery') {

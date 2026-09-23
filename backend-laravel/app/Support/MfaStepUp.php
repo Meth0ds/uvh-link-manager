@@ -4,43 +4,68 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Models\UvhSession;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
-/** Shared verification for operations that already hold user/session row locks. */
+/**
+ * Shared verification for operations that already hold user/session row locks.
+ *
+ * A step-up charges the account-wide attempt budget (MfaAttempts) — password
+ * and factor failures alike — so a stolen session cannot brute-force its way
+ * past the factor by rotating sessions. Beyond the factor typed now, a fresh
+ * window (MfaFreshness) bounds how old the session's own MFA proof may be;
+ * surfaces that ARE the refresh (mfa/reauthenticate) pass $requireFreshWindow
+ * false. A successful verification refreshes `mfa_verified_at` and restores
+ * the full attempt budget.
+ */
 class MfaStepUp
 {
-    /** @return array{status: string, factor?: string, recovery_codes?: array<int, string>} */
+    /** Surfaces without their own purpose share this account-wide bucket. */
+    public const ATTEMPT_PURPOSE = 'stepup';
+
+    /**
+     * @return array{status: string, factor?: string, recovery_codes?: array<int, string>, verified_at?: Carbon}
+     */
     public static function verify(
         User $user,
         UvhSession $session,
         string $password,
         string $factorCode,
-        bool $requirePreviouslyVerified = true,
+        bool $requireFreshWindow = true,
+        string $attemptPurpose = self::ATTEMPT_PURPOSE,
     ): array {
+        if (MfaAttempts::tooMany($user->id, $attemptPurpose)) {
+            return ['status' => 'locked'];
+        }
         if (! Hash::check($password, $user->password_hash)) {
+            MfaAttempts::recordFailure($user->id, $attemptPurpose);
+
             return ['status' => 'password'];
         }
         if (! $user->mfa_enabled) {
+            MfaAttempts::clear($user->id, $attemptPurpose);
+
             return ['status' => 'ok', 'factor' => 'password_only'];
         }
-        if ($requirePreviouslyVerified && $session->mfa_verified_at === null) {
-            return ['status' => 'stale'];
+        if ($requireFreshWindow && ! MfaFreshness::isFresh($session->mfa_verified_at)) {
+            // null = never verified (legacy 'stale'); past = the window lapsed.
+            return ['status' => $session->mfa_verified_at === null ? 'stale' : 'reauth'];
         }
 
         $factorCode = trim($factorCode);
         if (preg_match('/^\d{6}$/D', $factorCode)) {
             if (! is_string($user->mfa_secret) || $user->mfa_secret === '') {
-                return ['status' => 'factor'];
+                return self::factorFailure($user->id, $attemptPurpose);
             }
             try {
                 $secret = UvhCrypto::decryptAtRest($user->mfa_secret);
             } catch (\Throwable) {
-                return ['status' => 'factor'];
+                return self::factorFailure($user->id, $attemptPurpose);
             }
             $counter = Totp::matchingCounter($factorCode, $secret);
             if ($counter === null) {
-                return ['status' => 'factor'];
+                return self::factorFailure($user->id, $attemptPurpose);
             }
             $factor = substr(hash('sha256', $secret), 0, 24);
             try {
@@ -49,15 +74,15 @@ class MfaStepUp
                 throw new MfaInfrastructureUnavailable('MFA replay store unavailable', 0, $error);
             }
             if (! $reserved) {
-                return ['status' => 'factor'];
+                return self::factorFailure($user->id, $attemptPurpose);
             }
 
-            return ['status' => 'ok', 'factor' => 'totp'];
+            return self::success($user, $session, $attemptPurpose, 'totp');
         }
 
         $normalized = strtoupper((string) preg_replace('/[\s-]+/', '', $factorCode));
         if (! preg_match('/^[A-Z2-9]{16}$/D', $normalized) || ! is_array($user->recovery_codes)) {
-            return ['status' => 'factor'];
+            return self::factorFailure($user->id, $attemptPurpose);
         }
         $target = Ids::sha256Hex($normalized);
         $match = null;
@@ -67,11 +92,39 @@ class MfaStepUp
             }
         }
         if ($match === null) {
-            return ['status' => 'factor'];
+            return self::factorFailure($user->id, $attemptPurpose);
         }
         $remaining = $user->recovery_codes;
         array_splice($remaining, $match, 1);
 
-        return ['status' => 'ok', 'factor' => 'recovery', 'recovery_codes' => $remaining];
+        // Consumption is NOT persisted here: callers own the recovery_codes
+        // write (or replace the whole set, as mfaRegenerateRecoveryCodes does).
+        return self::success($user, $session, $attemptPurpose, 'recovery', $remaining);
+    }
+
+    /** @return array{status: string} */
+    private static function factorFailure(int $userId, string $attemptPurpose): array
+    {
+        MfaAttempts::recordFailure($userId, $attemptPurpose);
+
+        return ['status' => 'factor'];
+    }
+
+    /**
+     * @param  array<int, string>|null  $remaining
+     * @return array{status: string, factor: string, recovery_codes?: array<int, string>, verified_at: Carbon}
+     */
+    private static function success(User $user, UvhSession $session, string $attemptPurpose, string $factor, ?array $remaining = null): array
+    {
+        MfaAttempts::clear($user->id, $attemptPurpose);
+        $verifiedAt = now();
+        $session->update(['mfa_verified_at' => $verifiedAt]);
+
+        $result = ['status' => 'ok', 'factor' => $factor, 'verified_at' => $verifiedAt];
+        if ($remaining !== null) {
+            $result['recovery_codes'] = $remaining;
+        }
+
+        return $result;
     }
 }

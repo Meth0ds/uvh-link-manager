@@ -1,0 +1,56 @@
+<app-queue-section
+  title="Cola de moderación"
+  [paging]="reports"
+  loadingLabel="Cargando denuncias"
+  pagerLabel="Paginación de denuncias"
+  emptyIcon="task_alt"
+  emptyTitle="Sin denuncias"
+  emptyHint="No hay casos que coincidan con esta vista."
+  [pageSizes]="pageSizes"
+>
+  <p queue-summary>@if (!reports.error()) { {{ countLabel(reports.total(), "denuncia coincide", "denuncias coinciden") }} con los filtros. }</p>
+
+  <div class="filters" queue-filters>
+    <mat-form-field appearance="outline" class="filter-search">
+      <mat-label>Buscar alias, motivo o email</mat-label><mat-icon matPrefix>search</mat-icon>
+      <input matInput [value]="query()" (keyup.enter)="search(reportSearch.value)" #reportSearch />
+      <button mat-icon-button matSuffix type="button" (click)="search(reportSearch.value)" aria-label="Buscar denuncias"><mat-icon>arrow_forward</mat-icon></button>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Estado</mat-label>
+      <mat-select [value]="status()" (selectionChange)="filter($event.value)">
+        <mat-option value="">Todas</mat-option>
+        @for (option of reportStatusOptions; track option) { <mat-option [value]="option">{{ reportLabel(option) }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="moderation-grid" queue-rows>
+    @for (report of reports.rows(); track report.id) {
+      <article class="moderation-card">
+        <header>
+          <span class="badge" [class.warning]="report.status === 'open'" [class.success]="report.status === 'actioned'" [class.neutral]="report.status === 'reviewed'" [class.muted-badge]="report.status === 'dismissed'">{{ reportLabel(report.status) }}</span>
+          <time>{{ formatDate(report.created_at) }}</time>
+        </header>
+        <div class="moderation-target"><b>/{{ report.alias }}</b><span [title]="report.destination">{{ report.destination }}</span></div>
+        <div class="moderation-copy"><span>Motivo</span><b>{{ report.reason }}</b>@if (report.details) { <p>{{ report.details }}</p> }</div>
+        <dl><div><dt>Remitente</dt><dd>{{ report.reporter_email ?? "Anónimo" }}</dd></div><div><dt>Workspace</dt><dd>#{{ report.workspace_id }}</dd></div><div><dt>Enlace</dt><dd>{{ linkStateLabel(report.link_state) }}</dd></div></dl>
+        <footer>
+          @if (report.status !== "reviewed") { <button mat-stroked-button type="button" (click)="review(report)" [disabled]="reports.stale() || busy()">Revisada</button> }
+          @if (report.status !== "dismissed") { <button mat-stroked-button type="button" (click)="dismiss(report)" [disabled]="reports.stale() || busy()">Desestimar</button> }
+          @if (report.link_state !== "blocked") {
+            <button mat-flat-button class="destructive" type="button" (click)="block(report)" [disabled]="reports.stale() || busy()"><mat-icon>block</mat-icon>Bloquear</button>
+          } @else {
+            <button mat-flat-button type="button" (click)="unblock(report)" [disabled]="reports.stale() || busy()"><mat-icon>restart_alt</mat-icon>Desbloquear</button>
+          }
+          <button mat-stroked-button class="danger-button" type="button" (click)="blockDestination(report, 'url')" [disabled]="reports.stale() || busy()" matTooltip="Bloquea esta URL exacta para cualquier enlace">
+            <mat-icon>link_off</mat-icon>Destino: {{ kindLabel("url") }}
+          </button>
+          <button mat-stroked-button class="danger-button" type="button" (click)="blockDestination(report, 'host')" [disabled]="reports.stale() || busy()" matTooltip="Bloquea todo el host y reanaliza los enlaces que ya apuntaban ahí">
+            <mat-icon>link_off</mat-icon>Destino: {{ kindLabel("host") }}
+          </button>
+        </footer>
+      </article>
+    }
+  </div>
+</app-queue-section>

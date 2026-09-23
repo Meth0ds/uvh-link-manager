@@ -58,7 +58,7 @@ final class WebhookQueueLeaseTest extends TestCase
     private function pendingDelivery(string $suffix): WebhookDelivery
     {
         $owner = User::factory()->create();
-        $workspace = Workspace::create([
+        $workspace = Workspace::forceCreate([
             'name' => 'Queue lease',
             'slug' => 'queue-'.$suffix,
             'owner_user_id' => $owner->id,

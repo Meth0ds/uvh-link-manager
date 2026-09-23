@@ -18,4 +18,22 @@ export class StatusPageComponent {
   readonly forbidden = this.route.snapshot.data["kind"] === "forbidden";
   readonly code = this.forbidden ? "403" : "404";
   readonly title = this.forbidden ? "Esta puerta necesita permiso." : "Este camino no lleva a una página.";
+  readonly lead = this.forbidden
+    ? "Tu cuenta no tiene acceso a este recurso. Si crees que debería tenerlo, pídeselo al propietario del espacio de trabajo."
+    : "Puede que el enlace esté incompleto, que la página se haya movido o que ya no exista.";
+  // The spec pins the allowed destinations; only these paths may appear here.
+  readonly extras: ReadonlyArray<{ label: string; href: string; icon: string }> = this.forbidden
+    ? [
+      { label: "Centro de ayuda", href: "/help", icon: "support" },
+      { label: "Estado del servicio", href: "/status", icon: "monitor_heart" },
+    ]
+    : [
+      { label: "Ir al panel", href: "/app/dashboard", icon: "space_dashboard" },
+      { label: "Centro de ayuda", href: "/help", icon: "support" },
+      { label: "Estado del servicio", href: "/status", icon: "monitor_heart" },
+    ];
+
+  focusMain(main: HTMLElement): void {
+    main.focus();
+  }
 }

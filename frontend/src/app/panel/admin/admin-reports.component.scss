@@ -1,0 +1,13 @@
+// La gramática de la tarjeta de caso y la de cola son compartidas; esta hoja
+// declara lo que esta cola dibuja: su barra de filtros, su resumen proyectado y
+// los chips y botones de sus tarjetas. El marco pone el encabezado, el aviso, el
+// vacío y el paginador, así que no se incluyen aquí.
+@use "../queue-primitives.scss" as primitives;
+@use "./moderation-card.scss";
+
+:host { display: block; }
+
+@include primitives.filters;
+@include primitives.projected-paragraph;
+@include primitives.badge;
+@include primitives.danger-button;

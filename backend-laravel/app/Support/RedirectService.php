@@ -17,13 +17,28 @@ class RedirectService
     }
 
     /**
+     * El host público en su forma canónica, con o sin `www.`.
+     *
+     * Dos maneras de escribir el mismo lugar no pueden ser dos recursos
+     * distintos: quien decide a qué enlace pertenece una petición y quien cuenta
+     * su presupuesto de contraseña tienen que responder lo mismo, o el segundo
+     * se puede esquivar escribiendo `www.` delante del host (medido).
+     */
+    public static function canonicalHost(string $host): string
+    {
+        $host = self::normalizeHost($host);
+        $publicHost = strtolower((string) config('uvh.public_host'));
+
+        return $host === "www.{$publicHost}" ? $publicHost : $host;
+    }
+
+    /**
      * Map a Host header to a domain_id (null = default public host, -1 = unknown).
      */
     public static function resolveDomainId(string $host): ?int
     {
         $h = self::normalizeHost($host);
-        $publicHost = strtolower((string) config('uvh.public_host'));
-        if ($h === $publicHost || $h === "www.{$publicHost}") {
+        if (self::canonicalHost($h) === strtolower((string) config('uvh.public_host'))) {
             return null;
         }
         $row = CustomDomain::where('domain', $h)

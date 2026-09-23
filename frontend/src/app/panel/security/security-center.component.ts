@@ -4,6 +4,7 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
+import { dateTimeMediumLabel } from "../../core/date-time-label";
 import type { SecurityCenterSnapshot, Session } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
@@ -109,6 +110,6 @@ export class SecurityCenterComponent {
   }
 
   actionLabel(action: string): string { return ACTION_LABELS[action] ?? "Actividad de seguridad"; }
-  formatDate(value: string | null): string { return value ? new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "Sin registro disponible"; }
+  formatDate(value: string | null): string { return dateTimeMediumLabel(value, "Sin registro disponible"); }
   agent(value: string | null): string { return value?.slice(0, 160) || "Dispositivo no identificado"; }
 }

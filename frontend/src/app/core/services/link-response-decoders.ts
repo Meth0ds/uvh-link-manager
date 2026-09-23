@@ -1,4 +1,6 @@
-import type { AnalyticsOverview, AuditEvent, LinkDetailResponse, LinkDto, LinksResponse, LinkState, LinkTrashResponse, RedirectRule } from "../models";
+import type { AnalyticsOverview, AuditEvent, LinkAppeal, LinkDetailResponse, LinkDto, LinksResponse, LinkTrashResponse, RedirectRule } from "../models";
+import { LINK_APPEAL_STATUSES } from "../link-appeal-status";
+import { LINK_STATES } from "../link-state-label";
 import {
   boolean,
   boundedArray,
@@ -7,18 +9,36 @@ import {
   invalid,
   literal,
   nullableInteger,
+  nullableMultiline,
   nullableText,
   record,
   text,
 } from "./response-decoder-helpers";
 
-const LINK_STATES = new Set<LinkState>(["scheduled", "active", "paused", "expired", "blocked", "archived", "deleted"]);
 const DEVICES = new Set<NonNullable<RedirectRule["device"]>>(["desktop", "mobile", "tablet"]);
 
 function isoTimestamp(value: unknown, contract: string): string {
   const decoded = text(value, contract, 64);
   if (!/^\d{4}-\d{2}-\d{2}T/.test(decoded) || !Number.isFinite(Date.parse(decoded))) invalid(contract);
   return decoded;
+}
+
+function nullableIsoTimestamp(value: unknown, contract: string): string | null {
+  return value === null || value === undefined ? null : isoTimestamp(value, contract);
+}
+
+/** The owner's own appeal: status, the two dates, and why it was decided that way. */
+function linkAppeal(value: unknown): LinkAppeal {
+  const source = record(value, "link appeal");
+  return {
+    status: literal(source["status"], LINK_APPEAL_STATUSES, "link appeal status"),
+    createdAt: nullableIsoTimestamp(source["createdAt"], "link appeal creation timestamp"),
+    decidedAt: nullableIsoTimestamp(source["decidedAt"], "link appeal decision timestamp"),
+    // Same reading as the appeal itself: a payload from before the field existed
+    // carries no key, and that is a decision without a note, not a failure.
+    decisionNote: source["decisionNote"] === undefined
+      ? null : nullableMultiline(source["decisionNote"], "link appeal decision note", 500, true),
+  };
 }
 
 function link(value: unknown): LinkDto {
@@ -140,9 +160,21 @@ export function decodeLinkDetailResponse(value: unknown, expectedLinkId?: number
   const source = record(value, "link detail");
   const decodedLink = link(source["link"]);
   if (expectedLinkId !== undefined && decodedLink.id !== expectedLinkId) invalid("link detail context");
+  // A payload from before the field existed carries no key, and that reads as
+  // "never appealed" — the same thing the API means by an explicit null.
+  const appeal = source["appeal"] === null || source["appeal"] === undefined
+    ? null
+    : linkAppeal(source["appeal"]);
+  // The API only computes the reason for a blocked link, so a staler backend
+  // that does not send the field at all reads as "no reason", and the notice
+  // then states the block without a cause instead of refusing to render.
+  const blockReason = source["blockReason"] === undefined
+    ? null : nullableMultiline(source["blockReason"], "link block reason", 300, true);
   return {
     link: decodedLink,
     rules: boundedArray(source["rules"], "redirect rules", 20).map(rule),
+    appeal,
+    blockReason,
   };
 }
 

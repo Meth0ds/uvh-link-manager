@@ -4,7 +4,13 @@ import { authBearer, bearerExpiry, intentBearer } from "./auth-bearer";
 /** Minimal route stub: the two carriers a link can arrive in. */
 function route(fragment: string | null, query: Record<string, string> = {}): ActivatedRoute {
   return {
-    snapshot: { fragment, queryParamMap: new Map(Object.entries(query)) as never },
+    snapshot: {
+      fragment,
+      // `ParamMap.get` answers `null` for a key that is not there; a `Map`
+      // answers `undefined`, and that difference is the one this stub has to
+      // keep or it would test a contract the router does not have.
+      queryParamMap: { get: (key: string) => query[key] ?? null } as never,
+    },
   } as unknown as ActivatedRoute;
 }
 

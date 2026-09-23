@@ -5,11 +5,13 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
+import { dateTimeMediumLabel } from "../../core/date-time-label";
 import type { WebhookDelivery, WebhookDeliveryPage, WebhookDto } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { decodeWebhookDeliveriesResponse, decodeWebhooksResponse } from "../../core/services/credential-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { parseRouteId } from "../../core/strict-wire";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { webhookDeliveryIcon, webhookDeliveryLabel, webhookStateLabel } from "../../core/webhook-label";
@@ -70,7 +72,7 @@ export class WebhookInspectorComponent {
       this.total.set(0);
       this.page.set(1);
       this.error.set(null);
-      if (!Number.isSafeInteger(webhookId) || webhookId < 1) {
+      if (webhookId === null) {
         this.error.set("El identificador del webhook no es válido");
         this.loading.set(false);
         return;
@@ -83,8 +85,8 @@ export class WebhookInspectorComponent {
     });
   }
 
-  private paramId(): number {
-    return Number(this.route.snapshot.paramMap.get("id"));
+  private paramId(): number | null {
+    return parseRouteId(this.route.snapshot.paramMap.get("id"));
   }
 
   /** The identity a request must still match to be applied to this view. */
@@ -100,7 +102,7 @@ export class WebhookInspectorComponent {
     const workspaceId = this.workspaces.currentId();
     const role = this.workspaces.currentRole();
     const webhookId = this.webhookId();
-    if (workspaceId === null || role === null) return;
+    if (workspaceId === null || role === null || webhookId === null) return;
     const request = this.requests.begin(`${workspaceId}:${role}:${webhookId}:${targetPage}`);
     this.loading.set(true);
     this.error.set(null);
@@ -180,6 +182,6 @@ export class WebhookInspectorComponent {
   readonly deliveryIcon = webhookDeliveryIcon;
 
   formatDate(value: string | null): string {
-    return value ? new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+    return dateTimeMediumLabel(value);
   }
 }

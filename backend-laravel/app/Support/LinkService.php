@@ -287,6 +287,14 @@ class LinkService
                 ->where('edge_eligible', true)->whereNotNull('tls_ready_at')->lockForUpdate()->first(['id'])) {
                 throw new LinkException('Dominio no activado o sin acceso', 403);
             }
+            // An explicit empty alias asks to clear what identifies the link —
+            // impossible to apply — so it is refused with 422 instead of being
+            // accepted and silently ignored. Omitting the key keeps the current
+            // alias (PATCH semantics); the controller merges the current value
+            // in first, so a non-string alias here can only be an explicit one.
+            if (array_key_exists('alias', $input) && (! is_string($input['alias']) || $input['alias'] === '')) {
+                throw new LinkException('El alias no se puede vaciar; escribe otro alias', 422);
+            }
             $alias = ! empty($input['alias']) ? UrlUtil::normalizeAlias($input['alias']) : $link->alias;
             if (! empty($input['alias'])) {
                 if (UrlUtil::isReservedAlias($alias)) {
@@ -412,11 +420,16 @@ class LinkService
     {
         $scheduled = self::toDateTime($input['scheduled_at'] ?? null);
         $expires = self::toDateTime($input['expires_at'] ?? null);
-        if ($scheduled && $scheduled->isFuture()) {
-            return 'scheduled';
-        }
+        // Expiry wins over scheduling. `validate()` refuses a pair where
+        // `scheduled_at >= expires_at`, so for any admitted input the two
+        // cannot disagree — but a writer that reaches here without validation
+        // must still not derive a live-looking `scheduled` state from a link
+        // whose expiry is already in the past.
         if ($expires && $expires->isPast()) {
             return 'expired';
+        }
+        if ($scheduled && $scheduled->isFuture()) {
+            return 'scheduled';
         }
 
         return 'active';

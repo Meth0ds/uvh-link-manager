@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AccountRecoveryRequest;
 use App\Models\User;
 use App\Support\AccountRecoveryLifecycle;
+use App\Support\AdminText;
 use App\Support\Audit;
 use App\Support\DestinationDenylist;
 use App\Support\DestinationReputationService;
@@ -347,13 +348,13 @@ class AdminController
             return response()->json(['error' => 'Acción de moderación inválida'], 422);
         }
         $reason = trim(UvhRequest::inputString($request, 'reason'));
-        if (! mb_check_encoding($reason, 'UTF-8') || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $reason)) {
+        if (! AdminText::encodable($reason)) {
             return response()->json(['error' => 'El motivo contiene caracteres no válidos'], 422);
         }
-        if ($action === 'block' && (mb_strlen($reason) < 3 || mb_strlen($reason) > 500)) {
+        if ($action === 'block' && ! AdminText::bounded($reason, 3, 500)) {
             return response()->json(['error' => 'Indica un motivo de entre 3 y 500 caracteres'], 422);
         }
-        if ($action !== 'block' && mb_strlen($reason) > 500) {
+        if ($action !== 'block' && ! AdminText::bounded($reason, 0, 500)) {
             return response()->json(['error' => 'El comentario no puede superar 500 caracteres'], 422);
         }
 
@@ -414,8 +415,7 @@ class AdminController
     public function blockLink(Request $request, int $id)
     {
         $reason = trim(UvhRequest::inputString($request, 'reason'));
-        if (! mb_check_encoding($reason, 'UTF-8') || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $reason)
-            || mb_strlen($reason) < 3 || mb_strlen($reason) > 500) {
+        if (! AdminText::bounded($reason, 3, 500)) {
             return response()->json(['error' => 'Motivo requerido'], 422);
         }
 
@@ -974,16 +974,20 @@ class AdminController
                 'pendingJobs' => $jobCount,
                 'oldestJobAgeSeconds' => $oldestJobAge,
                 'failedJobs' => $failedJobs,
-                'webhookDeliveries' => $deliveryCounts,
+                // These four are maps of counts, and a client reads them as one:
+                // an empty PHP array encodes as `[]`, which is not an object and
+                // makes a strict reader reject the whole snapshot. Casting keeps
+                // an empty map a map.
+                'webhookDeliveries' => (object) $deliveryCounts,
                 'oldestPendingWebhookAgeSeconds' => $oldestPendingWebhookAge,
-                'mailOutbox' => $mailOutboxCounts,
+                'mailOutbox' => (object) $mailOutboxCounts,
                 'oldestPendingMailAgeSeconds' => $oldestPendingMailAge,
                 'activeSessions' => $activeSessions,
                 'unverifiedUsers' => $unverifiedUsers,
-                'domains' => $domainCounts,
+                'domains' => (object) $domainCounts,
                 'oldestDnsCheckAgeSeconds' => $oldestDnsCheckAge,
                 'oldestTlsProvisioningAgeSeconds' => $oldestTlsProvisioningAge,
-                'events60m' => $events60m,
+                'events60m' => (object) $events60m,
                 'queueHeartbeatAgeSeconds' => $queueHeartbeatAge,
                 'schedulerHeartbeatAgeSeconds' => $schedulerHeartbeatAge,
                 'activePrivacyRequests' => $activePrivacyRequests,
@@ -1239,7 +1243,7 @@ class AdminController
             return response()->json(['error' => 'Decisión inválida'], 422);
         }
         $note = trim(UvhRequest::inputString($request, 'note'));
-        if (! mb_check_encoding($note, 'UTF-8') || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $note) || mb_strlen($note) > 500) {
+        if (! AdminText::bounded($note, 0, 500)) {
             return response()->json(['error' => 'La nota contiene caracteres no válidos'], 422);
         }
 
@@ -1317,8 +1321,7 @@ class AdminController
     public function blockDestination(Request $request, int $id): JsonResponse
     {
         $reason = trim(UvhRequest::inputString($request, 'reason'));
-        if (! mb_check_encoding($reason, 'UTF-8') || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $reason)
-            || mb_strlen($reason) < 3 || mb_strlen($reason) > 500) {
+        if (! AdminText::bounded($reason, 3, 500)) {
             return response()->json(['error' => 'Motivo requerido'], 422);
         }
         $scope = UvhRequest::inputString($request, 'scope');

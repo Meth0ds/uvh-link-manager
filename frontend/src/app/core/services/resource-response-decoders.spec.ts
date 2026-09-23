@@ -83,9 +83,39 @@ describe("resource response decoders", () => {
 
   it("validates link and detail identities before publishing an edit", () => {
     expect(decodeLinkResponse({ link }, 4)).toEqual({ link });
-    expect(decodeLinkDetailResponse({ link, rules: [] }, 4)).toEqual({ link, rules: [] });
+    expect(decodeLinkDetailResponse({ link, rules: [], appeal: null, blockReason: null }, 4))
+      .toEqual({ link, rules: [], appeal: null, blockReason: null });
     expect(() => decodeLinkResponse({ link }, 9)).toThrow();
-    expect(() => decodeLinkDetailResponse({ link, rules: [] }, 9)).toThrow();
+    expect(() => decodeLinkDetailResponse({ link, rules: [], appeal: null }, 9)).toThrow();
+  });
+
+  it("reads the owner's own appeal and refuses an unknown status", () => {
+    const appeal = { status: "open" as const, createdAt: "2026-09-21T10:00:00.000000+00:00", decidedAt: null, decisionNote: null };
+    expect(decodeLinkDetailResponse({ link, rules: [], appeal }, 4).appeal).toEqual(appeal);
+    // A payload from before the field existed carries no key: no appeal, not a failure.
+    expect(decodeLinkDetailResponse({ link, rules: [] }, 4).appeal).toBeNull();
+    expect(() => decodeLinkDetailResponse({ link, rules: [], appeal: { ...appeal, status: "pending" } }, 4)).toThrow();
+    expect(() => decodeLinkDetailResponse({ link, rules: [], appeal: { ...appeal, createdAt: "ayer" } }, 4)).toThrow();
+  });
+
+  it("reads why the link is blocked and the note behind the decision", () => {
+    const decided = {
+      status: "upheld" as const,
+      createdAt: "2026-09-21T10:00:00.000000+00:00",
+      decidedAt: "2026-09-21T11:00:00.000000+00:00",
+      decisionNote: "El destino sigue suplantando una marca ajena.",
+    };
+    const detail = decodeLinkDetailResponse(
+      { link, rules: [], appeal: decided, blockReason: "Suplantación de marca confirmada." },
+      4,
+    );
+    expect(detail.appeal).toEqual(decided);
+    expect(detail.blockReason).toBe("Suplantación de marca confirmada.");
+    // A note is written by an operator and may span lines; a blocked link with no
+    // reason to print reads as no reason, not as a broken payload.
+    expect(decodeLinkDetailResponse({ link, rules: [], appeal: { ...decided, decisionNote: "Primera línea.\nSegunda línea." }, blockReason: null }, 4).appeal?.decisionNote)
+      .toBe("Primera línea.\nSegunda línea.");
+    expect(decodeLinkDetailResponse({ link, rules: [], appeal: decided }, 4).blockReason).toBeNull();
   });
 
   it("rejects unsafe link destinations and duplicate case-insensitive tags", () => {

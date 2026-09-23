@@ -214,6 +214,14 @@ GET    /api/v1/admin/appeals?status=open       # cola de apelaciones
 POST   /api/v1/admin/appeals/{id}/decision     # { "decision": "restore" | "uphold", "note": "…" }
 ```
 
+Las dos tienen pantalla: el panel de administración resuelve las apelaciones en
+*Moderación → Apelaciones* (filtro por estado, `restore` o `uphold` con nota) —y
+el dueño ve el veredicto en el detalle de su enlace— y la lista de destinos se ve
+y se retira en *Moderación → Destinos bloqueados*. Bloquear un destino se hace
+desde el propio caso, en la tarjeta de la denuncia, con el alcance explícito
+(`URL exacta` o `Todo el host`). Las llamadas HTTP de arriba siguen sirviendo
+para automatizar.
+
 ### Apelación del propietario
 
 ```http

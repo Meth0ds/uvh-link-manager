@@ -174,7 +174,7 @@ final class WorkspaceNoticeAtomicityTest extends TestCase
             'mfa_secret' => UvhCrypto::encryptAtRest('JBSWY3DPEHPK3PXP'), 'recovery_codes' => [Ids::sha256Hex(self::RECOVERY)],
         ]);
         $target = User::factory()->create(['email' => 'member@example.test']);
-        $workspace = Workspace::create(['name' => 'Notice Workspace', 'slug' => 'notice-workspace', 'owner_user_id' => $owner->id]);
+        $workspace = Workspace::forceCreate(['name' => 'Notice Workspace', 'slug' => 'notice-workspace', 'owner_user_id' => $owner->id]);
         foreach ([[$owner->id, 'owner'], [$target->id, 'viewer']] as [$userId, $role]) {
             DB::table('memberships')->insert(['workspace_id' => $workspace->id, 'user_id' => $userId, 'role' => $role, 'created_at' => now()]);
         }

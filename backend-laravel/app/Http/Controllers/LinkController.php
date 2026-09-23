@@ -8,7 +8,10 @@ use App\Models\User;
 use App\Models\UvhSession;
 use App\Support\Audit;
 use App\Support\IsoDate;
+use App\Support\LinkBlockReason;
 use App\Support\LinkService;
+use App\Support\MfaAttempts;
+use App\Support\MfaFreshness;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
@@ -176,6 +179,10 @@ class LinkController
         $workspaceId = UvhRequest::workspaceId($request);
         $user = UvhRequest::user($request);
 
+        $unsupported = $this->unsupportedBodyField($request);
+        if ($unsupported !== null) {
+            return response()->json(['error' => $unsupported], 422);
+        }
         if (! $this->validLinkBody($request)) {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
@@ -256,7 +263,14 @@ class LinkController
         $appeal = DB::table('link_appeals')
             ->where('link_id', $id)
             ->orderByDesc('id')
-            ->first(['status', 'created_at', 'decided_at']);
+            ->first(['status', 'created_at', 'decided_at', 'decision_note']);
+
+        // Why the platform is refusing the link is part of its state too, and
+        // the owner is the one who has to answer for it. Only a blocked link has
+        // a reason to explain, so no other read pays for the trail lookup.
+        $blockReason = (string) $link->state === 'blocked'
+            ? LinkBlockReason::forLink((int) $link->id, (int) $workspaceId)
+            : null;
 
         return response()->json([
             'link' => LinkService::dto($link),
@@ -265,7 +279,12 @@ class LinkController
                 'status' => (string) $appeal->status,
                 'createdAt' => $this->iso($appeal->created_at),
                 'decidedAt' => $this->iso($appeal->decided_at),
+                // What the operator decided in their own words. The form asks for
+                // it and the owner lives with the decision, so it is theirs to
+                // read, not an internal note.
+                'decisionNote' => $appeal->decision_note === null ? null : (string) $appeal->decision_note,
             ],
+            'blockReason' => $blockReason,
         ]);
     }
 
@@ -279,6 +298,10 @@ class LinkController
             return response()->json(['error' => 'Enlace no encontrado'], 404);
         }
 
+        $unsupported = $this->unsupportedBodyField($request, true);
+        if ($unsupported !== null) {
+            return response()->json(['error' => $unsupported], 422);
+        }
         if (! $this->validLinkBody($request, true)) {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
@@ -551,11 +574,14 @@ class LinkController
                     throw new LinkException('Cuota de enlaces alcanzada. Elimina otro enlace antes de restaurar este.', 429);
                 }
 
+                // Expiry wins over scheduling, in the same order as
+                // `LinkService::deriveState`: a restored link must not look
+                // alive because its activation date is still ahead.
                 $next = $link->state_before_delete === 'blocked'
                     ? 'blocked'
-                    : (($link->scheduled_at && $link->scheduled_at->isFuture())
-                        ? 'scheduled'
-                        : (($link->expires_at && $link->expires_at->isPast()) ? 'expired' : 'active'));
+                    : (($link->expires_at && $link->expires_at->isPast())
+                        ? 'expired'
+                        : (($link->scheduled_at && $link->scheduled_at->isFuture()) ? 'scheduled' : 'active'));
                 $link->update([
                     'deleted_at' => null,
                     'state' => $next,
@@ -637,6 +663,12 @@ class LinkController
             return response()->json(['error' => 'La verificación MFA no está disponible. No se eliminó el enlace.'], 503);
         }
 
+        if ($result['status'] === 'locked') {
+            return MfaAttempts::tooManyResponse($actor->id, MfaStepUp::ATTEMPT_PURPOSE);
+        }
+        if ($result['status'] === 'reauth') {
+            return MfaFreshness::reauthenticationRequired();
+        }
         $error = match ($result['status']) {
             'stale' => ['La sesión cambió. Vuelve a iniciar sesión.', 409],
             'forbidden' => ['Sólo propietarios y administradores pueden borrar definitivamente.', 403],
@@ -691,6 +723,40 @@ class LinkController
     }
 
     // ---------------- helpers ----------------
+
+    /**
+     * A write must refuse what it cannot apply instead of accepting it and
+     * moving on in silence. `state` is the dangerous one: a client that sent
+     * `state: "active"` here got a 200 and no state change, which reads as a
+     * successful moderation bypass. States travel their own endpoint
+     * (`POST /links/{id}/state`), never the edit body.
+     *
+     * @return string|null the error to answer with, or null when every field
+     *                     belongs to the write contract
+     */
+    private function unsupportedBodyField(Request $request, bool $partial = false): ?string
+    {
+        $supported = [
+            'destination', 'alias', 'domainId', 'fallbackDestination', 'password',
+            'maxClicks', 'singleUse', 'scheduledAt', 'expiresAt', 'notes',
+            'utm', 'tags', 'rules',
+        ];
+        if ($partial) {
+            // The optimistic-concurrency token only exists on edits.
+            $supported[] = 'version';
+        }
+        foreach (array_keys($request->all()) as $field) {
+            if (in_array($field, $supported, true)) {
+                continue;
+            }
+
+            return $field === 'state'
+                ? 'El estado no se cambia con esta petición: usa POST /api/v1/links/{id}/state'
+                : 'Campo no admitido: '.(string) $field;
+        }
+
+        return null;
+    }
 
     private function validLinkBody(Request $request, bool $partial = false): bool
     {

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Jobs\RecordClickAnalyticsJob;
 use App\Models\Link;
-use App\Support\Ids;
 use App\Support\OperationalMetrics;
 use App\Support\RedirectService;
 use App\Support\SignedToken;
@@ -12,6 +11,7 @@ use App\Support\Ua;
 use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
+use App\Support\VisitorAnswer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -48,19 +48,11 @@ class RedirectController
         }
 
         if ($outcome['kind'] === 'password_required') {
-            if ($this->wantsHtml($request)) {
-                [$html, $cookie] = $this->passwordPage($request, $alias);
-
-                return $cookie
-                    ? response($html, 403)->withCookie($cookie)
-                    : response($html, 403);
-            }
-
-            return response()->json(['error' => 'Enlace protegido con contraseña', 'passwordRequired' => true], 403);
+            return VisitorAnswer::passwordRequired($request, $alias);
         }
 
         if ($outcome['kind'] === 'gone') {
-            return response($this->page('Enlace agotado', 'Este enlace ya no está disponible (límite de clics o uso único alcanzado).', 410), 410);
+            return VisitorAnswer::notice('Enlace agotado', 'Este enlace ya no está disponible (límite de clics o uso único alcanzado).', 410);
         }
 
         if ($outcome['kind'] === 'unavailable') {
@@ -74,32 +66,40 @@ class RedirectController
             ];
             [$title, $body] = $labels[$outcome['reason']] ?? ['No disponible', 'Este enlace no está disponible.'];
 
-            return response($this->page($title, $body, 404), 404);
+            return VisitorAnswer::notice($title, $body, 404);
         }
 
-        return response($this->page('Enlace no encontrado', 'El enlace que buscas no existe o fue eliminado.', 404), 404);
+        return VisitorAnswer::notice('Enlace no encontrado', 'El enlace que buscas no existe o fue eliminado.', 404);
     }
 
+    /**
+     * Cada rechazo del formulario que un visitante puede provocar tiene que
+     * volver a la pantalla, no a un cuerpo JSON: quien tiene delante la puerta
+     * no puede leer `{"error":…}` ni tiene otra forma de continuar. El sobre
+     * JSON sigue siendo el mismo para los clientes de API, y el estado HTTP
+     * tampoco cambia. Aquí sólo se decide la admisión; quién ve qué lo resuelve
+     * `VisitorAnswer`.
+     */
     public function unlock(Request $request, string $alias)
     {
         if (! $this->verifyCsrf($request)) {
-            return response()->json(['error' => 'Token CSRF inválido'], 403);
+            return VisitorAnswer::staleForm($request, $alias);
         }
 
         $password = UvhRequest::inputString($request, 'password');
         if ($password === '' || strlen($password) > 72) {
-            return response()->json(['error' => 'Contraseña requerida'], 422);
+            return VisitorAnswer::passwordOutOfRange($request, $alias);
         }
 
         $alias = UrlUtil::normalizeAlias($alias);
         if ($alias === '' || strlen($alias) > 64 || UrlUtil::isReservedAlias($alias) || ! UrlUtil::isValidCustomAlias($alias)) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return VisitorAnswer::noSuchLink($request);
         }
         $host = RedirectService::normalizeHost($request->getHost());
         $domainId = RedirectService::resolveDomainId($host);
 
         if ($domainId === -1) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return VisitorAnswer::noSuchLink($request);
         }
 
         $query = Link::whereNull('deleted_at')->where('alias', $alias);
@@ -111,21 +111,11 @@ class RedirectController
         $link = $query->first();
 
         if (! $link || ! $link->password_hash) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return VisitorAnswer::noSuchLink($request);
         }
 
         if (! Hash::check($password, $link->password_hash)) {
-            if ($this->wantsHtml($request)) {
-                [$html, $cookie] = $this->passwordPage($request, $alias, 'Contraseña incorrecta');
-                $response = response($html, 403);
-                if ($cookie) {
-                    $response->withCookie($cookie);
-                }
-
-                return $response;
-            }
-
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return VisitorAnswer::wrongPassword($request, $alias);
         }
 
         // Bind the token to the exact link: a stale unlock token must not open
@@ -149,19 +139,10 @@ class RedirectController
             'lax',
         );
 
-        if ($this->wantsHtml($request)) {
-            return redirect('/r/'.rawurlencode($alias), 302)->withCookie($cookie);
-        }
-
-        return response()->json(['ok' => true])->withCookie($cookie);
+        return VisitorAnswer::unlocked($request, $alias, $cookie);
     }
 
     // ---------------- helpers ----------------
-
-    private function wantsHtml(Request $request): bool
-    {
-        return $request->accepts('text/html');
-    }
 
     private function countryFromHeaders(Request $request): ?string
     {
@@ -225,53 +206,5 @@ class RedirectController
 
         return is_string($cookie) && is_string($supplied)
             && $cookie !== '' && hash_equals($cookie, $supplied);
-    }
-
-    private function passwordPage(Request $request, string $alias, ?string $error = null): array
-    {
-        $token = $request->cookies->get((string) config('uvh.csrf_cookie'));
-        $cookie = null;
-        if (! is_string($token) || $token === '') {
-            $token = Ids::base64urlEncode(random_bytes(24));
-            $cookie = new Cookie((string) config('uvh.csrf_cookie'), $token, 0, '/', null, (bool) config('uvh.cookie_secure'), false, false, 'lax');
-        }
-
-        $err = $error !== null
-            ? '<div class="err">'.htmlspecialchars($error, ENT_QUOTES, 'UTF-8').'</div>'
-            : '';
-
-        $html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            .'<title>Enlace protegido · UVH</title><style>'
-            .'body{font-family:Manrope,Segoe UI,Arial,sans-serif;background:#F6F8FC;color:#07111F;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}'
-            .'.card{background:#fff;border:1px solid #E3E8F0;border-radius:16px;padding:40px;max-width:400px;width:100%}'
-            .'h1{font-size:20px;margin:0 0 4px} p{color:#33415C;margin:0 0 16px}'
-            .'input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #CBD3E0;border-radius:8px;font-size:15px}'
-            .'button{width:100%;margin-top:12px;background:#2457F5;color:#fff;border:0;padding:12px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}'
-            .'.err{color:#C62828;font-size:13px;margin-top:10px}'
-            .'</style></head><body><div class="card"><h1>Enlace protegido</h1><p>Este enlace está protegido con contraseña. Introdúcela para continuar.</p>'
-            .'<form method="post" action="/r/'.rawurlencode($alias).'/unlock">'
-            .'<input type="password" name="password" placeholder="Contraseña" autofocus required>'
-            .'<input type="hidden" name="_csrf" value="'.htmlspecialchars($token, ENT_QUOTES, 'UTF-8').'">'
-            .'<button type="submit">Continuar</button>'
-            .$err
-            .'</form></div></body></html>';
-
-        return [$html, $cookie];
-    }
-
-    private function page(string $title, string $body, int $status): string
-    {
-        // The heading and the document title are escaped separately: `<title>`
-        // is raw text, so an unescaped interpolation there is an injection even
-        // when the body is escaped.
-        return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            .'<title>'.htmlspecialchars($title, ENT_QUOTES, 'UTF-8').' · UVH</title><style>'
-            .'body{font-family:Manrope,Segoe UI,Arial,sans-serif;background:#F6F8FC;color:#07111F;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}'
-            .'.card{background:#fff;border:1px solid #E3E8F0;border-radius:16px;padding:40px;max-width:420px;text-align:center}'
-            .'h1{font-size:22px;margin:0 0 8px} p{color:#33415C;line-height:1.6;margin:0}'
-            .'.brand{font-weight:800;color:#2457F5;margin-bottom:16px} .brand b{color:#00A99D}'
-            .'a.btn{display:inline-block;margin-top:20px;background:#2457F5;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600}'
-            .'</style></head><body><div class="card"><div class="brand">UVH <b>· Enlaces cortos. Control total.</b></div>'
-            .'<h1>'.htmlspecialchars($title, ENT_QUOTES, 'UTF-8').'</h1><p>'.htmlspecialchars($body, ENT_QUOTES, 'UTF-8').'</p></div></body></html>';
     }
 }

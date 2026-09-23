@@ -1,0 +1,153 @@
+// La gramática que comparten las colas del panel — y nada más — con un solo
+// dueño. Es una biblioteca de mixins, no un parcial de reglas, y esa es la
+// diferencia que importa: `@use` compila todo lo que el fichero contiene, y la
+// encapsulación de Angular da a cada nodo el atributo del componente que lo
+// declara. Una regla escrita para un nodo proyectado (el resumen, la barra de
+// filtros, los chips y las filas) no puede casar en la hoja del marco, porque el
+// nodo lleva el atributo de su padre; y una regla escrita para los nodos del
+// marco (el encabezado, el vacío, el paginador) no puede casar en la hoja de una
+// cola. Por eso cada componente incluye exactamente los bloques que dibuja: eso,
+// y no el import, es lo que hace que la regla se aplique.
+
+/// La medida de un párrafo de encabezado. Uso interno.
+@mixin paragraph-look {
+  margin: 4px 0 0;
+  color: var(--uvh-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/// El encabezado de una sección. Lo dibuja el marco alrededor de cada cola y,
+/// para su propio bloque «Estado operativo», también la consola.
+@mixin heading {
+  .section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 17px;
+    h2 { margin: 0; color: var(--uvh-ink); font-size: 17.5px; font-weight: 800; letter-spacing: -.03em; }
+    // Una cola que vive bajo otra en la misma pestaña se separa con una regla,
+    // no con una tarjeta.
+    &.spaced { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--uvh-border); }
+  }
+  // En pantallas estrechas el encabezado deja de ser una fila.
+  @media (max-width: 650px) {
+    .section-heading { align-items: stretch; flex-direction: column; }
+  }
+}
+
+/// El párrafo del encabezado que dibuja el propio componente (la consola, en su
+/// bloque «Estado operativo»).
+@mixin heading-paragraph {
+  .section-heading p {
+    @include paragraph-look;
+    // Un párrafo que se esconde mientras su lectura falla no puede dejar una
+    // línea vacía detrás: las cuentas describen filas que nadie recibió.
+    &:empty { margin: 0; }
+  }
+}
+
+/// El resumen que una cola **proyecta** dentro del encabezado del marco. Vive en
+/// la hoja de la cola que lo declara, que es quien tiene el atributo del nodo.
+@mixin projected-paragraph {
+  [queue-summary] {
+    @include paragraph-look;
+    &:empty { margin: 0; }
+  }
+}
+
+/// El aviso con su reintento: lo dibuja el marco y, para el resumen y la
+/// operación, también la consola.
+@mixin notice {
+  .alert {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border-left: 3px solid var(--uvh-danger);
+    border-radius: 3px;
+    background: var(--uvh-danger-soft);
+    color: var(--uvh-danger);
+    font-size: 13px;
+    line-height: 1.6;
+    span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    > button { flex: 0 0 auto; margin-left: auto; }
+    &.compact { margin: 10px 0 14px; }
+  }
+}
+
+/// La barra de filtros que proyecta una cola. El `::ng-deep` alcanza los
+/// internos del campo de Material, que no llevan atributo de este componente.
+@mixin filters {
+  .filters {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 3px;
+    mat-form-field { width: 210px; }
+    .filter-search { width: min(100%, 420px); }
+    ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }
+    ::ng-deep .mat-mdc-text-field-wrapper { background: var(--uvh-surface); }
+  }
+  @media (max-width: 650px) {
+    .filters {
+      flex-direction: column;
+      mat-form-field, .filter-search { width: 100%; }
+    }
+  }
+}
+
+/// La misma gramática que el chip de estado compartido: etiqueta cuadrada,
+/// relleno suave, tinta fuerte.
+@mixin badge {
+  .badge {
+    display: inline-flex;
+    min-height: 22px;
+    align-items: center;
+    padding: 3px 8px;
+    border: 1px solid var(--uvh-border);
+    border-radius: 3px;
+    background: var(--uvh-surface);
+    color: var(--uvh-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    white-space: nowrap;
+    &.success { border-color: color-mix(in srgb, var(--uvh-success) 34%, var(--uvh-border)); background: var(--uvh-success-soft); color: var(--uvh-success); }
+    &.warning { border-color: color-mix(in srgb, var(--uvh-warn) 34%, var(--uvh-border)); background: var(--uvh-warn-soft); color: var(--uvh-warn); }
+    &.danger { border-color: color-mix(in srgb, var(--uvh-danger) 34%, var(--uvh-border)); background: var(--uvh-danger-soft); color: var(--uvh-danger); }
+    &.accent { border-color: color-mix(in srgb, var(--uvh-electric) 34%, var(--uvh-border)); background: color-mix(in srgb, var(--uvh-electric) 8%, var(--uvh-surface-raised)); color: var(--uvh-electric); }
+    &.neutral, &.muted-badge { background: var(--uvh-surface); }
+  }
+}
+
+/// Lo destructivo se lee como una regla sobre el texto, nunca como una caja
+/// tintada.
+@mixin danger-button {
+  .danger-button { border-color: color-mix(in srgb, var(--uvh-danger) 30%, var(--uvh-border)) !important; color: var(--uvh-danger) !important; }
+}
+
+/// El vacío: lo dibuja el marco.
+@mixin empty {
+  .empty {
+    display: flex;
+    min-height: 190px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 5px;
+    color: var(--uvh-muted);
+    text-align: center;
+    mat-icon { width: 28px; height: 28px; margin-bottom: 5px; font-size: 28px; }
+    b { color: var(--uvh-ink); font-size: 13px; }
+    span { font-size: 11.5px; }
+    &.compact-empty { min-height: 130px; }
+  }
+}
+
+/// El paginador: lo dibuja el marco.
+@mixin pager {
+  mat-paginator { margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background: transparent; }
+}

@@ -45,8 +45,8 @@ test("una invitación sólo concede acceso tras aceptarla con el destinatario ve
   await page.getByRole("link", { name: "Ir a mi panel" }).click();
   // Acceptance adds the workspace but deliberately preserves the user's
   // current workspace. Select the new membership explicitly before asserting.
-  await page.getByRole("combobox", { name: "Workspace" }).click();
-  await page.getByRole("option", { name: workspaceName, exact: true }).click();
+  await page.getByRole("button", { name: "Cambiar workspace" }).click();
+  await page.getByRole("menuitem", { name: workspaceName }).click();
   await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
 
   // Keep the issuer identifier live in the scenario so accidental account

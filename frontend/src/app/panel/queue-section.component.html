@@ -1,0 +1,35 @@
+<header class="section-heading" [class.spaced]="spaced()">
+  <div>
+    <h2>{{ title() }}</h2>
+    <ng-content select="[queue-summary]" />
+  </div>
+  <ng-content select="[queue-actions]" />
+</header>
+<ng-content select="[queue-filters]" />
+@if (paging().loading()) { <mat-progress-bar mode="indeterminate" [attr.aria-label]="loadingLabel()" /> }
+@if (paging().error(); as message) {
+  <div class="alert error compact" role="alert">
+    <mat-icon aria-hidden="true">error_outline</mat-icon>
+    <span>{{ message }}</span>
+    <button mat-stroked-button type="button" (click)="paging().load()">Reintentar</button>
+  </div>
+}
+<ng-content select="[queue-rows]" />
+@if (!paging().loading() && !paging().error() && paging().count() === 0) {
+  <div class="empty" [class.compact-empty]="compactEmpty()">
+    <mat-icon aria-hidden="true">{{ emptyIcon() }}</mat-icon>
+    <b>{{ emptyTitle() }}</b>
+    <span>{{ emptyHint() }}</span>
+  </div>
+}
+@if (!paging().error() && (showPagerWhenEmpty() || paging().total() > 0)) {
+  <mat-paginator
+    [length]="paging().total()"
+    [pageIndex]="paging().page()"
+    [pageSize]="paging().pageSize()"
+    [pageSizeOptions]="pageSizes()"
+    showFirstLastButtons
+    (page)="paging().goTo($event.pageIndex, $event.pageSize)"
+    [attr.aria-label]="pagerLabel()"
+  />
+}

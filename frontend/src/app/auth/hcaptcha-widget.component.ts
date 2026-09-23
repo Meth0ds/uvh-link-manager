@@ -112,7 +112,6 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
   readonly state = signal<HumanCheckState>("loading");
   readonly challengeOpen = signal(false);
   readonly compact = signal(typeof window !== "undefined" && window.matchMedia("(max-width: 380px)").matches);
-  readonly stateLabel = () => ({ loading: "Cargando", ready: "Pendiente", verifying: "Verificando", verified: "Verificado", expired: "Caducado", error: "Reintentar" })[this.state()];
 
   constructor() {
     effect(() => {

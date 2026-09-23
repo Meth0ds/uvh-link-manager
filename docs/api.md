@@ -48,9 +48,9 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 | GET | `/mfa/session` | sesión | `{ enabled, fresh, verifiedAt, expiresAt }`; sólo expone la frescura del factor de la sesión actual. |
 | POST | `/mfa/reauthenticate` | sesión verificada | `{ password, factorCode }`; renueva la ventana administrativa con TOTP o recovery actual sin rotar la cookie. |
 | PATCH | `/profile` | sesión | `{ name }`. |
-| POST | `/change-password` | sesión | `{ current, newPassword, factorCode? }`; exige TOTP/recovery si MFA está activo, revoca las demás sesiones y avisa por email. |
-| POST | `/change-email` | sesión verificada | `{ newEmail, password, factorCode? }`; reserva el buzón una hora y envía confirmación sin cambiar todavía el acceso. |
-| POST | `/change-email/cancel` | sesión verificada | `{ password, factorCode? }`; cancela la reserva pendiente. |
+| POST | `/change-password` | sesión | `{ current, newPassword, factorCode? }`; step-up si MFA está activo (ver «Verificación reforzada»), revoca las demás sesiones y avisa por email. |
+| POST | `/change-email` | sesión verificada | `{ newEmail, password, factorCode? }`; step-up si MFA está activo, reserva el buzón una hora y envía confirmación sin cambiar todavía el acceso. |
+| POST | `/change-email/cancel` | sesión verificada | `{ password, factorCode? }`; step-up si MFA está activo, cancela la reserva pendiente. |
 | POST | `/confirm-email-change` | — | `{ token }`; confirma el nuevo buzón, cambia la identidad y cierra todas las sesiones. La SPA exige clic explícito. |
 | GET | `/sessions` | sesión | `{ sessions[], truncated }`, hasta 100, incluyendo `current` para identificar el navegador actual. |
 | POST | `/sessions/:id/revoke` | sesión | Revoca una sesión; si es la actual devuelve `current: true`, borra la cookie y el panel cierra sesión inmediatamente (también sincroniza otras pestañas). |
@@ -58,7 +58,7 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 | POST | `/mfa/enable` | sesión | `{ code }` → `{ recoveryCodes[] }`; los códigos sólo se entregan en esta respuesta y después se almacenan mediante hash. |
 | POST | `/mfa/cancel-setup` | sesión | Invalida un secreto MFA pendiente que todavía no se ha activado. |
 | POST | `/mfa/recovery-codes/regenerate` | sesión + MFA | `{ password, factorCode }`; invalida el juego anterior, entrega `recoveryCodes[]` nuevos una sola vez y revoca otras sesiones. |
-| POST | `/mfa/disable` | sesión | `{ password, code }`; exige contraseña y TOTP o recovery actual (step-up). |
+| POST | `/mfa/disable` | sesión | `{ password, code }`; exige contraseña y TOTP o recovery actual (step-up con ventana fresca). |
 | GET | `/data-export` | sesión verificada | Estado de la solicitud de exportación más reciente. |
 | POST | `/data-export` | sesión verificada | `{ password, factorCode? }`; solicita confirmación por email tras step-up. |
 | POST | `/data-export/confirm` | — | `{ token }`; inicia el job sólo tras confirmación explícita en la SPA. |
@@ -97,6 +97,32 @@ no se devuelve `plainToken` en ese fallo. Cancelar una eliminación de cuenta es
 distinto: se prioriza detener el borrado, por lo que puede devolver `200` aunque
 falle admitir su aviso. El estado cancelado, no la recepción del correo, es la
 confirmación autoritativa; no se reactivará la eliminación para reintentar un aviso.
+
+### Verificación reforzada (step-up)
+
+Toda operación que pide contraseña y un factor (`factorCode`, o `code` en
+`/mfa/disable`) —tokens API, purga, transferencia/eliminación de workspace,
+cambio y cancelación de email, cambio de contraseña, desactivación de MFA,
+exportación y eliminación de cuenta, regeneración de recovery codes y
+reautenticación— aplica el mismo contrato:
+
+- **Presupuesto por cuenta y operación**: 10 fallos de verificación cada 15
+  minutos, contados por cuenta —no por sesión— e incluyendo fallos de
+  contraseña. Rotar de sesión no lo renueva. Tokens, purga, transferencia y
+  eliminación de workspace y regeneración de recovery codes comparten un mismo
+  presupuesto; cambio de email (incluida su cancelación), cambio de contraseña,
+  desactivación de MFA, exportación, eliminación de cuenta y reautenticación
+  tienen el suyo propio, y el login MFA el suyo, de modo que los fallos de una
+  operación nunca bloquean el acceso a la cuenta. Agotado → `429` con `Retry-After` y
+  `{ "error": "Demasiados intentos. Espera unos minutos.",
+  "retryAfterSeconds": n }`. Un éxito restaura el presupuesto completo.
+- **Ventana fresca**: exige que `mfa_verified_at` sea reciente
+  (`ADMIN_MFA_FRESH_MINUTES`, 15 minutos por defecto). Si caducó → `403` con
+  `details.reason = "mfa_reauthentication_required"` y el factor no se consume;
+  el remedio es `POST /mfa/reauthenticate` (único paso que no exige ventana).
+  Un step-up exitoso renueva la ventana.
+- El factor se verifica con antirreplay por contador (TOTP) y los recovery
+  codes son de un solo uso salvo que la operación reemplace el juego completo.
 
 ## Derechos sobre datos — `/api/v1/auth/privacy-requests`
 
@@ -170,10 +196,10 @@ Sólo se activa el limitador de volumen `uvh-pending` (escritura) y
 | Método | Ruta | Rol | Descripción |
 | ------ | ---- | --- | ----------- |
 | GET | `/` | viewer | Listado con `q, state, tag, sort, page, perPage` → `{ links, total, page, perPage }`. |
-| POST | `/` | editor | Crear enlace (destino, alias, dominio, UTM, notas, programación, expiración, contraseña, máx. clics, uso único, fallback, reglas, tags). |
+| POST | `/` | editor | Crear enlace (destino, alias, dominio, UTM, notas, programación, expiración, contraseña, máx. clics, uso único, fallback, reglas, tags). Toda clave ajena a ese contrato —incluido `state` y `version`— → `422` nombrándola. |
 | POST | `/check-alias` | viewer | `{ alias, domainId }` → `{ available, reason? }`. |
-| GET | `/:id` | viewer | `{ link, rules[], appeal }`; `appeal` es `null` o `{ status, createdAt, decidedAt }` de la última apelación. |
-| PATCH | `/:id` | editor | Editar enlace. |
+| GET | `/:id` | viewer | `{ link, rules[], appeal, blockReason }`; `appeal` es `null` o `{ status, createdAt, decidedAt, decisionNote }` de la última apelación —la nota de la decisión es del propietario, que es quien la sufre— y `blockReason` es `null` o el motivo del bloqueo vigente, tomado de la decisión que lo produjo. |
+| PATCH | `/:id` | editor | Editar enlace (`version` obligatoria). Claves admitidas: `destination`, `alias`, `domainId`, `fallbackDestination`, `password`, `maxClicks`, `singleUse`, `scheduledAt`, `expiresAt`, `notes`, `utm`, `tags`, `rules`, `version`; cualquier otra → `422` nombrándola. `alias` no se puede vaciar (`""`/`null` → `422`); omitirlo conserva el actual. `state` no se acepta aquí: se cambia con `POST /:id/state`. |
 | POST | `/:id/state` | editor | `{ state }` (active/paused/archived). |
 | DELETE | `/:id` | editor | Soft delete. |
 | POST | `/:id/restore` | editor | Restaura. |
@@ -407,4 +433,4 @@ de reautenticación y vuelve a la ruta interna original tras confirmar.
 > **no** usa el sobre JSON `{ error }`. Para alias/dominio desconocido o enlace no redirigible
 > devuelve una **página HTML** con status 404 (no `{ error }`); solo `/api/v1/*` usa el sobre JSON.
 > Ver `backend-laravel/tests/Feature/ApiParityTest.php`.
-| POST | `/r/:alias/unlock` | `{ password }` para enlaces protegidos (luego redirige). |
+| POST | `/r/:alias/unlock` | `{ password }` para enlaces protegidos. Con `Accept: application/json`: `{ ok: true }` 200 y la cookie de desbloqueo, o el sobre `{ error }` con 403/404/422/429 sin cambios. Con `Accept: text/html` el formulario se sirve y contesta como página en todos sus estados —contraseña incorrecta (403), contraseña fuera de rango (422), enlace inexistente (404) y límite de intentos agotado (429)—, y el acierto responde **200** con una pantalla que continúa al enlace: un `302` no sirve ahí porque `form-action 'self'` se comprueba en cada salto de la cadena de un envío de formulario y el destino está en otro origen, así que el navegador rechazaba el salto final y dejaba al visitante en la puerta. El presupuesto de intentos es **por enlace**: la clave normaliza el alias (`/r/ADV-X/unlock` y `/r/adv-x/unlock` comparten límite). El documento vive en `app/Support/VisitorPage.php`. |

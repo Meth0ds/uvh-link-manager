@@ -5,11 +5,13 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
+import { dateTimeMediumLabel } from "../../core/date-time-label";
 import type { DomainDetailResponse, DomainDto, DomainState } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { decodeDomainDetailResponse, decodeDomainStateResponse } from "../../core/services/domain-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { parseRouteId } from "../../core/strict-wire";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
@@ -79,7 +81,7 @@ export class DomainDetailComponent {
       this.requests.invalidate();
       this.domain.set(null);
       this.error.set(null);
-      if (!Number.isSafeInteger(domainId) || domainId < 1) {
+      if (domainId === null) {
         this.error.set("El identificador del dominio no es válido");
         this.loading.set(false);
         return;
@@ -92,8 +94,8 @@ export class DomainDetailComponent {
     });
   }
 
-  private paramId(): number {
-    return Number(this.route.snapshot.paramMap.get("id"));
+  private paramId(): number | null {
+    return parseRouteId(this.route.snapshot.paramMap.get("id"));
   }
 
   /** The identity a request must still match to be applied to this view. */
@@ -107,7 +109,7 @@ export class DomainDetailComponent {
     const workspaceId = this.workspaces.currentId();
     const role = this.workspaces.currentRole();
     const domainId = this.domainId();
-    if (workspaceId === null || role === null) {
+    if (workspaceId === null || role === null || domainId === null) {
       this.requests.invalidate();
       this.domain.set(null);
       this.loading.set(false);
@@ -185,8 +187,7 @@ export class DomainDetailComponent {
   tlsErrorLabel(error: string | null): string | null { return error ? (TLS_ERROR[error] ?? "No se pudo completar la preparación HTTPS.") : null; }
 
   formatDate(value: string | null): string {
-    if (!value) return "Todavía no disponible";
-    return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+    return dateTimeMediumLabel(value, "Todavía no disponible");
   }
 
   copy(value: string | null, label: string): void {

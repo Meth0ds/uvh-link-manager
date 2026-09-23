@@ -14,7 +14,8 @@ use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\LinkIntentRegistry;
 use App\Support\MailAdmissionException;
-use App\Support\MfaInfrastructureUnavailable;
+use App\Support\MfaAttempts;
+use App\Support\MfaFreshness;
 use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifactCleanup;
@@ -25,16 +26,11 @@ use App\Support\UvhRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class AccountController
 {
-    private const SENSITIVE_ATTEMPTS = 10;
-
-    private const SENSITIVE_WINDOW = 900;
-
     public function exportStatus(Request $request)
     {
         $user = UvhRequest::user($request);
@@ -52,16 +48,16 @@ class AccountController
         }
 
         $user = UvhRequest::user($request);
-        $attemptKey = $this->attemptKey($user->id, 'data-export');
-        if ($this->tooManySensitiveAttempts($attemptKey)) {
-            return response()->json(['error' => 'Demasiados intentos. Espera unos minutos.'], 429);
+        $purpose = 'data-export';
+        if (MfaAttempts::tooMany($user->id, $purpose)) {
+            return MfaAttempts::tooManyResponse($user->id, $purpose);
         }
 
         $confirmationToken = Ids::randomToken(32);
         $url = rtrim((string) config('app.url'), '/').'/auth/confirm-export#token='.rawurlencode($confirmationToken);
         $sessionId = UvhRequest::sessionId($request);
         try {
-            $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $confirmationToken, $url): array {
+            $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $purpose, $confirmationToken, $url): array {
                 $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
                 $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
                     ->whereNull('revoked_at')->lockForUpdate()->first();
@@ -79,7 +75,7 @@ class AccountController
                     return ['status' => 'active', 'export' => $active];
                 }
 
-                $stepUp = MfaStepUp::verify($lockedUser, $session, $password, $factorCode);
+                $stepUp = MfaStepUp::verify($lockedUser, $session, $password, $factorCode, true, $purpose);
                 if ($stepUp['status'] !== 'ok') {
                     return ['status' => $stepUp['status']];
                 }
@@ -137,13 +133,18 @@ class AccountController
         if ($result['status'] === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
         }
+        if ($result['status'] === 'locked') {
+            return MfaAttempts::tooManyResponse($user->id, $purpose);
+        }
+        if ($result['status'] === 'reauth') {
+            return MfaFreshness::reauthenticationRequired();
+        }
         if ($result['status'] === 'password') {
             Audit::write($user->id, 'account.data_export_request_failed', 'user', $user->id, ['reason' => 'password']);
 
             return response()->json(['error' => 'Contraseña incorrecta'], 403);
         }
         if ($result['status'] === 'factor') {
-            $this->recordSensitiveFailure($attemptKey);
             Audit::write($user->id, 'account.data_export_request_failed', 'user', $user->id, ['reason' => 'factor']);
 
             return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
@@ -155,7 +156,6 @@ class AccountController
             ], 409);
         }
 
-        $this->clearSensitiveAttempts($attemptKey);
         if (is_array($result['expired_artifact'] ?? null)) {
             PrivateArtifactCleanup::attempt(
                 $result['expired_artifact']['id'],
@@ -560,16 +560,16 @@ class AccountController
         }
 
         $user = UvhRequest::user($request);
-        $attemptKey = $this->attemptKey($user->id, 'account-deletion');
-        if ($this->tooManySensitiveAttempts($attemptKey)) {
-            return response()->json(['error' => 'Demasiados intentos. Espera unos minutos.'], 429);
+        $purpose = 'account-deletion';
+        if (MfaAttempts::tooMany($user->id, $purpose)) {
+            return MfaAttempts::tooManyResponse($user->id, $purpose);
         }
         $token = Ids::randomToken(32);
         $url = rtrim((string) config('app.url'), '/').'/auth/confirm-account-deletion#token='.rawurlencode($token);
         $sessionId = UvhRequest::sessionId($request);
 
         try {
-            $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $token, $url): array {
+            $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $purpose, $token, $url): array {
                 $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
                 $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
                     ->whereNull('revoked_at')->lockForUpdate()->first();
@@ -601,7 +601,7 @@ class AccountController
                     return ['status' => 'active', 'expires_at' => $existing->confirmation_expires_at];
                 }
 
-                $stepUp = MfaStepUp::verify($lockedUser, $session, $password, $factorCode);
+                $stepUp = MfaStepUp::verify($lockedUser, $session, $password, $factorCode, true, $purpose);
                 if ($stepUp['status'] !== 'ok') {
                     return ['status' => $stepUp['status']];
                 }
@@ -668,19 +668,23 @@ class AccountController
                 'confirmationExpiresAt' => $result['expires_at']->toIso8601String(),
             ], 409);
         }
+        if ($result['status'] === 'locked') {
+            return MfaAttempts::tooManyResponse($user->id, $purpose);
+        }
+        if ($result['status'] === 'reauth') {
+            return MfaFreshness::reauthenticationRequired();
+        }
         if ($result['status'] === 'password') {
             Audit::write($user->id, 'account.deletion_request_failed', 'user', $user->id, ['reason' => 'password']);
 
             return response()->json(['error' => 'Contraseña incorrecta'], 403);
         }
         if ($result['status'] === 'factor') {
-            $this->recordSensitiveFailure($attemptKey);
             Audit::write($user->id, 'account.deletion_request_failed', 'user', $user->id, ['reason' => 'factor']);
 
             return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
         }
 
-        $this->clearSensitiveAttempts($attemptKey);
         Audit::write($user->id, 'account.deletion_requested', 'account_deletion', $result['request_id'], [
             'factor' => $result['factor'], 'grace_days_after_confirmation' => 7,
         ]);
@@ -904,39 +908,6 @@ class AccountController
         Audit::write($result['user_id'], 'account.deletion_cancelled', 'account_deletion', $result['request_id']);
 
         return response()->json(['ok' => true]);
-    }
-
-    private function attemptKey(int $userId, string $purpose): string
-    {
-        return 'uvh:mfa:attempts:'.$purpose.':'.$userId;
-    }
-
-    private function tooManySensitiveAttempts(string $key): bool
-    {
-        try {
-            return RateLimiter::tooManyAttempts($key, self::SENSITIVE_ATTEMPTS);
-        } catch (\Throwable $error) {
-            throw new MfaInfrastructureUnavailable('Sensitive action limiter unavailable', 0, $error);
-        }
-    }
-
-    private function recordSensitiveFailure(string $key): void
-    {
-        try {
-            RateLimiter::hit($key, self::SENSITIVE_WINDOW);
-        } catch (\Throwable $error) {
-            throw new MfaInfrastructureUnavailable('Sensitive action limiter unavailable', 0, $error);
-        }
-    }
-
-    private function clearSensitiveAttempts(string $key): void
-    {
-        try {
-            RateLimiter::clear($key);
-        } catch (\Throwable $error) {
-            OperationalMetrics::increment('lock.unavailable');
-            report($error);
-        }
     }
 
     private function isExpired(DataExportRequest $request): bool

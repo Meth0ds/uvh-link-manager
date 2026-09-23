@@ -4,19 +4,16 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
-import { MatPaginatorModule, type PageEvent } from "@angular/material/paginator";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSelectModule } from "@angular/material/select";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTabsModule } from "@angular/material/tabs";
-import { MatTooltipModule } from "@angular/material/tooltip";
 import type {
   AdminDomain,
   AdminAccountRecovery,
   AdminMailOutboxMessage,
   AdminOperations,
   AdminOverview,
-  AdminReport,
   AdminUser,
   AuditEvent,
   AccountRecoveryStatus,
@@ -26,12 +23,13 @@ import type {
   PrivacyRightStatus,
   PrivacyRightType,
 } from "../../core/models";
-import { ApiRequestError, ApiService } from "../../core/services/api.service";
+import { adminMessage, apiMessage } from "../../core/api-message";
+import { QueuePaging } from "../../core/queue-paging";
+import { ApiService } from "../../core/services/api.service";
 import { accountRecoveryStateLabel, ACCOUNT_RECOVERY_REVIEW_FILTER } from "../../core/account-recovery-state-label";
 import { resourceTypeLabel } from "../../core/resource-type-label";
 import { ADMIN_ACCOUNT_FLAG_LABEL, ADMIN_USER_FILTERS, adminAccountStateLabel, type AdminUserFilterValue } from "../../core/admin-user-label";
 import { DOMAIN_STATE_ORDER, domainStateLabel } from "../../core/domain-state-label";
-import { isLinkState, linkStateLabel } from "../../core/link-state-label";
 import { mailOutboxStateLabel, MAIL_OUTBOX_STATE_ORDER } from "../../core/mail-outbox-state-label";
 import {
   privacyRightIsActive,
@@ -40,7 +38,8 @@ import {
   PRIVACY_RIGHT_STATUS_ORDER,
   PRIVACY_RIGHT_TYPE_ORDER,
 } from "../../core/privacy-right-label";
-import { reportStatusLabel, REPORT_STATUS_ORDER } from "../../core/report-status-label";
+import { countLabel } from "../../core/count-label";
+import { dateTimeLabel } from "../../core/date-time-label";
 import {
   decodeAccountRecoveryDecision,
   decodeAdminAuditPage,
@@ -49,7 +48,6 @@ import {
   decodeAdminOperations,
   decodeAdminOverview,
   decodeAdminRecoveriesPage,
-  decodeAdminReportsPage,
   decodeAdminUsersPage,
 } from "../../core/services/admin-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
@@ -57,22 +55,12 @@ import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
-
-interface PageResponse<T> {
-  total: number;
-  page: number;
-  perPage: number;
-  users?: T[];
-  reports?: T[];
-  recoveries?: T[];
-  domains?: T[];
-  events?: T[];
-  messages?: T[];
-  requests?: T[];
-}
+import { QueueSectionComponent } from "../queue-section.component";
+import { AdminAppealsComponent } from "./admin-appeals.component";
+import { AdminDestinationsComponent } from "./admin-destinations.component";
+import { AdminReportsComponent } from "./admin-reports.component";
 
 type UserStatus = "" | AdminUserFilterValue;
-type ReportStatus = "" | AdminReport["status"];
 type RecoveryStatus = "" | AccountRecoveryStatus;
 type DomainFilter = "" | DomainState;
 type MailStatusFilter = "" | MailOutboxStatus;
@@ -88,14 +76,16 @@ type PrivacyTypeFilter = "" | PrivacyRightType;
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatPaginatorModule,
     MatProgressBarModule,
+    QueueSectionComponent,
     MatSelectModule,
     MatSnackBarModule,
     MatTabsModule,
-    MatTooltipModule,
     PageHeaderComponent,
     PanelSkeletonComponent,
+    AdminAppealsComponent,
+    AdminDestinationsComponent,
+    AdminReportsComponent,
   ],
   templateUrl: "./admin.component.html",
   styleUrl: "./admin.component.scss",
@@ -107,97 +97,145 @@ export class AdminComponent {
   private readonly snackbar = inject(MatSnackBar);
   private readonly actions = inject(ActionDialogService);
 
-  // Each source owns its revision so an unrelated refresh cannot invalidate it.
-  // The guards also prevent queued HTTP continuations from writing after destroy.
+  // The console's own sources: the two snapshots above the tabs and the guards
+  // that keep a late answer from landing on a newer one.
   private readonly reloadRequests = new LatestRequest(this.destroyRef);
   private readonly overviewRequests = new LatestRequest(this.destroyRef);
   private readonly operationsRequests = new LatestRequest(this.destroyRef);
-  private readonly usersRequests = new LatestRequest(this.destroyRef);
-  private readonly recoveriesRequests = new LatestRequest(this.destroyRef);
-  private readonly reportsRequests = new LatestRequest(this.destroyRef);
-  private readonly domainsRequests = new LatestRequest(this.destroyRef);
-  private readonly auditRequests = new LatestRequest(this.destroyRef);
-  private readonly mailRequests = new LatestRequest(this.destroyRef);
-  private readonly privacyLoadRequests = new LatestRequest(this.destroyRef);
 
   readonly overview = signal<AdminOverview | null>(null);
   readonly operations = signal<AdminOperations | null>(null);
-  readonly users = signal<AdminUser[]>([]);
-  readonly reports = signal<AdminReport[]>([]);
-  readonly recoveries = signal<AdminAccountRecovery[]>([]);
-  readonly domains = signal<AdminDomain[]>([]);
-  readonly events = signal<AuditEvent[]>([]);
-  readonly mailMessages = signal<AdminMailOutboxMessage[]>([]);
-  readonly privacyRequests = signal<PrivacyRightRequest[]>([]);
 
   readonly initialLoading = signal(true);
   readonly refreshing = signal(false);
   readonly summaryError = signal<string | null>(null);
-  readonly usersLoading = signal(false);
-  readonly usersError = signal<string | null>(null);
-  readonly reportsLoading = signal(false);
-  readonly reportsError = signal<string | null>(null);
-  readonly recoveriesLoading = signal(false);
-  readonly recoveriesError = signal<string | null>(null);
-  readonly domainsLoading = signal(false);
-  readonly domainsError = signal<string | null>(null);
-  readonly auditLoading = signal(false);
-  readonly auditError = signal<string | null>(null);
   readonly operationsLoading = signal(false);
   readonly operationsError = signal<string | null>(null);
-  readonly mailLoading = signal(false);
-  readonly mailError = signal<string | null>(null);
-  readonly privacyLoading = signal(false);
-  readonly privacyError = signal<string | null>(null);
   readonly actionKey = signal<string | null>(null);
 
+  // Each paged queue declares its filters and its request; the page on screen,
+  // the loading flag, the notice and the cancel-on-supersede rule come from the
+  // shared engine, and the frame drawn around them from the shared component.
   readonly userQuery = signal("");
   readonly userStatus = signal<UserStatus>("");
-  readonly usersTotal = signal(0);
-  readonly usersPage = signal(0);
-  readonly usersPageSize = signal(25);
-
-  readonly reportQuery = signal("");
-  readonly reportStatus = signal<ReportStatus>("open");
-  readonly reportsTotal = signal(0);
-  readonly reportsPage = signal(0);
-  readonly reportsPageSize = signal(25);
+  readonly users = new QueuePaging<AdminUser>({
+    destroyRef: this.destroyRef,
+    fallback: "No se pudieron cargar los usuarios",
+    message: adminMessage,
+    filters: () => [this.userQuery(), this.userStatus()],
+    read: async (page, perPage, signal) => {
+      const response = await this.api.get(
+        "/api/v1/admin/users",
+        { q: this.userQuery(), status: this.userStatus(), page, perPage },
+        (value) => decodeAdminUsersPage(value, { page, perPage }),
+        { signal },
+      );
+      return { rows: response.users ?? [], total: response.total };
+    },
+  });
 
   readonly recoveryQuery = signal("");
   readonly recoveryStatus = signal<RecoveryStatus>("");
-  readonly recoveriesTotal = signal(0);
-  readonly recoveriesPage = signal(0);
-  readonly recoveriesPageSize = signal(25);
+  readonly recoveries = new QueuePaging<AdminAccountRecovery>({
+    destroyRef: this.destroyRef,
+    fallback: "No se pudieron cargar las recuperaciones",
+    message: adminMessage,
+    filters: () => [this.recoveryQuery(), this.recoveryStatus()],
+    read: async (page, perPage, signal) => {
+      const response = await this.api.get(
+        "/api/v1/admin/account-recoveries",
+        { q: this.recoveryQuery(), status: this.recoveryStatus(), page, perPage },
+        (value) => decodeAdminRecoveriesPage(value, { page, perPage }),
+        { signal },
+      );
+      return { rows: response.recoveries ?? [], total: response.total };
+    },
+  });
 
   readonly domainQuery = signal("");
   readonly domainState = signal<DomainFilter>("");
-  readonly domainsTotal = signal(0);
-  readonly domainsPage = signal(0);
-  readonly domainsPageSize = signal(25);
+  readonly domains = new QueuePaging<AdminDomain>({
+    destroyRef: this.destroyRef,
+    fallback: "No se pudieron cargar los dominios",
+    message: adminMessage,
+    filters: () => [this.domainQuery(), this.domainState()],
+    read: async (page, perPage, signal) => {
+      const response = await this.api.get(
+        "/api/v1/admin/domains",
+        { q: this.domainQuery(), state: this.domainState(), page, perPage },
+        (value) => decodeAdminDomainsPage(value, { page, perPage }),
+        { signal },
+      );
+      return { rows: response.domains ?? [], total: response.total };
+    },
+  });
 
   readonly auditQuery = signal("");
-  readonly auditTotal = signal(0);
-  readonly auditPage = signal(0);
-  readonly auditPageSize = signal(50);
+  readonly audit = new QueuePaging<AuditEvent>({
+    destroyRef: this.destroyRef,
+    fallback: "No se pudo cargar la auditoría",
+    message: adminMessage,
+    pageSize: 50,
+    filters: () => [this.auditQuery()],
+    read: async (page, perPage, signal) => {
+      const response = await this.api.get(
+        "/api/v1/admin/audit",
+        { q: this.auditQuery(), page, perPage },
+        (value) => decodeAdminAuditPage(value, { page, perPage }),
+        { signal },
+      );
+      return { rows: response.events ?? [], total: response.total };
+    },
+  });
 
   readonly mailStatus = signal<MailStatusFilter>("failed");
-  readonly mailTotal = signal(0);
-  readonly mailPage = signal(0);
-  readonly mailPageSize = signal(25);
+  readonly mail = new QueuePaging<AdminMailOutboxMessage>({
+    destroyRef: this.destroyRef,
+    fallback: "No se pudo cargar el outbox de correo",
+    message: adminMessage,
+    filters: () => [this.mailStatus()],
+    read: async (page, perPage, signal) => {
+      const response = await this.api.get(
+        "/api/v1/admin/mail-outbox",
+        { status: this.mailStatus(), page, perPage },
+        (value) => decodeAdminMailPage(value, { page, perPage }),
+        { signal },
+      );
+      return { rows: response.messages ?? [], total: response.total };
+    },
+  });
 
   readonly privacyStatus = signal<PrivacyStatusFilter>("");
   readonly privacyType = signal<PrivacyTypeFilter>("");
-  readonly privacyTotal = signal(0);
-  readonly privacyPage = signal(0);
-  readonly privacyPageSize = signal(20);
+  readonly privacy = new QueuePaging<PrivacyRightRequest>({
+    destroyRef: this.destroyRef,
+    fallback: "No se pudieron cargar las solicitudes de privacidad",
+    message: adminMessage,
+    pageSize: 20,
+    filters: () => [this.privacyStatus(), this.privacyType()],
+    read: async (page, perPage, signal) => {
+      const response = await this.api.get(
+        "/api/v1/admin/privacy-requests",
+        { status: this.privacyStatus(), type: this.privacyType(), page, perPage },
+        (value) => decodePrivacyRequestsPage(value, { page, perPage, admin: true }),
+        { signal },
+      );
+      return { rows: response.requests ?? [], total: response.total };
+    },
+  });
+
+  /**
+   * The console's signal that what the moderation views describe has changed.
+   *
+   * It is what the three queues of the moderation tab listen to, so none of them
+   * has to know which sibling acted: the console decides when they re-read.
+   */
+  readonly moderationRevision = signal(0);
 
   // Every state label and every filter option this console prints comes from the
   // vocabulary of the entity it describes, so a badge and the filter that selects
-  // it cannot name the same state differently. The fallbacks the report and
-  // recovery maps used to carry are gone: the admin decoders validate both status
-  // sets before the value reaches them, so an unmapped key cannot occur.
+  // it cannot name the same state differently.
   readonly domainLabel = domainStateLabel;
-  readonly reportLabel = reportStatusLabel;
   readonly recoveryLabel = accountRecoveryStateLabel;
   readonly mailStatusLabel = mailOutboxStateLabel;
   readonly privacyStatusLabel = privacyRightStatusLabel;
@@ -205,21 +243,17 @@ export class AdminComponent {
   readonly privacyActive = privacyRightIsActive;
   readonly accountStateLabel = adminAccountStateLabel;
 
-  /** A report carries the state of its link as plain text; print it as a state. */
-  readonly reportLinkStateLabel = (state: string) => (isLinkState(state) ? linkStateLabel(state) : state);
-
   readonly accountFlags = ADMIN_ACCOUNT_FLAG_LABEL;
   readonly userFilters = ADMIN_USER_FILTERS;
   readonly domainStateOptions = DOMAIN_STATE_ORDER;
-  readonly reportStatusOptions = REPORT_STATUS_ORDER;
   readonly recoveryStatusOptions = ACCOUNT_RECOVERY_REVIEW_FILTER;
   readonly mailStatusOptions = MAIL_OUTBOX_STATE_ORDER;
   readonly privacyStatusOptions = PRIVACY_RIGHT_STATUS_ORDER;
   readonly privacyTypeOptions = PRIVACY_RIGHT_TYPE_ORDER;
 
-  countLabel(count: number, singular: string, plural: string): string {
-    return `${count} ${count === 1 ? singular : plural}`;
-  }
+  /** Number agreement for the counts this screen prints, in one place. */
+  readonly countLabel = countLabel;
+  readonly formatDate = dateTimeLabel;
 
   constructor() {
     void this.reloadAll();
@@ -228,65 +262,32 @@ export class AdminComponent {
   async reloadAll(): Promise<void> {
     const request = this.reloadRequests.begin(null);
     this.refreshing.set(true);
+    // The queues of the moderation tab re-read on the revision instead of being
+    // awaited here: each one reports its own progress inside its own tab.
+    this.moderationRevision.update((value) => value + 1);
     await Promise.all([
       this.loadOverview(),
       this.loadOperations(),
-      this.loadUsers(),
-      this.loadRecoveries(),
-      this.loadReports(),
-      this.loadDomains(),
-      this.loadAudit(),
-      this.loadMailOutbox(),
-      this.loadPrivacyRequests(),
+      this.users.load(),
+      this.recoveries.load(),
+      this.domains.load(),
+      this.audit.load(),
+      this.mail.load(),
+      this.privacy.load(),
     ]);
     if (!this.reloadRequests.isCurrent(request, null)) return;
     this.initialLoading.set(false);
     this.refreshing.set(false);
   }
 
-  async loadRecoveries(): Promise<void> {
-    const query = this.recoveryQuery();
-    const status = this.recoveryStatus();
-    const page = this.recoveriesPage() + 1;
-    const perPage = this.recoveriesPageSize();
-    const context = JSON.stringify([query, status, page, perPage]);
-    const request = this.recoveriesRequests.begin(context);
-    this.recoveriesLoading.set(true);
-    this.recoveriesError.set(null);
-    try {
-      const response = await this.api.get<PageResponse<AdminAccountRecovery>>("/api/v1/admin/account-recoveries", {
-        q: query,
-        status,
-        page,
-        perPage,
-      }, (value) => decodeAdminRecoveriesPage(value, { page, perPage }), { signal: request.signal });
-      if (!this.recoveriesRequests.isCurrent(request, context)) return;
-      this.recoveries.set(response.recoveries ?? []);
-      this.recoveriesTotal.set(response.total);
-    } catch (error) {
-      if (!this.recoveriesRequests.isCurrent(request, context)) return;
-      this.recoveriesError.set(this.adminError(error, "No se pudieron cargar las recuperaciones"));
-    } finally {
-      if (this.recoveriesRequests.isCurrent(request, context)) this.recoveriesLoading.set(false);
-    }
-  }
-
   searchRecoveries(query: string): void {
     this.recoveryQuery.set(query.trim());
-    this.recoveriesPage.set(0);
-    void this.loadRecoveries();
+    this.recoveries.restart();
   }
 
   filterRecoveries(status: RecoveryStatus): void {
     this.recoveryStatus.set(status);
-    this.recoveriesPage.set(0);
-    void this.loadRecoveries();
-  }
-
-  onRecoveriesPage(event: PageEvent): void {
-    this.recoveriesPage.set(event.pageIndex);
-    this.recoveriesPageSize.set(event.pageSize);
-    void this.loadRecoveries();
+    this.recoveries.restart();
   }
 
   async approveRecovery(recovery: AdminAccountRecovery): Promise<void> {
@@ -325,7 +326,7 @@ export class AdminComponent {
           ? "Primera aprobación registrada; falta otro administrador"
           : "Expediente rechazado sin modificar la cuenta";
       this.snackbar.open(message, "Cerrar", { duration: 4000 });
-      await Promise.all([this.loadRecoveries(), this.loadAudit(), this.loadOperations()]);
+      await Promise.all([this.recoveries.load(), this.audit.load(), this.loadOperations()]);
     } catch (error) {
       this.showError(error);
     } finally {
@@ -342,53 +343,18 @@ export class AdminComponent {
       this.overview.set(response);
     } catch (error) {
       if (!this.overviewRequests.isCurrent(request, null)) return;
-      this.summaryError.set(this.adminError(error, "No se pudo cargar el resumen"));
-    }
-  }
-
-  async loadUsers(): Promise<void> {
-    const query = this.userQuery();
-    const status = this.userStatus();
-    const page = this.usersPage() + 1;
-    const perPage = this.usersPageSize();
-    const context = JSON.stringify([query, status, page, perPage]);
-    const request = this.usersRequests.begin(context);
-    this.usersLoading.set(true);
-    this.usersError.set(null);
-    try {
-      const response = await this.api.get<PageResponse<AdminUser>>("/api/v1/admin/users", {
-        q: query,
-        status,
-        page,
-        perPage,
-      }, (value) => decodeAdminUsersPage(value, { page, perPage }), { signal: request.signal });
-      if (!this.usersRequests.isCurrent(request, context)) return;
-      this.users.set(response.users ?? []);
-      this.usersTotal.set(response.total);
-    } catch (error) {
-      if (!this.usersRequests.isCurrent(request, context)) return;
-      this.usersError.set(this.errorMessage(error, "No se pudieron cargar los usuarios"));
-    } finally {
-      if (this.usersRequests.isCurrent(request, context)) this.usersLoading.set(false);
+      this.summaryError.set(adminMessage(error, "No se pudo cargar el resumen"));
     }
   }
 
   searchUsers(query: string): void {
     this.userQuery.set(query.trim());
-    this.usersPage.set(0);
-    void this.loadUsers();
+    this.users.restart();
   }
 
   filterUsers(status: UserStatus): void {
     this.userStatus.set(status);
-    this.usersPage.set(0);
-    void this.loadUsers();
-  }
-
-  onUsersPage(event: PageEvent): void {
-    this.usersPage.set(event.pageIndex);
-    this.usersPageSize.set(event.pageSize);
-    void this.loadUsers();
+    this.users.restart();
   }
 
   isAdminUser(user: AdminUser): boolean {
@@ -416,7 +382,7 @@ export class AdminComponent {
     try {
       await this.api.patch(`/api/v1/admin/users/${user.id}`, { isAdmin: granting });
       this.snackbar.open("Permisos actualizados", "Cerrar", { duration: 2500 });
-      await Promise.all([this.loadUsers(), this.loadAudit()]);
+      await Promise.all([this.users.load(), this.audit.load()]);
     } catch (error) {
       this.showError(error);
     } finally {
@@ -441,7 +407,7 @@ export class AdminComponent {
     try {
       await this.api.patch(`/api/v1/admin/users/${user.id}`, { blocked: blocking });
       this.snackbar.open(blocking ? "Cuenta bloqueada" : "Cuenta restaurada", "Cerrar", { duration: 2500 });
-      await Promise.all([this.loadUsers(), this.loadOverview(), this.loadOperations(), this.loadAudit()]);
+      await Promise.all([this.users.load(), this.loadOverview(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
       this.showError(error);
     } finally {
@@ -449,171 +415,42 @@ export class AdminComponent {
     }
   }
 
-  async loadReports(): Promise<void> {
-    const query = this.reportQuery();
-    const status = this.reportStatus();
-    const page = this.reportsPage() + 1;
-    const perPage = this.reportsPageSize();
-    const context = JSON.stringify([query, status, page, perPage]);
-    const request = this.reportsRequests.begin(context);
-    this.reportsLoading.set(true);
-    this.reportsError.set(null);
-    try {
-      const response = await this.api.get<PageResponse<AdminReport>>("/api/v1/admin/reports", {
-        q: query,
-        status,
-        page,
-        perPage,
-      }, (value) => decodeAdminReportsPage(value, { page, perPage }), { signal: request.signal });
-      if (!this.reportsRequests.isCurrent(request, context)) return;
-      this.reports.set(response.reports ?? []);
-      this.reportsTotal.set(response.total);
-    } catch (error) {
-      if (!this.reportsRequests.isCurrent(request, context)) return;
-      this.reportsError.set(this.errorMessage(error, "No se pudieron cargar las denuncias"));
-    } finally {
-      if (this.reportsRequests.isCurrent(request, context)) this.reportsLoading.set(false);
-    }
+  /**
+   * A queue of the moderation tab decided something.
+   *
+   * The decision lands in three places the acting queue does not own: the
+   * counters that summarise it, the trail that records it and the other queues
+   * that print the same links. Each of those has to re-read, so the console is
+   * the only place that knows what a decision invalidates.
+   */
+  onModerationChanged(): void {
+    void this.refreshModeration();
   }
 
-  searchReports(query: string): void {
-    this.reportQuery.set(query.trim());
-    this.reportsPage.set(0);
-    void this.loadReports();
-  }
-
-  filterReports(status: ReportStatus): void {
-    this.reportStatus.set(status);
-    this.reportsPage.set(0);
-    void this.loadReports();
-  }
-
-  onReportsPage(event: PageEvent): void {
-    this.reportsPage.set(event.pageIndex);
-    this.reportsPageSize.set(event.pageSize);
-    void this.loadReports();
-  }
-
-  async reviewReport(report: AdminReport): Promise<void> {
-    await this.moderate(report, "review", "Denuncia marcada como revisada");
-  }
-
-  async dismissReport(report: AdminReport): Promise<void> {
-    const confirmed = await this.actions.confirm({
-      title: "Desestimar denuncia",
-      message: `La denuncia sobre “${report.alias}” se cerrará sin modificar el enlace.`,
-      confirmLabel: "Desestimar",
-      destructive: false,
-    });
-    if (confirmed) await this.moderate(report, "dismiss", "Denuncia desestimada");
-  }
-
-  async blockLink(report: AdminReport): Promise<void> {
-    const reason = await this.actions.prompt({
-      title: "Bloquear enlace",
-      message: `La resolución de “${report.alias}” se detendrá y la denuncia quedará resuelta.`,
-      confirmLabel: "Bloquear enlace",
-      destructive: true,
-      inputLabel: "Motivo del bloqueo",
-      inputPlaceholder: "Describe el incumplimiento…",
-      inputHint: "Entre 3 y 500 caracteres.",
-      inputRequired: true,
-      inputMinLength: 3,
-      inputMaxLength: 500,
-    });
-    if (reason) await this.moderate(report, "block", "Enlace bloqueado", reason);
-  }
-
-  async unblockLink(report: AdminReport): Promise<void> {
-    const confirmed = await this.actions.confirm({
-      title: "Desbloquear enlace",
-      message: `“${report.alias}” volverá al estado que corresponda según su programación y caducidad.`,
-      confirmLabel: "Desbloquear",
-      destructive: false,
-    });
-    if (confirmed) await this.moderate(report, "unblock", "Enlace desbloqueado");
-  }
-
-  async loadDomains(): Promise<void> {
-    const query = this.domainQuery();
-    const state = this.domainState();
-    const page = this.domainsPage() + 1;
-    const perPage = this.domainsPageSize();
-    const context = JSON.stringify([query, state, page, perPage]);
-    const request = this.domainsRequests.begin(context);
-    this.domainsLoading.set(true);
-    this.domainsError.set(null);
-    try {
-      const response = await this.api.get<PageResponse<AdminDomain>>("/api/v1/admin/domains", {
-        q: query,
-        state,
-        page,
-        perPage,
-      }, (value) => decodeAdminDomainsPage(value, { page, perPage }), { signal: request.signal });
-      if (!this.domainsRequests.isCurrent(request, context)) return;
-      this.domains.set(response.domains ?? []);
-      this.domainsTotal.set(response.total);
-    } catch (error) {
-      if (!this.domainsRequests.isCurrent(request, context)) return;
-      this.domainsError.set(this.errorMessage(error, "No se pudieron cargar los dominios"));
-    } finally {
-      if (this.domainsRequests.isCurrent(request, context)) this.domainsLoading.set(false);
-    }
+  /**
+   * Re-read every view a moderation decision can change, and tell the queues
+   * themselves to re-read: the two queues print the state of the same links and
+   * the blocked-destination list is where a case writes, so a decision lands in
+   * all of them or in none.
+   */
+  private async refreshModeration(): Promise<void> {
+    this.moderationRevision.update((value) => value + 1);
+    await Promise.all([this.loadOverview(), this.loadOperations(), this.audit.load()]);
   }
 
   searchDomains(query: string): void {
     this.domainQuery.set(query.trim());
-    this.domainsPage.set(0);
-    void this.loadDomains();
+    this.domains.restart();
   }
 
   filterDomains(state: DomainFilter): void {
     this.domainState.set(state);
-    this.domainsPage.set(0);
-    void this.loadDomains();
-  }
-
-  onDomainsPage(event: PageEvent): void {
-    this.domainsPage.set(event.pageIndex);
-    this.domainsPageSize.set(event.pageSize);
-    void this.loadDomains();
-  }
-
-  async loadAudit(): Promise<void> {
-    const query = this.auditQuery();
-    const page = this.auditPage() + 1;
-    const perPage = this.auditPageSize();
-    const context = JSON.stringify([query, page, perPage]);
-    const request = this.auditRequests.begin(context);
-    this.auditLoading.set(true);
-    this.auditError.set(null);
-    try {
-      const response = await this.api.get<PageResponse<AuditEvent>>("/api/v1/admin/audit", {
-        q: query,
-        page,
-        perPage,
-      }, (value) => decodeAdminAuditPage(value, { page, perPage }), { signal: request.signal });
-      if (!this.auditRequests.isCurrent(request, context)) return;
-      this.events.set(response.events ?? []);
-      this.auditTotal.set(response.total);
-    } catch (error) {
-      if (!this.auditRequests.isCurrent(request, context)) return;
-      this.auditError.set(this.errorMessage(error, "No se pudo cargar la auditoría"));
-    } finally {
-      if (this.auditRequests.isCurrent(request, context)) this.auditLoading.set(false);
-    }
+    this.domains.restart();
   }
 
   searchAudit(query: string): void {
     this.auditQuery.set(query.trim());
-    this.auditPage.set(0);
-    void this.loadAudit();
-  }
-
-  onAuditPage(event: PageEvent): void {
-    this.auditPage.set(event.pageIndex);
-    this.auditPageSize.set(event.pageSize);
-    void this.loadAudit();
+    this.audit.restart();
   }
 
   async loadOperations(): Promise<void> {
@@ -626,47 +463,15 @@ export class AdminComponent {
       this.operations.set(response);
     } catch (error) {
       if (!this.operationsRequests.isCurrent(request, null)) return;
-      this.operationsError.set(this.errorMessage(error, "No se pudo leer el estado operativo"));
+      this.operationsError.set(adminMessage(error, "No se pudo leer el estado operativo"));
     } finally {
       if (this.operationsRequests.isCurrent(request, null)) this.operationsLoading.set(false);
     }
   }
 
-  async loadMailOutbox(): Promise<void> {
-    const status = this.mailStatus();
-    const page = this.mailPage() + 1;
-    const perPage = this.mailPageSize();
-    const context = JSON.stringify([status, page, perPage]);
-    const request = this.mailRequests.begin(context);
-    this.mailLoading.set(true);
-    this.mailError.set(null);
-    try {
-      const response = await this.api.get<PageResponse<AdminMailOutboxMessage>>("/api/v1/admin/mail-outbox", {
-        status,
-        page,
-        perPage,
-      }, (value) => decodeAdminMailPage(value, { page, perPage }), { signal: request.signal });
-      if (!this.mailRequests.isCurrent(request, context)) return;
-      this.mailMessages.set(response.messages ?? []);
-      this.mailTotal.set(response.total);
-    } catch (error) {
-      if (!this.mailRequests.isCurrent(request, context)) return;
-      this.mailError.set(this.adminError(error, "No se pudo cargar el outbox de correo"));
-    } finally {
-      if (this.mailRequests.isCurrent(request, context)) this.mailLoading.set(false);
-    }
-  }
-
   filterMail(status: MailStatusFilter): void {
     this.mailStatus.set(status);
-    this.mailPage.set(0);
-    void this.loadMailOutbox();
-  }
-
-  onMailPage(event: PageEvent): void {
-    this.mailPage.set(event.pageIndex);
-    this.mailPageSize.set(event.pageSize);
-    void this.loadMailOutbox();
+    this.mail.restart();
   }
 
   async retryMail(message: AdminMailOutboxMessage): Promise<void> {
@@ -683,58 +488,23 @@ export class AdminComponent {
     try {
       await this.api.post(`/api/v1/admin/mail-outbox/${message.id}/retry`, {});
       this.snackbar.open("Correo admitido de nuevo en la cola", "Cerrar", { duration: 3000 });
-      await Promise.all([this.loadMailOutbox(), this.loadOperations(), this.loadAudit()]);
+      await Promise.all([this.mail.load(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
       this.showError(error);
-      await this.loadMailOutbox();
+      await this.mail.load();
     } finally {
       this.actionKey.set(null);
     }
   }
 
-  async loadPrivacyRequests(): Promise<void> {
-    const status = this.privacyStatus();
-    const type = this.privacyType();
-    const page = this.privacyPage() + 1;
-    const perPage = this.privacyPageSize();
-    const context = JSON.stringify([status, type, page, perPage]);
-    const request = this.privacyLoadRequests.begin(context);
-    this.privacyLoading.set(true);
-    this.privacyError.set(null);
-    try {
-      const response = await this.api.get<PageResponse<PrivacyRightRequest>>("/api/v1/admin/privacy-requests", {
-        status,
-        type,
-        page,
-        perPage,
-      }, (value) => decodePrivacyRequestsPage(value, { page, perPage, admin: true }), { signal: request.signal });
-      if (!this.privacyLoadRequests.isCurrent(request, context)) return;
-      this.privacyRequests.set(response.requests ?? []);
-      this.privacyTotal.set(response.total);
-    } catch (error) {
-      if (!this.privacyLoadRequests.isCurrent(request, context)) return;
-      this.privacyError.set(this.adminError(error, "No se pudieron cargar las solicitudes de privacidad"));
-    } finally {
-      if (this.privacyLoadRequests.isCurrent(request, context)) this.privacyLoading.set(false);
-    }
-  }
-
   filterPrivacyStatus(status: PrivacyStatusFilter): void {
     this.privacyStatus.set(status);
-    this.privacyPage.set(0);
-    void this.loadPrivacyRequests();
+    this.privacy.restart();
   }
 
   filterPrivacyType(type: PrivacyTypeFilter): void {
     this.privacyType.set(type);
-    this.privacyPage.set(0);
-    void this.loadPrivacyRequests();
-  }
-
-  onPrivacyPage(event: PageEvent): void {
-    this.privacyPage.set(event.pageIndex);
-    this.privacyPageSize.set(event.pageSize);
-    void this.loadPrivacyRequests();
+    this.privacy.restart();
   }
 
   async startPrivacyReview(request: PrivacyRightRequest): Promise<void> {
@@ -782,7 +552,7 @@ export class AdminComponent {
     try {
       await this.api.post(`/api/v1/admin/privacy-requests/${request.id}/action`, { action, message, reasonCode });
       this.snackbar.open("Expediente actualizado", "Cerrar", { duration: 3000 });
-      await Promise.all([this.loadPrivacyRequests(), this.loadOperations(), this.loadAudit()]);
+      await Promise.all([this.privacy.load(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
       this.showError(error);
     } finally {
@@ -814,11 +584,6 @@ export class AdminComponent {
     return ({ local: "Desarrollo local", testing: "Pruebas", staging: "Preproducción", production: "Producción" } as Record<string, string>)[value] ?? value;
   }
 
-  formatDate(iso: string): string {
-    const date = new Date(iso);
-    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("es-ES");
-  }
-
   ageLabel(seconds: number | null): string {
     if (seconds === null) return "Sin espera";
     if (seconds < 60) return `${seconds} s`;
@@ -826,37 +591,7 @@ export class AdminComponent {
     return `${Math.floor(seconds / 3600)} h`;
   }
 
-  private async moderate(
-    report: AdminReport,
-    action: "block" | "unblock" | "review" | "dismiss",
-    success: string,
-    reason?: string,
-  ): Promise<void> {
-    if (this.actionKey()) return;
-    this.actionKey.set(`report-${report.id}`);
-    try {
-      await this.api.post(`/api/v1/admin/reports/${report.id}/moderate`, { action, reason });
-      this.snackbar.open(success, "Cerrar", { duration: 2500 });
-      await Promise.all([this.loadReports(), this.loadOverview(), this.loadOperations(), this.loadAudit()]);
-    } catch (error) {
-      this.showError(error);
-    } finally {
-      this.actionKey.set(null);
-    }
-  }
-
-  private adminError(error: unknown, fallback: string): string {
-    if (error instanceof ApiRequestError && error.status === 403) {
-      return "La consola requiere una sesión de administrador con MFA completado en este navegador.";
-    }
-    return this.errorMessage(error, fallback);
-  }
-
-  private errorMessage(error: unknown, fallback: string): string {
-    return error instanceof ApiRequestError ? error.message : fallback;
-  }
-
   private showError(error: unknown): void {
-    this.snackbar.open(this.errorMessage(error, "No se pudo completar la acción"), "Cerrar", { duration: 4000 });
+    this.snackbar.open(apiMessage(error, "No se pudo completar la acción"), "Cerrar", { duration: 4000 });
   }
 }

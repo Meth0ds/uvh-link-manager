@@ -36,6 +36,23 @@ export function nullableText(value: unknown, contract: string, maximum: number, 
   return value === null ? null : text(value, contract, maximum, allowEmpty);
 }
 
+/**
+ * Text that is allowed to span lines, as operator-authored reasons and notes are.
+ *
+ * The API rejects only the control characters nothing legitimate produces — a
+ * tab or a line break in a note it accepts — so a decoder that refused them
+ * would throw on a payload the server considers valid and take the whole view
+ * down with it.
+ */
+export function nullableMultiline(value: unknown, contract: string, maximum: number, allowEmpty = false): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || (!allowEmpty && value.length === 0) || value.length > maximum
+    || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value)) {
+    invalid(contract);
+  }
+  return value;
+}
+
 export function literal<T extends string>(value: unknown, allowed: ReadonlySet<T>, contract: string): T {
   if (typeof value !== "string" || !allowed.has(value as T)) invalid(contract);
   return value as T;

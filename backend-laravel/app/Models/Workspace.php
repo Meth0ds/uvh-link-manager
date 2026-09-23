@@ -9,7 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Workspace extends Model
 {
-    protected $fillable = ['name', 'slug', 'owner_user_id'];
+    /**
+     * `owner_user_id` is deliberately NOT mass-assignable. Moving ownership is
+     * a guarded operation — `transferOwnership` demands owner role, step-up MFA
+     * and a deterministic set of row locks — and a future
+     * `Workspace::update($request->all())` must not be able to walk around all
+     * of that by accident. The only two writers use `forceCreate`/`forceFill`.
+     */
+    protected $fillable = ['name', 'slug'];
 
     /** @return BelongsTo<User, $this> */
     public function owner(): BelongsTo

@@ -1,42 +1,22 @@
-<div class="status-shell" [class.forbidden]="forbidden">
-  <a class="skip-link" href="#status-content" (click)="$event.preventDefault(); statusContent.focus()">Ir al contenido</a>
-  <header class="status-header">
-    <a class="brand" routerLink="/" aria-label="UVH, inicio">uvh<span>.</span></a>
-    <span class="brand-caption">Enlaces con recorrido.</span>
-    <div class="header-actions"><a routerLink="/help">Ayuda</a><app-public-theme-toggle /></div>
-  </header>
-
-  <main #statusContent id="status-content" tabindex="-1" aria-labelledby="status-title">
-    <div class="status-layout">
-      <div class="route-sheet" aria-hidden="true">
-        <span class="sheet-label">{{ forbidden ? 'Acceso restringido' : 'Página no encontrada' }}</span>
-        <span class="status-code">{{ code }}</span>
-        <div class="route-line"><span class="route-origin"></span><span class="route-track"></span><span class="route-stop"><mat-icon>{{ forbidden ? 'lock_outline' : 'wrong_location' }}</mat-icon></span></div>
-        <span class="sheet-note">{{ forbidden ? 'El acceso se comprueba antes de continuar.' : 'La navegación se detiene aquí. Tú puedes seguir.' }}</span>
-      </div>
-
-      <section class="status-copy">
-        <p class="eyebrow">{{ code }} / {{ forbidden ? 'Acceso restringido' : 'Página no encontrada' }}</p>
-        <h1 id="status-title">{{ title }}</h1>
-        <p class="intro">{{ forbidden ? 'Con el acceso actual no puedes abrir esta sección. Puedes volver a tu panel y comprobar qué cuenta y workspace estás utilizando.' : 'No encontramos la página que buscas. Puede que la dirección haya cambiado, que se haya escrito mal o que ya no esté disponible.' }}</p>
-        <div class="actions">
-          <a mat-flat-button [routerLink]="forbidden ? '/app/dashboard' : '/'">{{ forbidden ? 'Volver a mi panel' : 'Volver al inicio' }}<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></a>
-          <a class="secondary-link" routerLink="/help">Consultar la ayuda<mat-icon aria-hidden="true">arrow_outward</mat-icon></a>
-        </div>
-        <p class="status-boundary">{{ forbidden ? 'Esta pantalla no cambia tus permisos ni cierra tu sesión.' : 'No hemos abierto ningún destino alternativo.' }}</p>
-      </section>
+<a class="skip-link" href="#status-content" (click)="focusMain(statusContent)">Saltar al contenido</a>
+<app-public-theme-toggle />
+<main #statusContent id="status-content" tabindex="-1">
+  <div class="wrap">
+    <p class="kicker">UVH Link Manager</p>
+    <h1>
+      <span class="code" aria-hidden="true">{{ code }}</span>
+      <span class="headline">{{ title }}</span>
+    </h1>
+    <p class="lead">{{ lead }}</p>
+    <div class="actions">
+      @if (forbidden) {
+        <a mat-flat-button color="primary" href="/app/dashboard"><mat-icon aria-hidden="true">space_dashboard</mat-icon>Ir al panel</a>
+      } @else {
+        <a mat-flat-button color="primary" href="/"><mat-icon aria-hidden="true">home</mat-icon>Volver al inicio</a>
+      }
+      @for (extra of extras; track extra.href) {
+        <a mat-stroked-button [href]="extra.href"><mat-icon aria-hidden="true">{{ extra.icon }}</mat-icon>{{ extra.label }}</a>
+      }
     </div>
-
-    <section class="next-steps" aria-labelledby="next-steps-title">
-      <h2 id="next-steps-title">{{ forbidden ? 'Comprueba el acceso, sin empezar de cero.' : 'Hay otras formas de llegar.' }}</h2>
-      <div class="guidance-grid">
-        <article><mat-icon aria-hidden="true">{{ forbidden ? 'workspaces' : 'link' }}</mat-icon><h3>{{ forbidden ? 'Revisa el workspace' : 'Comprueba la dirección' }}</h3><p>{{ forbidden ? 'En el panel, usa el selector de workspace. Una cuenta puede tener permisos distintos en cada espacio.' : 'Si copiaste la URL, comprueba que esté completa y que no incluya espacios o signos añadidos al final.' }}</p></article>
-        <article><mat-icon aria-hidden="true">{{ forbidden ? 'group' : 'forum' }}</mat-icon><h3>{{ forbidden ? 'Consulta con quien administra' : 'Pregunta a quien te la envió' }}</h3><p>{{ forbidden ? 'Si necesitas entrar, pide al responsable del espacio que revise tu acceso. No es necesario compartir tu contraseña ni códigos MFA.' : 'Puede facilitarte una dirección actualizada. No envíes contraseñas, tokens ni enlaces privados a canales públicos.' }}</p></article>
-        <a class="guidance-link" [routerLink]="forbidden ? '/' : '/app/dashboard'">
-          <mat-icon aria-hidden="true">{{ forbidden ? 'home' : 'space_dashboard' }}</mat-icon><h3>{{ forbidden ? 'La web sigue a mano' : 'Busca desde tu panel' }}</h3><p>{{ forbidden ? 'Vuelve a la página principal para consultar qué puedes hacer con UVH.' : 'Si buscabas uno de tus enlaces, abre el panel y localízalo dentro de su workspace.' }}</p><span>{{ forbidden ? 'Ir al inicio' : 'Abrir el panel' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></span>
-        </a>
-      </div>
-    </section>
-  </main>
-  <footer><span>UVH / Enlaces con recorrido.</span><nav aria-label="Información y soporte"><a routerLink="/status">Estado del servicio</a><a routerLink="/legal/privacidad">Privacidad</a></nav></footer>
-</div>
+  </div>
+</main>

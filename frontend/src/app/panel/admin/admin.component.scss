@@ -1,24 +1,23 @@
+// La gramática de cola que comparten todas las vistas del panel vive en
+// queue-primitives.scss. La consola incluye los bloques que dibuja: su propio
+// encabezado y sus avisos, el resumen que proyecta dentro de cada marco, la
+// barra de filtros de sus colas y los chips y botones de sus filas. El vacío y
+// el paginador los dibuja el marco, así que no se incluyen aquí. Este fichero
+// guarda lo particular de la consola: las bandas sobre las pestañas y sus tablas.
+@use "../queue-primitives.scss" as primitives;
+
 :host { display: block; }
+
+@include primitives.heading;
+@include primitives.heading-paragraph;
+@include primitives.projected-paragraph;
+@include primitives.notice;
+@include primitives.filters;
+@include primitives.badge;
+@include primitives.danger-button;
 
 .spin { animation: spin 800ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-// Danger reads as a left rule on tokens, never as a tinted rounded box.
-.alert {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding: 12px 14px;
-  border-left: 3px solid var(--uvh-danger);
-  border-radius: 3px;
-  background: var(--uvh-danger-soft);
-  color: var(--uvh-danger);
-  font-size: 13px;
-  line-height: 1.6;
-  span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-  &.compact { margin: 10px 0 14px; }
-}
 
 // The platform state is a ruled plate whose left edge takes the colour of the
 // signal, so the strip itself already reads healthy / attention / critical.
@@ -90,27 +89,6 @@
 
 .tab-panel { min-height: 430px; padding: 22px; }
 
-.section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 17px;
-  h2 { margin: 0; color: var(--uvh-ink); font-size: 17.5px; font-weight: 800; letter-spacing: -.03em; }
-  p { margin: 4px 0 0; color: var(--uvh-muted); font-size: 12px; line-height: 1.5; }
-}
-
-.filters {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 3px;
-  mat-form-field { width: 210px; }
-  .filter-search { width: min(100%, 420px); }
-  ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }
-  ::ng-deep .mat-mdc-text-field-wrapper { background: var(--uvh-surface); }
-}
-
 .data-list {
   overflow: hidden;
   margin-top: 13px;
@@ -178,32 +156,8 @@
 .domain-row > span small { display: block; color: var(--uvh-muted); font-size: 10px; }
 
 .badges { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-// Same grammar as the shared state chip: square tag, soft fill, strong ink.
-.badge {
-  display: inline-flex;
-  min-height: 22px;
-  align-items: center;
-  padding: 3px 8px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface);
-  color: var(--uvh-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .02em;
-  white-space: nowrap;
-  &.success { border-color: color-mix(in srgb, var(--uvh-success) 34%, var(--uvh-border)); background: var(--uvh-success-soft); color: var(--uvh-success); }
-  &.warning { border-color: color-mix(in srgb, var(--uvh-warn) 34%, var(--uvh-border)); background: var(--uvh-warn-soft); color: var(--uvh-warn); }
-  &.danger { border-color: color-mix(in srgb, var(--uvh-danger) 34%, var(--uvh-border)); background: var(--uvh-danger-soft); color: var(--uvh-danger); }
-  &.accent { border-color: color-mix(in srgb, var(--uvh-electric) 34%, var(--uvh-border)); background: color-mix(in srgb, var(--uvh-electric) 8%, var(--uvh-surface-raised)); color: var(--uvh-electric); }
-  &.neutral, &.muted-badge { background: var(--uvh-surface); }
-}
-
 .usage { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 0 5px; b { font-size: 12px; font-variant-numeric: tabular-nums; } small { color: var(--uvh-muted); font-size: 10px; } }
 .row-actions { display: flex; justify-content: flex-end; gap: 7px; button { min-width: 0; font-size: 11px; } }
-.danger-button { border-color: color-mix(in srgb, var(--uvh-danger) 30%, var(--uvh-border)) !important; color: var(--uvh-danger) !important; }
-
-.report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 13px; }
 // The policy reminder is a margin note on a rule, not a tinted card.
 .policy-note { display: flex; align-items: flex-start; gap: 10px; margin: -3px 0 16px; padding: 2px 0 2px 13px; border-left: 3px solid var(--uvh-electric); color: var(--uvh-muted); font-size: 11.5px; line-height: 1.6; mat-icon { width: 17px; height: 17px; flex: 0 0 17px; color: var(--uvh-electric); font-size: 17px; } }
 .recovery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 13px; }
@@ -215,31 +169,8 @@
 .recovery-identity { display: flex; min-width: 0; align-items: center; gap: 10px; margin: 14px 0; > span:last-child { display: flex; min-width: 0; flex-direction: column; } b, small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } b { color: var(--uvh-ink); font-size: 13px; } small { color: var(--uvh-muted); font-size: 10.5px; } }
 .approval-progress { padding: 12px; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); > div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; } span { height: 4px; background: var(--uvh-border); &.met { background: var(--uvh-teal); } } b { color: var(--uvh-ink); font-size: 10.5px; font-variant-numeric: tabular-nums; } }
 .role-warning { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px; color: var(--uvh-warn); font-size: 10.5px; line-height: 1.45; mat-icon { width: 16px; height: 16px; flex: 0 0 16px; font-size: 16px; } }
-.report-card {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  padding: 18px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface-raised);
-  transition: border-color 160ms ease;
-  // A denser edge is the affordance; nothing lifts off the paper.
-  &:hover { border-color: var(--uvh-border-strong); }
-  > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; time { color: var(--uvh-muted); font-size: 10.5px; font-variant-numeric: tabular-nums; } }
-  footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--uvh-border); button { font-size: 11px; } }
-  .destructive { background: var(--uvh-danger); color: var(--accent-ink); }
-}
-.report-target { display: flex; min-width: 0; flex-direction: column; gap: 4px; margin: 14px 0; b { font-family: "Courier New", monospace; font-size: 14px; } span { overflow: hidden; color: var(--uvh-muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; } }
-.report-copy { padding: 12px 0; border-block: 1px solid var(--uvh-border); span { display: block; margin-bottom: 4px; color: var(--uvh-muted); font-family: "Courier New", monospace; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; } b { font-size: 12px; } p { margin: 8px 0 0; color: var(--uvh-muted); font-size: 11.5px; line-height: 1.6; white-space: pre-wrap; } }
-.report-card dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 14px; div { min-width: 0; } dt { color: var(--uvh-muted); font-family: "Courier New", monospace; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; } dd { overflow: hidden; margin: 3px 0 0; color: var(--uvh-ink); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; } }
-
 .audit-list { overflow: hidden; margin-top: 13px; border: 1px solid var(--uvh-border); border-radius: 3px; }
 .audit-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--uvh-border); transition: background-color 150ms ease; &:last-child { border-bottom: 0; } &:hover { background: var(--uvh-surface); } > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; } b { overflow: hidden; color: var(--uvh-ink); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; } span { color: var(--uvh-muted); font-family: "Courier New", monospace; font-size: 10.5px; } time { color: var(--uvh-muted); font-size: 10.5px; white-space: nowrap; font-variant-numeric: tabular-nums; } }
-
-.empty { display: flex; min-height: 190px; align-items: center; justify-content: center; flex-direction: column; gap: 5px; color: var(--uvh-muted); text-align: center; mat-icon { width: 28px; height: 28px; margin-bottom: 5px; font-size: 28px; } b { color: var(--uvh-ink); font-size: 13px; } span { font-size: 11.5px; } }
-
-mat-paginator { margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background: transparent; }
 
 // Operational signals read as one ruled data grid, not eleven small cards.
 .system-overview { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 12px 0 20px; border-block: 1px solid var(--uvh-border); > div { display: flex; min-width: 0; min-height: 96px; flex-direction: column; gap: 4px; padding: 15px 14px; border-left: 1px solid var(--uvh-border); } > div:nth-child(6n + 1) { border-left: 0; } span { color: var(--uvh-muted); font-family: "Courier New", monospace; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; } b { margin-top: auto; color: var(--uvh-ink); font-size: 22px; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; font-variant-numeric: tabular-nums; } small { color: var(--uvh-muted); font-size: 9.5px; line-height: 1.5; } }
@@ -249,13 +180,13 @@ mat-paginator { margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background
 .check-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .check-row { display: flex; min-height: 62px; align-items: flex-start; gap: 9px; padding: 12px 14px; border-right: 1px solid var(--uvh-border); border-bottom: 1px solid var(--uvh-border); &:nth-child(2n) { border-right: 0; } mat-icon { width: 17px; height: 17px; color: var(--uvh-success); font-size: 17px; } > div { display: flex; min-width: 0; flex-direction: column; } b { color: var(--uvh-ink); font-size: 11px; } span { margin-top: 2px; color: var(--uvh-muted); font-size: 9.5px; line-height: 1.4; } &.check-warning mat-icon { color: var(--uvh-warn); } &.check-critical mat-icon { color: var(--uvh-danger); } }
 .metric-list { padding: 4px 16px; > div { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--uvh-border); &:last-child { border-bottom: 0; } span { color: var(--uvh-muted); font-size: 11.5px; } b { font-size: 17px; } } }
-.outbox-card { margin-top: 18px; padding: 18px; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface-raised); .section-heading { align-items: flex-start; margin-bottom: 10px; } mat-form-field { width: 180px; margin-bottom: -20px; } }
+// El encabezado de esta tarjeta lo dibuja el marco, que ya alinea arriba: aquí
+// sólo queda el filtro, que sí es un nodo de la consola.
+.outbox-card { margin-top: 18px; padding: 18px; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface-raised); mat-form-field { width: 180px; margin-bottom: -20px; } }
 .outbox-list { overflow: hidden; border: 1px solid var(--uvh-border); border-radius: 3px; }
 .outbox-row { display: grid; grid-template-columns: 34px minmax(170px, 1fr) auto minmax(130px, auto) auto auto; align-items: center; gap: 12px; padding: 12px 13px; border-bottom: 1px solid var(--uvh-border); &:last-child { border-bottom: 0; } time { color: var(--uvh-muted); font-size: 10.5px; white-space: nowrap; } button { font-size: 10.5px; } }
 .mail-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); color: var(--uvh-electric); mat-icon { width: 17px; height: 17px; font-size: 17px; } }
 .outbox-main, .outbox-attempts { display: flex; min-width: 0; flex-direction: column; b { overflow: hidden; color: var(--uvh-ink); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; } span { color: var(--uvh-muted); font-size: 9.5px; } }
-.compact-empty { min-height: 130px; }
-
 @media (max-width: 1180px) {
   .stat-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .stat-card { padding: 18px 14px; }
@@ -269,7 +200,7 @@ mat-paginator { margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background
 }
 
 @media (max-width: 850px) {
-  .report-grid, .recovery-grid, .privacy-grid, .system-columns { grid-template-columns: 1fr; }
+  .recovery-grid, .privacy-grid, .system-columns { grid-template-columns: 1fr; }
   .data-list { overflow: visible; border: 0; background: transparent; }
   .data-head { display: none; }
   .data-row { min-width: 0; margin-bottom: 9px; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface-raised); }
@@ -288,8 +219,6 @@ mat-paginator { margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background
   .stat-card:nth-child(n + 3) { border-top: 1px solid var(--uvh-border); }
   .stat-card:first-child { border-top: 0; }
   .tab-panel { min-height: 360px; padding: 16px 13px; }
-  .filters { flex-direction: column; mat-form-field, .filter-search { width: 100%; } }
-  .section-heading { align-items: stretch; flex-direction: column; }
   .outbox-card mat-form-field { width: 100%; }
   .system-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .system-overview > div:nth-child(3n + 1) { border-left: 1px solid var(--uvh-border); }
@@ -297,8 +226,6 @@ mat-paginator { margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background
   .system-overview > div:nth-child(n + 3) { border-top: 1px solid var(--uvh-border); }
   .check-list { grid-template-columns: 1fr; }
   .check-row { border-right: 0; }
-  .report-card dl { grid-template-columns: 1fr 1fr; }
-  .report-card footer button { flex: 1 1 calc(50% - 7px); }
   .audit-row { grid-template-columns: 34px minmax(0, 1fr); time { grid-column: 2; } }
   .admin-tabs ::ng-deep .mdc-tab { min-width: 100px; padding-inline: 12px; }
   .admin-tabs .tab-label-text { display: none; }
@@ -312,5 +239,5 @@ mat-paginator { margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background
 
 @media (prefers-reduced-motion: reduce) {
   .spin { animation-duration: 1.8s; }
-  .data-row, .audit-row, .report-card { transition: none; }
+  .data-row, .audit-row { transition: none; }
 }

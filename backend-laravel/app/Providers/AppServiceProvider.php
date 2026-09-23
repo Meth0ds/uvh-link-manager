@@ -5,8 +5,11 @@ namespace App\Providers;
 use App\Cache\UvhRateLimiter;
 use App\Support\OperationalMetrics;
 use App\Support\ProductionSecurity;
+use App\Support\RedirectService;
+use App\Support\UrlUtil;
 use App\Support\UvhLimiters;
 use App\Support\UvhRequest;
+use App\Support\VisitorAnswer;
 use Illuminate\Cache\Events\CacheFailedOver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -323,11 +326,24 @@ class AppServiceProvider extends ServiceProvider
             // The same alias may legitimately exist on many custom domains.
             // Include the normalized host so one NATed client cannot consume
             // another domain's password budget by collision alone.
-            $key = $request->ip().'|'.strtolower($request->getHost()).'|'.($request->route('alias') ?? '');
+            //
+            // The alias is normalized to the same spelling the lookup uses
+            // (`RedirectService` normalizes before it resolves the link). The
+            // raw route parameter is not: the controller lowercases and trims
+            // it, so `ADV-EXTERNO`, `Adv-Externo` and `adv-externo ` reached the
+            // same link while each spelling owned its own budget — measured, ten
+            // more attempts per variant. The budget belongs to the link.
+            $key = $request->ip().'|'.RedirectService::canonicalHost($request->getHost()).'|'.UrlUtil::normalizeAlias((string) ($request->route('alias') ?? ''));
 
             return Limit::perMinute(10)
                 ->by($key)
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiados intentos para este enlace.'], 429)->withHeaders($headers));
+                // El visitante que agota el presupuesto de intentos está mirando
+                // el formulario, no una integración: recibe la misma pantalla
+                // con el motivo, y el cliente de API el mismo sobre JSON de
+                // siempre. El estado y las cabeceras del limitador no cambian.
+                // El limitador declara el hecho; quién ve qué lo decide
+                // `VisitorAnswer`.
+                ->response(fn (Request $request, array $headers) => VisitorAnswer::tooManyAttempts($request, $headers));
         });
 
         RateLimiter::for('uvh-domain-dns', function (Request $request) {

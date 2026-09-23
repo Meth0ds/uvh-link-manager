@@ -119,3 +119,36 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   mat-icon { flex: 0 0 24px; }
   b { display: block; margin-bottom: 3px; }
 }
+// 2FA dialog: the step's content lives in a modal layer over a dimmed shell,
+// matching the OTP box component's focused-entry grammar.
+.otp-modal-scrim {
+  position: fixed; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 12px; overflow-y: auto;
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+  backdrop-filter: blur(3px);
+  animation: otp-scrim-in 200ms ease-out;
+}
+.otp-modal {
+  position: relative;
+  width: min(100%, 460px);
+  padding: 38px 34px 30px;
+  text-align: center;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .12);
+  animation: otp-modal-in 260ms cubic-bezier(.2, .8, .2, 1);
+}
+.otp-modal .mfa-stepper { margin-bottom: 22px; }
+.otp-modal .mode-illustration { margin-bottom: 14px; }
+.otp-modal .card-sub { margin-inline: auto; max-width: 34ch; }
+.otp-modal .mfa-account { text-align: left; }
+.otp-help { margin: 12px 0 0; color: var(--muted); font: 10px "Courier New", monospace; letter-spacing: .06em; text-transform: uppercase; }
+.otp-modal .alert { text-align: left; }
+@keyframes otp-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes otp-modal-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (max-width: 520px) {
+  .otp-modal { padding: 30px 18px 24px; }
+}

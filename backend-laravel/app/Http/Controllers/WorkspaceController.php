@@ -14,6 +14,8 @@ use App\Support\InvitationBudgetUnavailable;
 use App\Support\InvitationMailBudget;
 use App\Support\IsoDate;
 use App\Support\MailAdmissionException;
+use App\Support\MfaAttempts;
+use App\Support\MfaFreshness;
 use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
 use App\Support\PendingHandoff;
@@ -73,7 +75,9 @@ class WorkspaceController
             if (Workspace::where('owner_user_id', $user->id)->count() >= self::MAX_OWNED_WORKSPACES) {
                 return ['status' => 'limit'];
             }
-            $w = Workspace::create([
+            // `owner_user_id` is not mass-assignable; this explicit write is
+            // one of the only two doors allowed to set it.
+            $w = Workspace::forceCreate([
                 'name' => $name,
                 'slug' => 'ws-'.strtolower(Ids::randomToken(6)),
                 'owner_user_id' => $user->id,
@@ -332,7 +336,9 @@ class WorkspaceController
                     $lockedActor->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => now()]);
                 }
 
-                $workspace->update(['owner_user_id' => $target->id, 'updated_at' => now()]);
+                // The other door allowed to move ownership — after owner role,
+                // step-up MFA and every lock taken above.
+                $workspace->forceFill(['owner_user_id' => $target->id, 'updated_at' => now()])->save();
                 $actorMembership->update(['role' => 'admin']);
                 $targetMembership->update(['role' => 'owner']);
                 // Losing ownership permanently revokes grants that only an
@@ -372,6 +378,12 @@ class WorkspaceController
         }
         if ($result['status'] === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+        }
+        if ($result['status'] === 'locked') {
+            return MfaAttempts::tooManyResponse($actor->id, MfaStepUp::ATTEMPT_PURPOSE);
+        }
+        if ($result['status'] === 'reauth') {
+            return MfaFreshness::reauthenticationRequired();
         }
         if ($result['status'] === 'password') {
             return response()->json(['error' => 'Contraseña incorrecta'], 403);
@@ -569,6 +581,12 @@ class WorkspaceController
         }
         if ($deleted['status'] === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+        }
+        if ($deleted['status'] === 'locked') {
+            return MfaAttempts::tooManyResponse($user->id, MfaStepUp::ATTEMPT_PURPOSE);
+        }
+        if ($deleted['status'] === 'reauth') {
+            return MfaFreshness::reauthenticationRequired();
         }
         if ($deleted['status'] === 'password') {
             return response()->json(['error' => 'Contraseña incorrecta'], 403);

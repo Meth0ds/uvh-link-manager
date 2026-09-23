@@ -71,7 +71,6 @@ export class WebhooksComponent {
   readonly deliveriesLoading = signal<Record<number, boolean>>({});
   readonly deliveriesError = signal<Record<number, string | null>>({});
   readonly loading = signal(true);
-  readonly creating = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly showForm = signal(false);

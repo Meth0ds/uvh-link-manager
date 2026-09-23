@@ -54,6 +54,34 @@
     <div class="metric"><dt>Estado</dt><dd>{{ stateLabel(link.state) }}</dd><span>Situación actual</span></div>
     <div class="metric"><dt>Creado</dt><dd>{{ link.createdAt.slice(0, 10) }}</dd><span>Fecha de alta</span></div>
   </dl>
+  @if (link.state === "blocked") {
+    <section class="block-notice" aria-labelledby="block-notice-title">
+      <mat-icon class="notice-icon" aria-hidden="true">gpp_maybe</mat-icon>
+      <div class="block-copy">
+        <b id="block-notice-title">Este enlace lo bloqueó la plataforma</b>
+        @if (blockReason(); as reason) {
+          <p class="notice-reason">Motivo: {{ reason }}</p>
+        }
+        <p class="notice-help">Mientras siga bloqueado, el enlace no resuelve. Consulta las <a routerLink="/legal/terminos">condiciones de uso</a>.</p>
+        @if (appeal(); as a) {
+          <p class="appeal-state" role="status">
+            <mat-icon aria-hidden="true">{{ a.status === "open" ? "hourglass_top" : "gavel" }}</mat-icon>
+            <span><b>{{ appealStatusLabel(a.status) }}</b>@if (appealDate(a); as date) { · {{ a.status === "open" ? "solicitada el" : "resuelta el" }} {{ date }} }</span>
+          </p>
+          @if (a.decisionNote; as note) {
+            <p class="appeal-decision"><span>Respuesta de la administración</span>{{ note }}</p>
+          }
+        }
+        @if (canRequestReview()) {
+          <button mat-stroked-button type="button" (click)="requestReview()" [disabled]="actionBusy()">
+            <mat-icon>campaign</mat-icon> Solicitar revisión
+          </button>
+        } @else if (!canWrite()) {
+          <p class="appeal-note">Solo un rol con permiso de edición puede solicitar una revisión.</p>
+        }
+      </div>
+    </section>
+  }
   <div class="period-row">
     <span class="section-title">Analítica</span>
     <mat-form-field appearance="outline" class="period">

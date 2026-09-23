@@ -15,10 +15,11 @@ import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { LinkDialogService } from "./link-dialog.service";
 import { QrDialogComponent } from "./qr-dialog.component";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { parseRouteId } from "../../core/strict-wire";
 import { ActionDialogService } from "../action-dialog.service";
 import { MatDialog } from "@angular/material/dialog";
 import { ChartsComponent } from "../analytics/charts.component";
-import type { LinkDetailResponse, AnalyticsOverview, AuditEvent, LinkDto, RedirectRule } from "../../core/models";
+import type { LinkDetailResponse, AnalyticsOverview, AuditEvent, LinkAppeal, LinkDto, RedirectRule } from "../../core/models";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { targetWorkspace } from "../../core/services/workspace-target";
@@ -28,6 +29,7 @@ import {
   decodeLinkDetailResponse,
 } from "../../core/services/link-response-decoders";
 import { linkStateLabel } from "../../core/link-state-label";
+import { linkAppealStatusLabel } from "../../core/link-appeal-status";
 
 @Component({
   selector: "app-link-detail",
@@ -65,6 +67,15 @@ export class LinkDetailComponent {
 
   readonly link = signal<LinkDto | null>(null);
   readonly rules = signal<RedirectRule[]>([]);
+  readonly appeal = signal<LinkAppeal | null>(null);
+  /**
+   * Why the platform is refusing the link, answered by the API.
+   *
+   * The reason lives in the decision that produced the block, which is the
+   * backend's to read: this view prints what it is given, and says the block
+   * without a cause when there is none to print.
+   */
+  readonly blockReason = signal<string | null>(null);
   readonly analytics = signal<AnalyticsOverview | null>(null);
   readonly activity = signal<AuditEvent[]>([]);
   readonly period = signal("30d");
@@ -79,6 +90,15 @@ export class LinkDetailComponent {
     const role = this.workspaces.currentRole();
     return role === "owner" || role === "admin" || role === "editor";
   });
+
+  /**
+   * Whether the notice may offer to contest the block.
+   *
+   * The API accepts one *open* appeal per link, so a decided one does not forbid
+   * the next: hiding the action after a verdict would leave an upheld block with
+   * no way back in, which is the dead end this notice exists to remove.
+   */
+  readonly canRequestReview = computed(() => this.canWrite() && this.appeal()?.status !== "open");
 
   /**
    * The route's `:id`, kept reactive.
@@ -108,13 +128,15 @@ export class LinkDetailComponent {
       // The route can stay mounted while its workspace authorization changes.
       this.link.set(null);
       this.rules.set([]);
+      this.appeal.set(null);
+      this.blockReason.set(null);
       this.analytics.set(null);
       this.activity.set([]);
       this.error.set(null);
       this.analyticsError.set(null);
       this.activityError.set(null);
       this.activityTruncated.set(false);
-      if (!Number.isSafeInteger(linkId) || linkId < 1) {
+      if (linkId === null) {
         this.error.set("El identificador del enlace no es válido");
         this.loading.set(false);
         return;
@@ -127,17 +149,19 @@ export class LinkDetailComponent {
     });
   }
 
-  private paramId(): number {
-    return Number(this.route.snapshot.paramMap.get("id"));
+  private paramId(): number | null {
+    return parseRouteId(this.route.snapshot.paramMap.get("id"));
   }
 
   async load(): Promise<void> {
     const workspaceId = this.workspaces.currentId();
     const linkId = this.linkId();
-    if (workspaceId === null) {
+    if (workspaceId === null || linkId === null) {
       this.loadRequests.invalidate();
       this.link.set(null);
       this.rules.set([]);
+      this.appeal.set(null);
+      this.blockReason.set(null);
       this.loading.set(false);
       return;
     }
@@ -155,6 +179,8 @@ export class LinkDetailComponent {
       if (!this.loadRequests.isCurrent(request, this.currentContext())) return;
       this.link.set(detail.link);
       this.rules.set(detail.rules);
+      this.appeal.set(detail.appeal);
+      this.blockReason.set(detail.blockReason);
       await Promise.all([this.loadAnalytics(), this.loadActivity()]);
     } catch (err) {
       if (!this.loadRequests.isCurrent(request, this.currentContext())) return;
@@ -322,6 +348,50 @@ export class LinkDetailComponent {
     return parts.length ? parts.join(" · ") : "Sin condición";
   }
 
+  /**
+   * Ask the platform to review the block.
+   *
+   * The API accepts one open request per link and refuses anything but a
+   * blocked link, so the view re-reads after answering: a 409 means this screen
+   * is behind, and the newest state is the server's.
+   */
+  async requestReview(): Promise<void> {
+    if (!this.canWrite() || this.actionBusy()) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
+    const message = await this.actions.prompt({
+      title: "Solicitar revisión del bloqueo",
+      message: "Cuenta por qué crees que el bloqueo es un error. La revisión la resuelve la administración de la plataforma.",
+      confirmLabel: "Enviar solicitud",
+      inputLabel: "Comentario (opcional)",
+      inputPlaceholder: "Contexto que ayude a revisar el caso…",
+      inputHint: "Hasta 2000 caracteres.",
+      inputRequired: false,
+      inputMaxLength: 2000,
+    });
+    // `null` is a cancelled dialog; an empty string is a request without a comment.
+    if (message === null || !target.isCurrent() || this.actionBusy()) return;
+    this.actionBusy.set(true);
+    try {
+      await this.api.post(`/api/v1/links/${this.linkId()}/appeal`, { message: message.trim() });
+      if (!target.isCurrent()) return;
+      this.snackbar.open("Solicitud enviada. La revisión la resuelve la administración.", "Cerrar", { duration: 3500 });
+      await this.load();
+    } catch (err) {
+      if (!target.isCurrent()) return;
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo enviar la solicitud", "Cerrar", { duration: 4000 });
+      await this.load();
+    } finally {
+      if (target.isCurrent()) this.actionBusy.set(false);
+    }
+  }
+
+  /** The date that matters for the appeal's status: when it was asked, or decided. */
+  appealDate(appeal: LinkAppeal): string | null {
+    const at = appeal.status === "open" ? appeal.createdAt : appeal.decidedAt ?? appeal.createdAt;
+    return at === null ? null : at.slice(0, 10);
+  }
+
   actionLabel(action: string): string {
     const map: Record<string, string> = {
       "link.create": "Creación",
@@ -329,6 +399,12 @@ export class LinkDetailComponent {
       "link.state_change": "Cambio de estado",
       "link.delete": "Eliminación",
       "link.restore": "Restauración",
+      "link.appeal": "Revisión solicitada",
+      "admin.link_block": "Bloqueo de la plataforma",
+      "admin.link_unblock": "Bloqueo retirado",
+      "admin.link_appeal_resolved": "Respuesta a la revisión",
+      "admin.report_moderate": "Moderación de denuncia",
+      "system.link_block": "Bloqueo automático",
     };
     return map[action] ?? action;
   }
@@ -339,4 +415,5 @@ export class LinkDetailComponent {
   }
 
   readonly stateLabel = linkStateLabel;
+  readonly appealStatusLabel = linkAppealStatusLabel;
 }

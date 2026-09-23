@@ -119,9 +119,40 @@ export interface LinkTrashResponse {
   retentionDays: number;
 }
 
+/** Status of the owner's appeal against a platform block, as the API emits it. */
+export type LinkAppealStatus = "open" | "upheld" | "restored";
+
+/**
+ * The newest appeal of a link, and only for its owner's view: the API returns
+ * whether one is open so the panel never offers an action that would be refused.
+ */
+export interface LinkAppeal {
+  status: LinkAppealStatus;
+  createdAt: string | null;
+  decidedAt: string | null;
+  /**
+   * Why the platform decided as it did, in the operator's own words.
+   *
+   * Null while the appeal is open, when the decision carried no note, and in a
+   * payload from before the field existed. The note is written for the owner,
+   * not about them: it is theirs to read.
+   */
+  decisionNote: string | null;
+}
+
 export interface LinkDetailResponse {
   link: LinkDto;
   rules: RedirectRule[];
+  /** Null when the link was never appealed; a payload without the field reads as null. */
+  appeal: LinkAppeal | null;
+  /**
+   * Why the platform is refusing this link right now.
+   *
+   * Null unless the link is blocked, and also null when the block came from a
+   * path that records no reason. The notice prints it or says nothing about the
+   * cause; it never guesses one.
+   */
+  blockReason: string | null;
 }
 
 export type DomainState =
@@ -421,6 +452,23 @@ export interface AdminDomain {
   workspace_name: string;
 }
 
+/**
+ * One case in the appeal queue: the owner's own status, plus the surroundings an
+ * operator needs to decide it — which link, which workspace, and what was asked.
+ */
+export interface AdminAppeal {
+  id: number;
+  message: string | null;
+  status: LinkAppealStatus;
+  created_at: string;
+  decided_at: string | null;
+  decision_note: string | null;
+  alias: string;
+  destination: string;
+  link_state: LinkState;
+  workspace_id: number;
+}
+
 export interface AdminPage<T> {
   total: number;
   page: number;
@@ -516,6 +564,28 @@ export interface PrivacyRightRequest {
   name?: string;
   email?: string | null;
   assignedAdminName?: string | null;
+}
+
+/** What a denylist entry covers: one exact destination, or every URL on a host. */
+export type DestinationMatchKind = "host" | "url";
+
+/** Who put an entry there: a person, the reputation provider, or a report flow. */
+export type DestinationSource = "manual" | "provider" | "report";
+
+/**
+ * One destination the platform refuses to serve.
+ *
+ * A `url` entry carries the canonical hash of the destination, never the URL:
+ * the list is a matching table, not a copy of what it blocks.
+ */
+export interface AdminDestinationEntry {
+  id: number;
+  match_kind: DestinationMatchKind;
+  match_value: string;
+  reason: string;
+  source: DestinationSource;
+  expires_at: string | null;
+  created_at: string;
 }
 
 /** Public, minimized projection; deliberately separate from internal AuditEvent. */

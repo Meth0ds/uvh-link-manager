@@ -17,7 +17,7 @@ export const LINK_STATE_LABEL: Record<LinkState, string> = {
   deleted: "Eliminado",
 };
 
-const LINK_STATES: readonly LinkState[] = [
+const LINK_STATE_KEYS: readonly LinkState[] = [
   "scheduled",
   "active",
   "paused",
@@ -26,6 +26,15 @@ const LINK_STATES: readonly LinkState[] = [
   "archived",
   "deleted",
 ];
+
+/**
+ * The states this vocabulary can name, as a set.
+ *
+ * It is what the response decoders validate against: a payload that carried an
+ * unknown state has to be refused, and the list of valid ones belongs with the
+ * labels that name them, not copied into each decoder.
+ */
+export const LINK_STATES: ReadonlySet<LinkState> = new Set(LINK_STATE_KEYS);
 
 export function linkStateLabel(state: LinkState): string {
   return LINK_STATE_LABEL[state];
@@ -39,5 +48,5 @@ export function linkStateLabel(state: LinkState): string {
  * an operator.
  */
 export function isLinkState(value: string): value is LinkState {
-  return (LINK_STATES as readonly string[]).includes(value);
+  return LINK_STATES.has(value as LinkState);
 }

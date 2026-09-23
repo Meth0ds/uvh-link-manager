@@ -1,6 +1,8 @@
 import type {
   AccountRecoveryStatus,
   AdminAccountRecovery,
+  AdminAppeal,
+  AdminDestinationEntry,
   AdminDomain,
   AdminMailOutboxMessage,
   AdminOperations,
@@ -8,10 +10,13 @@ import type {
   AdminReport,
   AdminUser,
   AuditEvent,
+  DestinationMatchKind,
+  DestinationSource,
   DomainState,
-  LinkState,
   MailOutboxStatus,
 } from "../models";
+import { LINK_APPEAL_STATUSES } from "../link-appeal-status";
+import { LINK_STATES } from "../link-state-label";
 import {
   boolean,
   boundedArray,
@@ -32,6 +37,8 @@ export interface AdminPageResponse<T> {
   perPage: number;
   users?: T[];
   reports?: T[];
+  appeals?: T[];
+  entries?: T[];
   recoveries?: T[];
   domains?: T[];
   events?: T[];
@@ -46,7 +53,8 @@ export interface AdminPageContext {
 const REPORT_STATUSES = new Set<AdminReport["status"]>(["open", "reviewed", "actioned", "dismissed"]);
 const RECOVERY_STATUSES = new Set<AccountRecoveryStatus>(["requested", "email_confirmed", "in_review", "approved", "rejected", "completed", "expired", "cancelled"]);
 const DOMAIN_STATES = new Set<DomainState>(["pending", "verifying", "verified", "provisioning", "active", "error", "disabled"]);
-const LINK_STATES = new Set<LinkState>(["scheduled", "active", "paused", "expired", "blocked", "archived", "deleted"]);
+const DESTINATION_KINDS = new Set<DestinationMatchKind>(["host", "url"]);
+const DESTINATION_SOURCES = new Set<DestinationSource>(["manual", "provider", "report"]);
 const MAIL_STATUSES = new Set<MailOutboxStatus>(["pending", "queued", "processing", "sent", "failed", "obsolete", "comp_pending", "compensating", "compensated"]);
 
 function databaseBoolean(value: unknown, contract: string): boolean {
@@ -112,6 +120,61 @@ export function decodeAdminReportsPage(value: unknown, expected: AdminPageContex
       workspace_id: integer(source["workspace_id"], "admin report workspace", 1),
     };
   });
+}
+
+export function decodeAdminAppealsPage(value: unknown, expected: AdminPageContext): AdminPageResponse<AdminAppeal> {
+  return page(value, "appeals", expected, (item) => {
+    const source = record(item, "admin appeal");
+    return {
+      id: integer(source["id"], "admin appeal", 1),
+      message: nullableText(source["message"], "admin appeal message", 2000, true),
+      status: literal(source["status"], LINK_APPEAL_STATUSES, "admin appeal status"),
+      created_at: text(source["created_at"], "admin appeal timestamp", 64),
+      decided_at: nullableText(source["decided_at"], "admin appeal timestamp", 64),
+      decision_note: nullableText(source["decision_note"], "admin appeal note", 500, true),
+      alias: text(source["alias"], "admin appeal alias", 64),
+      destination: httpUrl(source["destination"], "admin appeal destination"),
+      link_state: literal(source["link_state"], LINK_STATES, "admin appeal link state"),
+      workspace_id: integer(source["workspace_id"], "admin appeal workspace", 1),
+    };
+  });
+}
+
+export function decodeAdminDestinationsPage(value: unknown, expected: AdminPageContext): AdminPageResponse<AdminDestinationEntry> {
+  return page(value, "entries", expected, (item) => {
+    const source = record(item, "destination entry");
+    return {
+      id: integer(source["id"], "destination entry", 1),
+      match_kind: literal(source["match_kind"], DESTINATION_KINDS, "destination entry kind"),
+      // A `url` row holds a hex digest of the destination and never the URL, so
+      // the width is the digest's, not a destination's.
+      match_value: text(source["match_value"], "destination entry value", 255),
+      reason: text(source["reason"], "destination entry reason", 500, true),
+      source: literal(source["source"], DESTINATION_SOURCES, "destination entry source"),
+      expires_at: nullableText(source["expires_at"], "destination entry expiry", 64, true),
+      created_at: text(source["created_at"], "destination entry timestamp", 64),
+    };
+  });
+}
+
+/**
+ * The outcome of blocking one link's destination: the sweep is bounded, and the
+ * answer says whether it reached every link or left the rest for later.
+ */
+export function decodeDestinationBlock(value: unknown): { linksScheduled: number; linksSweepTruncated: boolean } {
+  const source = record(value, "destination block");
+  if (source["ok"] !== true) invalid("destination block confirmation");
+  return {
+    linksScheduled: integer(source["linksScheduled"], "destination block schedule count"),
+    linksSweepTruncated: boolean(source["linksSweepTruncated"], "destination block sweep flag"),
+  };
+}
+
+/** Withdrawing an entry releases the links whose only ground was that entry. */
+export function decodeDestinationRemoval(value: unknown): { releasedLinks: number } {
+  const source = record(value, "destination removal");
+  if (source["ok"] !== true) invalid("destination removal confirmation");
+  return { releasedLinks: integer(source["releasedLinks"], "destination removal release count") };
 }
 
 export function decodeAdminRecoveriesPage(value: unknown, expected: AdminPageContext): AdminPageResponse<AdminAccountRecovery> {

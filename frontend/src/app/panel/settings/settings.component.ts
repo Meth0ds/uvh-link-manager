@@ -19,6 +19,7 @@ import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatSelectModule } from "@angular/material/select";
 import { MatPaginatorModule, type PageEvent } from "@angular/material/paginator";
 import QRCode from "qrcode";
+import { dateTimeMediumLabel } from "../../core/date-time-label";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ThemeService, type ThemePreference } from "../../core/services/theme.service";
@@ -82,11 +83,6 @@ export class SettingsComponent {
   private exportRequest = new LatestRequest(this.destroyRef);
   private deletionRequest = new LatestRequest(this.destroyRef);
   private privacyRequest = new LatestRequest(this.destroyRef);
-  private readonly dateTimeFormatter = new Intl.DateTimeFormat("es-ES", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-
   readonly user = this.auth.user;
   /** Keep local jumps inside this route despite the document's base href.
    * Focus follows the section so keyboard users continue at the destination.
@@ -716,9 +712,6 @@ export class SettingsComponent {
   }
 
   formatDate(iso: string): string {
-    const date = new Date(iso);
-    return iso && !Number.isNaN(date.getTime())
-      ? this.dateTimeFormatter.format(date)
-      : "Fecha no disponible";
+    return dateTimeMediumLabel(iso, "Fecha no disponible");
   }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\MfaFreshness;
 use App\Support\UvhRequest;
 use Closure;
 use Illuminate\Http\Request;
@@ -21,8 +22,7 @@ class RequireMfa
 
         if ($level === 'fresh') {
             $verifiedAt = UvhRequest::mfaVerifiedAt($request);
-            $freshMinutes = max(1, min(60, (int) config('uvh.admin_mfa_fresh_minutes', 15)));
-            if (! $verifiedAt || $verifiedAt < now()->subMinutes($freshMinutes)) {
+            if (! MfaFreshness::isFresh($verifiedAt)) {
                 return response()->json([
                     'error' => 'Vuelve a confirmar tu identidad para acceder a administración',
                     'details' => ['reason' => 'mfa_reauthentication_required'],

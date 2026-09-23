@@ -1,0 +1,80 @@
+// El encabezado, el aviso, el vacío y el paginador los dibuja el marco. Esta hoja
+// declara lo que la lista dibuja: su resumen proyectado, sus entradas y los chips
+// de alcance con el botón de retirada. No tiene barra de filtros.
+@use "../queue-primitives.scss" as primitives;
+
+:host { display: block; }
+
+@include primitives.projected-paragraph;
+@include primitives.badge;
+@include primitives.danger-button;
+
+.entry-list {
+  overflow: auto;
+  margin-top: 13px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface-raised);
+}
+
+.entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) 118px 96px minmax(0, 1.5fr) 122px 122px 96px;
+  align-items: center;
+  gap: 14px;
+  min-width: 980px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--uvh-border);
+  color: var(--uvh-ink);
+  font-size: 12px;
+
+  &:last-child { border-bottom: 0; }
+
+  > button { justify-self: end; min-width: 0; font-size: 11px; }
+}
+
+.entry-head {
+  border-bottom: 1px solid var(--uvh-border-strong);
+  background: var(--uvh-surface);
+  color: var(--uvh-muted);
+  font-family: "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.entry-value {
+  overflow: hidden;
+  font-family: "Courier New", monospace;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-reason { color: var(--uvh-muted); line-height: 1.5; overflow-wrap: anywhere; }
+.entry-row time { color: var(--uvh-muted); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 850px) {
+  .entry-list { overflow: visible; border: 0; background: transparent; }
+  .entry-head { display: none; }
+  .entry-row {
+    grid-template-columns: 1fr 1fr;
+    min-width: 0;
+    margin-bottom: 9px;
+    border: 1px solid var(--uvh-border);
+    border-radius: 3px;
+    background: var(--uvh-surface-raised);
+    .entry-value { grid-column: 1 / -1; }
+    > button { grid-column: 1 / -1; justify-self: start; }
+    [data-label]::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 3px;
+      color: var(--uvh-muted);
+      font-size: 8.5px;
+      font-weight: 750;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+  }
+}

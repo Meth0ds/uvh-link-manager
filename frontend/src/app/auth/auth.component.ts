@@ -17,6 +17,7 @@ import { PendingInvitationService } from "../core/services/pending-invitation.se
 import { LatestRequest } from "../core/services/latest-request";
 import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 import { intentBearer } from "./auth-bearer";
+import { OtpCodeInputComponent } from "./otp-code-input.component";
 
 type Step = "login" | "register" | "mfa" | "recovery" | "verify-pending";
 type RegisterStep = 1 | 2;
@@ -93,6 +94,7 @@ function assessPassword(password: string, name: string, email: string): Password
     MatProgressBarModule,
     AuthShellComponent,
     HCaptchaWidgetComponent,
+    OtpCodeInputComponent,
   ],
   templateUrl: "./auth.component.html",
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -369,6 +371,40 @@ export class AuthComponent {
       this.loginCaptchaWidget?.reset();
     } finally {
       if (!this.destroyRef.destroyed) this.busy.set(false);
+    }
+  }
+
+  /** Auto-submit once the sixth digit lands; onMfa's busy() guard dedupes. */
+  onOtpCompleted(): void {
+    if (this.step() === "mfa" && !this.busy()) {
+      void this.onMfa();
+    }
+  }
+
+  onOtpModalKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      if (this.busy()) return;
+      event.preventDefault();
+      this.restartMfaLogin();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    // While the dialog is open it is the only tabbable region (aria-modal):
+    // wrap focus at its edges so the keyboard cannot wander into the shell.
+    const scrim = event.currentTarget as HTMLElement;
+    const focusables = Array.from(
+      scrim.querySelectorAll<HTMLElement>("app-otp-code-input input:not([disabled]), button:not([disabled]), a[href]"),
+    );
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (!first || !last) return;
+    const active = document.activeElement as HTMLElement | null;
+    if (event.shiftKey && (active === first || !scrim.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active === last || !scrim.contains(active))) {
+      event.preventDefault();
+      first.focus();
     }
   }
 

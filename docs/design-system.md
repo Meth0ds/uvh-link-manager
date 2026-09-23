@@ -17,7 +17,7 @@ marcos finos en lugar de tarjetas redondeadas con sombra. Los tokens viven en
 | `--ink` | `#262821` | `#f4f0e4` | Texto principal |
 | `--muted` | `#626357` | `#b9bbae` | Texto secundario |
 | `--line` | `#cecec0` | `#4d5145` | Filetes y bordes |
-| `--accent` | `#c14022` | `#f79573` | Acento (terracota) |
+| `--accent` | `#b53c20` | `#f79573` | Acento (terracota) |
 | `--accent-ink` | `#fffaf0` | `#25251e` | Tinta sobre relleno de acento |
 | `--soft` | `#eae7dd` | `#30352b` | Pistas y carriles |
 | `--guide` | `#e5e8dc` | `#2a3025` | Superficie de guías |
@@ -131,16 +131,20 @@ Contraste medido sobre los tokens reales:
 | --- | ----- | ------ |
 | `--ink` sobre `--paper` | 13,32:1 | 13,79:1 |
 | `--muted` sobre `--paper` | 5,45:1 | 8,07:1 |
-| `--accent` sobre `--paper-raised` | 5,09:1 | 7,11:1 |
-| `--accent-ink` sobre `--accent` | 5,02:1 | — |
+| `--accent` sobre `--paper-raised` | 5,64:1 | 7,11:1 |
+| `--accent-ink` sobre `--accent` | 5,56:1 | — |
 | `--uvh-danger` sobre `--paper` | 5,68:1 | 9,01:1 |
 
-El acento también es texto sobre `--paper` (etiquetas de botones contorneados, enlaces
-de la barra lateral). El valor anterior medía **4,49:1** ahí, ligeramente por
-debajo del `4,5:1` que exige AA para texto normal, así que el token se ajustó a
-`#c14022`: **4,66:1** sobre `--paper` y 5,09:1 sobre `--paper-raised`, con un
-cambio imperceptible. Si vuelve a tocarse el acento, mide los dos pares: el
-texto sobre placa elevada no acredita el texto sobre el fondo de página.
+El acento también es texto sobre `--paper`, `--soft` y las superficies cálidas
+compuestas (etiquetas de botones contorneados, enlaces de la barra lateral, la
+confirmación de purga sobre `--uvh-danger-soft`). El valor `#c14022` medía
+**4,18:1** sobre la superficie compuesta de la papelera y 4,22:1 sobre `--soft`,
+por debajo del `4,5:1` que exige AA para texto normal — axe lo tumbó en las
+pantallas de purga y papelera —, así que el token se ajustó a `#b53c20`:
+**4,64:1** en el peor par medido y 5,17:1 sobre `--paper`, con un cambio
+imperceptible. Si vuelve a tocarse el acento, mide los pares sobre todas las
+superficies cálidas, no solo sobre placa elevada: el texto sobre placa elevada
+no acredita el texto sobre el fondo de página ni sobre `--soft`.
 
 Además: elementos nativos siempre que sea posible, `aria-label` en botones de
 icono, foco visible con `outline` de 2–3px y `outline-offset`, y verificación en

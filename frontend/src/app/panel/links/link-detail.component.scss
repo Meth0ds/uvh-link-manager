@@ -27,6 +27,91 @@
   }
 }
 
+// A blocked link is the one state where the plate has to lead with the cause and
+// with the single action the owner still has, before any metric.
+.block-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--uvh-danger);
+  border-left-width: 3px;
+  border-radius: 3px;
+  background: var(--uvh-danger-soft);
+  color: var(--uvh-ink);
+
+  .notice-icon {
+    flex: 0 0 auto;
+    color: var(--uvh-danger);
+  }
+
+  .block-copy {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+
+    > b {
+      font-size: 14px;
+    }
+
+    .notice-reason,
+    .notice-help,
+    .appeal-note {
+      margin: 0;
+      color: var(--uvh-muted);
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    .notice-reason {
+      color: var(--uvh-ink);
+    }
+
+    .appeal-state {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 2px 0 0;
+      font-size: 13px;
+
+      mat-icon {
+        width: 17px;
+        height: 17px;
+        font-size: 17px;
+      }
+    }
+
+    // The operator's own words, kept as typed: the note may span lines and is
+    // the answer the owner is reading the notice for.
+    .appeal-decision {
+      margin: 0;
+      max-width: 72ch;
+      color: var(--uvh-ink);
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+
+      > span {
+        display: block;
+        margin-bottom: 2px;
+        color: var(--uvh-muted);
+        font-family: "Courier New", monospace;
+        font-size: 9px;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+      }
+    }
+
+    > button {
+      justify-self: start;
+      margin-top: 4px;
+    }
+  }
+}
+
 // Masthead: a flat plate with hairline frame and eyebrow; no gradient halo.
 .link-hero {
   margin-bottom: 28px;

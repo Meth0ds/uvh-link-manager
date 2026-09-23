@@ -3,14 +3,19 @@ import { readMailLink } from "./mail";
 
 export const E2E_PASSWORD = "Glass-Falcon_Orbit-742!";
 
-export async function registerFromBrowser(page: Page, email: string, name = "Persona E2E"): Promise<void> {
+export async function registerFromBrowser(
+  page: Page,
+  email: string,
+  name = "Persona E2E",
+  password = E2E_PASSWORD,
+): Promise<void> {
   await page.goto("/auth?mode=register");
   await expect(page.getByRole("heading", { name: "Crea tu cuenta en UVH" })).toBeVisible();
   await page.getByLabel("Nombre completo").fill(name);
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Continuar" }).click();
-  await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
-  await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
+  await page.getByLabel("Contraseña", { exact: true }).fill(password);
+  await page.getByLabel("Repite la contraseña").fill(password);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Crear cuenta" }).click();
   await expect(page.getByRole("heading", { name: "Revisa tu email" })).toBeVisible();

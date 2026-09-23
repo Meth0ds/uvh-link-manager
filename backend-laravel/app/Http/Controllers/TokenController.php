@@ -9,6 +9,8 @@ use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\IsoDate;
 use App\Support\MailAdmissionException;
+use App\Support\MfaAttempts;
+use App\Support\MfaFreshness;
 use App\Support\MfaStepUp;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
@@ -134,6 +136,12 @@ class TokenController
         }
         if ($result['status'] === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+        }
+        if ($result['status'] === 'locked') {
+            return MfaAttempts::tooManyResponse($user->id, MfaStepUp::ATTEMPT_PURPOSE);
+        }
+        if ($result['status'] === 'reauth') {
+            return MfaFreshness::reauthenticationRequired();
         }
         if ($result['status'] === 'password') {
             return response()->json(['error' => 'Contraseña incorrecta'], 403);

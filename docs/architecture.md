@@ -201,6 +201,108 @@ apelable: el propietario abre una apelación y un moderador decide restaurar o
 mantener. Restaurar retira las entradas de denylist que aplicaban al destino, de
 modo que una persona puede anular una decisión automática.
 
+### 7 bis.1 Quién es dueño de qué en la consola
+
+La pestaña **Moderación** son tres colas con tres dueños, no una pantalla:
+
+| Cola | Dueño del estado | Dónde |
+|---|---|---|
+| Denuncias (y bloqueo de destino) | `AdminReportsComponent` | `frontend/src/app/panel/admin/admin-reports.component.*` |
+| Apelaciones | `AdminAppealsComponent` | `.../admin-appeals.component.*` |
+| Destinos bloqueados | `AdminDestinationsComponent` | `.../admin-destinations.component.*` |
+
+Cada cola tiene su filtro, su paginación, su estado de carga y error, sus
+acciones y su señal de «hay una acción en vuelo». El contrato entre ellas y la
+consola es de dos líneas y va en una sola dirección:
+
+- `reloadToken` (entrada): la consola dice **cuándo volver a leer**.
+- `changed` (salida): la cola dice **que algo cambió**, sin decidir qué
+  invalida.
+
+La política de refresco vive en un único punto (`AdminComponent::refreshModeration`):
+cualquier decisión de moderación incrementa `moderationRevision` —la entrada que
+escuchan las tres colas— y relee los contadores, la operación y el registro. Así
+una decisión no puede quedar aplicada en una vista y olvidada en otra, y ninguna
+cola necesita saber quién actuó. El contenido de cada pestaña se instancia al
+abrirse, de modo que una cola cerrada no pide nada.
+
+El aspecto compartido tampoco se escribe dos veces: `queue-primitives.scss` y
+`moderation-card.scss` son **bibliotecas de mixins**, no parciales de reglas, y esa
+diferencia es la que hace que la regla se aplique. `@use` compila todo lo que el
+fichero contiene, y la encapsulación de Angular da a cada nodo el atributo del
+componente que lo *declara*: una regla escrita para un nodo proyectado (el
+resumen, la barra de filtros, los chips, las filas) no puede casar en la hoja del
+marco, y una regla del marco (encabezado, vacío, paginador) no puede casar en la
+hoja de una cola. Por eso cada componente incluye exactamente los bloques que
+dibuja —el marco, cuatro; una cola, los suyos—, y los matices (`spaced`,
+`compact`, `boxed`) son modificadores, no copias. El reparto verificado: la hoja
+del marco emite `.empty`, `mat-paginator` y `.section-heading`; las de las colas
+emiten `.filters`, `.badge` y el resumen proyectado; nadie compila lo que no
+puede alcanzar.
+
+`core/date-time-label.ts` es el único formateador de fechas del panel, y lee las
+dos formas que la API manda (ISO 8601 y el texto propio de PostgreSQL, cuyo
+desfase puede venir corto: `+00` → `+00:00`). Decide las dos lecturas que el
+panel usa: `dateTimeLabel` (numérica, con segundos: la consola) y
+`dateTimeMediumLabel` (mes en palabra y sin segundos: cuenta, seguridad,
+papelera, webhooks y detalle de dominio, cada una con su texto de reserva).
+
+### 7 bis.2 Las colas del panel: un motor, un marco, seis declaraciones
+
+`core/queue-paging.ts` (`QueuePaging`) es el **motor de lectura** de una lista
+paginada: qué página está en pantalla, si está llegando, qué falló y qué
+respuesta es la vigente (cancela la anterior al cambiar de pregunta). No sabe
+nada de filas ni de aspecto. Una cola se declara con tres cosas —sus filtros
+(`filters`, que son la identidad de la petición), su lectura (`read`) y el texto
+de reserva si el fallo no trae mensaje— y recibe el resto. `panel/queue-section.component.ts`
+es su **marco de presentación**: encabezado, progreso, aviso con «Reintentar»,
+vacío y paginador. La cola proyecta en él sus cuatro piezas propias
+(`[queue-summary]`, `[queue-actions]`, `[queue-filters]`, `[queue-rows]`).
+
+Con eso, las seis colas que viven en la consola —usuarios, recuperaciones,
+dominios, auditoría, correo y privacidad— son seis declaraciones en
+`AdminComponent`, no seis copias de la misma contabilidad (eran ~150 líneas de
+cargadores, banderas, guardas y manejadores de paginador; ahora son ~90 líneas de
+declaración). El parpadeo del progreso en cada cambio de filtro se cierra con
+`patch` de test en el marco, no cola a cola.
+
+**Quién es dueño de qué** en la consola, tras la pasada:
+
+| Estado | Dueño |
+|---|---|
+| Resumen, operación y su registro de reintentos | `AdminComponent` (no son colas de filas) |
+| Página, banderas, aviso y cancelación de cada lista paginada | `QueuePaging`, una instancia por cola |
+| Cuándo relee la pestaña de moderación | `AdminComponent::refreshModeration` (`moderationRevision`) |
+| Contadores de estado, etiquetas y opciones de filtro | los módulos de vocabulario en `core/*-label.ts` y `core/*-status-label.ts` |
+| Mensaje de un fallo | `core/api-message.ts`: `apiMessage` y su lectura de consola `adminMessage` (un 403 es sesión cerrada) |
+
+Un cambio de comportamiento en la paginación (la regla de cancelar al
+superponerse, qué bandera espera una acción) aterriza ahora en `queue-paging.ts`
+y no en siete sitios.
+
+Del lado del backend, tres piezas tienen también un solo dueño:
+
+- `app/Support/LinkBlockReason.php` responde «por qué se está rechazando este
+  enlace» leyendo la transición más reciente del registro (una decisión de
+  moderación se registra contra la denuncia, de ahí que lea los dos ámbitos).
+- `app/Support/AdminText.php` contiene las reglas del texto libre que firma un
+  operador —UTF-8 válido, sin caracteres de control, con límite— para el motivo de
+  un bloqueo, el de un destino y la nota de una apelación; el mensaje que explica
+  cada rechazo sigue en su endpoint.
+- `app/Support/VisitorAnswer.php` decide **qué se le contesta a un visitante**.
+  Cada desenlace de la puerta —contraseña requerida, formulario caducado,
+  contraseña fuera de rango, incorrecta, acierto, enlace que no resuelve y límite
+  agotado— tiene un método con sus dos caras leídas juntas: la página que ve un
+  navegador y el sobre que recibe un cliente JSON, con los mismos códigos, los
+  mismos cuerpos y las mismas cabeceras del contrato congelado (incluido el
+  `Retry-After` y los `X-RateLimit-*` del limitador, que viajan en las dos). El
+  controlador decide la admisión; el limitador `uvh-unlock` declara el hecho;
+  ninguno de los dos compone el documento, que es de
+  `app/Support/VisitorPage.php`. El acierto responde 200 con su pantalla de
+  continuación y no un 302 porque la política `form-action 'self'` se comprueba en
+  cada salto de un envío de formulario y el destino de un enlace está en otro
+  origen.
+
 ## 8. Decisiones de seguridad destacadas
 
 - Validación de destino: solo `http`/`https`, rechazo de `javascript:`, `data:`, `file:`, credenciales embebidas, CR/LF.

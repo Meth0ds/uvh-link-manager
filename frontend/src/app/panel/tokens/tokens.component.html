@@ -19,7 +19,10 @@
     </mat-form-field>
     <mat-form-field appearance="outline" class="expires">
       <mat-label>Caduca (opcional)</mat-label>
-      <input matInput type="datetime-local" [(ngModel)]="expiresAt" />
+      <input matInput type="datetime-local" [(ngModel)]="expiresAt" [attr.aria-invalid]="expiryInvalid() || null" />
+      @if (expiryInvalid()) {
+        <mat-hint class="err-hint" role="alert">Introduce una fecha y hora válidas.</mat-hint>
+      }
     </mat-form-field>
   </div>
 
@@ -54,7 +57,7 @@
   </div>
 
   <div class="issue-actions">
-    <button mat-flat-button color="primary" type="button" (click)="create()" [disabled]="!name().trim() || !selectedScopes().length || !password() || (user()?.mfaEnabled && !factorCode().trim()) || creating()" [attr.aria-busy]="creating()">
+    <button mat-flat-button color="primary" type="button" (click)="create()" [disabled]="!name().trim() || !selectedScopes().length || !password() || (user()?.mfaEnabled && !factorCode().trim()) || expiryInvalid() || creating()" [attr.aria-busy]="creating()">
       <mat-icon aria-hidden="true">add</mat-icon> {{ creating() ? 'Generando token…' : 'Generar token' }}
     </button>
     <p>El secreto se mostrará una sola vez. Guárdalo fuera del código y de los registros de tu aplicación.</p>

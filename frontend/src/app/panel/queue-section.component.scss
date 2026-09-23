@@ -1,0 +1,12 @@
+// El marco dibuja el encabezado, el aviso, el vacío y el paginador. El resumen,
+// las filas y sus chips los proyecta la cola que los declara, y se estilan allí:
+// la gramática compartida vive en queue-primitives.scss, que cada componente
+// incluye por bloques para que ninguna regla se compile donde no puede casar.
+@use "./queue-primitives.scss" as primitives;
+
+:host { display: block; }
+
+@include primitives.heading;
+@include primitives.notice;
+@include primitives.empty;
+@include primitives.pager;

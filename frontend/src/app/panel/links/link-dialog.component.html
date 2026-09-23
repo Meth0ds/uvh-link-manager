@@ -26,7 +26,7 @@
             </mat-form-field>
             <div class="row">
               <mat-form-field appearance="outline" class="grow">
-                <mat-label>Alias (opcional)</mat-label>
+                <mat-label>{{ isEdit ? "Alias" : "Alias (opcional)" }}</mat-label>
                 <input matInput formControlName="alias" placeholder="mi-enlace" />
                 <mat-icon matPrefix>edit</mat-icon>
                 @if (aliasStatus() === 'available') {
@@ -39,6 +39,7 @@
                   <mat-hint class="err-hint">{{ aliasStatusText() }}</mat-hint>
                 }
                 @if (form.controls.alias.hasError('pattern')) { <mat-error>Usa letras, números, guion o guion bajo.</mat-error> }
+                @if (form.controls.alias.hasError('required')) { <mat-error>El alias no se puede vaciar.</mat-error> }
               </mat-form-field>
               <mat-form-field appearance="outline" class="domain">
                 <mat-label>Dominio</mat-label>
@@ -90,6 +91,7 @@
                 <input matInput formControlName="expiresAt" type="datetime-local" />
                 <mat-icon matPrefix>event_busy</mat-icon>
                 @if (form.controls.expiresAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
+                @if (form.controls.expiresAt.hasError('pastDateTime')) { <mat-error>La expiración debe ser futura: el enlace nacería caducado.</mat-error> }
               </mat-form-field>
             </div>
             @if (form.hasError('lifecycleOrder')) {

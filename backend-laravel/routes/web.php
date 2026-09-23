@@ -17,6 +17,10 @@ Route::get('/r/{alias}', [RedirectController::class, 'resolve'])->middleware('th
 // not compete with anonymous abuse reports or status checks from the same
 // NAT, otherwise unrelated public traffic can deny a valid password attempt.
 Route::post('/r/{alias}/unlock', [RedirectController::class, 'unlock'])->middleware('throttle:uvh-unlock');
+// Un refresco de la pantalla de error —o el botón «atrás» después de un intento
+// fallido— llega aquí como GET, que no tenía ruta: el visitante recibía una
+// página 405 del framework en lugar de su formulario. Devuelve a la puerta.
+Route::get('/r/{alias}/unlock', fn (string $alias) => redirect('/r/'.rawurlencode($alias), 302));
 
 // Canonical public surface: /{alias}.
 Route::get('/{alias}', [RedirectController::class, 'resolve'])->middleware('throttle:uvh-resolve');

@@ -76,7 +76,7 @@ export class PublicThemeTransitionService {
     button.with-label { width: 100%; padding: 12px 16px; }
     button:hover { background: var(--soft, #eae7dd); }
     button:active { transform: scale(.97); }
-    button:focus-visible { outline: 3px solid var(--accent, #c14022); outline-offset: 4px; }
+    button:focus-visible { outline: 3px solid var(--accent, #b53c20); outline-offset: 4px; }
     button[aria-disabled="true"] { cursor: progress; }
     .theme-disc { display: inline-block; font: 25px Georgia, serif; transition: transform 350ms cubic-bezier(.2,.8,.2,1); }
     button[aria-checked="true"] .theme-disc { transform: rotate(180deg); }

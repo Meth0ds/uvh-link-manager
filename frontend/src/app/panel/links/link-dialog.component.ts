@@ -26,6 +26,7 @@ import type { DomainDto, LinkDto, RedirectRule } from "../../core/models";
 import { decodeDomainsResponse } from "../../core/services/domain-response-decoders";
 import { decodeAliasAvailability, decodeLinkResponse, decodeRulesResponse } from "../../core/services/link-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
+import { localDateTimeIso, localDateTimeValue, parseLocalDateTime } from "../../core/strict-wire";
 
 export interface LinkDialogData {
   mode: "create" | "edit";
@@ -58,7 +59,6 @@ function httpUrlValidator(control: AbstractControl): ValidationErrors | null {
 }
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
-const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
 function noControlCharacters(control: AbstractControl): ValidationErrors | null {
   const value = String(control.value ?? "");
@@ -68,58 +68,33 @@ function noControlCharacters(control: AbstractControl): ValidationErrors | null 
 function localDateTimeValidator(control: AbstractControl): ValidationErrors | null {
   const value = String(control.value ?? "");
   if (!value) return null;
-  const match = LOCAL_DATE_TIME.exec(value);
-  if (!match) return { localDateTime: true };
+  return parseLocalDateTime(value) === null ? { localDateTime: true } : null;
+}
 
-  const [, year, month, day, hour, minute] = match.map(Number);
-  if (hour > 23 || minute > 59) return { localDateTime: true };
-
-  // Calendar validity is resolved in UTC: a local parse would move the date
-  // itself around a DST shift and turn a real day into a rejected one.
-  const calendar = new Date(Date.UTC(year, month - 1, day));
-  if (calendar.getUTCFullYear() !== year || calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== day) {
-    return { localDateTime: true };
-  }
-
-  // A wall clock inside a spring-forward gap does not exist in local time, and
-  // the runtime answers `new Date(2026, 2, 29, 2, 30)` in Europe/Madrid with
-  // 03:30 rather than with the value that was asked for. The hour is skipped by
-  // the zone, not rejected by the calendar — and it is a value the browser's own
-  // datetime-local input produces — so the drift it causes is accepted. Every
-  // other difference means the field does not name the moment it displays.
-  const parsed = new Date(year, month - 1, day, hour, minute);
-  const asked = Date.UTC(year, month - 1, day, hour, minute);
-  const answered = Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), parsed.getHours(), parsed.getMinutes());
-  const driftMinutes = Math.round((answered - asked) / 60_000);
-  return driftMinutes >= 0 && driftMinutes <= 180 ? null : { localDateTime: true };
+// Creating a link whose window already closed leaves the user with a dead
+// short link and no signal of why. Edition keeps accepting a past expiry: an
+// expired link must stay editable without being forced to extend its life.
+function futureLocalDateTime(control: AbstractControl): ValidationErrors | null {
+  const instant = parseLocalDateTime(String(control.value ?? ""));
+  return instant !== null && instant <= Date.now() ? { pastDateTime: true } : null;
 }
 
 function lifecycleOrderValidator(control: AbstractControl): ValidationErrors | null {
   const scheduled = control.get("scheduledAt");
   const expires = control.get("expiresAt");
-  if (!scheduled?.value || !expires?.value || scheduled.invalid || expires.invalid) return null;
-  return new Date(scheduled.value).getTime() < new Date(expires.value).getTime()
-    ? null
-    : { lifecycleOrder: true };
+  // Skip only unparseable windows: a readable date still deserves the order
+  // check even when another validator (e.g. a past expiry) already objects.
+  if (!scheduled?.value || !expires?.value || scheduled.hasError("localDateTime") || expires.hasError("localDateTime")) return null;
+  const start = parseLocalDateTime(String(scheduled.value));
+  const end = parseLocalDateTime(String(expires.value));
+  return start !== null && end !== null && start < end ? null : { lifecycleOrder: true };
 }
 
 function integerValidator(control: AbstractControl): ValidationErrors | null {
   return control.value == null || Number.isInteger(control.value) ? null : { integer: true };
 }
 
-function toLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
-function toIso(local: string | null | undefined): string | null {
-  if (!local) return null;
-  const d = new Date(local);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
 
 @Component({
   selector: "app-link-dialog",
@@ -165,7 +140,12 @@ export class LinkDialogComponent {
 
   form = this.fb.nonNullable.group({
     destination: ["", [Validators.required, Validators.maxLength(2048), httpUrlValidator]],
-    alias: ["", [Validators.maxLength(64), Validators.pattern(/^[a-z0-9][a-z0-9_-]{0,63}$/i)]],
+    // The alias identifies the link: editing can rename it but never clear it.
+    alias: ["", [
+      Validators.maxLength(64),
+      Validators.pattern(/^[a-z0-9][a-z0-9_-]{0,63}$/i),
+      ...(this.isEdit ? [Validators.required] : []),
+    ]],
     domainId: [null as number | null],
     fallbackDestination: ["", [Validators.maxLength(2048), httpUrlValidator]],
     password: ["", [Validators.maxLength(72)]],
@@ -173,7 +153,7 @@ export class LinkDialogComponent {
     maxClicks: [null as number | null, [Validators.min(1), Validators.max(10_000_000)]],
     singleUse: [false],
     scheduledAt: ["", [localDateTimeValidator]],
-    expiresAt: ["", [localDateTimeValidator]],
+    expiresAt: ["", [localDateTimeValidator, ...(this.isEdit ? [] : [futureLocalDateTime])]],
     notes: ["", [Validators.maxLength(1000), noControlCharacters]],
     utm: this.fb.nonNullable.group({
       source: ["", [Validators.maxLength(100), noControlCharacters]],
@@ -259,8 +239,8 @@ export class LinkDialogComponent {
       fallbackDestination: link.fallbackDestination ?? "",
       maxClicks: link.maxClicks,
       singleUse: link.singleUse,
-      scheduledAt: toLocalInput(link.scheduledAt),
-      expiresAt: toLocalInput(link.expiresAt),
+      scheduledAt: localDateTimeValue(link.scheduledAt),
+      expiresAt: localDateTimeValue(link.expiresAt),
       notes: link.notes ?? "",
       utm: {
         source: link.utm.source ?? "",
@@ -394,6 +374,11 @@ export class LinkDialogComponent {
   }
 
   async save(): Promise<void> {
+    // The expiry's "future" verdict is time-dependent: an expiry set ahead can
+    // lapse while the dialog sits open. Refreshing the control re-judges it
+    // against the present (and propagates up to re-judge the group), where a
+    // group-level refresh would keep the children's stale verdicts.
+    this.form.controls.expiresAt.updateValueAndValidity({ emitEvent: false });
     const aliasUnavailable = ["checking", "taken", "invalid", "reserved"].includes(this.aliasStatus());
     if (this.destroyRef.destroyed || this.form.invalid || this.hasInvalidRules || aliasUnavailable
       || this.busy() || (this.isEdit && !this.editDetailsLoaded())) return;
@@ -410,14 +395,18 @@ export class LinkDialogComponent {
       // from another browser. New links intentionally have no version.
       ...(this.isEdit ? { version: this.data.link!.version } : {}),
       destination: v.destination?.trim(),
-      alias: v.alias?.trim() || null,
+      // The alias identifies the link: emptying it deletes nothing and the
+      // server refuses it with 422. Editing omits the key instead (absent →
+      // keep current, exactly like `password`); creating asks for a random one
+      // with null.
+      alias: this.isEdit ? (v.alias?.trim() || undefined) : (v.alias?.trim() || null),
       domainId: v.domainId,
       fallbackDestination: v.fallbackDestination?.trim() || null,
       password,
       maxClicks: v.maxClicks,
       singleUse: v.singleUse,
-      scheduledAt: toIso(v.scheduledAt),
-      expiresAt: toIso(v.expiresAt),
+      scheduledAt: localDateTimeIso(v.scheduledAt ?? ""),
+      expiresAt: localDateTimeIso(v.expiresAt ?? ""),
       notes: v.notes?.trim() || null,
       utm: {
         source: v.utm?.source?.trim() || null,
