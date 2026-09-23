@@ -81,6 +81,10 @@ export class DomainDetailComponent {
       this.requests.invalidate();
       this.domain.set(null);
       this.error.set(null);
+      // An action still in flight belongs to the context that left the screen;
+      // its guarded `finally` will not clear the flag here, so the new context
+      // starts unblocked instead of inheriting a stuck busy state.
+      this.actionBusy.set(false);
       if (domainId === null) {
         this.error.set("El identificador del dominio no es válido");
         this.loading.set(false);

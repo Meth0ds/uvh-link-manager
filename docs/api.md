@@ -39,7 +39,7 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 | POST | `/mfa/verify` | — | Completa login MFA con `{ challenge, code }` → `{ user }`. El challenge dura cinco minutos, está ligado a la versión de seguridad y se consume una sola vez. |
 | POST | `/mfa/recovery` | — | Completa el mismo challenge con `{ challenge, code }`; consume atómicamente el challenge y un recovery code de un solo uso. |
 | POST | `/logout` | sesión | Revoca la sesión actual. |
-| POST | `/verify-email` | — | `{ token }` → verifica el email, consume el bearer token y revoca cualquier sesión legacy/preexistente; el acceso posterior exige un login nuevo. |
+| POST | `/verify-email` | — | `{ token, password }` → fija la contraseña definitiva de la cuenta, verifica el email, consume el bearer token y revoca cualquier sesión legacy/preexistente; el acceso posterior exige un login nuevo. La contraseña la establece quien abre el buzón tras la prueba de posesión: una re-registración anónima del registro pendiente nunca llega a ser credencial activa (anti pre-hijack). |
 | POST | `/resend-verification` | — / sesión | Reenvía el correo de verificación con `{ email }` cuando no hay sesión. La respuesta pública es genérica (anti-enumeración) y aplica cooldown de 60 s. |
 | POST | `/forgot-password` | — | `{ email }` → envía enlace (respuesta idéntica siempre, anti-enumeración). |
 | POST | `/reset-password` | — | `{ token, password }` → restablece y revoca sesiones; el token se consume atómicamente y solo puede funcionar una vez. |

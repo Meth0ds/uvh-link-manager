@@ -15,6 +15,7 @@ use App\Support\MailAdmissionException;
 use App\Support\MailDeliveryEligibility;
 use App\Support\MailOutboxDispatcher;
 use App\Support\MailTransportPolicy;
+use App\Support\MfaFreshness;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\ProductionSecurity;
@@ -351,10 +352,10 @@ class AdminController
         if (! AdminText::encodable($reason)) {
             return response()->json(['error' => 'El motivo contiene caracteres no válidos'], 422);
         }
-        if ($action === 'block' && ! AdminText::bounded($reason, 3, 500)) {
+        if ($action === 'block' && ! AdminText::bounded($reason, 3, AdminText::MAX_REASON)) {
             return response()->json(['error' => 'Indica un motivo de entre 3 y 500 caracteres'], 422);
         }
-        if ($action !== 'block' && ! AdminText::bounded($reason, 0, 500)) {
+        if ($action !== 'block' && ! AdminText::bounded($reason, 0, AdminText::MAX_REASON)) {
             return response()->json(['error' => 'El comentario no puede superar 500 caracteres'], 422);
         }
 
@@ -415,7 +416,7 @@ class AdminController
     public function blockLink(Request $request, int $id)
     {
         $reason = trim(UvhRequest::inputString($request, 'reason'));
-        if (! AdminText::bounded($reason, 3, 500)) {
+        if (! AdminText::bounded($reason, 3, AdminText::MAX_REASON)) {
             return response()->json(['error' => 'Motivo requerido'], 422);
         }
 
@@ -1163,9 +1164,11 @@ class AdminController
             || Carbon::parse($session->expires_at)->isPast() || $session->mfa_verified_at === null) {
             return false;
         }
-        $freshMinutes = max(1, min(60, (int) config('uvh.admin_mfa_fresh_minutes', 15)));
 
-        return Carbon::parse($session->mfa_verified_at)->gte(now()->subMinutes($freshMinutes));
+        // The freshness window lives in MfaFreshness alone: a second
+        // definition of its clamp is how two surfaces drift apart the day it
+        // changes.
+        return MfaFreshness::isFresh(Carbon::parse($session->mfa_verified_at));
     }
 
     private function positiveInteger(mixed $value, int $default, int $max): int
@@ -1243,7 +1246,7 @@ class AdminController
             return response()->json(['error' => 'Decisión inválida'], 422);
         }
         $note = trim(UvhRequest::inputString($request, 'note'));
-        if (! AdminText::bounded($note, 0, 500)) {
+        if (! AdminText::bounded($note, 0, AdminText::MAX_REASON)) {
             return response()->json(['error' => 'La nota contiene caracteres no válidos'], 422);
         }
 
@@ -1321,7 +1324,7 @@ class AdminController
     public function blockDestination(Request $request, int $id): JsonResponse
     {
         $reason = trim(UvhRequest::inputString($request, 'reason'));
-        if (! AdminText::bounded($reason, 3, 500)) {
+        if (! AdminText::bounded($reason, 3, AdminText::MAX_REASON)) {
             return response()->json(['error' => 'Motivo requerido'], 422);
         }
         $scope = UvhRequest::inputString($request, 'scope');

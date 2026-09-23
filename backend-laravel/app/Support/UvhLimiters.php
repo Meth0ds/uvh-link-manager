@@ -44,6 +44,13 @@ final class UvhLimiters
         'uvh-security-incident',
         'uvh-credential',
         'uvh-register',
+        // `uvh-unlock` bounds guessing a LINK PASSWORD. The subject it protects
+        // is a credential even though the visitor carrying it is anonymous and
+        // the route is the public redirect surface: a Redis outage must not
+        // hand out a fresh budget against the password of one link. The alias
+        // key is normalised for the same reason — the budget belongs to the
+        // link, not to a spelling of its name.
+        'uvh-unlock',
     ];
 
     /**

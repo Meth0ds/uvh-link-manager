@@ -129,6 +129,9 @@ final class LinkBlockReason
     /**
      * The reason the decision gave, bounded like the field the operator filled.
      *
+     * The bound is `AdminText::MAX_REASON`, the same one the write side
+     * validates with: anything an operator can store, the owner reads whole.
+     *
      * @param  array<string, mixed>  $metadata
      */
     private static function reason(array $metadata): ?string
@@ -140,7 +143,7 @@ final class LinkBlockReason
 
         $reason = trim($reason);
 
-        return $reason === '' ? null : mb_substr($reason, 0, 300);
+        return $reason === '' ? null : mb_substr($reason, 0, AdminText::MAX_REASON);
     }
 
     /**

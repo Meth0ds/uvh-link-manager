@@ -14,6 +14,8 @@ test("registro, verificación por email y login crean una sesión real", async (
   const verificationUrl = await readMailLink(email, "verification");
   await page.goto(verificationUrl);
   await expect(page).toHaveURL(/\/auth\/verify-email$/);
+  await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
+  await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Confirmar mi email" }).click();
   await expect(page.getByRole("heading", { name: "Email verificado" })).toBeVisible();
 

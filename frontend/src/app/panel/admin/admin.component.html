@@ -62,9 +62,10 @@
       </article>
     </section>
 
-    <mat-tab-group animationDuration="180ms" class="admin-tabs">
+    <mat-tab-group animationDuration="180ms" class="admin-tabs" (selectedIndexChange)="openTab($event)">
       <mat-tab aria-label="Usuarios">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">group</mat-icon><span class="tab-label-text">Usuarios</span></ng-template>
+        <ng-template matTabContent>
         <section class="tab-panel">
           <!-- A failed read leaves the previous page on screen for context, but
                nothing on it may act and no total may claim to describe it. -->
@@ -124,10 +125,12 @@
             </div>
           </app-queue-section>
         </section>
+        </ng-template>
       </mat-tab>
 
       <mat-tab aria-label="Recuperación de cuentas">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">support_agent</mat-icon><span class="tab-label-text">Recuperación</span></ng-template>
+        <ng-template matTabContent>
         <section class="tab-panel">
           @let recoveriesRead = recoveries.stale();
           <app-queue-section
@@ -179,10 +182,12 @@
             </div>
           </app-queue-section>
         </section>
+        </ng-template>
       </mat-tab>
 
       <mat-tab aria-label="Moderación">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">flag</mat-icon><span class="tab-label-text">Moderación</span></ng-template>
+        <ng-template matTabContent>
         <section class="tab-panel">
           <!-- The tab is three queues with three owners. Each one keeps its own
                state and actions, and the console is the only place that knows
@@ -191,10 +196,12 @@
           <app-admin-appeals [reloadToken]="moderationRevision()" (changed)="onModerationChanged()" />
           <app-admin-destinations [reloadToken]="moderationRevision()" (changed)="onModerationChanged()" />
         </section>
+        </ng-template>
       </mat-tab>
 
       <mat-tab aria-label="Dominios">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">language</mat-icon><span class="tab-label-text">Dominios</span></ng-template>
+        <ng-template matTabContent>
         <section class="tab-panel">
           <app-queue-section
             title="Dominios de la plataforma"
@@ -219,10 +226,12 @@
             </div>
           </app-queue-section>
         </section>
+        </ng-template>
       </mat-tab>
 
       <mat-tab aria-label="Auditoría">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">history</mat-icon><span class="tab-label-text">Auditoría</span></ng-template>
+        <ng-template matTabContent>
         <section class="tab-panel">
           <app-queue-section
             title="Registro de actividad"
@@ -243,10 +252,12 @@
             </div>
           </app-queue-section>
         </section>
+        </ng-template>
       </mat-tab>
 
       <mat-tab aria-label="Privacidad">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">policy</mat-icon><span class="tab-label-text">Privacidad</span></ng-template>
+        <ng-template matTabContent>
         <section class="tab-panel">
           @let privacyRead = privacy.stale();
           <app-queue-section
@@ -281,10 +292,12 @@
             </div>
           </app-queue-section>
         </section>
+        </ng-template>
       </mat-tab>
 
       <mat-tab aria-label="Sistema">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">monitor_heart</mat-icon><span class="tab-label-text">Sistema</span></ng-template>
+        <ng-template matTabContent>
         <section class="tab-panel system-panel">
           <header class="section-heading"><div><h2>Estado operativo</h2><p>Señales internas para detectar colas detenidas, entregas fallidas o configuración incompleta.</p></div><button mat-stroked-button type="button" (click)="loadOperations(); mail.load()" [disabled]="operationsLoading() || mail.loading()"><mat-icon>refresh</mat-icon>Actualizar</button></header>
           @if (operationsLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando estado operativo" /> }
@@ -328,6 +341,7 @@
             </app-queue-section>
           </section>
         </section>
+        </ng-template>
       </mat-tab>
     </mat-tab-group>
   }

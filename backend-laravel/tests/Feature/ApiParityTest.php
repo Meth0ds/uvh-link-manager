@@ -98,10 +98,10 @@ class ApiParityTest extends TestCase
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain])
+        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
             ->assertStatus(200)->assertJson(['ok' => true]);
         $this->assertNotNull(DB::table('sessions')->where('id', Ids::sha256Hex($staleToken))->value('revoked_at'));
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain])
+        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
             ->assertStatus(400)->assertJson(['error' => 'Token inválido o caducado']);
 
         $login = $this->postJson('/api/v1/auth/login', [
@@ -332,7 +332,7 @@ class ApiParityTest extends TestCase
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain])->assertStatus(200);
+        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])->assertStatus(200);
         $login = $this->postJson('/api/v1/auth/login', [
             'email' => $newEmail,
             'password' => self::PASSWORD,
@@ -455,10 +455,65 @@ class ApiParityTest extends TestCase
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain])
+        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
             ->assertStatus(200)->assertJson(['ok' => true]);
         $login = $this->postJson('/api/v1/auth/login', [
             'email' => 'parked@example.com',
+            'password' => self::PASSWORD,
+            'captchaToken' => 'test-login-passcode',
+        ]);
+        $login->assertStatus(200);
+        $this->assertNotNull($this->cookieFrom($login, 'uvh_session'));
+    }
+
+    public function test_a_later_anonymous_registration_never_installs_the_active_password(): void
+    {
+        // Pre-hijack: the victim registers, an anonymous request re-registers
+        // the same address, and the pending proposal now holds a password the
+        // attacker knows. Activation must not turn that proposal into the
+        // credential: the mailbox opener types the definitive password, so a
+        // replaced proposal is inert whatever order the registrations took.
+        $this->postJson('/api/v1/auth/register', array_merge([
+            'name' => 'Real Owner',
+            'email' => 'target@example.com',
+            'password' => self::PASSWORD,
+        ], $this->captchaPayload()))->assertStatus(201);
+        $this->postJson('/api/v1/auth/register', array_merge([
+            'name' => 'Attacker Name',
+            'email' => 'target@example.com',
+            'password' => 'qx-'.self::PASSWORD,
+        ], $this->captchaPayload()))->assertStatus(201);
+        $user = User::where('email', 'target@example.com')->firstOrFail();
+
+        $plain = 'verify-'.Ids::randomToken(16);
+        DB::table('email_tokens')->insert([
+            'id' => Ids::sha256Hex($plain),
+            'user_id' => $user->id,
+            'kind' => 'verify',
+            'expires_at' => now()->addHour(),
+            'created_at' => now(),
+        ]);
+
+        // The bearer alone no longer activates anything: without the password
+        // its holder establishes, there is nothing to activate the account
+        // with. The token itself stays alive for the real confirmation.
+        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain])
+            ->assertStatus(422)->assertJson(['error' => 'Datos inválidos']);
+        $this->assertNull($user->fresh()->email_verified_at);
+
+        // The mailbox opener chooses the password at activation…
+        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
+            ->assertStatus(200)->assertJson(['ok' => true]);
+
+        // …so the account is theirs: their password opens a session and the
+        // proposal the anonymous request left behind opens nothing.
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'target@example.com',
+            'password' => 'qx-'.self::PASSWORD,
+            'captchaToken' => 'test-login-passcode',
+        ])->assertStatus(401);
+        $login = $this->postJson('/api/v1/auth/login', [
+            'email' => 'target@example.com',
             'password' => self::PASSWORD,
             'captchaToken' => 'test-login-passcode',
         ]);
@@ -1453,7 +1508,7 @@ class ApiParityTest extends TestCase
             'created_at' => now(),
         ]);
 
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain])
+        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
             ->assertStatus(200)->assertJson(['ok' => true]);
 
         $login = $this->postJson('/api/v1/auth/login', [

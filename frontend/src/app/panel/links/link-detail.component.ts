@@ -125,6 +125,10 @@ export class LinkDetailComponent {
       this.loadRequests.invalidate();
       this.analyticsRequests.invalidate();
       this.activityRequests.invalidate();
+      // An action still in flight belongs to the context that left the screen;
+      // its guarded `finally` will not clear the flag here, so the new context
+      // starts unblocked instead of inheriting a stuck busy state.
+      this.actionBusy.set(false);
       // The route can stay mounted while its workspace authorization changes.
       this.link.set(null);
       this.rules.set([]);
@@ -329,7 +333,7 @@ export class LinkDetailComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
-      this.actionBusy.set(false);
+      if (target.isCurrent()) this.actionBusy.set(false);
     }
   }
 

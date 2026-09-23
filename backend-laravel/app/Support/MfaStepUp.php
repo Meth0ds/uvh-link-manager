@@ -16,8 +16,10 @@ use Illuminate\Support\Facades\Hash;
  * past the factor by rotating sessions. Beyond the factor typed now, a fresh
  * window (MfaFreshness) bounds how old the session's own MFA proof may be;
  * surfaces that ARE the refresh (mfa/reauthenticate) pass $requireFreshWindow
- * false. A successful verification refreshes `mfa_verified_at` and restores
- * the full attempt budget.
+ * false. The window is answered BEFORE the password, so a parked session
+ * cannot use these surfaces to ask "is this the current password?": wrong and
+ * right passwords meet the same remediation answer. A successful verification
+ * refreshes `mfa_verified_at` and restores the full attempt budget.
  */
 class MfaStepUp
 {
@@ -38,6 +40,15 @@ class MfaStepUp
         if (MfaAttempts::tooMany($user->id, $attemptPurpose)) {
             return ['status' => 'locked'];
         }
+        // Freshness before any credential check. A parked session must not
+        // learn whether a password is current from these surfaces: it gets the
+        // same `reauth` answer whatever it types, and nothing it sends is
+        // charged to the account budget (the only charged failures are the
+        // ones that reach a credential check on a session allowed to spend it).
+        if ($user->mfa_enabled && $requireFreshWindow && ! MfaFreshness::isFresh($session->mfa_verified_at)) {
+            // null = never verified (legacy 'stale'); past = the window lapsed.
+            return ['status' => $session->mfa_verified_at === null ? 'stale' : 'reauth'];
+        }
         if (! Hash::check($password, $user->password_hash)) {
             MfaAttempts::recordFailure($user->id, $attemptPurpose);
 
@@ -47,10 +58,6 @@ class MfaStepUp
             MfaAttempts::clear($user->id, $attemptPurpose);
 
             return ['status' => 'ok', 'factor' => 'password_only'];
-        }
-        if ($requireFreshWindow && ! MfaFreshness::isFresh($session->mfa_verified_at)) {
-            // null = never verified (legacy 'stale'); past = the window lapsed.
-            return ['status' => $session->mfa_verified_at === null ? 'stale' : 'reauth'];
         }
 
         $factorCode = trim($factorCode);

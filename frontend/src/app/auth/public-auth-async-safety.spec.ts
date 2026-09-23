@@ -258,6 +258,7 @@ describe("public auth views async safety", () => {
     });
     const fixture = TestBed.createComponent(VerifyEmailComponent);
     const component = fixture.componentInstance;
+    component.form.setValue({ password: "Safe-password-123!", confirm: "Safe-password-123!" });
 
     const verification = component.verify();
     fixture.destroy();

@@ -47,6 +47,8 @@ test("un enlace de verificación consumido no puede reutilizarse", async ({ page
   const { verificationUrl } = await registerVerifyAndLogin(page, "single-use-verification");
   await page.goto(verificationUrl);
   const responsePromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/verify-email"));
+  await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
+  await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Confirmar mi email" }).click();
   expect((await responsePromise).status()).toBe(400);
   await expect(page.getByRole("status")).toContainText(/no es válido|caducado|utilizado/i);

@@ -92,10 +92,21 @@ describe("AdminComponent", () => {
     await fixture.whenStable();
   });
 
-  it("loads every operator data source using server pagination", () => {
+  it("loads the open tab's queue and reads a closed one only when its tab opens", async () => {
     expect(component.overview()).toEqual(overview);
     expect(component.operations()).toEqual(operations);
     expect(api.get).toHaveBeenCalledWith("/api/v1/admin/users", jasmine.objectContaining({ page: 1, perPage: 25 }), jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
+    // A closed tab makes no request at all: each queue is read when the tab
+    // that pages it is opened, never before.
+    expect(api.get).not.toHaveBeenCalledWith("/api/v1/admin/audit", jasmine.anything(), jasmine.anything(), jasmine.anything());
+
+    // One more cycle so the end of the first paint reaches the DOM.
+    fixture.detectChanges();
+    const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]');
+    (tabs[4] as HTMLElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
     expect(api.get).toHaveBeenCalledWith("/api/v1/admin/audit", jasmine.objectContaining({ page: 1, perPage: 50 }), jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
   });
 

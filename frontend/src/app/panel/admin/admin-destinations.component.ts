@@ -87,9 +87,13 @@ export class AdminDestinationsComponent {
    * The answer says how many links were released, because that is the effect the
    * operator just caused: the links are re-evaluated and only the ones with no
    * remaining ground come back.
+   *
+   * A stale page may not act: its rows describe entries the current read could
+   * not confirm (a reload in flight, or one that failed), and withdrawing one
+   * of them would decide against a list the operator cannot see.
    */
   async withdraw(entry: AdminDestinationEntry): Promise<void> {
-    if (this.busy()) return;
+    if (this.entries.stale() || this.busy()) return;
     const confirmed = await this.actions.confirm({
       title: "Retirar el bloqueo",
       message: entry.match_kind === "host"
@@ -98,7 +102,7 @@ export class AdminDestinationsComponent {
       confirmLabel: "Retirar entrada",
       destructive: true,
     });
-    if (!confirmed || this.busy()) return;
+    if (!confirmed || this.entries.stale() || this.busy()) return;
     this.busy.set(true);
     try {
       const result = await this.api.delete(`/api/v1/admin/destinations/${entry.id}`, undefined, decodeDestinationRemoval);

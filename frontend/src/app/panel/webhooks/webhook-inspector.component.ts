@@ -151,7 +151,8 @@ export class WebhookInspectorComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo enviar la prueba", "Cerrar", { duration: 5000 });
     } finally {
-      this.actionId.set(null);
+      // Only the operation that still owns the flag may clear it.
+      if (this.actionId() === 0) this.actionId.set(null);
     }
   }
 
@@ -166,7 +167,8 @@ export class WebhookInspectorComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo programar el reenvío", "Cerrar", { duration: 5000 });
     } finally {
-      this.actionId.set(null);
+      // Only the operation that still owns the flag may clear it.
+      if (this.actionId() === delivery.id) this.actionId.set(null);
     }
   }
 

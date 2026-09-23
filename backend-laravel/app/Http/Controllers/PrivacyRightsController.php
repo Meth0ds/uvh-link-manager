@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\MailAdmissionException;
+use App\Support\MfaFreshness;
 use App\Support\OperationalMetrics;
 use App\Support\UvhCrypto;
 use App\Support\UvhMail;
@@ -470,9 +471,11 @@ final class PrivacyRightsController
             || Carbon::parse($session->expires_at)->isPast() || $session->mfa_verified_at === null) {
             return false;
         }
-        $freshMinutes = max(1, min(60, (int) config('uvh.admin_mfa_fresh_minutes', 15)));
 
-        return Carbon::parse($session->mfa_verified_at)->gte(now()->subMinutes($freshMinutes));
+        // The freshness window lives in MfaFreshness alone: a second
+        // definition of its clamp is how two surfaces drift apart the day it
+        // changes.
+        return MfaFreshness::isFresh(Carbon::parse($session->mfa_verified_at));
     }
 
     private function validBody(string $body, bool $required): string|false

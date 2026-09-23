@@ -21,12 +21,15 @@ final class UvhLimitersTest extends TestCase
 
     private const ROUTES = 'backend-laravel/routes/api.php';
 
+    /** `uvh-unlock` guards a route of the public redirect surface (`web.php`). */
+    private const WEB_ROUTES = 'backend-laravel/routes/web.php';
+
     private const BOOTSTRAP = 'backend-laravel/bootstrap/app.php';
 
     public function test_every_credential_limiter_is_registered_and_used_by_a_route(): void
     {
         $provider = RepositoryRoot::read(self::PROVIDER);
-        $routes = RepositoryRoot::read(self::ROUTES);
+        $routes = RepositoryRoot::read(self::ROUTES).RepositoryRoot::read(self::WEB_ROUTES);
 
         $this->assertNotSame([], UvhLimiters::SECURITY);
 

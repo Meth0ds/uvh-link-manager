@@ -17,6 +17,13 @@ final class AdminText
     /** Control characters that no legitimate reason or note contains. */
     private const CONTROL = '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u';
 
+    /**
+     * The longest reason or note an operator can supply, shared by the writer
+     * that accepts one and the reader that prints it back: a trail the reader
+     * had to silently shorten was a different reason than the one recorded.
+     */
+    public const MAX_REASON = 500;
+
     /** Whether the value can be stored and printed back. */
     public static function encodable(string $value): bool
     {

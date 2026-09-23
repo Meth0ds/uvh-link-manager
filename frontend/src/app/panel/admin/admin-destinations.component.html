@@ -24,7 +24,7 @@
         <span data-label="Motivo" class="entry-reason">{{ entry.reason }}</span>
         <time data-label="Alta">{{ formatDate(entry.created_at) }}</time>
         <time data-label="Caduca">{{ entry.expires_at ? formatDate(entry.expires_at) : "Sin caducidad" }}</time>
-        <button mat-stroked-button class="danger-button" type="button" (click)="withdraw(entry)" [disabled]="busy()" [attr.aria-label]="'Retirar el bloqueo de ' + entry.match_value">
+        <button mat-stroked-button class="danger-button" type="button" (click)="withdraw(entry)" [disabled]="entries.stale() || busy()" [attr.aria-label]="'Retirar el bloqueo de ' + entry.match_value">
           <mat-icon aria-hidden="true">delete_outline</mat-icon>Retirar
         </button>
       </article>

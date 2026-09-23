@@ -3,11 +3,17 @@
 namespace Tests\Feature;
 
 use App\Cache\UvhRateLimiter;
+use App\Models\User;
+use App\Support\Ids;
+use App\Support\SessionManager;
+use App\Support\UvhCrypto;
 use App\Support\UvhLimiters;
 use Illuminate\Cache\Events\CacheFailedOver;
 use Illuminate\Cache\RateLimiter;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\WithEnvironmentVariable;
 use Tests\TestCase;
@@ -28,6 +34,8 @@ use Tests\TestCase;
 final class SecurityLimiterStoreTest extends TestCase
 {
     private const CSRF = 'limiter-split-csrf';
+
+    private const MFA_PASSWORD = 'tiovivo-cobrizo-astilla-42';
 
     protected function setUp(): void
     {
@@ -168,6 +176,97 @@ final class SecurityLimiterStoreTest extends TestCase
 
         $this->attemptLogin()->assertStatus(401);
         $this->attemptLogin()->assertStatus(429);
+    }
+
+    /**
+     * The account-wide step-up budget (`MfaAttempts`) is not a middleware
+     * limiter, and the global `RateLimiter` facade it once counted on is bound
+     * to the availability store on purpose. Its counters must land on the
+     * security store like every other credential budget — and stay exactly
+     * there while the availability chain is down.
+     */
+    #[WithEnvironmentVariable('CACHE_LIMITER', 'failover')]
+    #[WithEnvironmentVariable('CACHE_FAILOVER_STORES', 'redis,database')]
+    public function test_the_mfa_attempt_budget_counts_on_the_security_store(): void
+    {
+        config(['cache.limiter_security' => 'database']);
+        $user = $this->mfaUser();
+        $this->useSession($user);
+
+        // The preferred member of the availability chain dies first, exactly
+        // like the failover drill: loopback port 1 refuses immediately.
+        $fallbacks = [];
+        Event::listen(CacheFailedOver::class, function () use (&$fallbacks): void {
+            $fallbacks[] = true;
+        });
+        config([
+            'database.redis.cache.url' => null,
+            'database.redis.cache.host' => '127.0.0.1',
+            'database.redis.cache.port' => 1,
+            'database.redis.cache.password' => null,
+        ]);
+
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $this->attemptStepUpFailure()->assertStatus(403);
+        }
+
+        // One purpose counter and one account-wide counter, each with its
+        // window anchor, hit once per failure: four rows in the durable store,
+        // exactly where an outage cannot reset them. Counting on the facade
+        // would have left this table empty — the test cache is not the durable
+        // store.
+        // The store prefixes its rows, so the counters are located by their own
+        // marker rather than by a literal row name.
+        $keys = DB::table('cache')->pluck('key')->all();
+        $budget = [];
+        foreach ($keys as $key) {
+            $position = strpos($key, 'uvh:mfa:attempts:');
+            if ($position !== false) {
+                $budget[] = substr($key, $position);
+            }
+        }
+        sort($budget);
+        $this->assertSame([
+            'uvh:mfa:attempts:global:'.$user->id,
+            'uvh:mfa:attempts:global:'.$user->id.':timer',
+            'uvh:mfa:attempts:stepup:'.$user->id,
+            'uvh:mfa:attempts:stepup:'.$user->id.':timer',
+        ], $budget, 'the MFA attempt budget did not count on the security store: '.json_encode($keys));
+
+        // And the credential path never consulted the availability chain: had
+        // it done so, these failures would have started from zero on the
+        // failover store and a failover event would have been recorded.
+        $this->assertSame([], $fallbacks, 'the MFA attempt budget consulted the availability chain');
+    }
+
+    /** An MFA account whose factor can only fail, for the budget probes. */
+    private function mfaUser(): User
+    {
+        $user = User::factory()->create(['password_hash' => Hash::make(self::MFA_PASSWORD)]);
+        $user->forceFill([
+            'email_verified_at' => now(),
+            'mfa_enabled' => true,
+            'mfa_secret' => UvhCrypto::encryptAtRest('JBSWY3DPEHPK3PXP'),
+            // Never present in any probe below, so no attempt can succeed.
+            'recovery_codes' => [Ids::sha256Hex('ABCDEFGH2345678J')],
+        ])->save();
+
+        return $user->refresh();
+    }
+
+    /** A distinct real session row, hydrated exactly like the middleware does. */
+    private function useSession(User $user): void
+    {
+        $token = SessionManager::create($user->id, Request::create('/'), (int) $user->security_version, mfaVerified: true);
+        $this->withCookie('uvh_session', $token);
+    }
+
+    private function attemptStepUpFailure(): TestResponse
+    {
+        return $this->postJson('/api/v1/auth/mfa/recovery-codes/regenerate', [
+            'password' => self::MFA_PASSWORD,
+            'factorCode' => 'ZZZZZZZZ2222YYYY',
+        ]);
     }
 
     private function attemptLogin(): TestResponse

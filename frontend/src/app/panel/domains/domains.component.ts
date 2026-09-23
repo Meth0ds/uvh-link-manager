@@ -170,7 +170,9 @@ export class DomainsComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo añadir el dominio", "Cerrar", { duration: 4000 });
     } finally {
-      this.adding.set(false);
+      // Only the context that started the create may clear its flag; the
+      // workspace-switch reset owns the stale case.
+      if (target.isCurrent()) this.adding.set(false);
     }
   }
 
@@ -291,7 +293,9 @@ export class DomainsComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.actionId.set(null);
+      // Only the operation that still owns the flag may clear it: a stale
+      // action landing late must not re-enable the rows of a newer one.
+      if (target.isCurrent() && this.actionId() === d.id) this.actionId.set(null);
     }
   }
 
@@ -313,7 +317,9 @@ export class DomainsComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.actionId.set(null);
+      // Only the operation that still owns the flag may clear it: a stale
+      // action landing late must not re-enable the rows of a newer one.
+      if (target.isCurrent() && this.actionId() === d.id) this.actionId.set(null);
     }
   }
 

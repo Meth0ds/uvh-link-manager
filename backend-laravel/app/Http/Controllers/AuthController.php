@@ -549,20 +549,39 @@ class AuthController
         return response()->json(['ok' => true])->withCookie(SessionManager::clearCookie());
     }
 
+    /**
+     * Activate a pending registration: mailbox proof (the bearer) plus the
+     * password typed NOW, which becomes the account's credential.
+     *
+     * The password is established here — after the mailbox proof — and never
+     * taken from the pending registration. A later anonymous `register` may
+     * have replaced that proposal (by design: the last pending registration
+     * wins so a parked address cannot dead-end its owner), and without this the
+     * email token alone would activate whatever that request left behind: the
+     * classic pre-hijack, where the attacker registers the victim's address
+     * first or last and waits for the victim to click. Here the mailbox opener
+     * decides the definitive password, so a replaced proposal is inert.
+     */
     public function verifyEmail(Request $request)
     {
         $token = UvhRequest::inputString($request, 'token');
-        if ($token === '' || strlen($token) > 256) {
-            return response()->json(['error' => 'Token inválido'], 422);
+        $password = UvhRequest::inputString($request, 'password');
+        if ($token === '' || strlen($token) > 256 || ! $this->validPassword($password)) {
+            return response()->json(['error' => 'Datos inválidos'], 422);
+        }
+        if (! PasswordStrength::isAcceptable($password)) {
+            // Deliberately generic, exactly like register and reset-password.
+            return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
         }
 
+        $passwordHash = Hash::make($password);
         $tokenHash = Ids::sha256Hex($token);
         $snapshot = EmailToken::where('id', $tokenHash)
             ->where('kind', 'verify')->whereNull('used_at')->first(['id', 'user_id']);
         // User first, bearer second is the global lifecycle lock order. The
         // preflight row is untrusted and every property is checked again under
         // lock, so replacement or consumption races fail closed.
-        $userId = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): ?int {
+        $userId = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password): ?int {
             $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
             $row = EmailToken::where('id', $tokenHash)
                 ->where('user_id', $snapshot->user_id)
@@ -577,10 +596,24 @@ class AuthController
             if (! $user || $user->deleted_at || $user->email_verified_at) {
                 return null;
             }
+            if (! PasswordStrength::isAcceptable($password, $user->name, $user->email)) {
+                // Re-evaluate with the live account identity while its row is
+                // locked. An activation must not accept a password derived from
+                // the name or mailbox merely because the anonymous preflight
+                // could not know that context (same contract as reset-password).
+                return -1;
+            }
 
             $now = now();
             $row->update(['used_at' => $now]);
-            $user->update(['email_verified_at' => $now, 'updated_at' => $now]);
+            $user->update([
+                'email_verified_at' => $now,
+                'password_hash' => $passwordHash,
+                // The credential was just settled, so every generation binds to
+                // this one — same hygiene as reset-password.
+                'security_version' => (int) $user->security_version + 1,
+                'updated_at' => $now,
+            ]);
             // A legacy deployment may have issued a session before email
             // verification became mandatory. Revoke all of them now; merely
             // waiting for a stale cookie to be used could resurrect it after
@@ -589,6 +622,9 @@ class AuthController
 
             return (int) $user->id;
         }) : null;
+        if ($userId === -1) {
+            return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
+        }
         if ($userId === null) {
             return response()->json(['error' => 'Token inválido o caducado'], 400);
         }
@@ -2314,6 +2350,12 @@ class AuthController
      * address again. Only the mailbox owner can ever complete either version
      * (the verification bearer lands in their inbox), so the last pending
      * registration wins and every bearer of the replaced one dies with it.
+     *
+     * The password written here is a PROPOSAL, never an activatable credential:
+     * `verifyEmail` establishes the definitive password from the mailbox
+     * opener's own input, so a replacement cannot install one the owner does
+     * not know. What the proposal does authenticate is
+     * `changeRegistrationEmail`, the correction of a mistyped address.
      *
      * @return array{status: string, user_id: int|null}
      */

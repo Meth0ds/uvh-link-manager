@@ -138,7 +138,11 @@ export class LinkTrashComponent {
       await this.load();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo borrar definitivamente", "Cerrar", { duration: 5000 });
-    } finally { this.actionId.set(null); }
+    } finally {
+      // Only the operation that still owns the flag may clear it: a stale
+      // `purge` landing late must not re-enable the rows of a newer action.
+      if (target.isCurrent() && this.actionId() === row.link.id) this.actionId.set(null);
+    }
   }
 
   formatDate(value: string): string { return dateTimeMediumLabel(value); }

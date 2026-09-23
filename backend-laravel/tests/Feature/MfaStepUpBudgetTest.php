@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Support\Ids;
+use App\Support\MfaAttempts;
 use App\Support\SessionManager;
 use App\Support\UvhCrypto;
 use Illuminate\Http\Request;
@@ -110,6 +111,70 @@ final class MfaStepUpBudgetTest extends TestCase
         );
     }
 
+    /**
+     * The parked-session answer must not depend on the password: a stale
+     * session that could tell "wrong password" from "lapsed window" would be
+     * asking these surfaces "is this the current password?". Every probe below
+     * carries a VALID factor and a wrong password, and must meet the same
+     * remediation answer — and charge nothing to the account budget.
+     */
+    public function test_a_parked_session_cannot_ask_is_this_the_password(): void
+    {
+        $codes = ['QRS2TUV3WXYZ4567', 'JKLMNPQR8ABCDEFG', 'HJKMNPQR2ABCDE34'];
+        $user = $this->mfaUser($codes);
+        $sessionId = $this->useSession($user);
+        DB::table('sessions')->where('id', $sessionId)
+            ->update(['mfa_verified_at' => now()->subMinutes(30)]);
+
+        for ($attempt = 0; $attempt < MfaAttempts::LIMIT; $attempt++) {
+            $this->regenerate($codes[0], 'la-contraseña-que-no-es')
+                ->assertStatus(403)
+                ->assertJsonPath('details.reason', 'mfa_reauthentication_required');
+        }
+
+        // Not one probe was charged: a fresh session still spends a real
+        // step-up. Had they been, the per-purpose cap would answer 429 here.
+        $this->useSession($user);
+        $this->regenerate($codes[2])->assertStatus(200)->assertJsonStructure(['recoveryCodes']);
+    }
+
+    /**
+     * Two levels, one account: a spent purpose leaves its siblings their own
+     * allowance (the operational isolation), while the account-wide level
+     * bounds the total — changing surfaces multiplies no guessing budget.
+     */
+    public function test_the_attempt_budget_is_shared_across_purposes(): void
+    {
+        $user = $this->mfaUser(['ABCDEFGH2345678J']);
+
+        foreach (['totp', 'recovery'] as $purpose) {
+            for ($attempt = 0; $attempt < MfaAttempts::LIMIT; $attempt++) {
+                MfaAttempts::recordFailure($user->id, $purpose);
+            }
+        }
+
+        // The step-up purpose bucket is pristine, but the account-wide one is
+        // spent: the surface refuses before checking anything at all.
+        $this->useSession($user);
+        $this->regenerate('ABCDEFGH2345678J')->assertStatus(429)
+            ->assertHeader('Retry-After')
+            ->assertJsonPath('error', 'Demasiados intentos. Espera unos minutos.');
+    }
+
+    public function test_a_spent_purpose_leaves_its_siblings_their_own_allowance(): void
+    {
+        $user = $this->mfaUser(['KLMNPQR23456789A']);
+
+        for ($attempt = 0; $attempt < MfaAttempts::LIMIT; $attempt++) {
+            MfaAttempts::recordFailure($user->id, 'totp');
+        }
+
+        // Half the account-wide allowance is spent on another surface; this
+        // one still operates with its own bucket.
+        $this->useSession($user);
+        $this->regenerate('KLMNPQR23456789A')->assertStatus(200)->assertJsonStructure(['recoveryCodes']);
+    }
+
     /** @param array<int, string> $recoveryCodes */
     private function mfaUser(array $recoveryCodes): User
     {
@@ -133,10 +198,10 @@ final class MfaStepUpBudgetTest extends TestCase
         return Ids::sha256Hex($token);
     }
 
-    private function regenerate(string $factorCode)
+    private function regenerate(string $factorCode, string $password = self::PASSWORD)
     {
         return $this->postJson('/api/v1/auth/mfa/recovery-codes/regenerate', [
-            'password' => self::PASSWORD,
+            'password' => $password,
             'factorCode' => $factorCode,
         ]);
     }

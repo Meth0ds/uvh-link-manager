@@ -100,6 +100,9 @@ export class AdminComponent {
   // The console's own sources: the two snapshots above the tabs and the guards
   // that keep a late answer from landing on a newer one.
   private readonly reloadRequests = new LatestRequest(this.destroyRef);
+
+  /** Tabs opened at least once; a closed one makes no request at all. */
+  private readonly openedTabs = new Set<number>();
   private readonly overviewRequests = new LatestRequest(this.destroyRef);
   private readonly operationsRequests = new LatestRequest(this.destroyRef);
 
@@ -256,7 +259,36 @@ export class AdminComponent {
   readonly formatDate = dateTimeLabel;
 
   constructor() {
-    void this.reloadAll();
+    void this.start();
+  }
+
+  /**
+   * The first paint: the two snapshots above the tabs and the queue of the tab
+   * that is already open. Every other queue reads nothing until its tab is
+   * opened, and the moderation queues read when their tab first instantiates —
+   * a closed tab asks for nothing.
+   */
+  private async start(): Promise<void> {
+    this.openTab(0);
+    await Promise.all([this.loadOverview(), this.loadOperations()]);
+    this.initialLoading.set(false);
+  }
+
+  /** Tab position to the queue it pages; moderation owns its queues inside its own lazy content. */
+  private queueForTab(index: number): { load: () => Promise<void> } | null {
+    const queues: Array<{ load: () => Promise<void> } | null> = [
+      this.users, this.recoveries, null, this.domains, this.audit, this.privacy, this.mail,
+    ];
+
+    return queues[index] ?? null;
+  }
+
+  /** A tab reads its queue once, when first opened. */
+  openTab(index: number): void {
+    if (this.openedTabs.has(index)) return;
+    this.openedTabs.add(index);
+    const queue = this.queueForTab(index);
+    if (queue) void queue.load();
   }
 
   async reloadAll(): Promise<void> {

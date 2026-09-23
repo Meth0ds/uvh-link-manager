@@ -49,7 +49,9 @@ async function expectSameAnswers(responses: APIResponse[], status: number): Prom
 
 async function verifyThroughMail(request: APIRequestContext, email: string): Promise<void> {
   const token = new URL(await readMailLink(email, "verification")).hash.replace("#token=", "");
-  expect((await api(request, "/api/v1/auth/verify-email", { token })).status()).toBe(200);
+  // Activation establishes the definitive password, typed by the mailbox
+  // owner alongside the bearer.
+  expect((await api(request, "/api/v1/auth/verify-email", { token, password: E2E_PASSWORD })).status()).toBe(200);
 }
 
 test("el registro contesta igual sea libre, ocupada o verificada la dirección", async ({ request }) => {
@@ -135,8 +137,12 @@ test("la pre-ocupación termina con el relevo del buzón, sin atajos para el que
   expect(owner.status()).toBe(201);
   expect(await owner.text()).toBe(parkedBytes);
 
-  // El enlace más reciente es el del dueño y completa el registro.
+  // El enlace más reciente es el del dueño, que completa el registro con la
+  // contraseña que elige al abrir su buzón: la propuesta sustituida por el
+  // atacante nunca llega a ser credencial activa.
   await page.goto(await readMailLink(email, "verification"));
+  await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
+  await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Confirmar mi email" }).click();
   await expect(page.getByRole("heading", { name: "Email verificado" })).toBeVisible();
 

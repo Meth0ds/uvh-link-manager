@@ -284,7 +284,9 @@ export class LinksComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
-      this.actionId.set(null);
+      // Only the operation that still owns the flag may clear it: a stale
+      // `remove` landing late must not re-enable the rows of a newer action.
+      if (target.isCurrent() && this.actionId() === link.id) this.actionId.set(null);
     }
   }
 

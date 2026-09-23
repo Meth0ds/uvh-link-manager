@@ -49,6 +49,10 @@ export async function registerVerifyAndLogin(
   await registerFromBrowser(page, email);
   const verificationUrl = await readMailLink(email, "verification");
   await page.goto(verificationUrl);
+  // Confirmation establishes the account's definitive password, chosen by
+  // whoever opens the mailbox, so the form asks for it here.
+  await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
+  await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Confirmar mi email" }).click();
   await expect(page.getByRole("heading", { name: "Email verificado" })).toBeVisible();
   await loginFromBrowser(page, email);

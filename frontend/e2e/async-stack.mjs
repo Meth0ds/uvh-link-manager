@@ -26,7 +26,7 @@ import { schedulerRecoveryDrill } from "./async/drills/scheduler-recovery.mjs";
 import { check, results, until } from "./async/expect.mjs";
 import { attemptsFor, fixture, messagesFor, setState, tokenFromUrl } from "./async/fixtures.mjs";
 import { brokerLossDrill, queueDepthDrill } from "./async/redis.mjs";
-import { api } from "./async/session.mjs";
+import { api, password } from "./async/session.mjs";
 import { control, docker, inspect, schedulerDeadlineMs } from "./async/topology.mjs";
 
 async function main() {
@@ -131,7 +131,7 @@ async function main() {
 
       const messages = await messagesFor(retry.email);
       const token = messages.map((message) => tokenFromUrl(message.raw)).find(Boolean) ?? null;
-      const verified = token ? await api("POST", "/api/v1/auth/verify-email", { json: { token } }) : { status: 0 };
+      const verified = token ? await api("POST", "/api/v1/auth/verify-email", { json: { token, password } }) : { status: 0 };
       check("mail retry: the retried message is still usable", verified.status === 200, `HTTP ${verified.status}`);
     }
   }
