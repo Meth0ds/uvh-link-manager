@@ -26,6 +26,11 @@
 // invalida lo que venga detrás: no se ejecuta PHPUnit sobre un árbol que no pasa
 // Pint ni Larastan, y no se compila un frontend que no pasa Karma.
 //
+// La instalación va dentro (`npm ci`, `composer install`) porque la CI la hace
+// y sin ella «checkout limpio + este script» no reproduce nada: se validarían
+// un `node_modules` y un `vendor` viejos, y el árbol daría verde con
+// dependencias que un checkout fresco no instalaría.
+//
 // Las pruebas de backend **son destructivas** para la base objetivo y el guard
 // de `TestCase` exige un nombre terminado en `_test`. Por eso el destino es
 // `uvh_test`, se migra desde cero (igual que la CI, para que el esquema exista
@@ -75,6 +80,13 @@ function chromeBin() {
 const steps = [
   {
     half: "frontend",
+    name: "Frontend / instalación desde el lockfile",
+    command: "npm",
+    args: ["ci"],
+    cwd: join(root, "frontend"),
+  },
+  {
+    half: "frontend",
     name: "Frontend / audit de dependencias",
     command: "npm",
     args: ["audit", "--audit-level=moderate"],
@@ -114,6 +126,11 @@ const steps = [
     half: "backend",
     name: "Backend / composer validate",
     compose: ["run", "--rm", "php", "composer", "validate", "--strict", "--no-check-publish"],
+  },
+  {
+    half: "backend",
+    name: "Backend / instalación desde el lockfile",
+    compose: ["run", "--rm", "php", "composer", "install", "--no-interaction", "--prefer-dist", "--no-progress"],
   },
   {
     half: "backend",

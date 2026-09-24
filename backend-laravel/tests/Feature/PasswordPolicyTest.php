@@ -125,7 +125,14 @@ class PasswordPolicyTest extends TestCase
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => 'tiovivo-cobrizo-astilla-42'])->assertStatus(200);
+        $this->postJson('/api/v1/auth/verify-email', [
+            'token' => $plain,
+            'password' => 'tiovivo-cobrizo-astilla-42',
+            'name' => 'Contract User',
+            'acceptTerms' => true,
+            'termsVersion' => '2026-08-30',
+            'privacyVersion' => '2026-08-30',
+        ])->assertStatus(200);
 
         $login = $this->postJson('/api/v1/auth/login', [
             'email' => 'charlie@example.com',

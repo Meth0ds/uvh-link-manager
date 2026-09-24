@@ -110,11 +110,11 @@ export class LinkTrashComponent {
     const action = this.mutations.begin(row.link.id);
     try {
       await this.api.post(`/api/v1/links/${row.link.id}/restore`);
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Enlace restaurado", "Cerrar", { duration: 2500 });
       await this.load();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo restaurar", "Cerrar", { duration: 4500 });
     } finally { this.mutations.settle(action); }
   }
@@ -142,10 +142,15 @@ export class LinkTrashComponent {
     const action = this.mutations.begin(row.link.id);
     try {
       await this.api.post(`/api/v1/links/${row.link.id}/purge`, { password: this.password(), factorCode: this.factorCode().trim(), confirmation: this.confirmation() });
+      // Quién publica el resultado es la operación que lo consiguió: una
+      // operación vieja que llega tarde no cierra el diálogo de una nueva, no
+      // muestra su snackbar y no provoca su reload (ver `OwnedMutations`).
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.closePurge();
       this.snackbar.open("Enlace borrado definitivamente", "Cerrar", { duration: 3000 });
       await this.load();
     } catch (err) {
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo borrar definitivamente", "Cerrar", { duration: 5000 });
     } finally {
       // Only the operation that still owns the slot may clear it: a stale

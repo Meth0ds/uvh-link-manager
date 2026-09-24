@@ -154,9 +154,14 @@ export class WebhookInspectorComponent {
     const action = this.mutations.begin(0);
     try {
       await this.api.post(`/api/v1/webhooks/${webhook.id}/test`);
+      // Quién publica el resultado es la operación que lo consiguió: una
+      // operación vieja que llega tarde no dispara el reload del inspector
+      // nuevo (el cambio de contexto ya hizo `reset()` del hueco).
+      if (!this.mutations.isCurrent(action)) return;
       this.snackbar.open("Ping admitido en la cola", "Cerrar", { duration: 3000 });
       await this.load(1);
     } catch (err) {
+      if (!this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo enviar la prueba", "Cerrar", { duration: 5000 });
     } finally {
       // Only the operation that still owns the slot may clear it.
@@ -170,9 +175,11 @@ export class WebhookInspectorComponent {
     const action = this.mutations.begin(delivery.id);
     try {
       await this.api.post(`/api/v1/webhooks/${webhook.id}/deliveries/${delivery.id}/resend`);
+      if (!this.mutations.isCurrent(action)) return;
       this.snackbar.open("Entrega pendiente en la cola", "Cerrar", { duration: 3000 });
       await this.load(this.page());
     } catch (err) {
+      if (!this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo programar el reenvío", "Cerrar", { duration: 5000 });
     } finally {
       // Only the operation that still owns the slot may clear it.

@@ -34,7 +34,9 @@ export async function mailChain() {
   const token = tokenFromUrl(message.raw);
   check("mail: accepted message carries a verification bearer", Boolean(token));
 
-  const verified = await api("POST", "/api/v1/auth/verify-email", { json: { token, password } });
+  const verified = await api("POST", "/api/v1/auth/verify-email", {
+    json: { token, password, name: "Persona E2E", acceptTerms: true, termsVersion: "2026-08-30", privacyVersion: "2026-08-30" },
+  });
   check("mail: bearer from the provider verifies the account", verified.status === 200, `HTTP ${verified.status}`);
 
   // Delivered rows erase their envelope, so this read is addressed by kind

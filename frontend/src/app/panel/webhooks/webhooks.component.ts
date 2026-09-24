@@ -242,10 +242,10 @@ export class WebhooksComponent {
     const action = this.mutations.begin(w.id);
     try {
       await this.api.patch(`/api/v1/webhooks/${w.id}`, { active: !w.active });
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       void this.load();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.mutations.settle(action);
@@ -259,10 +259,10 @@ export class WebhooksComponent {
     const action = this.mutations.begin(w.id);
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/test`);
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Ping admitido en la cola. Consulta el inspector para ver su entrega.", "Cerrar", { duration: 4500 });
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.mutations.settle(action);
@@ -284,11 +284,11 @@ export class WebhooksComponent {
     const action = this.mutations.begin(w.id);
     try {
       await this.api.delete(`/api/v1/webhooks/${w.id}`);
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.webhooks.update((list) => list.filter((x) => x.id !== w.id));
       this.snackbar.open("Webhook eliminado", "Cerrar", { duration: 2500 });
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.mutations.settle(action);
@@ -336,11 +336,11 @@ export class WebhooksComponent {
     const action = this.mutations.begin(w.id);
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/deliveries/${deliveryId}/resend`);
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Reenvío programado", "Cerrar", { duration: 2500 });
       this.deliveries.update((d) => ({ ...d, [w.id]: [] }));
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.mutations.settle(action);

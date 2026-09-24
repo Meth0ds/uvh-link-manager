@@ -304,11 +304,11 @@ export class LinkDetailComponent {
     const action = this.mutations.begin(0);
     try {
       await this.api.post(`/api/v1/links/${this.linkId()}/state`, { state });
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
       void this.load();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
       this.mutations.settle(action);
@@ -331,9 +331,13 @@ export class LinkDetailComponent {
     const action = this.mutations.begin(0);
     try {
       await this.api.delete(`/api/v1/links/${this.linkId()}`);
+      // Quién publica el resultado es la operación que lo consiguió: una
+      // operación vieja que llega tarde no navega fuera de la pantalla nueva.
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
       await this.router.navigate(["/app/links"]);
     } catch (err) {
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
       this.mutations.settle(action);
@@ -381,11 +385,11 @@ export class LinkDetailComponent {
     const action = this.mutations.begin(0);
     try {
       await this.api.post(`/api/v1/links/${this.linkId()}/appeal`, { message: message.trim() });
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Solicitud enviada. La revisión la resuelve la administración.", "Cerrar", { duration: 3500 });
       await this.load();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo enviar la solicitud", "Cerrar", { duration: 4000 });
       await this.load();
     } finally {

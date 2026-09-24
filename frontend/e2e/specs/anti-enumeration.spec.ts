@@ -1,3 +1,5 @@
+import type { Route } from "@playwright/test";
+
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from "../fixtures";
 
 import { E2E_PASSWORD, loginFromBrowser, logoutFromBrowser, registerFromBrowser } from "../support/auth";
@@ -65,34 +67,52 @@ async function expectSameAnswers(responses: APIResponse[], status: number): Prom
 
 async function verifyThroughMail(request: APIRequestContext, csrf: string, email: string): Promise<void> {
   const token = new URL(await readMailLink(email, "verification")).hash.replace("#token=", "");
-  // Activation establishes the definitive password, typed by the mailbox
-  // owner alongside the bearer.
-  expect((await api(request, csrf, "/api/v1/auth/verify-email", { token, password: E2E_PASSWORD })).status()).toBe(200);
+  // Activation establishes the definitive identity, legal acceptance and
+  // password, typed by the mailbox owner alongside the bearer.
+  expect((await api(request, csrf, "/api/v1/auth/verify-email", {
+    token,
+    password: E2E_PASSWORD,
+    name: "Persona E2E",
+    acceptTerms: true,
+    termsVersion: "2026-08-30",
+    privacyVersion: "2026-08-30",
+  })).status()).toBe(200);
 }
 
 /**
  * Pins the answer to the next registration, bytes included.
  *
- * The body is read inside the listener, while the response still exists. The
- * registration screen navigates as soon as it has an answer, and a body asked
- * for after that navigation is gone for good — "No data found for resource with
- * given identifier" — so writing this as `(await answer).text()` races the
- * screen. The bytes are the whole point of this file, so they are read here.
+ * The bytes are the whole point of this file, so they are taken from the wire,
+ * not from the page: the registration screen moves on as soon as it has an
+ * answer, and a body asked for after that navigation is gone for good — "No
+ * data found for resource with given identifier". Reading the body inside a
+ * `waitForResponse` listener only narrowed that window and still raced the
+ * screen under load. So the register request is proxied with `route.fetch()`
+ * and replayed untouched with `route.fulfill()`; the copy of the answer lives
+ * in the harness, where the page's navigation cannot reach it.
  */
 async function captureRegistration(page: Page): Promise<{ status: number; body: string }> {
-  let captured: { status: number; body: string } | null = null;
-  await page.waitForResponse(async (response) => {
-    if (!response.url().endsWith("/api/v1/auth/register")) return false;
-    captured = { status: response.status(), body: await response.text() };
-
-    return true;
+  let settle: (answer: { status: number; body: string }) => void = () => undefined;
+  const answer = new Promise<{ status: number; body: string }>((resolve) => {
+    settle = resolve;
   });
+  const handler = async (route: Route) => {
+    // Copia de la respuesta ANTES de reenviarla: los bytes viven en el arnés,
+    // donde la navegación de la pantalla no puede alcanzarlos.
+    const response = await route.fetch();
+    const body = await response.text();
+    // Reenvío intacto: este intermediario no debe alterar ni un byte de lo que
+    // el backend envió de verdad.
+    await route.fulfill({ response, body });
+    settle({ status: response.status(), body });
+  };
 
-  if (captured === null) {
-    throw new Error("the registration answer was not captured");
+  await page.route("**/api/v1/auth/register", handler);
+  try {
+    return await answer;
+  } finally {
+    await page.unroute("**/api/v1/auth/register", handler);
   }
-
-  return captured;
 }
 
 test("el registro contesta igual sea libre, ocupada o verificada la dirección", async ({ request }) => {
@@ -181,12 +201,15 @@ test("la pre-ocupación termina en el buzón del dueño, sin atajos para el que 
   expect(owner.body).toBe(parked.body);
 
   // Un solo registro existe y su bearer está en el buzón del dueño: quien lo
-  // abre completa la cuenta con la contraseña que elige ahí, así que la
+  // abre completa la cuenta con la identidad, la aceptación legal y la
+  // contraseña que elige ahí, así que la
   // propuesta del atacante —que el segundo registro ni siquiera reescribió—
   // nunca llega a ser credencial activa.
   await page.goto(await readMailLink(email, "verification"));
+  await page.getByLabel("Nombre completo").fill("Victima E2E");
   await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
   await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
+  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Confirmar mi email" }).click();
   await expect(page.getByRole("heading", { name: "Email verificado" })).toBeVisible();
 

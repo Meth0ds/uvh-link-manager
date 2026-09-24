@@ -22,8 +22,8 @@ import { OtpCodeInputComponent } from "./otp-code-input.component";
 type Step = "login" | "register" | "mfa" | "recovery" | "verify-pending";
 type RegisterStep = 1 | 2;
 
-const TERMS_VERSION = "2026-08-30";
-const PRIVACY_VERSION = "2026-08-30";
+export const TERMS_VERSION = "2026-08-30";
+export const PRIVACY_VERSION = "2026-08-30";
 
 interface PasswordAssessment {
   score: number;

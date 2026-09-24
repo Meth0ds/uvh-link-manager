@@ -96,7 +96,11 @@ export async function mailOutboxOutageDrill({ email, session, workspaceId }) {
     const accepted = (await attemptsFor(outageEmail)).filter((attempt) => attempt.accepted).length;
     check("outbox outage: the provider accepted the retried message exactly once", accepted === 1, `accepted=${accepted}`);
     const token = (await messagesFor(outageEmail)).map((message) => tokenFromUrl(message.raw)).find(Boolean) ?? null;
-    const verified = token ? await api("POST", "/api/v1/auth/verify-email", { json: { token, password } }) : { status: 0 };
+    const verified = token
+      ? await api("POST", "/api/v1/auth/verify-email", {
+          json: { token, password, name: "Persona E2E", acceptTerms: true, termsVersion: "2026-08-30", privacyVersion: "2026-08-30" },
+        })
+      : { status: 0 };
     check(
       "outbox outage: the bearer from the retried message is still valid",
       verified.status === 200,

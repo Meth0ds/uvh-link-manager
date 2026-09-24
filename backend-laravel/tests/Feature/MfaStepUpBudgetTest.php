@@ -175,6 +175,49 @@ final class MfaStepUpBudgetTest extends TestCase
         $this->regenerate('KLMNPQR23456789A')->assertStatus(200)->assertJsonStructure(['recoveryCodes']);
     }
 
+    /**
+     * The scenario that fixed `Retry-After`: 19 failures spent on other
+     * purposes, then one on a purpose of its own. The account-wide level is now
+     * exhausted (20) while this purpose still has 9 of its 10, so only the
+     * account-wide timer may dictate the wait. Announcing the fresh purpose's
+     * timer as well would report 900 seconds for a window that closes in 600 —
+     * the exact over-report this fixes.
+     *
+     * Frozen time, exact numbers: `retryAfterSeconds >= 1` would pass on both
+     * sides of the bug and pin nothing.
+     */
+    public function test_retry_after_announces_only_the_level_that_is_actually_blocked(): void
+    {
+        $user = $this->mfaUser(['ABCDEFGH2345678J']);
+        Carbon::setTestNow(Carbon::create(2026, 9, 24, 12, 0, 0));
+        try {
+            for ($attempt = 0; $attempt < 10; $attempt++) {
+                MfaAttempts::recordFailure($user->id, 'recovery');
+            }
+            for ($attempt = 0; $attempt < 9; $attempt++) {
+                MfaAttempts::recordFailure($user->id, 'mfa_setup');
+            }
+
+            // Five minutes later, one failure on a purpose of its own: the
+            // account-wide bucket reaches 20, this purpose sits at 1.
+            Carbon::setTestNow(now()->addMinutes(5));
+            MfaAttempts::recordFailure($user->id, 'totp');
+
+            // The account-wide level refuses the attempt; the purpose does not.
+            self::assertTrue(MfaAttempts::tooMany($user->id, 'totp'));
+
+            $response = MfaAttempts::tooManyResponse($user->id, 'totp');
+            // The account-wide window opened at T0 for 900 s: at T0+300 it
+            // closes in exactly 600. The purpose window (900 s from T0+300)
+            // would announce 900 — and it is NOT blocked, so it must stay out
+            // of the answer entirely.
+            self::assertSame('600', (string) $response->headers->get('Retry-After'));
+            self::assertSame(600, (int) json_decode((string) $response->getContent(), true)['retryAfterSeconds']);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     /** @param array<int, string> $recoveryCodes */
     private function mfaUser(array $recoveryCodes): User
     {

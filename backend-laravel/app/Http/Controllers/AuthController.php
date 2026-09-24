@@ -231,6 +231,9 @@ class AuthController
 
         $currentEmail = strtolower($currentEmail);
         $newEmail = strtolower($newEmail);
+        // Cheap early-out for garbage secrets; NOT the authority. The binding
+        // check runs inside the transaction, against the locked row — see
+        // below.
         $user = $this->findUserByEmail($currentEmail);
         if (! $user || $user->email_verified_at || ! RegistrationEdit::authorizes($request, $user)) {
             return response()->json(['error' => 'No se puede cambiar este registro'], 403);
@@ -239,9 +242,18 @@ class AuthController
         $tokenHash = Ids::sha256Hex($token);
         $verificationUrl = $this->appUrl().'/auth/verify-email#token='.rawurlencode($token);
         try {
-            $changed = DB::transaction(function () use ($user, $newEmail, $tokenHash, $verificationUrl): array {
+            $changed = DB::transaction(function () use ($request, $user, $newEmail, $tokenHash, $verificationUrl): array {
                 $locked = User::where('id', $user->id)->whereNull('email_verified_at')->lockForUpdate()->first();
-                if (! $locked) {
+                // The secret is validated HERE, against the locked row, and
+                // this is the check that grants. A credential bound to a
+                // version plus a mutation of that version must live inside ONE
+                // critical section —lock, check, use— because validating before
+                // the lock leaves the classic TOCTOU window: two requests
+                // carrying the same generation-1 secret both pass the pre-check,
+                // the first rotates the row to generation 2, and the second
+                // then finds the row already at 2 and rotates it to 3 — one
+                // single-use secret spent twice.
+                if (! $locked || ! RegistrationEdit::authorizes($request, $locked)) {
                     return ['status' => 'unavailable', 'security_version' => null];
                 }
                 $this->lockEmailAddress($newEmail);
@@ -588,29 +600,46 @@ class AuthController
 
     /**
      * Activate a pending registration: mailbox proof (the bearer) plus the
-     * password typed NOW, which becomes the account's credential.
+     * identity, legal acceptance and password typed NOW, which become the
+     * account's own.
      *
-     * The password is established here — after the mailbox proof — and never
-     * taken from the pending registration. That proposal is not a credential:
-     * any anonymous `register` writes one, so activating it would be the classic
-     * pre-hijack, where the attacker registers the victim's address and waits
-     * for the victim to click. Here the mailbox opener decides the definitive
-     * password, and a later anonymous registration cannot replace the row, its
-     * bearer or its proposal either: there is nothing left for it to install.
+     * Nothing provisional survives the activation: the password is never taken
+     * from the pending registration, and neither are the name or the legal
+     * acceptance. Those proposals are not credentials or evidence: any
+     * anonymous `register` writes them, so honouring them would be the classic
+     * pre-hijack —the attacker registers the victim's address and waits for the
+     * victim to click— extended to identity: the victim would inherit the
+     * attacker-chosen name, the `Workspace de …` derived from it, and a
+     * contractual acceptance stamped by someone else. Here the mailbox opener
+     * decides the definitive password, name and acceptance, and a later
+     * anonymous registration cannot replace the row or its bearer either: there
+     * is nothing left for it to install.
      */
     public function verifyEmail(Request $request)
     {
         $token = UvhRequest::inputString($request, 'token');
         $password = UvhRequest::inputString($request, 'password');
-        // The two are answered separately on purpose: they are two different
-        // things for the person reading the message —"your link is no good"
-        // versus "choose a password of 10 to 72 characters"— and neither answer
-        // describes the account, only the request that carried it.
+        $name = trim(UvhRequest::inputString($request, 'name'));
+        $termsVersion = UvhRequest::inputString($request, 'termsVersion');
+        $privacyVersion = UvhRequest::inputString($request, 'privacyVersion');
+        $acceptTerms = $request->boolean('acceptTerms');
+        // The answers are separate on purpose: they are different things for
+        // the person reading the message —"your link is no good" versus
+        // "choose a password of 10 to 72 characters"— and none describes the
+        // account, only the request that carried it.
         if ($token === '' || strlen($token) > 256) {
             return response()->json(['error' => 'Token inválido'], 422);
         }
         if (! $this->validPassword($password)) {
             return response()->json(['error' => 'La contraseña debe tener entre 10 y 72 caracteres'], 422);
+        }
+        // Identity and legal acceptance are decided at activation too, with the
+        // same input contract as `register`. An acceptance without the exact
+        // version shown is not evidence of anything.
+        if (! $this->validName($name) || ! $acceptTerms
+            || ! hash_equals(self::TERMS_VERSION, $termsVersion)
+            || ! hash_equals(self::PRIVACY_VERSION, $privacyVersion)) {
+            return response()->json(['error' => 'Datos inválidos'], 422);
         }
         if (! PasswordStrength::isAcceptable($password)) {
             // Deliberately generic, exactly like register and reset-password.
@@ -624,7 +653,7 @@ class AuthController
         // User first, bearer second is the global lifecycle lock order. The
         // preflight row is untrusted and every property is checked again under
         // lock, so replacement or consumption races fail closed.
-        $userId = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password): ?int {
+        $userId = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
             $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
             $row = EmailToken::where('id', $tokenHash)
                 ->where('user_id', $snapshot->user_id)
@@ -639,17 +668,28 @@ class AuthController
             if (! $user || $user->deleted_at || $user->email_verified_at) {
                 return null;
             }
-            if (! PasswordStrength::isAcceptable($password, $user->name, $user->email)) {
+            if (! PasswordStrength::isAcceptable($password, $name, $user->email)) {
                 // Re-evaluate with the live account identity while its row is
                 // locked. An activation must not accept a password derived from
                 // the name or mailbox merely because the anonymous preflight
                 // could not know that context (same contract as reset-password).
+                // The name that counts is the one typed HERE; the live mailbox
+                // is the row's.
                 return -1;
             }
 
             $now = now();
             $row->update(['used_at' => $now]);
+            // The generated workspace name is derived from the PROPOSED name,
+            // so it must be read before the identity below replaces it.
+            $generatedWorkspaceName = $this->defaultWorkspaceName((string) $user->name);
+            $workspace = DB::table('workspaces')->where('owner_user_id', $user->id)
+                ->orderBy('id')->lockForUpdate()->first(['id', 'name']);
             $user->update([
+                // Identity decided at activation, exactly like the password:
+                // the name an anonymous registration proposed is not the
+                // account owner's to keep.
+                'name' => $name,
                 'email_verified_at' => $now,
                 'password_hash' => $passwordHash,
                 // The credential was just settled, so every generation binds to
@@ -657,6 +697,17 @@ class AuthController
                 'security_version' => (int) $user->security_version + 1,
                 'updated_at' => $now,
             ]);
+            // The default workspace follows the definitive name, but only while
+            // it still carries the generated one: a workspace already renamed
+            // by its owner is theirs, not the activation's to touch.
+            if ($workspace && $workspace->name === $generatedWorkspaceName) {
+                DB::table('workspaces')->where('id', $workspace->id)
+                    ->update(['name' => $this->defaultWorkspaceName($name), 'updated_at' => $now]);
+            }
+            // The legal acceptance that counts is the one made HERE, by whoever
+            // proved the mailbox — not the one an anonymous first registrant
+            // stamped on the victim's behalf hours earlier.
+            $this->acceptRegistrationLegal((int) $user->id, $now);
             // A legacy deployment may have issued a session before email
             // verification became mandatory. Revoke all of them now; merely
             // waiting for a stale cookie to be used could resurrect it after
@@ -673,6 +724,13 @@ class AuthController
         }
 
         Audit::write($userId, 'auth.email_verified', 'user', $userId);
+        // Contractual evidence of THIS request, exactly like `register`: the
+        // acceptance on record is the one the mailbox opener made at
+        // activation, dated at activation.
+        Audit::write($userId, 'auth.terms_accepted', 'consent', self::TERMS_VERSION);
+        // The privacy policy is an information notice, not blanket consent for
+        // every processing purpose. Record the exact notice shown.
+        Audit::write($userId, 'auth.privacy_notice_acknowledged', 'privacy_notice', self::PRIVACY_VERSION);
 
         return response()->json(['ok' => true]);
     }
@@ -2406,12 +2464,13 @@ class AuthController
     }
 
     /**
-     * Registration legal acceptance: business evidence of THIS request. The
-     * table allows one row per user/document/version
-     * (`legal_acceptance_user_document_unique`), so a replacement registration
-     * refreshes the acceptance of the current version — the acceptance that
-     * counts is the one made by the registration that survives — instead of
-     * colliding with the registration it just superseded.
+     * Legal acceptance: business evidence of THIS request. The table allows one
+     * row per user/document/version (`legal_acceptance_user_document_unique`),
+     * so each new acceptance refreshes the current version's row instead of
+     * colliding with the superseded one. Both `register` and the activation
+     * (`verifyEmail`) call it: the acceptance that counts is always the last
+     * explicit one made by whoever controls the flow — and at activation that
+     * is the mailbox opener, not whoever registered first.
      */
     private function acceptRegistrationLegal(int $userId, Carbon $acceptedAt): void
     {

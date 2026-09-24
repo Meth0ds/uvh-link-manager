@@ -159,11 +159,11 @@ export class DomainDetailComponent {
         undefined,
         decodeDomainStateResponse,
       );
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Comprobación DNS iniciada", "Cerrar", { duration: 3000 });
       await this.load();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo iniciar la comprobación", "Cerrar", { duration: 5000 });
     } finally {
       this.mutations.settle(action);
@@ -178,11 +178,11 @@ export class DomainDetailComponent {
     const action = this.mutations.begin(0);
     try {
       await this.api.post<{ state: DomainState }>(`/api/v1/domains/${current.id}/activate`, undefined, decodeDomainStateResponse);
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Preparación HTTPS iniciada", "Cerrar", { duration: 3000 });
       await this.load();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo activar el dominio", "Cerrar", { duration: 5000 });
     } finally {
       this.mutations.settle(action);

@@ -4,11 +4,13 @@ import { Location } from "@angular/common";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
+import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { AuthShellComponent } from "./auth-shell.component";
+import { PRIVACY_VERSION, TERMS_VERSION } from "./auth.component";
 import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
@@ -16,20 +18,22 @@ import { authBearer } from "./auth-bearer";
 import { LatestRequest } from "../core/services/latest-request";
 
 /**
- * Activation of a pending registration: the email bearer plus the password
- * typed here, which becomes the account's credential.
+ * Activation of a pending registration: the email bearer plus the identity,
+ * legal acceptance and password typed here, which become the account's own.
  *
- * The password is established AFTER the mailbox proof and never taken from the
- * pending registration, because that proposal is not a credential: any
- * anonymous registration writes one. Whoever opens the mailbox decides the
- * definitive password, and a later anonymous registration cannot replace the
- * row it belongs to either, so the pre-hijack —the attacker registers the
- * victim's address and waits for the click— has nothing to install.
+ * Nothing provisional survives the activation. The password is never taken
+ * from the pending registration, and neither are the name or the contractual
+ * acceptance: any anonymous registration writes all three, so honouring them
+ * would be the pre-hijack —the attacker registers the victim's address and
+ * waits for the click— extended to identity. Whoever opens the mailbox decides
+ * the definitive name, accepts the current legal versions explicitly and
+ * chooses the password; the workspace generated from the attacker's name is
+ * renamed by the backend along the way.
  */
 @Component({
   selector: "app-verify-email",
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
+  imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatIconModule, MatProgressBarModule, AuthShellComponent],
   template: `
     <app-auth-shell>
       <div class="card center" aria-labelledby="verify-email-title">
@@ -45,6 +49,12 @@ import { LatestRequest } from "../core/services/latest-request";
         @if (token && !ok()) {
           <form class="form" [formGroup]="form" (ngSubmit)="verify()" [attr.aria-busy]="busy()">
             <mat-form-field appearance="outline">
+              <mat-label>Nombre completo</mat-label>
+              <input matInput formControlName="name" autocomplete="name" maxlength="80" />
+              <mat-hint>El nombre definitivo de la cuenta. No se conserva el que haya escrito quien registró la dirección.</mat-hint>
+              @if (form.controls.name.invalid && form.controls.name.touched) { <mat-error>Utiliza entre 2 y 80 caracteres.</mat-error> }
+            </mat-form-field>
+            <mat-form-field appearance="outline">
               <mat-label>Contraseña</mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="72" />
               <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
@@ -59,6 +69,12 @@ import { LatestRequest } from "../core/services/latest-request";
             </mat-form-field>
             @if (form.hasError('mismatch') && form.controls.confirm.touched) {
               <div class="alert error" role="alert">Las contraseñas no coinciden. Revisa el segundo campo.</div>
+            }
+            <mat-checkbox formControlName="acceptTerms" color="primary">
+              Acepto los Términos de servicio y la Política de privacidad vigentes
+            </mat-checkbox>
+            @if (form.controls.acceptTerms.hasError('required') && form.controls.acceptTerms.touched) {
+              <div class="alert error" role="alert">Debes aceptar los términos vigentes para activar la cuenta.</div>
             }
             <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()">
               {{ busy() ? 'Confirmando…' : (attempted() ? 'Volver a intentarlo' : 'Confirmar mi email') }}
@@ -90,7 +106,7 @@ export class VerifyEmailComponent {
   readonly ok = signal(false);
   readonly attempted = signal(false);
   readonly hide = signal(true);
-  readonly message = signal("Confirma que tú creaste la cuenta y elige su contraseña. Si no reconoces este registro, no continúes.");
+  readonly message = signal("Confirma que tú creaste esta cuenta y elige su identidad y contraseña. Si no reconoces este registro, no continúes.");
   readonly pendingLink = this.intents.pending;
   readonly pendingInvitation = this.invitations.pending;
   readonly token: string;
@@ -100,8 +116,10 @@ export class VerifyEmailComponent {
 
   form = this.fb.nonNullable.group(
     {
+      name: ["", [Validators.required, Validators.minLength(2), Validators.maxLength(80)]],
       password: ["", [Validators.required, Validators.minLength(10), Validators.maxLength(72)]],
       confirm: ["", [Validators.required]],
+      acceptTerms: [false, [Validators.requiredTrue]],
     },
     { validators: (g) => (g.get("password")?.value === g.get("confirm")?.value ? null : { mismatch: true }) },
   );
@@ -121,7 +139,18 @@ export class VerifyEmailComponent {
     this.busy.set(true);
     this.attempted.set(true);
     try {
-      await this.api.post("/api/v1/auth/verify-email", { token: this.token, password: this.form.value.password });
+      // Identity, legal acceptance and password all cross here: the backend
+      // installs them at activation and re-stamps the acceptance with this
+      // request's timestamp, so nothing the anonymous registration proposed
+      // becomes definitive.
+      await this.api.post("/api/v1/auth/verify-email", {
+        token: this.token,
+        password: this.form.controls.password.value,
+        name: this.form.controls.name.value.trim(),
+        acceptTerms: true,
+        termsVersion: TERMS_VERSION,
+        privacyVersion: PRIVACY_VERSION,
+      });
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.done.set(true);

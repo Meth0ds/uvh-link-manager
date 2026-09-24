@@ -131,7 +131,7 @@ async function main() {
 
       const messages = await messagesFor(retry.email);
       const token = messages.map((message) => tokenFromUrl(message.raw)).find(Boolean) ?? null;
-      const verified = token ? await api("POST", "/api/v1/auth/verify-email", { json: { token, password } }) : { status: 0 };
+      const verified = token ? await api("POST", "/api/v1/auth/verify-email", { json: { token, password, name: "Persona E2E", acceptTerms: true, termsVersion: "2026-08-30", privacyVersion: "2026-08-30" } }) : { status: 0 };
       check("mail retry: the retried message is still usable", verified.status === 200, `HTTP ${verified.status}`);
     }
   }

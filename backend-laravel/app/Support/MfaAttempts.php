@@ -6,22 +6,24 @@ namespace App\Support;
 
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Cache;    /**
-     * Account-wide verification-attempt budget for step-up factor checks.
-     *
-     * Single owner of "how many failed verifications one account may spend", at
-     * two levels: a per-purpose counter — so one broken surface cannot starve the
-     * others — and an account-wide one — so moving between purposes multiplies no
-     * guessing budget. Whichever exhausts first refuses the attempt.
-     *
-     * The two levels do not isolate as cleanly as the second one suggests: two
-     * purposes at their own limit add up to the account-wide one, so the third
-     * surface gets nothing until both windows clear, and the login challenge
-     * (`totp`, `recovery`) charges the same account-wide counter as every step-up
-     * purpose — a failure spent on one surface can therefore refuse the
-     * legitimate owner's login for the rest of the window. That is the price of
-     * "moving between surfaces multiplies no guessing budget", and it is the
-     * intended trade: bounded guessing first, surface isolation second.
+use Illuminate\Support\Facades\Cache;
+
+/**
+ * Account-wide verification-attempt budget for step-up factor checks.
+ *
+ * Single owner of "how many failed verifications one account may spend", at
+ * two levels: a per-purpose counter — so one broken surface cannot starve the
+ * others — and an account-wide one — so moving between purposes multiplies no
+ * guessing budget. Whichever exhausts first refuses the attempt.
+ *
+ * The two levels do not isolate as cleanly as the second one suggests: two
+ * purposes at their own limit add up to the account-wide one, so the third
+ * surface gets nothing until both windows clear, and the login challenge
+ * (`totp`, `recovery`) charges the same account-wide counter as every step-up
+ * purpose — a failure spent on one surface can therefore refuse the
+ * legitimate owner's login for the rest of the window. That is the price of
+ * "moving between surfaces multiplies no guessing budget", and it is the
+ * intended trade: bounded guessing first, surface isolation second.
  *
  * Where the counters live is part of the contract. They must not be resetable
  * by a dependency failure, so they count on the SECURITY store

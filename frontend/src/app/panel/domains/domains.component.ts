@@ -70,7 +70,9 @@ export class DomainsComponent {
 
   readonly domains = signal<DomainDto[]>([]);
   readonly loading = signal(true);
-  readonly adding = signal(false);
+  /** La creación en vuelo y su dueño; ver `OwnedMutations`. */
+  private readonly addMutation = new OwnedMutations();
+  readonly adding = this.addMutation.busy;
   readonly verifyingId = signal<number | null>(null);
   /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
   private readonly mutations = new OwnedMutations();
@@ -116,11 +118,11 @@ export class DomainsComponent {
       this.error.set(null);
       // Una acción en vuelo pertenece al workspace que dejó la pantalla; su
       // `finally` no va a liberar este hueco, así que lo libera el contexto.
+      // Vale igual para la creación: su hueco y su derecho a publicar mueren
+      // con el contexto que la inició.
       this.mutations.reset();
+      this.addMutation.reset();
       this.verifyingId.set(null);
-      // A create still in flight belongs to the workspace that left the screen;
-      // its busy flag must not stay stuck in the new one.
-      this.adding.set(false);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -157,7 +159,11 @@ export class DomainsComponent {
     if (!domain || this.adding() || !this.canEdit()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.adding.set(true);
+    // The create carries an operation identity too: comparing only the context
+    // still leaves the ABA —create 1 in flight, switch away and back, create 2
+    // starts, create 1 lands late and `isCurrent()` is true again— where the
+    // first result would publish over the second and clear ITS busy slot.
+    const action = this.addMutation.begin(0);
     try {
       const { domain: created } = await this.api.post<{ domain: DomainDto }>(
         "/api/v1/domains",
@@ -165,19 +171,19 @@ export class DomainsComponent {
         decodeCreatedDomainResponse,
       );
       // The created row carries a one-time ownership TXT token. Publish it only
-      // into the workspace it was created for: a selection change while the
-      // request was in flight must not move it into another tenant's list.
-      if (!target.isCurrent()) return;
+      // into the workspace it was created for AND only if this create still
+      // owns the slot: a selection change or a newer create in flight must not
+      // move it into another tenant's list or another operation's result.
+      if (!target.isCurrent() || !this.addMutation.isCurrent(action)) return;
       this.newDomain.set("");
       this.snackbar.open("Dominio añadido. Añade el registro TXT para verificar.", "Cerrar", { duration: 4000 });
       this.domains.update((d) => [created, ...d]);
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.addMutation.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo añadir el dominio", "Cerrar", { duration: 4000 });
     } finally {
-      // Only the context that started the create may clear its flag; the
-      // workspace-switch reset owns the stale case.
-      if (target.isCurrent()) this.adding.set(false);
+      // Only the operation that still owns the slot may clear it.
+      this.addMutation.settle(action);
     }
   }
 
@@ -191,12 +197,12 @@ export class DomainsComponent {
       const revalidation = d.state === "active" || d.state === "verified" || d.state === "disabled";
       const path = `/api/v1/domains/${d.id}/${revalidation ? "revalidate" : "verify"}`;
       const result = await this.api.post<{ state: DomainState }>(path, undefined, decodeDomainStateResponse);
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Verificación DNS iniciada. Actualizaremos el estado automáticamente.", "Cerrar", { duration: 4000 });
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       void this.pollVerification(d.id);
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(
         err instanceof ApiRequestError ? err.message : "No se pudo verificar el dominio",
         "Cerrar",
@@ -246,7 +252,7 @@ export class DomainsComponent {
         undefined,
         decodeDomainStateResponse,
       );
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       if (result.state === "provisioning") {
         this.snackbar.open("Emitiendo y validando el certificado…", "Cerrar", { duration: 3500 });
@@ -255,7 +261,7 @@ export class DomainsComponent {
         this.snackbar.open("Dominio activado", "Cerrar", { duration: 2500 });
       }
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       this.mutations.settle(action);
@@ -291,11 +297,11 @@ export class DomainsComponent {
     const action = this.mutations.begin(d.id);
     try {
       await this.api.post(`/api/v1/domains/${d.id}/disable`);
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Dominio desactivado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       // Only the operation that still owns the slot may clear it: a stale
@@ -317,9 +323,11 @@ export class DomainsComponent {
     const action = this.mutations.begin(d.id);
     try {
       await this.api.delete(`/api/v1/domains/${d.id}`);
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Dominio eliminado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
       // Only the operation that still owns the slot may clear it: a stale

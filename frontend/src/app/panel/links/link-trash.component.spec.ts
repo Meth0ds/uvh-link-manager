@@ -101,7 +101,7 @@ describe("LinkTrashComponent in-flight ownership", () => {
     // contexto no podía ver).
     let releaseFirst: () => void = () => {};
     api.post.and.returnValue(new Promise<void>((resolve) => { releaseFirst = resolve; }));
-    void component.restore(row(7));
+    const firstRestore = component.restore(row(7));
     await fixture.whenStable();
     expect(component.actionId()).toBe(7);
 
@@ -116,18 +116,20 @@ describe("LinkTrashComponent in-flight ownership", () => {
     // queda en vuelo: lo que se mide es de quién es el hueco, no si terminó.
     let releaseSecond: () => void = () => {};
     api.post.and.returnValue(new Promise<void>((resolve) => { releaseSecond = resolve; }));
-    void component.restore(row(7));
+    const secondRestore = component.restore(row(7));
     await fixture.whenStable();
     expect(component.actionId()).toBe(7);
 
-    // La vieja termina tarde y no lo libera.
+    // La vieja termina tarde y no lo libera. Se espera a la PROPIA operación:
+    // su publicación incluye un `load()` que un punto estable del fixture no
+    // garantiza cubierto, y lo que se afirma es qué pasa cuando YA terminó.
     releaseFirst();
-    await fixture.whenStable();
+    await firstRestore;
     expect(component.actionId()).toBe(7);
 
     // Y la dueña sí lo libera cuando termina.
     releaseSecond();
-    await fixture.whenStable();
+    await secondRestore;
     expect(component.actionId()).toBeNull();
   });
 });

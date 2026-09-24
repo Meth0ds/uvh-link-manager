@@ -259,11 +259,11 @@ export class LinksComponent {
     const action = this.mutations.begin(link.id);
     try {
       await this.api.post(`/api/v1/links/${link.id}/state`, { state });
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
       void this.reload();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
       this.mutations.settle(action);
@@ -284,9 +284,11 @@ export class LinksComponent {
     const action = this.mutations.begin(link.id);
     try {
       await this.api.delete(`/api/v1/links/${link.id}`);
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
       void this.reload();
     } catch (err) {
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
       // Only the operation that still owns the slot may clear it: a stale

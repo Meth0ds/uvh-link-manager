@@ -98,10 +98,10 @@ class ApiParityTest extends TestCase
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
+        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain))
             ->assertStatus(200)->assertJson(['ok' => true]);
         $this->assertNotNull(DB::table('sessions')->where('id', Ids::sha256Hex($staleToken))->value('revoked_at'));
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
+        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain))
             ->assertStatus(400)->assertJson(['error' => 'Token inválido o caducado']);
 
         $login = $this->postJson('/api/v1/auth/login', [
@@ -337,7 +337,7 @@ class ApiParityTest extends TestCase
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])->assertStatus(200);
+        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain, 'Typo User'))->assertStatus(200);
         $login = $this->postJson('/api/v1/auth/login', [
             'email' => $newEmail,
             'password' => self::PASSWORD,
@@ -469,8 +469,10 @@ class ApiParityTest extends TestCase
         self::assertSame(1, (int) $user->security_version);
         $this->assertNotNull(DB::table('email_tokens')->where('id', $bearerId)->whereNull('used_at')->first());
 
-        // The owner opens their mailbox and sets the definitive password, so the
-        // account is theirs…
+        // The owner opens their mailbox and decides the account's identity,
+        // legal acceptance and password. The acceptance rows are backdated
+        // first so the restamping below is observable at second precision.
+        DB::table('legal_acceptances')->where('user_id', $user->id)->update(['accepted_at' => now()->subDay()]);
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
@@ -479,8 +481,20 @@ class ApiParityTest extends TestCase
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
+        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain, 'Real Owner'))
             ->assertStatus(200)->assertJson(['ok' => true]);
+        // …the identity proposals die with the activation: the attacker-chosen
+        // name and the workspace generated from it are replaced by what the
+        // mailbox opener decided, and the legal acceptance on record is the one
+        // THEY made now, not the one the attacker stamped at registration…
+        $user->refresh();
+        $this->assertSame('Real Owner', $user->name);
+        $this->assertSame('Workspace de Real Owner', (string) DB::table('workspaces')->where('owner_user_id', $user->id)->value('name'));
+        $this->assertTrue(
+            Carbon::parse((string) DB::table('legal_acceptances')->where('user_id', $user->id)
+                ->where('document_type', 'terms')->value('accepted_at'))->gt(now()->subHour()),
+            'the legal acceptance on record must be the one made at activation, not the one an anonymous first registrant stamped',
+        );
         // …the activation revokes the sessions the parked row may have carried…
         $this->assertNotNull(DB::table('sessions')->where('id', Ids::sha256Hex($legacyToken))->value('revoked_at'));
         // …and the proposal the first registration left behind opens nothing.
@@ -561,8 +575,9 @@ class ApiParityTest extends TestCase
             ->assertStatus(422)->assertJson(['error' => 'La contraseña debe tener entre 10 y 72 caracteres']);
         $this->assertNull($user->fresh()->email_verified_at);
 
-        // The mailbox opener chooses the password at activation…
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
+        // The mailbox opener chooses the password and the identity at
+        // activation…
+        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain, 'Real Owner'))
             ->assertStatus(200)->assertJson(['ok' => true]);
 
         // …so the account is theirs: their password opens a session and the
@@ -1660,6 +1675,26 @@ class ApiParityTest extends TestCase
         ];
     }
 
+    /**
+     * The activation contract: whoever opens the mailbox decides the name, the
+     * legal acceptance and the password. Everything the anonymous registration
+     * proposed is provisional — the attacker who parks a registration on
+     * somebody else's address chose all three.
+     *
+     * @return array{token: string, password: string, name: string, acceptTerms: true, termsVersion: string, privacyVersion: string}
+     */
+    private function activationPayload(string $token, string $name = 'Contract User'): array
+    {
+        return [
+            'token' => $token,
+            'password' => self::PASSWORD,
+            'name' => $name,
+            'acceptTerms' => true,
+            'termsVersion' => '2026-08-30',
+            'privacyVersion' => '2026-08-30',
+        ];
+    }
+
     private function registerVerifiedLogin(string $email): string
     {
         $this->postJson('/api/v1/auth/register', array_merge([
@@ -1678,7 +1713,7 @@ class ApiParityTest extends TestCase
             'created_at' => now(),
         ]);
 
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
+        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain))
             ->assertStatus(200)->assertJson(['ok' => true]);
 
         $login = $this->postJson('/api/v1/auth/login', [
