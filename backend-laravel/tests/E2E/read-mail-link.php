@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\MailDeliveryEligibility;
 use App\Support\UvhCrypto;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
@@ -25,8 +26,19 @@ if (! filter_var($email, FILTER_VALIDATE_EMAIL) || $kind === '') {
 
 // Recipient and bearer URL are encrypted together. Decrypt only a bounded set
 // inside the test process and print solely the requested URL to stdout.
+//
+// The outbox is read the way the delivery jobs read it, not the way it is
+// written: an admission whose state has moved on is suppressed and never reaches
+// a mailbox, so a helper that returned its link would hand the suite a bearer no
+// inbox ever receives. `change-registration-email` pays exactly one of those for
+// a destination that is already taken, and `register` pays another when the
+// address is occupied, so this filter is also what keeps those two from looking
+// like mail.
 $rows = DB::table('mail_outbox')->where('kind', $kind)->orderByDesc('id')->limit(100)->get();
 foreach ($rows as $row) {
+    if (! MailDeliveryEligibility::isCurrent($row)) {
+        continue;
+    }
     try {
         $message = json_decode(UvhCrypto::decryptAtRest((string) $row->encrypted_envelope), true, 512, JSON_THROW_ON_ERROR);
     } catch (Throwable) {

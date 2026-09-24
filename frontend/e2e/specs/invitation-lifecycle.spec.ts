@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { loginFromBrowser, registerVerifyAndLogin } from "../support/auth";
 import { installHCaptchaBridge } from "../support/hcaptcha";
 import { readMailLink } from "../support/mail";

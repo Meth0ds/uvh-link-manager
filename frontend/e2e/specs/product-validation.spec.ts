@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "../fixtures";
 import { browserApi, selectedWorkspaceId } from "../support/api";
 import { E2E_PASSWORD, loginFromBrowser, logoutFromBrowser, registerVerifyAndLogin } from "../support/auth";
 import { installHCaptchaBridge } from "../support/hcaptcha";
@@ -128,8 +128,19 @@ async function settleEntryAnimations(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Colour contrast is measured on the appearance a control settles into, not on the
+ * path it takes to get there. A button that becomes enabled fades from the
+ * disabled grey to the accent, and a scan taken inside that window reports a
+ * ratio nobody sees for longer than the transition lasts — in a colour that
+ * differs from one run to the next, which turns the gate into a coin toss. The
+ * transitions are frozen for the measurement instead of being raced.
+ */
 async function expectNoWcagAAIssues(page: Page): Promise<void> {
   await settleEntryAnimations(page);
+  await page.addStyleTag({
+    content: "*, *::before, *::after { transition: none !important; animation: none !important; }",
+  });
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();

@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "../fixtures";
 import { browserApi, selectedWorkspaceId, type BrowserApiResult } from "../support/api";
 import { E2E_PASSWORD, registerVerifyAndLogin } from "../support/auth";
 import { installHCaptchaBridge } from "../support/hcaptcha";

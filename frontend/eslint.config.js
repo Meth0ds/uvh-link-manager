@@ -81,6 +81,14 @@ module.exports = tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    // Playwright requires a fixture's first parameter to destructure the fixture
+    // object even when the fixture depends on nothing, which is the one shape
+    // the empty-pattern rule exists to forbid. The exception is scoped to the
+    // file that has to write it.
+    files: ["e2e/fixtures.ts"],
+    rules: { "no-empty-pattern": "off" },
+  },
+  {
     files: ["e2e/**/*.mjs"],
     extends: [eslint.configs.recommended],
     languageOptions: { globals: globals.node, sourceType: "module" },

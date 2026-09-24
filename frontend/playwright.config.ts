@@ -44,7 +44,13 @@ export default defineConfig({
     {
       command: "npm start -- --host 127.0.0.1 --port 4201",
       cwd: __dirname,
-      env: { ...process.env, BACKEND_URL: "http://127.0.0.1:8010" },
+      // Angular's CLI prefers `PORT` over `--port`, so a caller that exports it
+      // —a container runtime, a dev-server manager, a shell that sets it for
+      // something else— moves the application to a port of its choosing while
+      // this config keeps probing 4201. The run then dies on the readiness
+      // timeout with a server that was listening perfectly well somewhere else.
+      // Where the suite looks is decided here, not by whoever launched it.
+      env: { ...process.env, PORT: "4201", BACKEND_URL: "http://127.0.0.1:8010" },
       url: "http://127.0.0.1:4201",
       reuseExistingServer: false,
       timeout: 120_000,
