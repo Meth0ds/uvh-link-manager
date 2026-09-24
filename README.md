@@ -124,6 +124,13 @@ está en [docs/local-control.md](docs/local-control.md).
 Las pruebas de backend **son destructivas** para la base de datos objetivo. El
 guard exige un nombre terminado en `_test`: no uses `uvh_local`.
 
+Todo lo que sigue, en el orden de la CI y deteniéndose en el primer fallo:
+
+```bash
+node scripts/verify-local.mjs              # frontend y backend
+node scripts/verify-local.mjs --only=frontend
+```
+
 ```powershell
 # Backend: calidad estática y pruebas contra una base aislada.
 docker compose -f docker-compose.local.yml --env-file .env.docker.local `
@@ -144,14 +151,30 @@ npm run e2e
 ```
 
 CI ejecuta estas comprobaciones desde lockfiles, con permisos de repositorio de
-solo lectura y una base PostgreSQL efímera `uvh_test`, en cuatro jobs:
+solo lectura y una base PostgreSQL efímera `uvh_test`, en nueve jobs:
 
-| Job | Contenido |
-| --- | --- |
-| Frontend | `typecheck`, tests con Karma y build de producción. |
-| Backend | `composer quality` (Pint + PHPStan) y PHPUnit. |
-| Browser | Recorridos críticos de Playwright sobre una pila efímera. |
-| Browser (release) | Smoke del proxy sobre las imágenes de producción. |
+> **Estado de la CI (2026-09): la cuenta de GitHub está bloqueada por
+> facturación.** Los workflows son válidos y sus jobs se crean, pero ninguno
+> arranca: aparecen como `failure` con `steps: []` y la anotación *“The job was
+> not started because your account is locked due to a billing issue”*. Ningún
+> commit lo arregla —se corrige en la cuenta o se mueve la ejecución a un runner
+> propio—, así que hasta entonces la evidencia de una tanda es
+> `node scripts/verify-local.mjs`: los pasos de los trabajos `frontend` y
+> `backend`, ejecutados y reproducibles. Los trabajos de navegador, runtime y
+> cadena de suministro no se ejecutan ahí —duran decenas de minutos cada uno— y
+> se invocan por su propia entrada, la que figura en la tabla.
+
+| Job | Contenido | Entrada local |
+| --- | --- | --- |
+| Frontend | `npm audit`, `lint`, `typecheck`, tests con Karma y build de producción. | `node scripts/verify-local.mjs --only=frontend` |
+| Backend | `composer validate` y `audit`, `composer quality` (Pint + PHPStan), `migrate:fresh` y PHPUnit contra `uvh_test`. | `node scripts/verify-local.mjs --only=backend` |
+| Browser | Recorridos críticos de Playwright sobre una pila efímera. | `npm run e2e` |
+| Browser (release) | Smoke del proxy sobre las imágenes de producción, con SBOM y gate de CRITICAL. | `npm run release:e2e` |
+| Runtime (boot) | Que cada invariante rota de producción detenga el contenedor al arrancar. | `npm run release:boot` |
+| Runtime (async) | Workers y scheduler reales hasta el estado durable, con el drill de contención analítica. | `npm run e2e:async` |
+| Runtime (backup) | Backup, destrucción y restore con RPO/RTO medidos. | `npm run e2e:backup` |
+| Supply chain (digests) | Que cada imagen base fijada siga resolviendo en el registro. | `node scripts/check-image-digests.mjs` |
+| Supply chain (bases) | Escaneo CRITICAL con parche de cada base fijada del árbol. | `node scripts/scan-pinned-images.mjs` |
 
 Antes de tocar el baseline de Larastan, lee
 [docs/static-analysis.md](docs/static-analysis.md); los recorridos de navegador
