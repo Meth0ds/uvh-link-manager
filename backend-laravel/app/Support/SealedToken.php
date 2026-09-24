@@ -83,6 +83,8 @@ final class SealedToken
             throw new \RuntimeException('Sealed token encryption failed');
         }
 
+        SealFormatTelemetry::modernIssued();
+
         return Ids::base64urlEncode($keyId.$nonce.$tag.$cipher);
     }
 
@@ -106,7 +108,19 @@ final class SealedToken
 
         // Formato actual primero; si su key-id no nombra nada o la tag no
         // respalda lo que nombra, queda el formato sin etiqueta de antes.
-        return self::openSealed($buffer) ?? self::openLegacy($buffer);
+        $plain = self::openSealed($buffer);
+        if ($plain !== null) {
+            return $plain;
+        }
+        $legacy = self::openLegacy($buffer);
+        if ($legacy !== null) {
+            // Un sello viejo vivo que abre de verdad: queda registrado, porque
+            // es lo que mide la ventana de retirada del fallback. Sólo el éxito
+            // cuenta —un rechazo no dice que exista ninguno—.
+            SealFormatTelemetry::legacyOpened('sealed');
+        }
+
+        return $legacy;
     }
 
     /** Formato v2: `keyId | nonce | tag | cipher`, con el key-id como AAD. */

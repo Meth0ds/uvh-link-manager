@@ -37,6 +37,8 @@ class SignedToken
         $body = Ids::base64urlEncode($payload);
         $mac = self::mac($body, (string) $exp, $keyId, $secret);
 
+        SealFormatTelemetry::modernIssued();
+
         return "{$body}.{$exp}.{$keyId}.{$mac}";
     }
 
@@ -84,6 +86,13 @@ class SignedToken
         }
         if (! $validMac) {
             return null;
+        }
+        if ($legacy) {
+            // Un token del formato antiguo que verifica de verdad es prueba de
+            // que alguno seguía en vuelo: la evidencia que mide la ventana de
+            // retirada del fallback. Sólo cuenta el éxito; un rechazo no dice
+            // que exista ninguno.
+            SealFormatTelemetry::legacyOpened('signed');
         }
 
         $payload = Ids::base64urlDecode($body);

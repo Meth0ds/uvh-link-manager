@@ -227,7 +227,10 @@ pide solo la dirección— más la que ya existía en «Revisa tu email».
 | `SealKeyringTest`, `RegistrationEdit*`, `ApiParityTest`, `AuthEmailTokenTest`, `PasswordPolicyTest`, `DatabaseSchemaTest` | ✅ en verde tras su reescritura |
 
 Pendientes conocidos: tus dos líneas de plantilla (hallazgo 4) y la retirada
-del fallback legacy de sellos cuando venza el último formato antiguo. La
+del fallback legacy de sellos —ya con plan y verificación: `uvh:crypto:seals`
+certifica con evidencia observada (aperturas legacy reales + marcador de
+primera emisión v2) cuándo puede borrarse el ramal; fases y criterio en
+`docs/app-secret-rotation-runbook.md`—. La
 pasada completa del arnés `e2e:async` ya está hecha: **125/125** el 2026-09-24
 (el run parcial anterior daba 92 PASS / 0 FAIL con los tres puntos editados
 cubiertos: portador del buzón HTTP 200, ensayo de caída del outbox y
