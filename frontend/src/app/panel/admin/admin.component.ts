@@ -266,7 +266,11 @@ export class AdminComponent {
    * The first paint: the two snapshots above the tabs and the queue of the tab
    * that is already open. Every other queue reads nothing until its tab is
    * opened, and the moderation queues read when their tab first instantiates —
-   * a closed tab asks for nothing.
+   * a closed tab asks for nothing *on this first paint*.
+   *
+   * `reloadAll()` is the explicit exception and the only one: "Actualizar todo"
+   * refreshes every queue, including the tabs the operator never opened, because
+   * that is what the button says. This initial read is what stays lazy.
    */
   private async start(): Promise<void> {
     this.openTab(0);
