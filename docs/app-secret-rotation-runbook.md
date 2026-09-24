@@ -147,3 +147,57 @@ Sólo después de preflight cero, drenaje y validación funcional:
 La rotación sólo se considera probada cuando este procedimiento haya pasado en
 una copia aislada, se haya interrumpido y reanudado deliberadamente, y se haya
 ensayado el rollback en ambos sentidos.
+
+## Retirada del fallback de formato legacy (sellos sin key-id)
+
+Distinta de retirar una CLAVE está retirar el FORMATO antiguo. Cuando el key-id
+entró dentro de los sellos, los sellos ya emitidos —sin etiqueta— siguieron
+abriendo por un camino de transición: `SealedToken::open` reintenta el formato
+`nonce | tag | cipher` probando el keyring completo, y `SignedToken::verify`
+acepta la forma de tres segmentos `body.exp.mac`. Ese fallback es una ventana
+de migración, no una característica: los sellos viejos mueren por su propia
+expiración y el ramal debe borrarse después.
+
+### Evidencia (no memoria)
+
+Los sellos viven en cookies y enlaces del cliente; no se pueden enumerar. La
+retirada se decide con dos observaciones (`SealFormatTelemetry`, ambas en
+`audit_events`):
+
+- `crypto.legacy_seal_opened` — un sello legacy se abrió o verificó **de
+  verdad**. Sólo el éxito cuenta: una cookie de basura no puede llenar el
+  registro. Cada fila es un sello viejo que estuvo vivo en ese momento.
+- `crypto.seal_v2_first_issued` — la primera emisión del formato con key-id
+  observada por este despliegue. Acota cuándo dejaron de emitirse sellos legacy
+  (el arranque rodante puede alargarlo unos minutos; el margen lo cubre).
+
+### Comprobación
+
+```bash
+docker compose -f docker-compose.production.yml --profile tools run --rm migrate php artisan uvh:crypto:seals
+```
+
+`uvh:crypto:seals` informa de las superficies con su TTL real (configuración
+viva: edición de registro ≤ 24 h, aparcamiento de invitación ≤ 30 d, de
+intención ≤ 168 h, desbloqueo 10 min), del keyring, de las aperturas legacy
+observadas y del cálculo: la **huella legacy** es el máximo entre el final de la
+emisión legacy y la última apertura observada, y el fallback puede retirarse en
+`huella + TTL máximo`. Códigos de salida: `0` retirada certificada, `2` aún en
+vuelo o ventana sin cerrar, `1` no evaluable (pasa `--since=FECHA` con la fecha
+del despliegue si aún no hay marcador). `--json` para scripting.
+
+### Fases
+
+1. **Instrumentación** (hecha): telemetría de aperturas legacy y marcador de
+   primera emisión v2, sin coste en el camino moderno.
+2. **Observación**: ejecutar el comando periódicamente (a mano o en la pasada de
+   housekeeping) hasta que certifique `0`. Añade un margen operativo de 24 h
+   entre el certificado y la retirada efectiva: cubre un arranque rodante que
+   haya emitido legacy unos minutos después del marcador.
+3. **Retirada**: borrar `SealedToken::openLegacy` y la rama legacy de
+   `SignedToken::verify`; el contrato de `SealKeyringTest` se invierte (los
+   formatos antiguos dejan de abrir); volver a ejecutar `uvh:crypto:seals`, que
+   debe seguir certificando con la superficie vacía.
+
+La retirada del FORMATO es independiente de la retirada de una CLAVE: una no
+sustituye a la otra, y cada una tiene su ventana y su evidencia.

@@ -29,15 +29,23 @@ test("registro, verificación por email y login crean una sesión real", async (
   await expect(page).toHaveURL(/\/app\/(dashboard|getting-started)$/);
 });
 
-test("una cuenta no verificada nunca recibe sesión ni reto MFA", async ({ page }) => {
+test("un registro pendiente no abre sesión ni reto MFA y el reenvío vive en una entrada propia", async ({ page }) => {
   const email = `unverified-${Date.now()}@example.test`;
   await registerFromBrowser(page, email);
   await loginFromBrowser(page, email);
 
+  // Un registro pendiente no es una cuenta: el login contesta como unas
+  // credenciales incorrectas —sin sesión y sin reto MFA— y con ello NO revela
+  // si esa dirección sigue pendiente (señal de ciclo de vida cerrada).
   await expect(page).toHaveURL(/\/auth$/);
-  await expect(page.getByRole("alert")).toContainText("Verifica tu email para continuar");
-  await expect(page.getByRole("button", { name: "Reenviar verificación" })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("Credenciales incorrectas");
   await expect(page.getByRole("heading", { name: "Confirma que eres tú" })).toHaveCount(0);
+
+  // La vuelta al buzón es una entrada pública del panel de acceso, siempre
+  // disponible y sin depender de ninguna señal del servidor.
+  await expect(page.getByRole("button", { name: "Reenviar verificación" })).toBeVisible();
+  await page.getByRole("button", { name: "Reenviar verificación" }).click();
+  await expect(page.getByText("recibirás un nuevo correo en breve")).toBeVisible();
 });
 
 test("registro duplicado conserva la respuesta anti-enumeración", async ({ page }) => {

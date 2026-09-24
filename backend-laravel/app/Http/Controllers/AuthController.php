@@ -8,6 +8,7 @@ use App\Models\AuditEvent;
 use App\Models\DataExportRequest;
 use App\Models\EmailChangeRequest;
 use App\Models\EmailToken;
+use App\Models\PendingRegistration;
 use App\Models\User;
 use App\Models\UvhSession;
 use App\Support\AccountRecoveryLifecycle;
@@ -84,64 +85,57 @@ class AuthController
 
         $email = strtolower($email);
 
-        // One bcrypt in every branch: what the destination holds decides the
-        // EFFECT below — never the response, the validation order, or the work
-        // paid for upfront.
-        $passwordHash = Hash::make($password);
+        // La inscripción es una PROPUESTA: nombre y contraseña se validan con
+        // el mismo contrato que la activación —el formulario y la API comparten
+        // una sola definición de lo que esta aplicación acepta—, pero NO se
+        // guardan. Nada que acredite identidad o credencial persiste antes de
+        // que el buzón se demuestre: ni fila de usuario, ni workspace, ni
+        // aceptación legal, ni contraseña —la activación decide todo eso con lo
+        // que escribe el que abre el buzón—.
+        //
+        // Sin propuesta guardada, `login` no puede distinguir a un registrante
+        // de una dirección desconocida: mismísima respuesta 401, mismo bcrypt
+        // de señuelo. La orientación al buzón no es una señal de ciclo de vida
+        // que el servidor revela —«sigue pendiente / ya no»—, sino la entrada
+        // pública «Reenviar verificación», siempre disponible en la UI.
         $token = Ids::randomToken(32);
         $tokenHash = Ids::sha256Hex($token);
         try {
-            $outcome = DB::transaction(function () use ($email, $name, $passwordHash, $token, $tokenHash): array {
+            $outcome = DB::transaction(function () use ($email, $token, $tokenHash): array {
                 $this->lockEmailAddress($email);
                 $reserved = EmailChangeRequest::whereRaw('lower(new_email) = ?', [$email])
                     ->where('expires_at', '>', now())->exists();
-                if ($reserved || User::whereRaw('lower(email) = ?', [$email])->exists()) {
-                    // Unverified, verified, soft-deleted or reserved: all four
-                    // are the same answer, and none of them is replaced. An
-                    // UNVERIFIED registration never owns an address — the
-                    // mailbox proof decides, and `verifyEmail` takes the
-                    // password from whoever opens the mailbox — so a later
-                    // anonymous registration has nothing to win by rewriting
-                    // the row: it used to rename the account, restamp its legal
-                    // acceptance and kill the bearer that was already sitting
-                    // in the owner's inbox, which is damage, not a fix. There is
-                    // no dead end either: that first bearer still completes the
-                    // registration, and `resend-verification` issues another.
+                if ($reserved
+                    || PendingRegistration::whereRaw('lower(email) = ?', [$email])->exists()
+                    || User::whereRaw('lower(email) = ?', [$email])->exists()) {
+                    // Pendiente, verificada, borrada en blando o reservada: las
+                    // cuatro son la misma respuesta y a ninguna se sustituye. Un
+                    // registro sin verificar nunca posee una dirección —la
+                    // prueba del buzón manda—, de modo que a una inscripción
+                    // anónima posterior no le queda nada que ganar: no hay fila
+                    // de usuario que reescribir, y el bearer que ya está en el
+                    // buzón del propietario sigue completando el registro. Tampoco
+                    // hay callejón sin salida: `resend-verification` emite otro.
                     //
-                    // The outcome pays exactly like a real registration: one
-                    // orphaned admission whose token has no backing row, so the
-                    // delivery jobs suppress it and no mailbox is touched.
+                    // El desenlace paga exactamente como una inscripción real:
+                    // una admisión huérfana cuyo token no tiene fila, de modo
+                    // que los jobs de entrega la suprimen y ningún buzón se
+                    // toca.
                     $this->admitOrphanVerification($email);
 
-                    return ['status' => 'occupied', 'user_id' => null, 'security_version' => null];
+                    return ['status' => 'occupied', 'registration_id' => null, 'security_version' => null];
                 }
 
-                $user = User::create([
+                $pending = PendingRegistration::create([
                     'email' => $email,
-                    'name' => $name,
-                    'password_hash' => $passwordHash,
-                    // First generation of the credential, written explicitly so
-                    // the edit secret can seal the version without re-reading
-                    // the row it was just inserted into.
+                    // Primera generación del secreto de edición, escrita
+                    // explícitamente para poder sellarla sin releer la fila.
                     'security_version' => 1,
                 ]);
-                // These rows are business evidence, not best-effort telemetry;
-                // failure must roll back the account and its default workspace.
-                $this->acceptRegistrationLegal((int) $user->id, now());
-                $workspace = $user->ownedWorkspaces()->create([
-                    // Registration accepts a longer personal name than the
-                    // workspace write contract. Keep the generated resource
-                    // inside that contract instead of creating an unreadable
-                    // workspace for otherwise valid registrations.
-                    'name' => $this->defaultWorkspaceName($name),
-                    'slug' => 'ws-'.strtolower(Ids::randomToken(6)),
-                ]);
-                $workspace->memberships()->create(['user_id' => $user->id, 'role' => 'owner']);
-                $workspace->quota()->create(['links_limit' => 1000]);
 
                 EmailToken::create([
                     'id' => $tokenHash,
-                    'user_id' => $user->id,
+                    'pending_registration_id' => (int) $pending->id,
                     'kind' => 'verify',
                     'expires_at' => now()->addDay(),
                 ]);
@@ -153,7 +147,7 @@ class AuthController
                     throw new MailAdmissionException('Registration verification outbox admission failed');
                 }
 
-                return ['status' => 'created', 'user_id' => (int) $user->id, 'security_version' => 1];
+                return ['status' => 'created', 'registration_id' => (int) $pending->id, 'security_version' => 1];
             });
         } catch (MailAdmissionException) {
             Audit::write(null, 'auth.email_delivery_failed', 'user', null, ['kind' => 'verify']);
@@ -177,11 +171,13 @@ class AuthController
         if ($outcome['status'] === 'occupied') {
             Audit::write(null, 'auth.register_duplicate', 'user', null);
         } else {
-            Audit::write($outcome['user_id'], 'auth.register', 'user', $outcome['user_id']);
-            Audit::write($outcome['user_id'], 'auth.terms_accepted', 'consent', self::TERMS_VERSION);
+            // Todavía sin cuenta: el evento nombra la fila pendiente y el actor
+            // queda en null hasta la activación, que es donde nace el usuario.
+            Audit::write(null, 'auth.register', 'pending_registration', (string) $outcome['registration_id']);
+            Audit::write(null, 'auth.terms_accepted', 'consent', self::TERMS_VERSION);
             // The privacy policy is an information notice, not blanket consent
             // for every processing purpose. Record the exact notice shown.
-            Audit::write($outcome['user_id'], 'auth.privacy_notice_acknowledged', 'privacy_notice', self::PRIVACY_VERSION);
+            Audit::write(null, 'auth.privacy_notice_acknowledged', 'privacy_notice', self::PRIVACY_VERSION);
         }
 
         // The registration edit secret, in every outcome and with the same
@@ -189,7 +185,7 @@ class AuthController
         // address later, and no branch of this endpoint announces itself by
         // whether it handed one out.
         $registrationEdit = is_int($outcome['security_version'])
-            ? RegistrationEdit::secret((int) $outcome['user_id'], $outcome['security_version'])
+            ? RegistrationEdit::secret((int) $outcome['registration_id'], $outcome['security_version'])
             : RegistrationEdit::decoy();
 
         return response()->json(['user' => null], 201)->withCookie($registrationEdit);
@@ -200,12 +196,11 @@ class AuthController
      * creating a session.
      *
      * The authority is the registration edit secret (`RegistrationEdit`), not
-     * the password the anonymous registration left behind. That password is a
-     * PROPOSAL: any `register` mints one, so accepting it here handed the
-     * pending registration's destination to whoever minted the latest, which is
-     * the same pre-hijack this commit closed at activation, one step earlier.
-     * The secret only exists in the browser that created the row and cannot be
-     * fabricated from anything an attacker writes.
+     * any password: the pending row keeps no proposal at all any more. (When it
+     * did, accepting it here handed the destination to whoever minted the
+     * latest `register` —the same pre-hijack this change closed at activation,
+     * one step earlier—.) The secret only exists in the browser that created
+     * the row and cannot be fabricated from anything an attacker writes.
      *
      * The row is not replaced by later registrations any more, so this endpoint
      * is not racing one either: it moves the pending row it was told to move, or
@@ -234,16 +229,16 @@ class AuthController
         // Cheap early-out for garbage secrets; NOT the authority. The binding
         // check runs inside the transaction, against the locked row — see
         // below.
-        $user = $this->findUserByEmail($currentEmail);
-        if (! $user || $user->email_verified_at || ! RegistrationEdit::authorizes($request, $user)) {
+        $pending = $this->findPendingRegistrationByEmail($currentEmail);
+        if (! $pending || ! RegistrationEdit::authorizes($request, $pending)) {
             return response()->json(['error' => 'No se puede cambiar este registro'], 403);
         }
         $token = Ids::randomToken(32);
         $tokenHash = Ids::sha256Hex($token);
         $verificationUrl = $this->appUrl().'/auth/verify-email#token='.rawurlencode($token);
         try {
-            $changed = DB::transaction(function () use ($request, $user, $newEmail, $tokenHash, $verificationUrl): array {
-                $locked = User::where('id', $user->id)->whereNull('email_verified_at')->lockForUpdate()->first();
+            $changed = DB::transaction(function () use ($request, $pending, $newEmail, $tokenHash, $verificationUrl): array {
+                $locked = PendingRegistration::where('id', $pending->id)->lockForUpdate()->first();
                 // The secret is validated HERE, against the locked row, and
                 // this is the check that grants. A credential bound to a
                 // version plus a mutation of that version must live inside ONE
@@ -263,7 +258,8 @@ class AuthController
                 // resolved by the flows that already own it — this
                 // registration's verification email, or `forgot-password` for
                 // the account that holds the destination.
-                $taken = User::where('id', '!=', $locked->id)->whereRaw('lower(email) = ?', [$newEmail])->exists()
+                $taken = User::whereRaw('lower(email) = ?', [$newEmail])->exists()
+                    || PendingRegistration::where('id', '!=', $locked->id)->whereRaw('lower(email) = ?', [$newEmail])->exists()
                     || EmailChangeRequest::whereRaw('lower(new_email) = ?', [$newEmail])->where('expires_at', '>', now())->exists();
 
                 // The same statement on both outcomes: only a taken destination
@@ -277,17 +273,17 @@ class AuthController
                     : ['email' => $newEmail, 'security_version' => $securityVersion, 'updated_at' => now()]);
 
                 if (! $taken) {
-                    // The old mailbox must lose every outstanding bearer. A reset
-                    // link delivered before this correction must not remain able
-                    // to change credentials after the account email has moved.
-                    EmailToken::where('user_id', $locked->id)
-                        ->whereIn('kind', ['verify', 'reset'])
+                    // The old mailbox must lose every outstanding bearer. A
+                    // pending registration has no sessions and no reset links —
+                    // those need a verified account —, so its verify bearers are
+                    // the whole surface, and the row itself dies at activation.
+                    EmailToken::where('pending_registration_id', $locked->id)
+                        ->where('kind', 'verify')
                         ->whereNull('used_at')
                         ->delete();
-                    DB::table('sessions')->where('user_id', $locked->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
                     EmailToken::create([
                         'id' => $tokenHash,
-                        'user_id' => $locked->id,
+                        'pending_registration_id' => (int) $locked->id,
                         'kind' => 'verify',
                         'expires_at' => now()->addDay(),
                     ]);
@@ -312,7 +308,7 @@ class AuthController
                 return ['status' => 'conflict', 'security_version' => (int) $locked->security_version];
             });
         } catch (MailAdmissionException) {
-            Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'verify']);
+            Audit::write(null, 'auth.email_delivery_failed', 'pending_registration', (string) $pending->id, ['kind' => 'verify']);
 
             return response()->json(['error' => 'No se pudo enviar la verificación. Inténtalo de nuevo más tarde'], 503);
         } catch (QueryException $e) {
@@ -324,22 +320,22 @@ class AuthController
             // still holds the generation this request was authorised with.
             // Answer exactly like the taken outcome instead of advertising the
             // race.
-            $changed = ['status' => 'conflict', 'security_version' => (int) $user->security_version];
+            $changed = ['status' => 'conflict', 'security_version' => (int) $pending->security_version];
         }
         if ($changed['status'] === 'unavailable') {
             return response()->json(['error' => 'No se puede cambiar este registro'], 403);
         }
         // One internal audit event per outcome; the HTTP answers stay identical.
-        Audit::write($user->id, $changed['status'] === 'ok'
+        Audit::write(null, $changed['status'] === 'ok'
             ? 'auth.registration_email_change'
-            : 'auth.registration_email_change_conflict', 'user', $user->id);
+            : 'auth.registration_email_change_conflict', 'pending_registration', (string) $pending->id);
 
         // The same answer and the same cookie shape either way: a move hands
         // back a secret sealed with the generation it just installed, and a
         // conflict re-seals the one the row still has, so the browser that
         // mistyped can try another address instead of losing its witness.
         return response()->json(['ok' => true])->withCookie(
-            RegistrationEdit::secret((int) $user->id, (int) $changed['security_version']),
+            RegistrationEdit::secret((int) $pending->id, (int) $changed['security_version']),
         );
     }
 
@@ -357,9 +353,14 @@ class AuthController
         }
 
         $user = $this->findUserByEmail($email);
+        // Un registro pendiente no es una cuenta y no guarda nada que
+        // reconocer —ni siquiera la propuesta de contraseña—: su correo cae en
+        // la misma rama que una dirección desconocida, con el mismo bcrypt de
+        // señuelo y el mismo 401. El servidor no revela «sigue pendiente / ya
+        // no»: la guía al buzón es la entrada pública «Reenviar verificación».
         $ok = Hash::check($password, $user ? $user->password_hash : self::DUMMY_PASSWORD_HASH);
 
-        if (! $user || ! $ok) {
+        if (! $ok || $user === null) {
             return response()->json(['error' => 'Credenciales incorrectas'], 401);
         }
 
@@ -649,73 +650,79 @@ class AuthController
         $passwordHash = Hash::make($password);
         $tokenHash = Ids::sha256Hex($token);
         $snapshot = EmailToken::where('id', $tokenHash)
-            ->where('kind', 'verify')->whereNull('used_at')->first(['id', 'user_id']);
-        // User first, bearer second is the global lifecycle lock order. The
-        // preflight row is untrusted and every property is checked again under
-        // lock, so replacement or consumption races fail closed.
-        $userId = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
-            $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-            $row = EmailToken::where('id', $tokenHash)
-                ->where('user_id', $snapshot->user_id)
-                ->where('kind', 'verify')
-                ->whereNull('used_at')
-                ->lockForUpdate()
-                ->first();
-            if (! $row || $row->expires_at->isPast()) {
-                return null;
-            }
+            ->where('kind', 'verify')->whereNull('used_at')->first(['id', 'pending_registration_id']);
+        // Pending registration first, bearer second is the global lifecycle
+        // lock order. The preflight row is untrusted and every property is
+        // checked again under lock, so replacement or consumption races fail
+        // closed.
+        $userId = $snapshot && $snapshot->pending_registration_id
+            ? DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
+                $pending = PendingRegistration::where('id', $snapshot->pending_registration_id)->lockForUpdate()->first();
+                $row = EmailToken::where('id', $tokenHash)
+                    ->where('pending_registration_id', $snapshot->pending_registration_id)
+                    ->where('kind', 'verify')
+                    ->whereNull('used_at')
+                    ->lockForUpdate()
+                    ->first();
+                if (! $row || $row->expires_at->isPast()) {
+                    return null;
+                }
 
-            if (! $user || $user->deleted_at || $user->email_verified_at) {
-                return null;
-            }
-            if (! PasswordStrength::isAcceptable($password, $name, $user->email)) {
-                // Re-evaluate with the live account identity while its row is
-                // locked. An activation must not accept a password derived from
-                // the name or mailbox merely because the anonymous preflight
-                // could not know that context (same contract as reset-password).
-                // The name that counts is the one typed HERE; the live mailbox
-                // is the row's.
-                return -1;
-            }
+                if (! $pending) {
+                    // La activación ya lo consumió o una corrección lo retiró: el
+                    // bearer no vuelve a abrir nada, y el desenlace es el mismo
+                    // `Token inválido o caducado` de siempre.
+                    return null;
+                }
+                if (! PasswordStrength::isAcceptable($password, $name, (string) $pending->email)) {
+                    // Re-evaluate with the live identity while its row is locked. An
+                    // activation must not accept a password derived from the name or
+                    // mailbox merely because the preflight could not know that
+                    // context (same contract as reset-password). The name that
+                    // counts is the one typed HERE; the live mailbox is the row's.
+                    return -1;
+                }
 
-            $now = now();
-            $row->update(['used_at' => $now]);
-            // The generated workspace name is derived from the PROPOSED name,
-            // so it must be read before the identity below replaces it.
-            $generatedWorkspaceName = $this->defaultWorkspaceName((string) $user->name);
-            $workspace = DB::table('workspaces')->where('owner_user_id', $user->id)
-                ->orderBy('id')->lockForUpdate()->first(['id', 'name']);
-            $user->update([
-                // Identity decided at activation, exactly like the password:
-                // the name an anonymous registration proposed is not the
-                // account owner's to keep.
-                'name' => $name,
-                'email_verified_at' => $now,
-                'password_hash' => $passwordHash,
-                // The credential was just settled, so every generation binds to
-                // this one — same hygiene as reset-password.
-                'security_version' => (int) $user->security_version + 1,
-                'updated_at' => $now,
-            ]);
-            // The default workspace follows the definitive name, but only while
-            // it still carries the generated one: a workspace already renamed
-            // by its owner is theirs, not the activation's to touch.
-            if ($workspace && $workspace->name === $generatedWorkspaceName) {
-                DB::table('workspaces')->where('id', $workspace->id)
-                    ->update(['name' => $this->defaultWorkspaceName($name), 'updated_at' => $now]);
-            }
-            // The legal acceptance that counts is the one made HERE, by whoever
-            // proved the mailbox — not the one an anonymous first registrant
-            // stamped on the victim's behalf hours earlier.
-            $this->acceptRegistrationLegal((int) $user->id, $now);
-            // A legacy deployment may have issued a session before email
-            // verification became mandatory. Revoke all of them now; merely
-            // waiting for a stale cookie to be used could resurrect it after
-            // verification. The user must establish a fresh session by login.
-            DB::table('sessions')->where('user_id', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
+                $now = now();
+                $row->update(['used_at' => $now]);
+                // La dirección se reclama en `users` con el advisory de esa misma
+                // dirección —justo antes de escribirla, y con la fila pendiente ya
+                // bloqueada, de modo que su correo no se mueve mientras tanto—. Es
+                // lo que serializa esta creación con `register` y con cualquier
+                // corrección que apunte al mismo destino: usuarios y registros
+                // pendientes son dos tablas, y una dirección vive en una sola.
+                $this->lockEmailAddress(strtolower((string) $pending->email));
+                $user = User::create([
+                    'email' => (string) $pending->email,
+                    // Identity decided at activation, exactly like the password:
+                    // nothing an anonymous registration proposed is the account
+                    // owner's to keep — there is no proposal stored at all.
+                    'name' => $name,
+                    'password_hash' => $passwordHash,
+                    'email_verified_at' => $now,
+                    // The credential was just settled: this is generation 1 of the
+                    // account, and every later generation binds to a change of it.
+                    'security_version' => 1,
+                ]);
+                // Registration accepts a longer personal name than the workspace
+                // write contract. Keep the generated resource inside that contract
+                // instead of creating an unreadable workspace.
+                $workspace = $user->ownedWorkspaces()->create([
+                    'name' => $this->defaultWorkspaceName($name),
+                    'slug' => 'ws-'.strtolower(Ids::randomToken(6)),
+                ]);
+                $workspace->memberships()->create(['user_id' => $user->id, 'role' => 'owner']);
+                $workspace->quota()->create(['links_limit' => 1000]);
+                // The legal acceptance that counts is the one made HERE, by whoever
+                // proved the mailbox — not one an anonymous first registrant could
+                // stamp on the victim's behalf hours earlier. Nothing provisional
+                // was kept, so nothing provisional survives either: the pending row
+                // and every bearer it still had die with it, in one cascade.
+                $this->acceptRegistrationLegal((int) $user->id, $now);
+                $pending->delete();
 
-            return (int) $user->id;
-        }) : null;
+                return (int) $user->id;
+            }) : null;
         if ($userId === -1) {
             return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
         }
@@ -746,15 +753,18 @@ class AuthController
         if (! $authenticated && ($captchaError = $this->captchaError($request, $captchaToken))) {
             return $captchaError;
         }
-        $user = $authenticated ?? ($this->validEmail($requestedEmail) ? $this->findUserByEmail($requestedEmail) : null);
-        $authenticatedCall = $authenticated !== null;
-
-        if (! $user || $user->email_verified_at) {
-            if ($authenticatedCall && $user?->email_verified_at) {
-                return response()->json(['error' => 'El email ya está verificado'], 400);
-            }
-
-            // Unknown and already-verified addresses are intentionally
+        if ($authenticated !== null) {
+            // Toda fila de usuario está verificada —el registro pendiente vive
+            // en `pending_registrations`, y el login no da sesión sin verificar—,
+            // así que un llamante autenticado no tiene nada pendiente que
+            // reenviar. El contrato de siempre para este caso.
+            return response()->json(['error' => 'El email ya está verificado'], 400);
+        }
+        $pending = $this->validEmail($requestedEmail)
+            ? $this->findPendingRegistrationByEmail($requestedEmail)
+            : null;
+        if (! $pending) {
+            // Unknown and already-consumed addresses are intentionally
             // indistinguishable on the public path.
             return response()->json(['ok' => true]);
         }
@@ -762,22 +772,25 @@ class AuthController
         $token = Ids::randomToken(32);
         $tokenHash = Ids::sha256Hex($token);
         try {
-            $result = DB::transaction(function () use ($user, $token, $tokenHash): array {
-                // The user lock makes cooldown, bearer replacement and outbox
-                // admission one commit; no crash can expose an undeliverable token.
-                $locked = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                if (! $locked || $locked->email_verified_at) {
-                    return ['status' => 'unavailable'];
+            DB::transaction(function () use ($pending, $token, $tokenHash): void {
+                // The pending row lock makes cooldown, bearer replacement and
+                // outbox admission one commit; no crash can expose an
+                // undeliverable token.
+                $locked = PendingRegistration::where('id', $pending->id)->lockForUpdate()->first();
+                if (! $locked) {
+                    // Consumida por una activación mientras tanto: igual que una
+                    // dirección desconocida, `ok` sin más.
+                    return;
                 }
-                $last = EmailToken::where('user_id', $locked->id)
+                $last = EmailToken::where('pending_registration_id', $locked->id)
                     ->where('kind', 'verify')->latest('created_at')->first();
                 if ($last && $last->created_at->gt(now()->subSeconds(60))) {
-                    return ['status' => 'cooldown'];
+                    return;
                 }
 
                 EmailToken::create([
                     'id' => $tokenHash,
-                    'user_id' => $locked->id,
+                    'pending_registration_id' => (int) $locked->id,
                     'kind' => 'verify',
                     'expires_at' => now()->addDay(),
                 ]);
@@ -788,27 +801,15 @@ class AuthController
                 )) {
                     throw new MailAdmissionException('Verification resend outbox admission failed');
                 }
-                EmailToken::where('user_id', $locked->id)->where('kind', 'verify')
+                EmailToken::where('pending_registration_id', $locked->id)->where('kind', 'verify')
                     ->whereNull('used_at')->where('id', '!=', $tokenHash)->delete();
-
-                return ['status' => 'created', 'user_id' => (int) $locked->id];
             });
         } catch (MailAdmissionException) {
-            Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'verify']);
+            Audit::write(null, 'auth.email_delivery_failed', 'pending_registration', (string) $pending->id, ['kind' => 'verify']);
 
-            return $authenticatedCall
-                ? response()->json(['error' => 'No se pudo poner en cola la verificación. Inténtalo de nuevo más tarde'], 503)
-                : response()->json(['ok' => true]);
-        }
-        if ($result['status'] === 'cooldown') {
-            return $authenticatedCall
-                ? response()->json(['error' => 'Espera un minuto antes de reenviar la verificación'], 429)
-                : response()->json(['ok' => true]);
-        }
-        if ($result['status'] !== 'created') {
-            return $authenticatedCall
-                ? response()->json(['error' => 'El email ya está verificado o la cuenta no está disponible'], 400)
-                : response()->json(['ok' => true]);
+            // The public path is uniform: a failure to enqueue is not a fact
+            // about the address either.
+            return response()->json(['ok' => true]);
         }
 
         return response()->json(['ok' => true]);
@@ -1762,7 +1763,12 @@ class AuthController
                     return ['status' => 'invalid'];
                 }
                 $this->lockEmailAddress(strtolower($row->new_email));
-                if (User::where('id', '!=', $user->id)->whereRaw('lower(email) = ?', [strtolower($row->new_email)])->exists()) {
+                // Un registro pendiente posee su dirección tanto como una
+                // cuenta: dejar esta reclamación sobre ella dejaría dos
+                // titulares y una activación que crearía un segundo usuario con
+                // el mismo correo.
+                if (User::where('id', '!=', $user->id)->whereRaw('lower(email) = ?', [strtolower($row->new_email)])->exists()
+                    || PendingRegistration::whereRaw('lower(email) = ?', [strtolower($row->new_email)])->exists()) {
                     $row->delete();
 
                     return ['status' => 'conflict'];
@@ -2467,10 +2473,9 @@ class AuthController
      * Legal acceptance: business evidence of THIS request. The table allows one
      * row per user/document/version (`legal_acceptance_user_document_unique`),
      * so each new acceptance refreshes the current version's row instead of
-     * colliding with the superseded one. Both `register` and the activation
-     * (`verifyEmail`) call it: the acceptance that counts is always the last
-     * explicit one made by whoever controls the flow — and at activation that
-     * is the mailbox opener, not whoever registered first.
+     * colliding with the superseded one. Only the activation (`verifyEmail`)
+     * calls it: the acceptance that counts is the one made by whoever proves
+     * the mailbox, never one an anonymous first registrant could stamp.
      */
     private function acceptRegistrationLegal(int $userId, Carbon $acceptedAt): void
     {
@@ -2488,6 +2493,11 @@ class AuthController
     private function findUserByEmail(string $email): ?User
     {
         return User::whereRaw('lower(email) = ?', [strtolower($email)])->whereNull('deleted_at')->first();
+    }
+
+    private function findPendingRegistrationByEmail(string $email): ?PendingRegistration
+    {
+        return PendingRegistration::whereRaw('lower(email) = ?', [strtolower($email)])->first();
     }
 
     private function validEmail(string $email): bool
@@ -2526,7 +2536,17 @@ class AuthController
         return rtrim((string) config('app.url'), '/');
     }
 
-    /** Serialize claims across users and pending email-change reservations. */
+    /**
+     * Serialize claims across users, pending registrations and pending
+     * email-change reservations.
+     *
+     * Disciplina anti-deadlock: cada flujo bloquea primero sus propias filas
+     * (el registro pendiente o el usuario, y sus tokens) y toma este advisory
+     * justo antes de escribir la dirección que reclama. Quien sostiene un
+     * advisory no vuelve a esperar a nada —sus escrituras de dirección solo
+     * chocan con las de otro poseedor del mismo advisory, que no existe—, de
+     * modo que ningún ciclo de espera puede cerrarse.
+     */
     private function lockEmailAddress(string $email): void
     {
         // A collision only causes harmless extra serialization. Using a

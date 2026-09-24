@@ -65,6 +65,21 @@ final class MailDeliveryEligibility
             return false;
         }
 
+        if ($tokenKind === 'verify') {
+            // Un bearer de verificación nombra un REGISTRO PENDIENTE, nunca un
+            // usuario: la cuenta no existe hasta que el bearer se gasta. El
+            // join ES la comprobación de vigencia —la activación borra la fila
+            // pendiente y sus bearers en cascada—, de modo que una fila viva es
+            // exactamente un registro sin activar esperando a su buzón.
+            return DB::table('email_tokens as t')
+                ->join('pending_registrations as p', 'p.id', '=', 't.pending_registration_id')
+                ->where('t.id', $id)
+                ->where('t.kind', 'verify')
+                ->whereNull('t.used_at')
+                ->where('t.expires_at', '>', now())
+                ->exists();
+        }
+
         $query = DB::table('email_tokens as t')
             ->join('users as u', 'u.id', '=', 't.user_id')
             ->where('t.id', $id)
@@ -72,9 +87,6 @@ final class MailDeliveryEligibility
             ->whereNull('t.used_at')
             ->where('t.expires_at', '>', now());
 
-        if ($tokenKind === 'verify') {
-            return $query->whereNull('u.deleted_at')->whereNull('u.email_verified_at')->exists();
-        }
         if ($tokenKind === 'reset') {
             return $query->whereNull('u.deleted_at')->whereNotNull('u.email_verified_at')->exists();
         }

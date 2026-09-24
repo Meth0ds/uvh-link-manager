@@ -61,6 +61,39 @@ class UvhCrypto
         return $secrets;
     }
 
+    /**
+     * Etiqueta pública de una clave del keyring.
+     *
+     * Derivada de la propia clave (HMAC con dominio propio, 4 bytes en
+     * base64url), nunca configurada aparte: una etiqueta escrita a mano puede
+     * desincronizarse de la clave que dice nombrar, y esta no. Es pública por
+     * diseño —viaja dentro del sello— y no se deduce la clave de ella.
+     */
+    public static function keyId(string $secret): string
+    {
+        return Ids::base64urlEncode(substr(hash_hmac('sha256', 'uvh:key-id:v1', $secret, true), 0, 4));
+    }
+
+    /**
+     * La clave que una etiqueta noma dentro del keyring vivo, o null si ninguna.
+     *
+     * El resultado sólo depende de la etiqueta, que ya es pública en el token;
+     * no hay nada que esconder en cómo se busca.
+     */
+    public static function secretByKeyId(string $keyId): ?string
+    {
+        if (preg_match('/^[A-Za-z0-9_-]{6}$/D', $keyId) !== 1) {
+            return null;
+        }
+        foreach (self::secrets() as $secret) {
+            if (hash_equals(self::keyId($secret), $keyId)) {
+                return $secret;
+            }
+        }
+
+        return null;
+    }
+
     public static function atRestKey(): string
     {
         return self::atRestKeyFor(self::secret());

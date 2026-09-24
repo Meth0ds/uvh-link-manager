@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
+use App\Models\PendingRegistration;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -40,7 +40,7 @@ final class RegistrationEditConcurrencyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement('TRUNCATE users, sessions, workspaces, memberships, quotas, email_tokens, mail_outbox, audit_events, operational_metrics RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, sessions, workspaces, memberships, quotas, pending_registrations, email_tokens, mail_outbox, audit_events, operational_metrics RESTART IDENTITY CASCADE');
 
         // Cookies sin cifrar y par double-submit CSRF, igual que el resto de
         // superficie de auth: `uvh.csrf` exige cookie y cabecera iguales.
@@ -65,8 +65,8 @@ final class RegistrationEditConcurrencyTest extends TestCase
         ], $this->captchaPayload()))->assertStatus(201);
         $secret = (string) $this->cookieFrom($registered, 'uvh_registration_edit');
         $this->assertNotSame('', $secret);
-        $user = User::where('email', $email)->firstOrFail();
-        $this->assertSame(1, (int) $user->security_version);
+        $pending = PendingRegistration::where('email', $email)->firstOrFail();
+        $this->assertSame(1, (int) $pending->security_version);
 
         $destinations = [
             'ganadora-'.strtolower(bin2hex(random_bytes(4))).'@example.com',
@@ -85,10 +85,10 @@ final class RegistrationEditConcurrencyTest extends TestCase
         // Exactly one move landed, and the generation advanced exactly once:
         // the loser's request found a row already rotated and refused instead
         // of rotating it again.
-        $user->refresh();
-        $this->assertSame(2, (int) $user->security_version);
-        $this->assertContains($user->email, $destinations);
-        $this->assertSame(1, User::whereIn('email', $destinations)->count());
+        $pending->refresh();
+        $this->assertSame(2, (int) $pending->security_version);
+        $this->assertContains($pending->email, $destinations);
+        $this->assertSame(1, PendingRegistration::whereIn('email', $destinations)->count());
     }
 
     // ---------------- harness ----------------
@@ -231,8 +231,8 @@ final class RegistrationEditConcurrencyTest extends TestCase
     // ---------------- the forced TOCTOU window ----------------
 
     /**
-     * A test-only trigger that makes every `users.security_version` rotation
-     * sleep 1.5 s INSIDE its transaction. That is the whole forcing trick: the
+     * A test-only trigger that makes every `pending_registrations.security_version`
+     * rotation sleep 1.5 s INSIDE its transaction. That is the whole forcing trick: the
      * winner holds the row lock while sleeping, so the loser's pre-lock
      * validation —which happens milliseconds after the barrier— is guaranteed
      * to run against generation 1 while the commit lands 1.5 s later.
@@ -247,12 +247,12 @@ BEGIN
 END;
 $fn$
 SQL);
-        DB::statement('CREATE TRIGGER uvh_test_slow_security_version BEFORE UPDATE OF security_version ON users FOR EACH ROW EXECUTE FUNCTION uvh_test_slow_security_version()');
+        DB::statement('CREATE TRIGGER uvh_test_slow_security_version BEFORE UPDATE OF security_version ON pending_registrations FOR EACH ROW EXECUTE FUNCTION uvh_test_slow_security_version()');
     }
 
     private function dropSlowRotationTrigger(): void
     {
-        DB::statement('DROP TRIGGER IF EXISTS uvh_test_slow_security_version ON users');
+        DB::statement('DROP TRIGGER IF EXISTS uvh_test_slow_security_version ON pending_registrations');
         DB::statement('DROP FUNCTION IF EXISTS uvh_test_slow_security_version()');
     }
 

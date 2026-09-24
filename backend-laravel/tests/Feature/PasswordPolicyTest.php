@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\PendingRegistration;
 use App\Models\User;
 use App\Support\Ids;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ class PasswordPolicyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement('TRUNCATE users, sessions, workspaces, memberships, invitations, quotas, email_tokens, mail_outbox RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, sessions, workspaces, memberships, invitations, quotas, pending_registrations, email_tokens, mail_outbox RESTART IDENTITY CASCADE');
         $this->disableCookieEncryption();
         $this->withCredentials();
         $this->withCookie('uvh_csrf', self::CSRF)->withHeaders(['X-CSRF-Token' => self::CSRF]);
@@ -116,11 +117,11 @@ class PasswordPolicyTest extends TestCase
             'password' => 'tiovivo-cobrizo-astilla-42',
         ], $this->captchaPayload()))->assertStatus(201);
 
-        $user = User::where('email', 'charlie@example.com')->firstOrFail();
+        $pending = PendingRegistration::where('email', 'charlie@example.com')->firstOrFail();
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
-            'user_id' => $user->id,
+            'pending_registration_id' => $pending->id,
             'kind' => 'verify',
             'expires_at' => now()->addHour(),
             'created_at' => now(),
