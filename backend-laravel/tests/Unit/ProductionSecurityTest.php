@@ -72,6 +72,7 @@ class ProductionSecurityTest extends TestCase
         $settings['csrf_cookie'] = 'uvh_csrf';
         $settings['invitation_cookie'] = 'uvh_pending_invitation';
         $settings['intent_cookie'] = 'uvh_pending_intent';
+        $settings['registration_edit_cookie'] = 'uvh_registration_edit';
         $settings['cache_store'] = 'array';
         $settings['queue_connection'] = 'sync';
 
@@ -84,6 +85,10 @@ class ProductionSecurityTest extends TestCase
         // shadow is a cookie a sibling host can read.
         $this->assertContains('PENDING_INVITATION_COOKIE debe usar el prefijo __Host- en producción', $errors);
         $this->assertContains('PENDING_INTENT_COOKIE debe usar el prefijo __Host- en producción', $errors);
+        // El secreto que autoriza corregir un registro es un testigo de
+        // propiedad: una cookie que un host hermano puede falsear es una cookie
+        // con la que un host hermano corrige registros ajenos.
+        $this->assertContains('REGISTRATION_EDIT_COOKIE debe usar el prefijo __Host- en producción', $errors);
         $this->assertContains('CACHE_STORE debe ser compartido entre procesos en producción', $errors);
         $this->assertContains('QUEUE_CONNECTION debe usar una cola persistente en producción', $errors);
     }
@@ -340,6 +345,8 @@ class ProductionSecurityTest extends TestCase
             'csrf_cookie' => '__Host-uvh_csrf',
             'invitation_cookie' => '__Host-uvh_pending_invitation',
             'intent_cookie' => '__Host-uvh_pending_intent',
+            'registration_edit_cookie' => '__Host-uvh_registration_edit',
+            'registration_edit_ttl_hours' => 24,
             'hsts_enabled' => true,
             'session_ttl_days' => 30,
             'invitation_ttl_days' => 7,

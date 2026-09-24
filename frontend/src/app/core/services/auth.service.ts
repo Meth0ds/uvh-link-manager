@@ -246,16 +246,23 @@ export class AuthService {
     await this.api.post<{ ok: true }>("/api/v1/auth/resend-verification", { email, captchaToken });
   }
 
+  /**
+   * Corrige la dirección de un registro sin verificar.
+   *
+   * No manda contraseña: la autoridad es la cookie `REGISTRATION_EDIT_COOKIE`
+   * que el servidor emitió al navegador que creó el registro, y que el cliente
+   * HTTP adjunta sola (HttpOnly, `withCredentials`). La contraseña propuesta ya
+   * no autoriza nada en el servidor, así que pedirla aquí sería pedir un dato
+   * que nadie va a leer.
+   */
   async changeRegistrationEmail(
     currentEmail: string,
     newEmail: string,
-    password: string,
     antiBot: { captchaToken: string; website?: string },
   ): Promise<void> {
     await this.api.post<{ ok: true }>("/api/v1/auth/change-registration-email", {
       currentEmail,
       newEmail,
-      password,
       ...antiBot,
     });
   }

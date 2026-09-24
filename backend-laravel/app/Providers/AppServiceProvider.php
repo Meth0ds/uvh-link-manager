@@ -413,6 +413,8 @@ class AppServiceProvider extends ServiceProvider
             'csrf_cookie' => config('uvh.csrf_cookie'),
             'invitation_cookie' => config('uvh.invitation_cookie'),
             'intent_cookie' => config('uvh.intent_cookie'),
+            'registration_edit_cookie' => config('uvh.registration_edit_cookie'),
+            'registration_edit_ttl_hours' => config('uvh.registration_edit_ttl_hours'),
             'hsts_enabled' => config('uvh.hsts_enabled'),
             'session_ttl_days' => config('uvh.session_ttl_days'),
             'invitation_ttl_days' => config('uvh.invitation_ttl_days'),

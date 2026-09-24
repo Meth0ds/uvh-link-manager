@@ -48,6 +48,7 @@ class EnvTemplateContractTest extends TestCase
         'CSRF_COOKIE' => 'same prefix rule as the session cookie',
         'PENDING_INVITATION_COOKIE' => 'same __Host- prefix rule as the session cookie: Secure, Path=/ and no Domain',
         'PENDING_INTENT_COOKIE' => 'same __Host- prefix rule as the session cookie: Secure, Path=/ and no Domain',
+        'REGISTRATION_EDIT_COOKIE' => 'same __Host- prefix rule: it is the witness that authorises correcting a pending registration',
         'TRUSTED_PROXIES' => 'the deployment proxy network; empty by default, which trusts nobody',
         'EDGE_INTERNAL_CIDRS' => 'the deployment network the edge accepts internal traffic from',
         'HSTS_ENABLED' => 'only safe behind TLS termination; off by default so local HTTP keeps working',

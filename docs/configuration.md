@@ -118,6 +118,8 @@ Ceremonia de rotación: [`app-secret-rotation-runbook.md`](app-secret-rotation-r
 | `SESSION_TTL_DAYS` | \* | `30` | Rango 1–30. |
 | `PENDING_INVITATION_COOKIE` | \* | `uvh_pending_invitation` | Cookie del aparcadero para la invitación (plantilla: `__Host-uvh_pending_invitation`). Mismo prefijo `__Host-` y host-only que la sesión; debe ser distinta de las otras tres. |
 | `PENDING_INTENT_COOKIE` | \* | `uvh_pending_intent` | Cookie del aparcadero para el link intent (plantilla: `__Host-uvh_pending_intent`). |
+| `REGISTRATION_EDIT_COOKIE` | \* | `uvh_registration_edit` | Cookie que guarda el secreto de edición de un registro sin verificar (plantilla: `__Host-uvh_registration_edit`). Es lo único que autoriza a `change-registration-email`: la contraseña que deja el registro anónimo ya no sirve para mover la dirección. |
+| `REGISTRATION_EDIT_TTL_HOURS` | \* | `24` | Rango 1–24. Vida del secreto y techo de su cookie: nunca más que el bearer de verificación emitido a la vez. |
 | `INVITATION_TTL_DAYS` | \* | `7` | Rango 1–30. Vida de una invitación **y** techo de la cookie que la aparca: el navegador nunca la guarda más tiempo que la invitación. |
 | `INTENT_TTL_HOURS` | \* | `24` | Rango 1–168. Vida de un link intent y techo de su cookie. |
 | `ADMIN_MFA_FRESH_MINUTES` | \* | `15` | Rango 5–60. Antigüedad máxima del segundo factor en acciones administrativas. |
@@ -536,6 +538,10 @@ controlados.
   `INTENT_TTL_HOURS`, `PENDING_LIMIT`, `PENDING_READ_LIMIT`. Sustituye el
   `localStorage` donde vivían el bearer de invitación y el del link intent; ver
   `docs/api.md` y `docs/security.md`.
+- **Secreto de edición de registro** (2 variables): `REGISTRATION_EDIT_COOKIE`
+  y `REGISTRATION_EDIT_TTL_HOURS`. Acredita que quien corrige la dirección de
+  una inscripción sin verificar es el navegador que la creó; la contraseña que
+  deja ese registro es una propuesta y no autoriza nada.
 
 Los cambios de esquema se aplican con `php artisan migrate`; las migraciones son
 idempotentes donde importa y los índices de tablas con historia se crean antes

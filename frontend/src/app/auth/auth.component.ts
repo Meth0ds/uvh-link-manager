@@ -101,6 +101,22 @@ function assessPassword(password: string, name: string, email: string): Password
   styleUrl: "./auth.component.scss",
 })
 export class AuthComponent {
+  /**
+   * Las reglas de credencial y de contrato del registro, en un solo sitio.
+   *
+   * La corrección de email reutiliza este formulario sin elegir credencial ni
+   * aceptar contratos —la contraseña que deja el registro es una propuesta y la
+   * aceptación es evidencia de quien se registró—, así que esas tres reglas se
+   * suspenden mientras el modo corrección está activo y se reponen al salir. Con
+   * las listas declaradas una vez, suspender y reponer no puede divergir de lo
+   * que el registro exige.
+   */
+  private static readonly PASSWORD_RULES = [Validators.required, Validators.minLength(10), Validators.maxLength(72)];
+
+  private static readonly CONFIRMATION_RULES = [Validators.required, Validators.maxLength(72)];
+
+  private static readonly TERMS_RULES = [Validators.requiredTrue];
+
   @ViewChild("loginCaptcha") private loginCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("registerCaptcha") private registerCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("resendCaptcha") private resendCaptchaWidget?: HCaptchaWidgetComponent;
@@ -166,9 +182,9 @@ export class AuthComponent {
     {
       name: ["", [Validators.required, Validators.minLength(2), Validators.maxLength(80)]],
       email: ["", [Validators.required, Validators.email, Validators.maxLength(254)]],
-      password: ["", [Validators.required, Validators.minLength(10), Validators.maxLength(72)]],
-      confirmPassword: ["", [Validators.required, Validators.maxLength(72)]],
-      acceptTerms: [false, [Validators.requiredTrue]],
+      password: ["", AuthComponent.PASSWORD_RULES],
+      confirmPassword: ["", AuthComponent.CONFIRMATION_RULES],
+      acceptTerms: [false, AuthComponent.TERMS_RULES],
       // Honeypot: real users never see or fill this field. The server rejects
       // it, adding a cheap signal against unsophisticated registration bots.
       company: ["", [Validators.maxLength(120)]],
@@ -264,6 +280,30 @@ export class AuthComponent {
       this.redirectedAuthenticatedVisitor = true;
       void this.router.navigateByUrl(this.returnTo());
     });
+
+    // La corrección de email comparte formulario con el registro pero no pide
+    // credencial ni contrato: sus reglas se suspenden mientras el modo está
+    // activo. Un `effect` cubre los cuatro caminos que entran y salen del modo
+    // —pestaña, cierre, corrección completada y modo inicial— sin repetir la
+    // llamada en ninguno de ellos.
+    effect(() => this.applyCredentialRules(!this.changeEmailMode()));
+  }
+
+  /**
+   * Suspende o repone las reglas que sólo tienen sentido al crear la cuenta.
+   *
+   * Suspenderlas no relaja el registro: `PASSWORD_RULES`, `CONFIRMATION_RULES`
+   * y `TERMS_RULES` son las mismas listas que el formulario declara, así que el
+   * alta las vuelve a exigir exactamente como estaban.
+   */
+  private applyCredentialRules(required: boolean): void {
+    const { password, confirmPassword, acceptTerms } = this.registerForm.controls;
+    password.setValidators(required ? AuthComponent.PASSWORD_RULES : null);
+    confirmPassword.setValidators(required ? AuthComponent.CONFIRMATION_RULES : null);
+    acceptTerms.setValidators(required ? AuthComponent.TERMS_RULES : null);
+    password.updateValueAndValidity();
+    confirmPassword.updateValueAndValidity();
+    acceptTerms.updateValueAndValidity();
   }
 
   onTabChange(index: number): void {
@@ -507,12 +547,7 @@ export class AuthComponent {
           this.error.set("Introduce una dirección de email distinta");
           return;
         }
-        await this.auth.changeRegistrationEmail(
-          currentEmail,
-          email,
-          this.registerForm.controls.password.value,
-          antiBot,
-        );
+        await this.auth.changeRegistrationEmail(currentEmail, email, antiBot);
       } else {
         await this.auth.register(
           this.registerForm.controls.name.value,
@@ -608,7 +643,7 @@ export class AuthComponent {
     this.registerForm.controls.email.setValue(email);
     this.registerCaptchaToken.set("");
     this.error.set(null);
-    this.info.set("Corrige el email y confirma el cambio con tu contraseña. Te enviaremos la verificación a la nueva dirección.");
+    this.info.set("Indica la dirección correcta: te enviaremos una nueva verificación al buzón nuevo. La contraseña de tu cuenta la eliges al abrir ese correo.");
   }
 
   closeRegistration(): void {

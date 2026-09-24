@@ -309,16 +309,21 @@ class ApiParityTest extends TestCase
     {
         $oldEmail = 'typo@example.com';
         $newEmail = 'corrected@example.com';
-        $this->postJson('/api/v1/auth/register', array_merge([
+        $registered = $this->postJson('/api/v1/auth/register', array_merge([
             'name' => 'Typo User',
             'email' => $oldEmail,
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201);
 
+        // The authority to correct the address is the secret the registration
+        // issued to this browser, not the password it proposed.
+        $secret = (string) $this->cookieFrom($registered, 'uvh_registration_edit');
+        $this->assertNotSame('', $secret);
+        $this->withCookie('uvh_registration_edit', $secret);
+
         $changed = $this->postJson('/api/v1/auth/change-registration-email', array_merge([
             'currentEmail' => $oldEmail,
             'newEmail' => $newEmail,
-            'password' => self::PASSWORD,
         ], $this->captchaPayload()));
         $changed->assertStatus(200)->assertExactJson(['ok' => true]);
         $this->assertNull($this->cookieFrom($changed, 'uvh_session'));
@@ -347,24 +352,44 @@ class ApiParityTest extends TestCase
         // 409 "Ese email ya está registrado" vs 200, a per-candidate account
         // existence oracle that bypassed the uniform contract of `register`.
         $this->registerVerifiedLogin('occupied-target@example.com');
-        foreach (['probe-taken@example.com', 'probe-free@example.com'] as $probe) {
+
+        // One secret per registration, each handed back to its own browser: the
+        // endpoint is no longer open to whoever knows a password. Both probes
+        // register before the baseline below, so the outbox comparison covers
+        // only the two corrections and not the two registrations.
+        $freeSecret = (string) $this->cookieFrom(
             $this->postJson('/api/v1/auth/register', array_merge([
-                'name' => 'Probe User',
-                'email' => $probe,
+                'name' => 'Probe Free',
+                'email' => 'probe-free@example.com',
                 'password' => self::PASSWORD,
-            ], $this->captchaPayload()))->assertStatus(201)->assertExactJson(['user' => null]);
-        }
+            ], $this->captchaPayload())),
+            'uvh_registration_edit',
+        );
+        $this->assertNotSame('', $freeSecret);
+        $takenSecret = (string) $this->cookieFrom(
+            $this->postJson('/api/v1/auth/register', array_merge([
+                'name' => 'Probe Taken',
+                'email' => 'probe-taken@example.com',
+                'password' => self::PASSWORD,
+            ], $this->captchaPayload())),
+            'uvh_registration_edit',
+        );
+        $this->assertNotSame('', $takenSecret);
+        // Two browsers, two secrets: the second registration inherits nothing
+        // from the first.
+        $this->assertNotSame($freeSecret, $takenSecret);
 
         $lastOutboxId = (int) DB::table('mail_outbox')->max('id');
+
+        $this->withCookie('uvh_registration_edit', $freeSecret);
         $free = $this->postJson('/api/v1/auth/change-registration-email', array_merge([
             'currentEmail' => 'probe-free@example.com',
             'newEmail' => 'moved-into@example.com',
-            'password' => self::PASSWORD,
         ], $this->captchaPayload()));
+        $this->withCookie('uvh_registration_edit', $takenSecret);
         $taken = $this->postJson('/api/v1/auth/change-registration-email', array_merge([
             'currentEmail' => 'probe-taken@example.com',
             'newEmail' => 'occupied-target@example.com',
-            'password' => self::PASSWORD,
         ], $this->captchaPayload()));
 
         // Same status and byte-identical body whatever the destination holds.
@@ -397,24 +422,26 @@ class ApiParityTest extends TestCase
         $this->assertFalse(MailDeliveryEligibility::isCurrent($admitted[1]));
     }
 
-    public function test_pre_occupied_registration_is_released_to_the_mailbox_owner(): void
+    public function test_a_parked_registration_is_completed_by_the_mailbox_owner(): void
     {
         // Pre-occupation (security finding #2): a registration parked on
-        // somebody else's address used to answer 201 and then block that
-        // mailbox with a dead end — "check your email" for the real owner,
-        // for a message that never comes. The last pending registration from
-        // the same mailbox now wins.
+        // somebody else's address used to answer 201 and then dead-end the real
+        // owner — "check your email" for a message that never arrives. It never
+        // was a takeover, and it is not a dead end either: the bearer lands in
+        // that mailbox, activation takes the password from whoever opens it, and
+        // a second anonymous registration no longer rewrites the row.
         $this->postJson('/api/v1/auth/register', array_merge([
             'name' => 'Attacker Name',
             'email' => 'parked@example.com',
             'password' => 'qx-'.self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201)->assertExactJson(['user' => null]);
         $parked = User::where('email', 'parked@example.com')->firstOrFail();
-        $oldTokenId = (string) DB::table('email_tokens')->where('user_id', $parked->id)
-            ->where('kind', 'verify')->value('id');
-        $this->assertNotSame('', $oldTokenId);
+        $bearerId = (string) DB::table('email_tokens')->where('user_id', $parked->id)
+            ->where('kind', 'verify')->whereNull('used_at')->value('id');
+        $this->assertNotSame('', $bearerId);
         // A legacy session on the parked registration (a pre-verification
-        // deployment may have issued one) must not survive the replacement.
+        // deployment may have issued one). It is not the second registration's
+        // business to revoke it: activation is what revokes every session.
         $legacyToken = Ids::randomToken(32);
         DB::table('sessions')->insert([
             'id' => Ids::sha256Hex($legacyToken),
@@ -425,28 +452,25 @@ class ApiParityTest extends TestCase
         ]);
 
         // The real mailbox owner registers the same address with their own
-        // password and gets the identical anti-enumeration answer.
+        // password and gets the identical anti-enumeration answer…
         $this->postJson('/api/v1/auth/register', array_merge([
             'name' => 'Real Owner',
             'email' => 'parked@example.com',
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201)->assertExactJson(['user' => null]);
 
-        // Same account, new credentials: the mailbox owner owns it now.
+        // …and wins nothing from the row: same account, same name, same
+        // proposal, same generation, and the bearer that was already sitting in
+        // the mailbox is still the one that completes it.
         $user = User::where('email', 'parked@example.com')->firstOrFail();
         $this->assertSame($parked->id, $user->id);
-        $this->assertSame('Real Owner', $user->name);
-        self::assertTrue(Hash::check(self::PASSWORD, $user->password_hash));
-        self::assertFalse(Hash::check('qx-'.self::PASSWORD, $user->password_hash));
-        self::assertGreaterThan(1, (int) $user->security_version);
-        $this->assertNotNull(DB::table('sessions')->where('id', Ids::sha256Hex($legacyToken))->value('revoked_at'));
+        $this->assertSame('Attacker Name', $user->name);
+        self::assertTrue(Hash::check('qx-'.self::PASSWORD, $user->password_hash));
+        self::assertSame(1, (int) $user->security_version);
+        $this->assertNotNull(DB::table('email_tokens')->where('id', $bearerId)->whereNull('used_at')->first());
 
-        // Every bearer of the replaced registration died with it...
-        $this->assertNull(DB::table('email_tokens')->where('id', $oldTokenId)->first());
-        $this->assertSame(1, DB::table('email_tokens')->where('user_id', $user->id)
-            ->where('kind', 'verify')->whereNull('used_at')->count());
-
-        // ...and the owner's fresh bearer verifies and logs in for real.
+        // The owner opens their mailbox and sets the definitive password, so the
+        // account is theirs…
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
@@ -457,6 +481,9 @@ class ApiParityTest extends TestCase
         ]);
         $this->postJson('/api/v1/auth/verify-email', ['token' => $plain, 'password' => self::PASSWORD])
             ->assertStatus(200)->assertJson(['ok' => true]);
+        // …the activation revokes the sessions the parked row may have carried…
+        $this->assertNotNull(DB::table('sessions')->where('id', Ids::sha256Hex($legacyToken))->value('revoked_at'));
+        // …and the proposal the first registration left behind opens nothing.
         $login = $this->postJson('/api/v1/auth/login', [
             'email' => 'parked@example.com',
             'password' => self::PASSWORD,
@@ -464,6 +491,11 @@ class ApiParityTest extends TestCase
         ]);
         $login->assertStatus(200);
         $this->assertNotNull($this->cookieFrom($login, 'uvh_session'));
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'parked@example.com',
+            'password' => 'qx-'.self::PASSWORD,
+            'captchaToken' => 'test-login-passcode',
+        ])->assertStatus(401);
     }
 
     public function test_a_later_anonymous_registration_never_installs_the_active_password(): void
@@ -471,19 +503,47 @@ class ApiParityTest extends TestCase
         // Pre-hijack: the victim registers, an anonymous request re-registers
         // the same address, and the pending proposal now holds a password the
         // attacker knows. Activation must not turn that proposal into the
-        // credential: the mailbox opener types the definitive password, so a
-        // replaced proposal is inert whatever order the registrations took.
+        // credential, and the second request must not rewrite the row either:
+        // it used to rename the account, restamp its legal acceptance and kill
+        // the bearer that was already sitting in the victim's inbox.
         $this->postJson('/api/v1/auth/register', array_merge([
             'name' => 'Real Owner',
             'email' => 'target@example.com',
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201);
-        $this->postJson('/api/v1/auth/register', array_merge([
+        $user = User::where('email', 'target@example.com')->firstOrFail();
+        $before = [
+            'name' => $user->name,
+            'password_hash' => $user->password_hash,
+            'security_version' => (int) $user->security_version,
+            'workspace' => (string) DB::table('workspaces')->where('owner_user_id', $user->id)->value('name'),
+            'accepted_at' => (string) DB::table('legal_acceptances')->where('user_id', $user->id)
+                ->where('document_type', 'terms')->value('accepted_at'),
+            'bearer' => (string) DB::table('email_tokens')->where('user_id', $user->id)
+                ->where('kind', 'verify')->whereNull('used_at')->value('id'),
+        ];
+        $this->assertNotSame('', $before['accepted_at']);
+        $this->assertNotSame('', $before['bearer']);
+
+        $attacker = $this->postJson('/api/v1/auth/register', array_merge([
             'name' => 'Attacker Name',
             'email' => 'target@example.com',
             'password' => 'qx-'.self::PASSWORD,
-        ], $this->captchaPayload()))->assertStatus(201);
-        $user = User::where('email', 'target@example.com')->firstOrFail();
+        ], $this->captchaPayload()))->assertStatus(201)->assertExactJson(['user' => null]);
+        // The attacker gets an edit secret of their own, and it is not the
+        // victim's: the row was not replaced, so there is nothing to inherit.
+        $attackerSecret = (string) $this->cookieFrom($attacker, 'uvh_registration_edit');
+        $this->assertNotSame('', $attackerSecret);
+
+        $after = $user->fresh();
+        $this->assertSame($before['name'], $after->name);
+        $this->assertSame($before['password_hash'], $after->password_hash);
+        $this->assertSame($before['security_version'], (int) $after->security_version);
+        $this->assertSame($before['workspace'], (string) DB::table('workspaces')->where('owner_user_id', $user->id)->value('name'));
+        $this->assertSame($before['accepted_at'], (string) DB::table('legal_acceptances')->where('user_id', $user->id)
+            ->where('document_type', 'terms')->value('accepted_at'));
+        $this->assertSame($before['bearer'], (string) DB::table('email_tokens')->where('user_id', $user->id)
+            ->where('kind', 'verify')->whereNull('used_at')->value('id'));
 
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
@@ -498,7 +558,7 @@ class ApiParityTest extends TestCase
         // its holder establishes, there is nothing to activate the account
         // with. The token itself stays alive for the real confirmation.
         $this->postJson('/api/v1/auth/verify-email', ['token' => $plain])
-            ->assertStatus(422)->assertJson(['error' => 'Datos inválidos']);
+            ->assertStatus(422)->assertJson(['error' => 'La contraseña debe tener entre 10 y 72 caracteres']);
         $this->assertNull($user->fresh()->email_verified_at);
 
         // The mailbox opener chooses the password at activation…
@@ -519,6 +579,95 @@ class ApiParityTest extends TestCase
         ]);
         $login->assertStatus(200);
         $this->assertNotNull($this->cookieFrom($login, 'uvh_session'));
+    }
+
+    /**
+     * The bypass this change closes, reproduced end to end.
+     *
+     * The pending registration's password was the only proof
+     * `change-registration-email` asked for, and any anonymous `register` mints
+     * one: the attacker registered the victim's address, installed their own
+     * proposal, and pointed the registration at their own mailbox before the
+     * victim opened the link. The proposal is no longer authority for anything,
+     * and neither is a re-registration: only the browser that created the row
+     * holds the secret, and every use of it rotates the generation.
+     */
+    public function test_the_registration_edit_secret_is_the_only_authority_over_a_pending_email(): void
+    {
+        $victimEmail = 'victima@example.com';
+        $attackerEmail = 'atacante@example.com';
+
+        $victimRegistration = $this->postJson('/api/v1/auth/register', array_merge([
+            'name' => 'Victima',
+            'email' => $victimEmail,
+            'password' => self::PASSWORD,
+        ], $this->captchaPayload()))->assertStatus(201);
+        $victimSecret = (string) $this->cookieFrom($victimRegistration, 'uvh_registration_edit');
+        $this->assertNotSame('', $victimSecret);
+        $victim = User::where('email', $victimEmail)->firstOrFail();
+        $victimBearer = (string) DB::table('email_tokens')->where('user_id', $victim->id)
+            ->where('kind', 'verify')->whereNull('used_at')->value('id');
+
+        $attackerRegistration = $this->postJson('/api/v1/auth/register', array_merge([
+            'name' => 'Atacante',
+            'email' => $victimEmail,
+            'password' => 'qx-'.self::PASSWORD,
+        ], $this->captchaPayload()))->assertStatus(201);
+        $attackerSecret = (string) $this->cookieFrom($attackerRegistration, 'uvh_registration_edit');
+        $this->assertNotSame('', $attackerSecret);
+
+        $move = ['currentEmail' => $victimEmail, 'newEmail' => $attackerEmail];
+
+        // Without a secret.
+        $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, $this->captchaPayload()))
+            ->assertStatus(403);
+        // With the proposal password, which is what used to be enough.
+        $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, ['password' => 'qx-'.self::PASSWORD], $this->captchaPayload()))
+            ->assertStatus(403);
+        // With the attacker's own valid secret: the signature names an account,
+        // and it is not this one.
+        $this->withCookie('uvh_registration_edit', $attackerSecret);
+        $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, $this->captchaPayload()))
+            ->assertStatus(403);
+        // With a tampered copy of the victim's: the signature rejects it.
+        $this->withCookie('uvh_registration_edit', 'x'.$victimSecret);
+        $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, $this->captchaPayload()))
+            ->assertStatus(403);
+
+        // Nothing moved: same account, same address, same bearer, same
+        // generation.
+        $this->assertSame(1, User::whereRaw('lower(email) = ?', [$victimEmail])->count());
+        $this->assertSame(0, User::whereRaw('lower(email) = ?', [$attackerEmail])->count());
+        $this->assertSame($victimBearer, (string) DB::table('email_tokens')->where('user_id', $victim->id)
+            ->where('kind', 'verify')->whereNull('used_at')->value('id'));
+        $this->assertSame(1, (int) $victim->fresh()->security_version);
+
+        // The browser that created the registration can correct it, and the
+        // move rotates the generation: the secret that authorised it is spent.
+        $this->withCookie('uvh_registration_edit', $victimSecret);
+        $moved = $this->postJson('/api/v1/auth/change-registration-email', array_merge([
+            'currentEmail' => $victimEmail,
+            'newEmail' => 'corregida@example.com',
+        ], $this->captchaPayload()))->assertStatus(200)->assertExactJson(['ok' => true]);
+        $rotated = (string) $this->cookieFrom($moved, 'uvh_registration_edit');
+        $this->assertNotSame('', $rotated);
+        $this->assertNotSame($victimSecret, $rotated);
+        $this->assertSame(2, (int) $victim->fresh()->security_version);
+        $this->assertSame(0, User::whereRaw('lower(email) = ?', [$victimEmail])->count());
+        $this->assertSame(1, User::whereRaw('lower(email) = ?', ['corregida@example.com'])->count());
+
+        // Replaying the spent secret changes nothing; the rotated one still
+        // allows a second correction from that same browser.
+        $this->withCookie('uvh_registration_edit', $victimSecret);
+        $this->postJson('/api/v1/auth/change-registration-email', array_merge([
+            'currentEmail' => 'corregida@example.com',
+            'newEmail' => 'otra@example.com',
+        ], $this->captchaPayload()))->assertStatus(403);
+        $this->withCookie('uvh_registration_edit', $rotated);
+        $this->postJson('/api/v1/auth/change-registration-email', array_merge([
+            'currentEmail' => 'corregida@example.com',
+            'newEmail' => 'definitiva@example.com',
+        ], $this->captchaPayload()))->assertStatus(200);
     }
 
     public function test_registration_never_reveals_what_the_destination_held(): void
@@ -559,26 +708,47 @@ class ApiParityTest extends TestCase
             $this->assertSame($answers[0]->json(), $answer->json());
         }
 
+        // The edit secret travels in every one of the four outcomes, with the
+        // same name, the same attributes and the same length: a `Set-Cookie`
+        // that only appeared on a free destination would be the existence oracle
+        // the identical body already closes.
+        $secrets = [];
+        foreach ($answers as $answer) {
+            $cookie = collect($answer->headers->getCookies())
+                ->first(fn ($cookie) => $cookie->getName() === 'uvh_registration_edit');
+            $this->assertNotNull($cookie, 'every register outcome hands out the registration edit secret');
+            $this->assertTrue($cookie->isHttpOnly());
+            $this->assertNull($cookie->getDomain(), 'the secret stays host-only');
+            $secrets[] = (string) $cookie->getValue();
+        }
+        // Same length in all four: the size of the secret must not say which
+        // branch answered.
+        $this->assertCount(1, array_unique(array_map('strlen', $secrets)));
+
         // One outbox admission per outcome, whichever it was: the old
         // duplicate branch that paid nothing cannot reappear as a timing
         // channel.
         $admitted = DB::table('mail_outbox')->where('id', '>', $lastOutboxId)->orderBy('id')->get();
         $this->assertCount(4, $admitted);
-        // [0] free and [1] replaced deliver a live verification; [2] occupied
-        // and [3] reserved are deliberately orphaned and suppressed.
+        // [0] free delivers a live verification; a destination that already
+        // holds a registration —parked or verified— and a reserved one are
+        // deliberately orphaned and suppressed.
         $this->assertNotSame('obsolete', $admitted[0]->status);
-        $this->assertNotSame('obsolete', $admitted[1]->status);
-        $this->assertSame('obsolete', $admitted[2]->status);
-        $this->assertSame('', $admitted[2]->encrypted_envelope);
-        $this->assertFalse(MailDeliveryEligibility::isCurrent($admitted[2]));
-        $this->assertSame('obsolete', $admitted[3]->status);
-        $this->assertFalse(MailDeliveryEligibility::isCurrent($admitted[3]));
+        foreach ([1, 2, 3] as $occupied) {
+            $this->assertSame('obsolete', $admitted[$occupied]->status);
+            $this->assertSame('', $admitted[$occupied]->encrypted_envelope);
+            $this->assertFalse(MailDeliveryEligibility::isCurrent($admitted[$occupied]));
+        }
 
-        // Effects differ invisibly: the replacement took, while the occupied
-        // and reserved destinations stayed untouched.
+        // Effects differ invisibly: nothing but the free destination was
+        // touched. The parked registration keeps its own proposal, its own
+        // bearer and its own account, because the mailbox owner —not the next
+        // anonymous request— is who completes it.
         $parked2 = User::where('email', 'parked-2@example.com')->firstOrFail();
-        self::assertNotSame($parkedHash, $parked2->password_hash);
-        self::assertTrue(Hash::check(self::PASSWORD, $parked2->password_hash));
+        $this->assertSame($parkedHash, $parked2->password_hash);
+        self::assertTrue(Hash::check('qx-'.self::PASSWORD, $parked2->password_hash));
+        $this->assertNotNull(DB::table('email_tokens')->where('user_id', $parked2->id)
+            ->where('kind', 'verify')->whereNull('used_at')->first());
         self::assertTrue(Hash::check(self::PASSWORD, $occupant->fresh()->password_hash));
         $this->assertSame(1, User::whereRaw('lower(email) = ?', ['verified-occupant@example.com'])->count());
         $this->assertSame(1, EmailChangeRequest::whereRaw('lower(new_email) = ?', ['reserved@example.com'])

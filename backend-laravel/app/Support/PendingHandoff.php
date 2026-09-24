@@ -224,19 +224,13 @@ final class PendingHandoff
         return ['bearer' => $parked['bearer'], 'expiresAt' => $parked['expiresAt']];
     }
 
+    /**
+     * The attributes live in `HostOnlyCookie`, which is the single owner of
+     * "host-only, HttpOnly, Lax" for cookies that only serve the origin that
+     * set them; see its docblock for why that policy is not the session one.
+     */
     private static function makeCookie(string $kind, string $value, int $expires): Cookie
     {
-        return new Cookie(
-            self::cookieName($kind),
-            $value,
-            $expires,
-            '/',
-            // Host-only, never `cookie_domain`: see the class docblock.
-            null,
-            (bool) config('uvh.cookie_secure'),
-            true,       // httpOnly: the point of parking the bearer here
-            false,      // raw
-            'lax',
-        );
+        return HostOnlyCookie::make(self::cookieName($kind), $value, $expires);
     }
 }

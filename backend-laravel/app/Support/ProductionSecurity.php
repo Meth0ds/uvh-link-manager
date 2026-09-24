@@ -137,6 +137,7 @@ final class ProductionSecurity
             'CSRF_COOKIE' => (string) ($settings['csrf_cookie'] ?? ''),
             'PENDING_INVITATION_COOKIE' => (string) ($settings['invitation_cookie'] ?? ''),
             'PENDING_INTENT_COOKIE' => (string) ($settings['intent_cookie'] ?? ''),
+            'REGISTRATION_EDIT_COOKIE' => (string) ($settings['registration_edit_cookie'] ?? ''),
         ];
         foreach ($cookieNames as $key => $name) {
             if (! str_starts_with($name, '__Host-')) {
@@ -159,6 +160,11 @@ final class ProductionSecurity
         }
         if (! self::inRange($settings['intent_ttl_hours'] ?? null, 1, 168)) {
             $errors[] = 'INTENT_TTL_HOURS debe estar entre 1 y 168 en producción';
+        }
+        // Igual que los dos anteriores: el valor es también el techo del secreto
+        // que el navegador guarda para poder corregir su registro.
+        if (! self::inRange($settings['registration_edit_ttl_hours'] ?? null, 1, 24)) {
+            $errors[] = 'REGISTRATION_EDIT_TTL_HOURS debe estar entre 1 y 24 en producción';
         }
         if (! self::inRange($settings['admin_mfa_fresh_minutes'] ?? null, 5, 60)) {
             $errors[] = 'ADMIN_MFA_FRESH_MINUTES debe estar entre 5 y 60 en producción';

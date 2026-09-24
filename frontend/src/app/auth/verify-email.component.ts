@@ -20,12 +20,11 @@ import { LatestRequest } from "../core/services/latest-request";
  * typed here, which becomes the account's credential.
  *
  * The password is established AFTER the mailbox proof and never taken from the
- * pending registration, because an anonymous re-registration may have replaced
- * that proposal (by design — the last pending registration wins so a parked
- * address cannot dead-end its owner). Whoever opens the mailbox decides the
- * definitive password, so a replaced proposal is inert: the pre-hijack where
- * the attacker registers the victim's address and waits for the click has
- * nothing to install.
+ * pending registration, because that proposal is not a credential: any
+ * anonymous registration writes one. Whoever opens the mailbox decides the
+ * definitive password, and a later anonymous registration cannot replace the
+ * row it belongs to either, so the pre-hijack —the attacker registers the
+ * victim's address and waits for the click— has nothing to install.
  */
 @Component({
   selector: "app-verify-email",

@@ -10,7 +10,6 @@ use App\Models\EmailChangeRequest;
 use App\Models\EmailToken;
 use App\Models\User;
 use App\Models\UvhSession;
-use App\Models\Workspace;
 use App\Support\AccountRecoveryLifecycle;
 use App\Support\Audit;
 use App\Support\HCaptcha;
@@ -24,6 +23,7 @@ use App\Support\MfaInfrastructureUnavailable;
 use App\Support\MfaStepUp;
 use App\Support\PasswordStrength;
 use App\Support\PrivateArtifactCleanup;
+use App\Support\RegistrationEdit;
 use App\Support\SessionManager;
 use App\Support\Totp;
 use App\Support\UvhCrypto;
@@ -95,32 +95,35 @@ class AuthController
                 $this->lockEmailAddress($email);
                 $reserved = EmailChangeRequest::whereRaw('lower(new_email) = ?', [$email])
                     ->where('expires_at', '>', now())->exists();
-                $pending = $reserved ? null : User::whereRaw('lower(email) = ?', [$email])
-                    ->whereNull('email_verified_at')
-                    ->whereNull('deleted_at')
-                    ->lockForUpdate()->first();
-                if ($pending instanceof User) {
-                    // Anti pre-occupation: an UNVERIFIED registration never
-                    // owns an address — only the mailbox owner can complete
-                    // either version, so the last pending registration wins
-                    // and the dead end is gone.
-                    return $this->replacePendingRegistration($pending, $email, $name, $passwordHash, $token, $tokenHash);
-                }
                 if ($reserved || User::whereRaw('lower(email) = ?', [$email])->exists()) {
-                    // A verified/soft-deleted occupant or an active reservation
-                    // is never revealed and never overwritten, but the outcome
-                    // pays exactly like a real registration: one orphaned
-                    // admission whose token has no backing row, so the delivery
-                    // jobs suppress it and no mailbox is touched.
+                    // Unverified, verified, soft-deleted or reserved: all four
+                    // are the same answer, and none of them is replaced. An
+                    // UNVERIFIED registration never owns an address — the
+                    // mailbox proof decides, and `verifyEmail` takes the
+                    // password from whoever opens the mailbox — so a later
+                    // anonymous registration has nothing to win by rewriting
+                    // the row: it used to rename the account, restamp its legal
+                    // acceptance and kill the bearer that was already sitting
+                    // in the owner's inbox, which is damage, not a fix. There is
+                    // no dead end either: that first bearer still completes the
+                    // registration, and `resend-verification` issues another.
+                    //
+                    // The outcome pays exactly like a real registration: one
+                    // orphaned admission whose token has no backing row, so the
+                    // delivery jobs suppress it and no mailbox is touched.
                     $this->admitOrphanVerification($email);
 
-                    return ['status' => 'occupied', 'user_id' => null];
+                    return ['status' => 'occupied', 'user_id' => null, 'security_version' => null];
                 }
 
                 $user = User::create([
                     'email' => $email,
                     'name' => $name,
                     'password_hash' => $passwordHash,
+                    // First generation of the credential, written explicitly so
+                    // the edit secret can seal the version without re-reading
+                    // the row it was just inserted into.
+                    'security_version' => 1,
                 ]);
                 // These rows are business evidence, not best-effort telemetry;
                 // failure must roll back the account and its default workspace.
@@ -150,7 +153,7 @@ class AuthController
                     throw new MailAdmissionException('Registration verification outbox admission failed');
                 }
 
-                return ['status' => 'created', 'user_id' => (int) $user->id];
+                return ['status' => 'created', 'user_id' => (int) $user->id, 'security_version' => 1];
             });
         } catch (MailAdmissionException) {
             Audit::write(null, 'auth.email_delivery_failed', 'user', null, ['kind' => 'verify']);
@@ -160,10 +163,12 @@ class AuthController
             if (($e->errorInfo[0] ?? null) === '23505') {
                 // A concurrent writer claimed the destination after the
                 // advisory-locked check; answer exactly like any other taken
-                // destination instead of advertising the race.
+                // destination instead of advertising the race. The edit secret
+                // travels all the same, because "there is a cookie" must not be
+                // the thing that tells the caller which branch it took.
                 Audit::write(null, 'auth.register_duplicate', 'user', null);
 
-                return response()->json(['user' => null], 201);
+                return response()->json(['user' => null], 201)->withCookie(RegistrationEdit::decoy());
             }
             throw $e;
         }
@@ -172,30 +177,51 @@ class AuthController
         if ($outcome['status'] === 'occupied') {
             Audit::write(null, 'auth.register_duplicate', 'user', null);
         } else {
-            Audit::write($outcome['user_id'], $outcome['status'] === 'replaced'
-                ? 'auth.registration_replaced'
-                : 'auth.register', 'user', $outcome['user_id']);
+            Audit::write($outcome['user_id'], 'auth.register', 'user', $outcome['user_id']);
             Audit::write($outcome['user_id'], 'auth.terms_accepted', 'consent', self::TERMS_VERSION);
             // The privacy policy is an information notice, not blanket consent
             // for every processing purpose. Record the exact notice shown.
             Audit::write($outcome['user_id'], 'auth.privacy_notice_acknowledged', 'privacy_notice', self::PRIVACY_VERSION);
         }
 
-        return response()->json(['user' => null], 201);
+        // The registration edit secret, in every outcome and with the same
+        // shape: only the browser that created a pending row can correct its
+        // address later, and no branch of this endpoint announces itself by
+        // whether it handed one out.
+        $registrationEdit = is_int($outcome['security_version'])
+            ? RegistrationEdit::secret((int) $outcome['user_id'], $outcome['security_version'])
+            : RegistrationEdit::decoy();
+
+        return response()->json(['user' => null], 201)->withCookie($registrationEdit);
     }
 
-    /** Correct an unverified registration without ever creating a session. */
+    /**
+     * Correct a mistyped address on an UNVERIFIED registration, without ever
+     * creating a session.
+     *
+     * The authority is the registration edit secret (`RegistrationEdit`), not
+     * the password the anonymous registration left behind. That password is a
+     * PROPOSAL: any `register` mints one, so accepting it here handed the
+     * pending registration's destination to whoever minted the latest, which is
+     * the same pre-hijack this commit closed at activation, one step earlier.
+     * The secret only exists in the browser that created the row and cannot be
+     * fabricated from anything an attacker writes.
+     *
+     * The row is not replaced by later registrations any more, so this endpoint
+     * is not racing one either: it moves the pending row it was told to move, or
+     * it refuses. Every refusal —unknown address, confirmed account, absent or
+     * foreign secret— is the same 403, because the difference between them is
+     * exactly what an enumerating caller wants to learn.
+     */
     public function changeRegistrationEmail(Request $request)
     {
         $currentEmail = trim(UvhRequest::inputString($request, 'currentEmail'));
         $newEmail = trim(UvhRequest::inputString($request, 'newEmail'));
-        $password = UvhRequest::inputString($request, 'password');
         $captchaToken = UvhRequest::inputString($request, 'captchaToken');
         $honeypot = trim(UvhRequest::inputString($request, 'website'));
 
         if (! $this->validEmail($currentEmail) || ! $this->validEmail($newEmail)
             || strtolower($currentEmail) === strtolower($newEmail)
-            || ! $this->validPassword($password)
             || $honeypot !== '') {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
@@ -206,18 +232,17 @@ class AuthController
         $currentEmail = strtolower($currentEmail);
         $newEmail = strtolower($newEmail);
         $user = $this->findUserByEmail($currentEmail);
-        $passwordOk = Hash::check($password, $user?->password_hash ?? self::DUMMY_PASSWORD_HASH);
-        if (! $user || $user->email_verified_at || ! $passwordOk) {
+        if (! $user || $user->email_verified_at || ! RegistrationEdit::authorizes($request, $user)) {
             return response()->json(['error' => 'No se puede cambiar este registro'], 403);
         }
         $token = Ids::randomToken(32);
         $tokenHash = Ids::sha256Hex($token);
         $verificationUrl = $this->appUrl().'/auth/verify-email#token='.rawurlencode($token);
         try {
-            $changed = DB::transaction(function () use ($user, $newEmail, $tokenHash, $verificationUrl): string {
+            $changed = DB::transaction(function () use ($user, $newEmail, $tokenHash, $verificationUrl): array {
                 $locked = User::where('id', $user->id)->whereNull('email_verified_at')->lockForUpdate()->first();
                 if (! $locked) {
-                    return 'unavailable';
+                    return ['status' => 'unavailable', 'security_version' => null];
                 }
                 $this->lockEmailAddress($newEmail);
                 // Whether the destination is taken must never reach the caller.
@@ -230,10 +255,14 @@ class AuthController
                     || EmailChangeRequest::whereRaw('lower(new_email) = ?', [$newEmail])->where('expires_at', '>', now())->exists();
 
                 // The same statement on both outcomes: only a taken destination
-                // leaves the address untouched.
+                // leaves the address untouched. A move rotates the security
+                // version, which is what spends the secret that authorised it —
+                // the same discipline as every other credential change in this
+                // controller.
+                $securityVersion = (int) $locked->security_version + ($taken ? 0 : 1);
                 $locked->update($taken
                     ? ['updated_at' => now()]
-                    : ['email' => $newEmail, 'updated_at' => now()]);
+                    : ['email' => $newEmail, 'security_version' => $securityVersion, 'updated_at' => now()]);
 
                 if (! $taken) {
                     // The old mailbox must lose every outstanding bearer. A reset
@@ -254,7 +283,7 @@ class AuthController
                         throw new MailAdmissionException('Registration email correction outbox admission failed');
                     }
 
-                    return 'ok';
+                    return ['status' => 'ok', 'security_version' => $securityVersion];
                 }
 
                 // A taken destination keeps the registration and its outstanding
@@ -268,7 +297,7 @@ class AuthController
                     throw new MailAdmissionException('Registration email correction outbox admission failed');
                 }
 
-                return 'conflict';
+                return ['status' => 'conflict', 'security_version' => (int) $locked->security_version];
             });
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'verify']);
@@ -279,19 +308,27 @@ class AuthController
                 throw $e;
             }
             // A concurrent writer claimed the destination between the check and
-            // the update; the transaction rolled back untouched. Answer exactly
-            // like the taken outcome instead of advertising the race.
-            $changed = 'conflict';
+            // the update; the transaction rolled back untouched, so the row
+            // still holds the generation this request was authorised with.
+            // Answer exactly like the taken outcome instead of advertising the
+            // race.
+            $changed = ['status' => 'conflict', 'security_version' => (int) $user->security_version];
         }
-        if ($changed === 'unavailable') {
+        if ($changed['status'] === 'unavailable') {
             return response()->json(['error' => 'No se puede cambiar este registro'], 403);
         }
         // One internal audit event per outcome; the HTTP answers stay identical.
-        Audit::write($user->id, $changed === 'ok'
+        Audit::write($user->id, $changed['status'] === 'ok'
             ? 'auth.registration_email_change'
             : 'auth.registration_email_change_conflict', 'user', $user->id);
 
-        return response()->json(['ok' => true]);
+        // The same answer and the same cookie shape either way: a move hands
+        // back a secret sealed with the generation it just installed, and a
+        // conflict re-seals the one the row still has, so the browser that
+        // mistyped can try another address instead of losing its witness.
+        return response()->json(['ok' => true])->withCookie(
+            RegistrationEdit::secret((int) $user->id, (int) $changed['security_version']),
+        );
     }
 
     public function login(Request $request)
@@ -554,20 +591,26 @@ class AuthController
      * password typed NOW, which becomes the account's credential.
      *
      * The password is established here — after the mailbox proof — and never
-     * taken from the pending registration. A later anonymous `register` may
-     * have replaced that proposal (by design: the last pending registration
-     * wins so a parked address cannot dead-end its owner), and without this the
-     * email token alone would activate whatever that request left behind: the
-     * classic pre-hijack, where the attacker registers the victim's address
-     * first or last and waits for the victim to click. Here the mailbox opener
-     * decides the definitive password, so a replaced proposal is inert.
+     * taken from the pending registration. That proposal is not a credential:
+     * any anonymous `register` writes one, so activating it would be the classic
+     * pre-hijack, where the attacker registers the victim's address and waits
+     * for the victim to click. Here the mailbox opener decides the definitive
+     * password, and a later anonymous registration cannot replace the row, its
+     * bearer or its proposal either: there is nothing left for it to install.
      */
     public function verifyEmail(Request $request)
     {
         $token = UvhRequest::inputString($request, 'token');
         $password = UvhRequest::inputString($request, 'password');
-        if ($token === '' || strlen($token) > 256 || ! $this->validPassword($password)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+        // The two are answered separately on purpose: they are two different
+        // things for the person reading the message —"your link is no good"
+        // versus "choose a password of 10 to 72 characters"— and neither answer
+        // describes the account, only the request that carried it.
+        if ($token === '' || strlen($token) > 256) {
+            return response()->json(['error' => 'Token inválido'], 422);
+        }
+        if (! $this->validPassword($password)) {
+            return response()->json(['error' => 'La contraseña debe tener entre 10 y 72 caracteres'], 422);
         }
         if (! PasswordStrength::isAcceptable($password)) {
             // Deliberately generic, exactly like register and reset-password.
@@ -2343,61 +2386,6 @@ class AuthController
         return response()->json([
             'error' => 'Completa de nuevo la verificación antiabuso.',
         ], 422);
-    }
-
-    /**
-     * Replace an UNVERIFIED registration when the same mailbox claims the
-     * address again. Only the mailbox owner can ever complete either version
-     * (the verification bearer lands in their inbox), so the last pending
-     * registration wins and every bearer of the replaced one dies with it.
-     *
-     * The password written here is a PROPOSAL, never an activatable credential:
-     * `verifyEmail` establishes the definitive password from the mailbox
-     * opener's own input, so a replacement cannot install one the owner does
-     * not know. What the proposal does authenticate is
-     * `changeRegistrationEmail`, the correction of a mistyped address.
-     *
-     * @return array{status: string, user_id: int|null}
-     */
-    private function replacePendingRegistration(User $pending, string $email, string $name, string $passwordHash, string $token, string $tokenHash): array
-    {
-        $now = now();
-        $pending->update([
-            'name' => $name,
-            'password_hash' => $passwordHash,
-            'security_version' => (int) $pending->security_version + 1,
-            'updated_at' => $now,
-        ]);
-        // The replaced registration's bearers must not outlive it: an old
-        // verification link cannot activate an account it no longer describes,
-        // a delivered reset link cannot touch the new credentials, and legacy
-        // sessions lose their standing with the bumped security version.
-        EmailToken::where('user_id', $pending->id)->whereNull('used_at')->delete();
-        DB::table('sessions')->where('user_id', $pending->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-        EmailChangeRequest::where('user_id', $pending->id)->delete();
-
-        // The default workspace and its quota survive (they belong to the
-        // account); only the derived display name follows the new registration.
-        $workspace = $pending->ownedWorkspaces()->orderBy('id')->first();
-        if ($workspace instanceof Workspace) {
-            $workspace->update(['name' => $this->defaultWorkspaceName($name)]);
-        }
-        $this->acceptRegistrationLegal((int) $pending->id, $now);
-        EmailToken::create([
-            'id' => $tokenHash,
-            'user_id' => $pending->id,
-            'kind' => 'verify',
-            'expires_at' => $now->addDay(),
-        ]);
-        if (! UvhMail::verification(
-            $email,
-            $this->appUrl().'/auth/verify-email#token='.rawurlencode($token),
-            $tokenHash,
-        )) {
-            throw new MailAdmissionException('Registration verification outbox admission failed');
-        }
-
-        return ['status' => 'replaced', 'user_id' => (int) $pending->id];
     }
 
     /**

@@ -39,6 +39,14 @@ return [
     // shared parent domain.
     'invitation_cookie' => env('PENDING_INVITATION_COOKIE', 'uvh_pending_invitation'),
     'intent_cookie' => env('PENDING_INTENT_COOKIE', 'uvh_pending_intent'),
+    // El secreto de edición de un registro sin verificar: acredita que quien
+    // corrige la dirección es el navegador que la registró. La contraseña de la
+    // inscripción no sirve para eso —cualquier registro anónimo escribe una—, así
+    // que la corrección necesita un testigo que el navegador no pueda fabricar.
+    'registration_edit_cookie' => env('REGISTRATION_EDIT_COOKIE', 'uvh_registration_edit'),
+    // Vida del secreto y techo de su cookie. Nunca más que el bearer de
+    // verificación que el registro emite a la vez (un día).
+    'registration_edit_ttl_hours' => (int) env('REGISTRATION_EDIT_TTL_HOURS', 24),
     'trusted_proxies' => env('TRUSTED_PROXIES', ''),
     'session_ttl_days' => (int) env('SESSION_TTL_DAYS', 30),
     // Vida de una invitación, y techo de la cookie que la aparca: el aparcadero
