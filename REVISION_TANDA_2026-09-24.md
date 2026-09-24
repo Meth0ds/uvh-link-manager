@@ -89,18 +89,20 @@ eso al activar.
 
 ## Hallazgo 4 — `.env.production.example` sin las dos líneas de `REGISTRATION_EDIT_*`
 
-**Estado: pendiente de tu mano** (la plantilla está bloqueada para las
-herramientas). PHPUnit sigue en 575/577; los dos fallos son exactamente este
-hallazgo. Pega junto a `PENDING_INTENT_COOKIE`:
+**Estado: cerrado el 2026-09-25** (pegadas a mano: la plantilla sigue bloqueada
+para las herramientas). PHPUnit pasó de 580/582 a **582/582**, y las dos líneas
+quedaron junto a `PENDING_INTENT_COOKIE`:
 
 ```env
 REGISTRATION_EDIT_COOKIE=__Host-uvh_registration_edit
 REGISTRATION_EDIT_TTL_HOURS=24
 ```
 
-**Qué revisar con lupa:** nada más que pegarlas tal cual; `ProductionSecurity`
-exige el prefijo `__Host-` y TTL 1–24, y `EnvTemplateContractTest` valida la
-coherencia plantilla↔código en ambos sentidos.
+**Qué revisar con lupa:** los dos valores, que no son elegibles: el contrato
+exige que la cookie **difiera** del default —el prefijo `__Host-` que
+`ProductionSecurity` exige— y que el TTL 1–24 **coincida** con el suyo (24).
+`EnvTemplateContractTest` valida la coherencia plantilla↔código en los dos
+sentidos, así que un valor «razonable» distinto vuelve a romperlo.
 
 ## Hallazgo 5 — `OwnedMutations` incompleto (ABA en `add`, publicación sin dueño)
 
@@ -220,14 +222,14 @@ pide solo la dirección— más la que ya existía en «Revisa tu email».
 | Puerta | Estado |
 |---|---|
 | Pint + Larastan (nivel 6) | ✅ verde |
-| PHPUnit (`uvh_test`, `migrate:fresh`) | **575/577** — solo las 2 aserciones de plantilla (hallazgo 4) |
+| PHPUnit (`uvh_test`, `migrate:fresh`) | ✅ **582/582** (4.896 aserciones, 76,7 s) |
 | Karma + lint + typecheck frontend | ✅ **435/435** (2 pruebas nuevas del contrato de reenvío) |
 | E2E (`npm run e2e`) | ✅ **30/30** en 4,1 min (contrato `auth.spec.ts` actualizado) |
 | Arnés async (`npm run e2e:async`, pila completa) | ✅ **125/125** (2026-09-24) — incluye los tres ensayos de caída: export con el worker muerto, planificador detenido/recuperado y outbox con el proveedor caído (reintento del correo con portador usable, HTTP 200) |
-| `SealKeyringTest`, `RegistrationEdit*`, `ApiParityTest`, `AuthEmailTokenTest`, `PasswordPolicyTest`, `DatabaseSchemaTest` | ✅ en verde tras su reescritura |
+| `SealKeyringTest`, `SealFormatStatusTest` (5/5), `RegistrationEdit*`, `ApiParityTest`, `AuthEmailTokenTest`, `PasswordPolicyTest`, `DatabaseSchemaTest` | ✅ en verde tras su reescritura |
 
-Pendientes conocidos: tus dos líneas de plantilla (hallazgo 4) y la retirada
-del fallback legacy de sellos —ya con plan y verificación: `uvh:crypto:seals`
+Pendientes conocidos: la retirada del fallback legacy de sellos —ya con plan y
+verificación: `uvh:crypto:seals`
 certifica con evidencia observada (aperturas legacy reales + marcador de
 primera emisión v2) cuándo puede borrarse el ramal; fases y criterio en
 `docs/app-secret-rotation-runbook.md`—. La
