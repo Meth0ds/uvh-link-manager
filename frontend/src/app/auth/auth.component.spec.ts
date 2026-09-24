@@ -6,7 +6,7 @@ import { Component, EventEmitter, Input, Output, signal, type WritableSignal } f
 import { By } from "@angular/platform-browser";
 import { AuthComponent } from "./auth.component";
 import { AuthService } from "../core/services/auth.service";
-import { ApiService } from "../core/services/api.service";
+import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 
@@ -386,6 +386,34 @@ describe("AuthComponent registration flow", () => {
     pending.resolve("fresh-resend-token");
     await resend;
     expect(auth.resendVerification).toHaveBeenCalledWith("ana@example.com", "fresh-resend-token");
+  });
+
+  it("keeps a failed login silent about lifecycle and offers the resend entry regardless", async () => {
+    // Un registro pendiente contesta como unas credenciales incorrectas. Ni el
+    // estado local ni la UI deben reaccionar con una señal de «sigue pendiente»
+    // —el 403 que antes la cargaba ya no existe—, y la entrada a «Reenviar
+    // verificación» se ofrece siempre, sin ningún desenlace del servidor.
+    component.loginForm.setValue({ email: "ana@example.com", password: "wrong-password" });
+    auth.login.and.rejectWith(new ApiRequestError("Credenciales incorrectas", 401));
+
+    await component.onLogin();
+    fixture.detectChanges();
+
+    expect(component.verificationEmail()).toBeNull();
+    expect(component.error()).toBe("Credenciales incorrectas");
+    const resend = Array.from(
+      fixture.nativeElement.querySelectorAll("button") as NodeListOf<HTMLButtonElement>,
+    ).find((button) => button.textContent?.trim() === "Reenviar verificación");
+    expect(resend).toBeDefined();
+  });
+
+  it("asks for the address when the resend entry is used without one", async () => {
+    component.loginForm.setValue({ email: "", password: "" });
+
+    await component.resendVerification();
+
+    expect(auth.resendVerification).not.toHaveBeenCalled();
+    expect(component.error()).toBe("Escribe tu email para reenviar la verificación.");
   });
 
   it("does not call login when the invisible challenge is closed", async () => {

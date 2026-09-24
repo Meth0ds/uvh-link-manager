@@ -2,33 +2,35 @@
 
 namespace App\Support;
 
-use App\Models\User;
+use App\Models\PendingRegistration;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * El secreto que acredita la autoría de un registro sin verificar.
  *
- * Un `register` anónimo crea una fila pendiente y deja una contraseña que
+ * Un `register` anónimo crea una fila pendiente y propone una contraseña que
  * `verifyEmail` ya no acepta como credencial activa: la decide quien abre el
- * buzón. Esa contraseña, sin embargo, seguía siendo la única prueba que
+ * buzón. Esa propuesta, sin embargo, seguía siendo la única prueba que
  * `changeRegistrationEmail` pedía para mover el registro a otra dirección —y
  * cualquier anónimo puede fabricar una registrándose—, de modo que un tercero
  * podía apuntar una inscripción ajena a su propio buzón. Este secreto sustituye
  * esa prueba: se emite al navegador que creó la fila, no viaja a ninguna otra
  * parte, y no se deduce de nada que el atacante pueda escribir.
  *
- * Lo que se sella es una *afirmación* (`uid` + `security_version`), no un
- * bearer con fila detrás. La fila ya existe: es el `User` pendiente, y el
+ * Lo que se sella es una *afirmación* (`pid` + `security_version`), no un
+ * bearer con fila detrás. La fila ya existe: es el registro pendiente, y el
  * testigo sólo tiene que decir cuál y acreditar que sigue siendo el mismo. Por
  * eso no hay tabla nueva ni `email_tokens`: la validez se comprueba contra el
- * estado vivo de la cuenta (`email_verified_at` nulo y la versión de seguridad
- * que el claim reclama), y rotar esa versión en cada corrección convierte el
- * secreto gastado en texto inservible sin necesidad de revocarlo.
+ * estado vivo del registro (`pending_registrations`, con la versión de
+ * seguridad que el claim reclama), y rotar esa versión en cada corrección
+ * convierte el secreto gastado en texto inservible sin necesidad de
+ * revocarlo. Cuando la activación consume el registro, la fila muere y con
+ * ella cualquier secreto que la nombrara.
  *
  * La afirmación va **cifrada con cifrado autenticado** (`SealedToken`), y eso
  * no es un detalle: la primera versión firmaba sin cifrar, y un payload
- * legible convertía la cookie en un oráculo de enumeración. El uid real de un
+ * legible convertía la cookie en un oráculo de enumeración. El id real de un
  * registro pendiente es pequeño y secuencial mientras que el de un señuelo era
  * un aleatorio enorme; un cliente HTTP propio decodificaba el `Set-Cookie` y
  * distinguía estadísticamente destinos libres de ocupados, exactamente lo que
@@ -37,17 +39,18 @@ use Symfony\Component\HttpFoundation\Cookie;
  *
  * Tres decisiones que parecen detalles y no lo son:
  *
- *  - **Opacidad total.** Ni uid, ni versión, ni expiración, ni siquiera la
+ *  - **Opacidad total.** Ni id, ni versión, ni expiración, ni siquiera la
  *    rama real/señuelo son observables: externamente sólo hay un blob base64url
- *    de longitud fija. No hace falta fabricar uid falsos «más realistas» porque
- *    no se ve ninguno.
- *  - **Ancho fijo.** El claim se escribe con anchos fijos (`uid` diez dígitos,
+ *    de longitud fija. La etiqueta de clave que `SealedToken` lleva dentro del
+ *    sello es la misma en un secreto real y en un señuelo. No hace falta
+ *    fabricar ids falsos «más realistas» porque no se ve ninguno.
+ *  - **Ancho fijo.** El claim se escribe con anchos fijos (`pid` diez dígitos,
  *    `sv` tres, expiración trece) para que un registro real y un señuelo
  *    sellen textos planos del mismo largo y produzcan ciphertexts
  *    indistinguibles incluso midiendo bytes.
  *  - **Señuelo para el desenlace sin fila.** La cookie se emite en TODOS los
  *    desenlaces de `register`, con la misma forma y los mismos atributos. En
- *    los que no hay cuenta que acreditar lleva una afirmación que no autoriza
+ *    los que no hay registro que acreditar lleva una afirmación que no autoriza
  *    nada (`decoy()`): un `Set-Cookie` que sólo aparece cuando el destino
  *    estaba libre sería el oráculo que el cuerpo idéntico de la respuesta ya
  *    cierra.
@@ -64,16 +67,18 @@ use Symfony\Component\HttpFoundation\Cookie;
 final class RegistrationEdit
 {
     /** Identifica la forma del claim, para que un cambio futuro sea explícito. */
-    private const PAYLOAD_VERSION = 1;
+    private const PAYLOAD_VERSION = 2;
 
     /**
-     * Forma del claim: `{"e":<13>,"v":1,"uid":"<10>","sv":"<3>"}`. Los anchos
+     * Forma del claim: `{"e":<13>,"v":2,"pid":"<10>","sv":"<3>"}`. Los anchos
      * fijos son la definición de la forma: lo que no case no es un secreto de
      * este despliegue, y no hay razón para intentar interpretarlo. (La
      * autenticación ya la garantiza el sello; el patrón documenta la forma y
-     * acota el trabajo de parseo.)
+     * acota el trabajo de parseo.) La v1 nombraba la fila de usuario que el
+     * modelo anterior creaba en el primer paso; la v2 nombra el registro
+     * pendiente, que es lo único que existe antes del buzón.
      */
-    private const CLAIM_PATTERN = '/^\{"e":[0-9]{13},"v":1,"uid":"[0-9]{10}","sv":"[0-9]{3}"\}$/D';
+    private const CLAIM_PATTERN = '/^\{"e":[0-9]{13},"v":2,"pid":"[0-9]{10}","sv":"[0-9]{3}"\}$/D';
 
     public static function cookieName(): string
     {
@@ -86,19 +91,19 @@ final class RegistrationEdit
     }
 
     /**
-     * The secret of one account at one credential generation.
+     * The secret of one pending registration at one credential generation.
      *
      * A fresh registration and a correction that rotated the row both come
      * through here: the generation is the argument, never something this class
      * guesses, so a caller cannot seal a stale version by accident.
      */
-    public static function secret(int $userId, int $securityVersion): Cookie
+    public static function secret(int $registrationId, int $securityVersion): Cookie
     {
-        return self::seal($userId, $securityVersion);
+        return self::seal($registrationId, $securityVersion);
     }
 
     /**
-     * El secreto de un desenlace que no creó ninguna cuenta.
+     * El secreto de un desenlace que no creó ningún registro.
      *
      * Longitud idéntica a uno real y atributos idénticos; lo único distinto es
      * que no autoriza nada, porque no hay fila pendiente con ese id y esa
@@ -120,23 +125,24 @@ final class RegistrationEdit
      * Whether this request may edit THIS pending registration.
      *
      * Every way of being wrong —absent, empty, tampered, expired, another
-     * deployment's keyring, another account's id, a version the row no longer
-     * has— returns the same false, so the caller cannot tell them apart either.
+     * deployment's keyring, another registration's id, a version the row no
+     * longer has— returns the same false, so the caller cannot tell them apart
+     * either.
      *
      * OJO con el sitio desde el que se llama: esta comprobación debe repetirse
      * contra la fila YA BLOQUEADA, dentro de la transacción que rota la
      * versión. Vale como rechazo temprano barato; la autoridad es la del lock.
      */
-    public static function authorizes(Request $request, User $user): bool
+    public static function authorizes(Request $request, PendingRegistration $registration): bool
     {
         $claim = self::claim($request);
 
         return $claim !== null
-            && $claim['uid'] === (int) $user->id
-            && $claim['sv'] === (int) $user->security_version;
+            && $claim['pid'] === (int) $registration->id
+            && $claim['sv'] === (int) $registration->security_version;
     }
 
-    private static function seal(int $userId, int $securityVersion): Cookie
+    private static function seal(int $registrationId, int $securityVersion): Cookie
     {
         $ttl = self::ttlSeconds();
         // `sv` se trunca a tres dígitos y no se recorta hacia arriba en la
@@ -147,10 +153,10 @@ final class RegistrationEdit
         // autenticación— con trece dígitos de milisegundos, que alcanzan hasta
         // el año 2286.
         $claim = sprintf(
-            '{"e":%013d,"v":%d,"uid":"%010d","sv":"%03d"}',
+            '{"e":%013d,"v":%d,"pid":"%010d","sv":"%03d"}',
             (int) (microtime(true) * 1000) + ($ttl * 1000),
             self::PAYLOAD_VERSION,
-            $userId,
+            $registrationId,
             min(999, max(0, $securityVersion)),
         );
 
@@ -161,7 +167,7 @@ final class RegistrationEdit
         );
     }
 
-    /** @return array{uid: int, sv: int}|null */
+    /** @return array{pid: int, sv: int}|null */
     private static function claim(Request $request): ?array
     {
         $value = $request->cookies->get(self::cookieName());
@@ -174,13 +180,13 @@ final class RegistrationEdit
             return null;
         }
         $decoded = json_decode($plain, true);
-        if (! is_array($decoded) || ! is_int($decoded['e'] ?? null) || ! is_string($decoded['uid'] ?? null) || ! is_string($decoded['sv'] ?? null)) {
+        if (! is_array($decoded) || ! is_int($decoded['e'] ?? null) || ! is_string($decoded['pid'] ?? null) || ! is_string($decoded['sv'] ?? null)) {
             return null;
         }
         if ($decoded['e'] < (int) (microtime(true) * 1000)) {
             return null;
         }
 
-        return ['uid' => (int) $decoded['uid'], 'sv' => (int) $decoded['sv']];
+        return ['pid' => (int) $decoded['pid'], 'sv' => (int) $decoded['sv']];
     }
 }

@@ -32,6 +32,7 @@ class DatabaseSchemaTest extends TestCase
             'webhook_deliveries',
             'abuse_reports',
             'audit_events',
+            'pending_registrations',
             'email_tokens',
             'email_change_requests',
             'data_export_requests',
@@ -78,7 +79,13 @@ class DatabaseSchemaTest extends TestCase
             'webhook_deliveries' => ['webhook_id', 'config_version', 'event', 'event_id', 'payload', 'status', 'attempts', 'locked_at', 'next_attempt_at'],
             'abuse_reports' => ['link_id', 'reason', 'status', 'source', 'reporter_hash', 'report_day'],
             'audit_events' => ['user_id', 'workspace_id', 'action', 'resource_type', 'resource_id', 'metadata'],
-            'email_tokens' => ['id', 'user_id', 'kind', 'expires_at', 'used_at'],
+            // Un registro sin verificar es una fila propia, no un usuario sin
+            // activar: ni nombre, ni workspace, ni aceptaciones que heredar, ni
+            // contraseña —la propuesta no se guarda—.
+            'pending_registrations' => ['id', 'email', 'security_version'],
+            // Un bearer `verify` nombra un registro pendiente; los demás kinds
+            // nombran un usuario (CHECK email_tokens_owner_check).
+            'email_tokens' => ['id', 'user_id', 'pending_registration_id', 'kind', 'expires_at', 'used_at'],
             // The primary string ID is itself the one-way bearer digest. Rows
             // are deleted on completion/cancellation rather than tombstoned.
             'email_change_requests' => ['id', 'user_id', 'new_email', 'security_version', 'expires_at', 'created_at'],

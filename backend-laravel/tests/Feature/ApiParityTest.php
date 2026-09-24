@@ -7,6 +7,7 @@ use App\Http\Middleware\RecordOperationalResponse;
 use App\Jobs\ProvisionDomainTlsJob;
 use App\Jobs\VerifyDomainDnsJob;
 use App\Models\EmailChangeRequest;
+use App\Models\PendingRegistration;
 use App\Models\User;
 use App\Models\Webhook;
 use App\Support\HCaptcha;
@@ -43,7 +44,7 @@ class ApiParityTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement('TRUNCATE users, sessions, workspaces, memberships, invitations, quotas, custom_domains, links, tags, link_tags, redirect_rules, click_events, metric_rollups, metric_unique_visitors, api_tokens, webhooks, webhook_deliveries, abuse_reports, audit_events, email_tokens, mail_outbox, operational_metrics, jobs, failed_jobs RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, sessions, workspaces, memberships, invitations, quotas, pending_registrations, custom_domains, links, tags, link_tags, redirect_rules, click_events, metric_rollups, metric_unique_visitors, api_tokens, webhooks, webhook_deliveries, abuse_reports, audit_events, email_tokens, mail_outbox, operational_metrics, jobs, failed_jobs RESTART IDENTITY CASCADE');
 
         // The app uses raw (unencrypted) cookies: bypass Laravel's test cookie
         // encryption, and send cookies on JSON requests (double-submit CSRF).
@@ -68,39 +69,37 @@ class ApiParityTest extends TestCase
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201)->assertExactJson(['user' => null]);
 
-        // Registration never creates a session and login is blocked until the
-        // email bearer token has been consumed.
+        // Registration never creates a session, and a pending registration is
+        // not an account: login answers exactly like wrong credentials —same
+        // 401, same body, no session— so the server never signals «sigue
+        // pendiente / ya no». La vuelta al buzón es una entrada pública de la
+        // UI, no un oráculo de ciclo de vida.
         $blocked = $this->postJson('/api/v1/auth/login', [
             'email' => 'parity@example.com',
             'password' => self::PASSWORD,
             'captchaToken' => 'test-login-passcode',
         ]);
-        $blocked->assertStatus(403)->assertExactJson(['error' => 'Verifica tu email para continuar']);
+        $blocked->assertStatus(401)->assertExactJson(['error' => 'Credenciales incorrectas']);
         $this->assertNull($this->cookieFrom($blocked, 'uvh_session'));
 
-        $user = User::where('email', 'parity@example.com')->firstOrFail();
-        // Upgrade safety: a session issued by a pre-verification deployment
-        // must be revoked during verification, or it could become valid after
-        // the account changes to verified.
-        $staleToken = Ids::randomToken(32);
-        DB::table('sessions')->insert([
-            'id' => Ids::sha256Hex($staleToken),
-            'user_id' => $user->id,
-            'created_at' => now(),
-            'last_used_at' => now(),
-            'expires_at' => now()->addHour(),
-        ]);
+        // Before the mailbox is proven there is no account at all: no user row,
+        // no workspace, no legal acceptance — and therefore no session a stale
+        // cookie could ever hold. The revocation the old model needed at
+        // verification is now structural.
+        $pending = PendingRegistration::where('email', 'parity@example.com')->firstOrFail();
+        $this->assertSame(0, User::whereRaw('lower(email) = ?', ['parity@example.com'])->count());
+        $this->assertSame(0, (int) DB::table('workspaces')->count());
+        $this->assertSame(0, (int) DB::table('legal_acceptances')->count());
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
-            'user_id' => $user->id,
+            'pending_registration_id' => $pending->id,
             'kind' => 'verify',
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
         $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain))
             ->assertStatus(200)->assertJson(['ok' => true]);
-        $this->assertNotNull(DB::table('sessions')->where('id', Ids::sha256Hex($staleToken))->value('revoked_at'));
         $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain))
             ->assertStatus(400)->assertJson(['error' => 'Token inválido o caducado']);
 
@@ -141,10 +140,22 @@ class ApiParityTest extends TestCase
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertCreated();
 
+        // The generated workspace follows the name decided at ACTIVATION —the
+        // one the mailbox opener types— and shares the 80-code-point contract
+        // with ordinary workspace writes, multibyte included.
+        $pending = PendingRegistration::where('email', 'long-workspace-name@example.com')->firstOrFail();
+        $plain = 'verify-'.Ids::randomToken(16);
+        DB::table('email_tokens')->insert([
+            'id' => Ids::sha256Hex($plain),
+            'pending_registration_id' => $pending->id,
+            'kind' => 'verify',
+            'expires_at' => now()->addHour(),
+            'created_at' => now(),
+        ]);
+        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain, $name))->assertStatus(200);
+
         $user = User::where('email', 'long-workspace-name@example.com')->firstOrFail();
         $workspaceName = (string) DB::table('workspaces')->where('owner_user_id', $user->id)->value('name');
-        // Registration and ordinary workspace writes share the same 80-code-
-        // point contract, including multibyte names.
         $this->assertSame(80, mb_strlen($workspaceName, 'UTF-8'));
         $this->assertStringStartsWith('Workspace de ', $workspaceName);
     }
@@ -328,11 +339,11 @@ class ApiParityTest extends TestCase
         $changed->assertStatus(200)->assertExactJson(['ok' => true]);
         $this->assertNull($this->cookieFrom($changed, 'uvh_session'));
 
-        $user = User::where('email', $newEmail)->firstOrFail();
+        $pending = PendingRegistration::where('email', $newEmail)->firstOrFail();
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
-            'user_id' => $user->id,
+            'pending_registration_id' => $pending->id,
             'kind' => 'verify',
             'expires_at' => now()->addHour(),
             'created_at' => now(),
@@ -404,12 +415,12 @@ class ApiParityTest extends TestCase
         $this->assertCount(2, $admitted);
 
         // The free outcome really moved the registration...
-        $this->assertNotNull(User::where('email', 'moved-into@example.com')->first());
-        $this->assertNull(User::where('email', 'probe-free@example.com')->first());
+        $this->assertNotNull(PendingRegistration::where('email', 'moved-into@example.com')->first());
+        $this->assertNull(PendingRegistration::where('email', 'probe-free@example.com')->first());
         // ... while the taken outcome was a no-op: address, bearer and the
         // occupied account itself survive untouched.
-        $probe = User::where('email', 'probe-taken@example.com')->firstOrFail();
-        $this->assertNotNull(DB::table('email_tokens')->where('user_id', $probe->id)
+        $probe = PendingRegistration::where('email', 'probe-taken@example.com')->firstOrFail();
+        $this->assertNotNull(DB::table('email_tokens')->where('pending_registration_id', $probe->id)
             ->where('kind', 'verify')->whereNull('used_at')->first());
         $this->assertSame(1, User::whereRaw('lower(email) = ?', ['occupied-target@example.com'])->count());
 
@@ -435,21 +446,10 @@ class ApiParityTest extends TestCase
             'email' => 'parked@example.com',
             'password' => 'qx-'.self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201)->assertExactJson(['user' => null]);
-        $parked = User::where('email', 'parked@example.com')->firstOrFail();
-        $bearerId = (string) DB::table('email_tokens')->where('user_id', $parked->id)
+        $parked = PendingRegistration::where('email', 'parked@example.com')->firstOrFail();
+        $bearerId = (string) DB::table('email_tokens')->where('pending_registration_id', $parked->id)
             ->where('kind', 'verify')->whereNull('used_at')->value('id');
         $this->assertNotSame('', $bearerId);
-        // A legacy session on the parked registration (a pre-verification
-        // deployment may have issued one). It is not the second registration's
-        // business to revoke it: activation is what revokes every session.
-        $legacyToken = Ids::randomToken(32);
-        DB::table('sessions')->insert([
-            'id' => Ids::sha256Hex($legacyToken),
-            'user_id' => $parked->id,
-            'created_at' => now(),
-            'last_used_at' => now(),
-            'expires_at' => now()->addHour(),
-        ]);
 
         // The real mailbox owner registers the same address with their own
         // password and gets the identical anti-enumeration answer…
@@ -459,45 +459,48 @@ class ApiParityTest extends TestCase
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201)->assertExactJson(['user' => null]);
 
-        // …and wins nothing from the row: same account, same name, same
-        // proposal, same generation, and the bearer that was already sitting in
-        // the mailbox is still the one that completes it.
-        $user = User::where('email', 'parked@example.com')->firstOrFail();
-        $this->assertSame($parked->id, $user->id);
-        $this->assertSame('Attacker Name', $user->name);
-        self::assertTrue(Hash::check('qx-'.self::PASSWORD, $user->password_hash));
-        self::assertSame(1, (int) $user->security_version);
+        // …and wins nothing from the row: same pending registration, same
+        // generation, and the bearer that was already sitting in the mailbox is
+        // still the one that completes it. There is no name, no workspace, no
+        // legal acceptance and no password proposal to inherit —the pending row
+        // never holds any— and no account exists yet at all.
+        $row = PendingRegistration::where('email', 'parked@example.com')->firstOrFail();
+        $this->assertSame($parked->id, $row->id);
+        $this->assertArrayNotHasKey('password_hash', $row->getAttributes(), 'la fila pendiente no guarda ninguna propuesta de contraseña');
+        self::assertSame(1, (int) $row->security_version);
         $this->assertNotNull(DB::table('email_tokens')->where('id', $bearerId)->whereNull('used_at')->first());
+        $this->assertSame(0, User::whereRaw('lower(email) = ?', ['parked@example.com'])->count());
+        $this->assertSame(0, (int) DB::table('workspaces')->count());
+        $this->assertSame(0, (int) DB::table('legal_acceptances')->count());
 
         // The owner opens their mailbox and decides the account's identity,
-        // legal acceptance and password. The acceptance rows are backdated
-        // first so the restamping below is observable at second precision.
-        DB::table('legal_acceptances')->where('user_id', $user->id)->update(['accepted_at' => now()->subDay()]);
+        // legal acceptance and password…
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
-            'user_id' => $user->id,
+            'pending_registration_id' => $parked->id,
             'kind' => 'verify',
             'expires_at' => now()->addHour(),
             'created_at' => now(),
         ]);
         $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain, 'Real Owner'))
             ->assertStatus(200)->assertJson(['ok' => true]);
-        // …the identity proposals die with the activation: the attacker-chosen
-        // name and the workspace generated from it are replaced by what the
-        // mailbox opener decided, and the legal acceptance on record is the one
-        // THEY made now, not the one the attacker stamped at registration…
-        $user->refresh();
+        // …and the account is born with exactly what THEY decided: the name,
+        // the workspace generated from it and the acceptance stamped now. The
+        // activation left nothing of the first registration behind: the pending
+        // row and every bearer it carried died with it.
+        $user = User::where('email', 'parked@example.com')->firstOrFail();
         $this->assertSame('Real Owner', $user->name);
         $this->assertSame('Workspace de Real Owner', (string) DB::table('workspaces')->where('owner_user_id', $user->id)->value('name'));
         $this->assertTrue(
             Carbon::parse((string) DB::table('legal_acceptances')->where('user_id', $user->id)
                 ->where('document_type', 'terms')->value('accepted_at'))->gt(now()->subHour()),
-            'the legal acceptance on record must be the one made at activation, not the one an anonymous first registrant stamped',
+            'the legal acceptance on record must be the one made at activation, not one an anonymous first registrant could stamp',
         );
-        // …the activation revokes the sessions the parked row may have carried…
-        $this->assertNotNull(DB::table('sessions')->where('id', Ids::sha256Hex($legacyToken))->value('revoked_at'));
-        // …and the proposal the first registration left behind opens nothing.
+        $this->assertNull(PendingRegistration::where('email', 'parked@example.com')->first());
+        $this->assertNull(DB::table('email_tokens')->where('id', $bearerId)->first());
+        // …and the password the first registration proposed opens nothing: it
+        // was never stored.
         $login = $this->postJson('/api/v1/auth/login', [
             'email' => 'parked@example.com',
             'password' => self::PASSWORD,
@@ -512,32 +515,30 @@ class ApiParityTest extends TestCase
         ])->assertStatus(401);
     }
 
-    public function test_a_later_anonymous_registration_never_installs_the_active_password(): void
+    public function test_a_later_anonymous_registration_never_replaces_the_pending_row(): void
     {
         // Pre-hijack: the victim registers, an anonymous request re-registers
-        // the same address, and the pending proposal now holds a password the
-        // attacker knows. Activation must not turn that proposal into the
-        // credential, and the second request must not rewrite the row either:
-        // it used to rename the account, restamp its legal acceptance and kill
-        // the bearer that was already sitting in the victim's inbox.
+        // the same address, and —mientras la fila guardaba una propuesta— esa
+        // propuesta quedaba con una contraseña que el atacante conocía. La fila
+        // ya no guarda propuesta alguna, y el segundo registro tampoco la
+        // reescribe: antes renombraba la cuenta, reestampaba su aceptación
+        // legal y mataba el bearer que ya estaba en el buzón de la víctima.
         $this->postJson('/api/v1/auth/register', array_merge([
             'name' => 'Real Owner',
             'email' => 'target@example.com',
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201);
-        $user = User::where('email', 'target@example.com')->firstOrFail();
+        $pending = PendingRegistration::where('email', 'target@example.com')->firstOrFail();
         $before = [
-            'name' => $user->name,
-            'password_hash' => $user->password_hash,
-            'security_version' => (int) $user->security_version,
-            'workspace' => (string) DB::table('workspaces')->where('owner_user_id', $user->id)->value('name'),
-            'accepted_at' => (string) DB::table('legal_acceptances')->where('user_id', $user->id)
-                ->where('document_type', 'terms')->value('accepted_at'),
-            'bearer' => (string) DB::table('email_tokens')->where('user_id', $user->id)
+            'security_version' => (int) $pending->security_version,
+            'bearer' => (string) DB::table('email_tokens')->where('pending_registration_id', $pending->id)
                 ->where('kind', 'verify')->whereNull('used_at')->value('id'),
         ];
-        $this->assertNotSame('', $before['accepted_at']);
         $this->assertNotSame('', $before['bearer']);
+        // Nothing identity-bearing exists to inherit in the first place: no
+        // account, no workspace, no legal acceptance.
+        $this->assertSame(0, (int) DB::table('workspaces')->count());
+        $this->assertSame(0, (int) DB::table('legal_acceptances')->count());
 
         $attacker = $this->postJson('/api/v1/auth/register', array_merge([
             'name' => 'Attacker Name',
@@ -549,20 +550,17 @@ class ApiParityTest extends TestCase
         $attackerSecret = (string) $this->cookieFrom($attacker, 'uvh_registration_edit');
         $this->assertNotSame('', $attackerSecret);
 
-        $after = $user->fresh();
-        $this->assertSame($before['name'], $after->name);
-        $this->assertSame($before['password_hash'], $after->password_hash);
+        $after = $pending->fresh();
+        $this->assertArrayNotHasKey('password_hash', $after->getAttributes(), 'la fila pendiente no guarda ninguna propuesta de contraseña');
         $this->assertSame($before['security_version'], (int) $after->security_version);
-        $this->assertSame($before['workspace'], (string) DB::table('workspaces')->where('owner_user_id', $user->id)->value('name'));
-        $this->assertSame($before['accepted_at'], (string) DB::table('legal_acceptances')->where('user_id', $user->id)
-            ->where('document_type', 'terms')->value('accepted_at'));
-        $this->assertSame($before['bearer'], (string) DB::table('email_tokens')->where('user_id', $user->id)
+        $this->assertSame($before['bearer'], (string) DB::table('email_tokens')->where('pending_registration_id', $after->id)
             ->where('kind', 'verify')->whereNull('used_at')->value('id'));
+        $this->assertSame(0, User::whereRaw('lower(email) = ?', ['target@example.com'])->count());
 
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
-            'user_id' => $user->id,
+            'pending_registration_id' => $pending->id,
             'kind' => 'verify',
             'expires_at' => now()->addHour(),
             'created_at' => now(),
@@ -573,7 +571,7 @@ class ApiParityTest extends TestCase
         // with. The token itself stays alive for the real confirmation.
         $this->postJson('/api/v1/auth/verify-email', ['token' => $plain])
             ->assertStatus(422)->assertJson(['error' => 'La contraseña debe tener entre 10 y 72 caracteres']);
-        $this->assertNull($user->fresh()->email_verified_at);
+        $this->assertSame(0, User::whereRaw('lower(email) = ?', ['target@example.com'])->count());
 
         // The mailbox opener chooses the password and the identity at
         // activation…
@@ -581,7 +579,7 @@ class ApiParityTest extends TestCase
             ->assertStatus(200)->assertJson(['ok' => true]);
 
         // …so the account is theirs: their password opens a session and the
-        // proposal the anonymous request left behind opens nothing.
+        // one the anonymous request proposed opens nothing —nunca se guardó—.
         $this->postJson('/api/v1/auth/login', [
             'email' => 'target@example.com',
             'password' => 'qx-'.self::PASSWORD,
@@ -600,12 +598,13 @@ class ApiParityTest extends TestCase
      * The bypass this change closes, reproduced end to end.
      *
      * The pending registration's password was the only proof
-     * `change-registration-email` asked for, and any anonymous `register` mints
+     * `change-registration-email` asked for, and any anonymous `register` minted
      * one: the attacker registered the victim's address, installed their own
      * proposal, and pointed the registration at their own mailbox before the
-     * victim opened the link. The proposal is no longer authority for anything,
-     * and neither is a re-registration: only the browser that created the row
-     * holds the secret, and every use of it rotates the generation.
+     * victim opened the link. The proposal is gone from the row entirely (it
+     * was authority for nothing), and neither is a re-registration: only the
+     * browser that created the row holds the secret, and every use of it
+     * rotates the generation.
      */
     public function test_the_registration_edit_secret_is_the_only_authority_over_a_pending_email(): void
     {
@@ -619,8 +618,8 @@ class ApiParityTest extends TestCase
         ], $this->captchaPayload()))->assertStatus(201);
         $victimSecret = (string) $this->cookieFrom($victimRegistration, 'uvh_registration_edit');
         $this->assertNotSame('', $victimSecret);
-        $victim = User::where('email', $victimEmail)->firstOrFail();
-        $victimBearer = (string) DB::table('email_tokens')->where('user_id', $victim->id)
+        $victim = PendingRegistration::where('email', $victimEmail)->firstOrFail();
+        $victimBearer = (string) DB::table('email_tokens')->where('pending_registration_id', $victim->id)
             ->where('kind', 'verify')->whereNull('used_at')->value('id');
 
         $attackerRegistration = $this->postJson('/api/v1/auth/register', array_merge([
@@ -636,7 +635,8 @@ class ApiParityTest extends TestCase
         // Without a secret.
         $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, $this->captchaPayload()))
             ->assertStatus(403);
-        // With the proposal password, which is what used to be enough.
+        // With a password field —lo que antes bastaba cuando la fila guardaba
+        // una propuesta—: ya no hay propuesta y el campo se ignora.
         $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, ['password' => 'qx-'.self::PASSWORD], $this->captchaPayload()))
             ->assertStatus(403);
         // With the attacker's own valid secret: the signature names an account,
@@ -649,11 +649,11 @@ class ApiParityTest extends TestCase
         $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, $this->captchaPayload()))
             ->assertStatus(403);
 
-        // Nothing moved: same account, same address, same bearer, same
+        // Nothing moved: same registration, same address, same bearer, same
         // generation.
-        $this->assertSame(1, User::whereRaw('lower(email) = ?', [$victimEmail])->count());
-        $this->assertSame(0, User::whereRaw('lower(email) = ?', [$attackerEmail])->count());
-        $this->assertSame($victimBearer, (string) DB::table('email_tokens')->where('user_id', $victim->id)
+        $this->assertSame(1, PendingRegistration::whereRaw('lower(email) = ?', [$victimEmail])->count());
+        $this->assertSame(0, PendingRegistration::whereRaw('lower(email) = ?', [$attackerEmail])->count());
+        $this->assertSame($victimBearer, (string) DB::table('email_tokens')->where('pending_registration_id', $victim->id)
             ->where('kind', 'verify')->whereNull('used_at')->value('id'));
         $this->assertSame(1, (int) $victim->fresh()->security_version);
 
@@ -668,8 +668,8 @@ class ApiParityTest extends TestCase
         $this->assertNotSame('', $rotated);
         $this->assertNotSame($victimSecret, $rotated);
         $this->assertSame(2, (int) $victim->fresh()->security_version);
-        $this->assertSame(0, User::whereRaw('lower(email) = ?', [$victimEmail])->count());
-        $this->assertSame(1, User::whereRaw('lower(email) = ?', ['corregida@example.com'])->count());
+        $this->assertSame(0, PendingRegistration::whereRaw('lower(email) = ?', [$victimEmail])->count());
+        $this->assertSame(1, PendingRegistration::whereRaw('lower(email) = ?', ['corregida@example.com'])->count());
 
         // Replaying the spent secret changes nothing; the rotated one still
         // allows a second correction from that same browser.
@@ -705,7 +705,7 @@ class ApiParityTest extends TestCase
             'email' => 'parked-2@example.com',
             'password' => 'qx-'.self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201);
-        $parkedHash = (string) User::where('email', 'parked-2@example.com')->firstOrFail()->password_hash;
+        $parked2Id = (int) PendingRegistration::where('email', 'parked-2@example.com')->firstOrFail()->id;
 
         $lastOutboxId = (int) DB::table('mail_outbox')->max('id');
         $answers = [];
@@ -756,13 +756,13 @@ class ApiParityTest extends TestCase
         }
 
         // Effects differ invisibly: nothing but the free destination was
-        // touched. The parked registration keeps its own proposal, its own
-        // bearer and its own account, because the mailbox owner —not the next
-        // anonymous request— is who completes it.
-        $parked2 = User::where('email', 'parked-2@example.com')->firstOrFail();
-        $this->assertSame($parkedHash, $parked2->password_hash);
-        self::assertTrue(Hash::check('qx-'.self::PASSWORD, $parked2->password_hash));
-        $this->assertNotNull(DB::table('email_tokens')->where('user_id', $parked2->id)
+        // touched. The parked registration keeps its own row and its own
+        // bearer —no hay propuesta que tocar—, because the mailbox owner —not
+        // the next anonymous request— is who completes it.
+        $parked2 = PendingRegistration::where('email', 'parked-2@example.com')->firstOrFail();
+        $this->assertSame($parked2Id, (int) $parked2->id);
+        $this->assertArrayNotHasKey('password_hash', $parked2->getAttributes(), 'la fila pendiente no guarda ninguna propuesta de contraseña');
+        $this->assertNotNull(DB::table('email_tokens')->where('pending_registration_id', $parked2->id)
             ->where('kind', 'verify')->whereNull('used_at')->first());
         self::assertTrue(Hash::check(self::PASSWORD, $occupant->fresh()->password_hash));
         $this->assertSame(1, User::whereRaw('lower(email) = ?', ['verified-occupant@example.com'])->count());
@@ -1703,11 +1703,11 @@ class ApiParityTest extends TestCase
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201);
 
-        $user = User::where('email', $email)->firstOrFail();
+        $pending = PendingRegistration::where('email', $email)->firstOrFail();
         $plain = 'verify-'.Ids::randomToken(16);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
-            'user_id' => $user->id,
+            'pending_registration_id' => $pending->id,
             'kind' => 'verify',
             'expires_at' => now()->addHour(),
             'created_at' => now(),

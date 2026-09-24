@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\DeliverMailOutboxJob;
+use App\Models\PendingRegistration;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -17,7 +18,7 @@ class AuthEmailTokenTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement('TRUNCATE users, sessions, email_tokens, mail_outbox RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, sessions, pending_registrations, email_tokens, mail_outbox RESTART IDENTITY CASCADE');
         $this->disableCookieEncryption();
         $this->withCredentials();
         $this->withCookie('uvh_csrf', self::CSRF)->withHeaders(['X-CSRF-Token' => self::CSRF]);
@@ -26,10 +27,15 @@ class AuthEmailTokenTest extends TestCase
 
     public function test_verification_resend_replaces_old_bearer_and_enforces_account_cooldown(): void
     {
-        $user = User::factory()->create(['email' => 'verify-cooldown@example.test', 'email_verified_at' => null]);
+        // Un registro sin verificar vive en `pending_registrations`; su bearer
+        // lo nombra a él, nunca a un usuario.
+        $pending = PendingRegistration::create([
+            'email' => 'verify-cooldown@example.test',
+            'security_version' => 1,
+        ]);
         DB::table('email_tokens')->insert([
             'id' => str_repeat('a', 64),
-            'user_id' => $user->id,
+            'pending_registration_id' => $pending->id,
             'kind' => 'verify',
             'expires_at' => now()->addDay(),
             'created_at' => now()->subSeconds(61),
@@ -38,20 +44,20 @@ class AuthEmailTokenTest extends TestCase
         // These are unauthenticated anti-enumeration endpoints, so their
         // tests must exercise the same server-verified hCaptcha boundary.
         $this->postJson('/api/v1/auth/resend-verification', [
-            'email' => $user->email,
+            'email' => $pending->email,
             'captchaToken' => self::CAPTCHA,
         ])
             ->assertOk()->assertExactJson(['ok' => true]);
-        $currentId = DB::table('email_tokens')->where('user_id', $user->id)->where('kind', 'verify')->value('id');
+        $currentId = DB::table('email_tokens')->where('pending_registration_id', $pending->id)->where('kind', 'verify')->value('id');
         $this->assertNotSame(str_repeat('a', 64), $currentId);
         $this->assertDatabaseCount('email_tokens', 1);
 
         $this->postJson('/api/v1/auth/resend-verification', [
-            'email' => $user->email,
+            'email' => $pending->email,
             'captchaToken' => self::CAPTCHA,
         ])
             ->assertOk()->assertExactJson(['ok' => true]);
-        $this->assertSame($currentId, DB::table('email_tokens')->where('user_id', $user->id)->value('id'));
+        $this->assertSame($currentId, DB::table('email_tokens')->where('pending_registration_id', $pending->id)->value('id'));
         Queue::assertPushed(DeliverMailOutboxJob::class, 1);
     }
 

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
+use App\Models\PendingRegistration;
 use App\Support\Ids;
 use App\Support\RegistrationEdit;
 use App\Support\SealedToken;
@@ -31,12 +31,12 @@ final class RegistrationEditTest extends TestCase
     {
         $request = $this->requestCarryingValue((string) RegistrationEdit::secret(127, 1)->getValue());
 
-        $this->assertTrue(RegistrationEdit::authorizes($request, $this->pendingUser(127, 1)));
+        $this->assertTrue(RegistrationEdit::authorizes($request, $this->pending(127, 1)));
         // Same account, later generation: the secret that authorised the move
         // was spent by it.
-        $this->assertFalse(RegistrationEdit::authorizes($request, $this->pendingUser(127, 2)));
+        $this->assertFalse(RegistrationEdit::authorizes($request, $this->pending(127, 2)));
         // Same generation, another account.
-        $this->assertFalse(RegistrationEdit::authorizes($request, $this->pendingUser(128, 1)));
+        $this->assertFalse(RegistrationEdit::authorizes($request, $this->pending(128, 1)));
     }
 
     public function test_every_wrong_shape_is_the_same_false(): void
@@ -53,7 +53,7 @@ final class RegistrationEditTest extends TestCase
             'another deployment' => str_repeat('A', strlen($valid)),
         ] as $label => $wrong) {
             $this->assertFalse(
-                RegistrationEdit::authorizes($this->requestCarryingValue($wrong), $this->pendingUser(127, 1)),
+                RegistrationEdit::authorizes($this->requestCarryingValue($wrong), $this->pending(127, 1)),
                 "a secret that is {$label} must refuse, exactly like every other way of being wrong",
             );
         }
@@ -64,13 +64,13 @@ final class RegistrationEditTest extends TestCase
         // One second in the past, sealed with the live keyring: only the
         // expiration says no, and it says the same `false` as everything else.
         $stale = SealedToken::seal(sprintf(
-            '{"e":%013d,"v":1,"uid":"%010d","sv":"%03d"}',
+            '{"e":%013d,"v":2,"pid":"%010d","sv":"%03d"}',
             (int) (microtime(true) * 1000) - 1000,
             127,
             1,
         ));
 
-        $this->assertFalse(RegistrationEdit::authorizes($this->requestCarryingValue($stale), $this->pendingUser(127, 1)));
+        $this->assertFalse(RegistrationEdit::authorizes($this->requestCarryingValue($stale), $this->pending(127, 1)));
     }
 
     public function test_a_secret_sealed_under_the_previous_key_still_opens(): void
@@ -79,10 +79,10 @@ final class RegistrationEditTest extends TestCase
         $value = (string) RegistrationEdit::secret(5, 1)->getValue();
 
         config(['uvh.secret' => str_repeat('b', 40), 'uvh.secret_previous' => [str_repeat('a', 40)]]);
-        $this->assertTrue(RegistrationEdit::authorizes($this->requestCarryingValue($value), $this->pendingUser(5, 1)));
+        $this->assertTrue(RegistrationEdit::authorizes($this->requestCarryingValue($value), $this->pending(5, 1)));
 
         config(['uvh.secret' => str_repeat('c', 40), 'uvh.secret_previous' => []]);
-        $this->assertFalse(RegistrationEdit::authorizes($this->requestCarryingValue($value), $this->pendingUser(5, 1)));
+        $this->assertFalse(RegistrationEdit::authorizes($this->requestCarryingValue($value), $this->pending(5, 1)));
     }
 
     public function test_real_and_decoy_secrets_are_indistinguishable_from_the_outside(): void
@@ -109,7 +109,7 @@ final class RegistrationEditTest extends TestCase
         // Neither the visible value nor its decoded bytes carry the claim.
         $this->assertStringNotContainsString(sprintf('%010d', 127), $real);
         $raw = Ids::base64urlDecode($real);
-        $this->assertStringNotContainsString('uid', $raw);
+        $this->assertStringNotContainsString('pid', $raw);
         $this->assertStringNotContainsString('"sv"', $raw);
     }
 
@@ -118,13 +118,13 @@ final class RegistrationEditTest extends TestCase
         $decoy = $this->requestCarryingValue((string) RegistrationEdit::decoy()->getValue());
 
         foreach ([[1, 1], [127, 1], [999_999_999, 1], [127, 2]] as [$id, $generation]) {
-            $this->assertFalse(RegistrationEdit::authorizes($decoy, $this->pendingUser($id, $generation)));
+            $this->assertFalse(RegistrationEdit::authorizes($decoy, $this->pending($id, $generation)));
         }
     }
 
-    private function pendingUser(int $id, int $securityVersion): User
+    private function pending(int $id, int $securityVersion): PendingRegistration
     {
-        return (new User)->forceFill(['id' => $id, 'security_version' => $securityVersion]);
+        return (new PendingRegistration)->forceFill(['id' => $id, 'security_version' => $securityVersion]);
     }
 
     private function requestCarryingValue(string $value): Request

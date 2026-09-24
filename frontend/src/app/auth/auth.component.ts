@@ -393,15 +393,10 @@ export class AuthComponent {
     } catch (err) {
       if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
       this.interactiveAuthStarted = false;
-      if (
-        err instanceof ApiRequestError &&
-        err.status === 403 &&
-        err.message === "Verifica tu email para continuar"
-      ) {
-        // Login never creates a session for an unverified account. Keep the
-        // address locally only to offer the safe public resend action.
-        this.verificationEmail.set(this.loginForm.controls.email.value.trim().toLowerCase());
-      }
+      // A pending registration answers exactly like wrong credentials, so
+      // there is no lifecycle signal to react to here. The path back to the
+      // mailbox is the always-visible «Reenviar verificación» entry, which
+      // needs nothing but the address.
       this.error.set(
         err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
           ? err.message
@@ -594,7 +589,11 @@ export class AuthComponent {
     const captchaWidget = pendingStep ? this.resendCaptchaWidget : this.loginCaptchaWidget;
     // Login and resend share the login widget: serialize both operations so
     // its single-use result cannot be redeemed by two requests.
-    if (!email || this.verificationBusy() || this.busy()) return;
+    if (this.verificationBusy() || this.busy()) return;
+    if (!email) {
+      this.error.set("Escribe tu email para reenviar la verificación.");
+      return;
+    }
     if (!this.captchaReady()) {
       this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
       return;

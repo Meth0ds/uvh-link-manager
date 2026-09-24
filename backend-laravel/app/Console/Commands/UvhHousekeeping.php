@@ -266,6 +266,18 @@ class UvhHousekeeping extends Command
                 $batch,
             );
 
+            // Un registro pendiente cuya última actividad supera los 30 días no
+            // es una cuenta: nadie reclamó el buzón y la reinscripción es el
+            // camino de vuelta. Plazo fijo, no surface de operador; sus bearers
+            // caen en cascada y los avisos que quedaran en el outbox pasan a
+            // obsoletos por la misma regla de siempre.
+            $this->purgeInBatches(
+                'pending_registrations', 'id',
+                'updated_at < ?',
+                [$cutoff(30)],
+                $batch,
+            );
+
             // API credentials remain visible for a short audit window after they
             // can no longer authenticate, then their hashes and metadata are removed.
             $apiTokenCutoff = $cutoff($this->days('api_token_purge_days', 30));
