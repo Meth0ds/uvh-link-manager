@@ -18,6 +18,7 @@ import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { webhookDeliveryLabel, webhookStateLabel } from "../../core/webhook-label";
 import {
@@ -81,7 +82,9 @@ export class WebhooksComponent {
   readonly selectedEvents = signal<string[]>([]);
   readonly eventOptions = EVENTS;
   readonly saving = signal(false);
-  readonly actionId = signal<number | null>(null);
+  /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
+  private readonly mutations = new OwnedMutations();
+  readonly actionId = this.mutations.value;
   readonly canEdit = computed(() => ["owner", "admin", "editor"].includes(this.workspaces.currentRole() ?? ""));
   readonly eventDescriptions: Record<string, string> = {
     "link.created": "Se crea un enlace", "link.updated": "Se modifica un enlace", "link.deleted": "Se elimina un enlace",
@@ -105,7 +108,8 @@ export class WebhooksComponent {
       this.deliveriesLoading.set({});
       this.deliveriesError.set({});
       this.error.set(null);
-      this.actionId.set(null);
+      // Una acción en vuelo pertenece al contexto que dejó la pantalla.
+      this.mutations.reset();
       this.saving.set(false);
       // A newly generated webhook secret belongs only to its source workspace.
       this.resetForm();
@@ -235,7 +239,7 @@ export class WebhooksComponent {
     if (!this.canEdit() || this.actionId()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionId.set(w.id);
+    const action = this.mutations.begin(w.id);
     try {
       await this.api.patch(`/api/v1/webhooks/${w.id}`, { active: !w.active });
       if (!target.isCurrent()) return;
@@ -244,7 +248,7 @@ export class WebhooksComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      if (target.isCurrent()) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 
@@ -252,7 +256,7 @@ export class WebhooksComponent {
     if (!this.canEdit() || !w.active || this.actionId()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionId.set(w.id);
+    const action = this.mutations.begin(w.id);
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/test`);
       if (!target.isCurrent()) return;
@@ -261,7 +265,7 @@ export class WebhooksComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      if (target.isCurrent()) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 
@@ -277,7 +281,7 @@ export class WebhooksComponent {
       destructive: true,
     });
     if (!confirmed || !this.canEdit() || !target.isCurrent() || this.actionId()) return;
-    this.actionId.set(w.id);
+    const action = this.mutations.begin(w.id);
     try {
       await this.api.delete(`/api/v1/webhooks/${w.id}`);
       if (!target.isCurrent()) return;
@@ -287,7 +291,7 @@ export class WebhooksComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      if (target.isCurrent()) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 
@@ -329,7 +333,7 @@ export class WebhooksComponent {
     if (!this.canEdit() || this.actionId()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionId.set(w.id);
+    const action = this.mutations.begin(w.id);
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/deliveries/${deliveryId}/resend`);
       if (!target.isCurrent()) return;
@@ -339,7 +343,7 @@ export class WebhooksComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      if (target.isCurrent()) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 

@@ -15,6 +15,7 @@ import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { domainStateLabel } from "../../core/domain-state-label";
 import {
@@ -71,7 +72,9 @@ export class DomainsComponent {
   readonly loading = signal(true);
   readonly adding = signal(false);
   readonly verifyingId = signal<number | null>(null);
-  readonly actionId = signal<number | null>(null);
+  /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
+  private readonly mutations = new OwnedMutations();
+  readonly actionId = this.mutations.value;
   readonly newDomain = signal("");
   readonly error = signal<string | null>(null);
 
@@ -111,7 +114,9 @@ export class DomainsComponent {
       this.pollRequests.invalidate();
       this.domains.set([]);
       this.error.set(null);
-      this.actionId.set(null);
+      // Una acción en vuelo pertenece al workspace que dejó la pantalla; su
+      // `finally` no va a liberar este hueco, así que lo libera el contexto.
+      this.mutations.reset();
       this.verifyingId.set(null);
       // A create still in flight belongs to the workspace that left the screen;
       // its busy flag must not stay stuck in the new one.
@@ -180,7 +185,7 @@ export class DomainsComponent {
     if (this.actionId() || !this.canEdit()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionId.set(d.id);
+    const action = this.mutations.begin(d.id);
     this.verifyingId.set(d.id);
     try {
       const revalidation = d.state === "active" || d.state === "verified" || d.state === "disabled";
@@ -199,10 +204,10 @@ export class DomainsComponent {
       );
       void this.load();
     } finally {
-      if (target.isCurrent() && this.actionId() === d.id) {
+      if (target.isCurrent() && this.mutations.isCurrent(action)) {
         this.verifyingId.set(null);
-        this.actionId.set(null);
       }
+      this.mutations.settle(action);
     }
   }
 
@@ -234,7 +239,7 @@ export class DomainsComponent {
     if (this.actionId() || !this.canEdit()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionId.set(d.id);
+    const action = this.mutations.begin(d.id);
     try {
       const result = await this.api.post<{ state: DomainState }>(
         `/api/v1/domains/${d.id}/activate`,
@@ -253,7 +258,7 @@ export class DomainsComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      if (target.isCurrent() && this.actionId() === d.id) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 
@@ -283,7 +288,7 @@ export class DomainsComponent {
     if (this.actionId() || !this.canEdit()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionId.set(d.id);
+    const action = this.mutations.begin(d.id);
     try {
       await this.api.post(`/api/v1/domains/${d.id}/disable`);
       if (!target.isCurrent()) return;
@@ -293,9 +298,9 @@ export class DomainsComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      // Only the operation that still owns the flag may clear it: a stale
+      // Only the operation that still owns the slot may clear it: a stale
       // action landing late must not re-enable the rows of a newer one.
-      if (target.isCurrent() && this.actionId() === d.id) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 
@@ -309,7 +314,7 @@ export class DomainsComponent {
       destructive: true,
     });
     if (!confirmed || this.actionId() || !target.isCurrent()) return;
-    this.actionId.set(d.id);
+    const action = this.mutations.begin(d.id);
     try {
       await this.api.delete(`/api/v1/domains/${d.id}`);
       this.snackbar.open("Dominio eliminado", "Cerrar", { duration: 2500 });
@@ -317,9 +322,9 @@ export class DomainsComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      // Only the operation that still owns the flag may clear it: a stale
+      // Only the operation that still owns the slot may clear it: a stale
       // action landing late must not re-enable the rows of a newer one.
-      if (target.isCurrent() && this.actionId() === d.id) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 

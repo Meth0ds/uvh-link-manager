@@ -22,6 +22,7 @@ import { ChartsComponent } from "../analytics/charts.component";
 import type { LinkDetailResponse, AnalyticsOverview, AuditEvent, LinkAppeal, LinkDto, RedirectRule } from "../../core/models";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import {
   decodeAnalyticsOverview,
@@ -81,7 +82,9 @@ export class LinkDetailComponent {
   readonly period = signal("30d");
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly actionBusy = signal(false);
+  /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
+  private readonly mutations = new OwnedMutations();
+  readonly actionBusy = this.mutations.busy;
   readonly analyticsError = signal<string | null>(null);
   readonly activityError = signal<string | null>(null);
   /** The activity view is bounded server-side; this says whether it was cut. */
@@ -128,7 +131,7 @@ export class LinkDetailComponent {
       // An action still in flight belongs to the context that left the screen;
       // its guarded `finally` will not clear the flag here, so the new context
       // starts unblocked instead of inheriting a stuck busy state.
-      this.actionBusy.set(false);
+      this.mutations.reset();
       // The route can stay mounted while its workspace authorization changes.
       this.link.set(null);
       this.rules.set([]);
@@ -298,7 +301,7 @@ export class LinkDetailComponent {
     // in another one.
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionBusy.set(true);
+    const action = this.mutations.begin(0);
     try {
       await this.api.post(`/api/v1/links/${this.linkId()}/state`, { state });
       if (!target.isCurrent()) return;
@@ -308,7 +311,7 @@ export class LinkDetailComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
-      if (target.isCurrent()) this.actionBusy.set(false);
+      this.mutations.settle(action);
     }
   }
 
@@ -325,7 +328,7 @@ export class LinkDetailComponent {
       destructive: true,
     });
     if (!confirmed || this.actionBusy() || !target.isCurrent()) return;
-    this.actionBusy.set(true);
+    const action = this.mutations.begin(0);
     try {
       await this.api.delete(`/api/v1/links/${this.linkId()}`);
       this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
@@ -333,7 +336,7 @@ export class LinkDetailComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
-      if (target.isCurrent()) this.actionBusy.set(false);
+      this.mutations.settle(action);
     }
   }
 
@@ -375,7 +378,7 @@ export class LinkDetailComponent {
     });
     // `null` is a cancelled dialog; an empty string is a request without a comment.
     if (message === null || !target.isCurrent() || this.actionBusy()) return;
-    this.actionBusy.set(true);
+    const action = this.mutations.begin(0);
     try {
       await this.api.post(`/api/v1/links/${this.linkId()}/appeal`, { message: message.trim() });
       if (!target.isCurrent()) return;
@@ -386,7 +389,7 @@ export class LinkDetailComponent {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo enviar la solicitud", "Cerrar", { duration: 4000 });
       await this.load();
     } finally {
-      if (target.isCurrent()) this.actionBusy.set(false);
+      this.mutations.settle(action);
     }
   }
 

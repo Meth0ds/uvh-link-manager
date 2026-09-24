@@ -10,6 +10,7 @@ import type { WebhookDelivery, WebhookDeliveryPage, WebhookDto } from "../../cor
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { decodeWebhookDeliveriesResponse, decodeWebhooksResponse } from "../../core/services/credential-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { parseRouteId } from "../../core/strict-wire";
 import { PageHeaderComponent } from "../page-header.component";
@@ -37,7 +38,9 @@ export class WebhookInspectorComponent {
   readonly page = signal(1);
   readonly perPage = 20;
   readonly loading = signal(true);
-  readonly actionId = signal<number | null>(null);
+  /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
+  private readonly mutations = new OwnedMutations();
+  readonly actionId = this.mutations.value;
   readonly error = signal<string | null>(null);
   readonly canEdit = computed(() => {
     const role = this.workspaces.currentRole();
@@ -67,6 +70,11 @@ export class WebhookInspectorComponent {
       if (context === this.loadedContext) return;
       this.loadedContext = context;
       this.requests.invalidate();
+      // Un envío o un reenvío en vuelo pertenecen al webhook que dejó la
+      // pantalla. Su `finally` no libera este hueco (no es current), así que lo
+      // libera el contexto: sin esto, cambiar de webhook o de workspace dejaba
+      // el inspector bloqueado de por vida.
+      this.mutations.reset();
       this.webhook.set(null);
       this.deliveries.set([]);
       this.total.set(0);
@@ -143,7 +151,7 @@ export class WebhookInspectorComponent {
   async sendTest(): Promise<void> {
     const webhook = this.webhook();
     if (!webhook || !webhook.active || !this.canEdit() || this.actionId() !== null) return;
-    this.actionId.set(0);
+    const action = this.mutations.begin(0);
     try {
       await this.api.post(`/api/v1/webhooks/${webhook.id}/test`);
       this.snackbar.open("Ping admitido en la cola", "Cerrar", { duration: 3000 });
@@ -151,15 +159,15 @@ export class WebhookInspectorComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo enviar la prueba", "Cerrar", { duration: 5000 });
     } finally {
-      // Only the operation that still owns the flag may clear it.
-      if (this.actionId() === 0) this.actionId.set(null);
+      // Only the operation that still owns the slot may clear it.
+      this.mutations.settle(action);
     }
   }
 
   async resend(delivery: WebhookDelivery): Promise<void> {
     const webhook = this.webhook();
     if (!webhook || !this.canEdit() || this.actionId() !== null || delivery.status === "processing" || delivery.status === "success") return;
-    this.actionId.set(delivery.id);
+    const action = this.mutations.begin(delivery.id);
     try {
       await this.api.post(`/api/v1/webhooks/${webhook.id}/deliveries/${delivery.id}/resend`);
       this.snackbar.open("Entrega pendiente en la cola", "Cerrar", { duration: 3000 });
@@ -167,8 +175,8 @@ export class WebhookInspectorComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo programar el reenvío", "Cerrar", { duration: 5000 });
     } finally {
-      // Only the operation that still owns the flag may clear it.
-      if (this.actionId() === delivery.id) this.actionId.set(null);
+      // Only the operation that still owns the slot may clear it.
+      this.mutations.settle(action);
     }
   }
 

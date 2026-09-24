@@ -14,6 +14,7 @@ import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { decodeLinkTrashResponse } from "../../core/services/link-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ActionDialogService } from "../action-dialog.service";
@@ -45,7 +46,9 @@ export class LinkTrashComponent {
   readonly q = signal("");
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly actionId = signal<number | null>(null);
+  /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
+  private readonly mutations = new OwnedMutations();
+  readonly actionId = this.mutations.value;
   readonly purgeId = signal<number | null>(null);
   readonly password = signal("");
   readonly factorCode = signal("");
@@ -62,6 +65,12 @@ export class LinkTrashComponent {
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
       this.requests.invalidate();
+      // Un purge en vuelo pertenece al workspace que dejó la pantalla: su
+      // `finally` no va a liberar este hueco, así que lo libera el contexto. Sin
+      // esto la papelera del workspace nuevo quedaba bloqueada de por vida
+      // —queda y purge salían por la guarda de "ya hay algo en vuelo"— hasta
+      // remontar la ruta.
+      this.mutations.reset();
       this.rows.set([]); this.total.set(0); this.retentionDays.set(null); this.page.set(0); this.closePurge();
       if (workspaceId === null) { this.loading.set(false); return; }
       void this.load();
@@ -98,7 +107,7 @@ export class LinkTrashComponent {
     // another workspace's quota.
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionId.set(row.link.id);
+    const action = this.mutations.begin(row.link.id);
     try {
       await this.api.post(`/api/v1/links/${row.link.id}/restore`);
       if (!target.isCurrent()) return;
@@ -107,7 +116,7 @@ export class LinkTrashComponent {
     } catch (err) {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo restaurar", "Cerrar", { duration: 4500 });
-    } finally { if (target.isCurrent()) this.actionId.set(null); }
+    } finally { this.mutations.settle(action); }
   }
 
   openPurge(row: TrashLinkDto): void {
@@ -130,7 +139,7 @@ export class LinkTrashComponent {
     const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({ title: "Borrar definitivamente", message: "Esta acción elimina el enlace y sus datos relacionados de forma irreversible.", confirmLabel: "Borrar definitivamente", destructive: true });
     if (!confirmed || !target.isCurrent()) return;
-    this.actionId.set(row.link.id);
+    const action = this.mutations.begin(row.link.id);
     try {
       await this.api.post(`/api/v1/links/${row.link.id}/purge`, { password: this.password(), factorCode: this.factorCode().trim(), confirmation: this.confirmation() });
       this.closePurge();
@@ -139,9 +148,10 @@ export class LinkTrashComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo borrar definitivamente", "Cerrar", { duration: 5000 });
     } finally {
-      // Only the operation that still owns the flag may clear it: a stale
-      // `purge` landing late must not re-enable the rows of a newer action.
-      if (target.isCurrent() && this.actionId() === row.link.id) this.actionId.set(null);
+      // Only the operation that still owns the slot may clear it: a stale
+      // `purge` landing late must not re-enable the rows of a newer action, and
+      // only `mutations.reset()` frees it after a context switch.
+      this.mutations.settle(action);
     }
   }
 

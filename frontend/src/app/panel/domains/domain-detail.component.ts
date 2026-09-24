@@ -10,6 +10,7 @@ import type { DomainDetailResponse, DomainDto, DomainState } from "../../core/mo
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { decodeDomainDetailResponse, decodeDomainStateResponse } from "../../core/services/domain-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { parseRouteId } from "../../core/strict-wire";
 import { targetWorkspace } from "../../core/services/workspace-target";
@@ -51,7 +52,9 @@ export class DomainDetailComponent {
 
   readonly domain = signal<DomainDto | null>(null);
   readonly loading = signal(true);
-  readonly actionBusy = signal(false);
+  /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
+  private readonly mutations = new OwnedMutations();
+  readonly actionBusy = this.mutations.busy;
   readonly error = signal<string | null>(null);
   readonly canEdit = computed(() => {
     const role = this.workspaces.currentRole();
@@ -84,7 +87,7 @@ export class DomainDetailComponent {
       // An action still in flight belongs to the context that left the screen;
       // its guarded `finally` will not clear the flag here, so the new context
       // starts unblocked instead of inheriting a stuck busy state.
-      this.actionBusy.set(false);
+      this.mutations.reset();
       if (domainId === null) {
         this.error.set("El identificador del dominio no es válido");
         this.loading.set(false);
@@ -148,8 +151,8 @@ export class DomainDetailComponent {
     if (!current || !this.canEdit() || this.actionBusy()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
+    const action = this.mutations.begin(0);
     const revalidate = current.state === "active" || current.state === "verified" || current.state === "disabled";
-    this.actionBusy.set(true);
     try {
       await this.api.post<{ state: DomainState }>(
         `/api/v1/domains/${current.id}/${revalidate ? "revalidate" : "verify"}`,
@@ -163,7 +166,7 @@ export class DomainDetailComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo iniciar la comprobación", "Cerrar", { duration: 5000 });
     } finally {
-      if (target.isCurrent()) this.actionBusy.set(false);
+      this.mutations.settle(action);
     }
   }
 
@@ -172,7 +175,7 @@ export class DomainDetailComponent {
     if (!current || current.state !== "verified" || !this.canEdit() || this.actionBusy()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionBusy.set(true);
+    const action = this.mutations.begin(0);
     try {
       await this.api.post<{ state: DomainState }>(`/api/v1/domains/${current.id}/activate`, undefined, decodeDomainStateResponse);
       if (!target.isCurrent()) return;
@@ -182,7 +185,7 @@ export class DomainDetailComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo activar el dominio", "Cerrar", { duration: 5000 });
     } finally {
-      if (target.isCurrent()) this.actionBusy.set(false);
+      this.mutations.settle(action);
     }
   }
 

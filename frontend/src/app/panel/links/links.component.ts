@@ -26,6 +26,7 @@ import type { LinksResponse, LinkDto, LinkState } from "../../core/models";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeLinksResponse } from "../../core/services/link-response-decoders";
 import { linkStateLabel } from "../../core/link-state-label";
@@ -74,7 +75,9 @@ export class LinksComponent {
   readonly total = signal(0);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly actionId = signal<number | null>(null);
+  /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
+  private readonly mutations = new OwnedMutations();
+  readonly actionId = this.mutations.value;
 
   readonly q = signal("");
   readonly state = signal<StateFilter>("");
@@ -121,7 +124,9 @@ export class LinksComponent {
       // previous tenant can make a populated smaller workspace appear empty.
       this.page.set(0);
       this.error.set(null);
-      this.actionId.set(null);
+      // Una mutación en vuelo pertenece al workspace que dejó la pantalla; su
+      // `finally` no va a liberar este hueco, así que lo libera el contexto.
+      this.mutations.reset();
       this.pendingAutoHandled = false;
       if (workspaceId === null) {
         this.loading.set(false);
@@ -251,7 +256,7 @@ export class LinksComponent {
     // there, so the mutation must not be sent after the header changed.
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    this.actionId.set(link.id);
+    const action = this.mutations.begin(link.id);
     try {
       await this.api.post(`/api/v1/links/${link.id}/state`, { state });
       if (!target.isCurrent()) return;
@@ -261,7 +266,7 @@ export class LinksComponent {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
-      if (target.isCurrent()) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 
@@ -276,7 +281,7 @@ export class LinksComponent {
       destructive: true,
     });
     if (!confirmed || this.actionId() || !target.isCurrent()) return;
-    this.actionId.set(link.id);
+    const action = this.mutations.begin(link.id);
     try {
       await this.api.delete(`/api/v1/links/${link.id}`);
       this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
@@ -284,9 +289,9 @@ export class LinksComponent {
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
     } finally {
-      // Only the operation that still owns the flag may clear it: a stale
+      // Only the operation that still owns the slot may clear it: a stale
       // `remove` landing late must not re-enable the rows of a newer action.
-      if (target.isCurrent() && this.actionId() === link.id) this.actionId.set(null);
+      this.mutations.settle(action);
     }
   }
 
