@@ -1,14 +1,17 @@
 import { signal, type WritableSignal } from "@angular/core";
-import { TestBed } from "@angular/core/testing";
+import { fakeAsync, flushMicrotasks, TestBed, tick } from "@angular/core/testing";
 import { Router } from "@angular/router";
 import { FormBuilder } from "@angular/forms";
+import { MatDialog } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
+import { Subject } from "rxjs";
 import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, SessionList } from "../../core/models";
 import { ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { ThemeService } from "../../core/services/theme.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ActionDialogService } from "../action-dialog.service";
+import { DataExportDialogComponent, type DataExportDialogResult } from "./data-export-dialog.component";
 import { SettingsComponent } from "./settings.component";
 
 interface Deferred<T> {
@@ -21,6 +24,16 @@ function deferred<T>(): Deferred<T> {
   const promise = new Promise<T>((onResolve) => { resolve = onResolve; });
   return { promise, resolve };
 }
+
+const processing: DataExportStatus = {
+  id: 1,
+  status: "processing",
+  failureReason: null,
+  downloadExpiresAt: null,
+  createdAt: "2026-09-06T00:00:00Z",
+  readyAt: null,
+  downloadedAt: null,
+};
 
 function session(id: string, current = false): Session {
   return {
@@ -43,6 +56,7 @@ describe("SettingsComponent async safety", () => {
   let api: jasmine.SpyObj<ApiService>;
   let snackbar: jasmine.SpyObj<MatSnackBar>;
   let router: jasmine.SpyObj<Router>;
+  let dialog: jasmine.SpyObj<MatDialog>;
   let selected: ReturnType<typeof signal<number | null>>;
   let component: SettingsComponent;
 
@@ -71,6 +85,7 @@ describe("SettingsComponent async safety", () => {
     snackbar = jasmine.createSpyObj<MatSnackBar>("MatSnackBar", ["open"]);
     router = jasmine.createSpyObj<Router>("Router", ["navigate"]);
     router.navigate.and.resolveTo(true);
+    dialog = jasmine.createSpyObj<MatDialog>("MatDialog", ["open"]);
     selected = signal<number | null>(7);
 
     TestBed.configureTestingModule({
@@ -80,6 +95,7 @@ describe("SettingsComponent async safety", () => {
         { provide: ApiService, useValue: api },
         { provide: MatSnackBar, useValue: snackbar },
         { provide: Router, useValue: router },
+        { provide: MatDialog, useValue: dialog },
         { provide: WorkspaceService, useValue: {
           list: signal([]), currentId: selected, select: (id: number | null) => selected.set(id),
         } },
@@ -180,7 +196,7 @@ describe("SettingsComponent async safety", () => {
     const older = deferred<DataExportStatus | null>();
     const newer = deferred<DataExportStatus | null>();
     auth.dataExportStatus.and.returnValues(older.promise, newer.promise);
-    const oldStatus = { id: 1, status: "processing", confirmationExpiresAt: null, downloadExpiresAt: null, createdAt: null, confirmedAt: null, readyAt: null, downloadedAt: null } satisfies DataExportStatus;
+    const oldStatus = { id: 1, status: "processing", failureReason: null, downloadExpiresAt: null, createdAt: null, readyAt: null, downloadedAt: null } satisfies DataExportStatus;
     const newStatus = { ...oldStatus, status: "ready" as const };
 
     const first = component.loadExportStatus(false);
@@ -275,5 +291,180 @@ describe("SettingsComponent async safety", () => {
     const messages = snackbar.open.calls.allArgs().map((args) => args[0]);
     expect(messages).toContain("La sesión quedó revocada. Abre la pantalla de acceso para continuar.");
     expect(messages).not.toContain("No se pudo revocar la sesión");
+  });
+
+  it("polls the export status with bounded backoff and stops at a final state", fakeAsync(() => {
+    spyOnProperty(document, "hidden", "get").and.returnValue(false);
+    auth.dataExportStatus.calls.reset();
+    auth.dataExportStatus.and.returnValue(Promise.resolve(processing));
+
+    void component.loadExportStatus(false, true);
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(1);
+
+    tick(3_000);
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(2);
+    tick(5_000);
+    flushMicrotasks();
+    tick(8_000);
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(4);
+
+    // The backoff saturates instead of growing without bound.
+    tick(13_000);
+    tick(21_000);
+    tick(30_000);
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(7);
+    tick(30_000);
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(8);
+
+    // A final state ends the loop: no probe and no timer remain.
+    auth.dataExportStatus.and.returnValue(Promise.resolve({ ...processing, status: "downloaded" }));
+    tick(30_000);
+    flushMicrotasks();
+    expect(component.exportStatus()?.status).toBe("downloaded");
+    tick(120_000);
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(9);
+  }));
+
+  it("pauses the probe while the tab is hidden and resumes when it comes back", fakeAsync(() => {
+    let hidden = true;
+    spyOnProperty(document, "hidden", "get").and.callFake(() => hidden);
+    auth.dataExportStatus.calls.reset();
+    auth.dataExportStatus.and.resolveTo(processing);
+
+    void component.loadExportStatus(false, true);
+    flushMicrotasks();
+    tick(120_000);
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(1);
+
+    hidden = false;
+    document.dispatchEvent(new Event("visibilitychange"));
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(2);
+
+    // Hiding again cancels the pending probe instead of firing it unseen.
+    hidden = true;
+    document.dispatchEvent(new Event("visibilitychange"));
+    tick(120_000);
+    flushMicrotasks();
+    expect(auth.dataExportStatus).toHaveBeenCalledTimes(2);
+  }));
+
+  it("keeps the last known export state and stays quiet when a silent probe fails", async () => {
+    spyOnProperty(document, "hidden", "get").and.returnValue(true);
+    auth.dataExportStatus.and.resolveTo(processing);
+    await component.loadExportStatus(false, true);
+    expect(component.exportStatus()).toEqual(processing);
+
+    auth.dataExportStatus.and.rejectWith(new TypeError("Failed to fetch"));
+    await component.loadExportStatus(false, true);
+
+    expect(component.exportStatus()).toEqual(processing);
+    expect(component.exportLoading()).toBeFalse();
+    expect(snackbar.open).not.toHaveBeenCalled();
+  });
+
+  it("downloads through the step-up dialog and reports the exact outcome", async () => {
+    const closed = new Subject<DataExportDialogResult>();
+    dialog.open.and.returnValue({ afterClosed: () => closed } as never);
+
+    component.openDataExportDialog("download");
+    expect(dialog.open).toHaveBeenCalledWith(DataExportDialogComponent, jasmine.objectContaining({
+      data: { purpose: "download" },
+      ariaLabel: "Descargar la exportación de datos",
+    }));
+
+    closed.next(true);
+    closed.complete();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(snackbar.open).toHaveBeenCalledWith("Archivo descargado", "Cerrar", jasmine.objectContaining({ duration: 3500 }));
+    expect(auth.dataExportStatus).toHaveBeenCalled();
+  });
+
+  it("explains a receipt that could not be confirmed without redoing the download", async () => {
+    const closed = new Subject<DataExportDialogResult>();
+    dialog.open.and.returnValue({ afterClosed: () => closed } as never);
+
+    component.openDataExportDialog("download");
+    closed.next("unconfirmed");
+    closed.complete();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const message = String(snackbar.open.calls.mostRecent().args[0]);
+    expect(message).toContain("No pudimos confirmar la recepción");
+  });
+
+  it("shows a waiting state that invites closing the page while the file is generated", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.componentInstance.exportLoading.set(false);
+    fixture.componentInstance.exportStatus.set(processing);
+    fixture.detectChanges();
+    const card = fixture.nativeElement.querySelector(".data-card") as HTMLElement;
+
+    expect(card.textContent).toContain("Estamos preparando tus datos");
+    expect(card.textContent).toContain("Puedes cerrar esta página");
+  });
+
+  it("offers the download action with its dates when the export is ready", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.componentInstance.exportLoading.set(false);
+    fixture.componentInstance.exportStatus.set({
+      id: 2, status: "ready", failureReason: null,
+      downloadExpiresAt: "2026-09-08T00:00:00Z", createdAt: "2026-09-06T00:00:00Z",
+      readyAt: "2026-09-06T00:05:00Z", downloadedAt: null,
+    });
+    fixture.detectChanges();
+    const card = fixture.nativeElement.querySelector(".data-card") as HTMLElement;
+
+    expect(card.textContent).toContain("Tu exportación está lista");
+    expect(card.querySelector<HTMLButtonElement>(".export-primary")?.textContent).toContain("Descargar archivo");
+    // The state advances alone: there is no manual refresh button anymore.
+    expect(card.textContent).not.toContain("Actualizar estado");
+  });
+
+  it("routes an automated size limit to the portability flow instead of support", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.componentInstance.exportLoading.set(false);
+    fixture.componentInstance.exportStatus.set({
+      id: 2, status: "failed", failureReason: "automated_size_limit",
+      downloadExpiresAt: null, createdAt: "2026-09-06T00:00:00Z",
+      readyAt: null, downloadedAt: null,
+    });
+    fixture.detectChanges();
+    const card = fixture.nativeElement.querySelector(".data-card") as HTMLElement;
+
+    expect(card.textContent).toContain("No pudimos preparar el archivo");
+    expect(card.textContent).not.toContain("contacta con soporte");
+    expect(card.querySelector<HTMLButtonElement>(".export-primary")?.textContent).toContain("Solicitar portabilidad");
+  });
+
+  it("offers a fresh export when the file has expired", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.componentInstance.exportLoading.set(false);
+    fixture.componentInstance.exportStatus.set({
+      id: 2, status: "expired", failureReason: null,
+      downloadExpiresAt: "2026-09-08T00:00:00Z", createdAt: "2026-09-06T00:00:00Z",
+      readyAt: "2026-09-06T00:05:00Z", downloadedAt: null,
+    });
+    fixture.detectChanges();
+    const card = fixture.nativeElement.querySelector(".data-card") as HTMLElement;
+
+    expect(card.textContent).toContain("El archivo ha caducado");
+    expect(card.querySelector<HTMLButtonElement>(".export-primary")?.textContent).toContain("Generar una nueva exportación");
+  });
+
+  it("preselects the portability right when the size limit blocked the export", () => {
+    component.openPortabilityFlow();
+
+    expect(component.privacyForm.controls.type.value).toBe("portability");
+    expect(component.privacyForm.controls.details.value).toBe("");
   });
 });

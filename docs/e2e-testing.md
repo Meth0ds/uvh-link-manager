@@ -90,7 +90,8 @@ contenedores, la red y los volúmenes efímeros.
 10. Creación de workspace y ciclo crear/pausar/editar/eliminar/restaurar enlace.
 11. Cambio de email, cierre de sesiones y traslado del acceso.
 12. Alta MFA por TOTP y consumo único de un código de recuperación.
-13. Solicitud y cancelación de exportación con invalidación del enlace.
+13. Exportación con step-up: solicitud, descarga con step-up, acuse que consume
+    y cancelación con retirada del artefacto.
 14. Creación, uso y revocación efectiva de un token Bearer de alcance mínimo.
 15. Invitación y aceptación por el destinatario verificado con rol `viewer`.
 16. Uso y límites con roles reales `owner`, `admin`, `editor` y `viewer`.

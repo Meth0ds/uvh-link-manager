@@ -2,6 +2,7 @@ import { expect, test } from "../fixtures";
 import { E2E_PASSWORD, loginFromBrowser, registerVerifyAndLogin } from "../support/auth";
 import { installHCaptchaBridge } from "../support/hcaptcha";
 import { readMailLink } from "../support/mail";
+import { runE2EExportsWorker } from "../support/queues";
 import { currentTotp } from "../support/totp";
 
 test.beforeEach(async ({ page }) => {
@@ -82,30 +83,57 @@ test("MFA permite TOTP y un código de recuperación sólo una vez", async ({ pa
   await expect(page.getByRole("alert")).toContainText(/incorrecto|inválido/i);
 });
 
-test("una exportación pendiente puede cancelarse e invalida su confirmación", async ({ page }) => {
+test("una exportación se solicita, se prepara sola y se descarga con step-up", async ({ page }) => {
   test.setTimeout(360_000);
-  const { email } = await registerVerifyAndLogin(page, "export-cancel");
+  await registerVerifyAndLogin(page, "export-flow");
   await page.goto("/app/settings#privacy");
-  // The request is a dialog too: password (plus the second factor when the
-  // account has one) before the confirmation mail is admitted.
+
+  // The request is a step-up dialog; on success it closes by itself and the
+  // card takes over without asking the user to confirm anything by email.
   await page.getByRole("button", { name: "Solicitar mi archivo" }).click();
   const exportDialog = page.getByRole("dialog");
   await exportDialog.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
   const requestPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/data-export") && response.request().method() === "POST");
   await exportDialog.getByRole("button", { name: "Solicitar mi archivo", exact: true }).click();
   expect((await requestPromise).status()).toBe(202);
-  await exportDialog.getByRole("button", { name: "Entendido" }).click();
-  await expect(page.getByText("Esperando confirmación", { exact: true })).toBeVisible();
-  const confirmationUrl = await readMailLink(email, "data_export_confirmation");
+
+  // Either the card is already waiting or the worker was fast; in both cases
+  // the state advances with no button and no page of the user.
+  await expect(
+    page.getByText("Estamos preparando tus datos").or(page.getByText("Tu exportación está lista")),
+  ).toBeVisible();
+  // The browser stack runs no workers, so the harness drains the exports queue
+  // itself. The panel still learns about it the only way it may: its own polls.
+  await runE2EExportsWorker();
+  await expect(page.getByText("Tu exportación está lista")).toBeVisible({ timeout: 120_000 });
+
+  // Downloading re-enters the step-up; the receipt then consumes the export.
+  await page.getByRole("button", { name: "Descargar archivo" }).click();
+  const downloadDialog = page.getByRole("dialog");
+  await downloadDialog.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
+  const downloadPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/data-export/download") && response.request().method() === "POST");
+  await downloadDialog.getByRole("button", { name: "Descargar archivo", exact: true }).click();
+  expect((await downloadPromise).status()).toBe(200);
+
+  await expect(page.getByText("Exportación descargada")).toBeVisible();
+});
+
+test("una exportación pendiente puede cancelarse", async ({ page }) => {
+  test.setTimeout(360_000);
+  await registerVerifyAndLogin(page, "export-cancel");
+  await page.goto("/app/settings#privacy");
+  await page.getByRole("button", { name: "Solicitar mi archivo" }).click();
+  const exportDialog = page.getByRole("dialog");
+  await exportDialog.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
+  const requestPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/data-export") && response.request().method() === "POST");
+  await exportDialog.getByRole("button", { name: "Solicitar mi archivo", exact: true }).click();
+  expect((await requestPromise).status()).toBe(202);
 
   await page.getByRole("button", { name: "Cancelar exportación" }).click();
   const cancelPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/data-export/cancel"));
   await page.getByRole("alertdialog").getByRole("button", { name: "Cancelar exportación" }).click();
   expect((await cancelPromise).status()).toBe(200);
 
-  await page.goto(confirmationUrl);
-  const stalePromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/auth/data-export/confirm"));
-  await page.getByRole("button", { name: "Confirmar y preparar archivo" }).click();
-  expect((await stalePromise).status()).toBe(400);
-  await expect(page.getByRole("heading", { name: "No se pudo confirmar" })).toBeVisible();
+  await expect(page.getByText("Solicitud cancelada")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Solicitar mi archivo" })).toBeVisible();
 });

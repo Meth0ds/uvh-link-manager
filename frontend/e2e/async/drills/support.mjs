@@ -1,18 +1,17 @@
 /**
  * The levers and diagnostics the crash drills share.
  *
- * `startExport` drives the real request/confirm handshake, `housekeepingNow`
- * runs the scheduler's own command with its heavy cadence opened, `exhaustOutbox`
- * walks a durable cycle to its terminal state, and the other two only read.
- * None of them decides anything for the application.
+ * `startExport` drives the real step-up request that enqueues the job,
+ * `housekeepingNow` runs the scheduler's own command with its heavy cadence
+ * opened, `exhaustOutbox` walks a durable cycle to its terminal state, and the
+ * other two only read. None of them decides anything for the application.
  */
 
 import { until } from "../expect.mjs";
-import { bearerMatching } from "../fixtures.mjs";
 import { api, password } from "../session.mjs";
 import { docker, inspect } from "../topology.mjs";
 
-/** Bearer whose stored hash matches, read from the provider's own record. */
+/** How many times an audited action happened on a resource. */
 export const auditCount = (action, resourceId) => Number(inspect("audit-count", `${action} ${resourceId}`).count);
 /**
  * The state that explains a job which did not finish: whether its worker is
@@ -33,32 +32,24 @@ export function whyStalled(service) {
 }
 
 /**
- * Request an export and confirm it with the bearer the provider delivered.
+ * Request an export with the account step-up.
  *
- * Failures come back with the reason attached: the three ways this can stop
- * (a refused request, a confirmation that never arrived, a refused
- * confirmation) look identical in the durable state and only the HTTP status
- * and the row tell them apart.
+ * The request itself enqueues the job: there is no separate confirmation step
+ * and no mail in the authorization path, so the ways this can stop are a
+ * refused request or a row that never appears, and only the HTTP status and
+ * the row tell them apart. Failures come back with the reason attached.
  */
-export async function startExport(email, session, workspaceId) {
+export async function startExport(session, workspaceId) {
   const requested = await api("POST", "/api/v1/auth/data-export", { session, workspaceId, json: { password } });
   if (requested.status !== 200 && requested.status !== 202) {
     return { reason: `request HTTP ${requested.status} ${requested.raw.slice(0, 160)}` };
   }
   const row = inspect("export-latest");
-  if (!row?.confirmation_hash) {
-    return { reason: `no confirmation bearer on request ${row?.id}: ${JSON.stringify(row)}` };
-  }
-  const token = await bearerMatching(email, row.confirmation_hash);
-  if (!token) {
-    return { reason: `the confirmation message never reached the provider for request ${row.id}` };
-  }
-  const confirmed = await api("POST", "/api/v1/auth/data-export/confirm", { json: { token } });
-  if (confirmed.status !== 200) {
-    return { reason: `confirm HTTP ${confirmed.status} ${confirmed.raw.slice(0, 160)}` };
+  if (!row?.id) {
+    return { reason: `no request row after admission: ${JSON.stringify(row)}` };
   }
 
-  return { id: row.id, confirmToken: token };
+  return { id: row.id };
 }
 
 /**

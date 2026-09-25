@@ -13,12 +13,6 @@ parameters:
 			path: app/Console/Commands/UvhHousekeeping.php
 
 		-
-			message: '#^Left side of && is always true\.$#'
-			identifier: booleanAnd.leftAlwaysTrue
-			count: 1
-			path: app/Http/Controllers/AccountController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\AccountController\:\:cancelDeletion\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -32,12 +26,6 @@ parameters:
 
 		-
 			message: '#^Method App\\Http\\Controllers\\AccountController\:\:confirmDeletion\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/AccountController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\AccountController\:\:confirmExport\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/AccountController.php

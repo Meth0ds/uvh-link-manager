@@ -390,7 +390,7 @@ class UvhHousekeeping extends Command
             foreach ($staleExports as $export) {
                 $updated = DB::table('data_export_requests')->where('id', $export->id)
                     ->where('status', 'processing')->where('updated_at', '<', now()->subMinutes(30))
-                    ->update(['status' => 'failed', 'updated_at' => now()]);
+                    ->update(['status' => 'failed', 'failure_reason' => 'stalled', 'updated_at' => now()]);
                 if ($updated === 1 && is_string($export->artifact_path) && $export->artifact_path !== '') {
                     PrivateArtifactCleanup::attempt((int) $export->id, $export->artifact_path);
                 }
@@ -400,21 +400,15 @@ class UvhHousekeeping extends Command
             // Claim each expiry transition before deleting its concrete path so a
             // concurrent download cannot race a blind filesystem sweep.
             $expiredExports = DB::table('data_export_requests')
-                ->where(function ($query) use ($nowIso) {
-                    $query->where(function ($requested) use ($nowIso) {
-                        $requested->where('status', 'requested')->where('confirmation_expires_at', '<', $nowIso);
-                    })->orWhere(function ($ready) use ($nowIso) {
-                        $ready->where('status', 'ready')->where('download_expires_at', '<', $nowIso);
-                    });
-                })
+                ->where('status', 'ready')
+                ->where('download_expires_at', '<', $nowIso)
                 ->orderBy('id')->limit(100)->get(['id', 'status', 'artifact_path']);
             foreach ($expiredExports as $export) {
                 $updated = DB::table('data_export_requests')
                     ->where('id', $export->id)->where('status', $export->status)
                     ->update([
                         'status' => 'expired',
-                        'confirmation_token_hash' => null,
-                        'download_token_hash' => null,
+                        'mail_generation_hash' => null,
                         'updated_at' => now(),
                     ]);
                 if ($updated === 1 && is_string($export->artifact_path) && $export->artifact_path !== '') {
@@ -639,8 +633,7 @@ class UvhHousekeeping extends Command
                     ->values()->all();
                 DB::table('data_export_requests')->where('user_id', $user->id)->update([
                     'status' => DB::raw("CASE WHEN status = 'downloaded' THEN status ELSE 'cancelled' END"),
-                    'confirmation_token_hash' => null,
-                    'download_token_hash' => null,
+                    'mail_generation_hash' => null,
                     'updated_at' => now(),
                 ]);
                 DB::table('sessions')->where('user_id', $user->id)->delete();

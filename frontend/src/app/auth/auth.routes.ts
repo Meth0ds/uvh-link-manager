@@ -13,16 +13,6 @@ export const authRoutes: Routes = [
     loadComponent: () => import("./confirm-email-change.component").then((m) => m.ConfirmEmailChangeComponent),
   },
   {
-    path: "confirm-export",
-    title: "Preparar exportación · UVH",
-    loadComponent: () => import("./confirm-data-export.component").then((m) => m.ConfirmDataExportComponent),
-  },
-  {
-    path: "download-export",
-    title: "Descargar tus datos · UVH",
-    loadComponent: () => import("./download-data-export.component").then((m) => m.DownloadDataExportComponent),
-  },
-  {
     path: "confirm-account-deletion",
     title: "Confirmar eliminación · UVH",
     loadComponent: () => import("./confirm-account-deletion.component").then((m) => m.ConfirmAccountDeletionComponent),

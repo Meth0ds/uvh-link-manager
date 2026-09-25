@@ -1,10 +1,10 @@
 import { signal, type WritableSignal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
-import { MatDialogRef } from "@angular/material/dialog";
+import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import type { AuthUser, DataExportStatus } from "../../core/models";
 import { ApiRequestError } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
-import { DataExportDialogComponent } from "./data-export-dialog.component";
+import { DataExportDialogComponent, type DataExportDialogData } from "./data-export-dialog.component";
 
 function user(mfaEnabled: boolean): AuthUser {
   return {
@@ -17,36 +17,43 @@ function user(mfaEnabled: boolean): AuthUser {
   };
 }
 
-const requested: DataExportStatus = {
+const processing: DataExportStatus = {
   id: 7,
-  status: "requested",
-  confirmationExpiresAt: "2026-09-06T00:15:00Z",
+  status: "processing",
+  failureReason: null,
   downloadExpiresAt: null,
   createdAt: "2026-09-06T00:00:00Z",
-  confirmedAt: null,
   readyAt: null,
   downloadedAt: null,
 };
 
 describe("DataExportDialogComponent", () => {
-  type AuthMethods = Pick<AuthService, "sessionGeneration" | "requestDataExport" | "user">;
+  type AuthMethods = Pick<AuthService,
+    "sessionGeneration" | "requestDataExport" | "downloadDataExport" | "acknowledgeDataExportDownload" | "user">;
   let auth: jasmine.SpyObj<AuthMethods> & { user: WritableSignal<AuthUser | null> };
   let ref: { disableClose: boolean; close: jasmine.Spy };
+  let data: DataExportDialogData;
   let generation: number;
 
   beforeEach(() => {
     generation = 1;
-    const authSpy = jasmine.createSpyObj<AuthMethods>("AuthService", ["sessionGeneration", "requestDataExport", "user"]);
+    const authSpy = jasmine.createSpyObj<AuthMethods>("AuthService", [
+      "sessionGeneration", "requestDataExport", "downloadDataExport", "acknowledgeDataExportDownload", "user",
+    ]);
     auth = Object.assign(authSpy, { user: signal<AuthUser | null>(user(false)) });
     auth.sessionGeneration.and.callFake(() => generation);
-    auth.requestDataExport.and.resolveTo(requested);
+    auth.requestDataExport.and.resolveTo(processing);
+    auth.downloadDataExport.and.resolveTo(new Blob(['{"account":{}}'], { type: "application/json" }));
+    auth.acknowledgeDataExportDownload.and.resolveTo();
 
     ref = { disableClose: true, close: jasmine.createSpy("close") };
+    data = { purpose: "request" };
 
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthService, useValue: auth },
         { provide: MatDialogRef, useValue: ref },
+        { provide: MAT_DIALOG_DATA, useValue: data },
       ],
     });
   });
@@ -75,12 +82,11 @@ describe("DataExportDialogComponent", () => {
     await component.submit();
 
     expect(auth.requestDataExport).toHaveBeenCalledWith("correct-horse-battery", undefined);
-    expect(component.isDone()).toBeTrue();
+    // Nothing but a small completion signal crosses the dialog boundary: no
+    // credential, no export payload.
+    expect(ref.close).toHaveBeenCalledOnceWith(true);
     expect(component.passwordForm.controls.password.value).toBe("");
     expect(ref.disableClose).toBeFalse();
-    // Nothing but the boolean crosses the dialog boundary: no credential, no
-    // export payload.
-    expect(ref.close).not.toHaveBeenCalled();
   });
 
   it("asks for the factor when MFA is on and never submits without it", async () => {
@@ -101,7 +107,51 @@ describe("DataExportDialogComponent", () => {
     component.factorForm.setValue({ factorCode: "123456" });
     await component.submit();
     expect(auth.requestDataExport).toHaveBeenCalledWith("correct-horse-battery", "123456");
-    expect(component.step()).toBe(3);
+    expect(ref.close).toHaveBeenCalledOnceWith(true);
+  });
+
+  it("downloads the artifact, saves it and acknowledges the receipt", async () => {
+    data.purpose = "download";
+    spyOn(URL, "createObjectURL").and.returnValue("blob:uvh-export");
+    spyOn(URL, "revokeObjectURL");
+    const component = build();
+    component.passwordForm.setValue({ password: "correct-horse-battery" });
+
+    await component.submit();
+
+    expect(auth.downloadDataExport).toHaveBeenCalledWith("correct-horse-battery", undefined);
+    expect(auth.acknowledgeDataExportDownload).toHaveBeenCalledTimes(1);
+    expect(ref.close).toHaveBeenCalledOnceWith(true);
+  });
+
+  it("keeps the export unacknowledged when the browser refuses to save the file", async () => {
+    data.purpose = "download";
+    spyOn(URL, "createObjectURL").and.throwError("quota");
+    const component = build();
+    component.passwordForm.setValue({ password: "correct-horse-battery" });
+
+    await component.submit();
+
+    // The receipt is what consumes the export: a failed save must not spend it.
+    expect(auth.acknowledgeDataExportDownload).not.toHaveBeenCalled();
+    expect(ref.close).not.toHaveBeenCalled();
+    expect(component.error()).toContain("La exportación sigue disponible");
+  });
+
+  it("reports an unconfirmed receipt without demanding the credentials again", async () => {
+    data.purpose = "download";
+    spyOn(URL, "createObjectURL").and.returnValue("blob:uvh-export");
+    spyOn(URL, "revokeObjectURL");
+    auth.acknowledgeDataExportDownload.and.rejectWith(new TypeError("Failed to fetch"));
+    const component = build();
+    component.passwordForm.setValue({ password: "correct-horse-battery" });
+
+    await component.submit();
+
+    // The file is already on the device: the dialog signals the nuance instead
+    // of forcing another step-up and a second download.
+    expect(auth.downloadDataExport).toHaveBeenCalledTimes(1);
+    expect(ref.close).toHaveBeenCalledOnceWith("unconfirmed");
   });
 
   it("surfaces what the API said and never implies the export was queued", async () => {
@@ -111,7 +161,7 @@ describe("DataExportDialogComponent", () => {
 
     await component.submit();
 
-    expect(component.isDone()).toBeFalse();
+    expect(ref.close).not.toHaveBeenCalled();
     expect(component.error()).toBe("Demasiadas solicitudes");
     expect(component.passwordForm.controls.password.value).toBe("");
     expect(ref.disableClose).toBeFalse();
@@ -127,8 +177,21 @@ describe("DataExportDialogComponent", () => {
     await component.submit();
 
     expect(component.error()).toContain("Comprueba su estado antes de volver a intentarlo");
-    expect(component.isDone()).toBeFalse();
+    expect(ref.close).not.toHaveBeenCalled();
     expect(component.passwordForm.controls.password.value).toBe("");
     expect(ref.disableClose).toBeFalse();
+  });
+
+  it("keeps the download retryable when the transfer fails without an explanation", async () => {
+    data.purpose = "download";
+    auth.downloadDataExport.and.rejectWith(new TypeError("Failed to fetch"));
+    const component = build();
+    component.passwordForm.setValue({ password: "correct-horse-battery" });
+
+    await component.submit();
+
+    expect(auth.acknowledgeDataExportDownload).not.toHaveBeenCalled();
+    expect(ref.close).not.toHaveBeenCalled();
+    expect(component.error()).toContain("Sigue disponible: vuelve a intentarlo");
   });
 });

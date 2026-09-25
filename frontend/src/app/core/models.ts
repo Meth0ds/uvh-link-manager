@@ -12,13 +12,14 @@ export interface AuthUser {
   pendingEmailExpiresAt?: string | null;
 }
 
+export type DataExportFailureReason = "automated_size_limit" | "generation_error" | "stalled";
+
 export interface DataExportStatus {
   id: number;
-  status: "requested" | "processing" | "ready" | "downloaded" | "failed" | "cancelled" | "expired";
-  confirmationExpiresAt: string | null;
+  status: "processing" | "ready" | "downloaded" | "failed" | "cancelled" | "expired";
+  failureReason: DataExportFailureReason | null;
   downloadExpiresAt: string | null;
   createdAt: string | null;
-  confirmedAt: string | null;
   readyAt: string | null;
   downloadedAt: string | null;
 }

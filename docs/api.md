@@ -59,11 +59,10 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 | POST | `/mfa/cancel-setup` | sesión | Invalida un secreto MFA pendiente que todavía no se ha activado. |
 | POST | `/mfa/recovery-codes/regenerate` | sesión + MFA | `{ password, factorCode }`; invalida el juego anterior, entrega `recoveryCodes[]` nuevos una sola vez y revoca otras sesiones. |
 | POST | `/mfa/disable` | sesión | `{ password, code }`; exige contraseña y TOTP o recovery actual (step-up con ventana fresca). |
-| GET | `/data-export` | sesión verificada | Estado de la solicitud de exportación más reciente. |
-| POST | `/data-export` | sesión verificada | `{ password, factorCode? }`; solicita confirmación por email tras step-up. |
-| POST | `/data-export/confirm` | — | `{ token }`; inicia el job sólo tras confirmación explícita en la SPA. |
-| POST | `/data-export/download` | — | `{ token }`; sirve el JSON privado con `no-store` sin consumir el bearer. Incluye expedientes/mensajes RGPD propios, sin secretos ni identificadores internos del personal. Una transferencia interrumpida se puede reintentar mientras no caduque. |
-| POST | `/data-export/download/acknowledge` | — | `{ token }`; exige que el servidor haya preparado antes una descarga válida y el navegador la invoca sólo después de recibir el cuerpo completo. Entonces marca `downloaded`, invalida el bearer y purga el artefacto. No afirma que el usuario haya abierto o guardado el fichero. |
+| GET | `/data-export` | sesión verificada | Estado de la solicitud de exportación más reciente, con `failureReason` (`automated_size_limit`, `generation_error`, `stalled`) cuando falló. |
+| POST | `/data-export` | sesión + step-up | `{ password, factorCode? }`; tras el step-up encola el job directamente y devuelve `processing`. El email posterior sólo anuncia que el archivo está listo, no autoriza nada. |
+| POST | `/data-export/download` | sesión + step-up | `{ password, factorCode? }`; sirve el JSON privado con `no-store` a la sesión que acaba de demostrar contraseña y segundo factor. Incluye expedientes/mensajes RGPD propios, sin secretos ni identificadores internos del personal. Una transferencia interrumpida se puede reintentar con un step-up nuevo mientras no caduque; el artefacto caduca a los 2 días de estar listo. |
+| POST | `/data-export/download/acknowledge` | sesión verificada | Sin cuerpo; exige que el servidor haya preparado antes una descarga válida y el navegador lo invoca sólo después de recibir el cuerpo completo. Entonces marca `downloaded` y purga el artefacto. Es lo único que consume la exportación y no afirma que el usuario haya abierto o guardado el fichero. |
 | POST | `/data-export/cancel` | sesión verificada | Cancela solicitud/worker/artefacto activo. |
 | GET | `/account-deletion` | sesión verificada | Impacto y bloqueos: admin, workspaces propios y confirmación pendiente. |
 | POST | `/account-deletion` | sesión verificada | `{ confirmation: "ELIMINAR MI CUENTA", password, factorCode? }`; envía doble confirmación. |

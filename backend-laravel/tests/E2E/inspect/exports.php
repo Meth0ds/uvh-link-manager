@@ -23,10 +23,10 @@ $describe = static fn ($row): array => $row === null ? [] : [
     'artifact' => $row->artifact_path !== null ? basename((string) $row->artifact_path) : null,
     'ready_at' => $row->ready_at !== null ? (string) $row->ready_at : null,
     'downloaded_at' => $row->downloaded_at !== null ? (string) $row->downloaded_at : null,
-    // Prefixes only: enough to match a bearer without ever printing usable or
-    // reversible token material.
-    'confirmation_hash' => is_string($row->confirmation_token_hash) ? substr($row->confirmation_token_hash, 0, 12) : null,
-    'download_hash' => is_string($row->download_token_hash) ? substr($row->download_token_hash, 0, 12) : null,
+    // Prefix only: enough to match the generation a queued notice described
+    // without ever printing hash material.
+    'mail_generation_hash' => is_string($row->mail_generation_hash) ? substr($row->mail_generation_hash, 0, 12) : null,
+    'failure_reason' => $row->failure_reason,
 ];
 
 return [

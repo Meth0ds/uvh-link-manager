@@ -317,6 +317,9 @@ app-page-header { display: block; margin-bottom: 18px; }
   &.ready > mat-icon { color: var(--uvh-success); }
   &.failed { border-left: 3px solid var(--uvh-danger); background: var(--uvh-danger-soft); }
   &.failed > mat-icon { color: var(--uvh-danger); }
+  &.expired { border-left: 3px solid var(--uvh-warn); background: var(--uvh-warn-soft); }
+  &.expired > mat-icon { color: var(--uvh-warn); }
+  .export-primary { display: flex; align-items: center; gap: 7px; margin-top: 11px; }
 }
 
 .danger-icon { background: var(--uvh-danger-soft); color: var(--uvh-danger); }

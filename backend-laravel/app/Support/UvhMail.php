@@ -247,32 +247,22 @@ class UvhMail
         );
     }
 
-    public static function dataExportConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
+    /**
+     * Aviso, no portador: la descarga se autoriza con la sesión y un step-up
+     * reciente, así que este enlace sólo navega hasta la sección de
+     * exportaciones. `$generationHash` identifica la generación anunciada para
+     * que el outbox descarte avisos de una exportación que ya no está viva.
+     */
+    public static function dataExportReady(string $to, string $url, string $expiresOn, int $requestId, string $generationHash): bool
     {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Confirmar exportación</a>';
-
-        return self::send(
-            'data_export_confirmation',
-            $to,
-            'Confirma tu exportación de datos en UVH',
-            self::layout('Confirma la exportación', '<p>Hemos recibido una solicitud para preparar una copia estructurada de tus datos. Confírmala durante la próxima hora.</p><p style="margin:18px 0">'.$link.'</p><p>Prepararemos el archivo en segundo plano y te enviaremos otro enlace cuando esté listo.</p>'),
-            "Confirma tu exportación de datos UVH durante la próxima hora: {$url}",
-            'data_export',
-            $requestId,
-            $generationHash,
-        );
-    }
-
-    public static function dataExportReady(string $to, string $url, int $requestId, string $generationHash): bool
-    {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#00A99D;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Descargar mis datos</a>';
+        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#00A99D;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Ir a mis exportaciones</a>';
 
         return self::send(
             'data_export_ready',
             $to,
             'Tu exportación de datos UVH está lista',
-            self::layout('Exportación lista', '<p>Tu archivo cifrado ya está preparado. El enlace funciona una sola vez y caduca en 24 horas.</p><p style="margin:18px 0">'.$link.'</p><p>No reenvíes este correo: el enlace permite descargar información de tu cuenta.</p>'),
-            "Tu exportación UVH está lista. El enlace funciona una sola vez y caduca en 24 horas: {$url}",
+            self::layout('Exportación lista', '<p>Tu archivo cifrado ya está preparado en tu sección de exportaciones.</p><p style="margin:18px 0">'.$link.'</p><p>Descárgalo antes del '.self::esc($expiresOn).'; después el archivo se elimina automáticamente. Al descargarlo te pediremos la contraseña de la cuenta y, si está activo, el segundo factor.</p>'),
+            "Tu exportación UVH está lista. Abre {$url} e inicia sesión para descargarla antes del {$expiresOn}.",
             'data_export',
             $requestId,
             $generationHash,

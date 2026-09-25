@@ -1,10 +1,10 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRef, Injector } from "@angular/core";
+import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { AccountDeletionDialogComponent } from "./account-deletion-dialog.component";
 import { EmailAccessDialogComponent, type EmailAccessDialogData } from "./email-access-dialog.component";
 import { PasswordChangeDialogComponent } from "./password-change-dialog.component";
-import { DataExportDialogComponent } from "./data-export-dialog.component";
+import { DataExportDialogComponent, type DataExportDialogResult } from "./data-export-dialog.component";
 
 import { Router } from "@angular/router";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
@@ -78,7 +78,7 @@ export class SettingsComponent {
   private deletionDialog?: MatDialogRef<AccountDeletionDialogComponent, boolean>;
   private emailDialog?: MatDialogRef<EmailAccessDialogComponent, boolean>;
   private passwordDialog?: MatDialogRef<PasswordChangeDialogComponent, boolean>;
-  private exportDialog?: MatDialogRef<DataExportDialogComponent, boolean>;
+  private exportDialog?: MatDialogRef<DataExportDialogComponent, DataExportDialogResult>;
   private sessionsRequest = new LatestRequest(this.destroyRef);
   private exportRequest = new LatestRequest(this.destroyRef);
   private deletionRequest = new LatestRequest(this.destroyRef);
@@ -115,6 +115,25 @@ export class SettingsComponent {
   readonly exportStatus = signal<DataExportStatus | null>(null);
   readonly exportLoading = signal(true);
   readonly exportBusy = signal(false);
+  /**
+   * Sondas automáticas mientras la exportación siga viva: el estado avanza
+   * solo y la página no debe pedir nada al usuario. La secuencia crece
+   * 3→5→8→13→21→30 s y se reinicia cuando el estado cambia; se pausa con la
+   * pestaña oculta, se retoma al volver y termina en cualquier estado final.
+   */
+  private static readonly EXPORT_POLL_DELAYS_MS = [3_000, 5_000, 8_000, 13_000, 21_000, 30_000];
+  private exportPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private exportPollIndex = 0;
+  private exportPollLastStatus: DataExportStatus["status"] | null = null;
+  /** Pausa la sonda con la pestaña oculta y la retoma al volver. */
+  private readonly syncExportPollVisibility = (): void => {
+    if (typeof document !== "undefined" && document.hidden) {
+      this.stopExportPoll();
+      return;
+    }
+    this.resumeExportPoll();
+  };
+  private readonly privacyFormBlock = viewChild<ElementRef<HTMLElement>>("privacyFormBlock");
   // ---------------- Account deletion ----------------
   readonly deletionImpact = signal<AccountDeletionImpact | null>(null);
   readonly deletionLoading = signal(true);
@@ -180,7 +199,16 @@ export class SettingsComponent {
       this.emailDialog?.close();
       this.passwordDialog?.close();
       this.exportDialog?.close();
+      this.stopExportPoll();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", this.syncExportPollVisibility);
+        window.removeEventListener("focus", this.syncExportPollVisibility);
+      }
     });
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this.syncExportPollVisibility);
+      window.addEventListener("focus", this.syncExportPollVisibility);
+    }
     void this.loadSessions();
     void this.loadExportStatus();
     void this.loadDeletionImpact();
@@ -266,35 +294,86 @@ export class SettingsComponent {
     }
   }
 
-  async loadExportStatus(notify = true): Promise<void> {
+  /**
+   * `silent` lo usan las sondas: no mueve el esqueleto, no avisa de nada y
+   * conserva el último estado conocido si la red falla (la siguiente sonda
+   * reintenta). Las cargas visibles mantienen su comportamiento original.
+   */
+  async loadExportStatus(notify = true, silent = false): Promise<void> {
     const context = this.auth.sessionGeneration();
     const request = this.exportRequest.begin(context);
-    this.exportLoading.set(true);
+    if (!silent) this.exportLoading.set(true);
     try {
       const status = await this.auth.dataExportStatus({ signal: request.signal });
       if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
+      if ((status?.status ?? null) !== this.exportPollLastStatus) this.exportPollIndex = 0;
+      this.exportPollLastStatus = status?.status ?? null;
       this.exportStatus.set(status);
     } catch (err) {
       if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
+      if (silent) return;
       this.exportStatus.set(null);
       if (notify) this.toast(err, "No se pudo consultar el estado de la exportación");
     } finally {
-      if (this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) this.exportLoading.set(false);
+      if (this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) {
+        if (!silent) this.exportLoading.set(false);
+        this.scheduleExportPoll();
+      }
     }
   }
 
-  openDataExportDialog(): void {
+  private exportNeedsPoll(): boolean {
+    const status = this.exportStatus()?.status ?? null;
+    return status === "processing" || status === "ready";
+  }
+
+  private scheduleExportPoll(): void {
+    this.stopExportPoll();
+    if (this.destroyRef.destroyed || typeof document === "undefined") return;
+    // Estado final: no queda nada que esperar y la sonda se apaga.
+    if (!this.exportNeedsPoll() || document.hidden) return;
+    const delays = SettingsComponent.EXPORT_POLL_DELAYS_MS;
+    const delay = delays[Math.min(this.exportPollIndex, delays.length - 1)];
+    this.exportPollIndex += 1;
+    this.exportPollTimer = setTimeout(() => {
+      this.exportPollTimer = null;
+      // Si la pestaña se ocultó sin evento, no se gasta la consulta.
+      if (typeof document !== "undefined" && document.hidden) return;
+      void this.loadExportStatus(false, true);
+    }, delay);
+  }
+
+  private resumeExportPoll(): void {
+    if (this.destroyRef.destroyed || typeof document === "undefined" || document.hidden) return;
+    if (!this.exportNeedsPoll() || this.exportPollTimer !== null) return;
+    this.exportPollIndex = 0;
+    void this.loadExportStatus(false, true);
+  }
+
+  private stopExportPoll(): void {
+    if (this.exportPollTimer !== null) {
+      clearTimeout(this.exportPollTimer);
+      this.exportPollTimer = null;
+    }
+  }
+
+  openDataExportDialog(purpose: "request" | "download" = "request"): void {
     if (this.exportDialog || this.exportBusy()) return;
     this.exportDialog = this.dialogs.open(DataExportDialogComponent, {
+      data: { purpose },
       width: "min(560px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: "#export-password-step input", restoreFocus: true, injector: this.injector,
-      ariaLabel: "Solicitar una exportación de datos",
+      ariaLabel: purpose === "download" ? "Descargar la exportación de datos" : "Solicitar una exportación de datos",
     });
-    this.exportDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
+    this.exportDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
       this.exportDialog = undefined;
-      if (!completed) return;
-      this.snackbar.open("Revisa tu email para confirmar la exportación", "Cerrar", { duration: 3500 });
-      void this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.auth.refreshUser()]);
+      if (!result) return;
+      if (result === "unconfirmed") {
+        this.snackbar.open("Archivo descargado. No pudimos confirmar la recepción: puedes descargarlo de nuevo o dejar que caduque.", "Cerrar", { duration: 6000 });
+      } else {
+        this.snackbar.open(purpose === "download" ? "Archivo descargado" : "Solicitud de exportación iniciada", "Cerrar", { duration: 3500 });
+      }
+      void this.settleAfterConfirmedMutation([this.loadExportStatus(false)]);
     });
   }
 
@@ -302,7 +381,7 @@ export class SettingsComponent {
     if (this.exportBusy()) return;
     const confirmed = await this.actions.confirm({
       title: "Cancelar exportación",
-      message: "La confirmación o descarga pendiente dejará de funcionar y se eliminará el archivo privado si ya estaba preparado.",
+      message: "La descarga pendiente dejará de funcionar y se eliminará el archivo privado si ya estaba preparado.",
       confirmLabel: "Cancelar exportación",
       destructive: true,
     });
@@ -322,7 +401,22 @@ export class SettingsComponent {
   }
 
   exportIsActive(): boolean {
-    return ["requested", "processing", "ready"].includes(this.exportStatus()?.status ?? "");
+    return ["processing", "ready"].includes(this.exportStatus()?.status ?? "");
+  }
+
+  /** Los estados con acción propia no repiten la entrada «Solicitar mi archivo». */
+  exportShowsRequestEntry(): boolean {
+    const status = this.exportStatus()?.status ?? null;
+    return status === null || status === "downloaded" || status === "cancelled";
+  }
+
+  /** El límite automático se resuelve por el flujo de portabilidad, no por soporte. */
+  openPortabilityFlow(): void {
+    this.privacyForm.reset({ type: "portability", details: "" });
+    const target = this.privacyFormBlock();
+    if (!target) return;
+    target.nativeElement.focus({ preventScroll: true });
+    target.nativeElement.scrollIntoView({ block: "start", behavior: "instant" });
   }
 
   async loadDeletionImpact(notify = true): Promise<void> {

@@ -29,6 +29,12 @@ class GenerateDataExportJob implements ShouldQueue
     /** @var array<int, int> */
     public array $backoff = [60, 300];
 
+    /**
+     * How long a ready file stays available. Short on purpose: it is a private
+     * artifact, and the owner is told the exact date in the notice.
+     */
+    private const DOWNLOAD_TTL_DAYS = 2;
+
     // AES-GCM and Base64URL each require another in-memory representation.
     // Keep the plaintext well below the 256 MiB production worker ceiling.
     private const MAX_JSON_BYTES = 12 * 1024 * 1024;
@@ -138,8 +144,8 @@ class GenerateDataExportJob implements ShouldQueue
                 $request->update([
                     'status' => 'failed',
                     'artifact_path' => null,
-                    'confirmation_token_hash' => null,
-                    'download_token_hash' => null,
+                    'mail_generation_hash' => null,
+                    'failure_reason' => 'automated_size_limit',
                     'updated_at' => now(),
                 ]);
 
@@ -194,9 +200,12 @@ class GenerateDataExportJob implements ShouldQueue
                 return;
             }
 
-            $downloadToken = Ids::randomToken(32);
-            $url = rtrim((string) config('app.url'), '/').'/auth/download-export#token='.rawurlencode($downloadToken);
-            $madeReady = DB::transaction(function () use ($requestId, $userId, $artifactPath, $downloadToken, $url): bool {
+            // The notice announces the file and names the section that serves
+            // it. It carries no authority of its own: downloads are authorised
+            // by the session plus a fresh step-up.
+            $mailGeneration = Ids::sha256Hex(Ids::randomToken(32));
+            $url = rtrim((string) config('app.url'), '/').'/app/settings#privacy';
+            $madeReady = DB::transaction(function () use ($requestId, $userId, $artifactPath, $mailGeneration, $url): bool {
                 $lockedUser = User::where('id', $userId)->lockForUpdate()->first();
                 $lockedRequest = DataExportRequest::where('id', $requestId)
                     ->where('user_id', $userId)->lockForUpdate()->first();
@@ -207,22 +216,25 @@ class GenerateDataExportJob implements ShouldQueue
                     || ! hash_equals($artifactPath, $lockedRequest->artifact_path)) {
                     return false;
                 }
-                // The encrypted outbox row commits with the matching bearer;
-                // its generation hash prevents stale-job compensation.
+                // The encrypted outbox row commits with this generation, so a
+                // notice queued for an older file is dropped instead of
+                // announcing a replaced or cancelled export.
+                $now = now();
+                $downloadExpiresAt = $now->copy()->addDays(self::DOWNLOAD_TTL_DAYS);
                 if (! UvhMail::dataExportReady(
                     $lockedUser->email,
                     $url,
+                    $downloadExpiresAt->format('d/m/Y H:i'),
                     (int) $lockedRequest->id,
-                    Ids::sha256Hex($downloadToken),
+                    $mailGeneration,
                 )) {
                     throw new \RuntimeException('Ready email queue admission failed');
                 }
-                $now = now();
                 $lockedRequest->update([
                     'status' => 'ready',
                     'artifact_path' => $artifactPath,
-                    'download_token_hash' => Ids::sha256Hex($downloadToken),
-                    'download_expires_at' => $now->copy()->addDay(),
+                    'mail_generation_hash' => $mailGeneration,
+                    'download_expires_at' => $downloadExpiresAt,
                     'ready_at' => $now,
                 ]);
 
@@ -270,16 +282,18 @@ class GenerateDataExportJob implements ShouldQueue
             User::where('id', $snapshot->user_id)->lockForUpdate()->first();
             $request = DataExportRequest::where('id', $snapshot->id)
                 ->where('user_id', $snapshot->user_id)->lockForUpdate()->first();
-            if (! $request || ! in_array($request->status, ['requested', 'processing'], true)) {
+            if (! $request || $request->status !== 'processing') {
                 return null;
             }
             $path = is_string($request->artifact_path) && $request->artifact_path !== ''
                 ? $request->artifact_path
                 : null;
+            // Exhausted retries are terminal: the owner sees a failed export
+            // and can ask for a new one, never a silent dead state.
             $request->update([
                 'status' => 'failed',
-                'confirmation_token_hash' => null,
-                'download_token_hash' => null,
+                'mail_generation_hash' => null,
+                'failure_reason' => 'generation_error',
             ]);
 
             return ['path' => $path, 'user_id' => (int) $request->user_id, 'request_id' => (int) $request->id];

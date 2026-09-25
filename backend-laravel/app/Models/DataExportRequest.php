@@ -10,9 +10,7 @@ use Illuminate\Support\Carbon;
  * Larastan types datetime columns from the database schema as `string` and
  * ignores the `datetime` cast, so attributes used as dates are declared here.
  *
- * @property Carbon|null $confirmation_expires_at
  * @property Carbon|null $download_expires_at
- * @property Carbon|null $confirmed_at
  * @property Carbon|null $ready_at
  * @property Carbon|null $download_served_at
  * @property Carbon|null $downloaded_at
@@ -23,26 +21,27 @@ class DataExportRequest extends Model
         'user_id',
         'security_version',
         'status',
-        'confirmation_token_hash',
-        'confirmation_expires_at',
-        'download_token_hash',
+        'mail_generation_hash',
+        'failure_reason',
         'download_expires_at',
         'artifact_path',
-        'confirmed_at',
         'ready_at',
         'download_served_at',
         'downloaded_at',
     ];
 
-    protected $hidden = ['confirmation_token_hash', 'download_token_hash', 'artifact_path'];
+    /**
+     * `mail_generation_hash` is not a bearer: it identifies the generation a
+     * queued "ready" notice describes, so the outbox can drop stale ones. The
+     * artifact path is internal plumbing.
+     */
+    protected $hidden = ['mail_generation_hash', 'artifact_path'];
 
     protected function casts(): array
     {
         return [
             'security_version' => 'integer',
-            'confirmation_expires_at' => 'datetime',
             'download_expires_at' => 'datetime',
-            'confirmed_at' => 'datetime',
             'ready_at' => 'datetime',
             'download_served_at' => 'datetime',
             'downloaded_at' => 'datetime',
