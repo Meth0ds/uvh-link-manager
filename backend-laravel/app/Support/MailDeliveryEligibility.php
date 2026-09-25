@@ -144,19 +144,17 @@ final class MailDeliveryEligibility
     private static function dataExport(string $kind, string $id, string $generation): bool
     {
         $numericId = self::numericId($id);
-        $state = match ($kind) {
-            'data_export_confirmation' => ['requested', 'confirmation_token_hash', 'confirmation_expires_at'],
-            'data_export_ready' => ['ready', 'download_token_hash', 'download_expires_at'],
-            default => null,
-        };
-        if ($numericId === null || $state === null) {
+        if ($numericId === null || $kind !== 'data_export_ready') {
             return false;
         }
 
+        // The ready notice is an announcement, not a bearer grant: it is
+        // deliverable only while the generation it describes is still the live
+        // one, so a cancelled or replaced export never announces itself.
         return DB::table('data_export_requests as r')
             ->join('users as u', 'u.id', '=', 'r.user_id')
-            ->where('r.id', $numericId)->where('r.status', $state[0])
-            ->where('r.'.$state[1], $generation)->where('r.'.$state[2], '>', now())
+            ->where('r.id', $numericId)->where('r.status', 'ready')
+            ->where('r.mail_generation_hash', $generation)->where('r.download_expires_at', '>', now())
             ->whereColumn('r.security_version', 'u.security_version')
             ->whereNull('u.deleted_at')->exists();
     }

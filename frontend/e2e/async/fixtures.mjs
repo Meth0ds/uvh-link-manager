@@ -3,13 +3,9 @@
  * use to make a provider fail on purpose.
  *
  * Reading what a provider actually received is what lets a scenario assert
- * reception rather than transport acceptance, so it lives here, together with
- * the bearer matching that ties a delivered message to the row that asked for
- * it.
+ * reception rather than transport acceptance, so it lives here.
  */
 
-import crypto from "node:crypto";
-import { until } from "./expect.mjs";
 import { control } from "./topology.mjs";
 
 export const fixtureSecret = "fixture-secret-0123456789";
@@ -53,11 +49,6 @@ function readableMessage(raw) {
  * tried: a body that is not quoted-printable can contain a literal `=a3`, and
  * the transport is free to choose the encoding.
  */
-/** First 12 hex characters of the stored hash for a bearer. */
-export function hashToken(token) {
-  return crypto.createHash("sha256").update(token).digest("hex").slice(0, 12);
-}
-
 export function tokenFromUrl(raw) {
   // Every bearer in this suite is a 32-byte base64url value (43 characters).
   // Prefer the exact length so a quoted-printable artefact cannot be glued to
@@ -106,12 +97,3 @@ export async function attemptsFor(email) {
     .filter((entry) => Array.isArray(entry.rcpt) && entry.rcpt.some((value) => String(value).toLowerCase() === email.toLowerCase()));
 }
 
-export async function bearerMatching(email, hash) {
-  return until("a bearer reaches the provider", async () => {
-    for (const message of await messagesFor(email)) {
-      const token = tokenFromUrl(message.raw);
-      if (token && hashToken(token) === hash) return token;
-    }
-    return undefined;
-  }, { deadlineMs: 45_000 }).catch(() => null);
-}

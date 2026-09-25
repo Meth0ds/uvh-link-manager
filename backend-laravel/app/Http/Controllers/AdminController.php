@@ -186,17 +186,16 @@ class AdminController
                 AccountRecoveryLifecycle::cancelActiveForUser($id, $now);
 
                 $artifacts = DB::table('data_export_requests')->where('user_id', $id)
-                    ->whereIn('status', ['requested', 'processing', 'ready'])
+                    ->whereIn('status', ['processing', 'ready'])
                     ->whereNotNull('artifact_path')->get(['id', 'artifact_path'])
                     ->filter(fn ($export) => is_string($export->artifact_path) && $export->artifact_path !== '')
                     ->map(fn ($export) => ['id' => (int) $export->id, 'path' => $export->artifact_path])
                     ->values()->all();
                 DB::table('data_export_requests')->where('user_id', $id)
-                    ->whereIn('status', ['requested', 'processing', 'ready'])
+                    ->whereIn('status', ['processing', 'ready'])
                     ->update([
                         'status' => 'cancelled',
-                        'confirmation_token_hash' => null,
-                        'download_token_hash' => null,
+                        'mail_generation_hash' => null,
                         'updated_at' => $now,
                     ]);
 

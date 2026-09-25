@@ -120,9 +120,6 @@ class AppServiceProvider extends ServiceProvider
             // let normal traffic deny verification for every account.
             $identity = $request->is('api/v1/auth/verify-email')
                 || $request->is('api/v1/auth/confirm-email-change')
-                || $request->is('api/v1/auth/data-export/confirm')
-                || $request->is('api/v1/auth/data-export/download')
-                || $request->is('api/v1/auth/data-export/download/acknowledge')
                 || $request->is('api/v1/auth/account-deletion/confirm')
                 || $request->is('api/v1/auth/account-deletion/cancel')
                 ? 'token:'.hash('sha256', UvhRequest::inputString($request, 'token'))

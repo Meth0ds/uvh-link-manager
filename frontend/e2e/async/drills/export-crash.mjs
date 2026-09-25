@@ -8,8 +8,8 @@
 
 import { auditCount, housekeepingNow, startExport, whyStalled } from "./support.mjs";
 import { check, sleep, until } from "../expect.mjs";
-import { bearerMatching, messagesFor } from "../fixtures.mjs";
-import { api, csrfToken } from "../session.mjs";
+import { messageMatching, messagesFor, tokenFromUrl } from "../fixtures.mjs";
+import { api, csrfToken, password } from "../session.mjs";
 import { backend, docker, inspect } from "../topology.mjs";
 
 /**
@@ -72,7 +72,7 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
     await sleep(6_000);
     docker(["pause", "queue-exports"]);
 
-    const request = await startExport(email, session, workspaceId);
+    const request = await startExport(session, workspaceId);
     if (request.reason) {
       docker(["kill", "queue-exports"]);
       check(`export crash: ${label} is confirmed`, false, request.reason);
@@ -108,8 +108,8 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
   const killedArtifact = first.killed.artifact;
   const afterKill = inspect("export-artifacts");
   check(
-    "export crash: the killed attempt wrote at most its own private file and published no bearer",
-    added(afterKill).length <= 1 && first.latest.download_hash === null
+    "export crash: the killed attempt wrote at most its own private file and minted no generation",
+    added(afterKill).length <= 1 && first.latest.mail_generation_hash === null
       && auditCount("account.data_export_ready", first.id) === 0,
     JSON.stringify({ added: added(afterKill), baseline: cleanBefore.length, latest: first.latest }),
   );
@@ -151,15 +151,16 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
   );
 
   // --- download and acknowledgement ---------------------------------------
-  const downloadToken = await bearerMatching(email, ready.download_hash);
-  if (!downloadToken) {
-    check(
-      "export crash: the ready message carries a download bearer",
-      false,
-      JSON.stringify({ outbox: inspect("mail-kind", "data_export_ready"), messages: (await messagesFor(email)).length }),
-    );
-    return;
-  }
+  // The ready message is only an announcement: it must reach the provider and
+  // must not carry anything that could authorize a download on its own. The
+  // anchor is ASCII so every mail encoding the provider can choose survives.
+  const notices = await messagesFor(email);
+  const notice = await messageMatching(email, (text) => /Ir a mis exportaciones|settings#privacy/i.test(text));
+  check(
+    "export crash: the ready message announces the artifact without any bearer",
+    Boolean(notice) && !tokenFromUrl(notice.raw),
+    JSON.stringify({ outbox: inspect("mail-kind", "data_export_ready"), messages: notices.length }),
+  );
 
   // A transfer that the client abandons after the headers must retire nothing.
   const controller = new AbortController();
@@ -167,8 +168,12 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
   try {
     const response = await fetch(`${backend}/api/v1/auth/data-export/download`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken, Cookie: `uvh_csrf=${csrfToken}` },
-      body: JSON.stringify({ token: downloadToken }),
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+        Cookie: `uvh_csrf=${csrfToken}; uvh_async_session=${session}`,
+      },
+      body: JSON.stringify({ password }),
       signal: controller.signal,
     });
     interruptedStatus = response.status;
@@ -187,7 +192,7 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
     JSON.stringify({ http: interruptedStatus, row: afterInterrupt }),
   );
 
-  const downloaded = await api("POST", "/api/v1/auth/data-export/download", { json: { token: downloadToken } });
+  const downloaded = await api("POST", "/api/v1/auth/data-export/download", { session, workspaceId, json: { password } });
   const bytes = Buffer.byteLength(downloaded.raw);
   // A body that is not JSON stays null, which the check below reports as a
   // download that did not serve the artifact.
@@ -209,7 +214,7 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
     `messages=${payload?.privacyRightsMessages?.length ?? null} bytes=${bytes} cap=${capBytes}`,
   );
 
-  const acknowledged = await api("POST", "/api/v1/auth/data-export/download/acknowledge", { json: { token: downloadToken } });
+  const acknowledged = await api("POST", "/api/v1/auth/data-export/download/acknowledge", { session, workspaceId });
   const retiredReady = inspect("export", String(first.id));
   const afterAck = inspect("export-artifacts");
   check(
@@ -218,8 +223,8 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
       && names(afterAck) === names(cleanBefore),
     JSON.stringify({ http: acknowledged.status, row: retiredReady, files: afterAck }),
   );
-  const reused = await api("POST", "/api/v1/auth/data-export/download", { json: { token: downloadToken } });
-  check("export crash: the retired bearer cannot be used again", reused.status !== 200, `HTTP ${reused.status}`);
+  const reused = await api("POST", "/api/v1/auth/data-export/download", { session, workspaceId, json: { password } });
+  check("export crash: the consumed export cannot be served again", reused.status === 410, `HTTP ${reused.status}`);
 
   // --- route two: the worker never comes back ------------------------------
   // The request is terminal now, so a second one is admitted. This time the
@@ -238,8 +243,9 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
   const afterRetire = inspect("export-artifacts");
   check("export crash: the scheduled recovery stage runs", housekeeping.exit === 0, JSON.stringify(housekeeping));
   check(
-    "export crash: the abandoned request ends terminal and keeps no bearer",
-    retired.status === "failed" && retired.artifact === null && abandoned.download_hash === null,
+    "export crash: the abandoned request ends terminal, stalled and without a generation",
+    retired.status === "failed" && retired.failure_reason === "stalled"
+      && retired.artifact === null && abandoned.mail_generation_hash === null,
     JSON.stringify({ row: retired, latest: abandoned }),
   );
   check(

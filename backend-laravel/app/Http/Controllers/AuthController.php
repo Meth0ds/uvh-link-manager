@@ -977,7 +977,7 @@ class AuthController
             }
 
             $artifacts = DataExportRequest::where('user_id', $user->id)
-                ->whereIn('status', ['requested', 'processing', 'ready'])
+                ->whereIn('status', ['processing', 'ready'])
                 ->whereNotNull('artifact_path')
                 ->get(['id', 'artifact_path'])
                 ->filter(fn ($export) => is_string($export->artifact_path) && $export->artifact_path !== '')
@@ -985,11 +985,10 @@ class AuthController
                 ->values()
                 ->all();
             DataExportRequest::where('user_id', $user->id)
-                ->whereIn('status', ['requested', 'processing', 'ready'])
+                ->whereIn('status', ['processing', 'ready'])
                 ->update([
                     'status' => 'cancelled',
-                    'confirmation_token_hash' => null,
-                    'download_token_hash' => null,
+                    'mail_generation_hash' => null,
                     'updated_at' => now(),
                 ]);
 
@@ -1292,7 +1291,7 @@ class AuthController
                 $now = now();
                 $wasAdmin = (bool) $user->is_admin;
                 $artifacts = DataExportRequest::where('user_id', $user->id)
-                    ->whereIn('status', ['requested', 'processing', 'ready'])
+                    ->whereIn('status', ['processing', 'ready'])
                     ->whereNotNull('artifact_path')
                     ->get(['id', 'artifact_path'])
                     ->filter(fn ($export) => is_string($export->artifact_path) && $export->artifact_path !== '')
@@ -1315,11 +1314,10 @@ class AuthController
                 EmailToken::where('user_id', $user->id)->whereIn('kind', ['reset', 'security_revoke'])->delete();
                 EmailChangeRequest::where('user_id', $user->id)->delete();
                 DataExportRequest::where('user_id', $user->id)
-                    ->whereIn('status', ['requested', 'processing', 'ready'])
+                    ->whereIn('status', ['processing', 'ready'])
                     ->update([
                         'status' => 'cancelled',
-                        'confirmation_token_hash' => null,
-                        'download_token_hash' => null,
+                        'mail_generation_hash' => null,
                         'updated_at' => $now,
                     ]);
                 AccountDeletionRequest::where('user_id', $user->id)

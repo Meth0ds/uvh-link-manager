@@ -4,16 +4,19 @@ namespace App\Support;
 
 use App\Models\AccountDeletionRequest;
 use App\Models\AccountRecoveryRequest;
-use App\Models\DataExportRequest;
 use App\Models\Invitation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Reverses only lifecycle state that would become unsafe without its email.
  * Every comparison is generation-aware so an old failure cannot undo a newer
- * invitation, export or account-deletion transition.
+ * invitation or account-deletion transition.
+ *
+ * Data exports are deliberately absent: their email announces that a file is
+ * ready and is not what authorises downloading it, so a notice that cannot be
+ * delivered leaves nothing unsafe behind. Failing the export because an
+ * announcement bounced would destroy work the owner can still reach.
  */
 final class MailLifecycleCompensator
 {
@@ -29,7 +32,6 @@ final class MailLifecycleCompensator
 
         return match ($resourceType) {
             'invitation' => $kind === 'invitation',
-            'data_export' => in_array($kind, ['data_export_confirmation', 'data_export_ready'], true),
             'account_recovery' => in_array($kind, ['account_recovery_confirmation', 'account_recovery_approved'], true),
             'account_deletion' => in_array($kind, ['account_deletion_confirmation', 'account_deletion_scheduled'], true),
             default => false,
@@ -54,40 +56,6 @@ final class MailLifecycleCompensator
                     return;
                 }
                 $row->update(['status' => 'cancelled']);
-            });
-
-            return;
-        }
-
-        if ($resourceType === 'data_export' && $numericId !== null
-            && self::validGeneration($resourceGeneration)) {
-            DB::transaction(function () use ($kind, $numericId, $resourceGeneration): void {
-                $row = DataExportRequest::where('id', $numericId)->lockForUpdate()->first();
-                if (! $row) {
-                    return;
-                }
-                $expected = $kind === 'data_export_confirmation' ? 'requested' : 'ready';
-                $hashField = $kind === 'data_export_confirmation' ? 'confirmation_token_hash' : 'download_token_hash';
-                if ($row->status !== $expected || ! is_string($row->{$hashField})
-                    || ! hash_equals($row->{$hashField}, $resourceGeneration)) {
-                    return;
-                }
-                $path = $row->artifact_path;
-                if (is_string($path) && $path !== '') {
-                    if (! PrivateArtifactCleanup::isManagedPath($path)) {
-                        throw new \RuntimeException('Invalid private export artifact path');
-                    }
-                    $disk = Storage::disk('local');
-                    if ($disk->exists($path) && ! $disk->delete($path)) {
-                        throw new \RuntimeException('Private export artifact cleanup failed');
-                    }
-                }
-                $row->update([
-                    'status' => 'failed',
-                    'confirmation_token_hash' => null,
-                    'download_token_hash' => null,
-                    'artifact_path' => null,
-                ]);
             });
 
             return;

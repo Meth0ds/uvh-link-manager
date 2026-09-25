@@ -233,16 +233,38 @@
     <app-panel-skeleton variant="form" label="Consultando exportaciones" />
   } @else {
     @if (exportStatus(); as currentExport) {
-      <section class="export-state" [class.ready]="currentExport.status === 'ready'" [class.failed]="currentExport.status === 'failed'" aria-live="polite">
-        <mat-icon>{{ currentExport.status === 'requested' ? 'mark_email_unread' : currentExport.status === 'processing' ? 'hourglass_top' : currentExport.status === 'ready' ? 'task_alt' : currentExport.status === 'downloaded' ? 'download_done' : currentExport.status === 'failed' ? 'error_outline' : 'history' }}</mat-icon>
+      <section class="export-state" [class.ready]="currentExport.status === 'ready'" [class.failed]="currentExport.status === 'failed'" [class.expired]="currentExport.status === 'expired'" aria-live="polite">
+        <mat-icon>{{ currentExport.status === 'processing' ? 'hourglass_top' : currentExport.status === 'ready' ? 'task_alt' : currentExport.status === 'downloaded' ? 'download_done' : currentExport.status === 'failed' ? 'error_outline' : 'history' }}</mat-icon>
         <div>
           @switch (currentExport.status) {
-            @case ('requested') { <b>Esperando confirmación</b><p>Revisa tu email. El enlace de confirmación caduca {{ formatDate(currentExport.confirmationExpiresAt ?? '') }}.</p> }
-            @case ('processing') { <b>Preparando el archivo</b><p>La generación continúa en segundo plano. Te avisaremos por email cuando termine.</p> }
-            @case ('ready') { <b>Archivo listo</b><p>El enlace de descarga de un solo uso se ha enviado por email y caduca {{ formatDate(currentExport.downloadExpiresAt ?? '') }}.</p> }
-            @case ('downloaded') { <b>Exportación descargada</b><p>El archivo y su enlace ya quedaron invalidados.</p> }
-            @case ('failed') { <b>No se pudo generar</b><p>Puedes solicitar otra exportación. Si el volumen excede el proceso automático, contacta con soporte para tramitar el acceso.</p> }
-            @case ('expired') { <b>Solicitud caducada</b><p>El archivo o la confirmación ya no están disponibles.</p> }
+            @case ('processing') {
+              <b>Estamos preparando tus datos</b>
+              <p>Puedes cerrar esta página: la generación sigue en segundo plano y te avisaremos por email cuando el archivo esté listo.</p>
+            }
+            @case ('ready') {
+              <b>Tu exportación está lista</b>
+              <p>Preparada {{ formatDate(currentExport.readyAt ?? '') }}. Disponible hasta {{ formatDate(currentExport.downloadExpiresAt ?? '') }}.</p>
+              <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog('download')" [disabled]="exportBusy()"><mat-icon aria-hidden="true">download</mat-icon>Descargar archivo</button>
+            }
+            @case ('downloaded') {
+              <b>Exportación descargada</b>
+              <p>Descargada {{ formatDate(currentExport.downloadedAt ?? '') }}. El archivo privado ya se ha eliminado.</p>
+            }
+            @case ('failed') {
+              <b>No pudimos preparar el archivo</b>
+              @if (currentExport.failureReason === 'automated_size_limit') {
+                <p>El volumen de tus datos supera el proceso automático. Puedes pedir el acceso por el flujo de portabilidad y te responderemos dentro del plazo legal.</p>
+                <button mat-flat-button class="export-primary" type="button" (click)="openPortabilityFlow()"><mat-icon aria-hidden="true">gavel</mat-icon>Solicitar portabilidad</button>
+              } @else {
+                <p>Fue un fallo de generación y puedes repetirlo. El nuevo intento vuelve a preparar el archivo desde cero.</p>
+                <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog()" [disabled]="exportBusy()"><mat-icon aria-hidden="true">replay</mat-icon>Volver a intentarlo</button>
+              }
+            }
+            @case ('expired') {
+              <b>El archivo ha caducado</b>
+              <p>Preparada {{ formatDate(currentExport.readyAt ?? '') }}, disponible hasta {{ formatDate(currentExport.downloadExpiresAt ?? '') }}. Por seguridad el archivo privado se elimina pasada la ventana de descarga.</p>
+              <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog()" [disabled]="exportBusy()"><mat-icon aria-hidden="true">restart_alt</mat-icon>Generar una nueva exportación</button>
+            }
             @default { <b>Solicitud cancelada</b><p>Puedes iniciar una nueva cuando lo necesites.</p> }
           }
         </div>
@@ -250,11 +272,11 @@
     }
 
     @if (exportIsActive()) {
-      <div class="row-actions"><button mat-stroked-button class="danger" type="button" (click)="cancelDataExport()" [disabled]="exportBusy()">{{ exportBusy() ? 'Cancelando…' : 'Cancelar exportación' }}</button><button mat-stroked-button type="button" (click)="loadExportStatus()" [disabled]="exportBusy()"><mat-icon>refresh</mat-icon>Actualizar estado</button></div>
-    } @else {
+      <div class="row-actions"><button mat-stroked-button class="danger" type="button" (click)="cancelDataExport()" [disabled]="exportBusy()">{{ exportBusy() ? 'Cancelando…' : 'Cancelar exportación' }}</button></div>
+    } @else if (exportShowsRequestEntry()) {
       <div class="security-entry export-entry">
         <span class="security-entry-mark" aria-hidden="true"><mat-icon>encrypted</mat-icon></span>
-        <p><b>Archivo privado y de un solo uso</b><span>Confirmaremos por email y separaremos la contraseña del segundo factor.</span></p>
+        <p><b>Archivo privado y descarga protegida</b><span>Preparamos el archivo en almacenamiento privado y pediremos tu contraseña y tu segundo factor por separado para entregarlo.</span></p>
         <button mat-stroked-button type="button" (click)="openDataExportDialog()"><mat-icon aria-hidden="true">download</mat-icon>Solicitar mi archivo</button>
       </div>
     }
@@ -270,7 +292,7 @@
     <li><span aria-hidden="true">3</span><div><b>Sigue la conversación</b><p>Consulta las respuestas y aporta información adicional cuando se solicite.</p></div></li>
   </ol>
   <div class="privacy-layout">
-    <form class="stack privacy-form" [formGroup]="privacyForm" (ngSubmit)="submitPrivacyRequest()">
+    <form #privacyFormBlock tabindex="-1" class="stack privacy-form" [formGroup]="privacyForm" (ngSubmit)="submitPrivacyRequest()">
       <h3>Nueva solicitud</h3>
       <p>El plazo ordinario empieza al registrarla. No incluyas contraseñas, códigos MFA ni documentos de identidad en el texto.</p>
       <mat-form-field appearance="outline"><mat-label>Derecho que quieres ejercer</mat-label><mat-select formControlName="type">@for (type of privacyTypeOptions; track type) { <mat-option [value]="type">{{ privacyTypeLabel(type) }}</mat-option> }</mat-select><mat-icon matPrefix>rule</mat-icon></mat-form-field>

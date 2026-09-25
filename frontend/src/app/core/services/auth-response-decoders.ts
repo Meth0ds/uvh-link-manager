@@ -1,10 +1,11 @@
-import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, SessionList, Workspace, WorkspaceRole } from "../models";
+import type { AccountDeletionImpact, AuthUser, DataExportFailureReason, DataExportStatus, Session, SessionList, Workspace, WorkspaceRole } from "../models";
 import type { LoginOutcome, LoginResponse, MfaSessionStatus } from "./auth.service";
 
 type JsonRecord = Record<string, unknown>;
 
 const WORKSPACE_ROLES = new Set<WorkspaceRole>(["owner", "admin", "editor", "viewer"]);
-const EXPORT_STATUSES = new Set<DataExportStatus["status"]>(["requested", "processing", "ready", "downloaded", "failed", "cancelled", "expired"]);
+const EXPORT_STATUSES = new Set<DataExportStatus["status"]>(["processing", "ready", "downloaded", "failed", "cancelled", "expired"]);
+const EXPORT_FAILURES = new Set<DataExportFailureReason>(["automated_size_limit", "generation_error", "stalled"]);
 const PRIVACY_TYPES = new Set(["access", "rectification", "erasure", "objection", "restriction", "portability"]);
 const PRIVACY_STATUSES = new Set(["submitted", "in_progress", "waiting_user", "completed", "rejected", "cancelled"]);
 
@@ -137,10 +138,9 @@ function dataExport(value: unknown): DataExportStatus {
   return {
     id: integer(source["id"], "data export", 1),
     status: literal(source["status"], EXPORT_STATUSES, "data export"),
-    confirmationExpiresAt: nullableText(source["confirmationExpiresAt"], "data export"),
+    failureReason: source["failureReason"] === null ? null : literal(source["failureReason"], EXPORT_FAILURES, "data export failure"),
     downloadExpiresAt: nullableText(source["downloadExpiresAt"], "data export"),
     createdAt: nullableText(source["createdAt"], "data export"),
-    confirmedAt: nullableText(source["confirmedAt"], "data export"),
     readyAt: nullableText(source["readyAt"], "data export"),
     downloadedAt: nullableText(source["downloadedAt"], "data export"),
   };

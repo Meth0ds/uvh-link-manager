@@ -1,12 +1,25 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, signal, viewChild } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
-import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS, MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
 import { ApiRequestError } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
+import { downloadBlob } from "../../core/services/browser-download";
+
+export interface DataExportDialogData {
+  /** `request` inicia una exportación; `download` entrega la ya preparada. */
+  purpose: "request" | "download";
+}
+
+/**
+ * `true` = la operación terminó; `"unconfirmed"` = el archivo se guardó en el
+ * navegador pero el acuse de recepción falló. Nunca cruzan credenciales ni
+ * datos de la exportación.
+ */
+export type DataExportDialogResult = boolean | "unconfirmed";
 
 @Component({
   selector: "app-data-export-dialog",
@@ -18,14 +31,15 @@ import { AuthService } from "../../core/services/auth.service";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DataExportDialogComponent {
-  readonly ref = inject(MatDialogRef<DataExportDialogComponent, boolean>);
+  readonly data = inject<DataExportDialogData>(MAT_DIALOG_DATA);
+  readonly ref = inject(MatDialogRef<DataExportDialogComponent, DataExportDialogResult>);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly context = this.auth.sessionGeneration();
   private readonly fb = inject(FormBuilder);
   private readonly heading = viewChild<ElementRef<HTMLElement>>("stepHeading");
   readonly requiresMfa = this.auth.user()?.mfaEnabled === true;
-  readonly step = signal<1 | 2 | 3>(1);
+  readonly step = signal<1 | 2>(1);
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   readonly passwordForm = this.fb.nonNullable.group({
@@ -37,8 +51,12 @@ export class DataExportDialogComponent {
 
   constructor() {
     // Export credentials never leave this overlay and are discarded on every
-    // exit path. Only a boolean completion signal reaches the settings page.
+    // exit path. Only a small completion signal reaches the settings page.
     this.destroyRef.onDestroy(() => this.clearSecrets());
+  }
+
+  get isDownload(): boolean {
+    return this.data.purpose === "download";
   }
 
   continueFromPassword(): void {
@@ -78,18 +96,25 @@ export class DataExportDialogComponent {
     this.busy.set(true);
     this.error.set(null);
     this.ref.disableClose = true;
+    const password = this.passwordForm.controls.password.value;
+    const factorCode = this.requiresMfa ? this.factorForm.controls.factorCode.value.trim() : undefined;
     try {
-      await this.auth.requestDataExport(
-        this.passwordForm.controls.password.value,
-        this.requiresMfa ? this.factorForm.controls.factorCode.value.trim() : undefined,
-      );
-      if (this.destroyRef.destroyed) return;
-      this.clearSecrets();
-      this.moveTo(this.requiresMfa ? 3 : 2);
+      if (this.isDownload) {
+        await this.finishDownload(password, factorCode);
+      } else {
+        await this.auth.requestDataExport(password, factorCode);
+        if (this.destroyRef.destroyed) return;
+        this.clearSecrets();
+        this.ref.close(true);
+      }
     } catch (error) {
       if (!this.destroyRef.destroyed) {
         this.clearSecrets();
-        this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar la solicitud. Comprueba su estado antes de volver a intentarlo.");
+        this.error.set(error instanceof ApiRequestError
+          ? error.message
+          : this.isDownload
+            ? "No se pudo descargar el archivo. Sigue disponible: vuelve a intentarlo."
+            : "No se pudo confirmar la solicitud. Comprueba su estado antes de volver a intentarlo.");
         this.moveTo(1);
       }
     } finally {
@@ -100,11 +125,41 @@ export class DataExportDialogComponent {
     }
   }
 
-  isDone(): boolean {
-    return this.requiresMfa ? this.step() === 3 : this.step() === 2;
+  primaryLabel(): string {
+    if (this.requiresMfa) return "Continuar a 2FA";
+    return this.busy()
+      ? (this.isDownload ? "Descargando…" : "Solicitando…")
+      : (this.isDownload ? "Descargar archivo" : "Solicitar mi archivo");
   }
 
-  private moveTo(step: 1 | 2 | 3): void {
+  private async finishDownload(password: string, factorCode?: string): Promise<void> {
+    const blob = await this.auth.downloadDataExport(password, factorCode);
+    if (this.destroyRef.destroyed) return;
+    if (!downloadBlob(blob, `uvh-datos-${new Date().toISOString().slice(0, 10)}.json`)) {
+      // No se acusa nada: la exportación sigue `ready` y un reintento vuelve
+      // a entregar el mismo archivo tras un nuevo step-up.
+      this.clearSecrets();
+      this.error.set("El navegador no pudo guardar el archivo. La exportación sigue disponible: vuelve a intentarlo.");
+      this.moveTo(1);
+      return;
+    }
+    try {
+      // postBlob sólo resuelve con el cuerpo completo en memoria del
+      // navegador; el acuse consume la exportación ya guardada.
+      await this.auth.acknowledgeDataExportDownload();
+      if (this.destroyRef.destroyed) return;
+      this.clearSecrets();
+      this.ref.close(true);
+    } catch {
+      if (this.destroyRef.destroyed) return;
+      // El archivo ya está en el dispositivo: no se obliga a repetir el
+      // step-up ni la descarga. Sin acuse, la exportación caduca sola.
+      this.clearSecrets();
+      this.ref.close("unconfirmed");
+    }
+  }
+
+  private moveTo(step: 1 | 2): void {
     this.step.set(step);
     queueMicrotask(() => this.heading()?.nativeElement.focus());
   }

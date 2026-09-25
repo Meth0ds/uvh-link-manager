@@ -53,11 +53,9 @@ class AccountController
             return MfaAttempts::tooManyResponse($user->id, $purpose);
         }
 
-        $confirmationToken = Ids::randomToken(32);
-        $url = rtrim((string) config('app.url'), '/').'/auth/confirm-export#token='.rawurlencode($confirmationToken);
         $sessionId = UvhRequest::sessionId($request);
         try {
-            $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $purpose, $confirmationToken, $url): array {
+            $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $purpose): array {
                 $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
                 $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
                     ->whereNull('revoked_at')->lockForUpdate()->first();
@@ -67,7 +65,7 @@ class AccountController
                 }
 
                 $active = DataExportRequest::where('user_id', $lockedUser->id)
-                    ->whereIn('status', ['requested', 'processing', 'ready'])
+                    ->whereIn('status', ['processing', 'ready'])
                     ->lockForUpdate()
                     ->first();
                 $staleSecurity = $active && (int) $active->security_version !== (int) $lockedUser->security_version;
@@ -87,8 +85,7 @@ class AccountController
                     }
                     $active->update([
                         'status' => $staleSecurity ? 'cancelled' : 'expired',
-                        'confirmation_token_hash' => null,
-                        'download_token_hash' => null,
+                        'mail_generation_hash' => null,
                     ]);
                 }
 
@@ -96,21 +93,14 @@ class AccountController
                     $lockedUser->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => now()]);
                 }
 
+                // The step-up above is the whole authorisation: there is no
+                // confirmation link to wait for, so generation starts now and
+                // the panel tracks it in the background.
                 $row = DataExportRequest::create([
                     'user_id' => $lockedUser->id,
                     'security_version' => (int) $lockedUser->security_version,
-                    'status' => 'requested',
-                    'confirmation_token_hash' => Ids::sha256Hex($confirmationToken),
-                    'confirmation_expires_at' => now()->addHour(),
+                    'status' => 'processing',
                 ]);
-                if (! UvhMail::dataExportConfirmation(
-                    $lockedUser->email,
-                    $url,
-                    (int) $row->id,
-                    Ids::sha256Hex($confirmationToken),
-                )) {
-                    throw new MailAdmissionException('Data export confirmation queue admission failed');
-                }
 
                 return [
                     'status' => 'created',
@@ -124,10 +114,6 @@ class AccountController
                 return response()->json(['error' => 'Ya existe una exportación activa para esta cuenta'], 409);
             }
             throw $e;
-        } catch (MailAdmissionException) {
-            Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'data_export_confirmation']);
-
-            return response()->json(['error' => 'No se pudo enviar la confirmación. Inténtalo de nuevo más tarde'], 503);
         }
 
         if ($result['status'] === 'stale') {
@@ -166,93 +152,17 @@ class AccountController
             'factor' => $result['factor'],
         ]);
 
-        return response()->json(['export' => $this->publicExport($result['export'])], 202);
-    }
-
-    public function confirmExport(Request $request)
-    {
-        $token = UvhRequest::inputString($request, 'token');
-        if (! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token)) {
-            return response()->json(['error' => 'Token inválido'], 422);
-        }
-
-        $tokenHash = Ids::sha256Hex($token);
-        // This unlocked lookup is only a routing hint. The transaction locks
-        // the user first and then revalidates the exact bearer row, matching
-        // every authenticated lifecycle operation for the same account.
-        $snapshot = DataExportRequest::where('confirmation_token_hash', $tokenHash)
-            ->where('status', 'requested')->first(['id', 'user_id']);
+        // Queue publication can fail even though the request is durable. The
+        // processing row is its own recovery marker and housekeeping re-admits
+        // the idempotent job, so the request is reported as started either way.
         try {
-            $result = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): array {
-                $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-                $row = DataExportRequest::where('id', $snapshot->id)
-                    ->where('user_id', $snapshot->user_id)
-                    ->where('confirmation_token_hash', $tokenHash)
-                    ->where('status', 'requested')->lockForUpdate()->first();
-                if (! $row) {
-                    return ['status' => 'invalid'];
-                }
-                if (! $row->confirmation_expires_at || $row->confirmation_expires_at->isPast()) {
-                    $row->update(['status' => 'expired', 'confirmation_token_hash' => null]);
-
-                    return ['status' => 'expired'];
-                }
-                if (! $user || $user->deleted_at
-                    || (int) $user->security_version !== (int) $row->security_version) {
-                    $row->update(['status' => 'cancelled', 'confirmation_token_hash' => null]);
-
-                    return ['status' => 'invalid'];
-                }
-
-                $row->update([
-                    'status' => 'processing',
-                    'confirmation_token_hash' => null,
-                    'confirmed_at' => now(),
-                ]);
-                try {
-                    GenerateDataExportJob::dispatch((int) $row->id)->afterCommit();
-                } catch (\Throwable) {
-                    throw new MailAdmissionException('Data export worker queue admission failed');
-                }
-
-                return ['status' => 'ok', 'request_id' => (int) $row->id, 'user_id' => (int) $user->id];
-            }) : ['status' => 'invalid'];
-        } catch (MailAdmissionException) {
-            // Queue publication may fail from Laravel's after-commit callback
-            // after the processing state is already durable. In that case the
-            // scheduler will re-admit the idempotent job; returning a hard error
-            // would tell the user the confirmation failed when it did not.
-            try {
-                $deferred = $snapshot && DataExportRequest::where('id', $snapshot->id)
-                    ->where('status', 'processing')
-                    ->whereNull('artifact_path')
-                    ->exists();
-            } catch (\Throwable) {
-                $deferred = false;
-            }
-            if ($deferred) {
-                OperationalMetrics::increment('export.queue_unavailable');
-                Audit::write((int) $snapshot->user_id, 'account.data_export_queue_deferred', 'data_export', (int) $snapshot->id);
-
-                return response()->json([
-                    'ok' => true,
-                    'queued' => false,
-                    'message' => 'La exportación quedó registrada y se iniciará automáticamente cuando la cola se recupere.',
-                ], 202);
-            }
-
-            return response()->json(['error' => 'No se pudo iniciar la generación. Inténtalo de nuevo más tarde'], 503);
+            GenerateDataExportJob::dispatch((int) $result['export']->id);
+        } catch (\Throwable) {
+            OperationalMetrics::increment('export.queue_unavailable');
+            Audit::write($user->id, 'account.data_export_queue_deferred', 'data_export', (int) $result['export']->id);
         }
 
-        if ($result['status'] === 'expired') {
-            return response()->json(['error' => 'La confirmación ha caducado. Solicita otra exportación desde Ajustes'], 400);
-        }
-        if ($result['status'] !== 'ok') {
-            return response()->json(['error' => 'La confirmación no es válida o ya se ha utilizado'], 400);
-        }
-        Audit::write($result['user_id'], 'account.data_export_confirmed', 'data_export', $result['request_id']);
-
-        return response()->json(['ok' => true]);
+        return response()->json(['export' => $this->publicExport($result['export'])], 202);
     }
 
     public function cancelExport(Request $request)
@@ -260,7 +170,7 @@ class AccountController
         $user = UvhRequest::user($request);
         $result = DB::transaction(function () use ($user): array {
             $row = DataExportRequest::where('user_id', $user->id)
-                ->whereIn('status', ['requested', 'processing', 'ready'])
+                ->whereIn('status', ['processing', 'ready'])
                 ->lockForUpdate()->first();
             if (! $row) {
                 return ['status' => 'missing'];
@@ -268,8 +178,7 @@ class AccountController
             $path = $row->artifact_path;
             $row->update([
                 'status' => 'cancelled',
-                'confirmation_token_hash' => null,
-                'download_token_hash' => null,
+                'mail_generation_hash' => null,
             ]);
 
             return [
@@ -289,53 +198,63 @@ class AccountController
         return response()->json(['ok' => true]);
     }
 
+    /**
+     * La descarga se autoriza con la sesión y un step-up reciente: la
+     * exportación pertenece a la cuenta y el artefacto se entrega sólo a quien
+     * acaba de demostrar la contraseña y, si está activo, el segundo factor.
+     * Sigue siendo de un solo uso por solicitud: el acuse posterior consume la
+     * exportación.
+     */
     public function downloadExport(Request $request)
     {
-        $token = UvhRequest::inputString($request, 'token');
-        if (! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token)) {
-            return response()->json(['error' => 'Token inválido'], 422);
+        $password = UvhRequest::inputString($request, 'password');
+        $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
+        if ($password === '' || strlen($password) > 72 || strlen($factorCode) > 24) {
+            return response()->json(['error' => 'Datos inválidos'], 422);
         }
 
-        $tokenHash = Ids::sha256Hex($token);
-        $snapshot = DataExportRequest::where('download_token_hash', $tokenHash)
-            ->where('status', 'ready')->first(['id', 'user_id']);
+        $user = UvhRequest::user($request);
+        $purpose = 'data-export';
+        if (MfaAttempts::tooMany($user->id, $purpose)) {
+            return MfaAttempts::tooManyResponse($user->id, $purpose);
+        }
+
+        $sessionId = UvhRequest::sessionId($request);
         try {
-            $result = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): array {
-                $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-                $row = DataExportRequest::where('id', $snapshot->id)
-                    ->where('user_id', $snapshot->user_id)
-                    ->where('download_token_hash', $tokenHash)
+            $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $purpose): array {
+                $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
+                $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
+                    ->whereNull('revoked_at')->lockForUpdate()->first();
+                if (! $lockedUser || ! $session
+                    || (int) $session->security_version !== (int) $lockedUser->security_version) {
+                    return ['status' => 'stale'];
+                }
+                $row = DataExportRequest::where('user_id', $lockedUser->id)
                     ->where('status', 'ready')->lockForUpdate()->first();
                 if (! $row) {
-                    return ['status' => 'invalid'];
+                    return ['status' => 'missing'];
                 }
+                $path = is_string($row->artifact_path) ? $row->artifact_path : null;
                 if (! $row->download_expires_at || $row->download_expires_at->isPast()) {
-                    $path = $row->artifact_path;
-                    $row->update([
-                        'status' => 'expired',
-                        'download_token_hash' => null,
-                    ]);
+                    $row->update(['status' => 'expired', 'mail_generation_hash' => null]);
 
                     return ['status' => 'expired', 'path' => $path, 'request_id' => (int) $row->id];
                 }
-                if (! $user || $user->deleted_at
-                    || (int) $user->security_version !== (int) $row->security_version) {
-                    $path = $row->artifact_path;
-                    $row->update([
-                        'status' => 'cancelled',
-                        'download_token_hash' => null,
-                    ]);
+                if ((int) $row->security_version !== (int) $lockedUser->security_version) {
+                    $row->update(['status' => 'cancelled', 'mail_generation_hash' => null]);
 
                     return ['status' => 'invalid', 'path' => $path, 'request_id' => (int) $row->id];
                 }
-                $path = $row->artifact_path;
-                if (! is_string($path) || $path === '') {
-                    $row->update(['status' => 'failed', 'download_token_hash' => null, 'artifact_path' => null]);
 
-                    return ['status' => 'missing'];
+                $stepUp = MfaStepUp::verify($lockedUser, $session, $password, $factorCode, true, $purpose);
+                if ($stepUp['status'] !== 'ok') {
+                    return ['status' => $stepUp['status']];
                 }
-                if (! PrivateArtifactCleanup::isManagedPath($path)) {
-                    $row->update(['status' => 'failed', 'download_token_hash' => null]);
+                if (isset($stepUp['recovery_codes'])) {
+                    $lockedUser->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => now()]);
+                }
+                if (! is_string($path) || $path === '' || ! PrivateArtifactCleanup::isManagedPath($path)) {
+                    $row->update(['status' => 'failed', 'failure_reason' => 'generation_error', 'mail_generation_hash' => null]);
 
                     return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
                 }
@@ -343,11 +262,11 @@ class AccountController
                 // Return only immutable identifiers and the managed path. Slow
                 // private-volume I/O and decryption must never extend the row
                 // locks protecting the user's security generation.
-                return ['status' => 'ok', 'path' => $path, 'user_id' => (int) $user->id, 'request_id' => (int) $row->id];
-            }) : ['status' => 'invalid'];
+                return ['status' => 'ok', 'path' => $path, 'user_id' => (int) $lockedUser->id, 'request_id' => (int) $row->id];
+            });
         } catch (\Throwable) {
-            // Keep the bearer and request state untouched when PostgreSQL is
-            // temporarily unavailable. The caller can safely retry.
+            // Keep the request state untouched when PostgreSQL is temporarily
+            // unavailable. The caller can safely retry.
             OperationalMetrics::increment('export.download_unavailable');
 
             return response()->json([
@@ -360,14 +279,33 @@ class AccountController
             && is_string($result['path'] ?? null)) {
             PrivateArtifactCleanup::attempt((int) $result['request_id'], $result['path']);
         }
+        if ($result['status'] === 'stale') {
+            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+        }
+        if ($result['status'] === 'locked') {
+            return MfaAttempts::tooManyResponse($user->id, $purpose);
+        }
+        if ($result['status'] === 'reauth') {
+            return MfaFreshness::reauthenticationRequired();
+        }
+        if ($result['status'] === 'password') {
+            Audit::write($user->id, 'account.data_export_download_failed', 'user', $user->id, ['reason' => 'password']);
+
+            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+        }
+        if ($result['status'] === 'factor') {
+            Audit::write($user->id, 'account.data_export_download_failed', 'user', $user->id, ['reason' => 'factor']);
+
+            return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
+        }
         if ($result['status'] === 'expired') {
-            return response()->json(['error' => 'El enlace de descarga ha caducado'], 400);
+            return response()->json(['error' => 'La exportación ha caducado. Solicita una nueva desde Ajustes'], 400);
         }
         if ($result['status'] === 'missing') {
             return response()->json(['error' => 'El archivo ya no está disponible. Solicita una nueva exportación'], 410);
         }
         if ($result['status'] !== 'ok') {
-            return response()->json(['error' => 'El enlace no es válido o ya se ha utilizado'], 400);
+            return response()->json(['error' => 'La exportación cambió de estado antes de poder entregarse'], 409);
         }
 
         try {
@@ -378,7 +316,8 @@ class AccountController
             $json = UvhCrypto::decryptAtRest($encrypted);
         } catch (\Throwable) {
             // A transient volume failure or interrupted read does not consume
-            // the bearer. Housekeeping still owns eventual expiry/cleanup.
+            // the export: it stays ready and the owner retries. Housekeeping
+            // still owns eventual expiry/cleanup.
             OperationalMetrics::increment('export.download_unavailable');
 
             return response()->json([
@@ -387,24 +326,23 @@ class AccountController
         }
 
         try {
-            $stillEligible = DB::transaction(function () use ($result, $tokenHash): bool {
-                $user = User::where('id', $result['user_id'])->lockForUpdate()->first();
+            $stillEligible = DB::transaction(function () use ($result): bool {
+                $lockedUser = User::where('id', $result['user_id'])->lockForUpdate()->first();
                 $row = DataExportRequest::where('id', $result['request_id'])
                     ->where('user_id', $result['user_id'])
-                    ->where('download_token_hash', $tokenHash)
                     ->where('status', 'ready')->lockForUpdate()->first();
 
                 $eligible = $row !== null
-                    && $user !== null
-                    && ! $user->deleted_at
-                    && (int) $user->security_version === (int) $row->security_version
+                    && $lockedUser !== null
+                    && ! $lockedUser->deleted_at
+                    && (int) $lockedUser->security_version === (int) $row->security_version
                     && $row->download_expires_at?->isFuture() === true
                     && is_string($row->artifact_path)
                     && hash_equals($result['path'], $row->artifact_path);
                 if ($eligible) {
                     // This timestamp proves only that PHP finished preparing a
-                    // response for this bearer. It enables acknowledgement but
-                    // deliberately does not consume the token or claim receipt.
+                    // response for this session. It enables acknowledgement but
+                    // deliberately does not consume the export or claim receipt.
                     $row->update(['download_served_at' => now()]);
                 }
 
@@ -437,21 +375,12 @@ class AccountController
 
     public function acknowledgeExportDownload(Request $request): Response
     {
-        $token = UvhRequest::inputString($request, 'token');
-        if (! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token)) {
-            return response()->json(['error' => 'Token inválido'], 422);
-        }
-
-        $tokenHash = Ids::sha256Hex($token);
-        $snapshot = DataExportRequest::where('download_token_hash', $tokenHash)
-            ->where('status', 'ready')->first(['id', 'user_id']);
+        $user = UvhRequest::user($request);
         try {
-            $result = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): array {
+            $result = DB::transaction(function () use ($user): array {
                 // Preserve the global lock order: user before user-owned state.
-                $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-                $row = DataExportRequest::where('id', $snapshot->id)
-                    ->where('user_id', $snapshot->user_id)
-                    ->where('download_token_hash', $tokenHash)
+                $lockedUser = User::where('id', $user->id)->lockForUpdate()->first();
+                $row = DataExportRequest::where('user_id', $user->id)
                     ->where('status', 'ready')->lockForUpdate()->first();
                 if (! $row) {
                     return ['status' => 'invalid'];
@@ -459,46 +388,45 @@ class AccountController
 
                 $path = is_string($row->artifact_path) ? $row->artifact_path : null;
                 if (! $row->download_expires_at || $row->download_expires_at->isPast()) {
-                    $row->update(['status' => 'expired', 'download_token_hash' => null]);
+                    $row->update(['status' => 'expired', 'mail_generation_hash' => null]);
 
                     return ['status' => 'expired', 'path' => $path, 'request_id' => (int) $row->id];
                 }
-                if (! $user || $user->deleted_at
-                    || (int) $user->security_version !== (int) $row->security_version) {
-                    $row->update(['status' => 'cancelled', 'download_token_hash' => null]);
+                if (! $lockedUser || $lockedUser->deleted_at
+                    || (int) $lockedUser->security_version !== (int) $row->security_version) {
+                    $row->update(['status' => 'cancelled', 'mail_generation_hash' => null]);
 
                     return ['status' => 'invalid', 'path' => $path, 'request_id' => (int) $row->id];
                 }
                 if (! $row->download_served_at) {
-                    // A caller cannot consume a bearer by invoking only the
+                    // A caller cannot consume an export by invoking only the
                     // acknowledgement endpoint; the artifact must first have
                     // passed the complete server-side download preparation.
                     return ['status' => 'not_served'];
                 }
                 if (! $path || ! PrivateArtifactCleanup::isManagedPath($path)) {
-                    $row->update(['status' => 'failed', 'download_token_hash' => null]);
+                    $row->update(['status' => 'failed', 'failure_reason' => 'generation_error', 'mail_generation_hash' => null]);
 
                     return ['status' => 'missing', 'path' => $path, 'request_id' => (int) $row->id];
                 }
 
                 $row->update([
                     'status' => 'downloaded',
-                    'download_token_hash' => null,
                     'downloaded_at' => now(),
                 ]);
 
                 return [
                     'status' => 'ok',
                     'path' => $path,
-                    'user_id' => (int) $user->id,
+                    'user_id' => (int) $lockedUser->id,
                     'request_id' => (int) $row->id,
                 ];
-            }) : ['status' => 'invalid'];
+            });
         } catch (\Throwable) {
             OperationalMetrics::increment('export.download_ack_unavailable');
 
             return response()->json([
-                'error' => 'No se pudo confirmar la recepción. El enlace caducará automáticamente.',
+                'error' => 'No se pudo confirmar la recepción. La exportación caducará automáticamente.',
             ], 503);
         }
 
@@ -506,7 +434,7 @@ class AccountController
             PrivateArtifactCleanup::attempt((int) $result['request_id'], $result['path']);
         }
         if ($result['status'] === 'expired') {
-            return response()->json(['error' => 'El enlace de descarga ha caducado'], 400);
+            return response()->json(['error' => 'La exportación ha caducado'], 400);
         }
         if ($result['status'] === 'missing') {
             return response()->json(['error' => 'El archivo ya no está disponible'], 410);
@@ -515,7 +443,7 @@ class AccountController
             return response()->json(['error' => 'La exportación todavía no se ha servido'], 409);
         }
         if ($result['status'] !== 'ok') {
-            return response()->json(['error' => 'El enlace no es válido o ya se ha utilizado'], 400);
+            return response()->json(['error' => 'No hay ninguna exportación disponible para esta cuenta'], 404);
         }
 
         Audit::write($result['user_id'], 'account.data_export_downloaded', 'data_export', $result['request_id']);
@@ -788,17 +716,16 @@ class AccountController
                 AccountRecoveryLifecycle::cancelActiveForUser((int) $user->id, $now);
 
                 $artifacts = DataExportRequest::where('user_id', $user->id)
-                    ->whereIn('status', ['requested', 'processing', 'ready'])
+                    ->whereIn('status', ['processing', 'ready'])
                     ->whereNotNull('artifact_path')->get(['id', 'artifact_path'])
                     ->filter(fn ($export) => is_string($export->artifact_path) && $export->artifact_path !== '')
                     ->map(fn ($export) => ['id' => (int) $export->id, 'path' => $export->artifact_path])
                     ->values()->all();
                 DataExportRequest::where('user_id', $user->id)
-                    ->whereIn('status', ['requested', 'processing', 'ready'])
+                    ->whereIn('status', ['processing', 'ready'])
                     ->update([
                         'status' => 'cancelled',
-                        'confirmation_token_hash' => null,
-                        'download_token_hash' => null,
+                        'mail_generation_hash' => null,
                         'updated_at' => $now,
                     ]);
 
@@ -912,8 +839,7 @@ class AccountController
 
     private function isExpired(DataExportRequest $request): bool
     {
-        return ($request->status === 'requested' && $request->confirmation_expires_at?->isPast())
-            || ($request->status === 'ready' && $request->download_expires_at?->isPast());
+        return $request->status === 'ready' && $request->download_expires_at?->isPast();
     }
 
     /** @return array<string, mixed>|null */
@@ -929,10 +855,9 @@ class AccountController
         return [
             'id' => (int) $request->id,
             'status' => $status,
-            'confirmationExpiresAt' => $request->confirmation_expires_at?->toIso8601String(),
+            'failureReason' => $status === 'failed' ? $request->failure_reason : null,
             'downloadExpiresAt' => $request->download_expires_at?->toIso8601String(),
             'createdAt' => $request->created_at?->toIso8601String(),
-            'confirmedAt' => $request->confirmed_at?->toIso8601String(),
             'readyAt' => $request->ready_at?->toIso8601String(),
             'downloadedAt' => $request->downloaded_at?->toIso8601String(),
         ];

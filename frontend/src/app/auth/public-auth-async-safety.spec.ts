@@ -14,8 +14,6 @@ import { ForgotPasswordComponent } from "./forgot-password.component";
 import { ResetPasswordComponent } from "./reset-password.component";
 import { VerifyEmailComponent } from "./verify-email.component";
 import { ConfirmEmailChangeComponent } from "./confirm-email-change.component";
-import { ConfirmDataExportComponent } from "./confirm-data-export.component";
-import { DownloadDataExportComponent } from "./download-data-export.component";
 import { ConfirmAccountDeletionComponent } from "./confirm-account-deletion.component";
 import { CancelAccountDeletionComponent } from "./cancel-account-deletion.component";
 import { SecurityIncidentComponent } from "./security-incident.component";
@@ -82,19 +80,6 @@ describe("public auth views async safety", () => {
     expect(api.post).toHaveBeenCalledTimes(1);
     expect(fixture.nativeElement.querySelector("form")).toBeNull();
     expect(fixture.nativeElement.querySelector('[role="status"]').textContent).toContain("Contraseña actualizada");
-  });
-
-  it("does not advertise an actionable download without a bearer", async () => {
-    const api = jasmine.createSpyObj<ApiService>("ApiService", ["postBlob", "post"]);
-    TestBed.configureTestingModule({ imports: [DownloadDataExportComponent], providers: sharedProviders(api) });
-    const fixture = TestBed.createComponent(DownloadDataExportComponent);
-    fixture.detectChanges();
-    await fixture.componentInstance.download();
-    expect(api.postBlob).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.textContent).not.toContain("Descargar mis datos");
-    expect(fixture.nativeElement.textContent).toContain("Volver al acceso");
-    // The projected screen must not create a second main landmark inside AuthShell.
-    expect(fixture.nativeElement.querySelectorAll("main").length).toBe(1);
   });
 
   it("keeps email verification behind an explicit action after rendering", () => {
@@ -288,26 +273,6 @@ describe("public auth views async safety", () => {
     await confirmation;
 
     expect(auth.accountSignedOut).toHaveBeenCalledOnceWith(7);
-    expect(component.ok()).toBeFalse();
-    expect(component.done()).toBeFalse();
-  });
-
-  it("ignores export confirmation UI after destruction", async () => {
-    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
-    const response = deferred<unknown>();
-    api.post.and.returnValue(response.promise);
-    TestBed.configureTestingModule({
-      imports: [ConfirmDataExportComponent],
-      providers: sharedProviders(api, `token=${TOKEN}`),
-    });
-    const fixture = TestBed.createComponent(ConfirmDataExportComponent);
-    const component = fixture.componentInstance;
-
-    const confirmation = component.confirm();
-    fixture.destroy();
-    response.resolve({});
-    await confirmation;
-
     expect(component.ok()).toBeFalse();
     expect(component.done()).toBeFalse();
   });

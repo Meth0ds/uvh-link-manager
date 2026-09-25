@@ -413,6 +413,28 @@ export class AuthService {
     return status;
   }
 
+  /**
+   * Descarga con step-up: el artefacto se entrega a la sesión que acaba de
+   * demostrar contraseña y segundo factor. Repetir la llamada es seguro hasta
+   * que el navegador acusa la recepción completa.
+   */
+  async downloadDataExport(password: string, factorCode?: string): Promise<Blob> {
+    const generation = this.generation;
+    const blob = await this.api.postBlob("/api/v1/auth/data-export/download", {
+      password,
+      ...(factorCode ? { factorCode } : {}),
+    });
+    this.assertCurrent(generation);
+    return blob;
+  }
+
+  /** Consume la exportación: marca `downloaded` y purga el artefacto. */
+  async acknowledgeDataExportDownload(): Promise<void> {
+    const generation = this.generation;
+    await this.api.post("/api/v1/auth/data-export/download/acknowledge");
+    this.assertCurrent(generation);
+  }
+
   async cancelDataExport(): Promise<void> {
     const generation = this.generation;
     await this.api.post("/api/v1/auth/data-export/cancel");

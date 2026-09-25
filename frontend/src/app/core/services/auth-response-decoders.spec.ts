@@ -68,10 +68,9 @@ describe("authentication response decoders", () => {
     const status = {
       id: 4,
       status: "ready",
-      confirmationExpiresAt: null,
+      failureReason: null,
       downloadExpiresAt: "2026-09-07T00:00:00Z",
       createdAt: "2026-09-06T00:00:00Z",
-      confirmedAt: "2026-09-06T00:01:00Z",
       readyAt: "2026-09-06T00:02:00Z",
       downloadedAt: null,
     } satisfies DataExportStatus;
@@ -79,6 +78,8 @@ describe("authentication response decoders", () => {
     expect(decodeRequiredDataExportResponse({ export: status })).toEqual({ export: status });
     expect(() => decodeRequiredDataExportResponse({ export: null })).toThrow();
     expect(() => decodeDataExportStatusResponse({ export: { ...status, status: "unknown" } })).toThrow();
+    expect(decodeDataExportStatusResponse({ export: { ...status, status: "failed", failureReason: "automated_size_limit" } }).export?.failureReason).toBe("automated_size_limit");
+    expect(() => decodeDataExportStatusResponse({ export: { ...status, failureReason: "mystery" } })).toThrow();
   });
 
   it("validates account-deletion impact and request contracts", () => {

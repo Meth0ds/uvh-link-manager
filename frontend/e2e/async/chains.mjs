@@ -7,7 +7,7 @@
 
 import crypto from "node:crypto";
 import { check, until } from "./expect.mjs";
-import { fixture, fixtureSecret, hashToken, hookUrl, messageMatching, messagesFor, setState, tokenFromUrl } from "./fixtures.mjs";
+import { fixture, fixtureSecret, hookUrl, messageMatching, setState, tokenFromUrl } from "./fixtures.mjs";
 import { api, login, password, register, uniqueEmail, workspaces } from "./session.mjs";
 import { control, docker, inspect, runningService } from "./topology.mjs";
 
@@ -123,34 +123,17 @@ export async function domainChain({ session, workspaceId }) {
   }
 }
 
-/** Request -> exports worker -> artifact -> download -> acknowledge -> expired. */
+/**
+ * Request -> exports worker -> artifact -> announcement -> download (reusable
+ * until acknowledged) -> acknowledge -> retired.
+ */
 export async function exportChain({ email, session, workspaceId }) {
   const requested = await api("POST", "/api/v1/auth/data-export", { session, workspaceId, json: { password } });
   check("export: request admitted with step-up", requested.status === 200 || requested.status === 202, `HTTP ${requested.status}`);
   if (requested.status !== 200 && requested.status !== 202) return;
 
-  const requestedRow = inspect("export-latest");
-
-  // The bearer is matched against the stored hash rather than against the URL
-  // path or the order in which messages arrived: the provider stores what it
-  // received, and only the hash proves it is the message this request meant.
-  const confirmation = await until("export: confirmation message reaches the provider", async () => {
-    for (const message of await messagesFor(email)) {
-      const token = tokenFromUrl(message.raw);
-      if (token && hashToken(token) === requestedRow.confirmation_hash) return { message, token };
-    }
-    return undefined;
-  }, { deadlineMs: 45_000 }).catch((error) => {
-    const outbox = inspect("mail-kind", "data_export_confirmation");
-    check("export: confirmation message reaches the provider", false, `${error.message} | request=${JSON.stringify(requestedRow)} outbox=${JSON.stringify(outbox)}`);
-    return null;
-  });
-  if (!confirmation) return;
-
-  const confirmToken = confirmation.token;
-  const confirmed = await api("POST", "/api/v1/auth/data-export/confirm", { json: { token: confirmToken } });
-  check("export: bearer from the provider confirms the request", confirmed.status === 200, `HTTP ${confirmed.status}`);
-
+  // The request is what enqueues the job: no confirmation step exists, so the
+  // state advances alone from here and the page only polls it.
   const ready = await until("export: exports worker produces the artifact", () => {
     const state = inspect("export-latest");
     return state.status === "ready" && state.artifact ? state : undefined;
@@ -160,25 +143,29 @@ export async function exportChain({ email, session, workspaceId }) {
   });
   if (!ready) return;
 
-  // Waiting for the second bearer here also proves the worker's own mail
-  // admission reached the provider.
-  const readyToken = await until("export: ready message reaches the provider", async () => {
-    for (const message of await messagesFor(email)) {
-      const token = tokenFromUrl(message.raw);
-      if (token && hashToken(token) === ready.download_hash) return token;
-    }
-    return undefined;
-  }, { deadlineMs: 45_000 }).catch((error) => {
-    check("export: ready message reaches the provider", false, `${error.message} | ${JSON.stringify(ready)}`);
+  // The ready notice is an announcement and nothing more: it reaches the
+  // provider and points at the exports section, carrying no bearer that could
+  // authorize a download on its own. The anchors are ASCII on purpose — the
+  // transport may encode accents, but the link text and its target survive
+  // every encoding the provider can choose.
+  const announced = await until("export: ready announcement reaches the provider", async () =>
+    messageMatching(email, (text) => /Ir a mis exportaciones|settings#privacy/i.test(text)),
+  { deadlineMs: 45_000 }).catch((error) => {
+    check("export: ready announcement reaches the provider", false, `${error.message} | ${JSON.stringify(ready)}`);
     return null;
   });
-  check("export: ready message carries a different bearer", Boolean(readyToken) && readyToken !== confirmToken);
-  if (!readyToken) return;
+  if (!announced) return;
+  check("export: the announcement advertises no bearer", !tokenFromUrl(announced.raw));
 
-  const downloaded = await api("POST", "/api/v1/auth/data-export/download", { json: { token: readyToken } });
-  check("export: artifact downloads once", downloaded.status === 200 && downloaded.raw.length > 0, `HTTP ${downloaded.status} bytes=${downloaded.raw.length}`);
+  const downloaded = await api("POST", "/api/v1/auth/data-export/download", { session, workspaceId, json: { password } });
+  check("export: a fresh step-up serves the whole artifact", downloaded.status === 200 && downloaded.raw.length > 0, `HTTP ${downloaded.status} bytes=${downloaded.raw.length}`);
 
-  const consumed = await api("POST", "/api/v1/auth/data-export/download/acknowledge", { json: { token: readyToken } });
+  // The acknowledgement is what consumes the export: until it arrives the
+  // same session may re-download and receives the same bytes.
+  const retried = await api("POST", "/api/v1/auth/data-export/download", { session, workspaceId, json: { password } });
+  check("export: an unacknowledged download serves the same artifact again", retried.status === 200 && retried.raw === downloaded.raw, `HTTP ${retried.status}`);
+
+  const consumed = await api("POST", "/api/v1/auth/data-export/download/acknowledge", { session, workspaceId });
   check("export: download acknowledged", consumed.status === 200, `HTTP ${consumed.status}`);
   const after = inspect("export-latest");
   check("export: artifact is retired after consumption", after.status === "downloaded" && after.artifact === null, JSON.stringify(after));
