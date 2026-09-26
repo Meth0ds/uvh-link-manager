@@ -11,10 +11,18 @@ namespace App\Support;
  * La convención aceptada es anteponer una comilla simple (`'=1+1`), que la
  * hoja muestra como texto. `guard()` se aplica a TODA celda exportada.
  *
- * Del lado de la importación, ningún campo admitido puede contener saltos de
- * línea (las validaciones de notas/UTM/etiquetas rechazan caracteres de
- * control), así que el archivo es una fila por línea y parsear línea a línea
- * es correcto, no una simplificación.
+ * Del lado de la importación, `unguard()` deshace exactamente esa protección
+ * (comilla seguida de un prefijo de fórmula), de modo que un archivo exportado
+ * por UVH se puede volver a importar sin que las notas legítimas acaben con
+ * una comilla de más: export→import es un round-trip. Un valor cuyo primer
+ * carácter legítimo es la comilla seguida de `=` no distingue su caso del
+ * escapado —ambos son la misma cadena en el archivo— y se importa sin la
+ * comilla; es la única ambigüedad de la convención.
+ *
+ * La importación parsea con `fgetcsv` sobre un stream: CSV RFC 4180 de verdad,
+ * con campos entrecomillados que contengan comas, comillas escapadas y saltos
+ * de línea. La validación posterior —no el parser— es la que rechaza caracteres
+ * de control en los campos.
  */
 final class Csv
 {
@@ -25,6 +33,19 @@ final class Csv
     {
         if ($value !== '' && in_array($value[0], self::FORMULA_PREFIXES, true)) {
             return "'".$value;
+        }
+
+        return $value;
+    }
+
+    /**
+     * La inversa de `guard()`: una comilla seguida de un prefijo de fórmula es
+     * el escapado de UVH y se retira; cualquier otro valor pasa intacto.
+     */
+    public static function unguard(string $value): string
+    {
+        if (strlen($value) >= 2 && $value[0] === "'" && in_array($value[1], self::FORMULA_PREFIXES, true)) {
+            return substr($value, 1);
         }
 
         return $value;
@@ -57,6 +78,12 @@ final class Csv
      * Divide el texto en filas de celdas. Primera fila: la cabecera. Devuelve
      * error ante un texto sin cabecera o con más filas de las admitidas.
      *
+     * El parser es RFC 4180 (`fgetcsv` sobre un stream): una celda
+     * entrecomillada puede contener comas, comillas dobles escapadas y saltos
+     * de línea. Los números de fila que la importación reporta son números de
+     * REGISTRO; si un valor entrecomillado lleva saltos de línea, no coinciden
+     * con los del editor de texto.
+     *
      * @return array{ok: true, header: list<string>, rows: list<list<string>>}|array{ok: false, error: string}
      */
     public static function parse(string $text, int $maxRows): array
@@ -64,30 +91,49 @@ final class Csv
         if (str_starts_with($text, "\xEF\xBB\xBF")) {
             $text = substr($text, 3);
         }
-        $lines = preg_split("/\r\n|\n|\r/", $text);
-        if ($lines === false) {
-            return ['ok' => false, 'error' => 'CSV ilegible'];
-        }
-        // Una última línea vacía es el salto final del archivo, no una fila.
-        while ($lines !== [] && end($lines) === '') {
-            array_pop($lines);
-        }
-        if ($lines === []) {
+        if (trim($text) === '') {
             return ['ok' => false, 'error' => 'El archivo CSV está vacío'];
         }
-        if (count($lines) - 1 > $maxRows) {
-            return ['ok' => false, 'error' => 'El archivo supera el máximo de '.$maxRows.' filas'];
-        }
 
-        $header = array_map(
-            static fn (string $cell): string => mb_strtolower(trim($cell)),
-            str_getcsv((string) array_shift($lines), ',', '"', ''),
-        );
-        $rows = [];
-        foreach ($lines as $line) {
-            $rows[] = str_getcsv((string) $line, ',', '"', '');
+        $stream = fopen('php://temp/maxmemory:2097152', 'r+b');
+        if ($stream === false) {
+            return ['ok' => false, 'error' => 'CSV ilegible'];
         }
+        try {
+            Streams::writeAll($stream, $text);
+            rewind($stream);
 
-        return ['ok' => true, 'header' => $header, 'rows' => $rows];
+            $header = null;
+            $rows = [];
+            while (($cells = fgetcsv($stream, null, ',', '"', '')) !== false) {
+                // Una línea en blanco es una fila sin celdas, no el fin del archivo.
+                if ($cells === [null]) {
+                    $cells = [''];
+                }
+                if ($header === null) {
+                    $header = array_map(
+                        static fn (mixed $cell): string => mb_strtolower(trim((string) $cell)),
+                        $cells,
+                    );
+
+                    continue;
+                }
+                if (count($rows) >= $maxRows) {
+                    return ['ok' => false, 'error' => 'El archivo supera el máximo de '.$maxRows.' filas'];
+                }
+                $rows[] = array_map(static fn (mixed $cell): string => (string) $cell, $cells);
+            }
+            // Una última fila vacía es el salto final del archivo, no una fila.
+            while ($rows !== [] && end($rows) === ['']) {
+                array_pop($rows);
+            }
+            if ($header === null) {
+                return ['ok' => false, 'error' => 'El archivo CSV está vacío'];
+            }
+
+            return ['ok' => true, 'header' => $header, 'rows' => $rows];
+        } finally {
+            fclose($stream);
+        }
     }
 }

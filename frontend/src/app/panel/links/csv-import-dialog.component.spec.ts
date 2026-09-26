@@ -1,8 +1,10 @@
+import { signal, type WritableSignal } from "@angular/core";
 import { TestBed, type ComponentFixture } from "@angular/core/testing";
 import { provideNoopAnimations } from "@angular/platform-browser/animations";
 import { MatDialogRef } from "@angular/material/dialog";
 import { CsvImportDialogComponent } from "./csv-import-dialog.component";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
+import { WorkspaceService } from "../../core/services/workspace.service";
 import type { ImportReport } from "../../core/models";
 
 const dryRunReport: ImportReport = {
@@ -18,6 +20,7 @@ describe("CsvImportDialogComponent", () => {
   let component: CsvImportDialogComponent;
   let api: jasmine.SpyObj<ApiService>;
   let dialogRef: jasmine.SpyObj<MatDialogRef<CsvImportDialogComponent, number>>;
+  let workspaceId: WritableSignal<number | null>;
 
   function importKey(callIndex: number): string {
     const headers = api.post.calls.argsFor(callIndex)[3] as Record<string, string>;
@@ -28,6 +31,7 @@ describe("CsvImportDialogComponent", () => {
     api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
     api.post.and.resolveTo(dryRunReport);
     dialogRef = jasmine.createSpyObj<MatDialogRef<CsvImportDialogComponent, number>>("MatDialogRef", ["close"]);
+    workspaceId = signal(1);
 
     await TestBed.configureTestingModule({
       imports: [CsvImportDialogComponent],
@@ -35,6 +39,7 @@ describe("CsvImportDialogComponent", () => {
         provideNoopAnimations(),
         { provide: ApiService, useValue: api },
         { provide: MatDialogRef, useValue: dialogRef },
+        { provide: WorkspaceService, useValue: { currentId: workspaceId } },
       ],
     }).compileComponents();
 
@@ -77,6 +82,27 @@ describe("CsvImportDialogComponent", () => {
     expect(importKey(3)).not.toBe(first);
     expect(component.done()).toBeTrue();
     expect(component.report()?.created).toBe(1);
+  });
+
+  it("refuses to import into a workspace selected after the dialog opened", async () => {
+    component.csv = "alias,destination\nok,https://example.test";
+    // El selector global cambia con el modal abierto: la importación pertenece
+    // al workspace de apertura y no debe salir NUNCA hacia el nuevo.
+    workspaceId.set(2);
+
+    await component.import();
+
+    expect(api.post).not.toHaveBeenCalled();
+    expect(dialogRef.close).toHaveBeenCalled();
+  });
+
+  it("closes itself when the workspace selection changes while it is open", async () => {
+    workspaceId.set(2);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(dialogRef.close).toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
   });
 
   it("closes reporting how many links the import created", async () => {

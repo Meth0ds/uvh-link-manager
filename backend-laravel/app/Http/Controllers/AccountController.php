@@ -357,8 +357,11 @@ class AccountController
             ], 503);
         }
 
+        // La descarga queda ligada a la sesión que superó el step-up: sólo esa
+        // sesión podrá confirmar recepción y consumir el artifact.
+        $servedBy = UvhRequest::sessionId($request);
         try {
-            $stillEligible = DB::transaction(function () use ($result): bool {
+            $stillEligible = DB::transaction(function () use ($result, $servedBy): bool {
                 $lockedUser = User::where('id', $result['user_id'])->lockForUpdate()->first();
                 $row = DataExportRequest::where('id', $result['request_id'])
                     ->where('user_id', $result['user_id'])
@@ -375,7 +378,11 @@ class AccountController
                     // This timestamp proves only that PHP finished preparing a
                     // response for this session. It enables acknowledgement but
                     // deliberately does not consume the export or claim receipt.
-                    $row->update(['download_served_at' => now()]);
+                    // The session id binds that acknowledgement to this session.
+                    $row->update([
+                        'download_served_at' => now(),
+                        'download_served_session_id' => $servedBy,
+                    ]);
                 }
 
                 return $eligible;
@@ -416,8 +423,9 @@ class AccountController
     public function acknowledgeExportDownload(Request $request): Response
     {
         $user = UvhRequest::user($request);
+        $sessionId = UvhRequest::sessionId($request);
         try {
-            $result = DB::transaction(function () use ($user): array {
+            $result = DB::transaction(function () use ($user, $sessionId): array {
                 // Preserve the global lock order: user before user-owned state.
                 $lockedUser = User::where('id', $user->id)->lockForUpdate()->first();
                 $row = DataExportRequest::where('user_id', $user->id)
@@ -443,6 +451,15 @@ class AccountController
                     // acknowledgement endpoint; the artifact must first have
                     // passed the complete server-side download preparation.
                     return ['status' => 'not_served'];
+                }
+                // La confirmación pertenece a la sesión que pasó el step-up y
+                // descargó: otra sesión de la misma cuenta no puede consumir ni
+                // borrar un artifact que nunca se le sirvió. Las filas servidas
+                // antes de este despliegue (sin sesión registrada) se aceptan
+                // durante su ventana de 48 h, para no varar descargas en curso.
+                if ($row->download_served_session_id !== null
+                    && ! hash_equals((string) $row->download_served_session_id, (string) $sessionId)) {
+                    return ['status' => 'foreign_session'];
                 }
                 if (! $path || ! PrivateArtifactCleanup::isManagedPath($path)) {
                     $row->update(['status' => 'failed', 'failure_reason' => 'generation_error', 'mail_generation_hash' => null]);
@@ -481,6 +498,9 @@ class AccountController
         }
         if ($result['status'] === 'not_served') {
             return response()->json(['error' => 'La exportación todavía no se ha servido'], 409);
+        }
+        if ($result['status'] === 'foreign_session') {
+            return response()->json(['error' => 'Confirma la descarga desde la sesión que la realizó'], 409);
         }
         if ($result['status'] !== 'ok') {
             return response()->json(['error' => 'No hay ninguna exportación disponible para esta cuenta'], 404);

@@ -109,7 +109,7 @@ final class AccountExportDocument
             if ($bytes > $limit) {
                 throw new ExportTooLarge('La exportación automática supera su techo operativo');
             }
-            fwrite($fragments[$section], $line);
+            Streams::writeAll($fragments[$section], $line);
         };
 
         DB::transaction(function () use ($userId, $write, $onPhase): void {
@@ -317,7 +317,7 @@ final class AccountExportDocument
             if ($bytes > $limit) {
                 throw new ExportTooLarge('La exportación automática supera su techo operativo');
             }
-            fwrite($out, $text);
+            Streams::writeAll($out, $text);
         };
 
         $put("{\n");

@@ -87,8 +87,11 @@ class LinkBulkController
             }
         }
 
+        // La identidad de la intención incluye el workspace: la misma clave en
+        // otro workspace es otra intención, jamás un replay cross-tenant.
+        $scope = self::SCOPE.':'.$workspaceId;
         $hash = Idempotency::hash($request->getContent());
-        $begin = Idempotency::begin((int) $user->id, self::SCOPE, $key, $hash);
+        $begin = Idempotency::begin((int) $user->id, $scope, $key, $hash);
         if ($begin['state'] === 'replay') {
             return response()->json($begin['body'], $begin['status'])->header('Idempotent-Replay', 'true');
         }
@@ -99,9 +102,10 @@ class LinkBulkController
             return response()->json(['error' => 'Ya hay una operación en curso con esta clave. Espera a que termine.'], 409);
         }
 
+        $lease = (string) ($begin['lease'] ?? '');
         $apiTokenContext = UvhRequest::apiToken($request);
         try {
-            $body = DB::transaction(function () use ($workspaceId, $user, $action, $ids, $tags, $collectionId, $key, $hash, $apiTokenContext): array {
+            $body = DB::transaction(function () use ($workspaceId, $user, $action, $ids, $tags, $collectionId, $scope, $key, $hash, $lease, $apiTokenContext): array {
                 if (! WorkspaceAccess::getMembershipLocked(
                     $user->id,
                     $workspaceId,
@@ -119,16 +123,16 @@ class LinkBulkController
                 // La respuesta se sella en la misma transacción que el efecto:
                 // o quedan ambos o ninguno, y una repetición nunca ve «hecho»
                 // sobre un efecto que se revirtió.
-                Idempotency::commit((int) $user->id, self::SCOPE, $key, $hash, 200, $body);
+                Idempotency::commit((int) $user->id, $scope, $key, $hash, 200, $body, $lease);
 
                 return $body;
             });
         } catch (LinkException $e) {
-            Idempotency::release((int) $user->id, self::SCOPE, $key);
+            Idempotency::release((int) $user->id, $scope, $key, $lease);
 
             return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {
-            Idempotency::release((int) $user->id, self::SCOPE, $key);
+            Idempotency::release((int) $user->id, $scope, $key, $lease);
             if (($e->errorInfo[0] ?? null) === '23505') {
                 return response()->json(['error' => 'No se puede restaurar: el alias ya está en uso'], 409);
             }
@@ -267,10 +271,11 @@ class LinkBulkController
                     $link->tags()->syncWithoutDetaching($tagIds);
                     $changed = $link->tags()->count() !== $before;
                 } else {
-                    $changed = $tagIds !== [];
-                    if ($changed) {
-                        $link->tags()->detach($tagIds);
-                    }
+                    // Exacto: `detach` devuelve las adhesiones realmente
+                    // retiradas. Un enlace que no llevaba esas etiquetas no
+                    // cuenta como aplicado ni sube versión: reportar el cambio
+                    // sería mentir sobre lo que hizo la operación.
+                    $changed = $tagIds !== [] && $link->tags()->detach($tagIds) > 0;
                 }
                 if (! $changed) {
                     continue;

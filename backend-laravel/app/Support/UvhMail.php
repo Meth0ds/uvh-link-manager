@@ -456,14 +456,20 @@ class UvhMail
      * un aviso de la propia cuenta, siempre vigente, que sólo lista títulos y
      * rutas internas — nunca secretos, URLs bearer ni contenido ajeno.
      */
-    public static function notificationDigest(string $to, string $summaryHtml, string $summaryText): bool
+    public static function notificationDigest(string $to, string $summaryHtml, string $summaryText, int $userId, string $generation): bool
     {
+        // Identidad de lifecycle determinista (cuenta + claim exacto): el mismo
+        // resumen reintentado tras un crash choca en la misma clave del outbox
+        // y se descarta en vez de duplicar el correo.
         return self::send(
             'notification_digest',
             $to,
             'Tu resumen de notificaciones de UVH',
             self::layout('Resumen de notificaciones', $summaryHtml),
             $summaryText,
+            'notification',
+            $userId,
+            $generation,
         );
     }
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
@@ -6,6 +6,8 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
+import { WorkspaceService } from "../../core/services/workspace.service";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeImportReport } from "../../core/services/scale-response-decoders";
 import type { ImportReport } from "../../core/models";
 
@@ -89,7 +91,10 @@ import type { ImportReport } from "../../core/models";
 })
 export class CsvImportDialogComponent {
   private readonly api = inject(ApiService);
+  private readonly workspaces = inject(WorkspaceService);
   private readonly dialogRef = inject(MatDialogRef<CsvImportDialogComponent, number>);
+  /** El workspace que abrió el diálogo: la importación pertenece a ese, no al que la cabecera seleccione después. */
+  private readonly openedIn = targetWorkspace(this.workspaces);
 
   csv = "";
   readonly busy = signal(false);
@@ -99,6 +104,14 @@ export class CsvImportDialogComponent {
   private created = 0;
   /** Misma política que la barra masiva: la clave sobrevive a fallos sin respuesta. */
   private lastImport: { signature: string; key: string } | null = null;
+
+  constructor() {
+    // El selector global sigue usable con el modal abierto: si cambia, el
+    // diálogo se cierra en vez de importar en un workspace que no pidió nada.
+    effect(() => {
+      if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) this.dialogRef.close(this.created);
+    });
+  }
 
   async onFile(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
@@ -123,6 +136,12 @@ export class CsvImportDialogComponent {
 
   private async send(dryRun: boolean): Promise<void> {
     if (this.busy() || !this.csv.trim()) return;
+    // Comprobación síncrona antes de enviar: el interceptor pone el workspace
+    // ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
+    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+      this.dialogRef.close(this.created);
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     if (!dryRun) {

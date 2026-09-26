@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Collection;
+use App\Models\LinkTemplate;
 use App\Support\Audit;
 use App\Support\UvhRequest;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Colecciones de un nivel (F7): agrupar enlaces sin anidamiento. Borrar una
@@ -45,7 +48,17 @@ class CollectionController
             return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
         }
 
-        $collection = Collection::create(['workspace_id' => $workspaceId, 'name' => $name]);
+        try {
+            $collection = Collection::create(['workspace_id' => $workspaceId, 'name' => $name]);
+        } catch (QueryException $e) {
+            // La comprobación previa y la escritura no son atómicas: si otra
+            // petición tomó el nombre en ese hueco, el índice único es el que
+            // decide y el resultado es un conflicto, no un error 500.
+            if (($e->errorInfo[0] ?? null) === '23505') {
+                return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
+            }
+            throw $e;
+        }
 
         Audit::write($user->id, 'collection.create', 'collection', (int) $collection->id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
 
@@ -71,7 +84,14 @@ class CollectionController
             return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
         }
 
-        $collection->update(['name' => $name]);
+        try {
+            $collection->update(['name' => $name]);
+        } catch (QueryException $e) {
+            if (($e->errorInfo[0] ?? null) === '23505') {
+                return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
+            }
+            throw $e;
+        }
 
         Audit::write($user->id, 'collection.rename', 'collection', $id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
 
@@ -89,11 +109,28 @@ class CollectionController
         }
 
         // Los enlaces quedan sin agrupar: la colección es una comodidad, no
-        // una propiedad de la que dependa la vida de ningún enlace.
-        $moved = $collection->links()->update(['collection_id' => null]);
-        $collection->delete();
+        // una propiedad de la que dependa la vida de ningún enlace. Las
+        // plantillas que apuntaban a la colección pierden esa referencia en la
+        // MISMA transacción: ninguna plantilla puede quedar apuntando a un id
+        // que ya no existe —ni sobrevivir un borrado a medias—.
+        [$moved, $cleared] = DB::transaction(function () use ($workspaceId, $collection, $id): array {
+            $moved = $collection->links()->update(['collection_id' => null]);
+            $cleared = 0;
+            foreach (LinkTemplate::where('workspace_id', $workspaceId)->get() as $template) {
+                $payload = $template->payload;
+                if (($payload['collection_id'] ?? null) !== $id) {
+                    continue;
+                }
+                unset($payload['collection_id']);
+                $template->update(['payload' => $payload]);
+                $cleared++;
+            }
+            $collection->delete();
 
-        Audit::write($user->id, 'collection.delete', 'collection', $id, ['moved' => $moved], UvhRequest::ip($request), workspaceId: $workspaceId);
+            return [$moved, $cleared];
+        });
+
+        Audit::write($user->id, 'collection.delete', 'collection', $id, ['moved' => $moved, 'cleared_templates' => $cleared], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true, 'moved' => $moved]);
     }

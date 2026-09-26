@@ -81,6 +81,71 @@ final class PrivateArtifactTest extends TestCase
         fclose($replaced);
     }
 
+    public function test_reencrypt_stream_preserves_a_chunked_artifact_with_the_current_key(): void
+    {
+        // La rotación de APP_SECRET recifra por streaming: más de dos bloques
+        // cruzan fronteras y ni el origen ni el destino viven enteros en RAM.
+        config(['uvh.secret' => 'vieja-clave-de-rotacion-0123456789abcdef', 'uvh.secret_previous' => []]);
+        $plain = str_repeat('0123456789abcdef', (9 * 1024 * 1024) / 16);
+        $path = 'account-exports/'.str_repeat('R', 32).'.uvh';
+        $stream = $this->streamOf($plain);
+        PrivateArtifact::write($path, $stream);
+        fclose($stream);
+
+        config(['uvh.secret' => 'clave-actual-de-rotacion-0123456789ab', 'uvh.secret_previous' => ['vieja-clave-de-rotacion-0123456789abcdef']]);
+        $in = fopen(Storage::disk('local')->path($path), 'rb');
+        $this->assertIsResource($in);
+        $out = fopen('php://temp/maxmemory:2097152', 'r+b');
+        $this->assertIsResource($out);
+        $changed = PrivateArtifact::reencryptStream($in, $out);
+        fclose($in);
+        $this->assertTrue($changed, 'old-key blocks must be re-encrypted');
+
+        rewind($out);
+        $rebuilt = '';
+        foreach (PrivateArtifact::readChunks($out) as $chunk) {
+            $rebuilt .= $chunk;
+        }
+        fclose($out);
+        $this->assertSame($plain, $rebuilt, 'the streamed re-encryption must preserve every byte');
+    }
+
+    public function test_reencrypt_stream_reports_unchanged_for_an_artifact_with_the_current_key(): void
+    {
+        $plain = '{"format":"current-key"}';
+        $path = 'account-exports/'.str_repeat('S', 32).'.uvh';
+        $stream = $this->streamOf($plain);
+        PrivateArtifact::write($path, $stream);
+        fclose($stream);
+
+        $in = fopen(Storage::disk('local')->path($path), 'rb');
+        $this->assertIsResource($in);
+        $out = fopen('php://temp/maxmemory:2097152', 'r+b');
+        $this->assertIsResource($out);
+        $changed = PrivateArtifact::reencryptStream($in, $out);
+        fclose($in);
+        fclose($out);
+        $this->assertFalse($changed, 'an artifact already with the current key must not be rewritten');
+    }
+
+    public function test_reencrypt_stream_keeps_the_legacy_blob_format(): void
+    {
+        config(['uvh.secret' => 'vieja-clave-de-rotacion-0123456789abcdef', 'uvh.secret_previous' => []]);
+        $blob = UvhCrypto::encryptAtRest('{"format":"legacy"}');
+
+        config(['uvh.secret' => 'clave-actual-de-rotacion-0123456789ab', 'uvh.secret_previous' => ['vieja-clave-de-rotacion-0123456789abcdef']]);
+        $in = $this->streamOf($blob);
+        $out = fopen('php://temp/maxmemory:2097152', 'r+b');
+        $this->assertIsResource($out);
+        $changed = PrivateArtifact::reencryptStream($in, $out);
+        fclose($in);
+        $this->assertTrue($changed);
+
+        rewind($out);
+        $this->assertSame('{"format":"legacy"}', iterator_to_array(PrivateArtifact::readChunks($out), false)[0]);
+        fclose($out);
+    }
+
     public function test_an_undecrypted_chunk_line_is_refused_never_read_as_plaintext(): void
     {
         // `decryptAtRest` tolera texto heredado para columnas de base de datos;

@@ -6,6 +6,7 @@ use App\Jobs\GenerateDataExportJob;
 use App\Models\DataExportRequest;
 use App\Models\User;
 use App\Support\PrivateArtifact;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -55,6 +56,43 @@ final class DataExportGenerationTest extends TestCase
         $decoded = json_decode($plain, true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('uvh-account-export-v1', $decoded['format']);
         $this->assertSame($user->email, $decoded['account']['email']);
+    }
+
+    public function test_every_stage_is_persisted_in_order_through_the_lateral_connection(): void
+    {
+        // Regresión de la conexión lateral: `connectUsing` sin `force` lanza al
+        // re-registrar el nombre y el `catch` de writeStage lo ocultaba, con lo
+        // que el progreso se congelaba en `collecting`. La secuencia COMPLETA
+        // debe llegar a la fila —una etapa por llamada, todas persistidas—.
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $request = DataExportRequest::create([
+            'user_id' => $user->id,
+            'security_version' => (int) $user->security_version,
+            'status' => 'processing',
+        ]);
+
+        $stages = [];
+        DB::listen(static function (QueryExecuted $query) use (&$stages): void {
+            if ($query->connectionName !== 'export-stage') {
+                return;
+            }
+            foreach ($query->bindings as $binding) {
+                if (is_string($binding)
+                    && in_array($binding, ['collecting', 'analytics', 'encoding', 'encrypting', 'finalizing'], true)) {
+                    $stages[] = $binding;
+                }
+            }
+        });
+
+        (new GenerateDataExportJob((int) $request->id))->handle();
+
+        $this->assertSame(
+            ['collecting', 'analytics', 'encoding', 'encrypting', 'finalizing'],
+            $stages,
+            'every generation stage must be persisted exactly once, in order',
+        );
+        $request->refresh();
+        $this->assertSame('ready', $request->status);
     }
 
     public function test_an_export_over_the_operational_ceiling_fails_with_the_size_reason(): void

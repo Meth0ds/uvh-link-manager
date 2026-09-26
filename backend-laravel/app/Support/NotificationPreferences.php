@@ -95,23 +95,29 @@ final class NotificationPreferences
             $applied[$kind] = $delivery;
         }
 
-        foreach ($applied as $kind => $delivery) {
-            DB::table('notification_preferences')->updateOrInsert(
-                ['user_id' => $userId, 'kind' => $kind],
-                ['delivery' => $delivery, 'updated_at' => now()],
-            );
-            // Cambiar de idea retira del resumen lo pendiente del kind: sólo
-            // puede ir al correo del resumen lo que hoy sigue siendo
-            // `daily_digest`. Lo ya mandado no se toca; lo futuro obedece la
-            // entrega nueva.
-            if ($delivery !== self::DELIVERY_DAILY_DIGEST) {
-                DB::table('notifications')
-                    ->where('user_id', $userId)
-                    ->where('kind', $kind)
-                    ->whereNull('digested_at')
-                    ->update(['digested_at' => now()]);
+        // El contrato «o cambia lo pedido o no cambia nada» es de escritura,
+        // no sólo de validación: preferencias y sellado de lo pendiente
+        // compilan juntos, y el claim del resumen diario los serializa contra
+        // su propia transacción.
+        DB::transaction(function () use ($applied, $userId): void {
+            foreach ($applied as $kind => $delivery) {
+                DB::table('notification_preferences')->updateOrInsert(
+                    ['user_id' => $userId, 'kind' => $kind],
+                    ['delivery' => $delivery, 'updated_at' => now()],
+                );
+                // Cambiar de idea retira del resumen lo pendiente del kind: sólo
+                // puede ir al correo del resumen lo que hoy sigue siendo
+                // `daily_digest`. Lo ya mandado no se toca; lo futuro obedece la
+                // entrega nueva.
+                if ($delivery !== self::DELIVERY_DAILY_DIGEST) {
+                    DB::table('notifications')
+                        ->where('user_id', $userId)
+                        ->where('kind', $kind)
+                        ->whereNull('digested_at')
+                        ->update(['digested_at' => now()]);
+                }
             }
-        }
+        });
 
         if ($applied !== []) {
             Audit::write($userId, 'account.notification_preferences_updated', 'account', $userId, [

@@ -1,9 +1,11 @@
+import { signal, type WritableSignal } from "@angular/core";
 import { ComponentFixture, fakeAsync, TestBed, tick } from "@angular/core/testing";
 import { FormBuilder } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 
 import type { LinkDto } from "../../core/models";
 import { ApiService } from "../../core/services/api.service";
+import { WorkspaceService } from "../../core/services/workspace.service";
 import { LinkDialogComponent } from "./link-dialog.component";
 
 interface Deferred<T> {
@@ -22,12 +24,14 @@ describe("LinkDialogComponent form and async safety", () => {
   let dialogRef: jasmine.SpyObj<MatDialogRef<LinkDialogComponent>>;
   let fixture: ComponentFixture<LinkDialogComponent>;
   let component: LinkDialogComponent;
+  let workspaceId: WritableSignal<number | null>;
 
   beforeEach(async () => {
     api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post", "patch"]);
     api.get.and.resolveTo({ domains: [] } as never);
     api.post.and.resolveTo({ link: {} as LinkDto } as never);
     dialogRef = jasmine.createSpyObj<MatDialogRef<LinkDialogComponent>>("MatDialogRef", ["close"]);
+    workspaceId = signal(1);
 
     TestBed.configureTestingModule({
       imports: [LinkDialogComponent],
@@ -35,6 +39,7 @@ describe("LinkDialogComponent form and async safety", () => {
         FormBuilder,
         { provide: ApiService, useValue: api },
         { provide: MatDialogRef, useValue: dialogRef },
+        { provide: WorkspaceService, useValue: { currentId: workspaceId } },
         { provide: MAT_DIALOG_DATA, useValue: { mode: "create" } },
       ],
     });
@@ -103,6 +108,18 @@ describe("LinkDialogComponent form and async safety", () => {
 
     const payload = api.post.calls.mostRecent().args[1] as { rules: unknown[] };
     expect(payload.rules).toEqual([]);
+  });
+
+  it("refuses to save into a workspace selected after the dialog opened", async () => {
+    component.form.controls.destination.setValue("https://example.test");
+    // El selector global cambia con el modal abierto: guardar pertenece al
+    // workspace de apertura y jamás debe crear el enlace en el nuevo.
+    workspaceId.set(2);
+
+    await component.save();
+
+    expect(api.post).not.toHaveBeenCalled();
+    expect(dialogRef.close).toHaveBeenCalled();
   });
 
   it("asks for a random alias with null when creating without one", async () => {

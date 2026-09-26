@@ -78,6 +78,34 @@ final class DataExportDownloadLifecycleTest extends TestCase
         Storage::disk('local')->assertMissing('account-exports/'.str_repeat('B', 32).'.uvh');
     }
 
+    public function test_only_the_session_that_downloaded_can_acknowledge_it(): void
+    {
+        // Sesión A sirve la descarga tras su step-up; sesión B —otra sesión de
+        // la MISMA cuenta— no puede consumir ni borrar un artifact que nunca se
+        // le entregó. La confirmación pertenece a la sesión que descargó.
+        $user = $this->mfaUser();
+        $request = $this->readyExport($user, '{"account":{"email":"safe@example.test"}}');
+        $cookie = (string) config('session.cookie');
+        $sessionA = SessionManager::create($user->id, Request::create('/'), (int) $user->security_version, true);
+        $this->withCookie($cookie, $sessionA);
+        $this->post('/api/v1/auth/data-export/download', $this->credentials(self::RECOVERY))->assertOk();
+
+        $sessionB = SessionManager::create($user->id, Request::create('/'), (int) $user->security_version, true);
+        $this->withCookie($cookie, $sessionB);
+        $this->postJson('/api/v1/auth/data-export/download/acknowledge')
+            ->assertStatus(409)->assertExactJson(['error' => 'Confirma la descarga desde la sesión que la realizó']);
+        $request->refresh();
+        $this->assertSame('ready', $request->status, 'another session must not consume the export');
+        Storage::disk('local')->assertExists((string) $request->artifact_path);
+
+        // La sesión que descargó sí la confirma.
+        $this->withCookie($cookie, $sessionA);
+        $this->postJson('/api/v1/auth/data-export/download/acknowledge')
+            ->assertOk()->assertExactJson(['ok' => true]);
+        $request->refresh();
+        $this->assertSame('downloaded', $request->status);
+    }
+
     public function test_acknowledgement_cannot_consume_an_export_that_was_never_served(): void
     {
         $user = $this->mfaUser();

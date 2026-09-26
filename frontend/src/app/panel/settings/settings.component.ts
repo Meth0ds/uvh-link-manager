@@ -169,13 +169,17 @@ export class SettingsComponent implements AfterViewInit {
   /** Historial acotado: las últimas diez filas, como el servidor. */
   readonly exportHistory = signal<DataExportStatus[]>([]);
   /**
-   * Sondas automáticas mientras la exportación siga viva: el estado avanza
-   * solo y la página no debe pedir nada al usuario. La secuencia crece
-   * 3→5→8→13→21→30 s y se reinicia cuando el estado cambia; se pausa con la
-   * pestaña oculta, se retoma al volver y termina en cualquier estado final.
+   * Sondas automáticas SÓLO mientras la exportación se está generando: el
+   * estado avanza solo y la página no debe pedir nada al usuario. La secuencia
+   * crece 3→5→8→13→21→30 s y se reinicia cuando el estado cambia; se pausa con
+   * la pestaña oculta y se retoma al volver. En `ready` no hay sondeo: la
+   * descarga ya existe y un GET cada 30 s durante 48 h sólo gasta peticiones;
+   * ahí la tarjeta se refresca al recuperar la pestaña y con un único
+   * temporizador hasta la caducidad.
    */
   private static readonly EXPORT_POLL_DELAYS_MS = [3_000, 5_000, 8_000, 13_000, 21_000, 30_000];
   private exportPollLastStatus: DataExportStatus["status"] | null = null;
+  private exportExpiryTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly exportPoller = new AsyncPoller({
     destroyRef: this.destroyRef,
     delays: SettingsComponent.EXPORT_POLL_DELAYS_MS,
@@ -297,7 +301,16 @@ export class SettingsComponent implements AfterViewInit {
       this.emailDialog?.close();
       this.passwordDialog?.close();
       this.exportDialog?.close();
+      this.stopExportExpiryCheck();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", this.exportReadyRefreshHandler);
+        window.removeEventListener("focus", this.exportReadyRefreshHandler);
+      }
     });
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this.exportReadyRefreshHandler);
+      window.addEventListener("focus", this.exportReadyRefreshHandler);
+    }
     void this.loadSessions();
     void this.loadExportStatus();
     void this.loadDeletionImpact();
@@ -400,6 +413,7 @@ export class SettingsComponent implements AfterViewInit {
       if (statusChanged) this.exportPoller.reset();
       this.exportPollLastStatus = status?.status ?? null;
       this.exportStatus.set(status);
+      this.armExportExpiryCheck(status);
       // El historial sólo cambia cuando cambia el estado visible; las sondas
       // silenciosas no lo tocan mientras la exportación siga igual.
       if (statusChanged) void this.loadExportHistory();
@@ -433,8 +447,39 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   private exportNeedsPoll(): boolean {
-    const status = this.exportStatus()?.status ?? null;
-    return status === "processing" || status === "ready";
+    // Sólo la generación avanza sola. `ready` es un estado final vivo: no se
+    // sondea, se refresca al recuperar la pestaña y al caducar la descarga.
+    return (this.exportStatus()?.status ?? null) === "processing";
+  }
+
+  /** Una exportación lista no sondea: al volver a la pestaña se refresca una vez. */
+  private readonly exportReadyRefreshHandler = (): void => {
+    if (typeof document !== "undefined" && document.hidden) return;
+    if ((this.exportStatus()?.status ?? null) === "ready") void this.loadExportStatus(false, true);
+  };
+
+  /**
+   * Un único temporizador hasta `downloadExpiresAt`: al caducar, la tarjeta se
+   * refresca una vez y pasa a `expired` sin sondeos periódicos.
+   */
+  private armExportExpiryCheck(status: DataExportStatus | null): void {
+    this.stopExportExpiryCheck();
+    if (status?.status !== "ready" || !status.downloadExpiresAt) return;
+    const expiresAt = new Date(status.downloadExpiresAt).getTime();
+    if (!Number.isFinite(expiresAt)) return;
+    // setTimeout acepta hasta 2^31-1 ms; un retardo negativo ya ha caducado.
+    const delay = Math.min(Math.max(expiresAt - Date.now(), 0), 2_147_483_647);
+    this.exportExpiryTimer = setTimeout(() => {
+      this.exportExpiryTimer = null;
+      void this.loadExportStatus(false, true);
+    }, delay);
+  }
+
+  private stopExportExpiryCheck(): void {
+    if (this.exportExpiryTimer !== null) {
+      clearTimeout(this.exportExpiryTimer);
+      this.exportExpiryTimer = null;
+    }
   }
 
   openDataExportDialog(purpose: "request" | "download" = "request"): void {

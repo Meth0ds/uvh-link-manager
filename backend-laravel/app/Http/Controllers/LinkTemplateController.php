@@ -7,6 +7,7 @@ use App\Models\LinkTemplate;
 use App\Support\Audit;
 use App\Support\LinkService;
 use App\Support\UvhRequest;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -82,12 +83,22 @@ class LinkTemplateController
             return response()->json(['error' => 'Ya existe una plantilla con ese nombre'], 409);
         }
 
-        $template = LinkTemplate::create([
-            'workspace_id' => $workspaceId,
-            'created_by' => (int) $user->id,
-            'name' => $name,
-            'payload' => $payload,
-        ]);
+        try {
+            $template = LinkTemplate::create([
+                'workspace_id' => $workspaceId,
+                'created_by' => (int) $user->id,
+                'name' => $name,
+                'payload' => $payload,
+            ]);
+        } catch (QueryException $e) {
+            // La comprobación previa y la escritura no son atómicas: si otra
+            // petición tomó el nombre en ese hueco, el índice único es el que
+            // decide y el resultado es un conflicto, no un error 500.
+            if (($e->errorInfo[0] ?? null) === '23505') {
+                return response()->json(['error' => 'Ya existe una plantilla con ese nombre'], 409);
+            }
+            throw $e;
+        }
 
         Audit::write($user->id, 'link_template.create', 'link_template', (int) $template->id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
 

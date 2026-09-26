@@ -1,6 +1,6 @@
 # UVH — Backlog vigente
 
-Última revisión: 25 de septiembre de 2026.
+Última revisión: 26 de septiembre de 2026.
 
 Este archivo es el backlog **vigente** del producto. Sustituye a
 [`todos.md`](archive/todos.md), archivado como registro histórico (su contenido
@@ -101,6 +101,41 @@ revisión jurídica) se listan aparte porque no dependen del código.
   etiquetas/colecciones/importación, colección y plantillas en el diálogo de
   enlace y export en analítica; la clave de idempotencia se reutiliza sólo en
   reintentos sin respuesta.
+- [x] **Hotfix 2026-09-26 — cierre de la auditoría externa (P1–P2)**,
+  verificado con suite backend completa (687 pruebas/5.590 aserciones sobre
+  `uvh_test`), `composer quality` (pint + phpstan) y frontend (lint,
+  typecheck, 527 pruebas):
+  - [x] Escrituras de exportación verificadas y fail-closed (`Streams::
+    writeAll`/`flush` en artefacto y documento) y etapas de generación
+    persistidas por conexión lateral reutilizable (`export-stage`), que ya no
+    se congela en `collecting`.
+  - [x] Resumen diario de notificaciones como claim transaccional: lock de
+    filas, revalidación de preferencias, outbox y sellado en la misma
+    transacción, con generación determinista y sin duplicados tras un crash.
+  - [x] Idempotencia con arriendo de ejecución (`lease_until`/`lease_token`),
+    scope por workspace (fin del replay cross-tenant) y takeover condicionado.
+  - [x] CSV round-trip portable: parseo RFC 4180 real, columnas de sólo
+    lectura del export aceptadas e ignoradas, `domain` resuelto por hostname
+    en el workspace destino, anti-fórmulas reversible, fin del N+1 de dominios
+    e importación reanudable (`link_import_batches`/`link_import_rows`).
+  - [x] Rotación de `APP_SECRET` por bloques en streaming (`reencryptStream`):
+    memoria viva de un bloque, formato conservado y segunda pasada que no
+    reescribe lo ya recifrado.
+  - [x] Confirmación de descarga de exportación ligada a la sesión que la
+    realizó (`download_served_session_id`, `409` desde otra sesión).
+  - [x] Frontend: diálogos de importación/tags/colecciones/ligadura anclados
+    al workspace en el momento de abrirse (cierre ante A→B, guards síncronos
+    antes de enviar) y exportación con refresco al recuperar foco y cierre por
+    timer hasta `downloadExpiresAt`.
+  - [x] Gestión: `untag` exacto (sólo cuenta y sube versión lo que cambió),
+    carreras de nombre `23505` → `409` en rename/store de tags, colecciones y
+    plantillas, uso de tags con una consulta agrupada (fin del N+1), fusión de
+    tags con candados en orden determinista y revalidación bajo lock, y
+    borrado de colección que limpia su referencia en plantillas en la misma
+    transacción.
+  - [x] P3 y deuda previa **diferidos por decisión**: aviso en la revocación
+    individual de sesión, step-up de `revokeOtherSessions` y bridge legacy
+    `/auth/download-export#token=`.
 - [ ] **F8 — Analítica medida antes de tocar**: eliminar la hot row
   `link/day` (o `lockForUpdate()` documentado) y caché 30–60 s por
   workspace/rango/filtro. Requiere medición previa con

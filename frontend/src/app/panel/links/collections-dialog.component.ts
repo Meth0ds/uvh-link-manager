@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
@@ -7,6 +7,7 @@ import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { ActionDialogService } from "../action-dialog.service";
 import {
   decodeCollectionDeleteResponse,
@@ -83,6 +84,9 @@ export class CollectionsDialogComponent {
   private readonly actions = inject(ActionDialogService);
   private readonly dialogRef = inject(MatDialogRef<CollectionsDialogComponent, boolean>);
 
+  /** El workspace que abrió el gestor: crear/renombrar/borrar pertenece a ese. */
+  private readonly openedIn = targetWorkspace(this.workspaces);
+
   readonly collections = signal<CollectionDto[]>([]);
   readonly loading = signal(true);
   readonly busy = signal(false);
@@ -96,6 +100,11 @@ export class CollectionsDialogComponent {
   });
 
   constructor() {
+    // El selector global sigue usable con el modal abierto: si cambia, el
+    // gestor se cierra en vez de tocar colecciones de otro workspace.
+    effect(() => {
+      if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) this.dialogRef.close(this.changed);
+    });
     void this.reload();
   }
 
@@ -148,6 +157,12 @@ export class CollectionsDialogComponent {
   }
 
   private async mutate<T>(run: () => Promise<T>, fallback: string): Promise<void> {
+    // Comprobación síncrona antes de enviar: el interceptor pone el workspace
+    // ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
+    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+      this.dialogRef.close(this.changed);
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     try {

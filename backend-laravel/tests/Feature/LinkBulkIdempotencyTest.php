@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Link;
+use App\Models\Tag;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Ids;
@@ -76,10 +77,13 @@ final class LinkBulkIdempotencyTest extends TestCase
         $foreign = $this->link($owner, $workspace, 'ajeno', otherWorkspace: true);
         $this->signIn($owner, $workspace);
 
-        // Reserva en curso (respuesta aún sin sellar): la repetición espera.
+        // Reserva en curso (arriendo de ejecución vivo, respuesta sin sellar):
+        // la repetición espera. El scope lleva el workspace y la reserva,
+        // arriendo y token: es exactamente lo que una ejecución real deja.
         DB::table('idempotency_keys')->insert([
-            'user_id' => $owner->id, 'scope' => 'links.bulk', 'key' => 'clave-vuelo-1',
+            'user_id' => $owner->id, 'scope' => 'links.bulk:'.$workspace->id, 'key' => 'clave-vuelo-1',
             'request_hash' => hash('sha256', json_encode(['action' => 'pause', 'linkIds' => [$good]])),
+            'lease_until' => now()->addMinutes(5), 'lease_token' => 'arriendo-plantado-1',
             'expires_at' => now()->addDay(), 'created_at' => now(),
         ]);
         $this->postJson('/api/v1/links/bulk', ['action' => 'pause', 'linkIds' => [$good]], $this->headers('clave-vuelo-1'))
@@ -142,6 +146,54 @@ final class LinkBulkIdempotencyTest extends TestCase
             ->assertOk()->assertJson(['applied' => 2]);
         $this->assertSame(2, Link::whereNull('deleted_at')->count());
         $this->assertSame(0, DB::table('links')->whereNotNull('deleted_at')->count());
+    }
+
+    public function test_untag_is_exact_and_only_touches_links_that_had_the_tag(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $with = $this->link($owner, $workspace, 'con');
+        $without = $this->link($owner, $workspace, 'sin');
+        $tag = Tag::create(['workspace_id' => $workspace->id, 'name' => 'prensa']);
+        DB::table('link_tags')->insert(['link_id' => $with, 'tag_id' => $tag->id]);
+        $this->signIn($owner, $workspace);
+
+        // Sólo el enlace que la llevaba cuenta como aplicado y sube versión;
+        // el que no la tenía no se toca aunque esté en la selección.
+        $this->postJson('/api/v1/links/bulk', ['action' => 'untag', 'linkIds' => [$with, $without], 'tags' => ['prensa']], $this->headers('clave-exacta-1'))
+            ->assertOk()->assertJson(['applied' => 1]);
+        $this->assertSame(2, (int) Link::where('id', $with)->value('version'));
+        $this->assertSame(1, (int) Link::where('id', $without)->value('version'));
+        $this->assertSame(0, DB::table('link_tags')->count());
+
+        // Nada que retirar: repetir con otra clave no aplica nada ni sube
+        // versión —reportar «applied» sería mentir sobre lo que se hizo—.
+        $this->postJson('/api/v1/links/bulk', ['action' => 'untag', 'linkIds' => [$with, $without], 'tags' => ['prensa']], $this->headers('clave-exacta-2'))
+            ->assertOk()->assertJson(['applied' => 0]);
+        $this->assertSame(2, (int) Link::where('id', $with)->value('version'));
+        $this->assertSame(1, (int) Link::where('id', $without)->value('version'));
+    }
+
+    public function test_the_same_key_in_another_workspace_is_a_different_intention(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $here = $this->link($owner, $workspace, 'aqui');
+        $there = $this->link($owner, $workspace, 'alla', otherWorkspace: true);
+        $foreignWorkspaceId = (int) Link::where('id', $there)->value('workspace_id');
+        $this->signIn($owner, $workspace);
+
+        $this->postJson('/api/v1/links/bulk', ['action' => 'pause', 'linkIds' => [$here]], $this->headers('clave-compartida-1'))
+            ->assertOk()->assertJson(['applied' => 1]);
+
+        // La MISMA clave en el workspace B del mismo usuario es otra intención:
+        // se ejecuta allí de verdad en vez de reproducir la respuesta de A. Si
+        // la identidad no llevara el workspace, esta petición recibiría un 409
+        // de «cuerpo distinto» o —peor— el replay de A sobre B.
+        $this->withHeader('X-Workspace-Id', (string) $foreignWorkspaceId);
+        $this->postJson('/api/v1/links/bulk', ['action' => 'pause', 'linkIds' => [$there]], $this->headers('clave-compartida-1'))
+            ->assertOk()->assertJson(['applied' => 1]);
+
+        $this->assertSame('paused', (string) Link::where('id', $there)->value('state'));
+        $this->assertSame(2, DB::table('idempotency_keys')->where('key', 'clave-compartida-1')->count());
     }
 
     /** @return array{0: User, 1: Workspace} */

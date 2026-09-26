@@ -60,7 +60,7 @@ return [
     // texto plano. No es un límite de producto —la generación por bloques no
     // tiene el tope de filas ni el de 12 MiB de antes—: protege el volumen
     // privado y el worker compartido de un documento desmedido. Se clampa hacia
-    // arriba y hacia abajo: un valor por debajo de 1 MiB no es una configuración
+    // arriba y hacia abajo: un valor por debajo de 1 KiB no es una configuración
     // sino un error, y el máximo absoluto es el que la capa de documento trae.
     // El defecto va como literal (268435456 = 256 MiB) para que el contrato de
     // la plantilla pueda compararlo sin evaluar PHP.

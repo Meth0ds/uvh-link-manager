@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Support\Ids;
 use App\Support\PrivateArtifact;
 use App\Support\PrivateArtifactCleanup;
+use App\Support\Streams;
 use App\Support\UvhCrypto;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -150,31 +151,42 @@ final class RotateAppSecret extends Command
                         if (! $disk->exists($path)) {
                             throw new \RuntimeException('falta un artefacto privado de exportación (id '.$row->id.')');
                         }
-                        $ciphertext = $disk->get($path);
-                        if (! is_string($ciphertext)) {
+                        $in = $disk->readStream($path);
+                        if (! is_resource($in)) {
                             throw new \RuntimeException('no se pudo leer un artefacto privado de exportación (id '.$row->id.')');
                         }
-                        // Formato por bloques o blob legado: la capa de
-                        // artefacto recifra cada cuerpo con la clave actual
-                        // conservando el formato con el que se emitió.
-                        if (PrivateArtifact::encryptedWithCurrentKey($ciphertext)) {
-                            return false;
-                        }
-
-                        $replaced = PrivateArtifact::reencrypt($ciphertext);
-                        if ($dryRun) {
-                            return true;
-                        }
-
-                        // The temporary file lives on the same private volume
-                        // so rename publishes a complete authenticated blob in
-                        // one filesystem operation. The database row remains
-                        // locked, serialising downloads and cleanup with the
-                        // replacement of the concrete artifact.
+                        // Recifrado por streaming, bloque a bloque: la
+                        // generación sostiene el artefacto con la memoria de un
+                        // bloque y la rotación también —un artefacto de 256 MiB
+                        // jamás cabe en la RAM de una rotación—. El temporal
+                        // vive en el mismo volumen privado para que el rename
+                        // publique un blob completo y autenticado en una sola
+                        // operación filesystem; la fila sigue bloqueada,
+                        // serializando descargas y limpiezas contra el
+                        // reemplazo del artefacto concreto.
                         $temporary = 'account-exports/.rotate-'.Ids::randomToken(18);
-                        if (! $disk->put($temporary, $replaced)) {
+                        $disk->makeDirectory('account-exports');
+                        $out = @fopen($disk->path($temporary), 'wb');
+                        if (! is_resource($out)) {
+                            fclose($in);
                             throw new \RuntimeException('no se pudo escribir un artefacto temporal de exportación (id '.$row->id.')');
                         }
+                        try {
+                            $changed = PrivateArtifact::reencryptStream($in, $out);
+                            Streams::flush($out);
+                        } finally {
+                            fclose($in);
+                            fclose($out);
+                        }
+                        // Sin cambios = ya estaba con la clave actual: el
+                        // temporal se descarta. En dry-run también, dejando
+                        // intacto el original.
+                        if ($dryRun || ! $changed) {
+                            $disk->delete($temporary);
+
+                            return $changed;
+                        }
+
                         $source = $disk->path($temporary);
                         $destination = $disk->path($path);
                         if (! @rename($source, $destination)) {

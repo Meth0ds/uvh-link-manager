@@ -29,6 +29,7 @@ class DataExportRequest extends Model
         'artifact_path',
         'ready_at',
         'download_served_at',
+        'download_served_session_id',
         'downloaded_at',
     ];
 
@@ -37,7 +38,7 @@ class DataExportRequest extends Model
      * queued "ready" notice describes, so the outbox can drop stale ones. The
      * artifact path is internal plumbing.
      */
-    protected $hidden = ['mail_generation_hash', 'artifact_path'];
+    protected $hidden = ['mail_generation_hash', 'artifact_path', 'download_served_session_id'];
 
     protected function casts(): array
     {

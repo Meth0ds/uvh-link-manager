@@ -1,4 +1,4 @@
-import { signal } from "@angular/core";
+import { signal, type WritableSignal } from "@angular/core";
 import { TestBed, type ComponentFixture } from "@angular/core/testing";
 import { provideNoopAnimations } from "@angular/platform-browser/animations";
 import { MatDialogRef } from "@angular/material/dialog";
@@ -12,6 +12,8 @@ describe("TagsDialogComponent", () => {
   let component: TagsDialogComponent;
   let api: jasmine.SpyObj<ApiService>;
   let actions: jasmine.SpyObj<ActionDialogService>;
+  let dialogRef: jasmine.SpyObj<MatDialogRef<TagsDialogComponent, boolean>>;
+  let workspaceId: WritableSignal<number | null>;
 
   beforeEach(async () => {
     api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post"]);
@@ -26,15 +28,17 @@ describe("TagsDialogComponent", () => {
     actions = jasmine.createSpyObj<ActionDialogService>("ActionDialogService", ["confirm", "prompt"]);
     actions.confirm.and.resolveTo(true);
     actions.prompt.and.resolveTo("Prensa 2026");
+    workspaceId = signal(1);
+    dialogRef = jasmine.createSpyObj("MatDialogRef", ["close"]);
 
     await TestBed.configureTestingModule({
       imports: [TagsDialogComponent],
       providers: [
         provideNoopAnimations(),
         { provide: ApiService, useValue: api },
-        { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: signal("owner") } },
+        { provide: WorkspaceService, useValue: { currentId: workspaceId, currentRole: signal("owner") } },
         { provide: ActionDialogService, useValue: actions },
-        { provide: MatDialogRef, useValue: jasmine.createSpyObj("MatDialogRef", ["close"]) },
+        { provide: MatDialogRef, useValue: dialogRef },
       ],
     }).compileComponents();
 
@@ -65,6 +69,17 @@ describe("TagsDialogComponent", () => {
     // La recarga posterior vuelve a listar: las fuentes ya no están.
     expect(api.get).toHaveBeenCalledTimes(2);
     expect(component.selected().size).toBe(0);
+  });
+
+  it("refuses to mutate into a workspace selected after the dialog opened", async () => {
+    // El selector global cambia con el gestor abierto: renombrar/fusionar
+    // pertenece al workspace de apertura y jamás debe salir hacia el nuevo.
+    workspaceId.set(2);
+
+    await component.rename(component.tags()[0]);
+
+    expect(api.post).not.toHaveBeenCalled();
+    expect(dialogRef.close).toHaveBeenCalled();
   });
 
   it("never offers a selected tag as merge target", () => {

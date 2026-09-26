@@ -16,6 +16,7 @@ use App\Support\PrivateArtifactCleanup;
 use App\Support\UvhMail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\DB;
 
@@ -323,18 +324,35 @@ class GenerateDataExportJob implements ShouldQueue
     private function writeStage(int $userId, int $requestId, string $stage): void
     {
         try {
-            $config = config('database.connections.'.config('database.default'));
-            if (! is_array($config)) {
-                return;
-            }
-            DB::connectUsing('export-stage', $config);
-            DB::connection('export-stage')->table('data_export_requests')
+            $this->stageConnection()->table('data_export_requests')
                 ->where('id', $requestId)
                 ->where('user_id', $userId)
                 ->where('status', 'processing')
                 ->update(['stage' => $stage]);
         } catch (\Throwable) {
             // Mejor-que-nada: el panel mostrará la última etapa conocida.
+        }
+    }
+
+    /**
+     * La conexión lateral de etapas, reutilizable: `connectUsing` SIN `force`
+     * lanza si el nombre ya está registrado, y cada generación escribe cinco
+     * etapas —si se reconectara por etapa, la segunda tiraría la progresión
+     * entera al suelo y el `catch` de `writeStage` la ocultaría—. Se resuelve
+     * una vez por proceso y las llamadas siguientes reutilizan el PDO (Laravel
+     * reconecta solo si el servidor lo ha caído).
+     */
+    private function stageConnection(): ConnectionInterface
+    {
+        try {
+            return DB::connection('export-stage');
+        } catch (\Throwable) {
+            $config = config('database.connections.'.config('database.default'));
+            if (! is_array($config)) {
+                throw new \RuntimeException('No hay configuración de base para la sesión de etapas');
+            }
+
+            return DB::connectUsing('export-stage', $config, true);
         }
     }
 

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
   FormBuilder,
@@ -31,6 +31,8 @@ import {
   decodeTemplatesResponse,
 } from "../../core/services/scale-response-decoders";
 import { ActionDialogService } from "../action-dialog.service";
+import { WorkspaceService } from "../../core/services/workspace.service";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { LatestRequest } from "../../core/services/latest-request";
 import { localDateTimeIso, localDateTimeValue, parseLocalDateTime } from "../../core/strict-wire";
 
@@ -127,7 +129,10 @@ export class LinkDialogComponent {
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
   private actions = inject(ActionDialogService);
+  private workspaces = inject(WorkspaceService);
   private dialogRef = inject(MatDialogRef<LinkDialogComponent>);
+  /** El workspace que abrió el diálogo: guardar o crear plantilla pertenece a ese. */
+  private readonly openedIn = targetWorkspace(this.workspaces);
   private readonly destroyRef = inject(DestroyRef);
   private readonly domainRequests = new LatestRequest(this.destroyRef);
   private readonly ruleRequests = new LatestRequest(this.destroyRef);
@@ -184,6 +189,11 @@ export class LinkDialogComponent {
       // still necessary even if a future transport layer adds cancellation.
       ++this.aliasRequest;
       ++this.saveRequest;
+    });
+    // El selector global sigue usable con el modal abierto: si cambia, el
+    // diálogo se cierra en vez de guardar el enlace en otro workspace.
+    effect(() => {
+      if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) this.dialogRef.close();
     });
     void this.load();
   }
@@ -387,6 +397,10 @@ export class LinkDialogComponent {
       inputMaxLength: 60,
     });
     if (name === null || this.destroyRef.destroyed) return;
+    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+      this.dialogRef.close();
+      return;
+    }
     const payload: LinkTemplatePayload = {
       destination,
       fallback_destination: v.fallbackDestination?.trim() || null,
@@ -486,6 +500,12 @@ export class LinkDialogComponent {
     const aliasUnavailable = ["checking", "taken", "invalid", "reserved"].includes(this.aliasStatus());
     if (this.destroyRef.destroyed || this.form.invalid || this.hasInvalidRules || aliasUnavailable
       || this.busy() || (this.isEdit && !this.editDetailsLoaded())) return;
+    // Comprobación síncrona antes de enviar: el interceptor pone el workspace
+    // ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
+    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+      this.dialogRef.close();
+      return;
+    }
     const requestId = ++this.saveRequest;
     this.busy.set(true);
     this.error.set(null);

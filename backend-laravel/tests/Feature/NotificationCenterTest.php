@@ -7,6 +7,7 @@ use App\Support\NotificationInbox;
 use App\Support\NotificationKinds;
 use App\Support\NotificationPreferences;
 use App\Support\SessionManager;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -229,6 +230,90 @@ final class NotificationCenterTest extends TestCase
         $this->assertSame(0, DB::table('notifications')->whereNull('digested_at')->count());
         $this->artisan('uvh:notifications-digest')->assertSuccessful();
         $this->assertSame(0, DB::table('mail_outbox')->where('kind', 'notification_digest')->count());
+    }
+
+    public function test_the_digest_never_mails_a_notice_whose_preference_already_retired_it(): void
+    {
+        // La ventana de carrera exacta de la revisión: la preferencia cambia
+        // DESPUÉS de que el digest hubiera leído las filas —aquí plantada sin el
+        // sellado que el cambio real hace—. El claim debe revalidar bajo lock
+        // y retirar el aviso en vez de mandar un correo que la cuenta pidió
+        // silenciar.
+        $user = $this->verifiedUser();
+        NotificationPreferences::update((int) $user->id, [NotificationKinds::API_TOKEN_CREATED => 'daily_digest']);
+        NotificationInbox::record((int) $user->id, NotificationKinds::API_TOKEN_CREATED, null, 'tok-1', 'api_token_created:1');
+
+        DB::table('notification_preferences')
+            ->where('user_id', $user->id)
+            ->where('kind', NotificationKinds::API_TOKEN_CREATED)
+            ->update(['delivery' => NotificationPreferences::DELIVERY_IN_APP_ONLY]);
+
+        $this->artisan('uvh:notifications-digest')->assertSuccessful();
+
+        $this->assertSame(0, DB::table('mail_outbox')->where('kind', 'notification_digest')->count());
+        $this->assertSame(0, DB::table('notifications')->whereNull('digested_at')->count(), 'the retired notice must be sealed, never mailed');
+    }
+
+    public function test_a_crash_between_outbox_admission_and_seal_cannot_duplicate_the_digest(): void
+    {
+        // El crash del que habla la revisión: el correo queda admitido y el
+        // sellado no llega. La clave del outbox es determinista —misma cuenta y
+        // mismos avisos—, así que la pasada que encuentra las filas otra vez
+        // pendientes choca en la misma clave y no duplica el resumen.
+        $user = $this->verifiedUser();
+        NotificationPreferences::update((int) $user->id, [NotificationKinds::API_TOKEN_CREATED => 'daily_digest']);
+        NotificationInbox::record((int) $user->id, NotificationKinds::API_TOKEN_CREATED, null, 'tok-1', 'api_token_created:1');
+        NotificationInbox::record((int) $user->id, NotificationKinds::API_TOKEN_CREATED, null, 'tok-2', 'api_token_created:2');
+
+        $this->artisan('uvh:notifications-digest')->assertSuccessful();
+        $this->assertSame(1, DB::table('mail_outbox')->where('kind', 'notification_digest')->count());
+
+        DB::table('notifications')->update(['digested_at' => null]);
+
+        $this->artisan('uvh:notifications-digest')->assertSuccessful();
+        $this->assertSame(1, DB::table('mail_outbox')->where('kind', 'notification_digest')->count(), 'the retry of the same claim must not duplicate the summary');
+        $this->assertSame(0, DB::table('notifications')->whereNull('digested_at')->count());
+    }
+
+    public function test_a_failed_outbox_admission_leaves_the_claim_untouched(): void
+    {
+        $user = $this->verifiedUser();
+        NotificationPreferences::update((int) $user->id, [NotificationKinds::API_TOKEN_CREATED => 'daily_digest']);
+        NotificationInbox::record((int) $user->id, NotificationKinds::API_TOKEN_CREATED, null, 'tok-1', 'api_token_created:1');
+
+        // Admisión del outbox interrumpida: la transacción del claim revierte
+        // entera —ni correo, ni sellado del aviso— y la próxima pasada lo
+        // reintenta intacto.
+        DB::listen(static function (QueryExecuted $event): void {
+            if (str_starts_with(strtolower($event->sql), 'insert') && str_contains($event->sql, '"mail_outbox"')) {
+                throw new \RuntimeException('Fixture: outbox admission interrupted');
+            }
+        });
+
+        $this->artisan('uvh:notifications-digest')->assertSuccessful();
+
+        $this->assertSame(0, DB::table('mail_outbox')->count());
+        $this->assertSame(1, DB::table('notifications')->whereNull('digested_at')->count(), 'a failed admission must not seal the claim');
+    }
+
+    public function test_a_run_digests_at_most_two_hundred_accounts(): void
+    {
+        // El tope de la pasada es operacional: la consulta elige primero los
+        // candidatos y nunca carga el backlog entero. La cuenta 201 espera a la
+        // siguiente pasada.
+        for ($i = 0; $i < 201; $i++) {
+            $user = User::factory()->create();
+            NotificationPreferences::update((int) $user->id, [NotificationKinds::API_TOKEN_CREATED => 'daily_digest']);
+            NotificationInbox::record((int) $user->id, NotificationKinds::API_TOKEN_CREATED, null, 'tok-'.$i, 'api_token_created:'.$i);
+        }
+
+        $this->artisan('uvh:notifications-digest')->assertSuccessful();
+
+        $this->assertSame(200, DB::table('mail_outbox')->where('kind', 'notification_digest')->count());
+        $this->assertSame(1, DB::table('notifications')->whereNull('digested_at')->count());
+
+        $this->artisan('uvh:notifications-digest')->assertSuccessful();
+        $this->assertSame(201, DB::table('mail_outbox')->where('kind', 'notification_digest')->count());
     }
 
     public function test_a_password_change_reaches_the_inbox_and_the_outbox(): void

@@ -60,7 +60,10 @@ final class PrivateArtifact
             throw new \RuntimeException('Private artifact storage rejected write');
         }
         try {
-            fwrite($out, self::HEADER."\n");
+            // Escrituras verificadas: un artifact truncado nunca se puede
+            // declarar completo. Si algo no llega íntegro, hay excepción y la
+            // fila en `processing` queda como ancla para el housekeeping.
+            Streams::writeAll($out, self::HEADER."\n");
             $written = 0;
             while (! feof($plainStream)) {
                 $chunk = self::readPlainChunk($plainStream, self::CHUNK_BYTES);
@@ -68,8 +71,9 @@ final class PrivateArtifact
                     break;
                 }
                 $written += strlen($chunk);
-                fwrite($out, UvhCrypto::encryptAtRest($chunk)."\n");
+                Streams::writeAll($out, UvhCrypto::encryptAtRest($chunk)."\n");
             }
+            Streams::flush($out);
         } finally {
             fclose($out);
         }
@@ -186,6 +190,62 @@ final class PrivateArtifact
         }
 
         return implode("\n", $out)."\n";
+    }
+
+    /**
+     * Recifra un artefacto de un stream a otro con la clave actual, conservando
+     * su formato y con la memoria viva de UN BLOQUE: la generación sostiene el
+     * artefacto sin cargarlo en RAM y la rotación de `APP_SECRET` también.
+     * Devuelve si algo cambió —con `false`, el destino es idéntico al origen y
+     * el llamante lo descarta—.
+     *
+     * @param  resource  $in
+     * @param  resource  $out
+     */
+    public static function reencryptStream($in, $out): bool
+    {
+        $first = fgets($in);
+        if ($first === false) {
+            throw new \RuntimeException('Private artifact is empty');
+        }
+        $first = rtrim($first, "\n");
+        $changed = false;
+
+        if ($first === self::HEADER) {
+            Streams::writeAll($out, self::HEADER."\n");
+            while (($line = fgets($in)) !== false) {
+                $line = rtrim($line, "\n");
+                if (trim($line) === '') {
+                    continue;
+                }
+                if (! UvhCrypto::isAtRestCiphertext($line)) {
+                    throw new \RuntimeException('Private artifact contains an unencrypted chunk line');
+                }
+                if (! UvhCrypto::encryptedWithCurrentKey($line)) {
+                    $line = UvhCrypto::encryptAtRest(UvhCrypto::decryptAtRest($line));
+                    $changed = true;
+                }
+                Streams::writeAll($out, $line."\n");
+            }
+
+            return $changed;
+        }
+
+        if (str_starts_with($first, self::HEADER)) {
+            throw new \RuntimeException('Private artifact header is unknown');
+        }
+        // Formato legado: un solo cuerpo, su recifrado entero —los artefactos
+        // legados son pequeños por construcción—.
+        if (! UvhCrypto::isAtRestCiphertext($first)) {
+            throw new \RuntimeException('Private artifact is not ciphertext');
+        }
+        if (! UvhCrypto::encryptedWithCurrentKey($first)) {
+            $first = UvhCrypto::encryptAtRest(UvhCrypto::decryptAtRest($first));
+            $changed = true;
+        }
+        Streams::writeAll($out, $first."\n");
+
+        return $changed;
     }
 
     /**

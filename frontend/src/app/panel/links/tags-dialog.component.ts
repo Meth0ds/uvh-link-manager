@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
@@ -8,6 +8,7 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatCheckboxModule } from "@angular/material/checkbox";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { targetWorkspace } from "../../core/services/workspace-target";
 import { ActionDialogService } from "../action-dialog.service";
 import {
   decodeTagMergeResponse,
@@ -92,6 +93,9 @@ export class TagsDialogComponent {
   private readonly actions = inject(ActionDialogService);
   private readonly dialogRef = inject(MatDialogRef<TagsDialogComponent, boolean>);
 
+  /** El workspace que abrió el gestor: renombrar/fusionar pertenece a ese. */
+  private readonly openedIn = targetWorkspace(this.workspaces);
+
   readonly tags = signal<TagDto[]>([]);
   readonly loading = signal(true);
   readonly busy = signal(false);
@@ -109,6 +113,11 @@ export class TagsDialogComponent {
   readonly mergeTargets = computed(() => this.tags().filter((tag) => !this.selected().has(tag.id)));
 
   constructor() {
+    // El selector global sigue usable con el modal abierto: si cambia, el
+    // gestor se cierra en vez de tocar etiquetas de otro workspace.
+    effect(() => {
+      if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) this.dialogRef.close(this.changed);
+    });
     void this.reload();
   }
 
@@ -134,6 +143,10 @@ export class TagsDialogComponent {
       inputMaxLength: 40,
     });
     if (name === null || name === tag.name) return;
+    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+      this.dialogRef.close(this.changed);
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -159,6 +172,10 @@ export class TagsDialogComponent {
       destructive: true,
     });
     if (!confirmed) return;
+    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+      this.dialogRef.close(this.changed);
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     try {

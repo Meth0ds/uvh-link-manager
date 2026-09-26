@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Ids;
 use App\Support\SessionManager;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -78,6 +79,33 @@ final class LinkTemplateTest extends TestCase
             'name' => 'válida',
             'payload' => ['destination' => 'https://example.org/y'],
         ])->assertStatus(409);
+    }
+
+    public function test_a_store_that_loses_the_name_race_reports_a_conflict(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $this->signIn($owner, $workspace);
+
+        // Otro hilo guarda «Prensa» entre la comprobación y la escritura: el
+        // índice único decide y el resultado es un conflicto, no un error 500.
+        $race = true;
+        DB::listen(static function (QueryExecuted $event) use (&$race, $workspace, $owner): void {
+            if (! $race || ! str_starts_with(strtolower($event->sql), 'select exists')
+                || ! str_contains($event->sql, '"link_templates"')) {
+                return;
+            }
+            $race = false;
+            DB::table('link_templates')->insert([
+                'workspace_id' => $workspace->id, 'created_by' => $owner->id, 'name' => 'Prensa',
+                'payload' => json_encode(['destination' => 'https://example.org/otra']),
+            ]);
+        });
+
+        $this->postJson('/api/v1/link-templates', [
+            'name' => 'Prensa',
+            'payload' => ['destination' => 'https://example.org/nota'],
+        ])->assertStatus(409);
+        $this->assertSame(1, DB::table('link_templates')->count());
     }
 
     private function workspace(): array
