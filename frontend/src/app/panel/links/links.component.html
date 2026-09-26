@@ -66,7 +66,65 @@
       </mat-select>
     </mat-form-field>
   </div>
+  <div class="scale-toolbar">
+    @if (canWrite()) {
+      <mat-checkbox
+        [checked]="allOnPage()"
+        [disabled]="!links().length || actionId() !== null"
+        (change)="toggleSelectPage($event.checked)"
+        aria-label="Seleccionar todos los enlaces de la página"
+      >Seleccionar página</mat-checkbox>
+    }
+    <div class="scale-tools">
+      <button mat-stroked-button type="button" (click)="openTags()"><mat-icon>sell</mat-icon> Etiquetas</button>
+      <button mat-stroked-button type="button" (click)="openCollections()"><mat-icon>folder</mat-icon> Colecciones</button>
+      @if (canWrite()) {
+        <button mat-stroked-button type="button" (click)="importCsv()"><mat-icon>upload</mat-icon> Importar CSV</button>
+      }
+      <button mat-stroked-button type="button" (click)="exportCsv()" [disabled]="exporting()"><mat-icon>download</mat-icon> Exportar CSV</button>
+    </div>
+  </div>
 </section>
+
+@if (selected().size > 0 && canWrite()) {
+  <section class="bulk-bar" aria-label="Acciones sobre los enlaces seleccionados">
+    <div class="bulk-line">
+      <b class="tnum">{{ selected().size }} seleccionados</b>
+      <button mat-button type="button" (click)="clearSelection()">Cancelar selección</button>
+      <span class="bulk-spacer"></span>
+      <button mat-stroked-button type="button" (click)="bulkState('pause')" [disabled]="actionId() !== null"><mat-icon>pause</mat-icon> Pausar</button>
+      <button mat-stroked-button type="button" (click)="bulkState('activate')" [disabled]="actionId() !== null"><mat-icon>play_arrow</mat-icon> Activar</button>
+      <button mat-stroked-button type="button" (click)="bulkState('archive')" [disabled]="actionId() !== null"><mat-icon>archive</mat-icon> Archivar</button>
+      <button mat-stroked-button type="button" (click)="openBulkPanel('tag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'tag'"><mat-icon>sell</mat-icon> Etiquetar</button>
+      <button mat-stroked-button type="button" (click)="openBulkPanel('untag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'untag'"><mat-icon>sell</mat-icon> Quitar etiqueta</button>
+      <button mat-stroked-button type="button" (click)="openBulkPanel('move')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'move'"><mat-icon>drive_file_move</mat-icon> Mover</button>
+      <button mat-stroked-button type="button" class="bulk-danger" (click)="bulkTrash()" [disabled]="actionId() !== null"><mat-icon>delete</mat-icon> Eliminar</button>
+    </div>
+    @if (bulkPanel() === 'tag' || bulkPanel() === 'untag') {
+      <div class="bulk-inline">
+        <mat-form-field appearance="outline" class="bulk-tags">
+          <mat-label>{{ bulkPanel() === 'tag' ? 'Etiquetas a añadir' : 'Etiquetas a quitar' }}</mat-label>
+          <input matInput [ngModel]="bulkTagsInput" (ngModelChange)="bulkTagsInput = $event" placeholder="prensa; 2026" (keyup.enter)="applyBulkTags()" aria-label="Etiquetas separadas por punto y coma" />
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="button" (click)="applyBulkTags()" [disabled]="actionId() !== null || !bulkTagsInput.trim()">Aplicar</button>
+      </div>
+    }
+    @if (bulkPanel() === 'move') {
+      <div class="bulk-inline">
+        <mat-form-field appearance="outline" class="bulk-collection">
+          <mat-label>Colección</mat-label>
+          <mat-select [value]="bulkCollectionId()" (selectionChange)="bulkCollectionId.set($event.value)" aria-label="Colección de destino">
+            <mat-option [value]="null">Sin colección</mat-option>
+            @for (collection of collections(); track collection.id) {
+              <mat-option [value]="collection.id">{{ collection.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="button" (click)="applyBulkMove()" [disabled]="actionId() !== null">Mover</button>
+      </div>
+    }
+  </section>
+}
 
 @if (loading() && links().length) {
   <mat-progress-bar mode="indeterminate" aria-label="Cargando enlaces" />
@@ -91,6 +149,16 @@
         (click)="openLink(link.id)"
         (keydown)="openLinkFromKeyboard($event, link.id)"
       >
+        @if (canWrite()) {
+          <mat-checkbox
+            class="link-check"
+            [checked]="selected().has(link.id)"
+            (change)="toggleSelected(link.id)"
+            (click)="$event.stopPropagation()"
+            (keydown)="$event.stopPropagation()"
+            [attr.aria-label]="'Seleccionar enlace ' + displayUrl(link.shortUrl)"
+          ></mat-checkbox>
+        }
         <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span>
         <div class="link-main">
           <div class="link-top">

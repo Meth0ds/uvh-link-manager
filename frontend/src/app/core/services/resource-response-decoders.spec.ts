@@ -28,6 +28,8 @@ const link: LinkDto = {
   utm: { source: null, medium: null, campaign: null, term: null, content: null },
   domainId: null,
   domain: null,
+  collectionId: null,
+  collection: null,
   tags: ["launch"],
   createdAt: "2026-09-06T10:00:00Z",
   updatedAt: "2026-09-06T10:00:00Z",

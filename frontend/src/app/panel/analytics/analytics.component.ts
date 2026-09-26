@@ -4,6 +4,7 @@ import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
+import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { ChartsComponent } from "./charts.component";
 import { WorkspaceService } from "../../core/services/workspace.service";
@@ -12,6 +13,7 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { decodeAnalyticsOverview } from "../../core/services/link-response-decoders";
+import { downloadBlob } from "../../core/services/browser-download";
 
 @Component({
   selector: "app-analytics",
@@ -20,6 +22,7 @@ import { decodeAnalyticsOverview } from "../../core/services/link-response-decod
     MatButtonModule,
     MatIconModule,
     MatProgressBarModule,
+    MatSnackBarModule,
     RouterLink,
     ChartsComponent,
     PageHeaderComponent,
@@ -33,6 +36,7 @@ export class AnalyticsComponent {
   private readonly numberFormatter = new Intl.NumberFormat("es-ES");
   private api = inject(ApiService);
   private workspaces = inject(WorkspaceService);
+  private snackbar = inject(MatSnackBar);
   private readonly requests = new LatestRequest(inject(DestroyRef));
   readonly overview = signal<AnalyticsOverview | null>(null);
   readonly period = signal("7d");
@@ -40,6 +44,7 @@ export class AnalyticsComponent {
   readonly customTo = signal("");
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly exporting = signal(false);
   readonly periodOptions = [
     { value: "24h", short: "24 h", label: "Últimas 24 horas" },
     { value: "7d", short: "7 d", label: "Últimos 7 días" },
@@ -153,5 +158,27 @@ export class AnalyticsComponent {
 
   formatCount(value: number): string {
     return this.numberFormatter.format(value);
+  }
+
+  /**
+   * Export del mismo periodo que se está leyendo (F7f): sólo agregados, sin
+   * hashes de visitante, en CSV o en el overview JSON completo.
+   */
+  async export(format: "csv" | "json"): Promise<void> {
+    if (this.exporting() || this.awaitingCustomRange() || this.customRangeError() !== null) return;
+    this.exporting.set(true);
+    try {
+      const blob = await this.api.getBlob("/api/v1/analytics/export", { ...this.query(), format });
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (!downloadBlob(blob, `uvh-analytics-${stamp}.${format}`)) {
+        this.snackbar.open("No se pudo iniciar la descarga", "Cerrar", { duration: 3000 });
+        return;
+      }
+      this.snackbar.open(`Export ${format.toUpperCase()} descargado`, "Cerrar", { duration: 2500 });
+    } catch (err) {
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo exportar la analítica", "Cerrar", { duration: 3500 });
+    } finally {
+      this.exporting.set(false);
+    }
   }
 }

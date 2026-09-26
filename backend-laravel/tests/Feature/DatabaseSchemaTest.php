@@ -50,6 +50,9 @@ class DatabaseSchemaTest extends TestCase
             'link_appeals',
             'notifications',
             'notification_preferences',
+            'idempotency_keys',
+            'collections',
+            'link_templates',
         ];
 
         foreach ($tables as $table) {
@@ -69,7 +72,10 @@ class DatabaseSchemaTest extends TestCase
             'invitation_mail_budgets' => ['budget_key', 'used', 'expires_at_epoch'],
             'quotas' => ['workspace_id', 'links_limit'],
             'custom_domains' => ['workspace_id', 'domain', 'verification_token', 'state', 'verified_at'],
-            'links' => ['workspace_id', 'created_by', 'domain_id', 'alias', 'destination', 'state', 'state_before_delete', 'password_hash', 'password_version', 'version', 'max_clicks', 'click_count', 'single_use', 'expires_at', 'deleted_at', 'reputation_blocked_at', 'reputation_block_source', 'reputation_block_prior_state', 'reputation_checked_at'],
+            'links' => ['workspace_id', 'created_by', 'domain_id', 'collection_id', 'alias', 'destination', 'state', 'state_before_delete', 'password_hash', 'password_version', 'version', 'max_clicks', 'click_count', 'single_use', 'expires_at', 'deleted_at', 'reputation_blocked_at', 'reputation_block_source', 'reputation_block_prior_state', 'reputation_checked_at'],
+            'idempotency_keys' => ['user_id', 'scope', 'key', 'request_hash', 'response_body', 'response_status', 'expires_at'],
+            'collections' => ['id', 'workspace_id', 'name'],
+            'link_templates' => ['id', 'workspace_id', 'created_by', 'name', 'payload'],
             'tags' => ['workspace_id', 'name'],
             'link_tags' => ['link_id', 'tag_id'],
             'redirect_rules' => ['link_id', 'priority', 'destination'],

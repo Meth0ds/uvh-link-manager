@@ -228,26 +228,40 @@ export class ApiService {
     return this.request(this.http.get<T>(path, { headers: this.headers(false), params: hp }), decoder, "read", options);
   }
 
-  /** POST (mutation — requires CSRF). */
-  async post<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
+  /** POST (mutation — requires CSRF). `extraHeaders` carries e.g. an Idempotency-Key. */
+  async post<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>, extraHeaders?: Record<string, string>): Promise<T> {
     this.assertApiPath(path);
-    return this.mutate(() => this.http.post<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
+    return this.mutate(() => this.http.post<T>(path, body ?? {}, {
+      headers: { ...this.headers(true), ...extraHeaders },
+    }), decoder);
   }
 
   /** POST returning a private binary artifact while preserving JSON errors. */
   async postBlob(path: string, body?: unknown): Promise<Blob> {
     this.assertApiPath(path);
     await this.ensureCsrf();
-    return this.retryOnRejectedCsrf(() => this.artifactRequest(path, body));
+    return this.retryOnRejectedCsrf(() => this.artifactRequest(this.http.post(path, body ?? {}, {
+      headers: this.headers(true),
+      responseType: "blob",
+    })));
   }
 
-  /** One artifact POST, translating a JSON error envelope returned as a Blob. */
-  private async artifactRequest(path: string, body?: unknown): Promise<Blob> {
+  /** GET returning a private binary artifact (exports) while preserving JSON errors. */
+  getBlob(path: string, params?: Record<string, string | number | boolean | null | undefined>): Promise<Blob> {
+    this.assertApiPath(path);
+    let hp = new HttpParams();
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v != null && v !== "") hp = hp.set(k, String(v));
+      }
+    }
+    return this.artifactRequest(this.http.get(path, { headers: this.headers(false), params: hp, responseType: "blob" }));
+  }
+
+  /** One artifact request, translating a JSON error envelope returned as a Blob. */
+  private async artifactRequest(source: Observable<Blob>): Promise<Blob> {
     try {
-      return await firstValueFrom(this.http.post(path, body ?? {}, {
-        headers: this.headers(true),
-        responseType: "blob",
-      }).pipe(timeout({ first: ARTIFACT_TIMEOUT_MS })));
+      return await firstValueFrom(source.pipe(timeout({ first: ARTIFACT_TIMEOUT_MS })));
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.error instanceof Blob) {
         try {

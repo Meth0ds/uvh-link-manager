@@ -22,9 +22,15 @@ import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatTooltipModule } from "@angular/material/tooltip";
 
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
-import type { DomainDto, LinkDto, RedirectRule } from "../../core/models";
+import type { CollectionDto, DomainDto, LinkDto, LinkTemplateDto, LinkTemplatePayload, RedirectRule } from "../../core/models";
 import { decodeDomainsResponse } from "../../core/services/domain-response-decoders";
 import { decodeAliasAvailability, decodeLinkResponse, decodeRulesResponse } from "../../core/services/link-response-decoders";
+import {
+  decodeCollectionsResponse,
+  decodeTemplateResponse,
+  decodeTemplatesResponse,
+} from "../../core/services/scale-response-decoders";
+import { ActionDialogService } from "../action-dialog.service";
 import { LatestRequest } from "../../core/services/latest-request";
 import { localDateTimeIso, localDateTimeValue, parseLocalDateTime } from "../../core/strict-wire";
 
@@ -120,6 +126,7 @@ function integerValidator(control: AbstractControl): ValidationErrors | null {
 export class LinkDialogComponent {
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
+  private actions = inject(ActionDialogService);
   private dialogRef = inject(MatDialogRef<LinkDialogComponent>);
   private readonly destroyRef = inject(DestroyRef);
   private readonly domainRequests = new LatestRequest(this.destroyRef);
@@ -133,6 +140,8 @@ export class LinkDialogComponent {
   readonly error = signal<string | null>(null);
   readonly domains = signal<DomainDto[]>([]);
   readonly tags = signal<string[]>([]);
+  readonly collections = signal<CollectionDto[]>([]);
+  readonly templates = signal<LinkTemplateDto[]>([]);
   readonly aliasStatus = signal<"idle" | "checking" | "available" | "taken" | "invalid" | "reserved">("idle");
   readonly aliasStatusText = signal("");
   private aliasRequest = 0;
@@ -147,6 +156,7 @@ export class LinkDialogComponent {
       ...(this.isEdit ? [Validators.required] : []),
     ]],
     domainId: [null as number | null],
+    collectionId: [null as number | null],
     fallbackDestination: ["", [Validators.maxLength(2048), httpUrlValidator]],
     password: ["", [Validators.maxLength(72)]],
     clearPassword: [false],
@@ -179,7 +189,7 @@ export class LinkDialogComponent {
   }
 
   private async load(): Promise<void> {
-    const requests: Promise<void>[] = [this.loadDomains()];
+    const requests: Promise<void>[] = [this.loadDomains(), this.loadCollectionsAndTemplates()];
     if (this.isEdit && this.data.link) {
       this.patchFromLink(this.data.link);
       requests.push(this.loadEditRules(this.data.link.id));
@@ -211,6 +221,20 @@ export class LinkDialogComponent {
     }
   }
 
+  /** Colecciones y plantillas comparten destino: sin ellas el formulario sigue siendo completo. */
+  private async loadCollectionsAndTemplates(): Promise<void> {
+    try {
+      const [collections, templates] = await Promise.all([
+        this.api.get("/api/v1/collections", undefined, decodeCollectionsResponse),
+        this.api.get("/api/v1/link-templates", undefined, decodeTemplatesResponse),
+      ]);
+      this.collections.set(collections.collections);
+      this.templates.set(templates.templates);
+    } catch {
+      // Los selectores quedan sin opciones, nunca a medias.
+    }
+  }
+
   private async loadEditRules(linkId: number): Promise<void> {
     const request = this.ruleRequests.begin(linkId);
     try {
@@ -236,6 +260,7 @@ export class LinkDialogComponent {
       destination: link.destination,
       alias: link.alias,
       domainId: link.domainId,
+      collectionId: link.collectionId,
       fallbackDestination: link.fallbackDestination ?? "",
       maxClicks: link.maxClicks,
       singleUse: link.singleUse,
@@ -314,6 +339,85 @@ export class LinkDialogComponent {
 
   removeTag(tag: string): void {
     this.tags.update((t) => t.filter((x) => x !== tag));
+  }
+
+  // ---------- Plantillas ----------
+  /**
+   * Rellena el formulario con los valores guardados. El alias nunca viaja en
+   * una plantilla: identifica un enlace concreto y copiarlo chocaría.
+   */
+  applyTemplate(template: LinkTemplateDto | null): void {
+    if (!template) return;
+    const payload = template.payload;
+    this.form.patchValue({
+      destination: payload.destination ?? "",
+      fallbackDestination: payload.fallback_destination ?? "",
+      maxClicks: payload.max_clicks ?? null,
+      singleUse: payload.single_use ?? false,
+      scheduledAt: localDateTimeValue(payload.scheduled_at ?? null),
+      expiresAt: localDateTimeValue(payload.expires_at ?? null),
+      notes: payload.notes ?? "",
+      collectionId: payload.collection_id ?? null,
+      utm: {
+        source: payload.utm?.source ?? "",
+        medium: payload.utm?.medium ?? "",
+        campaign: payload.utm?.campaign ?? "",
+        term: payload.utm?.term ?? "",
+        content: payload.utm?.content ?? "",
+      },
+    });
+    if (payload.tags) this.tags.set([...payload.tags]);
+    this.error.set(null);
+  }
+
+  async saveAsTemplate(): Promise<void> {
+    const v = this.form.value;
+    const destination = v.destination?.trim();
+    if (!destination) {
+      this.error.set("Escribe la URL de destino antes de guardar la plantilla.");
+      return;
+    }
+    const name = await this.actions.prompt({
+      title: "Guardar como plantilla",
+      message: "La plantilla guarda los valores del formulario, nunca el alias.",
+      confirmLabel: "Guardar plantilla",
+      inputLabel: "Nombre",
+      inputRequired: true,
+      inputMinLength: 1,
+      inputMaxLength: 60,
+    });
+    if (name === null || this.destroyRef.destroyed) return;
+    const payload: LinkTemplatePayload = {
+      destination,
+      fallback_destination: v.fallbackDestination?.trim() || null,
+      notes: v.notes?.trim() || null,
+      tags: this.tags(),
+      utm: {
+        source: v.utm?.source?.trim() || null,
+        medium: v.utm?.medium?.trim() || null,
+        campaign: v.utm?.campaign?.trim() || null,
+        term: v.utm?.term?.trim() || null,
+        content: v.utm?.content?.trim() || null,
+      },
+      max_clicks: v.maxClicks ?? null,
+      single_use: v.singleUse === true,
+      scheduled_at: localDateTimeIso(v.scheduledAt ?? ""),
+      expires_at: localDateTimeIso(v.expiresAt ?? ""),
+      collection_id: v.collectionId ?? null,
+    };
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const res = await this.api.post("/api/v1/link-templates", { name, payload }, decodeTemplateResponse);
+      if (this.destroyRef.destroyed) return;
+      this.templates.update((list) => [...list, res.template].sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (err) {
+      if (!this.destroyRef.destroyed) {
+        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo guardar la plantilla");
+      }
+    } finally {
+      if (!this.destroyRef.destroyed) this.busy.set(false);
+    }
   }
 
   // ---------- Rules ----------
@@ -401,6 +505,7 @@ export class LinkDialogComponent {
       // with null.
       alias: this.isEdit ? (v.alias?.trim() || undefined) : (v.alias?.trim() || null),
       domainId: v.domainId,
+      collectionId: v.collectionId ?? null,
       fallbackDestination: v.fallbackDestination?.trim() || null,
       password,
       maxClicks: v.maxClicks,

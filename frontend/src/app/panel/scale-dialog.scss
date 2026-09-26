@@ -1,0 +1,142 @@
+// Shared bodies for the scale-management dialogs (F7): import report, tag
+// manager and collection manager. They all render bounded lists of rows, so
+// one row primitive keeps them visually identical.
+
+.row-list {
+  display: grid;
+  gap: 0;
+  margin: 0 0 18px;
+  padding: 0;
+  border-top: 1px solid var(--uvh-border);
+  list-style: none;
+}
+
+.row-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--uvh-border);
+}
+
+.row-item .name {
+  flex: 1;
+  min-width: 0;
+  color: var(--uvh-ink);
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.row-item .count {
+  color: var(--uvh-muted);
+  font: 11px/1.5 "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0 0 18px;
+  color: var(--uvh-muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.report {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--uvh-electric);
+  background: color-mix(in srgb, var(--uvh-electric) 6%, transparent);
+  color: var(--uvh-ink);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.report.ok {
+  border-left-color: var(--uvh-success);
+  background: var(--uvh-success-soft);
+}
+
+.report b {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.row-errors {
+  max-height: 190px;
+  margin: 10px 0 0;
+  padding: 0;
+  overflow: auto;
+  border-top: 1px solid var(--uvh-border);
+  list-style: none;
+}
+
+.row-errors li {
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--uvh-border);
+  color: var(--uvh-danger);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.row-errors b {
+  display: inline;
+  margin: 0;
+}
+
+.note {
+  margin: 10px 0 0;
+  color: var(--uvh-muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.csv-input {
+  width: 100%;
+  min-height: 150px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface);
+  color: var(--uvh-ink);
+  font: 12px/1.6 "Courier New", monospace;
+  resize: vertical;
+}
+
+.csv-input:focus-visible {
+  outline: 2px solid var(--uvh-electric);
+  outline-offset: 1px;
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.inline-form mat-form-field {
+  flex: 1;
+  min-width: 180px;
+}
+
+.merge-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface);
+}
+
+.merge-bar mat-form-field {
+  flex: 1;
+  min-width: 170px;
+}

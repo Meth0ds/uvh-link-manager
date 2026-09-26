@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Exceptions\LinkException;
+use App\Models\Collection;
 use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Models\Tag;
@@ -69,6 +70,10 @@ class LinkService
         $domainId = $input['domain_id'] ?? null;
         if ($domainId !== null && (! is_int($domainId) || $domainId < 1)) {
             return ['ok' => false, 'error' => 'Dominio inválido'];
+        }
+        $collectionId = $input['collection_id'] ?? null;
+        if ($collectionId !== null && (! is_int($collectionId) || $collectionId < 1)) {
+            return ['ok' => false, 'error' => 'Colección inválida'];
         }
         $maxClicks = $input['max_clicks'] ?? null;
         if ($maxClicks !== null && (! is_int($maxClicks) || $maxClicks < 1 || $maxClicks > 10_000_000)) {
@@ -161,6 +166,7 @@ class LinkService
         ?int $actorSecurityVersion = null,
     ): array {
         $domainId = $input['domain_id'] ?? null;
+        $collectionId = $input['collection_id'] ?? null;
 
         if (! empty($input['alias'])) {
             $alias = UrlUtil::normalizeAlias($input['alias']);
@@ -174,7 +180,7 @@ class LinkService
         $state = self::deriveState($input);
         $utm = $input['utm'] ?? [];
 
-        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $alias, $state, $utm, $input, $apiTokenContext, $actorSecurityVersion) {
+        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $collectionId, $alias, $state, $utm, $input, $apiTokenContext, $actorSecurityVersion) {
             if (! WorkspaceAccess::getMembershipLocked(
                 $userId,
                 $workspaceId,
@@ -189,6 +195,10 @@ class LinkService
                 ->where('workspace_id', $workspaceId)->where('state', 'active')
                 ->where('edge_eligible', true)->whereNotNull('tls_ready_at')->lockForUpdate()->first(['id'])) {
                 throw new LinkException('Dominio no activado o sin acceso', 403);
+            }
+            if ($collectionId !== null && ! Collection::where('id', $collectionId)
+                ->where('workspace_id', $workspaceId)->exists()) {
+                throw new LinkException('Colección no encontrada', 422);
             }
 
             // Quota enforcement inside the transaction (no TOCTOU window). The
@@ -206,6 +216,7 @@ class LinkService
                     'workspace_id' => $workspaceId,
                     'created_by' => $userId,
                     'domain_id' => $domainId,
+                    'collection_id' => $collectionId,
                     'alias' => $alias,
                     'destination' => $input['destination'],
                     'fallback_destination' => $input['fallback_destination'] ?? null,
@@ -287,6 +298,11 @@ class LinkService
                 ->where('edge_eligible', true)->whereNotNull('tls_ready_at')->lockForUpdate()->first(['id'])) {
                 throw new LinkException('Dominio no activado o sin acceso', 403);
             }
+            $collectionId = array_key_exists('collection_id', $input) ? $input['collection_id'] : $link->collection_id;
+            if ($collectionId !== null && ! Collection::where('id', $collectionId)
+                ->where('workspace_id', $workspaceId)->exists()) {
+                throw new LinkException('Colección no encontrada', 422);
+            }
             // An explicit empty alias asks to clear what identifies the link —
             // impossible to apply — so it is refused with 422 instead of being
             // accepted and silently ignored. Omitting the key keeps the current
@@ -316,6 +332,7 @@ class LinkService
             try {
                 $link->update([
                     'domain_id' => $domainId,
+                    'collection_id' => $collectionId,
                     'alias' => $alias,
                     'destination' => $input['destination'],
                     'fallback_destination' => $input['fallback_destination'] ?? null,
@@ -370,7 +387,7 @@ class LinkService
      */
     public static function dto(Link $link): array
     {
-        $link->loadMissing('domain', 'tags');
+        $link->loadMissing('domain', 'tags', 'collection');
 
         return [
             'id' => $link->id,
@@ -395,6 +412,8 @@ class LinkService
             ],
             'domainId' => $link->domain_id,
             'domain' => $link->domain?->domain,
+            'collectionId' => $link->collection_id,
+            'collection' => $link->collection?->name,
             'tags' => $link->tags->pluck('name')->values()->all(),
             'createdAt' => self::iso($link->created_at),
             'updatedAt' => self::iso($link->updated_at),
@@ -464,7 +483,16 @@ class LinkService
         return $query->exists();
     }
 
-    private static function applyTags(Link $link, int $workspaceId, array $tags): void
+    /**
+     * Ids de las etiquetas nombradas, creando las que falten. El lookup es
+     * insensible a mayúsculas para que «Marketing» y «marketing» sean la misma
+     * etiqueta; la creación compite con el índice único y se resuelve con el
+     * reintento del lookup, igual que siempre.
+     *
+     * @param  list<string>  $tags
+     * @return list<int>
+     */
+    public static function tagIdsFor(int $workspaceId, array $tags): array
     {
         $ids = [];
         foreach ($tags as $raw) {
@@ -489,7 +517,13 @@ class LinkService
             }
             $ids[] = $tag->id;
         }
-        $link->tags()->sync(array_values(array_unique($ids)));
+
+        return array_values(array_unique($ids));
+    }
+
+    private static function applyTags(Link $link, int $workspaceId, array $tags): void
+    {
+        $link->tags()->sync(self::tagIdsFor($workspaceId, $tags));
     }
 
     private static function applyRules(Link $link, array $rules): void

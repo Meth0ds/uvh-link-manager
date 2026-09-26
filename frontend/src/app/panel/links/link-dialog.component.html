@@ -13,6 +13,23 @@
 
   @if (!loading()) {
     <form [formGroup]="form">
+      <div class="template-bar">
+        @if (templates().length) {
+          <mat-form-field appearance="outline" class="grow">
+            <mat-label>Plantilla</mat-label>
+            <mat-select [value]="null" (selectionChange)="applyTemplate($event.value)" aria-label="Aplicar plantilla">
+              <mat-option [value]="null">Elegir una plantilla…</mat-option>
+              @for (template of templates(); track template.id) {
+                <mat-option [value]="template">{{ template.name }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Rellena el formulario con los valores guardados.</mat-hint>
+          </mat-form-field>
+        }
+        <button mat-stroked-button type="button" (click)="saveAsTemplate()" [disabled]="busy()">
+          <mat-icon>bookmark_add</mat-icon> Guardar como plantilla
+        </button>
+      </div>
       <mat-tab-group animationDuration="220ms">
         <mat-tab label="Destino">
           <div class="tab-pad">
@@ -100,6 +117,16 @@
             <mat-form-field appearance="outline" class="full">
               <mat-label>Notas internas</mat-label>
               <textarea matInput formControlName="notes" rows="2" placeholder="Contexto para tu equipo…"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Colección</mat-label>
+              <mat-select formControlName="collectionId">
+                <mat-option [value]="null">Sin colección</mat-option>
+                @for (collection of collections(); track collection.id) {
+                  <mat-option [value]="collection.id">{{ collection.name }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>Agrupación plana dentro del workspace.</mat-hint>
             </mat-form-field>
             <mat-form-field appearance="outline" class="full">
               <mat-label>Etiquetas</mat-label>

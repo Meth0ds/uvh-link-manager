@@ -4,13 +4,18 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\DomainController;
+use App\Http\Controllers\LinkBulkController;
 use App\Http\Controllers\LinkController;
+use App\Http\Controllers\LinkCsvController;
 use App\Http\Controllers\LinkIntentController;
+use App\Http\Controllers\LinkTemplateController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PendingHandoffController;
 use App\Http\Controllers\PrivacyRightsController;
 use App\Http\Controllers\PublicController;
+use App\Http\Controllers\TagController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\WorkspaceActivityController;
@@ -141,6 +146,12 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::get('/', [LinkController::class, 'index'])->middleware('uvh.workspace:viewer');
         Route::post('check-alias', [LinkController::class, 'checkAlias'])->middleware(['uvh.workspace:viewer', 'throttle:uvh-link-create']);
         Route::post('/', [LinkController::class, 'store'])->middleware(['uvh.workspace:editor', 'throttle:uvh-link-create']);
+        // Escala (F7): rutas fijas antes que las de `{id}`. El export es una
+        // lectura en bloque; la importación crea enlaces y comparte su
+        // presupuesto; las acciones masivas exigen Idempotency-Key.
+        Route::get('export.csv', [LinkCsvController::class, 'export'])->middleware('uvh.workspace:viewer');
+        Route::post('import', [LinkCsvController::class, 'import'])->middleware(['uvh.workspace:editor', 'throttle:uvh-link-create']);
+        Route::post('bulk', [LinkBulkController::class, 'bulk'])->middleware('uvh.workspace:editor');
         Route::get('{id}/activity', [LinkController::class, 'activity'])->middleware('uvh.workspace:viewer')->where('id', '[0-9]+');
         Route::get('{id}', [LinkController::class, 'show'])->middleware('uvh.workspace:viewer')->where('id', '[0-9]+');
         Route::patch('{id}', [LinkController::class, 'update'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
@@ -153,9 +164,32 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::post('{id}/purge', [LinkController::class, 'purge'])->middleware(['uvh.workspace:admin', 'throttle:uvh-credential'])->where('id', '[0-9]+');
     });
 
+    // Gestor de etiquetas (F7): listar con uso, renombrar y fusionar.
+    Route::prefix('tags')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
+        Route::get('/', [TagController::class, 'index'])->middleware('uvh.workspace:viewer');
+        Route::post('merge', [TagController::class, 'merge'])->middleware('uvh.workspace:editor');
+        Route::post('{id}/rename', [TagController::class, 'rename'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
+    });
+
+    // Colecciones de un nivel (F7): agrupar sin anidamiento; borrar desagrupa.
+    Route::prefix('collections')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
+        Route::get('/', [CollectionController::class, 'index'])->middleware('uvh.workspace:viewer');
+        Route::post('/', [CollectionController::class, 'store'])->middleware('uvh.workspace:editor');
+        Route::patch('{id}', [CollectionController::class, 'rename'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
+        Route::delete('{id}', [CollectionController::class, 'destroy'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
+    });
+
+    // Plantillas de enlace (F7): valores por defecto, nunca un alias.
+    Route::prefix('link-templates')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
+        Route::get('/', [LinkTemplateController::class, 'index'])->middleware('uvh.workspace:viewer');
+        Route::post('/', [LinkTemplateController::class, 'store'])->middleware('uvh.workspace:editor');
+        Route::delete('{id}', [LinkTemplateController::class, 'destroy'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
+    });
+
     // Analytics.
     Route::prefix('analytics')->group(function () {
         Route::get('overview', [AnalyticsController::class, 'overview'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer', 'throttle:uvh-analytics']);
+        Route::get('export', [AnalyticsController::class, 'export'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer', 'throttle:uvh-analytics']);
     });
 
     // Workspaces.

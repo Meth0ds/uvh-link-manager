@@ -12,6 +12,7 @@ import { MatMenuModule } from "@angular/material/menu";
 import { MatDividerModule } from "@angular/material/divider";
 import { MatPaginatorModule, PageEvent } from "@angular/material/paginator";
 import { MatChipsModule } from "@angular/material/chips";
+import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatDialog } from "@angular/material/dialog";
@@ -22,14 +23,19 @@ import { LinkDialogService } from "./link-dialog.service";
 import { QrDialogComponent } from "./qr-dialog.component";
 import { ActionDialogService } from "../action-dialog.service";
 import { PendingLinkIntentService } from "../../core/services/pending-link-intent.service";
-import type { LinksResponse, LinkDto, LinkState } from "../../core/models";
+import type { BulkAction, CollectionDto, LinksResponse, LinkDto, LinkState } from "../../core/models";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeLinksResponse } from "../../core/services/link-response-decoders";
+import { decodeBulkActionResponse, decodeCollectionsResponse } from "../../core/services/scale-response-decoders";
+import { downloadBlob } from "../../core/services/browser-download";
 import { linkStateLabel } from "../../core/link-state-label";
+import { TagsDialogComponent } from "./tags-dialog.component";
+import { CollectionsDialogComponent } from "./collections-dialog.component";
+import { CsvImportDialogComponent } from "./csv-import-dialog.component";
 
 type StateFilter = "" | LinkState;
 
@@ -48,6 +54,7 @@ type StateFilter = "" | LinkState;
     MatDividerModule,
     MatPaginatorModule,
     MatChipsModule,
+    MatCheckboxModule,
     MatTooltipModule,
     MatSnackBarModule,
     MatProgressBarModule,
@@ -78,6 +85,22 @@ export class LinksComponent {
   /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
   private readonly mutations = new OwnedMutations();
   readonly actionId = this.mutations.value;
+
+  /** Selección de la página visible; los ids viajan a la acción masiva. */
+  readonly selected = signal<ReadonlySet<number>>(new Set());
+  /** Panel inline de la barra masiva: etiquetar, quitar etiqueta o mover. */
+  readonly bulkPanel = signal<"none" | "tag" | "untag" | "move">("none");
+  bulkTagsInput = "";
+  readonly bulkCollectionId = signal<number | null>(null);
+  readonly collections = signal<CollectionDto[]>([]);
+  readonly exporting = signal(false);
+  /**
+   * Clave de idempotencia de la última acción masiva y su firma. Se reutiliza
+   * cuando un intento quedó sin respuesta (red o 5xx): el reintento debe
+   * reproducir la respuesta original, nunca aplicar el efecto dos veces. Una
+   * respuesta definitiva del servidor la descarta.
+   */
+  private lastBulk: { signature: string; key: string } | null = null;
 
   readonly q = signal("");
   readonly state = signal<StateFilter>("");
@@ -146,6 +169,9 @@ export class LinksComponent {
       return;
     }
     const request = this.requests.begin(workspaceId);
+    // La selección pertenece a la página visible: un cambio de filas no puede
+    // arrastrar ids que ya no están delante del usuario.
+    this.clearSelection();
     const page = this.page() + 1;
     const perPage = this.pageSize();
     this.loading.set(true);
@@ -204,6 +230,154 @@ export class LinksComponent {
     this.page.set(e.pageIndex);
     this.pageSize.set(e.pageSize);
     void this.reload();
+  }
+
+  toggleSelected(id: number): void {
+    this.selected.update((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  allOnPage(): boolean {
+    const links = this.links();
+    return links.length > 0 && links.every((link) => this.selected().has(link.id));
+  }
+
+  toggleSelectPage(checked: boolean): void {
+    this.selected.update((current) => {
+      const next = new Set(current);
+      for (const link of this.links()) {
+        if (checked) next.add(link.id);
+        else next.delete(link.id);
+      }
+      return next;
+    });
+  }
+
+  clearSelection(): void {
+    this.selected.set(new Set());
+    this.bulkPanel.set("none");
+    this.bulkTagsInput = "";
+  }
+
+  openBulkPanel(mode: "tag" | "untag" | "move"): void {
+    this.bulkPanel.set(this.bulkPanel() === mode ? "none" : mode);
+    if (this.bulkPanel() === "move") void this.loadCollections();
+  }
+
+  applyBulkTags(): Promise<void> {
+    const tags = [...new Set(this.bulkTagsInput.split(/[;,\n]/).map((tag) => tag.trim()).filter((tag) => tag !== ""))];
+    if (!tags.length) return Promise.resolve();
+    return this.runBulk(this.bulkPanel() === "untag" ? "untag" : "tag", { tags });
+  }
+
+  applyBulkMove(): Promise<void> {
+    return this.runBulk("move", { collectionId: this.bulkCollectionId() });
+  }
+
+  bulkState(action: "pause" | "activate" | "archive"): Promise<void> {
+    return this.runBulk(action);
+  }
+
+  async bulkTrash(): Promise<void> {
+    const count = this.selected().size;
+    const confirmed = await this.actions.confirm({
+      title: "Eliminar enlaces seleccionados",
+      message: `¿Quieres eliminar ${count} ${count === 1 ? "enlace" : "enlaces"}? Podrás restaurarlos desde la papelera.`,
+      confirmLabel: "Eliminar enlaces",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    await this.runBulk("trash");
+  }
+
+  /**
+   * Aplica una acción a toda la selección o a ninguna, con una clave de
+   * idempotencia por intención: un reintento sin respuesta reproduce la
+   * respuesta original en vez de duplicar el efecto.
+   */
+  private async runBulk(action: BulkAction, extra: Record<string, unknown> = {}): Promise<void> {
+    if (this.actionId() !== null) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
+    const ids = [...this.selected()].sort((a, b) => a - b);
+    if (!ids.length) return;
+    const signature = JSON.stringify({ action, ids, ...extra });
+    const key = this.lastBulk?.signature === signature ? this.lastBulk.key : crypto.randomUUID();
+    this.lastBulk = { signature, key };
+    const op = this.mutations.begin(0);
+    try {
+      await this.api.post("/api/v1/links/bulk", { action, linkIds: ids, ...extra }, decodeBulkActionResponse, { "Idempotency-Key": key });
+      if (!target.isCurrent() || !this.mutations.isCurrent(op)) return;
+      this.lastBulk = null;
+      this.clearSelection();
+      this.snackbar.open("Acción aplicada", "Cerrar", { duration: 2500 });
+      void this.reload();
+    } catch (err) {
+      if (!target.isCurrent() || !this.mutations.isCurrent(op)) return;
+      // Una respuesta del servidor es definitiva: se descarta la clave y un
+      // nuevo intento es una nueva intención. Sin respuesta (red o 5xx) se
+      // conserva para que el reintento reproduzca en vez de aplicar dos veces.
+      if (err instanceof ApiRequestError && err.status > 0 && err.status < 500) this.lastBulk = null;
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo aplicar la acción", "Cerrar", { duration: 3500 });
+    } finally {
+      this.mutations.settle(op);
+    }
+  }
+
+  async exportCsv(): Promise<void> {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    try {
+      const blob = await this.api.getBlob("/api/v1/links/export.csv");
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (!downloadBlob(blob, `uvh-links-${stamp}.csv`)) {
+        this.snackbar.open("No se pudo iniciar la descarga", "Cerrar", { duration: 3000 });
+        return;
+      }
+      this.snackbar.open("Export CSV descargado", "Cerrar", { duration: 2500 });
+    } catch (err) {
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo exportar el CSV", "Cerrar", { duration: 3500 });
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
+  importCsv(): void {
+    this.dialog.open(CsvImportDialogComponent, { width: "min(720px, 94vw)", maxWidth: "94vw" })
+      .afterClosed()
+      .subscribe((imported: unknown) => {
+        if (typeof imported === "number" && imported > 0) void this.reload();
+      });
+  }
+
+  openTags(): void {
+    this.dialog.open(TagsDialogComponent, { width: "min(680px, 94vw)", maxWidth: "94vw" })
+      .afterClosed()
+      .subscribe((changed: unknown) => {
+        if (changed === true) void this.reload();
+      });
+  }
+
+  openCollections(): void {
+    this.dialog.open(CollectionsDialogComponent, { width: "min(680px, 94vw)", maxWidth: "94vw" })
+      .afterClosed()
+      .subscribe((changed: unknown) => {
+        if (changed === true) void this.reload();
+      });
+  }
+
+  private async loadCollections(): Promise<void> {
+    try {
+      const res = await this.api.get("/api/v1/collections", undefined, decodeCollectionsResponse);
+      this.collections.set(res.collections);
+    } catch {
+      // El selector queda vacío y se puede reintentar abriéndolo de nuevo:
+      // mejor vacío que una lista a medias.
+    }
   }
 
   copy(url: string): void {

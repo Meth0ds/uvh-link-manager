@@ -83,6 +83,9 @@ export interface LinkDto {
   utm: LinkUtm;
   domainId: number | null;
   domain: string | null;
+  /** Flat grouping inside the workspace; null is "sin colección". */
+  collectionId: number | null;
+  collection: string | null;
   tags: string[];
   createdAt: string;
   updatedAt: string;
@@ -125,6 +128,77 @@ export interface LinkTrashResponse {
   page: number;
   perPage: number;
   retentionDays: number;
+}
+
+/** A tag is just a name hanging off links; `links` counts only live ones. */
+export interface TagDto {
+  id: number;
+  name: string;
+  links: number;
+}
+
+export interface TagsResponse {
+  tags: TagDto[];
+}
+
+/** One-level grouping: no nesting, delete only ungroups the links. */
+export interface CollectionDto {
+  id: number;
+  name: string;
+  links: number;
+}
+
+export interface CollectionsResponse {
+  collections: CollectionDto[];
+}
+
+/**
+ * Template payloads keep the API's link-create contract (snake_case keys) so
+ * applying one is a plain create input; alias is never part of it.
+ */
+export interface LinkTemplatePayload {
+  destination?: string;
+  fallback_destination?: string | null;
+  notes?: string | null;
+  tags?: string[];
+  utm?: { source?: string | null; medium?: string | null; campaign?: string | null; term?: string | null; content?: string | null };
+  max_clicks?: number | null;
+  single_use?: boolean;
+  scheduled_at?: string | null;
+  expires_at?: string | null;
+  collection_id?: number | null;
+}
+
+export interface LinkTemplateDto {
+  id: number;
+  name: string;
+  payload: LinkTemplatePayload;
+  createdAt: string;
+}
+
+export interface LinkTemplatesResponse {
+  templates: LinkTemplateDto[];
+}
+
+export type BulkAction = "pause" | "activate" | "archive" | "trash" | "restore" | "tag" | "untag" | "move";
+
+export interface BulkActionResponse {
+  ok: boolean;
+  action: BulkAction;
+  applied: number;
+}
+
+export interface ImportRowError {
+  row: number;
+  error: string;
+}
+
+export interface ImportReport {
+  dryRun: boolean;
+  valid: number;
+  created: number;
+  errors: ImportRowError[];
+  truncated: boolean;
 }
 
 /** Status of the owner's appeal against a platform block, as the API emits it. */

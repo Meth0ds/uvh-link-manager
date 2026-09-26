@@ -26,6 +26,7 @@ class Link extends Model
         'workspace_id',
         'created_by',
         'domain_id',
+        'collection_id',
         'alias',
         'destination',
         'fallback_destination',
@@ -88,6 +89,12 @@ class Link extends Model
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'link_tags', 'link_id', 'tag_id');
+    }
+
+    /** @return BelongsTo<Collection, $this> */
+    public function collection(): BelongsTo
+    {
+        return $this->belongsTo(Collection::class);
     }
 
     /** @return HasMany<RedirectRule, $this> */

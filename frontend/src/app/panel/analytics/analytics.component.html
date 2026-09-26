@@ -4,6 +4,14 @@
       <button type="button" [class.active]="period() === option.value" [attr.aria-pressed]="period() === option.value" [attr.aria-label]="option.label" (click)="onPeriod(option.value)">{{ option.short }}</button>
     }
   </div>
+  <div class="export-actions" role="group" aria-label="Exportar la analítica">
+    <button mat-stroked-button type="button" (click)="export('csv')" [disabled]="exporting() || awaitingCustomRange() || customRangeError() !== null">
+      <mat-icon>download</mat-icon> Exportar CSV
+    </button>
+    <button mat-stroked-button type="button" (click)="export('json')" [disabled]="exporting() || awaitingCustomRange() || customRangeError() !== null">
+      <mat-icon>data_object</mat-icon> JSON
+    </button>
+  </div>
   @if (period() === "custom") {
     <div class="custom-range" role="group" aria-label="Fechas del rango personalizado">
       <label>Desde <input #fromInput type="date" [value]="customFrom()" (change)="onCustomDate('from', fromInput.value)" /></label>

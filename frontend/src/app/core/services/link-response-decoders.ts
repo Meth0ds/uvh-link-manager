@@ -72,6 +72,12 @@ function link(value: unknown): LinkDto {
     },
     domainId: nullableInteger(source["domainId"], "link domain", 1),
     domain: nullableText(source["domain"], "link domain", 253),
+    // A payload from before collections existed carries no key and reads as
+    // "sin colección" — the same thing an explicit null means.
+    collectionId: source["collectionId"] === undefined
+      ? null : nullableInteger(source["collectionId"], "link collection", 1),
+    collection: source["collection"] === undefined
+      ? null : nullableText(source["collection"], "link collection", 60),
     tags,
     createdAt: text(source["createdAt"], "link creation timestamp", 64),
     updatedAt: text(source["updatedAt"], "link update timestamp", 64),

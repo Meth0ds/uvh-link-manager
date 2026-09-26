@@ -221,21 +221,54 @@ Sólo se activa el limitador de volumen `uvh-pending` (escritura) y
 | Método | Ruta | Rol | Descripción |
 | ------ | ---- | --- | ----------- |
 | GET | `/` | viewer | Listado con `q, state, tag, sort, page, perPage` → `{ links, total, page, perPage }`. |
-| POST | `/` | editor | Crear enlace (destino, alias, dominio, UTM, notas, programación, expiración, contraseña, máx. clics, uso único, fallback, reglas, tags). Toda clave ajena a ese contrato —incluido `state` y `version`— → `422` nombrándola. |
+| POST | `/` | editor | Crear enlace (destino, alias, dominio, colección, UTM, notas, programación, expiración, contraseña, máx. clics, uso único, fallback, reglas, tags). Toda clave ajena a ese contrato —incluido `state` y `version`— → `422` nombrándola. |
 | POST | `/check-alias` | viewer | `{ alias, domainId }` → `{ available, reason? }`. |
+| GET | `/export.csv` | viewer | Export del workspace en CSV (BOM UTF-8, celdas anti-fórmulas). Máx. 5.000 enlaces: más allá → `409` con el total. Columnas: `id, alias, domain, destination, fallback_destination, state, click_count, max_clicks, single_use, scheduled_at, expires_at, notes, tags` (separadas por `;`), `created_at`. Auditoría `link.export`. |
+| POST | `/import` | editor | `{ dryRun, csv }` (texto, máx. 256 KiB / 500 filas). Columnas permitidas: `alias, destination, fallback_destination, notes, tags` (`;`), `scheduled_at, expires_at, max_clicks, single_use`; una desconocida → `422` nombrándola. `dryRun: true` no escribe nada y devuelve el mismo informe `{ dryRun, valid, created, errors[{row, error}], truncated }` (máx. 100 errores reportados). La importación real exige cabecera `Idempotency-Key`: un reintento reproduce la respuesta original sin duplicar enlaces. Cada fila se valida con las reglas de creación; una fila inválida se reporta sin frenar al resto. |
+| POST | `/bulk` | editor | Acciones masivas (máx. 100 enlaces) sobre la selección entera o ninguna: `{ action, linkIds[], tags? , collectionId? }` con `action` ∈ pause/activate/archive/trash/restore/tag/untag/move → `{ ok, action, applied }`. Exige cabecera `Idempotency-Key` (scope `links.bulk`): la respuesta se sella en la misma transacción que el efecto y una repetición responde con `Idempotent-Replay: true` sin volver a aplicar. `404` si algún id no es del workspace, `403` sobre enlaces bloqueados, `409` al activar un enlace programado o caducado, `429` si la cuota no admite la restauración. |
 | GET | `/:id` | viewer | `{ link, rules[], appeal, blockReason }`; `appeal` es `null` o `{ status, createdAt, decidedAt, decisionNote }` de la última apelación —la nota de la decisión es del propietario, que es quien la sufre— y `blockReason` es `null` o el motivo del bloqueo vigente, tomado de la decisión que lo produjo. |
-| PATCH | `/:id` | editor | Editar enlace (`version` obligatoria). Claves admitidas: `destination`, `alias`, `domainId`, `fallbackDestination`, `password`, `maxClicks`, `singleUse`, `scheduledAt`, `expiresAt`, `notes`, `utm`, `tags`, `rules`, `version`; cualquier otra → `422` nombrándola. `alias` no se puede vaciar (`""`/`null` → `422`); omitirlo conserva el actual. `state` no se acepta aquí: se cambia con `POST /:id/state`. |
+| PATCH | `/:id` | editor | Editar enlace (`version` obligatoria). Claves admitidas: `destination`, `alias`, `domainId`, `collectionId`, `fallbackDestination`, `password`, `maxClicks`, `singleUse`, `scheduledAt`, `expiresAt`, `notes`, `utm`, `tags`, `rules`, `version`; cualquier otra → `422` nombrándola. `collectionId` sigue semántica PATCH: omitido conserva la colección, `null` explícito desagrupa. `alias` no se puede vaciar (`""`/`null` → `422`); omitirlo conserva el actual. `state` no se acepta aquí: se cambia con `POST /:id/state`. |
 | POST | `/:id/state` | editor | `{ state }` (active/paused/archived). |
 | DELETE | `/:id` | editor | Soft delete. |
 | POST | `/:id/restore` | editor | Restaura. |
 | POST | `/:id/appeal` | editor | `{ message? }` → `{ ok, appealId }`. Solo si el enlace está bloqueado y una sola apelación abierta por enlace (`409` si ya existe, `409` si no está bloqueado). Rate limit por sesión e IP. |
 | GET | `/:id/activity` | viewer | `{ events[] }` (auditoría del enlace). |
 
+## Etiquetas — `/api/v1/tags` (workspace)
+
+| Método | Ruta | Rol | Descripción |
+| ------ | ---- | --- | ----------- |
+| GET | `/` | viewer | `{ tags[] }` con `{ id, name, links }`; `links` cuenta sólo enlaces vivos. |
+| POST | `/:id/rename` | editor | `{ name }` → `{ ok, id, name }`. `409` si el nombre (sin distinguir mayúsculas) ya existe en el workspace. |
+| POST | `/merge` | editor | `{ sourceIds[], targetId }` (máx. 50 orígenes) → `{ ok, id, name, moved }`. Las adhesiones se mueven sin duplicar las que ya tenían ambas etiquetas y las de origen se borran: un enlace nunca pierde ni gana grupos por una fusión. |
+
+## Colecciones — `/api/v1/collections` (workspace)
+
+Agrupación plana de un solo nivel; los nombres son únicos por workspace sin distinguir mayúsculas.
+
+| Método | Ruta | Rol | Descripción |
+| ------ | ---- | --- | ----------- |
+| GET | `/` | viewer | `{ collections[] }` con `{ id, name, links }` (enlaces vivos). |
+| POST | `/` | editor | `{ name }` (1–60) → `201 { collection }`. `409` si el nombre está tomado. |
+| PATCH | `/:id` | editor | `{ name }` → `{ ok, id, name }`. |
+| DELETE | `/:id` | editor | Borra la colección **sin tocar enlaces**: quedan sin agrupar (`collection_id` a `NULL`) → `{ ok, moved }`. |
+
+## Plantillas de enlace — `/api/v1/link-templates` (workspace)
+
+Valores por defecto con los que empezar un enlace. El `payload` sólo contiene campos del contrato de creación (`destination`, `fallback_destination`, `notes`, `tags`, `utm`, `max_clicks`, `single_use`, `scheduled_at`, `expires_at`, `collection_id`) y **nunca un alias**; se valida con las mismas reglas que un enlace real al guardar la plantilla.
+
+| Método | Ruta | Rol | Descripción |
+| ------ | ---- | --- | ----------- |
+| GET | `/` | viewer | `{ templates[] }` con `{ id, name, payload, createdAt }`. |
+| POST | `/` | editor | `{ name, payload }` → `201 { template }`. Un campo desconocido o un alias en el payload → `422` nombrándolo; nombre tomado (sin distinguir mayúsculas) → `409`. |
+| DELETE | `/:id` | editor | `{ ok }`. |
+
 ## Analítica — `/api/v1/analytics`
 
 | Método | Ruta | Auth | Descripción |
 | ------ | ---- | ---- | ----------- |
 | GET | `/overview` | sesión + workspace viewer | `period` (`24h`,`7d`,`30d`,`90d`,`custom`), `linkId?` → resumen + series + topLinks + desgloses. `custom` exige `from` y `to`; una `to` sin hora cubre el día completo («hasta el 30» incluye el 30) y el rango queda limitado a 180 días. |
+| GET | `/export` | sesión + workspace viewer | Mismos parámetros que `/overview` + `format` (`csv`\|`json`). Descarga (`Content-Disposition: attachment`, `Cache-Control: no-store`) del mismo resumen. El contrato de privacidad es el punto: **sólo agregados**, nunca un hash de visitante (el CSV lleva `section, key, day, clicks, visitors`); el JSON declara `visitorMetric: daily_pseudonyms` en vez de sugerir identificación de personas. |
 | GET | `/public/overview` | API token `analytics:read` | Igual que arriba para integraciones. |
 
 ## Workspaces — `/api/v1/workspaces`

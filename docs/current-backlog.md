@@ -87,10 +87,20 @@ revisión jurídica) se listan aparte porque no dependen del código.
 
 ## P2 — Escala y operación del código
 
-- [ ] **F7 — Gestión a escala**: acciones masivas con idempotency key,
-  import/export CSV (dry-run, errores por fila, CSV injection), gestor de tags
-  (renombrar/fusionar), colecciones de un nivel, plantillas de enlace, export
-  de analítica CSV/JSON sin visitor hashes.
+- [x] **F7 — Gestión a escala**: acciones masivas con idempotency key
+  (`POST /links/bulk`, clave obligatoria, respuesta sellada en la misma
+  transacción que el efecto y `Idempotent-Replay` en repeticiones; todo o
+  nada sobre la selección), import/export CSV (`GET /links/export.csv` con
+  guard anti-fórmulas y tope explícito; `POST /links/import` con `dryRun`,
+  errores por fila y la misma política de clave), gestor de tags (renombrar y
+  fusionar sin duplicar adhesiones), colecciones de un nivel (borrar
+  desagrupa, nunca borra enlaces), plantillas de enlace (payload validado con
+  el contrato de creación y sin alias) y export de analítica CSV/JSON
+  (`GET /analytics/export`, sólo agregados, sin visitor hashes). UI:
+  selección masiva con barra de acciones en la biblioteca, diálogos de
+  etiquetas/colecciones/importación, colección y plantillas en el diálogo de
+  enlace y export en analítica; la clave de idempotencia se reutiliza sólo en
+  reintentos sin respuesta.
 - [ ] **F8 — Analítica medida antes de tocar**: eliminar la hot row
   `link/day` (o `lockForUpdate()` documentado) y caché 30–60 s por
   workspace/rango/filtro. Requiere medición previa con

@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Csv;
 use App\Support\IsoDate;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceLimits;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 
 class AnalyticsController
@@ -69,6 +72,75 @@ class AnalyticsController
         }
 
         return response()->json($this->buildOverview($workspaceId, $linkId, $range['start'], $range['end']));
+    }
+
+    /**
+     * Exportación de analítica (F7) en CSV o JSON: sólo agregados.
+     *
+     * Los `visitor_hash` son seudónimos que rotan cada día y nunca abandonan
+     * el motor de analítica: lo que sale por aquí son recuentos (clics y
+     * visitantes del día), jamás los valores hash. Ni el JSON ni el CSV traen
+     * columna alguna de identificador de visitante, y el CSV lleva cada celda
+     * por el guardado anti-fórmulas de `Csv`.
+     */
+    public function export(Request $request): JsonResponse|Response
+    {
+        $workspaceId = UvhRequest::workspaceId($request);
+        $format = UvhRequest::queryString($request, 'format', 'csv');
+        if (! in_array($format, ['csv', 'json'], true)) {
+            return response()->json(['error' => 'format inválido (csv|json)'], 422);
+        }
+        $linkIdResult = $this->parseLinkId($request->query('linkId'));
+        if (! $linkIdResult['ok']) {
+            return response()->json(['error' => 'linkId debe ser un entero positivo'], 422);
+        }
+        $linkId = $linkIdResult['value'];
+
+        $range = $this->parseRange(
+            UvhRequest::queryString($request, 'period', '7d'),
+            $request->query('from') !== null ? UvhRequest::queryString($request, 'from') : null,
+            $request->query('to') !== null ? UvhRequest::queryString($request, 'to') : null,
+        );
+        if (! $range['ok']) {
+            return response()->json(['error' => $range['error']], 422);
+        }
+        if ($linkId !== null) {
+            $exists = DB::table('links')->where('id', $linkId)->where('workspace_id', $workspaceId)->exists();
+            if (! $exists) {
+                return response()->json(['error' => 'Enlace no encontrado'], 404);
+            }
+        }
+
+        $overview = $this->buildOverview($workspaceId, $linkId, $range['start'], $range['end']);
+        $filename = 'uvh-analytics-'.now()->format('Ymd').'.'.$format;
+
+        if ($format === 'json') {
+            return response((string) json_encode($overview, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 200, [
+                'Content-Type' => 'application/json; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+                'Cache-Control' => 'no-store',
+            ]);
+        }
+
+        $lines = [Csv::line(['section', 'key', 'day', 'clicks', 'visitors'])];
+        $lines[] = Csv::line(['totals', '', '', (string) $overview['totals']['clicks'], (string) $overview['totals']['visitors']]);
+        foreach ($overview['series'] as $point) {
+            $lines[] = Csv::line(['series', '', (string) $point['day'], (string) $point['clicks'], (string) $point['visitors']]);
+        }
+        foreach ($overview['topLinks'] as $link) {
+            $lines[] = Csv::line(['top_links', (string) $link['alias'], '', (string) $link['clicks'], (string) $link['visitors']]);
+        }
+        foreach (['countries', 'devices', 'browsers', 'os', 'referrers', 'campaigns'] as $dimension) {
+            foreach ($overview[$dimension] as $item) {
+                $lines[] = Csv::line([$dimension, (string) $item['key'], '', (string) $item['value'], '']);
+            }
+        }
+
+        return response(implode("\r\n", $lines)."\r\n", 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     /**

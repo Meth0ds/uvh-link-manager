@@ -737,7 +737,7 @@ class LinkController
     private function unsupportedBodyField(Request $request, bool $partial = false): ?string
     {
         $supported = [
-            'destination', 'alias', 'domainId', 'fallbackDestination', 'password',
+            'destination', 'alias', 'domainId', 'collectionId', 'fallbackDestination', 'password',
             'maxClicks', 'singleUse', 'scheduledAt', 'expiresAt', 'notes',
             'utm', 'tags', 'rules',
         ];
@@ -781,6 +781,10 @@ class LinkController
             && (! is_int($request->input('domainId')) || $request->input('domainId') < 1)) {
             return false;
         }
+        if ($request->has('collectionId') && $request->input('collectionId') !== null
+            && (! is_int($request->input('collectionId')) || $request->input('collectionId') < 1)) {
+            return false;
+        }
         if ($request->has('maxClicks') && $request->input('maxClicks') !== null
             && (! is_int($request->input('maxClicks')) || $request->input('maxClicks') < 1)) {
             return false;
@@ -803,6 +807,9 @@ class LinkController
             'destination' => UvhRequest::inputString($request, 'destination', $current->destination ?? ''),
             'alias' => $request->has('alias') ? $request->input('alias') : ($current->alias ?? null),
             'domain_id' => $request->has('domainId') ? $request->input('domainId') : ($current->domain_id ?? null),
+            // PATCH semantics like domain: an omitted collectionId preserves
+            // the current grouping, an explicit null clears it.
+            'collection_id' => $request->has('collectionId') ? $request->input('collectionId') : ($current->collection_id ?? null),
             'fallback_destination' => $request->has('fallbackDestination') ? $request->input('fallbackDestination') : ($current->fallback_destination ?? null),
             'max_clicks' => $request->has('maxClicks') ? $request->input('maxClicks') : ($current->max_clicks ?? null),
             'single_use' => $request->has('singleUse') ? (bool) $request->input('singleUse') : (bool) ($current->single_use ?? false),
