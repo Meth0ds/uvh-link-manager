@@ -2,7 +2,7 @@
   <a mat-stroked-button routerLink="/app/links/trash"><mat-icon>delete_sweep</mat-icon> Papelera</a>
   @if (canWrite()) {
     <button mat-flat-button color="primary" (click)="create()">
-      <mat-icon>add</mat-icon> Nuevo enlace
+      <mat-icon>add</mat-icon> Crear enlace
     </button>
   }
 </app-page-header>
@@ -37,16 +37,19 @@
           (click)="toggleTag(tag())"
         ><mat-icon aria-hidden="true">sell</mat-icon>#{{ tag() }}<mat-icon aria-hidden="true">close</mat-icon></button>
       }
-      <b class="filter-count tnum">{{ total() }} resultados</b>
+      @if (hasFilters()) {
+        <button mat-button type="button" (click)="clearFilters()">Limpiar filtros</button>
+      }
+      <span class="filter-count tnum" role="status">{{ loading() ? 'Buscando…' : error() ? 'Resultados sin actualizar' : total() + (total() === 1 ? ' resultado' : ' resultados') }}</span>
     </div>
   </div>
   <div class="filters">
-    <mat-form-field appearance="outline" class="search">
+    <mat-form-field appearance="outline" class="search" subscriptSizing="dynamic">
       <mat-icon matPrefix>search</mat-icon>
-      <input matInput aria-label="Buscar enlaces" placeholder="Buscar por alias, destino o notas…" [value]="q()" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
+      <input matInput type="search" name="link-search" autocomplete="off" spellcheck="false" aria-label="Buscar enlaces" placeholder="Buscar por alias, destino o notas…" [value]="q()" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
       <button mat-icon-button matSuffix type="button" (click)="onSearch(searchInput.value)" aria-label="Ejecutar búsqueda"><mat-icon>arrow_forward</mat-icon></button>
     </mat-form-field>
-    <mat-form-field appearance="outline" class="filter">
+    <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
       <mat-select [value]="state()" (selectionChange)="onState($event.value)" aria-label="Estado">
         <mat-option value="">Todos los estados</mat-option>
         <mat-option value="active">Activos</mat-option>
@@ -57,7 +60,7 @@
         <mat-option value="blocked">Bloqueados</mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-form-field appearance="outline" class="filter">
+    <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
       <mat-select [value]="sort()" (selectionChange)="onSort($event.value)" aria-label="Ordenar">
         <mat-option value="created_at_desc">Más recientes</mat-option>
         <mat-option value="created_at_asc">Más antiguos</mat-option>
@@ -70,7 +73,8 @@
     @if (canWrite()) {
       <mat-checkbox
         [checked]="allOnPage()"
-        [disabled]="!links().length || actionId() !== null"
+        [indeterminate]="someOnPage()"
+        [disabled]="loading() || !links().length || actionId() !== null"
         (change)="toggleSelectPage($event.checked)"
         aria-label="Seleccionar todos los enlaces de la página"
       >Seleccionar página</mat-checkbox>
@@ -141,28 +145,19 @@
 @if (!loading() && (!error() || links().length)) {
   <div class="link-list">
     @for (link of links(); track trackByLink($index, link)) {
-      <article
-        class="link-row"
-        role="link"
-        tabindex="0"
-        [attr.aria-label]="'Abrir enlace ' + displayUrl(link.shortUrl)"
-        (click)="openLink(link.id)"
-        (keydown)="openLinkFromKeyboard($event, link.id)"
-      >
+      <article class="link-row" [class.selected]="selected().has(link.id)" [class.selectable]="canWrite()">
         @if (canWrite()) {
           <mat-checkbox
             class="link-check"
             [checked]="selected().has(link.id)"
             (change)="toggleSelected(link.id)"
-            (click)="$event.stopPropagation()"
-            (keydown)="$event.stopPropagation()"
-            [attr.aria-label]="'Seleccionar enlace ' + displayUrl(link.shortUrl)"
+            [aria-label]="'Seleccionar enlace ' + displayUrl(link.shortUrl)"
           ></mat-checkbox>
         }
         <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span>
         <div class="link-main">
           <div class="link-top">
-            <a class="short tnum" [routerLink]="['/app/links', link.id]" (click)="$event.stopPropagation()">{{ displayUrl(link.shortUrl) }}</a>
+            <a class="short tnum" [routerLink]="['/app/links', link.id]" [attr.aria-label]="'Abrir enlace ' + displayUrl(link.shortUrl)">{{ displayUrl(link.shortUrl) }}</a>
             <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
             @if (link.clickCount > 0) {
               <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ link.clickCount }}</span>
@@ -202,7 +197,7 @@
           <mat-menu #menu="matMenu">
             <button mat-menu-item (click)="showQr(link.shortUrl)"><mat-icon>qr_code_2</mat-icon> QR</button>
             <button mat-menu-item (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar URL</button>
-            <button mat-menu-item (click)="router.navigate(['/app/links', link.id])"><mat-icon>query_stats</mat-icon> Analítica</button>
+            <a mat-menu-item [routerLink]="['/app/links', link.id]"><mat-icon>query_stats</mat-icon> Analítica</a>
             @if (canWrite()) {
               <button mat-menu-item (click)="edit(link)" [disabled]="actionId() === link.id"><mat-icon>edit</mat-icon> Editar</button>
               @if (link.state === 'active') {
@@ -223,11 +218,13 @@
     }
     @if (!links().length && !loading() && !error()) {
       <div class="empty-state">
-        <mat-icon>link_off</mat-icon>
-        <b>Sin enlaces todavía</b>
-        <p>Crea tu primer enlace corto para empezar a medir.</p>
-        @if (canWrite()) {
-          <button mat-flat-button color="primary" (click)="create()">Crear enlace</button>
+        <mat-icon aria-hidden="true">{{ hasFilters() ? 'search_off' : 'link_off' }}</mat-icon>
+        <b>{{ hasFilters() ? 'No hay enlaces con estos filtros' : 'Tu biblioteca empieza aquí' }}</b>
+        <p>{{ hasFilters() ? 'Prueba otra búsqueda o limpia los filtros para ver todos los enlaces.' : canWrite() ? 'Crea tu primer enlace corto. Aquí podrás cambiar su destino y seguir sus clics.' : 'Los enlaces de este espacio aparecerán aquí cuando el equipo los cree.' }}</p>
+        @if (hasFilters()) {
+          <button mat-stroked-button type="button" (click)="clearFilters()">Limpiar filtros</button>
+        } @else if (canWrite()) {
+          <button mat-flat-button color="primary" type="button" (click)="create()">Crear enlace</button>
         }
       </div>
     }

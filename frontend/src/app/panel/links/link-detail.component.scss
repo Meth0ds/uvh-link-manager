@@ -259,7 +259,7 @@
   font-weight: 700;
 }
 
-.metric dd {
+.metric dd:not(.metric-note) {
   margin: 6px 0 10px;
   color: var(--uvh-ink);
   font-size: clamp(26px, 4cqi, 40px);
@@ -270,11 +270,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.primary-metric dd {
+.primary-metric dd:not(.metric-note) {
   color: var(--uvh-electric);
 }
 
-.metric > span {
+.metric .metric-note { margin: 0;
   display: block;
   max-width: 26ch;
   color: var(--uvh-muted);
@@ -410,7 +410,7 @@
     }
   }
 
-  .metric dd {
+  .metric dd:not(.metric-note) {
     font-size: 30px;
   }
 }

@@ -4,9 +4,9 @@
   @if (points()) {
     @if (showBreakdowns()) {
       <dl class="chart-insights" aria-label="Lectura rápida de la serie">
-        <div><dt>Pico del periodo</dt><dd>{{ formatCount(peak()?.clicks ?? 0) }}</dd><span>{{ dayLabel(peak()?.day ?? '') }}</span></div>
-        <div><dt>Media diaria</dt><dd>{{ formatAverage(dailyAverage()) }}</dd><span>clics por día con datos</span></div>
-        <div><dt>Último dato</dt><dd>{{ formatCount(latest()?.clicks ?? 0) }}</dd><span>{{ dayLabel(latest()?.day ?? '') }}</span></div>
+        <div><dt>Pico del periodo</dt><dd>{{ formatCount(peak()?.clicks ?? 0) }}</dd><dd class="metric-note">{{ dayLabel(peak()?.day ?? '') }}</dd></div>
+        <div><dt>Media diaria</dt><dd>{{ formatAverage(dailyAverage()) }}</dd><dd class="metric-note">clics por día con datos</dd></div>
+        <div><dt>Último dato</dt><dd>{{ formatCount(latest()?.clicks ?? 0) }}</dd><dd class="metric-note">{{ dayLabel(latest()?.day ?? '') }}</dd></div>
       </dl>
     }
     <div class="plot" aria-hidden="true">

@@ -1,12 +1,12 @@
 import { Component, ChangeDetectionStrategy, inject } from "@angular/core";
-import { ActivatedRoute, RouterLink } from "@angular/router";
+import { ActivatedRoute } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { PublicThemeToggleComponent } from "./core/public-theme-toggle.component";
 
 @Component({
   selector: "app-status-page", standalone: true,
-  imports: [RouterLink, MatButtonModule, MatIconModule, PublicThemeToggleComponent],
+  imports: [ MatButtonModule, MatIconModule, PublicThemeToggleComponent],
   templateUrl: "./status-page.component.html",
   styleUrl: "./status-page.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,

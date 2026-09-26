@@ -145,7 +145,7 @@
                 <button mat-icon-button type="button" (click)="clearTransferTarget()" aria-label="Elegir a otra persona"><mat-icon>close</mat-icon></button>
               </div>
             } @else {
-              <mat-form-field appearance="outline" class="transfer-search"><mat-label>Buscar por nombre o email</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="transferQuery()" (input)="onTransferQuery(memberSearch.value)" #memberSearch autocomplete="off" maxlength="120" aria-label="Buscar entre todos los miembros del workspace" />@if (transferSearching()) { <mat-icon matSuffix>progress_activity</mat-icon> }</mat-form-field>
+              <mat-form-field appearance="outline" class="transfer-search"><mat-label>Buscar por nombre o email</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="transferQuery()" (input)="onTransferQuery(memberSearch.value)" #memberSearch autocomplete="off" maxlength="120" aria-label="Buscar entre todos los miembros del workspace" />@if (transferSearching()) { <mat-icon matSuffix>sync</mat-icon> }</mat-form-field>
               <div class="transfer-results">
                 @if (transferSearchError()) {
                   <p class="transfer-search-error">No se pudo buscar miembros. Inténtalo de nuevo.</p>

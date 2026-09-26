@@ -72,6 +72,9 @@ html, html.dark {
     inverse-primary: light-dark(#f79573, #b53c20),
     surface-tint: var(--accent),
   ));
+  // Keep the visible icon control and its hit target the same size. Material's
+  // 40px control + 48px target otherwise leaks past narrow forms and rows.
+  @include mat.icon-button-overrides((state-layer-size: 48px, touch-target-size: 48px));
   @include mat.button-overrides((
     filled-container-shape: 3px, outlined-container-shape: 3px,
     protected-container-shape: 3px, text-container-shape: 3px,
@@ -779,4 +782,8 @@ html .mat-typography .mat-body-small {
 
   .main app-page-header,
   .main app-page-header ~ * { animation: none !important; }
+}
+
+@media (max-height: 760px) {
+  app-panel .side .mat-drawer-inner-container { overflow-y: auto; overscroll-behavior: contain; }
 }

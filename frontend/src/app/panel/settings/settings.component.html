@@ -94,7 +94,7 @@
 <div class="card-block password-card">
   <div class="card-heading"><span class="card-icon"><mat-icon>password</mat-icon></span><div><h3>Contraseña</h3><p>Actualiza tu credencial y mantén una combinación única.</p></div></div>
   <div class="security-entry">
-    <span class="security-entry-mark" aria-hidden="true"><mat-icon>encrypted</mat-icon></span>
+    <span class="security-entry-mark" aria-hidden="true"><mat-icon>lock</mat-icon></span>
     <p><b>Proceso protegido</b><span>La contraseña y el segundo factor se solicitan en pasos separados.</span></p>
     <button mat-stroked-button type="button" (click)="openPasswordDialog()">Cambiar contraseña<mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
   </div>
@@ -320,7 +320,7 @@
       <div class="row-actions"><button mat-stroked-button class="danger" type="button" (click)="cancelDataExport()" [disabled]="exportBusy()">{{ exportBusy() ? 'Cancelando…' : 'Cancelar exportación' }}</button></div>
     } @else if (exportShowsRequestEntry()) {
       <div class="security-entry export-entry">
-        <span class="security-entry-mark" aria-hidden="true"><mat-icon>encrypted</mat-icon></span>
+        <span class="security-entry-mark" aria-hidden="true"><mat-icon>lock</mat-icon></span>
         <p><b>Archivo privado y descarga protegida</b><span>Preparamos el archivo en almacenamiento privado y pediremos tu contraseña y tu segundo factor por separado para entregarlo.</span></p>
         <button mat-stroked-button type="button" (click)="openDataExportDialog()"><mat-icon aria-hidden="true">download</mat-icon>Solicitar mi archivo</button>
       </div>

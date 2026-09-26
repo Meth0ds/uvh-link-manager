@@ -20,7 +20,7 @@ const links: LinkDto[] = aliases.map((alias, i) => ({
   clickCount: [2318, 1084, 0, 675, 42][i], maxClicks: null, singleUse: false, usedAt: null,
   scheduledAt: null, expiresAt: null, notes: null, passwordProtected: false,
   utm: { source: null, medium: null, campaign: null, term: null, content: null },
-  domainId: null, domain: null, tags: [], createdAt: "2026-09-08T12:00:00Z", updatedAt: "2026-09-08T12:00:00Z", version: 1,
+  domainId: null, domain: null, collectionId: null, collection: null, tags: i % 2 ? ["editorial", "septiembre"] : ["campaña"], createdAt: "2026-09-08T12:00:00Z", updatedAt: "2026-09-08T12:00:00Z", version: 1,
 }));
 
 function sampleOverview(period: unknown, empty: boolean): AnalyticsOverview {
@@ -67,12 +67,29 @@ export async function fixtureRead<T>(path: string, params?: Record<string, unkno
     { id: 9002, name: "IntegracionConNombreLargoSinEspaciosParaComprobarLaLecturaEnPantallasEstrechas", scopes: ["analytics:read", "domains:read", "domains:write"],
       createdAt: "2026-09-01T12:00:00Z", lastUsedAt: null, expiresAt: null, revokedAt: "2026-09-12T12:00:00Z" },
   ] };
-  else if (path === "/api/v1/links") value = { links: empty ? [] : links, total: empty ? 0 : links.length, page: 1, perPage: 5 };
+  else if (path === "/api/v1/notifications/unread") value = { unread: empty ? 0 : 2 };
+  else if (path === "/api/v1/notifications") value = { notifications: empty ? [] : [
+    { id: 3, kind: "password_changed", subject: null, workspaceId: null, route: "/app/settings/security", createdAt: "2026-09-26T12:30:00Z", readAt: null },
+    { id: 2, kind: "password_changed", subject: "CuentaEditorialConNombreLargoSinEspaciosParaComprobarQueNoSeRecortaEnUnaPantallaEstrecha", workspaceId: 1, route: "/app/settings/security", createdAt: "2026-09-25T08:00:00Z", readAt: null },
+    { id: 1, kind: "password_changed", subject: "Cuenta de ejemplo", workspaceId: null, route: null, createdAt: "2026-09-24T09:15:00Z", readAt: "2026-09-24T10:00:00Z" },
+  ], unread: empty ? 0 : 2, nextCursor: null };
+  else if (/^\/api\/v1\/links\/\d+\/activity$/.test(path)) value = { events: [], truncated: false };
+  else if (/^\/api\/v1\/links\/\d+$/.test(path)) value = { link: links.find(link => link.id === Number(path.split("/").pop())), rules: [], appeal: null, blockReason: null };
+  else if (path === "/api/v1/links") {
+    const q = String(params?.["q"] ?? "").toLowerCase();
+    const filtered = empty ? [] : links.filter(link =>
+      (!q || `${link.alias} ${link.destination}`.toLowerCase().includes(q)) &&
+      (!params?.["state"] || link.state === params["state"]) &&
+      (!params?.["tag"] || link.tags.includes(String(params["tag"]))));
+    const page = Number(params?.["page"] ?? 1);
+    const perPage = Number(params?.["perPage"] ?? 20);
+    value = { links: filtered.slice((page - 1) * perPage, page * perPage), total: filtered.length, page, perPage };
+  }
   else if (path === `/api/v1/workspaces/${currentId()}/getting-started`) {
     const workspaceId = currentId();
     if (workspaceId === null) return blocked();
     const viewer = currentId() === 2;
-    value = { workspaceId, role: viewer ? "viewer" : "owner",
+    value = { workspaceId, dismissedAt: null, role: viewer ? "viewer" : "owner",
       facts: { linkPresent: !empty, redirectObserved: !empty, mfaEnabled: false, domainPresent: false, teammatePresent: false, invitationPending: viewer ? null : false },
       capabilities: { createLink: !viewer, addDomain: !viewer, inviteTeam: !viewer },
     } satisfies WorkspaceGettingStarted;

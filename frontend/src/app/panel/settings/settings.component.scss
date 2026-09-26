@@ -819,7 +819,7 @@ app-async-operation-status {
   transition: background-color 160ms ease;
 
   &.current-session {
-    margin: 0 -10px;
+    margin: 0;
     padding-right: 10px;
     padding-left: 10px;
     border-radius: 3px;
@@ -933,6 +933,7 @@ app-async-operation-status {
     grid-template-columns: 1fr;
   }
   .security-strip { align-items: flex-start; flex-wrap: wrap; }
+  .security-strip > div { flex-basis: calc(100% - 51px); }
   .security-state { margin-left: 51px; }
   .privacy-case > header { flex-direction: column; }
   .privacy-case > dl { grid-template-columns: 1fr; }

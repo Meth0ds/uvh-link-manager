@@ -22,11 +22,11 @@ h1 { margin: 0; }
 .code {
   display: block;
   font: 800 clamp(88px, 22vw, 148px)/0.9 Manrope, sans-serif; letter-spacing: -.06em;
-  color: color-mix(in srgb, var(--ink, #262821) 12%, transparent);
+  color: var(--muted, #626357);
   user-select: none;
 }
 .headline {
-  display: block; margin-top: -14px;
+  display: block; margin-top: 16px;
   font: 700 clamp(24px, 5vw, 34px)/1.25 Manrope, sans-serif; letter-spacing: -.035em;
   color: var(--ink, #262821);
 }

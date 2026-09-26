@@ -101,4 +101,28 @@ describe("NotificationsComponent", () => {
     // notificaciones»: eso sólo se dice cuando la bandeja vuelve vacía y sin error.
     expect(component.items().map((row) => row.id)).toEqual([1]);
   });
+  it("clears a previous operation error when a retry succeeds", async () => {
+    component.error.set("No se pudo marcar la notificación.");
+    await component.markRead(item());
+    expect(component.error()).toBeNull();
+    component.error.set("No se pudo marcar la bandeja.");
+    await component.markAllRead();
+    expect(component.error()).toBeNull();
+    component.cursor.set(1);
+    component.error.set("No se pudo cargar la siguiente página.");
+    await component.loadMore();
+    expect(component.error()).toBeNull();
+  });
+
+  it("prevents read mutations and pagination while the inbox is refreshing", async () => {
+    component.loading.set(true);
+    component.cursor.set(1);
+    await component.markRead(item());
+    await component.markAllRead();
+    await component.loadMore();
+    expect(notifications.markRead).not.toHaveBeenCalled();
+    expect(notifications.markAllRead).not.toHaveBeenCalled();
+    expect(notifications.list).not.toHaveBeenCalled();
+  });
+
 });

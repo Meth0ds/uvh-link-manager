@@ -81,12 +81,12 @@
         <mat-icon>add_link</mat-icon> Crear enlace
       </button> }
 
-      <button mat-icon-button class="notifications-bell" routerLink="/app/notifications" [attr.aria-label]="unreadNotificationsLabel()">
+      <a mat-icon-button class="notifications-bell" routerLink="/app/notifications" [attr.aria-label]="unreadNotificationsLabel()">
         <mat-icon aria-hidden="true">notifications</mat-icon>
         @if (notifications.unread() > 0) {
           <span class="bell-badge" aria-hidden="true">{{ notifications.unread() > 99 ? '99+' : notifications.unread() }}</span>
         }
-      </button>
+      </a>
 
       <app-public-theme-toggle class="panel-theme" />
 
@@ -99,8 +99,8 @@
           <b>{{ user()?.name }}</b>
           <span>{{ user()?.email }}</span>
         </div>
-        <button mat-menu-item routerLink="/app/settings"><mat-icon>settings</mat-icon> Ajustes</button>
-        <button mat-menu-item routerLink="/app/team"><mat-icon>group</mat-icon> Equipo</button>
+        <a mat-menu-item routerLink="/app/settings"><mat-icon>settings</mat-icon> Ajustes</a>
+        <a mat-menu-item routerLink="/app/team"><mat-icon>group</mat-icon> Equipo</a>
         <a mat-menu-item routerLink="/"><mat-icon>language</mat-icon> Ir a la web</a>
         <mat-divider></mat-divider>
         <button mat-menu-item (click)="logout()" [disabled]="logoutBusy()"><mat-icon>logout</mat-icon> {{ logoutBusy() ? 'Cerrando sesión…' : 'Cerrar sesión' }}</button>

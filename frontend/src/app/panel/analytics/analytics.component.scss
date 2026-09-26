@@ -129,7 +129,7 @@
     font-weight: 700;
   }
 
-  dd {
+  dd:not(.metric-note) {
     margin: 6px 0 10px;
     color: var(--uvh-ink);
     font-size: clamp(26px, 4cqi, 40px);
@@ -140,7 +140,8 @@
     font-variant-numeric: tabular-nums;
   }
 
-  > span {
+  .metric-note {
+    margin: 0;
     display: block;
     max-width: 26ch;
     color: var(--uvh-muted);
@@ -149,7 +150,7 @@
   }
 }
 
-.primary-metric dd {
+.primary-metric dd:not(.metric-note) {
   color: var(--uvh-electric);
 }
 
@@ -221,6 +222,7 @@
     flex-direction: column;
 
     b {
+      overflow-wrap: anywhere;
       color: var(--uvh-electric);
       font-size: 14px;
       font-weight: 800;
@@ -304,6 +306,7 @@
 @container (max-width: 620px) {
   .period-switch { width: 100%; }
   .period-switch button { flex: 1; min-width: 0; padding-inline: 7px; }
+  .period-switch button:last-child { flex: 0 0 auto; }
   .reading-note { grid-template-columns: auto minmax(0, 1fr); margin-top: -2px; }
   .reading-note a { grid-column: 2; justify-self: start; }
 

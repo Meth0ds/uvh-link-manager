@@ -44,10 +44,10 @@
 
 @if (overview(); as o) {
   <dl class="metric-strip" aria-label="Resumen del periodo seleccionado">
-    <div class="metric primary-metric"><dt>Clics registrados</dt><dd>{{ formatCount(o.totals.clicks) }}</dd><span>Últimos {{ periodLabel() }}</span></div>
-    <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ formatCount(o.totals.visitors) }}</dd><span>No son personas únicas; pueden repetirse entre días.</span></div>
-    <div class="metric"><dt>Enlaces destacados</dt><dd>{{ formatCount(o.topLinks.length) }}</dd><span>Enlaces que aparecen en la selección inferior.</span></div>
-    <div class="metric"><dt>Referentes</dt><dd>{{ formatCount(o.dimensionTotals.referrers) }}</dd><span>Fuentes distintas de procedencia.</span></div>
+    <div class="metric primary-metric"><dt>Clics registrados</dt><dd>{{ formatCount(o.totals.clicks) }}</dd><dd class="metric-note">Últimos {{ periodLabel() }}</dd></div>
+    <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ formatCount(o.totals.visitors) }}</dd><dd class="metric-note">No son personas únicas; pueden repetirse entre días.</dd></div>
+    <div class="metric"><dt>Enlaces destacados</dt><dd>{{ formatCount(o.topLinks.length) }}</dd><dd class="metric-note">Enlaces que aparecen en la selección inferior.</dd></div>
+    <div class="metric"><dt>Referentes</dt><dd>{{ formatCount(o.dimensionTotals.referrers) }}</dd><dd class="metric-note">Fuentes distintas de procedencia.</dd></div>
   </dl>
 
   <section class="activity-section" aria-labelledby="activity-title">

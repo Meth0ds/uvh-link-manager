@@ -4,8 +4,9 @@
 // result count — no shadowed rounded card around the controls.
 .filter-bar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -35,6 +36,8 @@
 
 .filter-summary {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   gap: 12px;
 }
@@ -45,6 +48,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-height: 44px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 3px 10px;
   border: 1px solid var(--uvh-electric);
   border-radius: 999px;
@@ -166,13 +172,13 @@
 }
 
 .link-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 16px 4px;
   border-bottom: 1px solid var(--uvh-border);
   background: transparent;
-  cursor: pointer;
   transition: background-color 180ms ease;
 
   &:hover,
@@ -180,10 +186,7 @@
     background: var(--uvh-surface-raised);
   }
 
-  &:focus-visible {
-    outline: 2px solid var(--uvh-electric);
-    outline-offset: -2px;
-  }
+  &.selected { background: var(--guide); }
 }
 
 .link-leading {
@@ -215,6 +218,14 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+
+// Native stretched link keeps Cmd/Ctrl-click and keyboard navigation intact.
+// Sibling controls sit above the hit area instead of inside a role=link wrapper.
+.short::after { content: ""; position: absolute; inset: 0; }
+.short:focus-visible { outline: none; }
+.short:focus-visible::after { outline: 2px solid var(--uvh-electric); outline-offset: -2px; }
+.link-check, .link-actions, .meta .tag { position: relative; z-index: 1; }
+.filter-count { color: var(--uvh-muted); font-size: 12px; }
 
 .short {
   color: var(--uvh-electric);
@@ -264,7 +275,10 @@
   flex-wrap: wrap;
 
   .tag {
-    padding: 2px 7px;
+    min-height: 32px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    padding: 4px 8px;
     border: 1px solid var(--uvh-border);
     border-radius: 3px;
     background: transparent;
@@ -318,37 +332,24 @@
     gap: 10px;
   }
 
-  .filters {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .search { grid-column: 1 / -1; }
+  .link-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 10px 12px; padding: 16px 0; align-items: start; }
+  .link-row.selectable { grid-template-columns: 40px minmax(0, 1fr); }
+  .link-row.selectable .link-leading { display: none; }
+  .link-main { min-width: 0; }
+  .link-actions { grid-column: 2; justify-content: flex-end; opacity: 1; }
+  .link-top { gap: 8px; }
+  .short { flex-basis: 100%; }
+  .pending-link { align-items: flex-start; flex-wrap: wrap; }
+  .pending-link-actions { width: 100%; flex-wrap: wrap; }
+  .bulk-spacer { display: none; }
 }
-
-@media (max-width: 640px) {
-  .pending-link {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .pending-link-actions {
-    width: 100%;
-    padding-left: 52px;
-  }
-
-  .link-row {
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-
-  .link-main {
-    max-width: calc(100% - 54px);
-  }
-
-  .link-actions {
-    width: 100%;
-    justify-content: flex-end;
-    padding-left: 54px;
-    opacity: 1;
-  }
+@container (max-width: 340px) {
+  .filters { grid-template-columns: minmax(0, 1fr); }
+  .scale-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .scale-tools button { padding-inline: 8px; font-size: 12px; }
+  .link-actions { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -385,7 +386,7 @@
   padding: 12px 14px;
   border: 1px solid var(--uvh-border);
   border-left: 3px solid var(--uvh-electric);
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--uvh-surface-raised);
   box-shadow: var(--uvh-shadow-md);
 }
@@ -442,3 +443,5 @@
     top: 0;
   }
 }
+
+@container (max-width: 760px) { .bulk-bar { position: static; box-shadow: none; } }

@@ -57,10 +57,10 @@
 
 @if (overview(); as o) {
   <dl class="metric-strip" aria-label="Resumen del periodo seleccionado">
-    <div class="metric primary-metric"><dt>Clics registrados</dt><dd>{{ formatCount(o.totals.clicks) }}</dd><span>{{ periodLabel() }}</span></div>
-    <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ formatCount(o.totals.visitors) }}</dd><span>Actividad privada; no son personas únicas.</span></div>
-    <div class="metric"><dt>Días en la serie</dt><dd>{{ formatCount(o.series.length) }}</dd><span>Intervalos con datos devueltos.</span></div>
-    <div class="metric"><dt>Enlaces destacados</dt><dd>{{ formatCount(o.topLinks.length) }}</dd><span>Los que concentran más clics.</span></div>
+    <div class="metric primary-metric"><dt>Clics registrados</dt><dd>{{ formatCount(o.totals.clicks) }}</dd><dd class="metric-note">{{ periodLabel() }}</dd></div>
+    <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ formatCount(o.totals.visitors) }}</dd><dd class="metric-note">Actividad privada; no son personas únicas.</dd></div>
+    <div class="metric"><dt>Días en la serie</dt><dd>{{ formatCount(o.series.length) }}</dd><dd class="metric-note">Intervalos con datos devueltos.</dd></div>
+    <div class="metric"><dt>Enlaces destacados</dt><dd>{{ formatCount(o.topLinks.length) }}</dd><dd class="metric-note">Los que concentran más clics.</dd></div>
   </dl>
   <app-charts [overview]="o" />
   <div class="section-heading"><div><span>Rendimiento</span><h2>Enlaces con más actividad</h2></div><small>{{ periodLabel() }}</small></div>

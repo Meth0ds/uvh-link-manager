@@ -5,15 +5,16 @@
   description="Avisos de seguridad y operativos de tu cuenta, en un solo sitio."
 >
   @if (items().length) {
-    <button mat-stroked-button type="button" (click)="markAllRead()" [disabled]="busy() || unread() === 0">
+    <button mat-stroked-button type="button" (click)="markAllRead()" [disabled]="loading() || busy() || unread() === 0">
       <mat-icon aria-hidden="true">done_all</mat-icon>Marcar todas como leídas
     </button>
   }
 </app-page-header>
 
-@if (loading()) {
-  <mat-progress-bar mode="indeterminate" aria-label="Cargando notificaciones" />
+@if (loading() && !items().length) {
+  <app-panel-skeleton variant="list" label="Cargando notificaciones" />
 } @else {
+  @if (loading()) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando notificaciones" /> }
   @if (error(); as message) {
     <div class="alert error" role="alert">
       <mat-icon aria-hidden="true">error_outline</mat-icon>
@@ -23,16 +24,22 @@
   }
 
   @if (!error() && !items().length) {
-    <p class="muted empty-inbox">No tienes notificaciones. Aquí verás los avisos de seguridad y la actividad de tu cuenta.</p>
+    <div class="empty-state" role="status">
+      <mat-icon aria-hidden="true">notifications_none</mat-icon>
+      <b>No tienes notificaciones</b>
+      <p>Aquí verás los avisos de seguridad y la actividad de tu cuenta. Puedes elegir cómo recibirlos.</p>
+      <a mat-stroked-button routerLink="/app/settings/notifications">Preferencias de notificaciones</a>
+    </div>
   }
 
   @if (items().length) {
-    <ul class="notification-list">
+    <div class="inbox-summary" role="status"><span>{{ unread() === 0 ? 'Todo al día' : unread() + ' sin leer' }}</span><a routerLink="/app/settings/notifications">Preferencias de avisos</a></div>
+    <ul class="notification-list" aria-label="Avisos de tu cuenta" [attr.aria-busy]="loading() || busy()">
       @for (item of items(); track item.id) {
         <li class="notification-row" [class.unread]="item.readAt === null">
           <span class="notification-icon" aria-hidden="true"><mat-icon>{{ kindIcon(item.kind) }}</mat-icon></span>
           <div class="notification-copy">
-            <b>{{ kindLabel(item.kind) }}</b>
+            <div class="notification-heading"><b>{{ kindLabel(item.kind) }}</b>@if (item.readAt === null) { <span class="unread-label">Sin leer</span> }</div>
             @if (item.subject) { <span class="notification-subject">{{ item.subject }}</span> }
             <time [attr.datetime]="item.createdAt">{{ item.createdAt | date:'dd/MM/yyyy HH:mm':'UTC' }} UTC</time>
           </div>
@@ -41,7 +48,7 @@
               <a mat-stroked-button [routerLink]="item.route">Ver detalle</a>
             }
             @if (item.readAt === null) {
-              <button mat-button type="button" (click)="markRead(item)" [disabled]="busy()">Marcar como leída</button>
+              <button mat-button type="button" (click)="markRead(item)" [disabled]="loading() || busy()">Marcar como leída</button>
             } @else {
               <span class="read-mark"><mat-icon aria-hidden="true">task_alt</mat-icon>Leída</span>
             }
@@ -50,7 +57,7 @@
       }
     </ul>
     @if (hasMore()) {
-      <div class="row-actions"><button mat-stroked-button type="button" (click)="loadMore()" [disabled]="busy()">{{ busy() ? 'Cargando…' : 'Cargar más' }}</button></div>
+      <div class="row-actions"><button mat-stroked-button type="button" (click)="loadMore()" [disabled]="loading() || busy()">{{ busy() ? 'Cargando…' : 'Cargar más' }}</button></div>
     }
   }
 }

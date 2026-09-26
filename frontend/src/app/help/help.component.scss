@@ -144,3 +144,6 @@ a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
   .support-note { gap: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+
+// Inline links must be identifiable without relying on their color.
+p a { text-decoration: underline; text-underline-offset: 3px; }

@@ -11,6 +11,7 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatDialog } from "@angular/material/dialog";
 import { of } from "rxjs";
+import { LinkDetailComponent } from "../src/app/panel/links/link-detail.component";
 import { PanelComponent } from "../src/app/panel/panel.component";
 import { PageHeaderComponent } from "../src/app/panel/page-header.component";
 import { ActionDialogComponent } from "../src/app/panel/action-dialog.component";
@@ -73,6 +74,9 @@ void bootstrapApplication(DesignPreviewRootComponent, {
       { path: "forbidden", component: StatusPageComponent, data: { kind: "forbidden" }, title: "403 · Vista de diseño" },
       { path: "not-found", component: StatusPageComponent, data: { kind: "not-found" }, title: "404 · Vista de diseño" },
       { path: "app", component: PanelComponent, children: [
+        { path: "links/:id", component: LinkDetailComponent },
+        { path: "links", component: WorkspacePreviewComponent, data: { page: "links" } },
+        { path: "notifications", component: WorkspacePreviewComponent, data: { page: "notifications" } },
         { path: "settings", component: SettingsPreviewComponent },
         { path: "dashboard", component: WorkspacePreviewComponent, data: { page: "dashboard" } },
         { path: "analytics", component: WorkspacePreviewComponent, data: { page: "analytics" } },

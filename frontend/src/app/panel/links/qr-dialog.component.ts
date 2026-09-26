@@ -20,7 +20,7 @@ import QRCode from "qrcode";
         <p class="qr-error" role="alert">{{ error() }}</p>
       }
       @if (dataUrl()) {
-        <img [src]="dataUrl()" alt="Código QR de {{ url }}" class="qr-img" />
+        <img [src]="dataUrl()" alt="Código QR de {{ url }}" class="qr-img" width="240" height="240" />
       }
       <p class="url tnum">{{ url }}</p>
     </mat-dialog-content>
@@ -42,10 +42,10 @@ import QRCode from "qrcode";
       h2 b { color: var(--uvh-ink); font-size: 21px; font-weight: 800; letter-spacing: -.045em; }
       .title-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); color: var(--uvh-electric); }
       .title-icon mat-icon { width: 20px; height: 20px; font-size: 20px; }
-      .qr-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 18px 8px; text-align: center; min-width: 260px; }
+      .qr-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 18px 8px; text-align: center; min-width: 0; overflow-wrap: anywhere; }
       /* The QR itself stays on white paper (scanners need the contrast) but
          as a flat plate with a hairline frame, not an elevated rounded card. */
-      .qr-img { width: 240px; height: 240px; border: 1px solid var(--uvh-border); border-radius: 3px; padding: 11px; background: #fff; }
+      .qr-img { width: min(240px, 100%); height: auto; aspect-ratio: 1; border: 1px solid var(--uvh-border); border-radius: 3px; padding: 11px; background: #fff; }
       .url { color: var(--uvh-muted); font-size: 12px; font-variant-numeric: tabular-nums; word-break: break-all; margin: 0; }
       .qr-error { border-left: 3px solid var(--uvh-danger); background: var(--uvh-danger-soft); color: var(--uvh-danger); font-size: 13px; padding: 10px 12px; margin: 24px 0 8px; text-align: left; }
     `,

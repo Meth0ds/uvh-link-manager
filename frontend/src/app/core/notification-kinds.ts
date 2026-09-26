@@ -15,7 +15,7 @@ export const NOTIFICATION_KINDS = {
   mfa_enabled: { category: "mandatory", icon: "verified_user", label: "Activaste la verificación en dos pasos" },
   mfa_reconfigured: { category: "mandatory", icon: "verified_user", label: "Reconfiguraste la verificación en dos pasos" },
   mfa_recovery_codes_regenerated: { category: "mandatory", icon: "lock_reset", label: "Regeneraste tus códigos de recuperación" },
-  mfa_disabled: { category: "mandatory", icon: "no_encrypted_mail", label: "Desactivaste la verificación en dos pasos" },
+  mfa_disabled: { category: "mandatory", icon: "lock_open", label: "Desactivaste la verificación en dos pasos" },
   email_change_requested: { category: "mandatory", icon: "mail", label: "Solicitaste cambiar tu email" },
   email_changed: { category: "mandatory", icon: "mail", label: "Tu email ha cambiado" },
   data_export_ready: { category: "mandatory", icon: "download", label: "Tu descarga de datos está lista" },

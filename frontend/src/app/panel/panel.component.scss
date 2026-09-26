@@ -157,6 +157,15 @@
   position: absolute; top: 2px; right: 2px;
   display: inline-flex; min-width: 16px; height: 16px; padding: 0 4px;
   align-items: center; justify-content: center; border-radius: 8px;
-  background: var(--uvh-electric); color: var(--uvh-surface);
+  background: var(--uvh-electric); color: var(--accent-ink);
   font: 700 10px/1 "Courier New", monospace;
+}
+
+// On short windows the whole drawer scrolls, so fixed chrome cannot consume
+// the space needed to reach the navigation (including at browser zoom).
+@media (max-height: 760px) {
+  .side-head { padding-top: 18px; padding-bottom: 8px; }
+  .brand-caption, .workspace-summary { display: none; }
+  .nav-list { flex: 1 0 auto; overflow: visible; }
+  .side-foot { flex-shrink: 0; }
 }

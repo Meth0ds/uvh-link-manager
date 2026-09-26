@@ -49,10 +49,10 @@
     </div>
   </section>
   <dl class="metric-strip" aria-label="Resumen del enlace">
-    <div class="metric primary-metric"><dt>Clics</dt><dd>{{ link.clickCount }}</dd><span>Actividad acumulada</span></div>
-    <div class="metric"><dt>Límite</dt><dd>{{ link.maxClicks ?? "∞" }}</dd><span>Máximo configurado</span></div>
-    <div class="metric"><dt>Estado</dt><dd>{{ stateLabel(link.state) }}</dd><span>Situación actual</span></div>
-    <div class="metric"><dt>Creado</dt><dd>{{ link.createdAt.slice(0, 10) }}</dd><span>Fecha de alta</span></div>
+    <div class="metric primary-metric"><dt>Clics</dt><dd>{{ link.clickCount }}</dd><dd class="metric-note">Actividad acumulada</dd></div>
+    <div class="metric"><dt>Límite</dt><dd>{{ link.maxClicks ?? "∞" }}</dd><dd class="metric-note">Máximo configurado</dd></div>
+    <div class="metric"><dt>Estado</dt><dd>{{ stateLabel(link.state) }}</dd><dd class="metric-note">Situación actual</dd></div>
+    <div class="metric"><dt>Creado</dt><dd>{{ link.createdAt.slice(0, 10) }}</dd><dd class="metric-note">Fecha de alta</dd></div>
   </dl>
   @if (link.state === "blocked") {
     <section class="block-notice" aria-labelledby="block-notice-title">

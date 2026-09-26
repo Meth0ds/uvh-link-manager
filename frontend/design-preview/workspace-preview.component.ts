@@ -6,11 +6,13 @@ import { fixtureMode } from "./workspace-fixture";
 import { TokensComponent } from "../src/app/panel/tokens/tokens.component";
 import { WebhookInspectorComponent } from "../src/app/panel/webhooks/webhook-inspector.component";
 import { WebhooksComponent } from "../src/app/panel/webhooks/webhooks.component";
+import { LinksComponent } from "../src/app/panel/links/links.component";
+import { NotificationsComponent } from "../src/app/panel/notifications/notifications.component";
 import { AnalyticsComponent } from "../src/app/panel/analytics/analytics.component";
 
 @Component({
   selector: "app-workspace-preview", standalone: true,
-  imports: [DashboardComponent, GettingStartedComponent, TokensComponent, WebhookInspectorComponent, WebhooksComponent, AnalyticsComponent], changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [LinksComponent, NotificationsComponent, DashboardComponent, GettingStartedComponent, TokensComponent, WebhookInspectorComponent, WebhooksComponent, AnalyticsComponent], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <aside class="fixture-toolbar" aria-label="Controles de la vista de diseño">
       <b>VISTA DE DISEÑO · DATOS FICTICIOS · SIN API</b>
@@ -23,7 +25,7 @@ import { AnalyticsComponent } from "../src/app/panel/analytics/analytics.compone
     <!-- Changing a scenario creates a fresh component, cancelling pending
          reads without test hooks in the real application or its router. -->
     @for (scenario of [mode()]; track scenario) {
-      @if (page === 'getting-started') { <app-getting-started /> } @else if (page === 'tokens') { <app-tokens /> } @else if (page === 'inspector') { <app-webhook-inspector /> } @else if (page === 'webhooks') { <app-webhooks /> } @else if (page === 'analytics') { <app-analytics /> } @else { <app-dashboard /> }
+      @if (page === 'links') { <app-links /> } @else if (page === 'notifications') { <app-notifications /> } @else if (page === 'getting-started') { <app-getting-started /> } @else if (page === 'tokens') { <app-tokens /> } @else if (page === 'inspector') { <app-webhook-inspector /> } @else if (page === 'webhooks') { <app-webhooks /> } @else if (page === 'analytics') { <app-analytics /> } @else { <app-dashboard /> }
     }
   `,
   styles: `

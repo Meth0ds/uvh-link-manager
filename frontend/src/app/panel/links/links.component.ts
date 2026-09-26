@@ -106,6 +106,8 @@ export class LinksComponent {
   readonly state = signal<StateFilter>("");
   readonly tag = signal("");
   readonly sort = signal("created_at_desc");
+  readonly hasFilters = computed(() => Boolean(this.q().trim() || this.state() || this.tag()));
+  readonly someOnPage = computed(() => this.links().some(link => this.selected().has(link.id)) && !this.allOnPage());
   readonly page = signal(0);
   readonly pageSizeOptions = [20, 50, 100];
   readonly pageSize = signal(20);
@@ -198,7 +200,15 @@ export class LinksComponent {
   }
 
   onSearch(value: string): void {
-    this.q.set(value);
+    this.q.set(value.trim());
+    this.page.set(0);
+    void this.reload();
+  }
+
+  clearFilters(): void {
+    this.q.set("");
+    this.state.set("");
+    this.tag.set("");
     this.page.set(0);
     void this.reload();
   }
@@ -469,16 +479,6 @@ export class LinksComponent {
       // `remove` landing late must not re-enable the rows of a newer action.
       this.mutations.settle(action);
     }
-  }
-
-  openLink(id: number): void {
-    void this.router.navigate(["/app/links", id]);
-  }
-
-  openLinkFromKeyboard(event: KeyboardEvent, id: number): void {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    this.openLink(id);
   }
 
   trackByLink(_i: number, l: LinkDto): number {

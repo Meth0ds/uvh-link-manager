@@ -124,3 +124,6 @@
   .report-card { padding-inline: 0; border-inline: 0; background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+// Inline links must be identifiable without relying on their color.
+p a { text-decoration: underline; text-underline-offset: 3px; }

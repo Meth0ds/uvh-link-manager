@@ -7,6 +7,7 @@ import { RouterLink } from "@angular/router";
 import type { NotificationItem } from "../../core/models";
 import { NOTIFICATION_KINDS, type NotificationKind } from "../../core/notification-kinds";
 import { NotificationService } from "../../core/services/notification.service";
+import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { PageHeaderComponent } from "../page-header.component";
 
 /**
@@ -20,7 +21,7 @@ import { PageHeaderComponent } from "../page-header.component";
 @Component({
   selector: "app-notifications",
   standalone: true,
-  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, PageHeaderComponent],
+  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, PageHeaderComponent, PanelSkeletonComponent],
   templateUrl: "./notifications.component.html",
   styleUrl: "./notifications.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,6 +50,7 @@ export class NotificationsComponent {
   }
 
   async load(): Promise<void> {
+    if (this.busy()) return;
     this.loading.set(true);
     this.error.set(null);
     try {
@@ -64,8 +66,9 @@ export class NotificationsComponent {
 
   async loadMore(): Promise<void> {
     const before = this.cursor();
-    if (before === null || this.busy()) return;
+    if (before === null || this.busy() || this.loading()) return;
     this.busy.set(true);
+    this.error.set(null);
     try {
       const page = await this.notifications.list(before);
       this.items.update((current) => [...current, ...page.notifications]);
@@ -78,8 +81,9 @@ export class NotificationsComponent {
   }
 
   async markRead(item: NotificationItem): Promise<void> {
-    if (item.readAt !== null || this.busy()) return;
+    if (item.readAt !== null || this.busy() || this.loading()) return;
     this.busy.set(true);
+    this.error.set(null);
     try {
       await this.notifications.markRead(item.id);
       this.items.update((current) => current.map((row) =>
@@ -92,8 +96,9 @@ export class NotificationsComponent {
   }
 
   async markAllRead(): Promise<void> {
-    if (this.busy()) return;
+    if (this.busy() || this.loading()) return;
     this.busy.set(true);
+    this.error.set(null);
     try {
       await this.notifications.markAllRead();
       const now = new Date().toISOString();
