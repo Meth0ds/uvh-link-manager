@@ -1,5 +1,7 @@
 // ---------- TypeScript DTOs matching the UVH backend API ----------
 
+import type { NotificationCategory, NotificationDelivery, NotificationKind } from "./notification-kinds";
+
 export interface AuthUser {
   id: number;
   email: string;
@@ -14,10 +16,15 @@ export interface AuthUser {
 
 export type DataExportFailureReason = "automated_size_limit" | "generation_error" | "stalled";
 
+/** Etapas visibles de la generación, en el orden del pipeline por bloques. */
+export type DataExportStage = "collecting" | "analytics" | "encoding" | "encrypting" | "finalizing";
+
 export interface DataExportStatus {
   id: number;
   status: "processing" | "ready" | "downloaded" | "failed" | "cancelled" | "expired";
   failureReason: DataExportFailureReason | null;
+  /** Progreso vivo, sólo mientras `processing`. Es información, no estado. */
+  stage: DataExportStage | null;
   downloadExpiresAt: string | null;
   createdAt: string | null;
   readyAt: string | null;
@@ -270,6 +277,14 @@ export interface Member {
   joined_at: string;
 }
 
+/** A member found by the remote picker search; no `joined_at` in search rows. */
+export interface MemberSearchHit {
+  id: number;
+  email: string;
+  name: string;
+  role: WorkspaceRole;
+}
+
 export interface Invitation {
   id: number;
   email: string;
@@ -303,6 +318,8 @@ export interface WorkspaceGettingStarted {
     mfaEnabled: boolean;
   };
   capabilities: { createLink: boolean; addDomain: boolean; inviteTeam: boolean };
+  /** Presentation state of this membership only: when its owner hid the guide. */
+  dismissedAt: string | null;
 }
 
 export type WorkspaceUsagePolicy = "enforced" | "not_configured" | "unavailable";
@@ -408,6 +425,22 @@ export interface AdminUser {
   links: number;
 }
 
+/**
+ * A registration that has not yet proved its mailbox: what the old
+ * `unverified` user filter pretended to describe. Only what an operator needs
+ * to answer "did the mail arrive, is the link still live" — never a password
+ * proposal (none is stored) nor any bearer.
+ */
+export interface AdminPendingRegistration {
+  id: number;
+  email: string;
+  created_at: string;
+  /** When the latest verification mail was issued; null if none was ever sent. */
+  last_mail_at: string | null;
+  /** Expiry of that mail's verification link; null if no link was ever issued. */
+  link_expires_at: string | null;
+}
+
 export interface AdminReport {
   id: number;
   link_id: number;
@@ -477,6 +510,7 @@ export interface AdminPage<T> {
   users?: T[];
   reports?: T[];
   recoveries?: T[];
+  registrations?: T[];
   domains?: T[];
   events?: T[];
 }
@@ -502,7 +536,8 @@ export interface AdminOperations {
     mailOutbox: Record<string, number>;
     oldestPendingMailAgeSeconds: number | null;
     activeSessions: number;
-    unverifiedUsers: number;
+    /** Registrations waiting to prove their mailbox; never a user count. */
+    pendingRegistrations: number;
     domains: Record<string, number>;
     oldestDnsCheckAgeSeconds: number | null;
     oldestTlsProvisioningAgeSeconds: number | null;
@@ -624,4 +659,26 @@ export interface ApiError {
   details?: unknown;
   /** Stable discriminator for rejections whose status code is overloaded. */
   reason?: string;
+}
+
+/**
+ * Centro de notificaciones. La fila sólo trae identidad y texto ya seguro:
+ * nunca secretos, URLs bearer ni contenido de correo. `route` es una ruta
+ * interna del panel; `subject` es el nombre visible capturado en el momento
+ * del evento (un workspace, un token).
+ */
+export interface NotificationItem {
+  id: number;
+  kind: NotificationKind;
+  subject: string | null;
+  workspaceId: number | null;
+  route: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationPreference {
+  kind: NotificationKind;
+  category: NotificationCategory;
+  delivery: NotificationDelivery;
 }

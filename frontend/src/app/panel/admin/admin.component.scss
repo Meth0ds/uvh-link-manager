@@ -115,6 +115,8 @@
 }
 
 .user-row, .user-list .data-head { grid-template-columns: minmax(245px, 1.7fr) minmax(200px, 1.25fr) minmax(130px, .8fr) minmax(150px, .9fr) minmax(250px, 1.4fr); }
+
+.pending-row, .pending-list .data-head { grid-template-columns: minmax(245px, 1.7fr) minmax(150px, .9fr) minmax(150px, .9fr) minmax(150px, .9fr); }
 // The state column keeps room for the longest domain state label: the badge is
 // nowrap, so a floor below its width would push it over the neighbouring cell
 // while the table sits at its minimum width.
@@ -205,6 +207,7 @@
   .data-head { display: none; }
   .data-row { min-width: 0; margin-bottom: 9px; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface-raised); }
   .user-row { grid-template-columns: 1fr 1fr; .identity, .row-actions { grid-column: 1 / -1; } .row-actions { justify-content: flex-start; } }
+  .pending-row { grid-template-columns: 1fr 1fr; .identity { grid-column: 1 / -1; } }
   .domain-row { grid-template-columns: 1fr 1fr; .domain-name { grid-column: 1 / -1; } }
   [data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; color: var(--uvh-muted); font-size: 8.5px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
   .outbox-row { grid-template-columns: 34px minmax(0, 1fr) auto; .outbox-attempts, time { grid-column: 2; } button { grid-column: 2 / -1; justify-self: start; } }
@@ -232,7 +235,7 @@
 }
 
 @media (max-width: 430px) {
-  .user-row, .domain-row { grid-template-columns: 1fr; > * { grid-column: 1 !important; } }
+  .user-row, .domain-row, .pending-row { grid-template-columns: 1fr; > * { grid-column: 1 !important; } }
   .row-actions button { flex: 1; }
   .system-overview { grid-template-columns: 1fr 1fr; > div { min-height: 86px; padding: 11px; } }
 }

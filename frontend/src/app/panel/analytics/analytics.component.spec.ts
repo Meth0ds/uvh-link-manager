@@ -66,4 +66,46 @@ describe("AnalyticsComponent request isolation", () => {
     expect(fixture.componentInstance.overview()).toBeNull();
     expect(fixture.componentInstance.loading()).toBeFalse();
   });
+
+  it("asks for a custom window only once both dates are set", async () => {
+    api.get.and.resolveTo(overview(5));
+    fixture = TestBed.createComponent(AnalyticsComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    api.get.calls.reset();
+
+    const component = fixture.componentInstance;
+    await component.onPeriod("custom");
+    // Picking the mode alone is not a query: no meaningless window is fetched.
+    expect(api.get).not.toHaveBeenCalled();
+    expect(component.awaitingCustomRange()).toBeTrue();
+
+    await component.onCustomDate("from", "2026-08-01");
+    expect(api.get).not.toHaveBeenCalled();
+    await component.onCustomDate("to", "2026-08-30");
+    expect(api.get).toHaveBeenCalledOnceWith(
+      "/api/v1/analytics/overview",
+      { period: "custom", from: "2026-08-01", to: "2026-08-30" },
+      jasmine.any(Function),
+      jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }),
+    );
+    expect(component.periodLabel()).toMatch(/^Del .+ al .+$/);
+  });
+
+  it("refuses an inverted custom range instead of querying it", async () => {
+    api.get.and.resolveTo(overview(5));
+    fixture = TestBed.createComponent(AnalyticsComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    api.get.calls.reset();
+
+    const component = fixture.componentInstance;
+    await component.onPeriod("custom");
+    await component.onCustomDate("from", "2026-08-30");
+    await component.onCustomDate("to", "2026-08-01");
+
+    expect(api.get).not.toHaveBeenCalled();
+    expect(component.customRangeError()).toBe("La fecha inicial debe ser anterior o igual a la final.");
+    expect(component.overview()).toBeNull();
+  });
 });

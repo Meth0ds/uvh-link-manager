@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 use App\Jobs\GenerateDataExportJob;
+use App\Support\AccountExportDocument;
 use App\Support\Ids;
 use App\Support\UvhCrypto;
 use Illuminate\Support\Facades\DB;
@@ -40,10 +41,10 @@ return [
         if (! $user || $requestedMessages < 1 || $requestedMessages > 9_500 || $perMessageBytes < 64 || $perMessageBytes > 262_144) {
             return ['error' => 'expected "<email> <messages 1..9500> <bytes-per-message 64..262144>"'];
         }
-        // The automated path's own budget, read from the job that applies it
-        // rather than restated here: the fitting target and the drill's
-        // assertions are then about that ceiling, not about a copy of it.
-        $cap = (int) (new ReflectionClassConstant(GenerateDataExportJob::class, 'MAX_JSON_BYTES'))->getValue();
+        // El techo operativo del camino automático, leído de la capa que lo
+        // aplica y no reescrito aquí: el ajuste por debajo y las afirmaciones
+        // del drill hablan de ese techo, no de una copia suya.
+        $cap = AccountExportDocument::maxPlaintextBytes();
         $target = $cap - 512 * 1024;
         $requestId = (int) DB::table('privacy_rights_requests')->insertGetId([
             'user_id' => (int) $user->id,
@@ -56,9 +57,6 @@ return [
             'updated_at' => now(),
         ]);
         $body = UvhCrypto::encryptAtRest(str_repeat('a', $perMessageBytes));
-        $builder = new ReflectionMethod(GenerateDataExportJob::class, 'buildPayload');
-        $builder->setAccessible(true);
-        $job = new GenerateDataExportJob($requestId);
         $messageCount = $requestedMessages;
         $encoded = 0;
         for ($attempt = 0; $attempt < 4; $attempt++) {
@@ -77,9 +75,14 @@ return [
                 DB::table('privacy_rights_messages')->insert($chunk);
             }
             unset($rows);
-            $payload = $builder->invoke($job, (int) $user->id);
-            $encoded = strlen(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-            unset($payload);
+            // El documento se codifica con el propio constructor del job —el
+            // mismo camino por bloques de la generación real— y se mide en un
+            // spool temporal, sin sostener el documento en memoria.
+            $out = fopen('php://temp/maxmemory:2097152', 'r+b');
+            AccountExportDocument::render((int) $user->id, $out, null);
+            fseek($out, 0, SEEK_END);
+            $encoded = (int) ftell($out);
+            fclose($out);
             gc_collect_cycles();
             if ($encoded <= $target) {
                 break;

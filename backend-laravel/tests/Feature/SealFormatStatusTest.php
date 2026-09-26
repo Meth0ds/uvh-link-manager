@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\PendingRegistration;
 use App\Support\Ids;
+use App\Support\RegistrationEdit;
 use App\Support\SealedToken;
 use App\Support\SealFormatTelemetry;
 use App\Support\SignedToken;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -13,8 +16,10 @@ use Tests\TestCase;
 
 /**
  * Contratos del verificador de formatos: qué evidencia queda cuando un sello
- * legacy abre de verdad, y cuándo el comando certifica la retirada del
- * fallback. La retirada se decide con datos observados, no con memoria.
+ * legacy sigue sirviendo de verdad, y cuándo el comando certifica la retirada
+ * del fallback. La retirada se decide con datos observados, no con memoria.
+ * La evidencia se emite tras la validación semántica del consumidor, no al
+ * descifrar: un sello auténtico caducado no dice que haya nada vivo.
  */
 final class SealFormatStatusTest extends TestCase
 {
@@ -28,14 +33,35 @@ final class SealFormatStatusTest extends TestCase
         config(['uvh.secret' => self::SECRET, 'uvh.secret_previous' => []]);
     }
 
-    public function test_only_a_legacy_seal_that_actually_opens_is_recorded(): void
+    public function test_only_a_legacy_seal_that_survives_the_consumers_validation_is_recorded(): void
     {
         // `seal()` ya no produce la forma sin key-id; esta se fabrica a mano.
-        $this->assertSame('old-claim', SealedToken::open($this->legacySealed('old-claim')));
-        SealedToken::open(SealedToken::seal('new-claim'));
-        SealedToken::open('basura-que-no-abre');
+        // Abrir sin más descifra, pero no es evidencia: nada ha validado aún
+        // que el claim siga sirviendo.
+        $legacy = null;
+        $this->assertSame('old-claim', SealedToken::open($this->legacySealed('old-claim'), $legacy));
+        $this->assertTrue($legacy, 'the open must report the legacy path to its consumer');
+        $this->assertCount(0, $this->legacyOpens());
 
-        $rows = DB::table('audit_events')->where('action', SealFormatTelemetry::ACTION_LEGACY_OPENED)->get();
+        // Un sello auténtico caducado descifra igual pero ya no autoriza nada:
+        // no puede contar como vivo.
+        RegistrationEdit::authorizes(
+            $this->requestCarrying($this->legacySealed($this->claim(127, 1, -60_000))),
+            $this->pending(127, 1),
+        );
+        // Formato moderno y basura: tampoco.
+        RegistrationEdit::authorizes($this->requestCarrying(SealedToken::seal($this->claim(127, 1))), $this->pending(127, 1));
+        $this->assertFalse(RegistrationEdit::authorizes($this->requestCarrying('basura-que-no-abre'), $this->pending(127, 1)));
+        $this->assertCount(0, $this->legacyOpens());
+
+        // El claim legacy que además pasa patrón y expiración: exactamente
+        // una entrada.
+        $this->assertTrue(RegistrationEdit::authorizes(
+            $this->requestCarrying($this->legacySealed($this->claim(127, 1))),
+            $this->pending(127, 1),
+        ));
+
+        $rows = $this->legacyOpens();
         $this->assertCount(1, $rows);
         $this->assertSame('sealed', $rows[0]->resource_id);
     }
@@ -79,14 +105,14 @@ final class SealFormatStatusTest extends TestCase
 
         // Una apertura legacy reciente reabre la ventana por sí sola: hay un
         // sello viejo vivo, aunque la emisión legacy terminara hace tiempo.
-        SealedToken::open($this->legacySealed('old-claim'));
+        $this->recordLegacySealOpen();
         $this->artisan('uvh:crypto:seals', ['--since' => now()->subDays(40)->toIso8601String()])
             ->assertExitCode(2);
     }
 
     public function test_the_json_report_names_the_evidence_and_the_keyring(): void
     {
-        SealedToken::open($this->legacySealed('old-claim'));
+        $this->recordLegacySealOpen();
         SealedToken::seal('new-claim');
 
         // El informe entero se escribe de una vez: se captura la salida y se
@@ -98,6 +124,42 @@ final class SealFormatStatusTest extends TestCase
         $this->assertStringContainsString('"verdict": "in_flight"', $output);
         $this->assertStringContainsString('"legacy_opens"', $output);
         $this->assertStringContainsString('"current_key_id"', $output);
+    }
+
+    /** Una apertura legacy que supera la validación semántica del consumidor real. */
+    private function recordLegacySealOpen(): void
+    {
+        $this->assertTrue(RegistrationEdit::authorizes(
+            $this->requestCarrying($this->legacySealed($this->claim(127, 1))),
+            $this->pending(127, 1),
+        ));
+    }
+
+    /** El claim de edición de registro, con la expiración desplazada en ms. */
+    private function claim(int $id, int $securityVersion, int $offsetMs = 60_000): string
+    {
+        return sprintf(
+            '{"e":%013d,"v":2,"pid":"%010d","sv":"%03d"}',
+            (int) (microtime(true) * 1000) + $offsetMs,
+            $id,
+            $securityVersion,
+        );
+    }
+
+    private function pending(int $id, int $securityVersion): PendingRegistration
+    {
+        return (new PendingRegistration)->forceFill(['id' => $id, 'security_version' => $securityVersion]);
+    }
+
+    private function requestCarrying(string $value): Request
+    {
+        return Request::create('/', 'GET', [], [RegistrationEdit::cookieName() => $value]);
+    }
+
+    /** @return iterable<object> */
+    private function legacyOpens(): iterable
+    {
+        return DB::table('audit_events')->where('action', SealFormatTelemetry::ACTION_LEGACY_OPENED)->get();
     }
 
     /** Blob sellado sin key-id (`nonce | tag | cipher`, sin AAD), como antes. */

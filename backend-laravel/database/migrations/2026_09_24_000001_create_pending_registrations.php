@@ -49,17 +49,24 @@ return new class extends Migration
         $this->moveUnverifiedRegistrations();
     }
 
+    /**
+     * Irreversible hacia atrás, y lo dice fallando.
+     *
+     * Una fila pendiente no tiene forma de usuario que recuperar —nombre y
+     * aceptaciones se deciden en la activación y aquí no existen—, así que el
+     * único «down» posible borraría los registros pendientes: gente que pidió
+     * una cuenta y cuyo enlace de buzón seguiría vivo pierde su registro sin
+     * aviso. En vez de destruir filas a escondidas, el rollback se niega: es
+     * una operación destructiva que un operador debe decidir sobre una copia,
+     * con las consecuencias conocidas, no una reversión silenciosa de una
+     * migración. Un down que fabricara usuarios sería mentira sobre los datos.
+     */
     public function down(): void
     {
-        // Irreversible hacia atrás: una fila pendiente no tiene forma de
-        // usuario que recuperar —nombre y aceptaciones se deciden en la
-        // activación y aquí no existen—. Se retira la atadura y se deja la
-        // tabla; un down que fabricara usuarios sería mentira sobre los datos.
-        DB::statement('ALTER TABLE email_tokens DROP CONSTRAINT IF EXISTS email_tokens_owner_check');
-        Schema::table('email_tokens', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('pending_registration_id');
-        });
-        Schema::dropIfExists('pending_registrations');
+        throw new RuntimeException(
+            'migrate:rollback irreversible: pending_registrations guarda registros sin verificar que este down perdería sin recuperación. '
+                .'Restaura desde copia de seguridad o convierte las filas a mano antes de retirar la tabla.'
+        );
     }
 
     /**

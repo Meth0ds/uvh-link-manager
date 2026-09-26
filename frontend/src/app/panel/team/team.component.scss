@@ -213,6 +213,40 @@
 
 .transfer-actions { display: flex; grid-column: 1 / -1; justify-content: flex-end; gap: 8px; }
 
+// The remote picker spans the whole row: the search field, then either the
+// result rows or the single chosen recipient.
+.transfer-search, .transfer-results, .transfer-selected { grid-column: 1 / -1; }
+
+.transfer-results { display: grid; gap: 6px; }
+
+.transfer-result {
+  justify-content: flex-start;
+  gap: 8px;
+
+  b { color: var(--uvh-ink); font-size: 12.5px; }
+  span { color: var(--uvh-muted); font-size: 11px; }
+}
+
+.transfer-selected {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--uvh-warn);
+
+  > div { display: grid; min-width: 0; }
+  b { color: var(--uvh-ink); font-size: 12.5px; }
+  span { color: var(--uvh-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+.transfer-search-hint, .transfer-search-error {
+  margin: 2px 0;
+  color: var(--uvh-muted);
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+.transfer-search-error { color: var(--uvh-danger); }
+
 .delete-form {
   border-left-color: var(--uvh-danger);
   background: var(--uvh-danger-soft);

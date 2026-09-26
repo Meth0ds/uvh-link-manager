@@ -22,25 +22,25 @@ import { backend, docker, inspect } from "../topology.mjs";
  * acknowledgement; each of those is driven to its own boundary here.
  */
 export async function exportCrashDrill({ email, session, workspaceId }) {
-  // A maximum-size export on the automated path's own budget: the encoded
-  // document just under its cap, across thousands of records, so the crash
-  // happens on the real payload path — row hydration, decryption, JSON
-  // encoding, encryption, storage write — and not on a toy one.
+  // A large export through the real payload path —row hydration, decryption,
+  // JSON encoding, chunked encryption, storage write— across thousands of
+  // records, and never a toy one. The generation is streamed by blocks now, so
+  // there is no small automated budget to fill: what the drill needs is a
+  // document big enough that the kill lands inside generation and that the
+  // chunked path is the one exercised.
   //
   // The row count is asked for and then fitted by the inspector: it encodes the
-  // payload with the job's own builder and trims the count until the document
-  // fits, because the cap applies to the encoded JSON and not to the message
-  // bodies. Both the fitting target and every assertion below read that cap
-  // from the job that applies it (`cap_bytes`), so no ceiling is restated here.
+  // document with the job's own builder and trims the count if it would cross
+  // the operational ceiling. Both the fitting target and every assertion below
+  // read that ceiling from the layer that applies it (`cap_bytes`), so no
+  // ceiling is restated here.
   const seeded = inspect("export-seed", `${email} 9500 1300`);
-  // One MiB of slack under the ceiling: the document has to be *near* the cap
-  // to exercise a maximum-size export, but never over it, which is the job's
-  // own refusal.
   const capBytes = seeded.cap_bytes ?? 0;
+  const largeBytes = 8 * 1024 * 1024;
   check(
-    "export crash: a maximum-size account export is seeded",
+    "export crash: a large account export is seeded",
     seeded.messages > 0 && seeded.messages <= 10_000
-      && seeded.json_bytes > capBytes - 1024 * 1024 && seeded.json_bytes <= capBytes,
+      && seeded.json_bytes > largeBytes && seeded.json_bytes <= capBytes,
     JSON.stringify(seeded),
   );
   if (!seeded.messages) return;
@@ -140,14 +140,14 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
     ready.artifact !== killedArtifact && publishedNew.length === 1 && publishedNew[0].name === ready.artifact,
     JSON.stringify({ added: publishedNew, killed: killedArtifact }),
   );
-  // What the volume holds is ciphertext, so it is larger than the payload: the
-  // cap applies to the JSON the download serves, which is checked below. The
-  // envelope costs about a third — measured at 1.3x on this drill — so the
-  // artifact sits above the cap and well below twice it.
+  // What the volume holds is ciphertext by blocks, so it is larger than the
+  // payload: the chunked envelope costs about a third —base64 of each
+  // authenticated block— so the artifact sits above the document and well
+  // below twice it.
   check(
     "export crash: the stored artifact is the encrypted form of the payload",
-    (publishedNew[0]?.bytes ?? 0) > capBytes && (publishedNew[0]?.bytes ?? 0) < 2 * capBytes,
-    `bytes=${publishedNew[0]?.bytes} cap=${capBytes}`,
+    (publishedNew[0]?.bytes ?? 0) > seeded.json_bytes && (publishedNew[0]?.bytes ?? 0) < 2 * seeded.json_bytes,
+    `bytes=${publishedNew[0]?.bytes} document=${seeded.json_bytes}`,
   );
 
   // --- download and acknowledgement ---------------------------------------
@@ -155,7 +155,7 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
   // must not carry anything that could authorize a download on its own. The
   // anchor is ASCII so every mail encoding the provider can choose survives.
   const notices = await messagesFor(email);
-  const notice = await messageMatching(email, (text) => /Ir a mis exportaciones|settings#privacy/i.test(text));
+  const notice = await messageMatching(email, (text) => /Ir a mis exportaciones|settings\/privacy/i.test(text));
   check(
     "export crash: the ready message announces the artifact without any bearer",
     Boolean(notice) && !tokenFromUrl(notice.raw),
@@ -208,9 +208,9 @@ export async function exportCrashDrill({ email, session, workspaceId }) {
     `HTTP ${downloaded.status} bytes=${bytes}`,
   );
   check(
-    "export crash: the served payload is a complete maximum-size export",
+    "export crash: the served payload is a complete large export",
     payload?.privacyRightsMessages?.length === messages
-      && bytes > capBytes - 1024 * 1024 && bytes <= capBytes,
+      && bytes > largeBytes && bytes <= capBytes,
     `messages=${payload?.privacyRightsMessages?.length ?? null} bytes=${bytes} cap=${capBytes}`,
   );
 

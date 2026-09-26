@@ -128,6 +128,49 @@
         </ng-template>
       </mat-tab>
 
+      <mat-tab aria-label="Registros pendientes">
+        <ng-template mat-tab-label><mat-icon aria-hidden="true">mark_email_unread</mat-icon><span class="tab-label-text">Registros</span></ng-template>
+        <ng-template matTabContent>
+        <section class="tab-panel">
+          <!-- Sólo el correo, cuándo se emitió el último y hasta cuándo vive su
+               enlace: lo que responde «¿llegó el correo?», sin propuestas de
+               contraseña —no se guardan— ni bearers. -->
+          @let pendingRead = pendingRegistrations.stale();
+          <app-queue-section
+            title="Registros pendientes"
+            [paging]="pendingRegistrations"
+            loadingLabel="Cargando registros pendientes"
+            pagerLabel="Paginación de registros pendientes"
+            emptyIcon="mark_email_unread"
+            emptyTitle="No hay registros pendientes"
+            emptyHint="Todos los registros han activado su cuenta o caducaron y se purgaron."
+            [pageSizes]="[10, 25, 50, 100]"
+          >
+            <p queue-summary>@if (!pendingRegistrations.error()) { {{ countLabel(pendingRegistrations.total(), 'registro pendiente coincide', 'registros pendientes coinciden') }} con los filtros. }</p>
+            <div class="filters" queue-filters>
+              <mat-form-field appearance="outline" class="filter-search">
+                <mat-label>Buscar por email</mat-label>
+                <mat-icon matPrefix>search</mat-icon>
+                <input matInput [value]="pendingQuery()" (keyup.enter)="searchPendingRegistrations(pendingSearch.value)" #pendingSearch />
+                <button mat-icon-button matSuffix type="button" (click)="searchPendingRegistrations(pendingSearch.value)" aria-label="Buscar registros pendientes"><mat-icon>arrow_forward</mat-icon></button>
+              </mat-form-field>
+            </div>
+            <div class="data-list pending-list" queue-rows>
+              <div class="data-row data-head" aria-hidden="true"><span>Email</span><span>Alta</span><span>Último correo</span><span>Caducidad del enlace</span></div>
+              @for (registration of pendingRegistrations.rows(); track registration.id) {
+                <article class="data-row pending-row" [class.is-stale]="pendingRead">
+                  <div class="identity"><span><b>{{ registration.email }}</b></span></div>
+                  <time data-label="Alta">{{ formatDate(registration.created_at) }}</time>
+                  <span data-label="Último correo">{{ registration.last_mail_at ? formatDate(registration.last_mail_at) : '—' }}</span>
+                  <span data-label="Caducidad del enlace">{{ registration.link_expires_at ? formatDate(registration.link_expires_at) : '—' }}</span>
+                </article>
+              }
+            </div>
+          </app-queue-section>
+        </section>
+        </ng-template>
+      </mat-tab>
+
       <mat-tab aria-label="Recuperación de cuentas">
         <ng-template mat-tab-label><mat-icon aria-hidden="true">support_agent</mat-icon><span class="tab-label-text">Recuperación</span></ng-template>
         <ng-template matTabContent>
@@ -303,7 +346,7 @@
           @if (operationsLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando estado operativo" /> }
           @if (operationsError(); as message) { <div class="alert error compact" role="alert"><mat-icon>error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadOperations()">Reintentar</button></div> }
           @if (operations(); as operation) {
-            <div class="system-overview"><div><span>Entorno</span><b>{{ environmentLabel(operation.environment) }}</b></div><div><span>Trabajos pendientes</span><b>{{ operation.metrics.pendingJobs }}</b><small>espera máxima {{ ageLabel(operation.metrics.oldestJobAgeSeconds) }}</small></div><div><span>Worker</span><b [class.metric-alert]="operation.metrics.queueHeartbeatAgeSeconds === null || operation.metrics.queueHeartbeatAgeSeconds > 180">{{ ageLabel(operation.metrics.queueHeartbeatAgeSeconds) }}</b><small>desde el último pulso</small></div><div><span>Scheduler</span><b [class.metric-alert]="operation.metrics.schedulerHeartbeatAgeSeconds === null || operation.metrics.schedulerHeartbeatAgeSeconds > 210">{{ ageLabel(operation.metrics.schedulerHeartbeatAgeSeconds) }}</b><small>desde el último pulso</small></div><div><span>Trabajos fallidos</span><b [class.metric-alert]="operation.metrics.failedJobs > 0">{{ operation.metrics.failedJobs }}</b></div><div><span>Correo pendiente</span><b>{{ count(operation.metrics.mailOutbox, 'pending') + count(operation.metrics.mailOutbox, 'queued') + count(operation.metrics.mailOutbox, 'processing') + count(operation.metrics.mailOutbox, 'comp_pending') + count(operation.metrics.mailOutbox, 'compensating') }}</b><small><span [class.metric-alert]="operation.metrics.oldestPendingMailAgeSeconds !== null && operation.metrics.oldestPendingMailAgeSeconds > 600">espera máxima {{ ageLabel(operation.metrics.oldestPendingMailAgeSeconds) }}</span></small></div><div><span>Correo fallido</span><b [class.metric-alert]="count(operation.metrics.mailOutbox, 'failed') > 0">{{ count(operation.metrics.mailOutbox, 'failed') }}</b></div><div><span>Solicitudes RGPD</span><b>{{ operation.metrics.activePrivacyRequests }}</b><small><span [class.metric-alert]="operation.metrics.overduePrivacyRequests > 0">{{ operation.metrics.overduePrivacyRequests }} fuera de plazo</span></small></div><div><span>Sesiones activas</span><b>{{ operation.metrics.activeSessions }}</b></div><div><span>Usuarios sin verificar</span><b>{{ operation.metrics.unverifiedUsers }}</b></div><div><span>Webhooks fallidos</span><b [class.metric-alert]="count(operation.metrics.webhookDeliveries, 'failed') > 0">{{ count(operation.metrics.webhookDeliveries, 'failed') }}</b></div></div>
+            <div class="system-overview"><div><span>Entorno</span><b>{{ environmentLabel(operation.environment) }}</b></div><div><span>Trabajos pendientes</span><b>{{ operation.metrics.pendingJobs }}</b><small>espera máxima {{ ageLabel(operation.metrics.oldestJobAgeSeconds) }}</small></div><div><span>Worker</span><b [class.metric-alert]="operation.metrics.queueHeartbeatAgeSeconds === null || operation.metrics.queueHeartbeatAgeSeconds > 180">{{ ageLabel(operation.metrics.queueHeartbeatAgeSeconds) }}</b><small>desde el último pulso</small></div><div><span>Scheduler</span><b [class.metric-alert]="operation.metrics.schedulerHeartbeatAgeSeconds === null || operation.metrics.schedulerHeartbeatAgeSeconds > 210">{{ ageLabel(operation.metrics.schedulerHeartbeatAgeSeconds) }}</b><small>desde el último pulso</small></div><div><span>Trabajos fallidos</span><b [class.metric-alert]="operation.metrics.failedJobs > 0">{{ operation.metrics.failedJobs }}</b></div><div><span>Correo pendiente</span><b>{{ count(operation.metrics.mailOutbox, 'pending') + count(operation.metrics.mailOutbox, 'queued') + count(operation.metrics.mailOutbox, 'processing') + count(operation.metrics.mailOutbox, 'comp_pending') + count(operation.metrics.mailOutbox, 'compensating') }}</b><small><span [class.metric-alert]="operation.metrics.oldestPendingMailAgeSeconds !== null && operation.metrics.oldestPendingMailAgeSeconds > 600">espera máxima {{ ageLabel(operation.metrics.oldestPendingMailAgeSeconds) }}</span></small></div><div><span>Correo fallido</span><b [class.metric-alert]="count(operation.metrics.mailOutbox, 'failed') > 0">{{ count(operation.metrics.mailOutbox, 'failed') }}</b></div><div><span>Solicitudes RGPD</span><b>{{ operation.metrics.activePrivacyRequests }}</b><small><span [class.metric-alert]="operation.metrics.overduePrivacyRequests > 0">{{ operation.metrics.overduePrivacyRequests }} fuera de plazo</span></small></div><div><span>Sesiones activas</span><b>{{ operation.metrics.activeSessions }}</b></div><div><span>Registros pendientes</span><b>{{ operation.metrics.pendingRegistrations }}</b></div><div><span>Webhooks fallidos</span><b [class.metric-alert]="count(operation.metrics.webhookDeliveries, 'failed') > 0">{{ count(operation.metrics.webhookDeliveries, 'failed') }}</b></div></div>
             <div class="system-columns">
               <section class="check-card"><header><div><h3>Preparación del entorno</h3><p>Requisitos evaluados por la aplicación.</p></div><span class="badge" [class.success]="operation.state === 'healthy'" [class.warning]="operation.state === 'attention'" [class.danger]="operation.state === 'critical'">{{ operation.state === 'healthy' ? 'Correcto' : operation.state === 'critical' ? 'Crítico' : 'Atención' }}</span></header><div class="check-list">@for (check of operation.checks; track check.key) { <div class="check-row" [class]="'check-' + check.status"><mat-icon>{{ check.status === 'ok' ? 'check_circle' : check.status === 'critical' ? 'cancel' : 'warning' }}</mat-icon><div><b>{{ check.label }}</b>@if (check.detail) { <span>{{ check.detail }}</span> }</div></div> }</div></section>
               <section class="check-card"><header><div><h3>Entrega e incidentes</h3><p>Señales agregadas de la última hora, sin rutas, destinatarios, cuentas ni contenido.</p></div></header><div class="metric-list"><div><span>Webhooks pendientes</span><b>{{ count(operation.metrics.webhookDeliveries, 'pending') }}</b></div><div><span>Webhooks en proceso</span><b>{{ count(operation.metrics.webhookDeliveries, 'processing') }}</b></div><div><span>Espera webhook máxima</span><b [class.metric-alert]="operation.metrics.oldestPendingWebhookAgeSeconds !== null && operation.metrics.oldestPendingWebhookAgeSeconds > 600">{{ ageLabel(operation.metrics.oldestPendingWebhookAgeSeconds) }}</b></div><div><span>Webhooks entregados</span><b>{{ count(operation.metrics.webhookDeliveries, 'success') }}</b></div><div><span>Webhooks fallidos</span><b [class.metric-alert]="count(operation.metrics.webhookDeliveries, 'failed') > 0">{{ count(operation.metrics.webhookDeliveries, 'failed') }}</b></div><div><span>Correos enviados</span><b>{{ count(operation.metrics.mailOutbox, 'sent') }}</b></div><div><span>Correos fallidos</span><b [class.metric-alert]="count(operation.metrics.mailOutbox, 'failed') > 0">{{ count(operation.metrics.mailOutbox, 'failed') }}</b></div><div><span>DNS en curso</span><b [class.metric-alert]="operation.metrics.oldestDnsCheckAgeSeconds !== null && operation.metrics.oldestDnsCheckAgeSeconds > 600">{{ ageLabel(operation.metrics.oldestDnsCheckAgeSeconds) }}</b></div><div><span>TLS en curso</span><b [class.metric-alert]="operation.metrics.oldestTlsProvisioningAgeSeconds !== null && operation.metrics.oldestTlsProvisioningAgeSeconds > 3600">{{ ageLabel(operation.metrics.oldestTlsProvisioningAgeSeconds) }}</b></div><div><span>Respuestas 5xx</span><b [class.metric-alert]="count(operation.metrics.events60m, 'http.server_error') > 0">{{ count(operation.metrics.events60m, 'http.server_error') }}</b></div><div><span>Respuestas 429</span><b>{{ count(operation.metrics.events60m, 'http.too_many_requests') }}</b></div><div><span>hCaptcha no disponible</span><b [class.metric-alert]="count(operation.metrics.events60m, 'hcaptcha.unavailable') > 0">{{ count(operation.metrics.events60m, 'hcaptcha.unavailable') }}</b></div><div><span>Fallos de auditoría</span><b [class.metric-alert]="count(operation.metrics.events60m, 'audit.write_failed') > 0">{{ count(operation.metrics.events60m, 'audit.write_failed') }}</b></div><div><span>Fallos de housekeeping</span><b [class.metric-alert]="count(operation.metrics.events60m, 'housekeeping.stage_failed') > 0">{{ count(operation.metrics.events60m, 'housekeeping.stage_failed') }}</b></div></div></section>

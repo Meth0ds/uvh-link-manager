@@ -6,6 +6,7 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import type { WorkspaceRole, WorkspaceUsage, WorkspaceUsageQuota } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
+import { RetryCountdown } from "../../core/retry-countdown";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { WORKSPACE_ROLE_LABEL } from "../../core/workspace-role-label";
@@ -52,7 +53,9 @@ export class UsageComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly requests = new LatestRequest(this.destroyRef);
   private readonly state = signal<UsageState | null>(null);
-  private wait: { userId: number; until: number } | null = null;
+  // Account-wide advice survives workspace switches in this component. It is
+  // merely UX: the backend enforces its own limit across sessions and tabs.
+  private readonly waits = new RetryCountdown(this.destroyRef);
 
   readonly roleLabels = WORKSPACE_ROLE_LABEL;
   readonly context = computed<UsageContext | null>(() => {
@@ -65,7 +68,19 @@ export class UsageComponent {
   private readonly current = computed(() => this.state()?.context === this.context() ? this.state() : null);
   readonly data = computed(() => this.current()?.data ?? null);
   readonly loading = computed(() => this.current()?.loading ?? this.context() !== null);
-  readonly error = computed(() => this.current()?.error ?? null);
+  /** Cuenta atrás de la espera por cuenta; 0 cuando no hay espera activa. */
+  readonly waitSeconds = computed(() => {
+    const context = this.context();
+    return context ? this.waits.remaining(String(context.userId)) : 0;
+  });
+  /**
+   * Mientras queda espera, el mensaje cuenta hacia abajo y sólo permite un
+   * nuevo intento manual cuando caduca; nada se reintenta solo.
+   */
+  readonly error = computed(() => {
+    const wait = this.waitSeconds();
+    return wait > 0 ? `Espera ${wait} segundos antes de volver a consultar.` : this.current()?.error ?? null;
+  });
   readonly cards = computed<UsageCard[]>(() => {
     const data = this.data();
     if (!data) return [];
@@ -92,7 +107,6 @@ export class UsageComponent {
     });
     this.destroyRef.onDestroy(() => {
       this.state.set(null);
-      this.wait = null;
     });
   }
 
@@ -105,10 +119,9 @@ export class UsageComponent {
     const request = this.requests.begin(requestContext);
     const isCurrent = () => this.requests.isCurrent(request, requestContext) && this.context() === context;
     const fail = (message: string) => this.state.set({ context, data: null, loading: false, error: message });
-    if (this.wait?.userId === context.userId && this.wait.until > Date.now()) {
-      fail(`Espera ${Math.ceil((this.wait.until - Date.now()) / 1000)} segundos antes de volver a consultar.`);
-      return;
-    }
+    // The visible countdown is the state while it lasts: no premature request.
+    // Fresh clock read: the wall clock can move without any signal change.
+    if (this.waits.remaining(String(context.userId)) > 0) return;
     this.state.set({ context, data: null, loading: true, error: null });
     try {
       const data = await this.api.get(
@@ -122,9 +135,11 @@ export class UsageComponent {
     } catch (error) {
       if (!isCurrent()) return;
       const status = error instanceof ApiRequestError ? error.status : 0;
-      const seconds = error instanceof ApiRequestError ? error.retryAfterSeconds : undefined;
-      if ((status === 429 || status === 503) && seconds !== undefined && Number.isSafeInteger(seconds) && seconds >= 0) {
-        this.wait = { userId: context.userId, until: Date.now() + seconds * 1000 };
+      // Server advice becomes a visible countdown keyed by account. It only
+      // permits a new manual attempt when it expires and never schedules one;
+      // missing or invalid advice invents no wait.
+      if (status === 429 || status === 503) {
+        this.waits.defer(String(context.userId), error instanceof ApiRequestError ? error.retryAfterSeconds : undefined);
       }
       fail(status === 401 || status === 403
         ? "Ya no tienes acceso al uso de este workspace. Comprueba tu sesión y tus permisos."

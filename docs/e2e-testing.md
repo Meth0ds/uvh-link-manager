@@ -183,11 +183,12 @@ Por encima de la suite de navegador hay dos puertas que no miran pantallas:
   los que otros importan: el resto no se exporta, de modo que la superficie de
   cada fichero dice qué promete y qué guarda para sí.
 
-  Una política se declara una vez y se lee donde se aplica. El tope de 12 MiB
-  del export automático vive en `GenerateDataExportJob::MAX_JSON_BYTES`, y ni el
-  semillero del ensayo ni sus aserciones lo repiten: el inspector lo lee del
-  propio job por reflexión y lo publica como `cap_bytes`, así que el volumen
-  sembrado y la banda «cerca del tope» se calculan contra el techo real. Lo
+  Una política se declara una vez y se lee donde se aplica. El techo operativo
+  del export automático vive en `AccountExportDocument::maxPlaintextBytes()`
+  (`EXPORT_MAX_PLAINTEXT_BYTES`, sobre el texto plano ya codificado), y ni el
+  semillero del ensayo ni sus aserciones lo repiten: el inspector lo lee de la
+  capa que lo aplica y lo publica como `cap_bytes`, así que el volumen sembrado
+  y la banda «cerca del tope» se calculan contra el techo real. Lo
   mismo con la forma de una fila: cada módulo del inspector tiene un único
   descriptor (`$describe`) que usan todos sus lectores, de modo que añadir un
   campo no puede dejar a un lector publicando menos que otro —el ensayo lee eso

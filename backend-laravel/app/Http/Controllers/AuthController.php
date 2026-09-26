@@ -22,6 +22,8 @@ use App\Support\MfaAttempts;
 use App\Support\MfaFreshness;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\MfaStepUp;
+use App\Support\NotificationInbox;
+use App\Support\NotificationKinds;
 use App\Support\PasswordStrength;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\RegistrationEdit;
@@ -747,6 +749,14 @@ class AuthController
         // Public by design: login does not create an unverified session, so a
         // user must still be able to request the message after a failed login.
         // Authenticated callers remain supported for backwards compatibility.
+        //
+        // El temporizador arranca aquí y se cierre en TODAS las ramas que
+        // contestan `ok`: la respuesta es deliberadamente la misma para una
+        // dirección conocida y una desconocida, y la latencia también debe
+        // serlo —la rama que envía correo hace trabajo real y la que no se
+        // amortigua hasta el mismo suelo—. Sin eso, medir la respuesta sigue
+        // distinguiendo quién tiene registro pendiente.
+        $startedAt = hrtime(true);
         $authenticated = UvhRequest::user($request);
         $requestedEmail = trim(UvhRequest::inputString($request, 'email'));
         $captchaToken = UvhRequest::inputString($request, 'captchaToken');
@@ -766,6 +776,8 @@ class AuthController
         if (! $pending) {
             // Unknown and already-consumed addresses are intentionally
             // indistinguishable on the public path.
+            $this->equalizeResendVerificationDuration($startedAt);
+
             return response()->json(['ok' => true]);
         }
 
@@ -809,10 +821,33 @@ class AuthController
 
             // The public path is uniform: a failure to enqueue is not a fact
             // about the address either.
+            $this->equalizeResendVerificationDuration($startedAt);
+
             return response()->json(['ok' => true]);
         }
 
+        $this->equalizeResendVerificationDuration($startedAt);
+
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Iguala el coste de las ramas que contestan `ok` hasta el suelo de
+     * `uvh.resend_verification_min_duration_ms`.
+     *
+     * La rama completa (transacción + token + admisión al outbox) suele pasar
+     * el suelo por sí sola; las ramas que no envían —dirección desconocida,
+     * cooldown, consumo concurrente, fallo de admisión— duermen el resto. El
+     * residuo que queda fuera del suelo (la varianza de la base de datos bajo
+     * carga) está documentado como límite conocido de la compensación temporal.
+     */
+    private function equalizeResendVerificationDuration(float $startedAt): void
+    {
+        $floorMs = max(0, (int) config('uvh.resend_verification_min_duration_ms'));
+        $remainingUs = ($floorMs * 1000) - (hrtime(true) - $startedAt) / 1000;
+        if ($remainingUs > 0) {
+            usleep((int) round($remainingUs));
+        }
     }
 
     public function forgotPassword(Request $request)
@@ -1602,6 +1637,7 @@ class AuthController
                 // The previous mailbox must receive a durable warning in the
                 // same commit as the new mailbox's bearer. If either admission
                 // fails, retain the previous reservation and recovery code.
+                NotificationInbox::record((int) $locked->id, NotificationKinds::EMAIL_CHANGE_REQUESTED);
                 if (! UvhMail::emailChangeRequested($locked->email)) {
                     throw new MailAdmissionException('Email change warning outbox admission failed');
                 }
@@ -1790,6 +1826,7 @@ class AuthController
                 // Both identity-change notices belong to this commit. Failure
                 // on the second mailbox also rolls back the first envelope;
                 // neither mailbox may be told about a change that was undone.
+                NotificationInbox::record((int) $user->id, NotificationKinds::EMAIL_CHANGED);
                 foreach (array_unique([$oldEmail, $newEmail]) as $recipient) {
                     if (! UvhMail::emailChanged($recipient)) {
                         throw new MailAdmissionException('Email changed notices outbox admission failed');
@@ -1989,7 +2026,8 @@ class AuthController
             ->orderByDesc('created_at')->orderByDesc('id')->first(['created_at']);
         $visibleActions = [
             'auth.login', 'auth.logout', 'auth.password_change', 'auth.password_reset',
-            'auth.session_revoke', 'auth.mfa_enable', 'auth.mfa_disable', 'auth.mfa_reconfigured',
+            'auth.session_revoke', 'auth.sessions_revoked_others', 'auth.sessions_revoked_all',
+            'auth.mfa_enable', 'auth.mfa_disable', 'auth.mfa_reconfigured',
             'auth.mfa_recovery', 'auth.mfa_recovery_regenerate', 'auth.mfa_reauthenticated',
             'auth.email_change_requested', 'auth.email_change_cancelled', 'auth.email_change_confirmed',
             'auth.emergency_access_revoked', 'auth.account_recovery_completed',
@@ -2038,6 +2076,67 @@ class AuthController
         $response = response()->json(['ok' => true, 'current' => $current]);
 
         return $current ? $response->withCookie(SessionManager::clearCookie()) : $response;
+    }
+
+    /**
+     * Cierre masivo conservando la sesión que llama: revoca todas las demás
+     * sesiones sin cerrar de la cuenta. No toca credenciales ni exige step-up,
+     * igual que la revocación individual, y es idempotente. El contador es de
+     * filas cerradas ahora, incluidas las que expiraron sin cerrarse antes.
+     */
+    public function revokeOtherSessions(Request $request): JsonResponse
+    {
+        $user = UvhRequest::user($request);
+        $currentId = UvhRequest::sessionId($request);
+        try {
+            // El aviso de seguridad se admite en la misma transacción que el
+            // cierre, como en el cambio de contraseña: sin aviso entregable no
+            // se cierra nada, y una repetición sin filas que cerrar no manda
+            // otro correo.
+            $revoked = DB::transaction(function () use ($user, $currentId): int {
+                $revoked = $user->sessions()->where('id', '!=', $currentId)
+                    ->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                if ($revoked > 0) {
+                    $this->admitSessionsRevokedNotice($user, false);
+                }
+
+                return $revoked;
+            });
+        } catch (MailAdmissionException) {
+            Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'sessions_revoked_others']);
+
+            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se cerró ninguna sesión. Inténtalo de nuevo más tarde'], 503);
+        }
+        Audit::write($user->id, 'auth.sessions_revoked_others', 'user', $user->id, ['revoked' => $revoked]);
+
+        return response()->json(['ok' => true, 'revoked' => $revoked]);
+    }
+
+    /**
+     * Cierre total: revoca todas las sesiones de la cuenta, incluida la actual,
+     * y limpia la cookie para que este navegador no vuelva a presentar la fila
+     * muerta. La cuenta queda fuera en todos los dispositivos.
+     */
+    public function revokeAllSessions(Request $request): JsonResponse
+    {
+        $user = UvhRequest::user($request);
+        try {
+            $revoked = DB::transaction(function () use ($user): int {
+                $revoked = $user->sessions()->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                if ($revoked > 0) {
+                    $this->admitSessionsRevokedNotice($user, true);
+                }
+
+                return $revoked;
+            });
+        } catch (MailAdmissionException) {
+            Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'sessions_revoked_all']);
+
+            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se cerró ninguna sesión. Inténtalo de nuevo más tarde'], 503);
+        }
+        Audit::write($user->id, 'auth.sessions_revoked_all', 'user', $user->id, ['revoked' => $revoked]);
+
+        return response()->json(['ok' => true, 'revoked' => $revoked])->withCookie(SessionManager::clearCookie());
     }
 
     public function mfaSetup(Request $request)
@@ -2153,6 +2252,7 @@ class AuthController
                 AccountRecoveryLifecycle::cancelActiveForUser((int) $locked->id, $now);
                 // Security notices without bearers are still mandatory: commit
                 // the factor, recovery hashes and encrypted notice together.
+                NotificationInbox::record((int) $locked->id, $reconfigured ? NotificationKinds::MFA_RECONFIGURED : NotificationKinds::MFA_ENABLED);
                 if (! UvhMail::mfaEnabled($locked->email, $reconfigured)) {
                     throw new MailAdmissionException('MFA enable notice outbox admission failed');
                 }
@@ -2254,6 +2354,7 @@ class AuthController
                 DB::table('sessions')->where('user_id', $locked->id)->where('id', '!=', $session->id)
                     ->whereNull('revoked_at')->update(['revoked_at' => $now]);
                 AccountRecoveryLifecycle::cancelActiveForUser((int) $locked->id, $now);
+                NotificationInbox::record((int) $locked->id, NotificationKinds::MFA_RECOVERY_CODES_REGENERATED);
                 if (! UvhMail::mfaRecoveryCodesRegenerated($locked->email)) {
                     throw new MailAdmissionException('MFA recovery codes notice outbox admission failed');
                 }
@@ -2347,6 +2448,7 @@ class AuthController
                 $session->update(['security_version' => $nextVersion, 'mfa_verified_at' => null]);
                 DB::table('sessions')->where('user_id', $locked->id)->where('id', '!=', $session->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
                 AccountRecoveryLifecycle::cancelActiveForUser((int) $locked->id, $now);
+                NotificationInbox::record((int) $locked->id, NotificationKinds::MFA_DISABLED);
                 if (! UvhMail::mfaDisabled($locked->email)) {
                     throw new MailAdmissionException('MFA disable notice outbox admission failed');
                 }
@@ -2387,18 +2489,45 @@ class AuthController
 
     // ---------------- helpers ----------------
 
-    /**
-     * Admit the incident bearer and encrypted notice in the credential commit.
-     *
-     * Callers must already hold the user's row lock. Do not open a separate
-     * transaction or swallow admission failures here: a crash must not commit
-     * new credentials without a recoverable security notice. Provider delivery
-     * remains after-commit and is not a prerequisite for changing credentials.
-     */
     private function admitPasswordChangedNotice(User $lockedUser): void
     {
+        $this->admitSecurityIncidentNotice(
+            $lockedUser,
+            NotificationKinds::PASSWORD_CHANGED,
+            static fn (string $to, string $incidentUrl, string $tokenHash): bool => UvhMail::passwordChanged($to, $incidentUrl, $tokenHash),
+        );
+    }
+
+    /**
+     * Cierre masivo de sesiones: el mismo portador de incidente que el cambio
+     * de contraseña, con el aviso admitido en la transacción que cierra. Si el
+     * cierre no cerró filas —ya estaban cerradas o no hay más sesiones— no hay
+     * evento que anunciar y no se admite correo alguno.
+     */
+    private function admitSessionsRevokedNotice(User $lockedUser, bool $closedAll): void
+    {
+        $this->admitSecurityIncidentNotice(
+            $lockedUser,
+            $closedAll ? NotificationKinds::SESSIONS_REVOKED_ALL : NotificationKinds::SESSIONS_REVOKED_OTHERS,
+            static fn (string $to, string $incidentUrl, string $tokenHash): bool => UvhMail::sessionsRevoked($to, $incidentUrl, $tokenHash, $closedAll),
+        );
+    }
+
+    /**
+     * Admit the incident bearer and encrypted notice in the mutation's commit.
+     *
+     * Callers must already hold the row locks that serialize the mutation. Do
+     * not open a separate transaction or swallow admission failures here: a
+     * crash must not commit the security change without a recoverable notice.
+     * Provider delivery remains after-commit and is not a prerequisite for
+     * changing credentials.
+     *
+     * @param  \Closure(string, string, string): bool  $deliver
+     */
+    private function admitSecurityIncidentNotice(User $lockedUser, string $notificationKind, \Closure $deliver): void
+    {
         if (DB::transactionLevel() < 1) {
-            throw new \LogicException('Security notice requires the credential transaction');
+            throw new \LogicException('Security notice requires the mutation transaction');
         }
 
         $token = Ids::randomToken(32);
@@ -2410,7 +2539,8 @@ class AuthController
             'expires_at' => now()->addDay(),
         ]);
         $url = $this->appUrl().'/auth/security-incident#token='.rawurlencode($token);
-        if (! UvhMail::passwordChanged($lockedUser->email, $url, $tokenHash)) {
+        NotificationInbox::record((int) $lockedUser->id, $notificationKind);
+        if (! $deliver($lockedUser->email, $url, $tokenHash)) {
             throw new MailAdmissionException('Security notice outbox admission failed');
         }
 

@@ -162,5 +162,5 @@ código: se verifica en el checklist de release, no aquí.
 - [ ] El flujo `Security scans` en verde en el commit que se despliega: Semgrep
   sin hallazgos ERROR, Gitleaks sin hallazgos, y Trivy sin HIGH/CRITICAL con
   parche. Las excepciones vigentes están en `.trivyignore.yaml`, `.gitleaks.toml`
-  y `.gitleaksignore`, cada una con su motivo y su deuda en `todos.md`;
+  y `.gitleaksignore`, cada una con su motivo y su deuda en `archive/todos.md`;
   `Tests\Unit\SecurityScanContractTest` comprueba que sigan siéndolo.

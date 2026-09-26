@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
  * Larastan types datetime columns from the database schema as `string` and
  * ignores the `datetime` cast, so attributes used as dates are declared here.
  *
+ * @property string|null $stage
  * @property Carbon|null $download_expires_at
  * @property Carbon|null $ready_at
  * @property Carbon|null $download_served_at
@@ -21,6 +22,7 @@ class DataExportRequest extends Model
         'user_id',
         'security_version',
         'status',
+        'stage',
         'mail_generation_hash',
         'failure_reason',
         'download_expires_at',

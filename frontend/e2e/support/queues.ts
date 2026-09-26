@@ -18,7 +18,7 @@ export async function runE2EExportsWorker(): Promise<void> {
   await execFileAsync(
     "docker",
     ["compose", "-p", "uvh-e2e", "-f", "docker-compose.e2e.yml", "exec", "-T", "app", "php",
-      "artisan", "queue:work", "--queue=exports", "--stop-when-empty", "--tries=3", "--timeout=180"],
+      "artisan", "queue:work", "--queue=exports", "--stop-when-empty", "--tries=3", "--timeout=660"],
     { cwd: repositoryRoot, encoding: "utf8", timeout: 180_000 },
   );
 }

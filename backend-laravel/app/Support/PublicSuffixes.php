@@ -23,7 +23,7 @@ namespace App\Support;
  * always block a concrete host.
  *
  * Updating it is a deliberate, reviewable act: add the suffix, move
- * `REVISED_AT` forward, and say why in the commit. `todos.md` carries the
+ * `REVISED_AT` forward, and say why in the commit. `docs/current-backlog.md` carries the
  * reminder that this file ages.
  */
 final class PublicSuffixes

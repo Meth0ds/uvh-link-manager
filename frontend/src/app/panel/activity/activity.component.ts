@@ -9,6 +9,7 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { readActivityPage } from "./activity-page";
 import { LatestRequest } from "../../core/services/latest-request";
+import { RetryCountdown } from "../../core/retry-countdown";
 import { resourceTypeLabel } from "../../core/resource-type-label";
 
 type Context = { workspaceId: number; userId: number; name: string };
@@ -29,7 +30,7 @@ export class ActivityComponent {
   private readonly state = signal<State | null>(null);
   // Account-wide advice survives workspace switches in this component. It is
   // merely UX: the backend enforces its own limit across sessions and tabs.
-  private wait: { userId: number; until: number } | null = null;
+  private readonly waits = new RetryCountdown(this.destroyRef);
   readonly maximumEvents = 500;
   readonly pageSize = 25;
   readonly outcomeLabels = { completed: "Completado", pending: "Solicitud admitida", failed: "Fallido", unknown: "Resultado no confirmado" };
@@ -46,7 +47,19 @@ export class ActivityComponent {
   private readonly current = computed(() => this.state()?.context === this.context() ? this.state() : null);
   readonly events = computed(() => this.current()?.events ?? []);
   readonly loading = computed(() => this.current()?.loading ?? this.context() !== null);
-  readonly error = computed(() => this.current()?.error ?? null);
+  /** Cuenta atrás de la espera por cuenta; 0 cuando no hay espera activa. */
+  readonly waitSeconds = computed(() => {
+    const context = this.context();
+    return context ? this.waits.remaining(String(context.userId)) : 0;
+  });
+  /**
+   * Mientras queda espera, el mensaje cuenta hacia abajo y sólo permite un
+   * nuevo intento manual cuando caduca; nada se reintenta solo.
+   */
+  readonly error = computed(() => {
+    const wait = this.waitSeconds();
+    return wait > 0 ? `Espera ${wait} segundos antes de volver a consultar.` : this.current()?.error ?? null;
+  });
   readonly capped = computed(() => this.events().length >= this.maximumEvents);
   readonly hasMore = computed(() => !!this.current()?.cursor && !this.capped());
 
@@ -57,7 +70,6 @@ export class ActivityComponent {
     });
     this.destroyRef.onDestroy(() => {
       this.state.set(null);
-      this.wait = null;
     });
   }
 
@@ -75,10 +87,9 @@ export class ActivityComponent {
     const requestContext = `${context.userId}:${context.workspaceId}`;
     const request = this.requests.begin(requestContext);
     const reset = (error: string) => this.state.set({ context, events: [], cursor: null, loading: false, error });
-    if (this.wait?.userId === context.userId && this.wait.until > Date.now()) {
-      reset(`Espera ${Math.ceil((this.wait.until - Date.now()) / 1000)} segundos antes de volver a consultar.`);
-      return;
-    }
+    // The visible countdown is the state while it lasts: no premature request.
+    // Fresh clock read: the wall clock can move without any signal change.
+    if (this.waits.remaining(String(context.userId)) > 0) return;
     const cursor = append ? previous!.cursor : null;
     // A server may return a short page with more available. Bound the final
     // request by remaining capacity, not by a count of full-size pages.
@@ -105,10 +116,11 @@ export class ActivityComponent {
       // A failed page also clears earlier pages: in particular, revoked access
       // must not leave previously authorized data rendered behind an error.
       const status = error instanceof ApiRequestError ? error.status : 0;
-      const seconds = error instanceof ApiRequestError ? error.retryAfterSeconds : undefined;
-      if ((status === 429 || status === 503) && seconds !== undefined && Number.isSafeInteger(seconds) && seconds >= 0
-        && Number.isSafeInteger(Date.now() + seconds * 1000)) {
-        this.wait = { userId: context.userId, until: Date.now() + seconds * 1000 };
+      // Server advice becomes a visible countdown keyed by account. It only
+      // permits a new manual attempt when it expires and never schedules one;
+      // missing or invalid advice invents no wait.
+      if (status === 429 || status === 503) {
+        this.waits.defer(String(context.userId), error instanceof ApiRequestError ? error.retryAfterSeconds : undefined);
       }
       reset(status === 401 || status === 403 ? "Ya no tienes acceso a esta actividad. Comprueba tu sesión y tus permisos."
         : status === 422 ? "La paginación ha caducado o no es válida. Actualiza para empezar desde el inicio."

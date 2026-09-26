@@ -2,6 +2,7 @@ import {
   decodeAccountDeletionImpact,
   decodeAccountDeletionRequest,
   decodeAuthUserResponse,
+  decodeDataExportHistoryResponse,
   decodeDataExportStatusResponse,
   decodeLoginOutcome,
   decodeLoginResponse,
@@ -11,6 +12,7 @@ import {
   decodeRecoveryCodes,
   decodeRequiredDataExportResponse,
   decodeSessionRevocation,
+  decodeSessionsBulkRevocation,
   decodeSessionsResponse,
   decodeWorkspacesResponse,
 } from "./auth-response-decoders";
@@ -69,6 +71,7 @@ describe("authentication response decoders", () => {
       id: 4,
       status: "ready",
       failureReason: null,
+      stage: null,
       downloadExpiresAt: "2026-09-07T00:00:00Z",
       createdAt: "2026-09-06T00:00:00Z",
       readyAt: "2026-09-06T00:02:00Z",
@@ -80,6 +83,29 @@ describe("authentication response decoders", () => {
     expect(() => decodeDataExportStatusResponse({ export: { ...status, status: "unknown" } })).toThrow();
     expect(decodeDataExportStatusResponse({ export: { ...status, status: "failed", failureReason: "automated_size_limit" } }).export?.failureReason).toBe("automated_size_limit");
     expect(() => decodeDataExportStatusResponse({ export: { ...status, failureReason: "mystery" } })).toThrow();
+    // Sólo una generación viva tiene etapa; las etapas se validan por literal.
+    expect(decodeDataExportStatusResponse({ export: { ...status, status: "processing", stage: "collecting" } }).export?.stage).toBe("collecting");
+    expect(() => decodeDataExportStatusResponse({ export: { ...status, stage: "quantum" } })).toThrow();
+  });
+
+  it("decodes the export history bounded to the server's ten rows", () => {
+    const row: DataExportStatus = {
+      id: 9,
+      status: "processing",
+      failureReason: null,
+      stage: "collecting",
+      downloadExpiresAt: null,
+      createdAt: "2026-09-06T00:00:00Z",
+      readyAt: null,
+      downloadedAt: null,
+    };
+    expect(decodeDataExportHistoryResponse({ exports: [] })).toEqual({ exports: [] });
+    expect(decodeDataExportHistoryResponse({ exports: [row] })).toEqual({ exports: [row] });
+    expect(() => decodeDataExportHistoryResponse({ exports: Array.from({ length: 11 }, () => row) })).toThrow();
+    expect(() => decodeDataExportHistoryResponse({ exports: [{ ...row, stage: "quantum" }] })).toThrow();
+    expect(() => decodeDataExportHistoryResponse({ exports: [{ ...row, stage: null, status: "processing" }] })).not.toThrow();
+    expect(() => decodeDataExportHistoryResponse({ exports: {} })).toThrow();
+    expect(() => decodeDataExportHistoryResponse({ exports: [null] })).toThrow();
   });
 
   it("validates account-deletion impact and request contracts", () => {
@@ -109,6 +135,9 @@ describe("authentication response decoders", () => {
     expect(decodeSessionsResponse({ sessions: [session] })).toEqual({ sessions: [session], truncated: false });
     expect(decodeSessionsResponse({ sessions: [session], truncated: true })).toEqual({ sessions: [session], truncated: true });
     expect(decodeSessionRevocation({ ok: true, current: true })).toEqual({ ok: true, current: true });
+    expect(decodeSessionsBulkRevocation({ ok: true, revoked: 3 })).toEqual({ ok: true, revoked: 3 });
+    expect(() => decodeSessionsBulkRevocation({ ok: true, revoked: "3" })).toThrow();
+    expect(() => decodeSessionsBulkRevocation({ ok: true, revoked: -1 })).toThrow();
     expect(() => decodeSessionsResponse({ sessions: [{ ...session, current: 1 }] })).toThrow();
     // A flag that is present but not a boolean must not be read as "complete".
     expect(() => decodeSessionsResponse({ sessions: [session], truncated: "yes" })).toThrow();

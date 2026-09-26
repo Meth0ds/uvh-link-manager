@@ -1,5 +1,5 @@
 import { Component, computed, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
+import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { BreakpointObserver } from "@angular/cdk/layout";
 import { filter, map, startWith } from "rxjs";
 import { NavigationEnd, RouterOutlet, RouterLink, RouterLinkActive, Router } from "@angular/router";
@@ -17,6 +17,7 @@ import { MatDialog } from "@angular/material/dialog";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 
 import { AuthService } from "../core/services/auth.service";
+import { NotificationService } from "../core/services/notification.service";
 import { WorkspaceService } from "../core/services/workspace.service";
 import { isWorkspaceRole, workspaceRoleLabel } from "../core/workspace-role-label";
 import { LinkDialogService } from "./links/link-dialog.service";
@@ -69,7 +70,11 @@ export class PanelComponent {
   private snackbar = inject(MatSnackBar);
 
   readonly workspaces = inject(WorkspaceService);
+  readonly notifications = inject(NotificationService);
   readonly user = this.auth.user;
+  readonly unreadNotificationsLabel = computed(() => this.notifications.unread() > 0
+    ? `${this.notifications.unread()} notificaciones sin leer`
+    : "Notificaciones");
   readonly isAdmin = computed(() => this.user()?.isAdmin === true);
   readonly workspaceName = computed(() => this.workspaces.list().find((workspace) => workspace.id === this.workspaces.currentId())?.name ?? "Sin workspace");
   readonly workspaceRole = computed(() => this.workspaces.list().find(w => w.id === this.workspaces.currentId())?.role);
@@ -94,6 +99,16 @@ export class PanelComponent {
   readonly logoutBusy = signal(false);
   readonly isMobile = toSignal(this.breakpoint.observe("(max-width: 720px)").pipe(map((state) => state.matches)), { initialValue: false });
   readonly panelContent = viewChild.required<ElementRef<HTMLElement>>("panelContent");
+
+  // La campana sigue el ritmo de navegación: cada página del panel puede haber
+  // registrado o leído avisos. El fallo silencioso conserva el último contador.
+  private readonly unreadRefresh = this.router.events
+    .pipe(filter((event) => event instanceof NavigationEnd), takeUntilDestroyed())
+    .subscribe(() => { void this.notifications.refreshUnread().catch(() => undefined); });
+
+  constructor() {
+    void this.notifications.refreshUnread().catch(() => undefined);
+  }
 
   readonly initials = computed(() => {
     const name = this.user()?.name ?? "?";
@@ -128,6 +143,7 @@ export class PanelComponent {
       label: "Cuenta",
       items: [
         { path: "/app/team", label: "Equipo", icon: "group" },
+        { path: "/app/notifications", label: "Notificaciones", icon: "notifications" },
         { path: "/app/security", label: "Centro de seguridad", icon: "security" },
         { path: "/app/settings", label: "Ajustes", icon: "settings" },
       ],

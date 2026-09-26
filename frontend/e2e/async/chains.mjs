@@ -149,7 +149,7 @@ export async function exportChain({ email, session, workspaceId }) {
   // transport may encode accents, but the link text and its target survive
   // every encoding the provider can choose.
   const announced = await until("export: ready announcement reaches the provider", async () =>
-    messageMatching(email, (text) => /Ir a mis exportaciones|settings#privacy/i.test(text)),
+    messageMatching(email, (text) => /Ir a mis exportaciones|settings\/privacy/i.test(text)),
   { deadlineMs: 45_000 }).catch((error) => {
     check("export: ready announcement reaches the provider", false, `${error.message} | ${JSON.stringify(ready)}`);
     return null;

@@ -14,6 +14,7 @@ import type {
   AdminMailOutboxMessage,
   AdminOperations,
   AdminOverview,
+  AdminPendingRegistration,
   AdminUser,
   AuditEvent,
   AccountRecoveryStatus,
@@ -47,6 +48,7 @@ import {
   decodeAdminMailPage,
   decodeAdminOperations,
   decodeAdminOverview,
+  decodeAdminPendingRegistrationsPage,
   decodeAdminRecoveriesPage,
   decodeAdminUsersPage,
 } from "../../core/services/admin-response-decoders";
@@ -134,6 +136,26 @@ export class AdminComponent {
         { signal },
       );
       return { rows: response.users ?? [], total: response.total };
+    },
+  });
+
+  // The queue the old `unverified` user filter pretended to describe: a
+  // registration lives here until its mailbox is proven, and this read is the
+  // only place its addresses are listed (admin-gated like the whole console).
+  readonly pendingQuery = signal("");
+  readonly pendingRegistrations = new QueuePaging<AdminPendingRegistration>({
+    destroyRef: this.destroyRef,
+    fallback: "No se pudieron cargar los registros pendientes",
+    message: adminMessage,
+    filters: () => [this.pendingQuery()],
+    read: async (page, perPage, signal) => {
+      const response = await this.api.get(
+        "/api/v1/admin/pending-registrations",
+        { q: this.pendingQuery(), page, perPage },
+        (value) => decodeAdminPendingRegistrationsPage(value, { page, perPage }),
+        { signal },
+      );
+      return { rows: response.registrations ?? [], total: response.total };
     },
   });
 
@@ -281,7 +303,7 @@ export class AdminComponent {
   /** Tab position to the queue it pages; moderation owns its queues inside its own lazy content. */
   private queueForTab(index: number): { load: () => Promise<void> } | null {
     const queues: Array<{ load: () => Promise<void> } | null> = [
-      this.users, this.recoveries, null, this.domains, this.audit, this.privacy, this.mail,
+      this.users, this.pendingRegistrations, this.recoveries, null, this.domains, this.audit, this.privacy, this.mail,
     ];
 
     return queues[index] ?? null;
@@ -305,6 +327,7 @@ export class AdminComponent {
       this.loadOverview(),
       this.loadOperations(),
       this.users.load(),
+      this.pendingRegistrations.load(),
       this.recoveries.load(),
       this.domains.load(),
       this.audit.load(),
@@ -386,6 +409,11 @@ export class AdminComponent {
   searchUsers(query: string): void {
     this.userQuery.set(query.trim());
     this.users.restart();
+  }
+
+  searchPendingRegistrations(query: string): void {
+    this.pendingQuery.set(query.trim());
+    this.pendingRegistrations.restart();
   }
 
   filterUsers(status: UserStatus): void {

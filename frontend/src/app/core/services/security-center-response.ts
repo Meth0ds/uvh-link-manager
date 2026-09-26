@@ -3,6 +3,7 @@ import { boolean, boundedArray, integer, literal, nullableText, record, text } f
 
 const ACTIONS = new Set([
   "auth.login", "auth.logout", "auth.password_change", "auth.password_reset", "auth.session_revoke",
+  "auth.sessions_revoked_others", "auth.sessions_revoked_all",
   "auth.mfa_enable", "auth.mfa_disable", "auth.mfa_reconfigured", "auth.mfa_recovery",
   "auth.mfa_recovery_regenerate", "auth.mfa_reauthenticated", "auth.email_change_requested",
   "auth.email_change_cancelled", "auth.email_change_confirmed", "auth.emergency_access_revoked",

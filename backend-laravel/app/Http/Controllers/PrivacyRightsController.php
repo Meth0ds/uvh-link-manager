@@ -6,6 +6,8 @@ use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\MailAdmissionException;
 use App\Support\MfaFreshness;
+use App\Support\NotificationInbox;
+use App\Support\NotificationKinds;
 use App\Support\OperationalMetrics;
 use App\Support\UvhCrypto;
 use App\Support\UvhMail;
@@ -83,6 +85,7 @@ final class PrivacyRightsController
                 if ($details !== '') {
                     $this->insertMessage($id, 'user', (int) $locked->id, $details);
                 }
+                NotificationInbox::record((int) $locked->id, NotificationKinds::PRIVACY_REQUEST_RECEIVED);
                 if (! UvhMail::privacyRequestReceived((string) $locked->email, $id, $generation)) {
                     throw new MailAdmissionException('Privacy request acknowledgement outbox admission failed');
                 }
@@ -188,6 +191,7 @@ final class PrivacyRightsController
                     'cancelled_at' => now(),
                     'updated_at' => now(),
                 ]);
+                NotificationInbox::record((int) $lockedUser->id, NotificationKinds::PRIVACY_REQUEST_UPDATED);
                 if (! UvhMail::privacyRequestUpdated((string) $lockedUser->email, $id, 'cancelled', $generation)) {
                     throw new MailAdmissionException('Privacy cancellation outbox admission failed');
                 }
@@ -331,6 +335,9 @@ final class PrivacyRightsController
                 }
 
                 $target = $targetUserId !== null ? $lockedUsers->get($targetUserId) : null;
+                if ($target && $target->deleted_at === null) {
+                    NotificationInbox::record((int) $target->id, NotificationKinds::PRIVACY_REQUEST_UPDATED);
+                }
                 if ($target && $target->deleted_at === null
                     && ! UvhMail::privacyRequestUpdated((string) $target->email, $id, $action === 'extend' ? 'extended' : $nextStatus, $generation)) {
                     throw new MailAdmissionException('Privacy status outbox admission failed');

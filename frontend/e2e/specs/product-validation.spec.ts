@@ -480,7 +480,7 @@ test("una sesión MFA caducada reautentica administración y registra el evento"
   test.setTimeout(600_000);
   const { email } = await registerVerifyAndLogin(page, "security-reauthentication");
 
-  await page.goto("/app/settings#security");
+  await page.goto("/app/settings/security");
   await page.getByLabel("Contraseña actual").filter({ visible: true }).last().fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Empezar configuración" }).click();
   const secret = (await page.locator(".mfa-secret code").textContent())?.trim() ?? "";
@@ -532,7 +532,7 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
 
   // Enable a real second factor before creating disposable data so this case
   // proves that irreversible deletion cannot silently fall back to password-only.
-  await page.goto("/app/settings#security");
+  await page.goto("/app/settings/security");
   await page.getByLabel("Contraseña actual").filter({ visible: true }).last().fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Empezar configuración" }).click();
   const mfaSecret = (await page.locator(".mfa-secret code").textContent())?.trim() ?? "";

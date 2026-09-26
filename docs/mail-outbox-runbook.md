@@ -210,7 +210,7 @@ restricción y sin haber ejecutado los casos.
 `WorkspaceNoticeAtomicityTest` añade siete casos de tokens/workspace, webhook
 ocupado y cancelación protectora, preparados y sin ejecutar.
 
-Referencias: [`todos.md`](todos.md),
+Referencias: [`archive/todos.md`](archive/todos.md),
 [`project-radiography-2026-09-04.md`](project-radiography-2026-09-04.md),
 [`production-readiness.md`](production-readiness.md) y
 [`backend-audit-findings.md`](backend-audit-findings.md), BAF-122 a BAF-129.

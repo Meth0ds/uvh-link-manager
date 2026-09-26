@@ -783,6 +783,56 @@ class ApiParityTest extends TestCase
         $this->withCookie('uvh_session', $sessionToken)->getJson('/api/v1/auth/me')->assertStatus(401);
     }
 
+    public function test_revoking_other_sessions_keeps_the_current_one_and_closes_the_rest(): void
+    {
+        $current = $this->registerVerifiedLogin('others-owner@example.com');
+        $second = $this->postJson('/api/v1/auth/login', [
+            'email' => 'others-owner@example.com',
+            'password' => self::PASSWORD,
+            'captchaToken' => 'test-login-passcode',
+        ]);
+        $second->assertStatus(200);
+        $other = $this->cookieFrom($second, 'uvh_session');
+        // Another account's sessions are out of scope and must survive intact.
+        $bystander = $this->registerVerifiedLogin('others-bystander@example.com');
+
+        $closed = $this->withCookie('uvh_session', $current)
+            ->postJson('/api/v1/auth/sessions/revoke-others', []);
+        $closed->assertStatus(200)->assertExactJson(['ok' => true, 'revoked' => 1]);
+
+        // The caller's session keeps working while the other dies immediately.
+        $this->withCookie('uvh_session', $current)->getJson('/api/v1/auth/me')->assertStatus(200);
+        $this->withCookie('uvh_session', $other)->getJson('/api/v1/auth/me')->assertStatus(401);
+        $this->withCookie('uvh_session', $bystander)->getJson('/api/v1/auth/me')->assertStatus(200);
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'auth.sessions_revoked_others')->count());
+
+        // Idempotent: there is no other session left to close.
+        $this->withCookie('uvh_session', $current)
+            ->postJson('/api/v1/auth/sessions/revoke-others', [])->assertExactJson(['ok' => true, 'revoked' => 0]);
+    }
+
+    public function test_revoking_all_sessions_closes_the_current_one_too(): void
+    {
+        $current = $this->registerVerifiedLogin('close-all@example.com');
+        $second = $this->postJson('/api/v1/auth/login', [
+            'email' => 'close-all@example.com',
+            'password' => self::PASSWORD,
+            'captchaToken' => 'test-login-passcode',
+        ]);
+        $second->assertStatus(200);
+        $other = $this->cookieFrom($second, 'uvh_session');
+
+        $closed = $this->withCookie('uvh_session', $current)
+            ->postJson('/api/v1/auth/sessions/revoke-all', []);
+        $closed->assertStatus(200)->assertExactJson(['ok' => true, 'revoked' => 2]);
+        // The cookie is cleared so the browser cannot present the dead session.
+        $this->assertSame('', $this->cookieFrom($closed, 'uvh_session'));
+
+        $this->withCookie('uvh_session', $current)->getJson('/api/v1/auth/me')->assertStatus(401);
+        $this->withCookie('uvh_session', $other)->getJson('/api/v1/auth/me')->assertStatus(401);
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'auth.sessions_revoked_all')->count());
+    }
+
     public function test_hcaptcha_is_verified_server_side_and_honeypot_is_rejected_before_provider_call(): void
     {
         Http::swap(new HttpFactory);

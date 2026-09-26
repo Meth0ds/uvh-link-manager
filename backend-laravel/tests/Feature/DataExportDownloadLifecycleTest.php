@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\DataExportRequest;
 use App\Models\User;
 use App\Support\Ids;
+use App\Support\PrivateArtifact;
 use App\Support\SessionManager;
 use App\Support\UvhCrypto;
 use Illuminate\Http\Request;
@@ -58,7 +59,7 @@ final class DataExportDownloadLifecycleTest extends TestCase
             $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
             $this->assertTrue($response->headers->hasCacheControlDirective('no-cache'));
             $this->assertSame('0', (string) $response->headers->getCacheControlDirective('max-age'));
-            $this->assertSame('{"account":{"email":"safe@example.test"}}', $response->getContent(), "download attempt {$attempt}");
+            $this->assertSame('{"account":{"email":"safe@example.test"}}', $response->streamedContent(), "download attempt {$attempt}");
             $request->refresh();
             $this->assertSame('ready', $request->status);
             $this->assertNotNull($request->download_served_at);
@@ -109,6 +110,29 @@ final class DataExportDownloadLifecycleTest extends TestCase
         Storage::disk('local')->assertExists((string) $request->artifact_path);
     }
 
+    public function test_a_legacy_single_blob_artifact_still_serves(): void
+    {
+        // Artefactos emitidos antes del formato por bloques: un solo blob, y
+        // el mismo cuerpo sale servido. La ventana de descarga dura 48 horas,
+        // más corta que cualquier transición de formato.
+        $user = $this->mfaUser();
+        $path = 'account-exports/'.str_repeat('C', 32).'.uvh';
+        Storage::disk('local')->put($path, UvhCrypto::encryptAtRest('{"format":"legacy-blob"}'));
+        DataExportRequest::create([
+            'user_id' => $user->id,
+            'security_version' => (int) $user->security_version,
+            'status' => 'ready',
+            'mail_generation_hash' => Ids::sha256Hex(Ids::randomToken(32)),
+            'download_expires_at' => now()->addHour(),
+            'artifact_path' => $path,
+            'ready_at' => now(),
+        ]);
+
+        $response = $this->post('/api/v1/auth/data-export/download', $this->credentials());
+        $response->assertOk();
+        $this->assertSame('{"format":"legacy-blob"}', $response->streamedContent());
+    }
+
     public function test_the_step_up_is_mandatory(): void
     {
         $user = $this->mfaUser();
@@ -154,6 +178,60 @@ final class DataExportDownloadLifecycleTest extends TestCase
             ->assertJsonMissingPath('export.confirmationExpiresAt');
     }
 
+    public function test_the_status_exposes_the_live_stage_only_while_processing(): void
+    {
+        $user = $this->mfaUser();
+        $row = DataExportRequest::create([
+            'user_id' => $user->id,
+            'security_version' => (int) $user->security_version,
+            'status' => 'processing',
+            'stage' => 'analytics',
+        ]);
+
+        $this->getJson('/api/v1/auth/data-export')->assertOk()
+            ->assertJsonPath('export.status', 'processing')
+            ->assertJsonPath('export.stage', 'analytics');
+
+        // La etapa es progreso de una generación viva; al terminar, la última
+        // etapa junto a un estado terminal sería una historia falsa.
+        DB::table('data_export_requests')->where('id', $row->id)->update([
+            'status' => 'ready',
+            'stage' => null,
+            'download_expires_at' => now()->addHour(),
+            'ready_at' => now(),
+        ]);
+        $this->getJson('/api/v1/auth/data-export')->assertOk()
+            ->assertJsonPath('export.status', 'ready')
+            ->assertJsonPath('export.stage', null);
+    }
+
+    public function test_the_history_lists_recent_exports_without_plumbing(): void
+    {
+        $user = $this->mfaUser();
+        foreach (range(1, 12) as $ignored) {
+            DataExportRequest::create([
+                'user_id' => $user->id,
+                'security_version' => (int) $user->security_version,
+                'status' => 'downloaded',
+                'mail_generation_hash' => Ids::sha256Hex(Ids::randomToken(32)),
+                'artifact_path' => 'account-exports/'.str_repeat('D', 32).'.uvh',
+                'downloaded_at' => now(),
+            ]);
+        }
+
+        $exports = $this->getJson('/api/v1/auth/data-export/history')->assertOk()->json('exports');
+        $this->assertIsArray($exports);
+        $this->assertCount(10, $exports, 'the history is bounded to the last ten exports');
+        foreach ($exports as $entry) {
+            $this->assertSame('downloaded', $entry['status']);
+            $this->assertArrayNotHasKey('artifactPath', $entry);
+            $this->assertArrayNotHasKey('mailGenerationHash', $entry);
+        }
+
+        // El historial es sólo lectura: no toca la exportación que describe.
+        $this->assertSame(12, DB::table('data_export_requests')->where('user_id', $user->id)->count());
+    }
+
     /** @return array{password: string, factorCode: string} */
     private function credentials(string $factorCode = self::RECOVERY): array
     {
@@ -185,8 +263,13 @@ final class DataExportDownloadLifecycleTest extends TestCase
 
     private function readyExport(User $user, string $json): DataExportRequest
     {
+        // El formato vivo: contenedor por bloques, como lo escribe el job.
         $path = 'account-exports/'.str_repeat('B', 32).'.uvh';
-        Storage::disk('local')->put($path, UvhCrypto::encryptAtRest($json));
+        $plain = fopen('php://temp/maxmemory:2097152', 'r+b');
+        fwrite($plain, $json);
+        rewind($plain);
+        PrivateArtifact::write($path, $plain);
+        fclose($plain);
 
         return DataExportRequest::create([
             'user_id' => $user->id,

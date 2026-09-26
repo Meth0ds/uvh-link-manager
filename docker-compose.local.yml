@@ -108,7 +108,7 @@ services:
     profiles: ["laravel"]
     # `security` is the pool the reputation checks run on: without it, blocking
     # a destination never reanalyses the links that point at it.
-    command: ["php", "artisan", "queue:work", "--queue=mail,webhooks,domains,exports,analytics,security,default", "--timeout=180", "--tries=3"]
+    command: ["php", "artisan", "queue:work", "--queue=mail,webhooks,domains,exports,analytics,security,default", "--timeout=660", "--tries=3"]
 
   # Laravel: scheduler local (php artisan schedule:work).
   schedule:

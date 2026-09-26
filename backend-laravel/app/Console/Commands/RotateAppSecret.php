@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Support\Ids;
+use App\Support\PrivateArtifact;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\UvhCrypto;
 use Illuminate\Console\Command;
@@ -153,11 +154,14 @@ final class RotateAppSecret extends Command
                         if (! is_string($ciphertext)) {
                             throw new \RuntimeException('no se pudo leer un artefacto privado de exportación (id '.$row->id.')');
                         }
-                        if (UvhCrypto::encryptedWithCurrentKey($ciphertext)) {
+                        // Formato por bloques o blob legado: la capa de
+                        // artefacto recifra cada cuerpo con la clave actual
+                        // conservando el formato con el que se emitió.
+                        if (PrivateArtifact::encryptedWithCurrentKey($ciphertext)) {
                             return false;
                         }
 
-                        $plain = UvhCrypto::decryptAtRest($ciphertext);
+                        $replaced = PrivateArtifact::reencrypt($ciphertext);
                         if ($dryRun) {
                             return true;
                         }
@@ -168,7 +172,7 @@ final class RotateAppSecret extends Command
                         // locked, serialising downloads and cleanup with the
                         // replacement of the concrete artifact.
                         $temporary = 'account-exports/.rotate-'.Ids::randomToken(18);
-                        if (! $disk->put($temporary, UvhCrypto::encryptAtRest($plain))) {
+                        if (! $disk->put($temporary, $replaced)) {
                             throw new \RuntimeException('no se pudo escribir un artefacto temporal de exportación (id '.$row->id.')');
                         }
                         $source = $disk->path($temporary);

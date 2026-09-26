@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild } from "@angular/core";
+import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
+import { Location } from "@angular/common";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { AccountDeletionDialogComponent } from "./account-deletion-dialog.component";
@@ -6,7 +7,7 @@ import { EmailAccessDialogComponent, type EmailAccessDialogData } from "./email-
 import { PasswordChangeDialogComponent } from "./password-change-dialog.component";
 import { DataExportDialogComponent, type DataExportDialogResult } from "./data-export-dialog.component";
 
-import { Router } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS, MatFormFieldModule } from "@angular/material/form-field";
@@ -25,7 +26,15 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { ThemeService, type ThemePreference } from "../../core/services/theme.service";
 import { downloadBlob } from "../../core/services/browser-download";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
-import type { AccountDeletionImpact, DataExportStatus, PrivacyRightRequest, PrivacyRightType, Session } from "../../core/models";
+import type { AccountDeletionImpact, DataExportStage, DataExportStatus, NotificationPreference, PrivacyRightRequest, PrivacyRightType, Session } from "../../core/models";
+import {
+  NOTIFICATION_DELIVERIES,
+  NOTIFICATION_DELIVERY_LABELS,
+  NOTIFICATION_KINDS,
+  type NotificationDelivery,
+  type NotificationKind,
+} from "../../core/notification-kinds";
+import { NotificationService } from "../../core/services/notification.service";
 import {
   privacyRightIsActive,
   privacyRightStatusLabel,
@@ -37,6 +46,8 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-decoders";
+import { AsyncPoller } from "../../core/async-poller";
+import { AsyncOperationStatusComponent, type AsyncOperationTone } from "../async-operation-status.component";
 
 @Component({
   selector: "app-settings",
@@ -56,6 +67,7 @@ import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-
     MatPaginatorModule,
     PageHeaderComponent,
     PanelSkeletonComponent,
+    AsyncOperationStatusComponent,
   ],
   templateUrl: "./settings.component.html",
   // Hints and validation messages must reserve their real height on narrow screens.
@@ -63,11 +75,13 @@ import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./settings.component.scss",
 })
-export class SettingsComponent {
+export class SettingsComponent implements AfterViewInit {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private workspaces = inject(WorkspaceService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private location = inject(Location);
   private theme = inject(ThemeService);
   private snackbar = inject(MatSnackBar);
   private actions = inject(ActionDialogService);
@@ -75,21 +89,58 @@ export class SettingsComponent {
   private destroyRef = inject(DestroyRef);
   private readonly dialogs = inject(MatDialog);
   private readonly injector = inject(Injector);
+  private readonly notifications = inject(NotificationService);
   private deletionDialog?: MatDialogRef<AccountDeletionDialogComponent, boolean>;
   private emailDialog?: MatDialogRef<EmailAccessDialogComponent, boolean>;
   private passwordDialog?: MatDialogRef<PasswordChangeDialogComponent, boolean>;
   private exportDialog?: MatDialogRef<DataExportDialogComponent, DataExportDialogResult>;
   private sessionsRequest = new LatestRequest(this.destroyRef);
   private exportRequest = new LatestRequest(this.destroyRef);
+  private exportHistoryRequest = new LatestRequest(this.destroyRef);
   private deletionRequest = new LatestRequest(this.destroyRef);
   private privacyRequest = new LatestRequest(this.destroyRef);
   readonly user = this.auth.user;
+  /** Ruta canónica de cada sección: la URL nombra la sección que se está leyendo. */
+  private static readonly SECTION_PATHS: Record<string, string> = {
+    account: "/app/settings/profile",
+    security: "/app/settings/security",
+    notifications: "/app/settings/notifications",
+    privacy: "/app/settings/privacy",
+    danger: "/app/settings/danger",
+  };
+  private readonly accountSectionRef = viewChild<ElementRef<HTMLElement>>("accountSection");
+  private readonly securitySectionRef = viewChild<ElementRef<HTMLElement>>("securitySection");
+  private readonly notificationsSectionRef = viewChild<ElementRef<HTMLElement>>("notificationsSection");
+  private readonly privacySectionRef = viewChild<ElementRef<HTMLElement>>("privacySection");
+  private readonly dangerSectionRef = viewChild<ElementRef<HTMLElement>>("dangerSection");
+
   /** Keep local jumps inside this route despite the document's base href.
    * Focus follows the section so keyboard users continue at the destination.
    * No form is unmounted: unfinished MFA setup and recovery codes stay intact.
    */
   goToSection(event: Event, section: HTMLElement): void {
     event.preventDefault();
+    this.jumpTo(section);
+    // La barra de direcciones sigue a la sección visible para poder
+    // compartirla. `replaceState` no navega: nada se re-renderiza ni se
+    // desmonta, y el contrato de salto local se mantiene.
+    const path = SettingsComponent.SECTION_PATHS[section.id];
+    if (path) this.location.replaceState(path);
+  }
+
+  /** Una ruta de sección (`/app/settings/security`) activa su sección como un salto. */
+  ngAfterViewInit(): void {
+    const section = this.route.snapshot.data["section"] as string | undefined;
+    const ref = section === "account" ? this.accountSectionRef()
+      : section === "security" ? this.securitySectionRef()
+        : section === "notifications" ? this.notificationsSectionRef()
+          : section === "privacy" ? this.privacySectionRef()
+            : section === "danger" ? this.dangerSectionRef()
+              : null;
+    if (ref) this.jumpTo(ref.nativeElement);
+  }
+
+  private jumpTo(section: HTMLElement): void {
     section.focus({ preventScroll: true });
     section.scrollIntoView({ block: "start", behavior: "instant" });
   }
@@ -115,6 +166,8 @@ export class SettingsComponent {
   readonly exportStatus = signal<DataExportStatus | null>(null);
   readonly exportLoading = signal(true);
   readonly exportBusy = signal(false);
+  /** Historial acotado: las últimas diez filas, como el servidor. */
+  readonly exportHistory = signal<DataExportStatus[]>([]);
   /**
    * Sondas automáticas mientras la exportación siga viva: el estado avanza
    * solo y la página no debe pedir nada al usuario. La secuencia crece
@@ -122,17 +175,13 @@ export class SettingsComponent {
    * pestaña oculta, se retoma al volver y termina en cualquier estado final.
    */
   private static readonly EXPORT_POLL_DELAYS_MS = [3_000, 5_000, 8_000, 13_000, 21_000, 30_000];
-  private exportPollTimer: ReturnType<typeof setTimeout> | null = null;
-  private exportPollIndex = 0;
   private exportPollLastStatus: DataExportStatus["status"] | null = null;
-  /** Pausa la sonda con la pestaña oculta y la retoma al volver. */
-  private readonly syncExportPollVisibility = (): void => {
-    if (typeof document !== "undefined" && document.hidden) {
-      this.stopExportPoll();
-      return;
-    }
-    this.resumeExportPoll();
-  };
+  private readonly exportPoller = new AsyncPoller({
+    destroyRef: this.destroyRef,
+    delays: SettingsComponent.EXPORT_POLL_DELAYS_MS,
+    wantsMore: () => this.exportNeedsPoll(),
+    attempt: () => void this.loadExportStatus(false, true),
+  });
   private readonly privacyFormBlock = viewChild<ElementRef<HTMLElement>>("privacyFormBlock");
   // ---------------- Account deletion ----------------
   readonly deletionImpact = signal<AccountDeletionImpact | null>(null);
@@ -193,26 +242,67 @@ export class SettingsComponent {
     { value: "system", label: "Seguir sistema" },
   ];
 
+  // ---------------- Notification preferences ----------------
+  readonly notificationPreferences = signal<NotificationPreference[]>([]);
+  readonly notificationPrefsLoading = signal(true);
+  readonly notificationPrefsBusy = signal(false);
+  readonly notificationPrefsError = signal<string | null>(null);
+  readonly notificationDeliveries = NOTIFICATION_DELIVERIES;
+  // Los críticos —credenciales, MFA, email, exportación o eliminación de
+  // cuenta— llegan siempre; el servidor además rechaza silenciarlos.
+  readonly mandatoryPreferences = computed(() => this.notificationPreferences().filter((p) => p.category === "mandatory"));
+  readonly operationalPreferences = computed(() => this.notificationPreferences().filter((p) => p.category === "operational"));
+
+  notificationKindLabel(kind: NotificationKind): string {
+    return NOTIFICATION_KINDS[kind].label;
+  }
+
+  notificationKindIcon(kind: NotificationKind): string {
+    return NOTIFICATION_KINDS[kind].icon;
+  }
+
+  notificationDeliveryLabel(delivery: NotificationDelivery): string {
+    return NOTIFICATION_DELIVERY_LABELS[delivery];
+  }
+
+  async loadNotificationPreferences(): Promise<void> {
+    this.notificationPrefsLoading.set(true);
+    this.notificationPrefsError.set(null);
+    try {
+      this.notificationPreferences.set(await this.notifications.preferences());
+    } catch {
+      this.notificationPrefsError.set("No se pudieron cargar tus preferencias de aviso. Inténtalo de nuevo.");
+    } finally {
+      this.notificationPrefsLoading.set(false);
+    }
+  }
+
+  async setNotificationDelivery(pref: NotificationPreference, delivery: NotificationDelivery): Promise<void> {
+    // El servidor rechaza cambiar un obligatorio; no se le manda ni se intenta.
+    if (pref.category === "mandatory" || pref.delivery === delivery || this.notificationPrefsBusy()) return;
+    this.notificationPrefsBusy.set(true);
+    try {
+      this.notificationPreferences.set(await this.notifications.updatePreferences([{ kind: pref.kind, delivery }]));
+      this.snackbar.open("Preferencia de avisos guardada", "Cerrar", { duration: 3000 });
+    } catch (err) {
+      this.toast(err, "No se pudo guardar la preferencia. Inténtalo de nuevo.");
+    } finally {
+      this.notificationPrefsBusy.set(false);
+    }
+  }
+
   constructor() {
     this.destroyRef.onDestroy(() => {
       this.deletionDialog?.close();
       this.emailDialog?.close();
       this.passwordDialog?.close();
       this.exportDialog?.close();
-      this.stopExportPoll();
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", this.syncExportPollVisibility);
-        window.removeEventListener("focus", this.syncExportPollVisibility);
-      }
     });
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", this.syncExportPollVisibility);
-      window.addEventListener("focus", this.syncExportPollVisibility);
-    }
     void this.loadSessions();
     void this.loadExportStatus();
     void this.loadDeletionImpact();
     void this.loadPrivacyRequests();
+    void this.loadNotificationPreferences();
   }
 
   private toast(err: unknown, fallback: string): void {
@@ -306,9 +396,13 @@ export class SettingsComponent {
     try {
       const status = await this.auth.dataExportStatus({ signal: request.signal });
       if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
-      if ((status?.status ?? null) !== this.exportPollLastStatus) this.exportPollIndex = 0;
+      const statusChanged = (status?.status ?? null) !== this.exportPollLastStatus;
+      if (statusChanged) this.exportPoller.reset();
       this.exportPollLastStatus = status?.status ?? null;
       this.exportStatus.set(status);
+      // El historial sólo cambia cuando cambia el estado visible; las sondas
+      // silenciosas no lo tocan mientras la exportación siga igual.
+      if (statusChanged) void this.loadExportHistory();
     } catch (err) {
       if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       if (silent) return;
@@ -317,44 +411,30 @@ export class SettingsComponent {
     } finally {
       if (this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) {
         if (!silent) this.exportLoading.set(false);
-        this.scheduleExportPoll();
+        this.exportPoller.schedule();
       }
+    }
+  }
+
+  /**
+   * Historial de exportaciones (máximo diez). Un fallo aquí nunca bloquea la
+   * tarjeta de estado: lo que manda es la exportación activa.
+   */
+  async loadExportHistory(): Promise<void> {
+    const context = this.auth.sessionGeneration();
+    const request = this.exportHistoryRequest.begin(context);
+    try {
+      const exports = await this.auth.dataExportHistory({ signal: request.signal });
+      if (!this.exportHistoryRequest.isCurrent(request, this.auth.sessionGeneration())) return;
+      this.exportHistory.set(exports);
+    } catch {
+      // Sin historial no se pierde nada operativo; se conserva el último visto.
     }
   }
 
   private exportNeedsPoll(): boolean {
     const status = this.exportStatus()?.status ?? null;
     return status === "processing" || status === "ready";
-  }
-
-  private scheduleExportPoll(): void {
-    this.stopExportPoll();
-    if (this.destroyRef.destroyed || typeof document === "undefined") return;
-    // Estado final: no queda nada que esperar y la sonda se apaga.
-    if (!this.exportNeedsPoll() || document.hidden) return;
-    const delays = SettingsComponent.EXPORT_POLL_DELAYS_MS;
-    const delay = delays[Math.min(this.exportPollIndex, delays.length - 1)];
-    this.exportPollIndex += 1;
-    this.exportPollTimer = setTimeout(() => {
-      this.exportPollTimer = null;
-      // Si la pestaña se ocultó sin evento, no se gasta la consulta.
-      if (typeof document !== "undefined" && document.hidden) return;
-      void this.loadExportStatus(false, true);
-    }, delay);
-  }
-
-  private resumeExportPoll(): void {
-    if (this.destroyRef.destroyed || typeof document === "undefined" || document.hidden) return;
-    if (!this.exportNeedsPoll() || this.exportPollTimer !== null) return;
-    this.exportPollIndex = 0;
-    void this.loadExportStatus(false, true);
-  }
-
-  private stopExportPoll(): void {
-    if (this.exportPollTimer !== null) {
-      clearTimeout(this.exportPollTimer);
-      this.exportPollTimer = null;
-    }
   }
 
   openDataExportDialog(purpose: "request" | "download" = "request"): void {
@@ -373,7 +453,7 @@ export class SettingsComponent {
       } else {
         this.snackbar.open(purpose === "download" ? "Archivo descargado" : "Solicitud de exportación iniciada", "Cerrar", { duration: 3500 });
       }
-      void this.settleAfterConfirmedMutation([this.loadExportStatus(false)]);
+      void this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.loadExportHistory()]);
     });
   }
 
@@ -392,7 +472,7 @@ export class SettingsComponent {
     try {
       await this.auth.cancelDataExport();
       this.snackbar.open("Exportación cancelada", "Cerrar", { duration: 2500 });
-      await this.settleAfterConfirmedMutation([this.loadExportStatus(false)]);
+      await this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.loadExportHistory()]);
     } catch (err) {
       this.toast(err, "");
     } finally {
@@ -408,6 +488,49 @@ export class SettingsComponent {
   exportShowsRequestEntry(): boolean {
     const status = this.exportStatus()?.status ?? null;
     return status === null || status === "downloaded" || status === "cancelled";
+  }
+
+  private static readonly EXPORT_STAGE_LABELS: Record<DataExportStage, string> = {
+    collecting: "Recopilando tus datos",
+    analytics: "Calculando totales",
+    encoding: "Preparando el contenido",
+    encrypting: "Cifrando el archivo",
+    finalizing: "Finalizando la entrega",
+  };
+
+  private static readonly EXPORT_STATUS_LABELS: Record<DataExportStatus["status"], string> = {
+    processing: "En preparación",
+    ready: "Lista",
+    downloaded: "Descargada",
+    failed: "Falló",
+    cancelled: "Cancelada",
+    expired: "Caducada",
+  };
+
+  /** Etapa viva de la generación; sin etapa conocida, texto neutro. */
+  exportStageLabel(stage: DataExportStage | null): string {
+    return stage ? SettingsComponent.EXPORT_STAGE_LABELS[stage] : "Preparando el archivo";
+  }
+
+  exportStatusLabel(status: DataExportStatus["status"]): string {
+    return SettingsComponent.EXPORT_STATUS_LABELS[status];
+  }
+
+  /** Icono y tono de la tarjeta comparten el estado de la exportación. */
+  exportTone(status: DataExportStatus["status"]): AsyncOperationTone {
+    return status === "processing" ? "working"
+      : status === "ready" ? "ready"
+      : status === "failed" ? "failed"
+      : status === "expired" ? "expired"
+      : "done";
+  }
+
+  exportIcon(status: DataExportStatus["status"]): string {
+    return status === "processing" ? "hourglass_top"
+      : status === "ready" ? "task_alt"
+      : status === "downloaded" ? "download_done"
+      : status === "failed" ? "error_outline"
+      : "history";
   }
 
   /** El límite automático se resuelve por el flujo de portabilidad, no por soporte. */

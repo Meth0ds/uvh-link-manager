@@ -13,14 +13,14 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
-import type { WorkspaceDetail, Member, Invitation, WorkspaceRole } from "../../core/models";
+import type { WorkspaceDetail, Member, MemberSearchHit, Invitation, WorkspaceRole } from "../../core/models";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { InvitationRetryService } from "./invitation-retry.service";
 import { LatestRequest } from "../../core/services/latest-request";
 import { targetWorkspace } from "../../core/services/workspace-target";
-import { decodeWorkspaceDetail } from "../../core/services/workspace-response-decoders";
+import { decodeWorkspaceDetail, decodeWorkspaceMemberSearch } from "../../core/services/workspace-response-decoders";
 import { isWorkspaceRole, workspaceRoleLabel } from "../../core/workspace-role-label";
 import { invitationStatusLabel } from "../../core/invitation-status-label";
 
@@ -53,7 +53,12 @@ export class TeamComponent {
   private workspaces = inject(WorkspaceService);
   private actions = inject(ActionDialogService);
   readonly invitationRetry = inject(InvitationRetryService);
-  private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly requests = new LatestRequest(this.destroyRef);
+  // The picker searches independently of the paged team snapshot, so a slow
+  // lookup must never cancel (or be cancelled by) the page load.
+  private readonly transferRequests = new LatestRequest(this.destroyRef);
+  private transferSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly detail = signal<WorkspaceDetail | null>(null);
   readonly loading = signal(true);
@@ -64,7 +69,14 @@ export class TeamComponent {
   readonly error = signal<string | null>(null);
   readonly user = this.auth.user;
   readonly transferOpen = signal(false);
-  readonly transferTargetId = signal<number | null>(null);
+  /** The recipient picked from the remote search; never read from the loaded page. */
+  readonly transferTarget = signal<MemberSearchHit | null>(null);
+  readonly transferQuery = signal("");
+  /** Null until a search answers: the picker must not claim "nobody" by default. */
+  readonly transferResults = signal<MemberSearchHit[] | null>(null);
+  readonly transferTotal = signal(0);
+  readonly transferSearching = signal(false);
+  readonly transferSearchError = signal(false);
   readonly transferPassword = signal("");
   readonly transferFactorCode = signal("");
   readonly deleteOpen = signal(false);
@@ -90,6 +102,9 @@ export class TeamComponent {
   private loadedWorkspaceId: number | null | undefined;
 
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.transferSearchTimer !== null) clearTimeout(this.transferSearchTimer);
+    });
     effect(() => {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
@@ -98,6 +113,7 @@ export class TeamComponent {
       this.detail.set(null);
       this.memberPageIndex.set(0);
       this.invitationPageIndex.set(0);
+      this.resetTransferPicker();
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -386,24 +402,96 @@ export class TeamComponent {
   beginOwnershipTransfer(): void {
     if (this.saving()) return;
     this.transferOpen.set(true);
-    this.transferTargetId.set(null);
+    this.resetTransferPicker();
     this.transferPassword.set("");
     this.transferFactorCode.set("");
+    // Opening the picker lists the first window of members right away, so the
+    // recipient is findable even without remembering a name to type.
+    void this.searchTransferCandidates();
   }
 
   cancelOwnershipTransfer(): void {
     if (this.saving()) return;
     this.transferOpen.set(false);
+    this.resetTransferPicker();
     this.transferPassword.set("");
     this.transferFactorCode.set("");
+  }
+
+  private resetTransferPicker(): void {
+    if (this.transferSearchTimer !== null) {
+      clearTimeout(this.transferSearchTimer);
+      this.transferSearchTimer = null;
+    }
+    this.transferRequests.invalidate();
+    this.transferTarget.set(null);
+    this.transferQuery.set("");
+    this.transferResults.set(null);
+    this.transferTotal.set(0);
+    this.transferSearching.set(false);
+    this.transferSearchError.set(false);
+  }
+
+  /** Debounce keystrokes so typing a name is one search, not one per letter. */
+  onTransferQuery(value: string): void {
+    this.transferQuery.set(value);
+    if (this.transferSearchTimer !== null) clearTimeout(this.transferSearchTimer);
+    this.transferSearchTimer = setTimeout(() => {
+      this.transferSearchTimer = null;
+      void this.searchTransferCandidates();
+    }, 250);
+  }
+
+  /**
+   * Search every member of the workspace, not just the page of the team list.
+   * A result that arrives after a newer query is dropped: the picker must show
+   * matches for what is typed now, never for a superseded term.
+   */
+  async searchTransferCandidates(): Promise<void> {
+    const detail = this.detail();
+    if (!detail) return;
+    const query = this.transferQuery().trim();
+    const request = this.transferRequests.begin(query);
+    this.transferSearching.set(true);
+    this.transferSearchError.set(false);
+    try {
+      const result = await this.api.get<{ members: MemberSearchHit[]; total: number }>(
+        `/api/v1/workspaces/${detail.workspace.id}/members`,
+        { q: query, perPage: 10 },
+        decodeWorkspaceMemberSearch,
+        { signal: request.signal },
+      );
+      if (!this.transferRequests.isCurrent(request, query)) return;
+      // Ownership is transferred, never assigned: the current owner is never a
+      // candidate, whatever page of the team list happens to be loaded.
+      this.transferResults.set(result.members.filter((member) => member.role !== "owner"));
+      this.transferTotal.set(result.total);
+    } catch {
+      if (!this.transferRequests.isCurrent(request, query)) return;
+      this.transferResults.set(null);
+      this.transferSearchError.set(true);
+    } finally {
+      if (this.transferRequests.isCurrent(request, query)) this.transferSearching.set(false);
+    }
+  }
+
+  selectTransferTarget(candidate: MemberSearchHit): void {
+    if (this.saving() || candidate.role === "owner") return;
+    this.transferTarget.set(candidate);
+    this.transferResults.set(null);
+  }
+
+  clearTransferTarget(): void {
+    if (this.saving()) return;
+    this.transferTarget.set(null);
+    void this.searchTransferCandidates();
   }
 
   async transferOwnership(): Promise<void> {
     const detail = this.detail();
     const scope = targetWorkspace(this.workspaces, detail?.workspace.id ?? null);
-    const targetId = this.transferTargetId();
-    const recipient = detail?.members.find((member) => member.id === targetId && member.role !== "owner");
-    if (!detail || !recipient || !this.transferPassword()
+    const recipient = this.transferTarget();
+    if (!detail || !recipient || recipient.role === "owner" || !this.transferPassword()
       || (this.user()?.mfaEnabled && !this.transferFactorCode()) || this.saving()) return;
 
     const confirmed = await this.actions.confirm({
@@ -431,7 +519,7 @@ export class TeamComponent {
       this.transferOpen.set(false);
       this.transferPassword.set("");
       this.transferFactorCode.set("");
-      this.transferTargetId.set(null);
+      this.resetTransferPicker();
       this.snackbar.open("Propiedad transferida", "Cerrar", { duration: 3000 });
       try {
         await Promise.all([this.auth.refreshWorkspaces(), this.auth.refreshUser()]);

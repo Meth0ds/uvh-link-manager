@@ -4,6 +4,13 @@
       <button type="button" [class.active]="period() === option.value" [attr.aria-pressed]="period() === option.value" [attr.aria-label]="option.label" (click)="onPeriod(option.value)">{{ option.short }}</button>
     }
   </div>
+  @if (period() === "custom") {
+    <div class="custom-range" role="group" aria-label="Fechas del rango personalizado">
+      <label>Desde <input #fromInput type="date" [value]="customFrom()" (change)="onCustomDate('from', fromInput.value)" /></label>
+      <label>Hasta <input #toInput type="date" [value]="customTo()" (change)="onCustomDate('to', toInput.value)" /></label>
+      @if (customRangeError(); as message) { <p class="custom-range-error" role="alert">{{ message }}</p> }
+    </div>
+  }
 </app-page-header>
 
 <aside class="reading-note" aria-label="Cómo interpretar estas métricas">
@@ -24,12 +31,20 @@
 }
 
 @if (!loading() && !overview() && !error()) {
-  <div class="empty-state">
-    <mat-icon>query_stats</mat-icon>
-    <b>Aún no hay analítica</b>
-    <p>Comparte un enlace para empezar a observar clics, actividad diaria y campañas.</p>
-    <button mat-flat-button color="primary" routerLink="/app/links">Ver enlaces</button>
-  </div>
+  @if (awaitingCustomRange() || customRangeError()) {
+    <div class="empty-state">
+      <mat-icon>date_range</mat-icon>
+      <b>Elige las dos fechas</b>
+      <p>Selecciona desde y hasta para consultar tu rango personalizado (hasta 180 días).</p>
+    </div>
+  } @else {
+    <div class="empty-state">
+      <mat-icon>query_stats</mat-icon>
+      <b>Aún no hay analítica</b>
+      <p>Comparte un enlace para empezar a observar clics, actividad diaria y campañas.</p>
+      <button mat-flat-button color="primary" routerLink="/app/links">Ver enlaces</button>
+    </div>
+  }
 }
 
 @if (overview(); as o) {

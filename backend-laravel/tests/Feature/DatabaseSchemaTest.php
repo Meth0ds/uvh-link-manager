@@ -48,6 +48,8 @@ class DatabaseSchemaTest extends TestCase
             'destination_denylist',
             'destination_reputation_checks',
             'link_appeals',
+            'notifications',
+            'notification_preferences',
         ];
 
         foreach ($tables as $table) {
@@ -92,7 +94,7 @@ class DatabaseSchemaTest extends TestCase
             // El aviso de «listo» identifica su generación, no autoriza nada: la
             // descarga pide sesión y step-up. `failure_reason` distingue un
             // fallo transitorio de un volumen fuera del proceso automático.
-            'data_export_requests' => ['id', 'user_id', 'security_version', 'status', 'mail_generation_hash', 'failure_reason', 'artifact_path', 'download_served_at'],
+            'data_export_requests' => ['id', 'user_id', 'security_version', 'status', 'stage', 'mail_generation_hash', 'failure_reason', 'artifact_path', 'download_served_at'],
             'account_deletion_requests' => ['id', 'user_id', 'security_version', 'status', 'confirmation_token_hash', 'cancel_token_hash', 'execute_after'],
             'link_intent_claims' => ['intent_hash', 'user_id', 'expires_at'],
             'mail_outbox' => ['id', 'idempotency_key', 'encrypted_envelope', 'kind', 'resource_type', 'resource_id', 'resource_generation', 'status', 'attempts', 'manual_retry_count', 'available_at', 'queued_at', 'locked_at', 'lock_token', 'sent_at', 'failed_at', 'last_manual_retry_at', 'last_error'],
@@ -105,6 +107,11 @@ class DatabaseSchemaTest extends TestCase
             'destination_denylist' => ['id', 'match_kind', 'match_value', 'reason', 'source', 'created_by', 'expires_at'],
             'destination_reputation_checks' => ['id', 'url_hash', 'host', 'verdict', 'score', 'provider', 'checked_at', 'expires_at', 'failure_count', 'last_error'],
             'link_appeals' => ['id', 'link_id', 'workspace_id', 'actor_user_id', 'message', 'status', 'decided_by', 'decided_at', 'decision_note'],
+            // Sólo identidad y texto ya seguro: nunca secretos, URLs bearer ni
+            // contenido de correo. `dedupe_key` es la identidad lógica del
+            // evento dentro de la cuenta (índice único parcial).
+            'notifications' => ['id', 'user_id', 'workspace_id', 'kind', 'subject', 'dedupe_key', 'route', 'created_at', 'read_at', 'digested_at'],
+            'notification_preferences' => ['user_id', 'kind', 'delivery', 'updated_at'],
         ];
 
         foreach ($expect as $table => $columns) {

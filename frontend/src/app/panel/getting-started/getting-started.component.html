@@ -45,8 +45,8 @@
           <aside class="guide-note"><mat-icon aria-hidden="true">info_outline</mat-icon><div><b>Tú decides cuándo dar el siguiente paso.</b><p>Sólo abrimos pantallas internas. Ningún enlace se visita ni se envía correo automáticamente. Puedes reanudar la guía desde «Primeros pasos» en el menú.</p></div></aside>
         }
       }
-      @if (storageWarning()) {
-        <p class="guide-note" role="status">El navegador no permite guardar esta preferencia; al volver podría mostrarse la guía de nuevo.</p>
+      @if (preferenceError()) {
+        <p class="guide-note" role="status">No se pudo guardar tu preferencia; al volver podría mostrarse la guía de nuevo.</p>
       }
     </section>
   }

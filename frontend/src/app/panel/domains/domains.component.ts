@@ -15,6 +15,7 @@ import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
+import { AsyncPoller } from "../../core/async-poller";
 import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { domainStateLabel } from "../../core/domain-state-label";
@@ -65,6 +66,7 @@ export class DomainsComponent {
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
   private actions = inject(ActionDialogService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly loadRequests = new LatestRequest(inject(DestroyRef));
   private readonly pollRequests = new LatestRequest(inject(DestroyRef));
 
@@ -200,7 +202,7 @@ export class DomainsComponent {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Verificación DNS iniciada. Actualizaremos el estado automáticamente.", "Cerrar", { duration: 4000 });
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
-      void this.pollVerification(d.id);
+      this.pollVerification(d.id);
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(
@@ -217,28 +219,54 @@ export class DomainsComponent {
     }
   }
 
-  private async pollVerification(id: number): Promise<void> {
+  private pollVerification(id: number): void {
+    this.pollDomainState(id, {
+      attempts: 15,
+      settled: (domain) => !this.isChecking(domain),
+      exhausted: "La comprobación sigue en cola. Puedes actualizar el estado dentro de unos minutos.",
+    });
+  }
+
+  /**
+   * Sonda única por operación: refresca el estado hasta que se asienta o se
+   * agotan los intentos. La espera vive en `AsyncPoller`: una sola espera
+   * armada, pausa con la pestaña oculta, reanudación al volver y corte al
+   * cambiar de workspace (el guardián `pollRequests` manda sobre la sonda).
+   */
+  private pollDomainState(
+    id: number,
+    options: { attempts: number; settled: (domain: DomainDto) => boolean; exhausted: string },
+  ): void {
     const workspaceId = this.workspaces.currentId();
     if (workspaceId === null) return;
     const request = this.pollRequests.begin(workspaceId);
-    const attempts = 15;
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
-      if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
-      try {
-        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()), { signal: request.signal });
+    let remaining = options.attempts;
+    const poller = new AsyncPoller({
+      destroyRef: this.destroyRef,
+      delays: [2_000],
+      wantsMore: () => remaining > 0,
+      attempt: async () => {
+        remaining -= 1;
         if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
-        this.domains.set(domains);
-        const current = domains.find((domain) => domain.id === id);
-        if (!current) return;
-        if (!this.isChecking(current)) return;
-      } catch {
-        return;
-      }
-    }
-    if (this.pollRequests.isCurrent(request, this.workspaces.currentId())) {
-      this.snackbar.open("La comprobación sigue en cola. Puedes actualizar el estado dentro de unos minutos.", "Cerrar", { duration: 5000 });
-    }
+        try {
+          const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()), { signal: request.signal });
+          if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
+          this.domains.set(domains);
+          const current = domains.find((domain) => domain.id === id);
+          if (!current || options.settled(current)) return;
+        } catch {
+          return;
+        }
+        if (remaining <= 0) {
+          if (this.pollRequests.isCurrent(request, this.workspaces.currentId())) {
+            this.snackbar.open(options.exhausted, "Cerrar", { duration: 5000 });
+          }
+          return;
+        }
+        poller.schedule();
+      },
+    });
+    poller.schedule();
   }
 
   async activate(d: DomainDto): Promise<void> {
@@ -256,7 +284,7 @@ export class DomainsComponent {
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       if (result.state === "provisioning") {
         this.snackbar.open("Emitiendo y validando el certificado…", "Cerrar", { duration: 3500 });
-        void this.pollActivation(d.id);
+        this.pollActivation(d.id);
       } else {
         this.snackbar.open("Dominio activado", "Cerrar", { duration: 2500 });
       }
@@ -268,26 +296,12 @@ export class DomainsComponent {
     }
   }
 
-  private async pollActivation(id: number): Promise<void> {
-    const workspaceId = this.workspaces.currentId();
-    if (workspaceId === null) return;
-    const request = this.pollRequests.begin(workspaceId);
-    for (let attempt = 0; attempt < 30; attempt += 1) {
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
-      if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
-      try {
-        const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()), { signal: request.signal });
-        if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
-        this.domains.set(domains);
-        const current = domains.find((domain) => domain.id === id);
-        if (!current || current.state !== "provisioning") return;
-      } catch {
-        return;
-      }
-    }
-    if (this.pollRequests.isCurrent(request, this.workspaces.currentId())) {
-      this.snackbar.open("La emisión continúa en segundo plano. El estado se actualizará al terminar.", "Cerrar", { duration: 5000 });
-    }
+  private pollActivation(id: number): void {
+    this.pollDomainState(id, {
+      attempts: 30,
+      settled: (domain) => domain.state !== "provisioning",
+      exhausted: "La emisión continúa en segundo plano. El estado se actualizará al terminar.",
+    });
   }
 
   async disable(d: DomainDto): Promise<void> {

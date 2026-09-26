@@ -24,6 +24,7 @@
 .panel { padding: 18px; }
 .panel > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .panel h2 { margin: 2px 0; font-size: 16px; font-weight: 800; letter-spacing: -.025em; }
+.bulk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 .count { display: grid; min-width: 28px; height: 28px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; color: var(--uvh-electric); background: var(--uvh-surface); font: 11px/1 "Courier New", monospace; }
 .session { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--uvh-border); }
 .session > mat-icon { color: var(--uvh-muted); }
@@ -41,5 +42,5 @@
 .bounded-note { margin: 10px 0 0; line-height: 1.7; }
 .privacy-note { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--uvh-border); }
 @media (max-width: 900px) { .security-columns, .control-grid { grid-template-columns: 1fr; } }
-@media (max-width: 620px) { .posture { align-items: flex-start; flex-wrap: wrap; } .posture > div { flex-basis: calc(100% - 60px); } .session { align-items: flex-start; } }
+@media (max-width: 620px) { .posture { align-items: flex-start; flex-wrap: wrap; } .posture > div { flex-basis: calc(100% - 60px); } .session { align-items: flex-start; } .bulk-actions { order: 3; flex-basis: 100%; margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .control-card > mat-icon:last-child { transition: none; } .control-card:hover > mat-icon:last-child { transform: none; } }

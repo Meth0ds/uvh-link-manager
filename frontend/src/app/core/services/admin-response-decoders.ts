@@ -7,6 +7,7 @@ import type {
   AdminMailOutboxMessage,
   AdminOperations,
   AdminOverview,
+  AdminPendingRegistration,
   AdminReport,
   AdminUser,
   AuditEvent,
@@ -40,6 +41,7 @@ export interface AdminPageResponse<T> {
   appeals?: T[];
   entries?: T[];
   recoveries?: T[];
+  registrations?: T[];
   domains?: T[];
   events?: T[];
   messages?: T[];
@@ -99,6 +101,19 @@ export function decodeAdminUsersPage(value: unknown, expected: AdminPageContext)
       deleted_at: nullableText(source["deleted_at"], "admin user timestamp", 64),
       workspaces: integer(source["workspaces"], "admin user workspace count"),
       links: integer(source["links"], "admin user link count"),
+    };
+  });
+}
+
+export function decodeAdminPendingRegistrationsPage(value: unknown, expected: AdminPageContext): AdminPageResponse<AdminPendingRegistration> {
+  return page(value, "registrations", expected, (item) => {
+    const source = record(item, "admin pending registration");
+    return {
+      id: integer(source["id"], "admin pending registration", 1),
+      email: text(source["email"], "admin pending registration email", 320),
+      created_at: text(source["created_at"], "admin pending registration timestamp", 64),
+      last_mail_at: nullableText(source["last_mail_at"], "admin pending registration timestamp", 64),
+      link_expires_at: nullableText(source["link_expires_at"], "admin pending registration timestamp", 64),
     };
   });
 }
@@ -271,7 +286,7 @@ export function decodeAdminOperations(value: unknown): AdminOperations {
       mailOutbox: countRecord(metrics["mailOutbox"], "mail outbox metrics"),
       oldestPendingMailAgeSeconds: nullableAge("oldestPendingMailAgeSeconds"),
       activeSessions: integer(metrics["activeSessions"], "admin operations metrics"),
-      unverifiedUsers: integer(metrics["unverifiedUsers"], "admin operations metrics"),
+      pendingRegistrations: integer(metrics["pendingRegistrations"], "admin operations metrics"),
       domains: countRecord(metrics["domains"], "domain metrics"),
       oldestDnsCheckAgeSeconds: nullableAge("oldestDnsCheckAgeSeconds"),
       oldestTlsProvisioningAgeSeconds: nullableAge("oldestTlsProvisioningAgeSeconds"),

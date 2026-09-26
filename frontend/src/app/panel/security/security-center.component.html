@@ -19,7 +19,16 @@
 
   <div class="security-columns">
     <section class="panel" aria-labelledby="sessions-title">
-      <header><div><span class="eyebrow">Accesos actuales</span><h2 id="sessions-title">Sesiones activas</h2></div><span class="count">{{ sessions().length }}{{ sessionsTruncated() ? '+' : '' }}</span></header>
+      <header>
+        <div><span class="eyebrow">Accesos actuales</span><h2 id="sessions-title">Sesiones activas</h2></div>
+        <!-- Cierres masivos: siempre bajo confirmación y sin tocar credenciales;
+             el servidor responde con el recuento real, incluido cero. -->
+        <div class="bulk-actions">
+          <button mat-stroked-button type="button" (click)="closeOtherSessions()" [disabled]="loading() || revokingId() !== null">Cerrar las demás</button>
+          <button mat-stroked-button type="button" (click)="closeAllSessions()" [disabled]="loading() || revokingId() !== null">Cerrar todas</button>
+        </div>
+        <span class="count">{{ sessions().length }}{{ sessionsTruncated() ? '+' : '' }}</span>
+      </header>
       @for (session of sessions(); track session.id) {
         <article class="session"><mat-icon>devices</mat-icon><div><b>{{ agent(session.user_agent) }}</b><span>Último uso: {{ formatDate(session.last_used_at) }}</span><small>{{ session.current ? 'Esta sesión' : 'Otra sesión' }}{{ session.mfa_verified_at ? ' · MFA verificado' : '' }}</small></div><button mat-stroked-button type="button" (click)="revoke(session)" [disabled]="revokingId() !== null">{{ session.current ? 'Cerrar' : 'Revocar' }}</button></article>
       }

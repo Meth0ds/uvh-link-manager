@@ -54,20 +54,46 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 | POST | `/confirm-email-change` | — | `{ token }`; confirma el nuevo buzón, cambia la identidad y cierra todas las sesiones. La SPA exige clic explícito. |
 | GET | `/sessions` | sesión | `{ sessions[], truncated }`, hasta 100, incluyendo `current` para identificar el navegador actual. |
 | POST | `/sessions/:id/revoke` | sesión | Revoca una sesión; si es la actual devuelve `current: true`, borra la cookie y el panel cierra sesión inmediatamente (también sincroniza otras pestañas). |
+| POST | `/sessions/revoke-others` | sesión | Cierre masivo conservando la actual; `{ ok, revoked }` con el recuento real de filas cerradas (cero si no había otras) e idempotente. Si cierra sesiones, admite en la misma transacción el aviso de seguridad por email (enlace de incidente 24 h); sin aviso entregable no se cierra nada (`503`). |
+| POST | `/sessions/revoke-all` | sesión | Cierre total incluida la actual; `{ ok, revoked }`, borra la cookie y la cuenta queda fuera en todos los dispositivos. Mismo aviso de seguridad atómico que `revoke-others`. |
 | POST | `/mfa/setup` | sesión | `{ password, code? }` → `{ secret, uri }`; `code` es obligatorio al reconfigurar MFA activo y la configuración pendiente caduca a los diez minutos. |
 | POST | `/mfa/enable` | sesión | `{ code }` → `{ recoveryCodes[] }`; los códigos sólo se entregan en esta respuesta y después se almacenan mediante hash. |
 | POST | `/mfa/cancel-setup` | sesión | Invalida un secreto MFA pendiente que todavía no se ha activado. |
 | POST | `/mfa/recovery-codes/regenerate` | sesión + MFA | `{ password, factorCode }`; invalida el juego anterior, entrega `recoveryCodes[]` nuevos una sola vez y revoca otras sesiones. |
 | POST | `/mfa/disable` | sesión | `{ password, code }`; exige contraseña y TOTP o recovery actual (step-up con ventana fresca). |
-| GET | `/data-export` | sesión verificada | Estado de la solicitud de exportación más reciente, con `failureReason` (`automated_size_limit`, `generation_error`, `stalled`) cuando falló. |
+| GET | `/data-export` | sesión verificada | Estado de la solicitud de exportación más reciente, con `stage` (`collecting\|analytics\|encoding\|encrypting\|finalizing`) mientras se genera y `failureReason` (`automated_size_limit`, `generation_error`, `stalled`) cuando falló. |
+| GET | `/data-export/history` | sesión verificada | `{ exports[] }`, las últimas diez exportaciones con la misma forma que `/data-export` (`stage` sólo en las vivas). Sólo estado y fechas: sin rutas de artefacto ni generaciones de correo. |
 | POST | `/data-export` | sesión + step-up | `{ password, factorCode? }`; tras el step-up encola el job directamente y devuelve `processing`. El email posterior sólo anuncia que el archivo está listo, no autoriza nada. |
-| POST | `/data-export/download` | sesión + step-up | `{ password, factorCode? }`; sirve el JSON privado con `no-store` a la sesión que acaba de demostrar contraseña y segundo factor. Incluye expedientes/mensajes RGPD propios, sin secretos ni identificadores internos del personal. Una transferencia interrumpida se puede reintentar con un step-up nuevo mientras no caduque; el artefacto caduca a los 2 días de estar listo. |
+| POST | `/data-export/download` | sesión + step-up | `{ password, factorCode? }`; sirve el artefacto cifrado por bloques descifrando al vuelo (`streaming`, `no-store`) a la sesión que acaba de demostrar contraseña y segundo factor. Contenido según [`data-export-matrix.md`](data-export-matrix.md): incluye expedientes/mensajes RGPD propios, sin secretos ni identificadores internos del personal. Una transferencia interrumpida se puede reintentar con un step-up nuevo mientras no caduque; el artefacto caduca a los 2 días de estar listo. |
 | POST | `/data-export/download/acknowledge` | sesión verificada | Sin cuerpo; exige que el servidor haya preparado antes una descarga válida y el navegador lo invoca sólo después de recibir el cuerpo completo. Entonces marca `downloaded` y purga el artefacto. Es lo único que consume la exportación y no afirma que el usuario haya abierto o guardado el fichero. |
 | POST | `/data-export/cancel` | sesión verificada | Cancela solicitud/worker/artefacto activo. |
 | GET | `/account-deletion` | sesión verificada | Impacto y bloqueos: admin, workspaces propios y confirmación pendiente. |
 | POST | `/account-deletion` | sesión verificada | `{ confirmation: "ELIMINAR MI CUENTA", password, factorCode? }`; envía doble confirmación. |
 | POST | `/account-deletion/confirm` | — | `{ token }`; cierra acceso y programa anonimización a siete días. |
 | POST | `/account-deletion/cancel` | — | `{ token }`; restaura el acceso durante el periodo de gracia, sin restaurar tokens revocados. |
+| GET | `/notifications` | sesión verificada | `{ notifications[], unread, nextCursor }`: página de 20, de más reciente a más antigua, paginada por cursor (`?before=<id>`). Cada fila trae `id`, `kind` del catálogo cerrado, `subject` (nombre visible capturado en el momento del evento), `workspaceId`, `route` (ruta interna del panel), `createdAt` y `readAt`. Sin secretos, URLs bearer ni contenido de correo. |
+| GET | `/notifications/unread` | sesión verificada | `{ unread }`; sólo el contador, para la campana del panel. |
+| POST | `/notifications/:id/read` | sesión verificada | Marca una notificación propia como leída y devuelve `{ unread }`. Una notificación ajena no existe (`404`). |
+| POST | `/notifications/read-all` | sesión verificada | Marca la bandeja entera como leída → `{ unread: 0 }`. |
+| GET | `/notifications/preferences` | sesión verificada | `{ preferences[] }` con el catálogo completo: `kind`, `category` (`mandatory|operational`) y la entrega efectiva (`immediate|daily_digest|in_app_only|disabled`). |
+| PATCH | `/notifications/preferences` | sesión verificada | `{ preferences: [{ kind, delivery }] }`; valida el lote entero antes de escribir nada, registra el cambio en auditoría y rechaza (`422`) cualquier modificación de un kind obligatorio: los avisos críticos de credenciales, MFA, email, exportación o eliminación de cuenta llegan siempre. |
+
+La exportación es una **copia de acceso a la cuenta** de autogestión (art. 15
+RGPD): el propio documento lo declara en `rights.document:
+"account_access_copy"`. El ejercicio formal de los derechos de acceso y
+portabilidad (art. 15 y 20 RGPD) va por el flujo de expedientes de privacidad,
+con verificación de identidad proporcional y plazo legal; el límite del proceso
+automático (`automated_size_limit`) deriva ahí, no a soporte. El techo operativo
+de 256 MiB de texto plano protege al worker y no es un límite del producto.
+
+El centro de notificaciones separa los **avisos obligatorios** —seguridad y
+respuestas a solicitudes propias: credenciales, MFA, email, exportación,
+eliminación de cuenta y privacidad— de los **operativos**, configurables por
+cuenta: `immediate` (bandeja y email al momento), `daily_digest` (bandeja ya;
+email en el resumen diario), `in_app_only` («Solo UVH», sólo bandeja) o
+`disabled` (nada). El resumen diario (`uvh:notifications-digest`, programado a
+las 08:00) manda cada aviso una sola vez; cambiar de preferencia retira del
+resumen lo pendiente del kind y todo cambio queda auditado.
 
 Los endpoints TOTP y recovery serializan el consumo del challenge. Una segunda
 petición simultánea recibe `409`; si el store compartido o su lock no puede
@@ -209,7 +235,7 @@ Sólo se activa el limitador de volumen `uvh-pending` (escritura) y
 
 | Método | Ruta | Auth | Descripción |
 | ------ | ---- | ---- | ----------- |
-| GET | `/overview` | sesión + workspace viewer | `period` (`24h`,`7d`,`30d`,`90d`), `linkId?` → resumen + series + topLinks + desgloses. |
+| GET | `/overview` | sesión + workspace viewer | `period` (`24h`,`7d`,`30d`,`90d`,`custom`), `linkId?` → resumen + series + topLinks + desgloses. `custom` exige `from` y `to`; una `to` sin hora cubre el día completo («hasta el 30» incluye el 30) y el rango queda limitado a 180 días. |
 | GET | `/public/overview` | API token `analytics:read` | Igual que arriba para integraciones. |
 
 ## Workspaces — `/api/v1/workspaces`
@@ -219,6 +245,7 @@ Sólo se activa el limitador de volumen `uvh-pending` (escritura) y
 | GET | `/` | `{ workspaces[] }` del usuario. |
 | POST | `/` | Crear workspace. |
 | GET | `/:id` | `memberPage`, `memberPerPage`, `invitationPage`, `invitationPerPage` → `{ workspace, members[], membersPage, invitations[], invitationsPage }`; cada `perPage` admite hasta 100. Invitaciones sólo se exponen desde rol `admin`. |
+| GET | `/:id/members` | Búsqueda remota de miembros para el selector de transferencia de propiedad: `q` (nombre o email, comodines escapados) y `perPage` (1–25, 10 por defecto) → `{ members[], total }`. Cubre todos los miembros del workspace, no sólo la página cargada en Equipo. Cualquier miembro puede consultarla. |
 | PATCH | `/:id` | Renombrar (admin/owner). |
 | PATCH | `/:id/members/:userId` | Cambiar rol (admin/owner). |
 | POST | `/:id/transfer-ownership` | Owner + step-up `{ targetUserId, password, factorCode? }`; el owner anterior pasa a admin. |
@@ -326,6 +353,12 @@ pertenece al usuario que consulta. No se devuelven destinos, emails, challenges 
 secretos. Las capacidades `createLink`, `addDomain`, `inviteTeam` orientan la UI,
 sin sustituir controles de cada mutación. No guarda progreso ni visita enlaces.
 
+PATCH `/:id/getting-started` con `{ hidden }` (booleano obligatorio; `422` si
+falta) guarda sólo el estado de presentación de la guía en la membresía que
+llama (`memberships.onboarding_dismissed_at`), con lo que sigue a la cuenta en
+cualquier dispositivo. Devuelve `{ ok, dismissedAt }`; sin membresía: `403`.
+No guarda hechos, progreso ni visitas: ocultar la guía no cambia nada medible.
+
 Sin sesión: `401`; sin acceso o workspace inexistente: `403` genérico. Base de
 PRODUCT-001 implementada y conectada a la pantalla de primeros pasos; validación pendiente.
 
@@ -344,6 +377,12 @@ PRODUCT-001 implementada y conectada a la pantalla de primeros pasos; validació
 El alta normaliza IDN a Punycode y soporta únicamente hostnames que puedan usar
 un CNAME directo hacia el edge configurado. Apex, ANAME/ALIAS flattening, proxies
 DNS y wildcards quedan fuera de este contrato hasta disponer de validación propia.
+
+Cuando una comprobación **pedida por una persona** (`verify` o `revalidate`)
+confirma a la vez propiedad y ruta, y el dominio no estaba deshabilitado ni
+tiene certificado previo, la propia comprobación admite la emisión TLS
+(`state: provisioning`) sin esperar a `activate`. El barrido periódico nunca
+inicia ACME por su cuenta; sólo las comprobaciones con actor disparan ese paso.
 
 ## API tokens — `/api/v1/tokens` (workspace)
 
@@ -396,8 +435,9 @@ de reautenticación y vuelve a la ruta interna original tras confirmar.
 | Método | Ruta | Descripción |
 | ------ | ---- | ----------- |
 | GET | `/overview` | Contadores globales. |
-| GET | `/users` | `q`, `status`, `page`, `perPage` → `{ users[], total, page, perPage }`. Estados: `active`, `blocked`, `unverified`, `admin`, `mfa`. |
+| GET | `/users` | `q`, `status`, `page`, `perPage` → `{ users[], total, page, perPage }`. Estados: `active`, `blocked`, `admin`, `mfa`. Sin `unverified`: una fila de usuario está verificada por definición y el registro sin verificar vive en `/pending-registrations`. |
 | PATCH | `/users/:id` | `{ isAdmin?, blocked? }`. |
+| GET | `/pending-registrations` | `q`, `page`, `perPage` → `{ registrations[], total, page, perPage }`. Registros que aún no han demostrado su buzón: `email`, `created_at`, `last_mail_at` (último correo de verificación emitido) y `link_expires_at` (caducidad de su enlace). Sin propuestas de contraseña ni bearers; sólo esta consola admin-gated lista estas direcciones. |
 | GET | `/reports` | `q`, `status`, `page`, `perPage` → `{ reports[], total, page, perPage }`. |
 | PATCH | `/reports/:id` | `{ status }`. |
 | POST | `/reports/:id/moderate` | `{ action, reason? }`, con `action=block|unblock|review|dismiss`. Actualiza denuncia y enlace en una única transacción. |

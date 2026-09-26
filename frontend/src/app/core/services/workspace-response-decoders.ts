@@ -1,4 +1,4 @@
-import type { Invitation, Member, Workspace, WorkspaceDetail, WorkspaceGettingStarted, WorkspaceRole } from "../models";
+import type { Invitation, Member, MemberSearchHit, Workspace, WorkspaceDetail, WorkspaceGettingStarted, WorkspaceRole } from "../models";
 import { boolean } from "./response-decoder-helpers";
 
 type JsonRecord = Record<string, unknown>;
@@ -38,6 +38,10 @@ function text(value: unknown, contract: string, maximum: number): string {
     invalid(contract);
   }
   return value;
+}
+
+function nullableTimestamp(value: unknown, contract: string): string | null {
+  return value === null ? null : text(value, contract, 64);
 }
 
 function role(value: unknown, contract: string): WorkspaceRole {
@@ -164,5 +168,38 @@ export function decodeWorkspaceGettingStarted(value: unknown, expectedWorkspaceI
       addDomain: boolean(capabilities["addDomain"], "workspace getting started capabilities"),
       inviteTeam: boolean(capabilities["inviteTeam"], "workspace getting started capabilities"),
     },
+    dismissedAt: nullableTimestamp(source["dismissedAt"], "workspace getting started"),
   };
+}
+
+/** The dismissal mutation: presentation state only, never facts or progress. */
+export function decodeWorkspaceDismissal(value: unknown): { ok: true; dismissedAt: string | null } {
+  const source = record(value, "workspace dismissal");
+  if (source["ok"] !== true) invalid("workspace dismissal");
+  return { ok: true, dismissedAt: nullableTimestamp(source["dismissedAt"], "workspace dismissal") };
+}
+
+function memberSearchHit(value: unknown): MemberSearchHit {
+  const source = record(value, "workspace member search result");
+  return {
+    id: integer(source["id"], "workspace member search result", 1),
+    email: text(source["email"], "workspace member search result", 320),
+    name: text(source["name"], "workspace member search result", 255),
+    role: role(source["role"], "workspace member search result"),
+  };
+}
+
+/**
+ * One bounded window of the remote member picker. The search spans the whole
+ * workspace, so a hit may name someone the paged team list never loaded.
+ */
+export function decodeWorkspaceMemberSearch(value: unknown): { members: MemberSearchHit[]; total: number } {
+  const source = record(value, "workspace member search");
+  const rawMembers = source["members"];
+  if (!Array.isArray(rawMembers)) invalid("workspace member search");
+  const total = integer(source["total"], "workspace member search", 0);
+  // The API caps one window at 25 rows and never returns more rows than the
+  // total it reports.
+  if (rawMembers.length > 25 || rawMembers.length > total) invalid("workspace member search");
+  return { members: rawMembers.map(memberSearchHit), total };
 }

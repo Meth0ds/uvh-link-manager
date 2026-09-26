@@ -35,9 +35,12 @@ final class SealFormatTelemetry
     public const MARKER_CACHE_KEY = 'uvh:seal-format:v2-first-issued';
 
     /**
-     * Un sello legacy abrió de verdad: prueba de que seguía en vuelo.
-     * `$kind` nombra la familia —`sealed` (opaco) o `signed` (firmado)—, no
-     * la superficie: el que abre no sabe en qué cookie viajaba.
+     * Un sello legacy abrió Y superó la validación semántica de su consumidor:
+     * prueba de que seguía en vuelo y sirviendo. El consumidor emite después de
+     * validar (expiración, patrón, parseo), nunca al descifrar: un sello
+     * auténtico caducado no es evidencia de nada vivo. `$kind` nombra la
+     * familia —`sealed` (opaco) o `signed` (firmado)—, no la superficie: el
+     * que abre no sabe en qué cookie viajaba.
      */
     public static function legacyOpened(string $kind): void
     {

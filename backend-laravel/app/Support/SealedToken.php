@@ -94,9 +94,17 @@ final class SealedToken
      * Vacío, demasiado largo, alfabeto ajeno a base64url, truncado, bit
      * alterado, otra clave u otro despliegue: todo es el mismo null, para que
      * ni el llamante ni su observador aprendan cuál fue.
+     *
+     * `$legacy` dice cómo se abrió —true si fue el formato sin key-id, false
+     * si el moderno, null si no se abrió nada— para que el consumidor registre
+     * la evidencia de formato DESPUÉS de su validación semántica (patrón,
+     * expiración…). Registrar aquí contaría como «vivo» un sello auténtico que
+     * ya caducó y no autoriza nada; la ventana de retirada del fallback se mide
+     * con los que siguen sirviendo, no con los que meramente descifran.
      */
-    public static function open(string $token): ?string
+    public static function open(string $token, ?bool &$legacy = null): ?string
     {
+        $legacy = null;
         if ($token === '' || strlen($token) > self::MAX_TOKEN_BYTES || preg_match('/^[A-Za-z0-9_-]+$/D', $token) !== 1) {
             return null;
         }
@@ -110,17 +118,16 @@ final class SealedToken
         // respalda lo que nombra, queda el formato sin etiqueta de antes.
         $plain = self::openSealed($buffer);
         if ($plain !== null) {
+            $legacy = false;
+
             return $plain;
         }
-        $legacy = self::openLegacy($buffer);
-        if ($legacy !== null) {
-            // Un sello viejo vivo que abre de verdad: queda registrado, porque
-            // es lo que mide la ventana de retirada del fallback. Sólo el éxito
-            // cuenta —un rechazo no dice que exista ninguno—.
-            SealFormatTelemetry::legacyOpened('sealed');
+        $plain = self::openLegacy($buffer);
+        if ($plain !== null) {
+            $legacy = true;
         }
 
-        return $legacy;
+        return $plain;
     }
 
     /** Formato v2: `keyId | nonce | tag | cipher`, con el key-id como AAD. */
@@ -150,7 +157,9 @@ final class SealedToken
     /**
      * Formato sin key-id (`nonce | tag | cipher`), probando el keyring completo
      * sin salida temprana al acertar: la clave que abre no debe ser observable
-     * por cronometraje (mismo criterio que `SignedToken::verify`).
+     * por cronometraje (mismo criterio que `SignedToken::verify`). Se recorre
+     * entero aunque una clave ya haya abierto, y se devuelve el primer texto
+     * plano que abrió.
      */
     private static function openLegacy(string $buffer): ?string
     {
@@ -158,14 +167,15 @@ final class SealedToken
         $tag = substr($buffer, self::NONCE_BYTES, self::TAG_BYTES);
         $cipher = substr($buffer, self::NONCE_BYTES + self::TAG_BYTES);
 
+        $plain = null;
         foreach (UvhCrypto::secrets() as $secret) {
-            $plain = openssl_decrypt($cipher, 'aes-256-gcm', self::key($secret), OPENSSL_RAW_DATA, $nonce, $tag);
-            if ($plain !== false) {
-                return $plain;
+            $opened = openssl_decrypt($cipher, 'aes-256-gcm', self::key($secret), OPENSSL_RAW_DATA, $nonce, $tag);
+            if ($opened !== false && $plain === null) {
+                $plain = $opened;
             }
         }
 
-        return null;
+        return $plain;
     }
 
     private static function key(string $secret): string

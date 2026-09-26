@@ -25,6 +25,9 @@ final class MailDeliveryEligibility
         'mfa_disabled',
         'api_token_created',
         'workspace_deleted',
+        // El resumen diario de la bandeja no nace de un recurzo: es siempre
+        // un aviso vigente de la propia cuenta.
+        'notification_digest',
     ];
 
     public static function isCurrent(object $row): bool
@@ -58,7 +61,12 @@ final class MailDeliveryEligibility
         $tokenKind = match ($kind) {
             'verification' => 'verify',
             'password_reset' => 'reset',
+            // El cierre masivo de sesiones comparte el portador de incidente
+            // del cambio de contraseña: un aviso que sigue ofreciendo el mismo
+            // control de emergencia mientras su bearer siga vivo.
             'password_changed' => 'security_revoke',
+            'sessions_revoked_others' => 'security_revoke',
+            'sessions_revoked_all' => 'security_revoke',
             default => null,
         };
         if ($tokenKind === null || ! self::validHash($id) || ! hash_equals($id, $generation)) {

@@ -16,6 +16,9 @@ use App\Support\MailDeliveryEligibility;
 use App\Support\MailOutboxDispatcher;
 use App\Support\MailTransportPolicy;
 use App\Support\MfaFreshness;
+use App\Support\NotificationInbox;
+use App\Support\NotificationKinds;
+use App\Support\NotificationPreferences;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\ProductionSecurity;
@@ -52,7 +55,12 @@ class AdminController
         [$page, $perPage] = $this->pagination($request);
         $search = $this->search($request);
         $status = UvhRequest::queryString($request, 'status');
-        if (! in_array($status, ['', 'active', 'blocked', 'unverified', 'admin', 'mfa'], true)) {
+        // Sin `unverified`: una fila de usuario está verificada por definición
+        // —el registro sin verificar vive en `pending_registrations` y sólo la
+        // activación crea usuario—. Lo que una vez fue ese filtro es la cola de
+        // «Registros pendientes»; filtrar aquí por `email_verified_at` miraría
+        // una columna que ya no significa lo que su nombre dice.
+        if (! in_array($status, ['', 'active', 'blocked', 'admin', 'mfa'], true)) {
             return response()->json(['error' => 'Filtro de usuario inválido'], 422);
         }
 
@@ -68,7 +76,6 @@ class AdminController
         match ($status) {
             'active' => $query->whereNull('u.deleted_at'),
             'blocked' => $query->whereNotNull('u.deleted_at'),
-            'unverified' => $query->whereNull('u.deleted_at')->whereNull('u.email_verified_at'),
             'admin' => $query->whereNull('u.deleted_at')->where('u.is_admin', true),
             'mfa' => $query->whereNull('u.deleted_at')->where('u.mfa_enabled', true),
             default => null,
@@ -85,6 +92,50 @@ class AdminController
 
         return response()->json([
             'users' => $rows,
+            'total' => $total,
+            'page' => $page,
+            'perPage' => $perPage,
+        ]);
+    }
+
+    /**
+     * Registros sin verificar: la cola que el filtro `unverified` de usuarios
+     * dejó de representar cuando el registro pasó a vivir en su propia tabla.
+     *
+     * Sólo email, alta, último correo de verificación emitido y la caducidad de
+     * su enlace: lo que un operador necesita para responder «¿llegó el correo?
+     * ¿sigue vivo el enlace?», y nada más. Ni propuesta de contraseña —no se
+     * guarda—, ni bearers, ni existencia de cuentas asociadas: esta lista nombra
+     * registros pendientes y sólo eso. Admin-gated como el resto de la consola:
+     * un listado de direcciones que aún no tienen cuenta no debe salir de aquí.
+     */
+    public function pendingRegistrations(Request $request): JsonResponse
+    {
+        [$page, $perPage] = $this->pagination($request);
+        $search = $this->search($request);
+
+        // El último correo de verificación es el bearer `verify` más reciente:
+        // token y sobre salen en la misma transacción, así que su creación es la
+        // emisión del correo. La caducidad que se muestra es la del enlace de
+        // ese mismo correo (un día), no la retención de la fila (30 días desde
+        // la última actividad, la purga de housekeeping).
+        $query = DB::table('pending_registrations as p')
+            ->select('p.id', 'p.email', 'p.created_at')
+            ->selectRaw("(SELECT MAX(t.created_at) FROM email_tokens t WHERE t.pending_registration_id = p.id AND t.kind = 'verify') AS last_mail_at")
+            ->selectRaw("(SELECT MAX(t.expires_at) FROM email_tokens t WHERE t.pending_registration_id = p.id AND t.kind = 'verify') AS link_expires_at");
+
+        if ($search !== '') {
+            $query->where('p.email', 'ilike', $search);
+        }
+
+        $total = (clone $query)->count();
+        $rows = $query->orderByDesc('p.created_at')->orderByDesc('p.id')
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get();
+
+        return response()->json([
+            'registrations' => $rows,
             'total' => $total,
             'page' => $page,
             'perPage' => $perPage,
@@ -606,7 +657,15 @@ class AdminController
                         'rejected_at' => now(),
                         'updated_at' => now(),
                     ]);
-                    if (! UvhMail::accountRecoveryRejected($target->email)) {
+                    $delivery = NotificationInbox::record(
+                        (int) $target->id,
+                        NotificationKinds::ACCOUNT_RECOVERY_REJECTED,
+                        null,
+                        null,
+                        'account_recovery_rejected:'.$row->id,
+                    );
+                    if ($delivery === NotificationPreferences::DELIVERY_IMMEDIATE
+                        && ! UvhMail::accountRecoveryRejected($target->email)) {
                         throw new MailAdmissionException('Account recovery rejection outbox admission failed');
                     }
 
@@ -935,10 +994,10 @@ class AdminController
             ->whereNull('revoked_at')
             ->where('expires_at', '>', now())
             ->count();
-        $unverifiedUsers = DB::table('users')
-            ->whereNull('deleted_at')
-            ->whereNull('email_verified_at')
-            ->count();
+        // Registros que esperan demostrar su buzón. El censo de usuarios sin
+        // verificar ya no existe: una fila de usuario está verificada, y quien
+        // aún no lo está es un registro pendiente con su propia cola.
+        $pendingRegistrations = DB::table('pending_registrations')->count();
         $activePrivacyRequests = DB::table('privacy_rights_requests')
             ->whereIn('status', ['submitted', 'in_progress', 'waiting_user'])->count();
         $overduePrivacyRequests = DB::table('privacy_rights_requests')
@@ -983,7 +1042,7 @@ class AdminController
                 'mailOutbox' => (object) $mailOutboxCounts,
                 'oldestPendingMailAgeSeconds' => $oldestPendingMailAge,
                 'activeSessions' => $activeSessions,
-                'unverifiedUsers' => $unverifiedUsers,
+                'pendingRegistrations' => $pendingRegistrations,
                 'domains' => (object) $domainCounts,
                 'oldestDnsCheckAgeSeconds' => $oldestDnsCheckAge,
                 'oldestTlsProvisioningAgeSeconds' => $oldestTlsProvisioningAge,

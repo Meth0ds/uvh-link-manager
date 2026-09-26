@@ -2,8 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\GenerateDataExportJob;
 use App\Models\User;
+use App\Support\AccountExportDocument;
+use App\Support\ExportTooLarge;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -26,16 +27,33 @@ final class DataExportSnapshotTest extends TestCase
         });
     }
 
-    public function test_export_budget_and_sections_share_one_read_only_repeatable_read_snapshot(): void
+    public function test_export_sections_share_one_read_only_repeatable_read_snapshot(): void
     {
         $user = User::factory()->create();
-        $method = new \ReflectionMethod(GenerateDataExportJob::class, 'buildConsistentPayload');
-        $payload = $method->invoke(new GenerateDataExportJob(1), (int) $user->id);
+        $out = fopen('php://temp/maxmemory:2097152', 'r+b');
+        $this->assertIsResource($out);
+        $phases = [];
+        $bytes = AccountExportDocument::render((int) $user->id, $out, function (string $phase) use (&$phases): void {
+            $phases[] = $phase;
+        });
+        rewind($out);
+        $document = (string) stream_get_contents($out);
+        fclose($out);
 
-        $this->assertIsArray($payload);
-        $this->assertSame('uvh-account-export-v1', $payload['format']);
-        $this->assertSame($user->id, $payload['account']->id);
+        $decoded = json_decode($document, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('uvh-account-export-v1', $decoded['format']);
+        $this->assertSame($user->email, $decoded['account']['email']);
+        // El documento declara sobre sí mismo la separación contractual: es la
+        // copia de acceso de la cuenta, no el ejercicio de un derecho formal.
+        $this->assertSame('account_access_copy', $decoded['rights']['document']);
+        $this->assertIsArray($decoded['memberships']);
+        $this->assertIsArray($decoded['aggregateAnalytics']);
+        $this->assertSame($bytes, strlen($document));
         $this->assertSame(0, DB::transactionLevel());
+
+        // El pipeline se anuncia completo y en orden: recogida, analítica y
+        // codificación; el job añade cifrado y remate sobre esto.
+        $this->assertSame(['collecting', 'analytics', 'encoding'], $phases);
 
         $isolation = collect($this->queries)->first(
             fn (array $query): bool => str_contains($query['sql'], 'set transaction isolation level repeatable read read only'),
@@ -49,5 +67,22 @@ final class DataExportSnapshotTest extends TestCase
         );
         $this->assertNotEmpty($snapshotReads);
         $this->assertTrue($snapshotReads->every(fn (array $query): bool => $query['level'] === 1));
+    }
+
+    public function test_the_document_ceiling_stops_an_oversized_export_with_the_size_reason(): void
+    {
+        $user = User::factory()->create();
+        config(['uvh.export_max_plaintext_bytes' => 1024]);
+        $out = fopen('php://temp/maxmemory:2097152', 'r+b');
+        $this->assertIsResource($out);
+
+        try {
+            AccountExportDocument::render((int) $user->id, $out, null);
+            $this->fail('a document over the ceiling must refuse');
+        } catch (ExportTooLarge) {
+            $this->addToAssertionCount(1);
+        } finally {
+            fclose($out);
+        }
     }
 }

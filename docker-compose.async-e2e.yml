@@ -63,7 +63,7 @@ x-php-service: &php-service
     QUEUE_CONNECTION: redis
     # Above the longest worker timeout in this stack (180 s), which is what the
     # production gate requires for the same reason.
-    REDIS_QUEUE_RETRY_AFTER: "300"
+    REDIS_QUEUE_RETRY_AFTER: "900"
     # A real SMTP conversation is required: UvhMail only short-circuits for the
     # development `log`/`array` mailers, so the mail chain must reach a socket.
     MAIL_MAILER: smtp
@@ -300,7 +300,7 @@ services:
     command: ["php", "artisan", "queue:work", "--queue=domains", "--sleep=1", "--tries=3", "--timeout=90"]
   queue-exports:
     <<: *queue-service
-    command: ["php", "artisan", "queue:work", "--queue=exports", "--sleep=1", "--tries=3", "--timeout=180"]
+    command: ["php", "artisan", "queue:work", "--queue=exports", "--sleep=1", "--tries=3", "--timeout=660"]
   queue-analytics:
     <<: *queue-service
     command: ["php", "artisan", "queue:work", "--queue=analytics", "--sleep=1", "--tries=5", "--timeout=45"]

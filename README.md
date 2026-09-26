@@ -237,7 +237,7 @@ el [modelo de amenazas](docs/threat-model.md).
 | [Pruebas E2E](docs/e2e-testing.md) | Aislamiento, ejecución, cobertura y límites de Playwright. |
 | [Análisis estático](docs/static-analysis.md) | Configuración de Pint y Larastan, y su baseline. |
 | [Control local](docs/local-control.md) | Panel de escritorio, arranque y diagnóstico. |
-| [TODOs](docs/todos.md) | Trabajo implementado, validado y pendiente. |
+| [Backlog](docs/current-backlog.md) | Trabajo vigente por prioridades (histórico en [docs/archive/todos.md](docs/archive/todos.md)). |
 
 ### Evidencias de release
 

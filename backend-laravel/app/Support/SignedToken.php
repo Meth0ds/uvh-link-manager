@@ -87,13 +87,6 @@ class SignedToken
         if (! $validMac) {
             return null;
         }
-        if ($legacy) {
-            // Un token del formato antiguo que verifica de verdad es prueba de
-            // que alguno seguía en vuelo: la evidencia que mide la ventana de
-            // retirada del fallback. Sólo cuenta el éxito; un rechazo no dice
-            // que exista ninguno.
-            SealFormatTelemetry::legacyOpened('signed');
-        }
 
         $payload = Ids::base64urlDecode($body);
         if ($payload === '') {
@@ -101,13 +94,28 @@ class SignedToken
         }
         if ($parse !== null) {
             try {
-                return $parse($payload);
+                $result = $parse($payload);
             } catch (\Throwable) {
                 return null;
             }
+            if ($result === null) {
+                return null;
+            }
+        } else {
+            $result = $payload;
         }
 
-        return $payload;
+        if ($legacy) {
+            // Un token del formato antiguo que verifica Y pasa la validación
+            // semántica del consumidor ($parse) es prueba de que alguno seguía
+            // en vuelo y sirviendo: la evidencia que mide la ventana de
+            // retirada del fallback. Emitir antes de $parse contaría como
+            // vivos tokens de MAC intacta pero payload ya inservible. Sólo
+            // cuenta el éxito; un rechazo no dice que exista ninguno.
+            SealFormatTelemetry::legacyOpened('signed');
+        }
+
+        return $result;
     }
 
     /**

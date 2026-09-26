@@ -1,0 +1,29 @@
+.notification-list {
+  list-style: none; margin: 24px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.notification-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 16px; border: 1px solid var(--uvh-border); border-radius: 6px;
+  background: var(--uvh-surface);
+}
+.notification-row.unread { border-left: 3px solid var(--uvh-electric); }
+
+.notification-icon { display: inline-flex; color: var(--uvh-electric); }
+.notification-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.notification-copy b { font-size: 14px; }
+.notification-subject { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.notification-copy time { color: var(--muted); font: 11px/1.4 "Courier New", monospace; }
+
+.notification-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.read-mark { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
+.read-mark mat-icon { width: 16px; height: 16px; font-size: 16px; }
+
+.empty-inbox { margin: 24px 0; }
+.row-actions { margin: 16px 0; }
+
+@media (max-width: 720px) {
+  .notification-row { flex-wrap: wrap; }
+  .notification-actions { width: 100%; justify-content: flex-end; }
+}

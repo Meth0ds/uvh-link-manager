@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\AccountExportDocument;
+
 return [
     'metrics' => [
         'bearer_token' => env('METRICS_BEARER_TOKEN', ''),
@@ -47,6 +49,25 @@ return [
     // Vida del secreto y techo de su cookie. Nunca más que el bearer de
     // verificación que el registro emite a la vez (un día).
     'registration_edit_ttl_hours' => (int) env('REGISTRATION_EDIT_TTL_HOURS', 24),
+    // Piso de duración, en milisegundos, de toda respuesta `ok` del reenvío
+    // público de verificación. La rama que conoce el registro hace trabajo real
+    // (transacción, token, outbox) y la que no contesta de inmediato: sin este
+    // piso, la latencia es un oráculo de «¿tiene registro pendiente?». Todas
+    // las ramas se amortiguan hasta el mismo suelo, y el valor no es superficie
+    // de operador: bajarlo reabriría el oráculo que existe para cerrar.
+    'resend_verification_min_duration_ms' => (int) env('RESEND_VERIFICATION_MIN_DURATION_MS', 250),
+    // Techo operativo del documento de una exportación automática, en bytes de
+    // texto plano. No es un límite de producto —la generación por bloques no
+    // tiene el tope de filas ni el de 12 MiB de antes—: protege el volumen
+    // privado y el worker compartido de un documento desmedido. Se clampa hacia
+    // arriba y hacia abajo: un valor por debajo de 1 MiB no es una configuración
+    // sino un error, y el máximo absoluto es el que la capa de documento trae.
+    // El defecto va como literal (268435456 = 256 MiB) para que el contrato de
+    // la plantilla pueda compararlo sin evaluar PHP.
+    'export_max_plaintext_bytes' => min(
+        AccountExportDocument::MAX_PLAINTEXT_BYTES,
+        max(1024, (int) env('EXPORT_MAX_PLAINTEXT_BYTES', 268435456)),
+    ),
     'trusted_proxies' => env('TRUSTED_PROXIES', ''),
     'session_ttl_days' => (int) env('SESSION_TTL_DAYS', 30),
     // Vida de una invitación, y techo de la cookie que la aparca: el aparcadero

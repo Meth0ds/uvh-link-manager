@@ -7,6 +7,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkIntentController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PendingHandoffController;
 use App\Http\Controllers\PrivacyRightsController;
 use App\Http\Controllers\PublicController;
@@ -95,6 +96,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('auth/change-email', [AuthController::class, 'requestEmailChange'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
     Route::post('auth/change-email/cancel', [AuthController::class, 'cancelEmailChange'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
     Route::get('auth/data-export', [AccountController::class, 'exportStatus'])->middleware('uvh.auth:verified');
+    Route::get('auth/data-export/history', [AccountController::class, 'exportHistory'])->middleware('uvh.auth:verified');
     Route::post('auth/data-export', [AccountController::class, 'requestExport'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
     Route::post('auth/data-export/cancel', [AccountController::class, 'cancelExport'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
     Route::post('auth/data-export/download', [AccountController::class, 'downloadExport'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
@@ -108,8 +110,23 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('link-intents/claim', [LinkIntentController::class, 'claim'])->middleware('uvh.auth:verified');
     Route::post('link-intents/complete', [LinkIntentController::class, 'complete'])->middleware('uvh.auth:verified');
     Route::post('auth/change-password', [AuthController::class, 'changePassword'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
+
+    // Centro de notificaciones de la cuenta: bandeja, lectura y preferencias.
+    // Las lecturas son idempotentes y baratas; la única escritura con alcance
+    // (preferencias) tampoco toca credenciales, así que ninguna requiere
+    // step-up, sólo sesión verificada.
+    Route::prefix('notifications')->middleware('uvh.auth:verified')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::get('unread', [NotificationController::class, 'unread']);
+        Route::post('read-all', [NotificationController::class, 'readAll']);
+        Route::get('preferences', [NotificationController::class, 'preferences']);
+        Route::patch('preferences', [NotificationController::class, 'updatePreferences']);
+        Route::post('{id}/read', [NotificationController::class, 'read'])->where('id', '[0-9]+');
+    });
     Route::get('auth/sessions', [AuthController::class, 'sessions'])->middleware('uvh.auth');
     Route::get('auth/security-center', [AuthController::class, 'securityCenter'])->middleware('uvh.auth');
+    Route::post('auth/sessions/revoke-others', [AuthController::class, 'revokeOtherSessions'])->middleware('uvh.auth');
+    Route::post('auth/sessions/revoke-all', [AuthController::class, 'revokeAllSessions'])->middleware('uvh.auth');
     Route::post('auth/sessions/{id}/revoke', [AuthController::class, 'revokeSession'])->middleware('uvh.auth');
     Route::post('auth/mfa/setup', [AuthController::class, 'mfaSetup'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
     Route::post('auth/mfa/enable', [AuthController::class, 'mfaEnable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
@@ -150,6 +167,9 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::get('{id}', [WorkspaceController::class, 'show'])->where('id', '[0-9]+');
         Route::get('{id}/getting-started', [WorkspaceOnboardingController::class, 'show'])
             ->middleware(['uvh.auth:verified', 'throttle:uvh-api'])->where('id', '[0-9]+');
+        Route::patch('{id}/getting-started', [WorkspaceOnboardingController::class, 'dismiss'])
+            ->middleware(['uvh.auth:verified', 'throttle:uvh-api'])->where('id', '[0-9]+');
+        Route::get('{id}/members', [WorkspaceController::class, 'searchMembers'])->where('id', '[0-9]+');
         Route::get('{id}/activity', [WorkspaceActivityController::class, 'index'])
             ->middleware(['uvh.auth:verified', 'throttle:uvh-api', 'throttle:uvh-activity'])->where('id', '[0-9]+');
         Route::get('{id}/usage', [WorkspaceUsageController::class, 'show'])
@@ -199,6 +219,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::prefix('admin')->middleware(['uvh.auth:admin', 'uvh.mfa:fresh', 'throttle:uvh-admin'])->group(function () {
         Route::get('overview', [AdminController::class, 'overview']);
         Route::get('users', [AdminController::class, 'users']);
+        Route::get('pending-registrations', [AdminController::class, 'pendingRegistrations']);
         Route::patch('users/{id}', [AdminController::class, 'updateUser'])->where('id', '[0-9]+');
         Route::get('reports', [AdminController::class, 'reports']);
         Route::get('account-recoveries', [AdminController::class, 'accountRecoveries']);

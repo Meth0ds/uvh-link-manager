@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class AnalyticsController
 {
-    private const PERIODS = ['24h', '7d', '30d', '90d'];
+    private const PERIODS = ['24h', '7d', '30d', '90d', 'custom'];
 
     private const MAX_RANGE_DAYS = WorkspaceLimits::ANALYTICS_RANGE_DAYS;
 
@@ -77,7 +77,12 @@ class AnalyticsController
     private function parseRange(string $period, ?string $from, ?string $to): array
     {
         if (! in_array($period, self::PERIODS, true)) {
-            return ['ok' => false, 'error' => 'period inválido (24h|7d|30d|90d)'];
+            return ['ok' => false, 'error' => 'period inválido (24h|7d|30d|90d|custom)'];
+        }
+        // `custom` is the date-picker range: its window comes entirely from the
+        // two bounds, so both are mandatory instead of derived from a preset.
+        if ($period === 'custom' && ($from === null || $to === null)) {
+            return ['ok' => false, 'error' => 'custom requiere from y to'];
         }
         $parsedFrom = $from !== null ? IsoDate::parse($from) : null;
         if ($from !== null && $parsedFrom === null) {
@@ -87,8 +92,13 @@ class AnalyticsController
         if ($to !== null && $parsedTo === null) {
             return ['ok' => false, 'error' => 'to debe ser una fecha ISO válida'];
         }
+        // A date-only `to` names a day, not its midnight: «hasta el 30» has to
+        // include what happened during the 30th. Exact timestamps stay exact.
+        if ($parsedTo !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/D', (string) $to) === 1) {
+            $parsedTo = $parsedTo->endOfDay();
+        }
 
-        $days = ['24h' => 1, '7d' => 7, '30d' => 30, '90d' => 90][$period];
+        $days = ['24h' => 1, '7d' => 7, '30d' => 30, '90d' => 90][$period] ?? 0;
         $end = $parsedTo ?? now();
         $start = $parsedFrom ?? $end->copy()->subDays($days);
 

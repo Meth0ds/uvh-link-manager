@@ -20,6 +20,8 @@ const ACTION_LABELS: Record<string, string> = {
   "auth.password_change": "Contraseña cambiada",
   "auth.password_reset": "Contraseña restablecida",
   "auth.session_revoke": "Sesión revocada",
+  "auth.sessions_revoked_others": "Sesiones ajenas cerradas",
+  "auth.sessions_revoked_all": "Todas las sesiones cerradas",
   "auth.mfa_enable": "MFA activado",
   "auth.mfa_disable": "MFA desactivado",
   "auth.mfa_reconfigured": "MFA reconfigurado",
@@ -104,6 +106,54 @@ export class SecurityCenterComponent {
       await this.load();
     } catch (err) {
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo revocar la sesión", "Cerrar", { duration: 4000 });
+    } finally {
+      this.revokingId.set(null);
+    }
+  }
+
+  /**
+   * Cierre masivo bajo confirmación explícita: conserva la sesión actual y
+   * reporta el recuento real que devolvió el servidor, incluido cero.
+   */
+  async closeOtherSessions(): Promise<void> {
+    const confirmed = await this.actions.confirm({
+      title: "Cerrar las demás sesiones",
+      message: "Todos los demás dispositivos perderán el acceso inmediatamente. Esta sesión se mantiene abierta.",
+      confirmLabel: "Cerrar las demás",
+      destructive: true,
+    });
+    if (!confirmed || this.revokingId() !== null) return;
+    this.revokingId.set("bulk-others");
+    try {
+      const revoked = await this.auth.revokeOtherSessions();
+      this.snackbar.open(
+        revoked > 0 ? `Se cerraron ${revoked} sesiones` : "No había otras sesiones abiertas",
+        "Cerrar",
+        { duration: 3000 },
+      );
+      await this.load();
+    } catch (err) {
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudieron cerrar las demás sesiones", "Cerrar", { duration: 4000 });
+    } finally {
+      this.revokingId.set(null);
+    }
+  }
+
+  /** Cierre total, incluida la actual: el navegador sale a la pantalla de acceso. */
+  async closeAllSessions(): Promise<void> {
+    const confirmed = await this.actions.confirm({
+      title: "Cerrar todas las sesiones",
+      message: "Se cerrará la sesión de este dispositivo y la de todos los demás. Tendrás que volver a iniciar sesión.",
+      confirmLabel: "Cerrar todas",
+      destructive: true,
+    });
+    if (!confirmed || this.revokingId() !== null) return;
+    this.revokingId.set("bulk-all");
+    try {
+      await this.auth.revokeAllSessions();
+      await this.router.navigate(["/auth"]);
+    } catch (err) {
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudieron cerrar las sesiones", "Cerrar", { duration: 4000 });
     } finally {
       this.revokingId.set(null);
     }

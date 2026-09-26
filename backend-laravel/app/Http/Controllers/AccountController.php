@@ -17,13 +17,16 @@ use App\Support\MailAdmissionException;
 use App\Support\MfaAttempts;
 use App\Support\MfaFreshness;
 use App\Support\MfaStepUp;
+use App\Support\NotificationInbox;
+use App\Support\NotificationKinds;
 use App\Support\OperationalMetrics;
+use App\Support\PrivateArtifact;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\SessionManager;
-use App\Support\UvhCrypto;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -37,6 +40,28 @@ class AccountController
         $row = DataExportRequest::where('user_id', $user->id)->latest('id')->first();
 
         return response()->json(['export' => $this->publicExport($row, (int) $user->security_version)]);
+    }
+
+    /**
+     * Historial de exportaciones: las últimas diez, con su estado.
+     *
+     * Sólo lo que `publicExport` ya publica de cada una: sin rutas de artefacto
+     * ni generaciones de correo. Una fila `ready` es la misma descarga de
+     * siempre —sesión + step-up, reintentable hasta el acuse—, así que el
+     * historial no añade ninguna vía de acceso que la exportación activa no
+     * tuviera.
+     */
+    public function exportHistory(Request $request): JsonResponse
+    {
+        $user = UvhRequest::user($request);
+        $rows = DataExportRequest::where('user_id', $user->id)
+            ->latest('id')->limit(10)->get();
+
+        return response()->json([
+            'exports' => $rows
+                ->map(fn (DataExportRequest $row): ?array => $this->publicExport($row, (int) $user->security_version))
+                ->values()->all(),
+        ]);
     }
 
     public function requestExport(Request $request)
@@ -309,11 +334,18 @@ class AccountController
         }
 
         try {
-            $encrypted = Storage::disk('local')->get($result['path']);
-            if (! is_string($encrypted)) {
+            $cipher = Storage::disk('local')->readStream($result['path']);
+            if (! is_resource($cipher)) {
                 throw new \RuntimeException('Private artifact storage returned an invalid value');
             }
-            $json = UvhCrypto::decryptAtRest($encrypted);
+            // La FORMA del artefacto se resuelve antes de los encabezados: un
+            // fichero que no es artefacto de este sistema responde 503 sin
+            // consumir nada. La autenticación de cada bloque ocurre al servir
+            // cada bloque: un bloque corrupto a mitad de fichero trunca la
+            // descarga —el navegador la reporta fallida—, y la exportación
+            // sigue `ready` y reintentable, que es lo que un fallo de volumen
+            // transitorio exige.
+            PrivateArtifact::validate($cipher);
         } catch (\Throwable) {
             // A transient volume failure or interrupted read does not consume
             // the export: it stays ready and the owner retries. Housekeeping
@@ -364,9 +396,17 @@ class AccountController
         // that separately after postBlob has completed.
         Audit::write($result['user_id'], 'account.data_export_served', 'data_export', $result['request_id']);
 
-        return response($json, 200, [
+        // El cuerpo se descifra por bloques al salir: la memoria viva de una
+        // descarga es la de un bloque, sea el documento del tamaño que sea.
+        return response()->streamDownload(function () use ($cipher): void {
+            foreach (PrivateArtifact::readChunks($cipher) as $chunk) {
+                echo $chunk;
+            }
+            if (is_resource($cipher)) {
+                fclose($cipher);
+            }
+        }, 'uvh-datos-'.now()->format('Y-m-d').'.json', [
             'Content-Type' => 'application/json; charset=utf-8',
-            'Content-Disposition' => 'attachment; filename="uvh-datos-'.now()->format('Y-m-d').'.json"',
             'Cache-Control' => 'private, no-store, no-cache, max-age=0',
             'Pragma' => 'no-cache',
             'X-Content-Type-Options' => 'nosniff',
@@ -671,6 +711,7 @@ class AccountController
                 $executeAfter = $now->copy()->addDays(7);
                 $cancelToken = Ids::randomToken(32);
                 $cancelUrl = rtrim((string) config('app.url'), '/').'/auth/cancel-account-deletion#token='.rawurlencode($cancelToken);
+                NotificationInbox::record((int) $user->id, NotificationKinds::ACCOUNT_DELETION_SCHEDULED);
                 if (! UvhMail::accountDeletionScheduled(
                     $user->email,
                     $cancelUrl,
@@ -810,6 +851,7 @@ class AccountController
             // On success the envelope still commits with the restored account.
             try {
                 $noticeAdmitted = DB::transaction(function () use ($user): bool {
+                    NotificationInbox::record((int) $user->id, NotificationKinds::ACCOUNT_DELETION_CANCELLED);
                     if (! UvhMail::accountDeletionCancelled($user->email)) {
                         throw new MailAdmissionException('Deletion cancellation notice outbox admission failed');
                     }
@@ -856,6 +898,9 @@ class AccountController
             'id' => (int) $request->id,
             'status' => $status,
             'failureReason' => $status === 'failed' ? $request->failure_reason : null,
+            // Sólo una exportación en curso tiene etapa viva; junto a un estado
+            // terminal sería una historia que ya no es cierta.
+            'stage' => $status === 'processing' ? $request->stage : null,
             'downloadExpiresAt' => $request->download_expires_at?->toIso8601String(),
             'createdAt' => $request->created_at?->toIso8601String(),
             'readyAt' => $request->ready_at?->toIso8601String(),

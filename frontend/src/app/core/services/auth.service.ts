@@ -5,6 +5,7 @@ import {
   decodeAccountDeletionImpact,
   decodeAccountDeletionRequest,
   decodeAuthUserResponse,
+  decodeDataExportHistoryResponse,
   decodeDataExportStatusResponse,
   decodeLoginOutcome,
   decodeLoginResponse,
@@ -14,6 +15,7 @@ import {
   decodeRecoveryCodes,
   decodeRequiredDataExportResponse,
   decodeSessionRevocation,
+  decodeSessionsBulkRevocation,
   decodeSessionsResponse,
   decodeWorkspacesResponse,
 } from "./auth-response-decoders";
@@ -403,6 +405,14 @@ export class AuthService {
     return status;
   }
 
+  /** Historial acotado: las últimas diez exportaciones, sin rutas de artefacto. */
+  async dataExportHistory(options?: ApiReadOptions): Promise<DataExportStatus[]> {
+    const generation = this.generation;
+    const { exports } = await this.api.get<{ exports: DataExportStatus[] }>("/api/v1/auth/data-export/history", undefined, decodeDataExportHistoryResponse, options);
+    this.assertCurrent(generation);
+    return exports;
+  }
+
   async requestDataExport(password: string, factorCode?: string): Promise<DataExportStatus> {
     const generation = this.generation;
     const { export: status } = await this.api.post<{ export: DataExportStatus }>("/api/v1/auth/data-export", {
@@ -481,6 +491,34 @@ export class AuthService {
     this.assertCurrent(generation);
     if (current || result.current) this.sessionExpired();
     return result.current === true || current;
+  }
+
+  /**
+   * Cierre masivo conservando esta sesión: devuelve cuántas sesiones más se
+   * cerraron (cero si no había ninguna). Idempotente y sin tocar credenciales.
+   */
+  async revokeOtherSessions(): Promise<number> {
+    const generation = this.generation;
+    const result = await this.api.post<{ ok: true; revoked: number }>(
+      "/api/v1/auth/sessions/revoke-others",
+      undefined,
+      decodeSessionsBulkRevocation,
+    );
+    this.assertCurrent(generation);
+    return result.revoked;
+  }
+
+  /** Cierre total, incluida la actual: la cuenta queda fuera y esta sesión local expira. */
+  async revokeAllSessions(): Promise<number> {
+    const generation = this.generation;
+    const result = await this.api.post<{ ok: true; revoked: number }>(
+      "/api/v1/auth/sessions/revoke-all",
+      undefined,
+      decodeSessionsBulkRevocation,
+    );
+    this.assertCurrent(generation);
+    this.sessionExpired();
+    return result.revoked;
   }
 
   async mfaSetup(password: string, code?: string): Promise<{ secret: string; uri: string }> {

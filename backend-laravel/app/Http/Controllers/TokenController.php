@@ -12,6 +12,9 @@ use App\Support\MailAdmissionException;
 use App\Support\MfaAttempts;
 use App\Support\MfaFreshness;
 use App\Support\MfaStepUp;
+use App\Support\NotificationInbox;
+use App\Support\NotificationKinds;
+use App\Support\NotificationPreferences;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceAccess;
@@ -119,8 +122,19 @@ class TokenController
                     'created_by' => $user->id,
                 ]);
                 // Admit the warning with the credential and persisted recovery-code
-                // consumption. Never return a usable plain token without its notice.
-                if (! UvhMail::apiTokenCreated($lockedUser->email, $token->name)) {
+                // consumption. Never return a usable plain token without its notice:
+                // el aviso obligatorio sigue el correo, pero la bandeja es la que
+                // responde a la preferencia del usuario (Inmediato / Resumen diario
+                // / Solo UVH / Desactivado).
+                $delivery = NotificationInbox::record(
+                    (int) $lockedUser->id,
+                    NotificationKinds::API_TOKEN_CREATED,
+                    (int) $workspaceId,
+                    $token->name,
+                    'api_token_created:'.$token->id,
+                );
+                if ($delivery === NotificationPreferences::DELIVERY_IMMEDIATE
+                    && ! UvhMail::apiTokenCreated($lockedUser->email, $token->name)) {
                     throw new MailAdmissionException('API token notice outbox admission failed');
                 }
 

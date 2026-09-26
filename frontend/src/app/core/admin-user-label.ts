@@ -14,7 +14,13 @@ export const ADMIN_ACCOUNT_STATE_LABEL = {
   active: "Activa",
 } as const;
 
-/** The qualifiers a directory row prints next to the access state. */
+/**
+ * The qualifiers a directory row prints next to the access state.
+ *
+ * `unverified` stays as a badge only: a registration without a proven mailbox
+ * is not a user any more, so the filter that once selected them is gone — what
+ * it pretended to list is the pending-registrations queue of the console.
+ */
 export const ADMIN_ACCOUNT_FLAG_LABEL = {
   admin: "Admin",
   unverified: "Sin verificar",
@@ -29,7 +35,6 @@ export const ADMIN_ACCOUNT_FLAG_LABEL = {
 export const ADMIN_USER_FILTERS = [
   { value: "active", label: ADMIN_ACCOUNT_STATE_LABEL.active },
   { value: "blocked", label: ADMIN_ACCOUNT_STATE_LABEL.blocked },
-  { value: "unverified", label: ADMIN_ACCOUNT_FLAG_LABEL.unverified },
   { value: "admin", label: ADMIN_ACCOUNT_FLAG_LABEL.admin },
   { value: "mfa", label: ADMIN_ACCOUNT_FLAG_LABEL.mfa },
 ] as const;

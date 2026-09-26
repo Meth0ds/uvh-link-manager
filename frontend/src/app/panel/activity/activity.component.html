@@ -12,7 +12,14 @@
       <p role="status">Cargando actividad…</p>
     }
     @if (error(); as message) {
-      <p class="error" role="alert">{{ message }}</p>
+      <p class="error" role="alert">
+        @if (waitSeconds() > 0) {
+          <!-- El contador se muestra pero no se anuncia en cada tick. -->
+          <span role="timer" aria-live="off">{{ message }}</span>
+        } @else {
+          {{ message }}
+        }
+      </p>
     } @else if (!loading() && events().length === 0) {
       <p role="status">No hay actividad disponible para mostrar. Esto no implica que no hayan ocurrido cambios.</p>
     }

@@ -1,6 +1,9 @@
 import type { Routes } from "@angular/router";
 import { authGuard, adminGuard } from "../core/guards/auth.guard";
 
+/** One long settings surface; the section routes name which part to open. */
+const settings = () => import("./settings/settings.component").then((m) => m.SettingsComponent);
+
 export const panelRoutes: Routes = [
   {
     path: "",
@@ -61,13 +64,25 @@ export const panelRoutes: Routes = [
         loadComponent: () => import("./webhooks/webhook-inspector.component").then((m) => m.WebhookInspectorComponent),
       },
       {
+        path: "notifications",
+        loadComponent: () => import("./notifications/notifications.component").then((m) => m.NotificationsComponent),
+      },
+      {
         path: "team",
         loadComponent: () => import("./team/team.component").then((m) => m.TeamComponent),
       },
       {
         path: "settings",
-        loadComponent: () => import("./settings/settings.component").then((m) => m.SettingsComponent),
+        loadComponent: settings,
       },
+      // Rutas de sección: cada una carga la misma página y activa su sección
+      // (`data.section` es el id del elemento), para que un aviso enlace al
+      // punto exacto donde se resuelve el asunto.
+      { path: "settings/profile", data: { section: "account" }, loadComponent: settings },
+      { path: "settings/security", data: { section: "security" }, loadComponent: settings },
+      { path: "settings/notifications", data: { section: "notifications" }, loadComponent: settings },
+      { path: "settings/privacy", data: { section: "privacy" }, loadComponent: settings },
+      { path: "settings/danger", data: { section: "danger" }, loadComponent: settings },
       {
         path: "security",
         loadComponent: () => import("./security/security-center.component").then((m) => m.SecurityCenterComponent),

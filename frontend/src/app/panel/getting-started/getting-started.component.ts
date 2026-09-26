@@ -7,7 +7,7 @@ import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import type { WorkspaceGettingStarted } from "../../core/models";
-import { decodeWorkspaceGettingStarted } from "../../core/services/workspace-response-decoders";
+import { decodeWorkspaceDismissal, decodeWorkspaceGettingStarted } from "../../core/services/workspace-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
 import { PageHeaderComponent } from "../page-header.component";
 import { gettingStartedSteps } from "./getting-started.steps";
@@ -30,9 +30,11 @@ export class GettingStartedComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly requests = new LatestRequest(this.destroyRef);
   private readonly state = signal<LoadState | null>(null);
+  // Local override of the server-side presentation preference. A mutation's
+  // result always wins over a GET that was already in flight when it happened.
   private readonly preference = signal<{ key: string; hidden: boolean } | null>(null);
   readonly reviewing = signal(false);
-  readonly storageWarning = signal(false);
+  readonly preferenceError = signal(false);
 
   readonly context = computed(() => {
     const user = this.auth.user();
@@ -42,30 +44,29 @@ export class GettingStartedComponent {
       workspaceId: workspace.id, name: workspace.name,
       // Role/MFA changes invalidate display immediately, before the effect runs.
       key: `${user.id}:${workspace.id}:${workspace.role}:${user.mfaEnabled}`,
-      preferenceKey: `uvh.getting-started.hidden.v1:${user.id}:${workspace.id}`,
     };
   });
   private readonly currentState = computed(() => this.state()?.key === this.context()?.key ? this.state() : null);
   readonly data = computed(() => this.currentState()?.data ?? null);
   readonly loading = computed(() => this.context() !== null && (this.currentState()?.loading ?? true));
   readonly error = computed(() => this.currentState()?.error ?? null);
-  readonly hidden = computed(() => this.preference()?.key === this.context()?.preferenceKey && this.preference()?.hidden === true);
+  readonly hidden = computed(() => {
+    const context = this.context();
+    const preference = this.preference();
+    if (context && preference?.key === context.key) return preference.hidden;
+    return this.currentState()?.data?.dismissedAt != null;
+  });
   readonly steps = computed(() => this.data() ? gettingStartedSteps(this.data()!) : []);
   readonly observed = computed(() => this.steps().filter((s) => !s.optional && s.observed).length);
   readonly complete = computed(() => this.data() !== null && this.steps().filter((s) => !s.optional).every((s) => s.observed));
 
   constructor() {
     effect(() => {
-      const context = this.context();
+      this.context(); // Register the dependency that triggers a reload.
       untracked(() => {
         this.reviewing.set(false);
-        this.storageWarning.set(false);
-        let hidden = false;
-        if (context) {
-          try { hidden = localStorage.getItem(context.preferenceKey) === "1"; }
-          catch { this.storageWarning.set(true); }
-        }
-        this.preference.set(context ? { key: context.preferenceKey, hidden } : null);
+        this.preferenceError.set(false);
+        this.preference.set(null);
         void this.reload();
       });
     });
@@ -96,27 +97,40 @@ export class GettingStartedComponent {
     }
   }
 
-  dismiss(): void {
-    this.setHidden(true);
+  async dismiss(): Promise<void> {
+    await this.setHidden(true);
     this.reviewing.set(false);
   }
 
-  resume(): void {
-    this.setHidden(false);
+  async resume(): Promise<void> {
+    await this.setHidden(false);
     this.reviewing.set(true);
     void this.reload();
   }
 
-  private setHidden(hidden: boolean): void {
+  /**
+   * Persist only the presentation preference, never facts, email, token or a
+   * completion bit. Closing the guide cannot change server-side progress: the
+   * flag lives on the caller's membership row, so it follows the account across
+   * devices instead of this browser's `localStorage` alone.
+   */
+  private async setHidden(hidden: boolean): Promise<void> {
     const context = this.context();
     if (!context) return;
-    // Persist only presentation preference, never facts, email, token or a
-    // completion bit. Closing the guide cannot change server-side progress.
-    this.preference.set({ key: context.preferenceKey, hidden });
+    this.preference.set({ key: context.key, hidden });
     try {
-      if (hidden) localStorage.setItem(context.preferenceKey, "1");
-      else localStorage.removeItem(context.preferenceKey);
-      this.storageWarning.set(false);
-    } catch { this.storageWarning.set(true); }
+      const result = await this.api.patch<{ ok: true; dismissedAt: string | null }>(
+        `/api/v1/workspaces/${context.workspaceId}/getting-started`,
+        { hidden },
+        decodeWorkspaceDismissal,
+      );
+      this.preference.set({ key: context.key, hidden: result.dismissedAt != null });
+      this.preferenceError.set(false);
+    } catch {
+      // The server keeps its own truth: fall back to it and warn instead of
+      // claiming a dismissal that never happened.
+      this.preference.set(null);
+      this.preferenceError.set(true);
+    }
   }
 }

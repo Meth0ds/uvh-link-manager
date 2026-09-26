@@ -21,6 +21,7 @@ const processing: DataExportStatus = {
   id: 7,
   status: "processing",
   failureReason: null,
+  stage: "collecting",
   downloadExpiresAt: null,
   createdAt: "2026-09-06T00:00:00Z",
   readyAt: null,

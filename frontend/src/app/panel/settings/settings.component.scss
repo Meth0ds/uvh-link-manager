@@ -184,6 +184,22 @@ app-page-header { display: block; margin-bottom: 18px; }
 .card-icon mat-icon { width: 19px; height: 19px; font-size: 19px; }
 .count-badge { display: inline-flex; min-width: 28px; height: 28px; align-items: center; justify-content: center; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface); color: var(--uvh-electric); font: 11px/1 "Courier New", monospace; font-weight: 700; }
 
+/* Preferencias de avisos: los obligatorios se leen como una lista fija y los
+   operativos llevan su control de frecuencia a la derecha. */
+.prefs-group-title { margin: 18px 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.prefs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pref-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; border: 1px solid var(--uvh-border); border-radius: 6px; background: var(--uvh-surface); }
+.pref-label { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.pref-label mat-icon { color: var(--uvh-electric); }
+.pref-label b { font-size: 14px; }
+.pref-fixed { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font: 11px/1 "Courier New", monospace; }
+.pref-fixed mat-icon { width: 16px; height: 16px; font-size: 16px; }
+.pref-row mat-form-field { width: 190px; }
+@media (max-width: 720px) {
+  .pref-row { flex-wrap: wrap; }
+  .pref-row mat-form-field { width: 100%; }
+}
+
 .stack {
   display: flex;
   flex-direction: column;
@@ -300,26 +316,31 @@ app-page-header { display: block; margin-bottom: 18px; }
 
 .export-entry { margin-top: 14px; }
 .muted.compact { margin: 0 0 9px; font-size: 10.5px; }
-.export-state {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  padding: 12px;
-  border-left: 2px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface);
-
-  > mat-icon { width: 20px; height: 20px; flex: 0 0 20px; color: var(--uvh-muted); font-size: 20px; }
-  > div { min-width: 0; }
+/* El marco de estado y sus colores viven en app-async-operation-status; aquí
+   sólo se estiliza el contenido proyectado, que conserva este encapsulado. */
+app-async-operation-status {
+  display: block;
   b { color: var(--uvh-ink); font-size: 11.5px; }
   p { margin: 3px 0 0; color: var(--uvh-muted); font-size: 10.5px; line-height: 1.5; }
-  &.ready { border-left: 3px solid var(--uvh-success); background: var(--uvh-success-soft); }
-  &.ready > mat-icon { color: var(--uvh-success); }
-  &.failed { border-left: 3px solid var(--uvh-danger); background: var(--uvh-danger-soft); }
-  &.failed > mat-icon { color: var(--uvh-danger); }
-  &.expired { border-left: 3px solid var(--uvh-warn); background: var(--uvh-warn-soft); }
-  &.expired > mat-icon { color: var(--uvh-warn); }
   .export-primary { display: flex; align-items: center; gap: 7px; margin-top: 11px; }
+}
+
+.export-history {
+  margin-top: 16px;
+  h4 { margin: 0 0 3px; color: var(--uvh-ink); font-size: 11px; }
+  ul { list-style: none; margin: 9px 0 0; padding: 0; display: grid; gap: 6px; }
+  li {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--uvh-border);
+    border-radius: 3px;
+    color: var(--uvh-muted);
+    font-size: 10.5px;
+  }
+  .export-history-status { color: var(--uvh-ink); font-weight: 600; }
 }
 
 .danger-icon { background: var(--uvh-danger-soft); color: var(--uvh-danger); }

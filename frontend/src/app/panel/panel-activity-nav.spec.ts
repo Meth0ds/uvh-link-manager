@@ -7,6 +7,7 @@ import { Router } from "@angular/router";
 import { Subject, of } from "rxjs";
 import type { AuthUser, Workspace } from "../core/models";
 import { AuthService } from "../core/services/auth.service";
+import { NotificationService } from "../core/services/notification.service";
 import { WorkspaceService } from "../core/services/workspace.service";
 import { LinkDialogService } from "./links/link-dialog.service";
 import { PanelComponent } from "./panel.component";
@@ -38,6 +39,9 @@ describe("Panel activity navigation", () => {
       { provide: LinkDialogService, useValue: {} },
       { provide: MatDialog, useValue: {} }, { provide: MatSnackBar, useValue: {} },
       { provide: BreakpointObserver, useValue: { observe: () => of({ matches: false, breakpoints: {} }) } },
+      // La campana del panel consulta el contador de no leídas al crearse y en
+      // cada navegación; aquí no se prueba la campana, sólo no debe estorbar.
+      { provide: NotificationService, useValue: { unread: signal(0), refreshUnread: () => Promise.resolve(0) } },
     ] });
     // Exercise the real navigation projection without creating a second routed
     // panel or launching requests through its children.

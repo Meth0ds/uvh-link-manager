@@ -50,7 +50,7 @@ x-php-service: &php-service
     # framework default (90 s) is below the longest worker timeout in this file
     # (180 s). A worker would then be able to claim a job another one is still
     # running, so the value is stated here rather than left to a default.
-    REDIS_QUEUE_RETRY_AFTER: "240"
+    REDIS_QUEUE_RETRY_AFTER: "900"
   secrets:
     - uvh_app_key
     - uvh_app_secret
@@ -131,7 +131,7 @@ services:
     environment:
       <<: *php-environment
       UVH_QUEUE_POOL: exports
-    command: ["php", "artisan", "queue:work", "--queue=exports", "--sleep=1", "--tries=3", "--timeout=180", "--max-time=3600"]
+    command: ["php", "artisan", "queue:work", "--queue=exports", "--sleep=1", "--tries=3", "--timeout=660", "--max-time=3600"]
 
   queue-analytics:
     <<: *queue-service
@@ -152,7 +152,7 @@ services:
     # 90 s, not 60: the sweep job that continues a destination sweep declares its
     # own 60 s budget, and the job's timeout has to fire before the worker's so it
     # can release its lease and report the failure instead of being killed
-    # mid-write. Both stay under REDIS_QUEUE_RETRY_AFTER (240 s).
+    # mid-write. Both stay under REDIS_QUEUE_RETRY_AFTER (900 s).
     # `QueueTimeoutContractTest` holds the three values together.
     command: ["php", "artisan", "queue:work", "--queue=security", "--sleep=1", "--tries=3", "--timeout=90", "--max-time=3600"]
 

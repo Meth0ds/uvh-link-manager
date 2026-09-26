@@ -277,7 +277,7 @@ antiguo durante la transición. Esta prueba acredita control DNS, pero no acredi
 que el CNAME/A/AAAA apunte al edge ni que HTTPS esté listo. El estado actual de
 la aplicación no modela todavía esas dos condiciones, por lo que la activación
 de dominios personalizados permanece bloqueada para lanzamiento hasta completar
-los P0 de [`todos.md`](todos.md).
+los P0 de [`current-backlog.md`](current-backlog.md).
 
 El proxy perimetral debe sobrescribir `X-Forwarded-*`, pasar un `Host` validado,
 rechazar acceso directo al puerto interno y no aplicar HSTS con

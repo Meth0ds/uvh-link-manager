@@ -307,7 +307,7 @@ class AdminConsoleTest extends TestCase
                 'pendingJobs', 'oldestJobAgeSeconds', 'failedJobs',
                 'webhookDeliveries', 'oldestPendingWebhookAgeSeconds',
                 'mailOutbox', 'oldestPendingMailAgeSeconds',
-                'activeSessions', 'unverifiedUsers', 'domains',
+                'activeSessions', 'pendingRegistrations', 'domains',
                 'oldestDnsCheckAgeSeconds', 'oldestTlsProvisioningAgeSeconds',
                 'events60m',
             ],

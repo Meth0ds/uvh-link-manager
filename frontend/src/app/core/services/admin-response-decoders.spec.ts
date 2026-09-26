@@ -5,6 +5,7 @@ import {
   decodeAdminMailPage,
   decodeAdminOperations,
   decodeAdminOverview,
+  decodeAdminPendingRegistrationsPage,
   decodeAdminRecoveriesPage,
   decodeAdminReportsPage,
   decodeAdminUsersPage,
@@ -21,6 +22,11 @@ describe("admin response decoders", () => {
       email_verified_at: timestamp, mfa_enabled: true, created_at: timestamp,
       deleted_at: null, workspaces: 1, links: 3,
     }), context).users?.[0].is_admin).toBeTrue();
+
+    expect(decodeAdminPendingRegistrationsPage(page("registrations", {
+      id: 11, email: "pending@example.test", created_at: timestamp,
+      last_mail_at: timestamp, link_expires_at: timestamp,
+    }), context).registrations?.[0].email).toBe("pending@example.test");
 
     expect(decodeAdminReportsPage(page("reports", {
       id: 3, link_id: 4, reporter_email: null, reason: "phishing", details: null,
@@ -63,7 +69,7 @@ describe("admin response decoders", () => {
         pendingJobs: 0, oldestJobAgeSeconds: null, failedJobs: 0,
         webhookDeliveries: { pending: 0 }, oldestPendingWebhookAgeSeconds: null,
         mailOutbox: { queued: 1 }, oldestPendingMailAgeSeconds: null,
-        activeSessions: 1, unverifiedUsers: 0, domains: { active: 1 },
+        activeSessions: 1, pendingRegistrations: 0, domains: { active: 1 },
         oldestDnsCheckAgeSeconds: null, oldestTlsProvisioningAgeSeconds: null,
         events60m: { login: 1 }, queueHeartbeatAgeSeconds: 2,
         schedulerHeartbeatAgeSeconds: 3, activePrivacyRequests: 0, overduePrivacyRequests: 0,

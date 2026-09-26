@@ -166,6 +166,34 @@ class UvhMail
         );
     }
 
+    /**
+     * Cierre masivo de sesiones. Comparte el portador de incidente del cambio
+     * de contraseña: si no reconoces el cierre, el mismo control de emergencia
+     * sigue disponible durante las próximas 24 horas.
+     */
+    public static function sessionsRevoked(string $to, string $incidentUrl, string $tokenHash, bool $all): bool
+    {
+        $link = '<a href="'.self::esc($incidentUrl).'" style="display:inline-block;background:#B42318;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Cerrar accesos de emergencia</a>';
+        $body = $all
+            ? '<p>Se han cerrado todas las sesiones abiertas de tu cuenta, incluida la desde la que se realizó la acción. Tendrás que iniciar sesión de nuevo en cada dispositivo.</p>'
+            : '<p>Se han cerrado las demás sesiones abiertas de tu cuenta. La sesión desde la que se realizó la acción permanece activa.</p>';
+
+        return self::send(
+            $all ? 'sessions_revoked_all' : 'sessions_revoked_others',
+            $to,
+            $all ? 'Todas las sesiones cerradas en UVH' : 'Sesiones cerradas en UVH',
+            self::layout(
+                $all ? 'Todas las sesiones cerradas' : 'Sesiones cerradas',
+                $body.'<p>Si no reconoces esta acción, usa el control de emergencia durante las próximas 24 horas. Revocará sesiones, tokens API y cambios pendientes, pero no iniciará sesión ni desactivará MFA.</p><p style="margin:18px 0">'.$link.'</p>',
+            ),
+            ($all ? 'Se han cerrado todas las sesiones de tu cuenta UVH.' : 'Se han cerrado las demás sesiones abiertas de tu cuenta UVH.')
+                .' Si no reconoces la acción, revoca los accesos durante las próximas 24 horas: '.$incidentUrl,
+            'email_token',
+            $tokenHash,
+            $tokenHash,
+        );
+    }
+
     public static function accountRecoveryConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
     {
         $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Confirmar solicitud</a>';
@@ -420,6 +448,22 @@ class UvhMail
             'Workspace eliminado en UVH',
             self::layout('Workspace eliminado', '<p>El workspace <strong>'.self::esc($workspace).'</strong> y sus recursos asociados se han eliminado.</p><p>Si no reconoces esta operación, contacta con soporte de inmediato.</p>'),
             "El workspace {$workspace} se ha eliminado en UVH. Si no reconoces la operación, contacta con soporte de inmediato.",
+        );
+    }
+
+    /**
+     * El resumen diario del centro de notificaciones. Sin recurso asociado: es
+     * un aviso de la propia cuenta, siempre vigente, que sólo lista títulos y
+     * rutas internas — nunca secretos, URLs bearer ni contenido ajeno.
+     */
+    public static function notificationDigest(string $to, string $summaryHtml, string $summaryText): bool
+    {
+        return self::send(
+            'notification_digest',
+            $to,
+            'Tu resumen de notificaciones de UVH',
+            self::layout('Resumen de notificaciones', $summaryHtml),
+            $summaryText,
         );
     }
 

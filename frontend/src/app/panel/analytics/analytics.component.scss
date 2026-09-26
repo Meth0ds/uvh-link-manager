@@ -25,6 +25,39 @@
   }
 }
 
+.custom-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--uvh-muted);
+    font: 11px/1 "Courier New", monospace;
+  }
+
+  input {
+    min-height: 44px;
+    padding: 0 10px;
+    border: 1px solid var(--uvh-border);
+    border-radius: 3px;
+    background: var(--uvh-surface);
+    color: var(--uvh-ink);
+    font: 12px/1 "Courier New", monospace;
+  }
+
+  .custom-range-error {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--uvh-danger);
+    font: 11px/1.5 "Courier New", monospace;
+  }
+}
+
 .reading-note {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

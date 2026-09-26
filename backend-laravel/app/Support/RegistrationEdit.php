@@ -106,13 +106,16 @@ final class RegistrationEdit
      * El secreto de un desenlace que no creó ningún registro.
      *
      * Longitud idéntica a uno real y atributos idénticos; lo único distinto es
-     * que no autoriza nada, porque no hay fila pendiente con ese id y esa
-     * versión. Sus valores son indistinguibles de los reales porque ninguno de
-     * los dos es legible fuera del servidor.
+     * que no autoriza nada: sella `pid=0, sv=0`, una pareja que ningún secreto
+     * real puede llevar porque los ids de fila empiezan en 1 y `secret()` sólo
+     * recibe ids de fila reales. Un decoy aleatorio con id plausible corría el
+     * riesgo de coincidir con una fila viva; con 0/0 la imposibilidad es por
+     * construcción, no por probabilidad. Sus valores son indistinguibles de los
+     * reales porque ninguno de los dos es legible fuera del servidor.
      */
     public static function decoy(): Cookie
     {
-        return self::seal(random_int(1, 999_999_999), 1);
+        return self::seal(0, 0);
     }
 
     /** El secreto ya gastado, para no dejar al navegador sosteniendo algo inútil. */
@@ -175,7 +178,8 @@ final class RegistrationEdit
             return null;
         }
 
-        $plain = SealedToken::open($value);
+        $legacy = null;
+        $plain = SealedToken::open($value, $legacy);
         if ($plain === null || preg_match(self::CLAIM_PATTERN, $plain) !== 1) {
             return null;
         }
@@ -185,6 +189,15 @@ final class RegistrationEdit
         }
         if ($decoded['e'] < (int) (microtime(true) * 1000)) {
             return null;
+        }
+
+        if ($legacy === true) {
+            // Un sello legacy que además pasa la validación semántica del
+            // claim (patrón y expiración): la prueba de que seguía vivo y
+            // sirviendo, que es lo que mide la ventana de retirada del
+            // fallback. Emitir al abrir contaría también sellos auténticos
+            // caducados, que ya no autorizan nada.
+            SealFormatTelemetry::legacyOpened('sealed');
         }
 
         return ['pid' => (int) $decoded['pid'], 'sv' => (int) $decoded['sv']];

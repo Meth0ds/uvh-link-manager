@@ -1,4 +1,4 @@
-import type { AccountDeletionImpact, AuthUser, DataExportFailureReason, DataExportStatus, Session, SessionList, Workspace, WorkspaceRole } from "../models";
+import type { AccountDeletionImpact, AuthUser, DataExportFailureReason, DataExportStage, DataExportStatus, Session, SessionList, Workspace, WorkspaceRole } from "../models";
 import type { LoginOutcome, LoginResponse, MfaSessionStatus } from "./auth.service";
 
 type JsonRecord = Record<string, unknown>;
@@ -6,6 +6,7 @@ type JsonRecord = Record<string, unknown>;
 const WORKSPACE_ROLES = new Set<WorkspaceRole>(["owner", "admin", "editor", "viewer"]);
 const EXPORT_STATUSES = new Set<DataExportStatus["status"]>(["processing", "ready", "downloaded", "failed", "cancelled", "expired"]);
 const EXPORT_FAILURES = new Set<DataExportFailureReason>(["automated_size_limit", "generation_error", "stalled"]);
+const EXPORT_STAGES = new Set<DataExportStage>(["collecting", "analytics", "encoding", "encrypting", "finalizing"]);
 const PRIVACY_TYPES = new Set(["access", "rectification", "erasure", "objection", "restriction", "portability"]);
 const PRIVACY_STATUSES = new Set(["submitted", "in_progress", "waiting_user", "completed", "rejected", "cancelled"]);
 
@@ -139,6 +140,9 @@ function dataExport(value: unknown): DataExportStatus {
     id: integer(source["id"], "data export", 1),
     status: literal(source["status"], EXPORT_STATUSES, "data export"),
     failureReason: source["failureReason"] === null ? null : literal(source["failureReason"], EXPORT_FAILURES, "data export failure"),
+    // Sólo una generación viva tiene etapa; junto a un estado terminal sería
+    // una historia falsa, así que el contrato exige null ahí.
+    stage: source["stage"] === null ? null : literal(source["stage"], EXPORT_STAGES, "data export stage"),
     downloadExpiresAt: nullableText(source["downloadExpiresAt"], "data export"),
     createdAt: nullableText(source["createdAt"], "data export"),
     readyAt: nullableText(source["readyAt"], "data export"),
@@ -149,6 +153,14 @@ function dataExport(value: unknown): DataExportStatus {
 export function decodeDataExportStatusResponse(value: unknown): { export: DataExportStatus | null } {
   const source = record(value, "data export envelope");
   return { export: source["export"] === null ? null : dataExport(source["export"]) };
+}
+
+/** El historial acota a las últimas diez filas, como el servidor. */
+export function decodeDataExportHistoryResponse(value: unknown): { exports: DataExportStatus[] } {
+  const source = record(value, "data export history");
+  const rows = source["exports"];
+  if (!Array.isArray(rows) || rows.length > 10) invalid("data export history");
+  return { exports: rows.map(dataExport) };
 }
 
 export function decodeRequiredDataExportResponse(value: unknown): { export: DataExportStatus } {
@@ -230,6 +242,13 @@ export function decodeSessionRevocation(value: unknown): { ok: true; current?: b
   const source = record(value, "session revocation");
   if (source["ok"] !== true || (source["current"] !== undefined && typeof source["current"] !== "boolean")) invalid("session revocation");
   return source["current"] === undefined ? { ok: true } : { ok: true, current: source["current"] as boolean };
+}
+
+/** Cierre masivo de sesiones: el recuento es de filas cerradas ahora, entero y no negativo. */
+export function decodeSessionsBulkRevocation(value: unknown): { ok: true; revoked: number } {
+  const source = record(value, "sessions bulk revocation");
+  if (source["ok"] !== true) invalid("sessions bulk revocation");
+  return { ok: true, revoked: integer(source["revoked"], "sessions bulk revocation") };
 }
 
 export function decodeMfaSetup(value: unknown): { secret: string; uri: string } {

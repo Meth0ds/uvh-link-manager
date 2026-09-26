@@ -81,6 +81,13 @@
         <mat-icon>add_link</mat-icon> Crear enlace
       </button> }
 
+      <button mat-icon-button class="notifications-bell" routerLink="/app/notifications" [attr.aria-label]="unreadNotificationsLabel()">
+        <mat-icon aria-hidden="true">notifications</mat-icon>
+        @if (notifications.unread() > 0) {
+          <span class="bell-badge" aria-hidden="true">{{ notifications.unread() > 99 ? '99+' : notifications.unread() }}</span>
+        }
+      </button>
+
       <app-public-theme-toggle class="panel-theme" />
 
       <button mat-button [matMenuTriggerFor]="userMenu" class="avatar-btn" aria-label="Menú de usuario">

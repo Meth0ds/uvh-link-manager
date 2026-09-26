@@ -138,10 +138,34 @@
         @if (transferOpen()) {
           <div class="transfer-form">
             <div class="transfer-form-copy"><b>Nuevo propietario</b><p>La transferencia requiere tu contraseña{{ user()?.mfaEnabled ? ' y segundo factor' : '' }}.</p></div>
-            <mat-form-field appearance="outline"><mat-label>Miembro de esta página</mat-label><mat-select [(ngModel)]="transferTargetId"><mat-option [value]="null">Selecciona una persona</mat-option>@for (member of d.members; track member.id) { @if (member.role !== 'owner') { <mat-option [value]="member.id">{{ member.name }} · {{ member.email }}</mat-option> } }</mat-select></mat-form-field>
+            @if (transferTarget(); as target) {
+              <div class="transfer-selected">
+                <mat-icon>how_to_reg</mat-icon>
+                <div><b>{{ target.name }}</b><span>{{ target.email }} · {{ roleLabel(target.role) }}</span></div>
+                <button mat-icon-button type="button" (click)="clearTransferTarget()" aria-label="Elegir a otra persona"><mat-icon>close</mat-icon></button>
+              </div>
+            } @else {
+              <mat-form-field appearance="outline" class="transfer-search"><mat-label>Buscar por nombre o email</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="transferQuery()" (input)="onTransferQuery(memberSearch.value)" #memberSearch autocomplete="off" maxlength="120" aria-label="Buscar entre todos los miembros del workspace" />@if (transferSearching()) { <mat-icon matSuffix>progress_activity</mat-icon> }</mat-form-field>
+              <div class="transfer-results">
+                @if (transferSearchError()) {
+                  <p class="transfer-search-error">No se pudo buscar miembros. Inténtalo de nuevo.</p>
+                } @else if (transferResults(); as results) {
+                  @for (candidate of results; track candidate.id) {
+                    <button mat-stroked-button type="button" class="transfer-result" (click)="selectTransferTarget(candidate)"><b>{{ candidate.name }}</b><span>{{ candidate.email }} · {{ roleLabel(candidate.role) }}</span></button>
+                  } @empty {
+                    <p class="transfer-search-hint">Ningún miembro coincide con la búsqueda.</p>
+                  }
+                  @if (transferTotal() > results.length) {
+                    <p class="transfer-search-hint">{{ transferTotal() }} coincidencias en el workspace; sigue escribiendo para acotar.</p>
+                  }
+                } @else {
+                  <p class="transfer-search-hint">Escribe para buscar entre todos los miembros del workspace, no sólo de esta página.</p>
+                }
+              </div>
+            }
             <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" [(ngModel)]="transferPassword" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
             @if (user()?.mfaEnabled) { <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput [(ngModel)]="transferFactorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field> }
-            <div class="transfer-actions"><button mat-stroked-button type="button" (click)="cancelOwnershipTransfer()" [disabled]="saving()">Cancelar</button><button mat-flat-button color="warn" type="button" (click)="transferOwnership()" [disabled]="!transferTargetId() || !transferPassword() || (user()?.mfaEnabled && !transferFactorCode()) || saving()">{{ saving() ? 'Transfiriendo…' : 'Confirmar transferencia' }}</button></div>
+            <div class="transfer-actions"><button mat-stroked-button type="button" (click)="cancelOwnershipTransfer()" [disabled]="saving()">Cancelar</button><button mat-flat-button color="warn" type="button" (click)="transferOwnership()" [disabled]="!transferTarget() || !transferPassword() || (user()?.mfaEnabled && !transferFactorCode()) || saving()">{{ saving() ? 'Transfiriendo…' : 'Confirmar transferencia' }}</button></div>
           </div>
         }
         <div class="danger-row">

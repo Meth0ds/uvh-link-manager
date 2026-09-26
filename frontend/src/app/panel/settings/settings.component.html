@@ -19,6 +19,7 @@
     <nav class="settings-nav" aria-label="Secciones de ajustes">
       <a href="#account" (click)="goToSection($event, accountSection)"><mat-icon aria-hidden="true">person_outline</mat-icon><span><b>Perfil y apariencia</b><small>Nombre, email y tema</small></span></a>
       <a href="#security" (click)="goToSection($event, securitySection)"><mat-icon aria-hidden="true">lock_outline</mat-icon><span><b>Acceso y seguridad</b><small>Contraseña, MFA y sesiones</small></span></a>
+      <a href="#notifications" (click)="goToSection($event, notificationsSection)"><mat-icon aria-hidden="true">notifications</mat-icon><span><b>Notificaciones</b><small>Avisos y su frecuencia</small></span></a>
       <a href="#privacy" (click)="goToSection($event, privacySection)"><mat-icon aria-hidden="true">policy</mat-icon><span><b>Tus datos</b><small>Descargas y solicitudes</small></span></a>
       <a href="#danger" (click)="goToSection($event, dangerSection)"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Cerrar la cuenta</b><small>Requisitos y consecuencias</small></span></a>
     </nav>
@@ -221,6 +222,53 @@
 
     </section>
 
+    <section #notificationsSection id="notifications" tabindex="-1" class="settings-section notifications-settings-section" aria-labelledby="notifications-title">
+      <header class="settings-section-head">
+        <div><h2 id="notifications-title">Notificaciones</h2><p>Elige cómo quieres recibir los avisos operativos. Los avisos de seguridad de tu cuenta llegan siempre.</p></div>
+      </header>
+
+      <div class="card-block notification-prefs-card">
+        <div class="card-heading"><span class="card-icon"><mat-icon>notifications</mat-icon></span><div><h3>Preferencias de avisos</h3><p>Cada aviso operativo puede llegar al momento, en el resumen diario, sólo en UVH o desactivarse.</p></div></div>
+        @if (notificationPrefsLoading()) {
+          <app-panel-skeleton variant="list" label="Cargando preferencias" />
+        }
+        @if (notificationPrefsError(); as message) {
+          <div class="alert error" role="alert">
+            <mat-icon aria-hidden="true">error_outline</mat-icon>
+            <span>{{ message }}</span>
+            <button mat-stroked-button type="button" (click)="loadNotificationPreferences()">Reintentar</button>
+          </div>
+        }
+        @if (!notificationPrefsLoading() && !notificationPrefsError()) {
+          <h4 class="prefs-group-title">Avisos de seguridad · siempre activos</h4>
+          <ul class="prefs-list">
+            @for (pref of mandatoryPreferences(); track pref.kind) {
+              <li class="pref-row">
+                <span class="pref-label"><mat-icon aria-hidden="true">{{ notificationKindIcon(pref.kind) }}</mat-icon><b>{{ notificationKindLabel(pref.kind) }}</b></span>
+                <span class="pref-fixed"><mat-icon aria-hidden="true">lock</mat-icon>Siempre</span>
+              </li>
+            }
+          </ul>
+          <h4 class="prefs-group-title">Avisos operativos</h4>
+          <ul class="prefs-list">
+            @for (pref of operationalPreferences(); track pref.kind) {
+              <li class="pref-row">
+                <span class="pref-label"><mat-icon aria-hidden="true">{{ notificationKindIcon(pref.kind) }}</mat-icon><b>{{ notificationKindLabel(pref.kind) }}</b></span>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>Frecuencia</mat-label>
+                  <mat-select [value]="pref.delivery" [disabled]="notificationPrefsBusy()" (selectionChange)="setNotificationDelivery(pref, $event.value)">
+                    @for (delivery of notificationDeliveries; track delivery) {
+                      <mat-option [value]="delivery">{{ notificationDeliveryLabel(delivery) }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    </section>
+
     <section #privacySection id="privacy" tabindex="-1" class="settings-section privacy-section" aria-labelledby="privacy-title">
       <header class="settings-section-head">
         <div><h2 id="privacy-title">Datos y privacidad</h2><p>Descarga tu información y gestiona tus derechos desde un expediente trazable.</p></div>
@@ -228,18 +276,16 @@
 
 <!-- Data portability -->
 <div class="card-block data-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>download_for_offline</mat-icon></span><div><h3>Descarga de datos</h3><p>Solicita una copia estructurada de la información asociada a tu cuenta.</p></div></div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>download_for_offline</mat-icon></span><div><h3>Descarga de datos</h3><p>Copia de cuenta de uso propio, preparada al momento. El derecho de acceso del RGPD, con expediente y plazos, se ejerce en «Derechos sobre tus datos».</p></div></div>
   @if (exportLoading()) {
     <app-panel-skeleton variant="form" label="Consultando exportaciones" />
   } @else {
     @if (exportStatus(); as currentExport) {
-      <section class="export-state" [class.ready]="currentExport.status === 'ready'" [class.failed]="currentExport.status === 'failed'" [class.expired]="currentExport.status === 'expired'" aria-live="polite">
-        <mat-icon>{{ currentExport.status === 'processing' ? 'hourglass_top' : currentExport.status === 'ready' ? 'task_alt' : currentExport.status === 'downloaded' ? 'download_done' : currentExport.status === 'failed' ? 'error_outline' : 'history' }}</mat-icon>
-        <div>
+      <app-async-operation-status [tone]="exportTone(currentExport.status)" [icon]="exportIcon(currentExport.status)" aria-live="polite">
           @switch (currentExport.status) {
             @case ('processing') {
               <b>Estamos preparando tus datos</b>
-              <p>Puedes cerrar esta página: la generación sigue en segundo plano y te avisaremos por email cuando el archivo esté listo.</p>
+              <p>Etapa actual: {{ exportStageLabel(currentExport.stage) }}. Puedes cerrar esta página: la generación sigue en segundo plano y te avisaremos por email cuando el archivo esté listo.</p>
             }
             @case ('ready') {
               <b>Tu exportación está lista</b>
@@ -267,8 +313,7 @@
             }
             @default { <b>Solicitud cancelada</b><p>Puedes iniciar una nueva cuando lo necesites.</p> }
           }
-        </div>
-      </section>
+      </app-async-operation-status>
     }
 
     @if (exportIsActive()) {
@@ -278,6 +323,22 @@
         <span class="security-entry-mark" aria-hidden="true"><mat-icon>encrypted</mat-icon></span>
         <p><b>Archivo privado y descarga protegida</b><span>Preparamos el archivo en almacenamiento privado y pediremos tu contraseña y tu segundo factor por separado para entregarlo.</span></p>
         <button mat-stroked-button type="button" (click)="openDataExportDialog()"><mat-icon aria-hidden="true">download</mat-icon>Solicitar mi archivo</button>
+      </div>
+    }
+
+    @if (exportHistory().length) {
+      <div class="export-history" aria-labelledby="export-history-title">
+        <h4 id="export-history-title">Historial de exportaciones</h4>
+        <p class="muted compact">Se guardan las últimas diez solicitudes con su estado y fechas.</p>
+        <ul>
+          @for (row of exportHistory(); track row.id) {
+            <li>
+              <span class="export-history-status">{{ exportStatusLabel(row.status) }}</span>
+              <span class="tnum">{{ formatDate(row.createdAt ?? '') }}</span>
+              @if (row.status === 'processing') { <span class="export-history-stage">{{ exportStageLabel(row.stage) }}</span> }
+            </li>
+          }
+        </ul>
       </div>
     }
   }

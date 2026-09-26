@@ -17,13 +17,18 @@ use App\Support\MailAdmissionException;
 use App\Support\MfaAttempts;
 use App\Support\MfaFreshness;
 use App\Support\MfaStepUp;
+use App\Support\NotificationInbox;
+use App\Support\NotificationKinds;
+use App\Support\NotificationPreferences;
 use App\Support\OperationalMetrics;
 use App\Support\PendingHandoff;
+use App\Support\SearchTerm;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
 use App\Support\WorkspaceAccess;
 use App\Support\WorkspaceLimits;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -350,7 +355,22 @@ class WorkspaceController
                     ->update(['status' => 'cancelled']);
                 // Both owners' notices must describe the same committed transfer.
                 // Failure on the second envelope rolls back roles and the first.
-                foreach (array_unique([$lockedActor->email, $target->email]) as $recipient) {
+                // Cada destinatario gobierna su propio canal operativo: quien pidió
+                // «Solo UVH» o «Desactivado» recibe —o no— por su preferencia.
+                $transferNotice = [
+                    (int) $lockedActor->id => $lockedActor->email,
+                    (int) $target->id => $target->email,
+                ];
+                foreach ($transferNotice as $noticeUserId => $recipient) {
+                    $delivery = NotificationInbox::record(
+                        $noticeUserId,
+                        NotificationKinds::WORKSPACE_OWNERSHIP_TRANSFER,
+                        (int) $workspace->id,
+                        $workspace->name,
+                    );
+                    if ($delivery !== NotificationPreferences::DELIVERY_IMMEDIATE) {
+                        continue;
+                    }
                     if (! UvhMail::workspaceOwnershipTransferred($recipient, $workspace->name)) {
                         throw new MailAdmissionException('Ownership transfer notices outbox admission failed');
                     }
@@ -561,8 +581,17 @@ class WorkspaceController
                 DB::table('workspaces')->where('id', $id)->delete();
 
                 // The outbox is independent of workspace foreign keys, so the
-                // deletion and its historical notice can commit together.
-                if (! UvhMail::workspaceDeleted($lockedUser->email, $workspace->name)) {
+                // deletion and its historical notice can commit together. La fila
+                // de bandeja captura el nombre: el workspace ya no existe al
+                // confirmar esta misma transacción y no hay a qué apuntar.
+                $delivery = NotificationInbox::record(
+                    (int) $lockedUser->id,
+                    NotificationKinds::WORKSPACE_DELETED,
+                    null,
+                    $workspace->name,
+                );
+                if ($delivery === NotificationPreferences::DELIVERY_IMMEDIATE
+                    && ! UvhMail::workspaceDeleted($lockedUser->email, $workspace->name)) {
                     throw new MailAdmissionException('Workspace deletion notice outbox admission failed');
                 }
 
@@ -1002,6 +1031,50 @@ class WorkspaceController
         Audit::write($user->id, 'workspace.invitation_resent', 'workspace', $id, null, UvhRequest::ip($request));
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Búsqueda remota de miembros para el selector de transferencia de
+     * propiedad: cubre TODOS los miembros del workspace, no sólo la página que
+     * el panel tenga cargada. El término va siempre como parámetro acotado con
+     * los comodines de `ILIKE` escapados (`SearchTerm`); el listado paginado de
+     * la página de equipo sigue siendo `show`.
+     */
+    public function searchMembers(Request $request, int $id): JsonResponse
+    {
+        $user = UvhRequest::user($request);
+        if (! WorkspaceAccess::getMembership($user->id, $id)) {
+            return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+        }
+
+        $perPage = (int) $request->query('perPage', 10);
+        $perPage = $perPage < 1 ? 10 : min($perPage, 25);
+        $pattern = SearchTerm::contains(UvhRequest::queryString($request, 'q'));
+
+        $query = DB::table('memberships as m')
+            ->join('users as u', 'u.id', '=', 'm.user_id')
+            ->where('m.workspace_id', $id);
+        if ($pattern !== '') {
+            $query->where(function ($search) use ($pattern): void {
+                $search->where('u.name', 'ilike', $pattern)
+                    ->orWhere('u.email', 'ilike', $pattern);
+            });
+        }
+        $total = (clone $query)->count();
+        $members = $query
+            ->orderByRaw("CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'editor' THEN 2 ELSE 3 END")
+            ->orderBy('u.name')
+            ->orderBy('u.id')
+            ->limit($perPage)
+            ->get(['u.id', 'u.email', 'u.name', 'm.role'])
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'email' => $r->email,
+                'name' => $r->name,
+                'role' => $r->role,
+            ]);
+
+        return response()->json(['members' => $members, 'total' => $total]);
     }
 
     // ---------------- helpers ----------------

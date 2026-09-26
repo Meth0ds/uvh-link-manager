@@ -21,10 +21,7 @@ class SessionManager
         }
         $token = Ids::randomToken(32);
         $expiresAt = now()->addDays((int) config('uvh.session_ttl_days'));
-        $userAgent = $request->header('user-agent');
-        if (is_string($userAgent)) {
-            $userAgent = mb_strcut($userAgent, 0, 255, 'UTF-8');
-        }
+        $userAgent = self::persistableUserAgent($request->header('user-agent'));
 
         UvhSession::create([
             'id' => Ids::sha256Hex($token),
@@ -39,6 +36,30 @@ class SessionManager
         ]);
 
         return $token;
+    }
+
+    /**
+     * Persisted-header policy (BAF-051): the user agent is attacker controlled
+     * and the column is `varchar(255)`, so whatever arrives must leave here as
+     * valid UTF-8 within the column's bound — or the INSERT fails with a 500
+     * and this client cannot log in at all.
+     *
+     * Invalid byte sequences are scrubbed and control characters —including
+     * NUL, which PostgreSQL refuses inside `text`— are dropped; what remains is
+     * cut to 255 BYTES, which always fit `varchar(255)` because UTF-8 never
+     * uses fewer bytes than characters, and `mb_strcut` stops on a character
+     * boundary so the stored value stays well-formed. A header with nothing
+     * persistable left stores no user agent at all instead of an empty string.
+     */
+    private static function persistableUserAgent(?string $userAgent): ?string
+    {
+        if ($userAgent === null) {
+            return null;
+        }
+        $userAgent = preg_replace('/[\x00-\x1F\x7F]/', '', mb_scrub($userAgent, 'UTF-8')) ?? '';
+        $userAgent = mb_strcut(trim($userAgent), 0, 255, 'UTF-8');
+
+        return $userAgent === '' ? null : $userAgent;
     }
 
     public static function cookie(string $token): Cookie

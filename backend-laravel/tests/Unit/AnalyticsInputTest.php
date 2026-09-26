@@ -17,6 +17,20 @@ class AnalyticsInputTest extends TestCase
         }
     }
 
+    public function test_custom_range_needs_both_bounds_and_covers_the_closing_day(): void
+    {
+        $ok = $this->invoke('parseRange', ['custom', '2026-08-01', '2026-08-30']);
+        $this->assertTrue($ok['ok']);
+        $this->assertStringStartsWith('2026-08-01', $ok['start']);
+        // A date-only `to` names the whole day, not its midnight.
+        $this->assertStringStartsWith('2026-08-30T23:59', $ok['end']);
+
+        $this->assertFalse($this->invoke('parseRange', ['custom', '2026-08-01', null])['ok']);
+        $this->assertFalse($this->invoke('parseRange', ['custom', null, '2026-08-30'])['ok']);
+        $this->assertFalse($this->invoke('parseRange', ['custom', null, null])['ok']);
+        $this->assertFalse($this->invoke('parseRange', ['quince', '2026-08-01', '2026-08-30'])['ok']);
+    }
+
     public function test_link_id_parser_rejects_ambiguous_or_overflowing_values(): void
     {
         $this->assertSame(['ok' => true, 'value' => null], $this->linkId(null));

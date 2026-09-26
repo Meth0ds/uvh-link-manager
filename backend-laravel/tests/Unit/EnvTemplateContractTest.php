@@ -69,6 +69,15 @@ class EnvTemplateContractTest extends TestCase
         // gate already validates; a template entry would only add a way to
         // weaken them by accident.
         'EXPORT_PURGE_DAYS' => 'default 7 days, range checked at startup',
+        // The timing floor that keeps the public resend-verification endpoint
+        // from telling known and unknown addresses apart. Not operator surface:
+        // a template entry would be a way to reopen the enumeration oracle by
+        // accident.
+        'RESEND_VERIFICATION_MIN_DURATION_MS' => 'anti-enumeration timing floor with a working default, deliberately not tunable',
+        // The operational ceiling of the automated export document. Generous by
+        // default and clamped by the code; a template entry would invite
+        // raising it without measuring the private volume first.
+        'EXPORT_MAX_PLAINTEXT_BYTES' => 'operational export ceiling with a generous default, clamped in code',
         'VERIFIED_REQUIRED_TO_CREATE' => 'default true, which is the safe value',
         // Empty by default: the pool is derived from the worker command, so the
         // variable only exists for a deployment that splits the queues.

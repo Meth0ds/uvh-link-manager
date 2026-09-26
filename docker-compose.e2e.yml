@@ -96,7 +96,7 @@ services:
       COOKIE_DOMAIN: ""
       COOKIE_SECURE: "false"
       QUEUE_CONNECTION: redis
-      REDIS_QUEUE_RETRY_AFTER: "300"
+      REDIS_QUEUE_RETRY_AFTER: "900"
       MAIL_MAILER: array
       HCAPTCHA_SITE_KEY: 10000000-ffff-ffff-ffff-000000000001
       HCAPTCHA_SECRET: uvh-e2e-hcaptcha-secret

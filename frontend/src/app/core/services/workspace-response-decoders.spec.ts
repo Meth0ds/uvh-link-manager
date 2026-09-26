@@ -53,9 +53,12 @@ describe("workspace response decoders", () => {
       role: "admin",
       facts: { linkPresent: true, redirectObserved: false, domainPresent: true, teammatePresent: false, invitationPending: null, mfaEnabled: true },
       capabilities: { createLink: true, addDomain: true, inviteTeam: true },
+      dismissedAt: null,
     } as const;
     expect(decodeWorkspaceGettingStarted(onboarding, 2)).toEqual(onboarding);
     expect(() => decodeWorkspaceGettingStarted(onboarding, 3)).toThrow();
     expect(() => decodeWorkspaceGettingStarted({ ...onboarding, capabilities: { ...onboarding.capabilities, inviteTeam: "yes" } }, 2)).toThrow();
+    expect(decodeWorkspaceGettingStarted({ ...onboarding, dismissedAt: "2026-09-26T09:30:00Z" }, 2).dismissedAt).toBe("2026-09-26T09:30:00Z");
+    expect(() => decodeWorkspaceGettingStarted({ ...onboarding, dismissedAt: 42 }, 2)).toThrow();
   });
 });

@@ -142,6 +142,12 @@ class UvhCrypto
         throw new \RuntimeException('At-rest decryption failed');
     }
 
+    /** ¿Es un ciphertext en reposo de este sistema (y no texto plano heredado)? */
+    public static function isAtRestCiphertext(string $value): bool
+    {
+        return str_starts_with($value, self::PREFIX);
+    }
+
     public static function encryptedWithCurrentKey(string $value): bool
     {
         if (! str_starts_with($value, self::PREFIX)) {

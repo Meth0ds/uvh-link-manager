@@ -22,6 +22,9 @@ final class WorkspaceOnboardingTest extends TestCase
         DB::statement('TRUNCATE users RESTART IDENTITY CASCADE');
         $this->disableCookieEncryption();
         $this->withCredentials();
+        // Double-submit CSRF for the PATCH the guide dismissal needs; the GETs
+        // never cared, the mutation does.
+        $this->withCookie('uvh_csrf', 'onboarding-csrf')->withHeaders(['X-CSRF-Token' => 'onboarding-csrf']);
     }
 
     public function test_empty_workspace_returns_only_derived_facts_and_capabilities(): void
@@ -36,6 +39,7 @@ final class WorkspaceOnboardingTest extends TestCase
                 'teammatePresent' => false, 'invitationPending' => false, 'mfaEnabled' => false,
             ],
             'capabilities' => ['createLink' => true, 'addDomain' => true, 'inviteTeam' => true],
+            'dismissedAt' => null,
         ])->assertHeader('Cache-Control', 'max-age=0, no-store, private');
         $this->assertSame(0, DB::table('links')->count());
         $this->assertSame(0, DB::table('mail_outbox')->count());
@@ -111,6 +115,40 @@ final class WorkspaceOnboardingTest extends TestCase
         $this->signIn($owner);
         $workspace->memberships()->delete();
         $this->getJson($this->path($workspace))->assertForbidden();
+    }
+
+    public function test_the_guide_dismissal_travels_with_the_membership_not_with_the_browser(): void
+    {
+        $owner = User::factory()->create();
+        $workspace = $this->workspace($owner);
+        $viewer = User::factory()->create();
+        $workspace->memberships()->create(['user_id' => $viewer->id, 'role' => 'viewer']);
+        $this->signIn($owner);
+
+        $dismissed = $this->patchJson($this->path($workspace), ['hidden' => true])->assertOk();
+        $this->assertIsString($dismissed->json('dismissedAt'));
+        $this->assertIsString($this->getJson($this->path($workspace))->assertOk()->json('dismissedAt'));
+
+        // Another member of the same workspace still sees the guide: the
+        // preference is scoped to the membership row, never to the device.
+        $this->signIn($viewer);
+        $this->assertNull($this->getJson($this->path($workspace))->assertOk()->json('dismissedAt'));
+
+        $this->signIn($owner);
+        $this->assertNull($this->patchJson($this->path($workspace), ['hidden' => false])->assertOk()->json('dismissedAt'));
+        $this->assertNull($this->getJson($this->path($workspace))->assertOk()->json('dismissedAt'));
+    }
+
+    public function test_the_dismissal_needs_a_boolean_and_a_membership(): void
+    {
+        $owner = User::factory()->create();
+        $workspace = $this->workspace($owner);
+        $this->signIn($owner);
+        $this->patchJson($this->path($workspace), ['hidden' => 'yes'])->assertStatus(422)
+            ->assertExactJson(['error' => 'Datos inválidos']);
+        $this->patchJson('/api/v1/workspaces/999999/getting-started', ['hidden' => true])
+            ->assertForbidden()->assertExactJson(['error' => 'Sin acceso a este workspace']);
+        $this->assertSame(0, DB::table('memberships')->whereNotNull('onboarding_dismissed_at')->count());
     }
 
     private function workspace(User $owner): Workspace

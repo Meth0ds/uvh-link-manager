@@ -149,3 +149,14 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Campana del centro de notificaciones: contador a la vista y sin mover el
+   resto de la barra cuando aparece. */
+.notifications-bell { position: relative; }
+.bell-badge {
+  position: absolute; top: 2px; right: 2px;
+  display: inline-flex; min-width: 16px; height: 16px; padding: 0 4px;
+  align-items: center; justify-content: center; border-radius: 8px;
+  background: var(--uvh-electric); color: var(--uvh-surface);
+  font: 700 10px/1 "Courier New", monospace;
+}

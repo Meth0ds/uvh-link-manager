@@ -105,7 +105,7 @@ Cinco defectos reales aparecieron al recorrer este documento y quedaron cerrados
 
 ## Dominios personalizados y DNS
 
-El backlog técnico detallado está en [`todos.md`](todos.md). Ningún dominio se considera listo por tener solamente el estado local `verified` o `active`. **Las ocho casillas de este bloque exigen DNS, ACME y un despliegue reales**; lo verificado aquí es la configuración que las sostiene.
+El backlog técnico detallado está en [`current-backlog.md`](current-backlog.md) (histórico en [`archive/todos.md`](archive/todos.md)). Ningún dominio se considera listo por tener solamente el estado local `verified` o `active`. **Las ocho casillas de este bloque exigen DNS, ACME y un despliegue reales**; lo verificado aquí es la configuración que las sostiene.
 
 - [ ] El edge Caddy incluido se despliega con almacenamiento persistente, puertos ACME accesibles, cuenta ACME monitorizada y versión identificada por digest; el endpoint On-Demand TLS `ask` sólo es accesible por la red privada.
   Configuración verificada: `caddy` va fijado por digest, `uvh-caddy-data` y `uvh-caddy-config` son volúmenes persistentes, publica 80/443, y el `ask` vive en un listener interno de Nginx (`:8081`) que no publica Compose, inyecta un secreto compartido que el cliente no tiene y sólo admite `GET`. El despliegue, la accesibilidad ACME y la cuenta monitorizada son externos.

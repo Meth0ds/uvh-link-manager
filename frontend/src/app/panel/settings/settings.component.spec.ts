@@ -1,6 +1,7 @@
 import { signal, type WritableSignal } from "@angular/core";
 import { fakeAsync, flushMicrotasks, TestBed, tick } from "@angular/core/testing";
-import { Router } from "@angular/router";
+import { Location } from "@angular/common";
+import { ActivatedRoute, Router } from "@angular/router";
 import { FormBuilder } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
@@ -8,6 +9,7 @@ import { Subject } from "rxjs";
 import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, SessionList } from "../../core/models";
 import { ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
+import { NotificationService } from "../../core/services/notification.service";
 import { ThemeService } from "../../core/services/theme.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ActionDialogService } from "../action-dialog.service";
@@ -29,6 +31,7 @@ const processing: DataExportStatus = {
   id: 1,
   status: "processing",
   failureReason: null,
+  stage: "collecting",
   downloadExpiresAt: null,
   createdAt: "2026-09-06T00:00:00Z",
   readyAt: null,
@@ -50,19 +53,22 @@ function session(id: string, current = false): Session {
 
 describe("SettingsComponent async safety", () => {
   type AuthMethods = Pick<AuthService,
-    "sessionGeneration" | "listSessions" | "dataExportStatus" | "accountDeletionImpact"
+    "sessionGeneration" | "listSessions" | "dataExportStatus" | "dataExportHistory" | "accountDeletionImpact"
     | "updateProfile" | "changePassword" | "refreshUser" | "revokeSession">;
   let auth: jasmine.SpyObj<AuthMethods> & { user: WritableSignal<AuthUser | null> };
   let api: jasmine.SpyObj<ApiService>;
   let snackbar: jasmine.SpyObj<MatSnackBar>;
   let router: jasmine.SpyObj<Router>;
+  let location: jasmine.SpyObj<Location>;
+  let route: { snapshot: { data: Record<string, string | undefined> } };
   let dialog: jasmine.SpyObj<MatDialog>;
+  let notifications: jasmine.SpyObj<Pick<NotificationService, "preferences" | "updatePreferences">>;
   let selected: ReturnType<typeof signal<number | null>>;
   let component: SettingsComponent;
 
   beforeEach(async () => {
     const authSpy = jasmine.createSpyObj<AuthMethods>("AuthService", [
-      "sessionGeneration", "listSessions", "dataExportStatus", "accountDeletionImpact",
+      "sessionGeneration", "listSessions", "dataExportStatus", "dataExportHistory", "accountDeletionImpact",
       "updateProfile", "changePassword", "refreshUser", "revokeSession",
     ]);
     auth = Object.assign(authSpy, { user: signal<AuthUser | null>({
@@ -72,6 +78,7 @@ describe("SettingsComponent async safety", () => {
     auth.sessionGeneration.and.returnValue(1);
     auth.listSessions.and.resolveTo({ sessions: [], truncated: false });
     auth.dataExportStatus.and.resolveTo(null);
+    auth.dataExportHistory.and.resolveTo([]);
     auth.accountDeletionImpact.and.resolveTo({
       canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null,
     } satisfies AccountDeletionImpact);
@@ -82,9 +89,13 @@ describe("SettingsComponent async safety", () => {
 
     api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post"]);
     api.get.and.resolveTo({ requests: [], total: 0 } as never);
+    notifications = jasmine.createSpyObj("NotificationService", ["preferences", "updatePreferences"]);
+    notifications.preferences.and.resolveTo([]);
     snackbar = jasmine.createSpyObj<MatSnackBar>("MatSnackBar", ["open"]);
     router = jasmine.createSpyObj<Router>("Router", ["navigate"]);
     router.navigate.and.resolveTo(true);
+    location = jasmine.createSpyObj<Location>("Location", ["replaceState"]);
+    route = { snapshot: { data: {} } };
     dialog = jasmine.createSpyObj<MatDialog>("MatDialog", ["open"]);
     selected = signal<number | null>(7);
 
@@ -95,18 +106,44 @@ describe("SettingsComponent async safety", () => {
         { provide: ApiService, useValue: api },
         { provide: MatSnackBar, useValue: snackbar },
         { provide: Router, useValue: router },
+        { provide: Location, useValue: location },
+        { provide: ActivatedRoute, useValue: route },
         { provide: MatDialog, useValue: dialog },
         { provide: WorkspaceService, useValue: {
           list: signal([]), currentId: selected, select: (id: number | null) => selected.set(id),
         } },
         { provide: ThemeService, useValue: { preference: signal("system"), set: jasmine.createSpy("set") } },
         { provide: ActionDialogService, useValue: jasmine.createSpyObj("ActionDialogService", ["confirm", "prompt"]) },
+        { provide: NotificationService, useValue: notifications },
       ],
     });
     component = TestBed.runInInjectionContext(() => new SettingsComponent());
     await Promise.resolve();
     await Promise.resolve();
     snackbar.open.calls.reset();
+  });
+
+  it("groups notification preferences and never silences a critical notice", async () => {
+    notifications.preferences.and.resolveTo([
+      { kind: "password_changed", category: "mandatory", delivery: "immediate" },
+      { kind: "api_token_created", category: "operational", delivery: "immediate" },
+    ]);
+    await component.loadNotificationPreferences();
+    expect(component.mandatoryPreferences().map((p) => p.kind)).toEqual(["password_changed"]);
+    expect(component.operationalPreferences().map((p) => p.kind)).toEqual(["api_token_created"]);
+
+    await component.setNotificationDelivery(
+      { kind: "password_changed", category: "mandatory", delivery: "immediate" }, "disabled");
+    expect(notifications.updatePreferences).not.toHaveBeenCalled();
+
+    notifications.updatePreferences.and.resolveTo([
+      { kind: "api_token_created", category: "operational", delivery: "daily_digest" },
+    ]);
+    await component.setNotificationDelivery(
+      { kind: "api_token_created", category: "operational", delivery: "immediate" }, "daily_digest");
+    expect(notifications.updatePreferences).toHaveBeenCalledOnceWith([{ kind: "api_token_created", delivery: "daily_digest" }]);
+    expect(component.operationalPreferences()[0].delivery).toBe("daily_digest");
+    expect(snackbar.open).toHaveBeenCalled();
   });
 
   it("keeps the newest sessions response when an older request finishes last", async () => {
@@ -141,6 +178,7 @@ describe("SettingsComponent async safety", () => {
   it("keeps section jumps local and moves keyboard focus without clearing MFA setup", () => {
     const event = new MouseEvent("click", { cancelable: true });
     const section = document.createElement("section");
+    section.id = "security";
     const focus = spyOn(section, "focus");
     const scroll = spyOn(section, "scrollIntoView");
     component.recoveryCodes.set(["fictional-code"]);
@@ -149,7 +187,46 @@ describe("SettingsComponent async safety", () => {
     expect(focus).toHaveBeenCalledWith({ preventScroll: true });
     expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
     expect(component.recoveryCodes()).toEqual(["fictional-code"]);
+    // The address bar follows the visible section without a navigation: the
+    // URL stays shareable and nothing is re-rendered or unmounted.
+    expect(location.replaceState).toHaveBeenCalledOnceWith("/app/settings/security");
     expect(router.navigate).not.toHaveBeenCalled();
+
+    const dangerEvent = new MouseEvent("click", { cancelable: true });
+    const danger = document.createElement("section");
+    danger.id = "danger";
+    component.goToSection(dangerEvent, danger);
+    expect(location.replaceState).toHaveBeenCalledWith("/app/settings/danger");
+  });
+
+  it("activates the section named by a section route like a local jump", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.detectChanges();
+    const section = fixture.nativeElement.querySelector("#notifications") as HTMLElement;
+    const focus = spyOn(section, "focus");
+    const scroll = spyOn(section, "scrollIntoView");
+    route.snapshot.data = { section: "notifications" };
+    fixture.componentInstance.ngAfterViewInit();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
+    expect(router.navigate).not.toHaveBeenCalled();
+
+    // The danger section has its own route too: account-closure notices land
+    // exactly where the irreversible decision lives.
+    const danger = fixture.nativeElement.querySelector("#danger") as HTMLElement;
+    const dangerFocus = spyOn(danger, "focus");
+    const dangerScroll = spyOn(danger, "scrollIntoView");
+    route.snapshot.data = { section: "danger" };
+    fixture.componentInstance.ngAfterViewInit();
+    expect(dangerFocus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(dangerScroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
+    // A plain /app/settings load names no section and scrolls nowhere.
+    const base = TestBed.createComponent(SettingsComponent);
+    const baseSection = base.nativeElement.querySelector("#privacy") as HTMLElement;
+    const baseScroll = spyOn(baseSection, "scrollIntoView");
+    route.snapshot.data = {};
+    base.componentInstance.ngAfterViewInit();
+    expect(baseScroll).not.toHaveBeenCalled();
   });
 
   it("renders identity, explicit save feedback and accessible theme choices", async () => {
@@ -175,7 +252,7 @@ describe("SettingsComponent async safety", () => {
     fixture.componentInstance.deletionImpact.set({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null });
     fixture.detectChanges();
     const element: HTMLElement = fixture.nativeElement;
-    expect(element.querySelectorAll('.settings-section[tabindex="-1"]')).toHaveSize(4);
+    expect(element.querySelectorAll('.settings-section[tabindex="-1"]')).toHaveSize(5);
     expect(element.querySelector<HTMLButtonElement>(".deletion-entry button")).not.toBeNull();
     expect(element.querySelector(".deletion-entry input")).toBeNull();
     expect(element.querySelector(".password-card input")).toBeNull();
@@ -196,7 +273,7 @@ describe("SettingsComponent async safety", () => {
     const older = deferred<DataExportStatus | null>();
     const newer = deferred<DataExportStatus | null>();
     auth.dataExportStatus.and.returnValues(older.promise, newer.promise);
-    const oldStatus = { id: 1, status: "processing", failureReason: null, downloadExpiresAt: null, createdAt: null, readyAt: null, downloadedAt: null } satisfies DataExportStatus;
+    const oldStatus = { id: 1, status: "processing", failureReason: null, stage: "collecting", downloadExpiresAt: null, createdAt: null, readyAt: null, downloadedAt: null } satisfies DataExportStatus;
     const newStatus = { ...oldStatus, status: "ready" as const };
 
     const first = component.loadExportStatus(false);
@@ -410,14 +487,42 @@ describe("SettingsComponent async safety", () => {
     const card = fixture.nativeElement.querySelector(".data-card") as HTMLElement;
 
     expect(card.textContent).toContain("Estamos preparando tus datos");
+    expect(card.textContent).toContain("Etapa actual: Recopilando tus datos");
     expect(card.textContent).toContain("Puedes cerrar esta página");
+  });
+
+  it("lists the bounded export history with its status labels and live stage", () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.componentInstance.exportLoading.set(false);
+    fixture.componentInstance.exportStatus.set(processing);
+    fixture.componentInstance.exportHistory.set([
+      processing,
+      { id: 2, status: "downloaded", failureReason: null, stage: null, downloadExpiresAt: null, createdAt: "2026-09-01T00:00:00Z", readyAt: "2026-09-01T00:05:00Z", downloadedAt: "2026-09-01T00:06:00Z" },
+    ]);
+    fixture.detectChanges();
+    const history = fixture.nativeElement.querySelector(".export-history") as HTMLElement;
+
+    expect(history.textContent).toContain("Historial de exportaciones");
+    expect(history.textContent).toContain("En preparación");
+    expect(history.textContent).toContain("Descargada");
+    expect(history.querySelector(".export-history-stage")?.textContent).toContain("Recopilando tus datos");
+  });
+
+  it("refreshes the export history when the visible export state changes", async () => {
+    auth.dataExportStatus.and.resolveTo(processing);
+    auth.dataExportHistory.and.resolveTo([processing]);
+
+    await component.loadExportStatus(false);
+
+    expect(auth.dataExportHistory).toHaveBeenCalled();
+    expect(component.exportHistory()).toEqual([processing]);
   });
 
   it("offers the download action with its dates when the export is ready", () => {
     const fixture = TestBed.createComponent(SettingsComponent);
     fixture.componentInstance.exportLoading.set(false);
     fixture.componentInstance.exportStatus.set({
-      id: 2, status: "ready", failureReason: null,
+      id: 2, status: "ready", failureReason: null, stage: null,
       downloadExpiresAt: "2026-09-08T00:00:00Z", createdAt: "2026-09-06T00:00:00Z",
       readyAt: "2026-09-06T00:05:00Z", downloadedAt: null,
     });
@@ -434,7 +539,7 @@ describe("SettingsComponent async safety", () => {
     const fixture = TestBed.createComponent(SettingsComponent);
     fixture.componentInstance.exportLoading.set(false);
     fixture.componentInstance.exportStatus.set({
-      id: 2, status: "failed", failureReason: "automated_size_limit",
+      id: 2, status: "failed", failureReason: "automated_size_limit", stage: null,
       downloadExpiresAt: null, createdAt: "2026-09-06T00:00:00Z",
       readyAt: null, downloadedAt: null,
     });
@@ -450,7 +555,7 @@ describe("SettingsComponent async safety", () => {
     const fixture = TestBed.createComponent(SettingsComponent);
     fixture.componentInstance.exportLoading.set(false);
     fixture.componentInstance.exportStatus.set({
-      id: 2, status: "expired", failureReason: null,
+      id: 2, status: "expired", failureReason: null, stage: null,
       downloadExpiresAt: "2026-09-08T00:00:00Z", createdAt: "2026-09-06T00:00:00Z",
       readyAt: "2026-09-06T00:05:00Z", downloadedAt: null,
     });

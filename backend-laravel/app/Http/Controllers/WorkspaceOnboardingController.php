@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\IsoDate;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceAccess;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -23,7 +25,7 @@ final class WorkspaceOnboardingController
             ->whereNull('u.deleted_at')->whereNotNull('u.email_verified_at')
             ->where('u.security_version', (int) $user->security_version)
             ->whereIn('m.role', WorkspaceAccess::ROLE_ORDER)
-            ->select(['w.id', 'm.role', 'u.mfa_enabled'])
+            ->select(['w.id', 'm.role', 'u.mfa_enabled', 'm.onboarding_dismissed_at'])
             ->selectRaw("CASE WHEN EXISTS (
                 SELECT 1 FROM links l WHERE l.workspace_id = w.id AND l.deleted_at IS NULL AND l.state <> 'deleted'
             ) THEN 1 ELSE 0 END AS link_present")
@@ -74,6 +76,37 @@ final class WorkspaceOnboardingController
                 'addDomain' => WorkspaceAccess::roleAtLeast($row->role, 'editor'),
                 'inviteTeam' => WorkspaceAccess::roleAtLeast($row->role, 'admin'),
             ],
+            // Estado de presentación propio de esta membresía: la guía cerrada
+            // en un navegador sigue cerrada en los demás, y sólo el propio
+            // usuario puede volver a abrirla.
+            'dismissedAt' => IsoDate::format($row->onboarding_dismissed_at),
+        ]);
+    }
+
+    /**
+     * Oculta o reabre la guía para ESTE usuario en ESTE workspace. Sólo
+     * persiste la preferencia de presentación: cerrar la guía no cambia hechos,
+     * progreso ni nada que el servidor derive de los recursos.
+     */
+    public function dismiss(Request $request, int $id): JsonResponse
+    {
+        $user = UvhRequest::user($request);
+        $hidden = $request->input('hidden');
+        if (! is_bool($hidden)) {
+            return response()->json(['error' => 'Datos inválidos'], 422);
+        }
+
+        $updated = DB::table('memberships')
+            ->where('workspace_id', $id)->where('user_id', $user->id)
+            ->update(['onboarding_dismissed_at' => $hidden ? now() : null]);
+        if ($updated === 0) {
+            // Same answer as `show`: no existence oracle for foreign ids.
+            return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'dismissedAt' => $hidden ? IsoDate::format(now()) : null,
         ]);
     }
 }

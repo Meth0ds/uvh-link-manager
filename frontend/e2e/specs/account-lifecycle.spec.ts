@@ -46,7 +46,7 @@ test("MFA permite TOTP y un código de recuperación sólo una vez", async ({ pa
   test.setTimeout(480_000);
   const { email } = await registerVerifyAndLogin(page, "mfa-recovery");
 
-  await page.goto("/app/settings#security");
+  await page.goto("/app/settings/security");
   await page.getByLabel("Contraseña actual").filter({ visible: true }).last().fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Empezar configuración" }).click();
   const secret = (await page.locator(".mfa-secret code").textContent())?.trim() ?? "";
@@ -86,7 +86,7 @@ test("MFA permite TOTP y un código de recuperación sólo una vez", async ({ pa
 test("una exportación se solicita, se prepara sola y se descarga con step-up", async ({ page }) => {
   test.setTimeout(360_000);
   await registerVerifyAndLogin(page, "export-flow");
-  await page.goto("/app/settings#privacy");
+  await page.goto("/app/settings/privacy");
 
   // The request is a step-up dialog; on success it closes by itself and the
   // card takes over without asking the user to confirm anything by email.
@@ -121,7 +121,7 @@ test("una exportación se solicita, se prepara sola y se descarga con step-up", 
 test("una exportación pendiente puede cancelarse", async ({ page }) => {
   test.setTimeout(360_000);
   await registerVerifyAndLogin(page, "export-cancel");
-  await page.goto("/app/settings#privacy");
+  await page.goto("/app/settings/privacy");
   await page.getByRole("button", { name: "Solicitar mi archivo" }).click();
   const exportDialog = page.getByRole("dialog");
   await exportDialog.getByLabel("Contraseña actual").fill(E2E_PASSWORD);

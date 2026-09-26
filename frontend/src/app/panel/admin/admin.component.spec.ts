@@ -43,7 +43,7 @@ const operations: AdminOperations = {
     mailOutbox: { sent: 3 },
     oldestPendingMailAgeSeconds: null,
     activeSessions: 2,
-    unverifiedUsers: 1,
+    pendingRegistrations: 1,
     domains: { active: 3 },
     oldestDnsCheckAgeSeconds: null,
     oldestTlsProvisioningAgeSeconds: null,
@@ -67,6 +67,7 @@ describe("AdminComponent", () => {
       if (path.endsWith("/overview")) return Promise.resolve(overview as T);
       if (path.endsWith("/operations")) return Promise.resolve(operations as T);
       if (path.endsWith("/users")) return Promise.resolve({ users: [], total: 0, page: 1, perPage: 25 } as T);
+      if (path.endsWith("/pending-registrations")) return Promise.resolve({ registrations: [], total: 0, page: 1, perPage: 25 } as T);
       if (path.endsWith("/domains")) return Promise.resolve({ domains: [], total: 0, page: 1, perPage: 25 } as T);
       return Promise.resolve({ events: [], total: 0, page: 1, perPage: 50 } as T);
     });
@@ -103,7 +104,7 @@ describe("AdminComponent", () => {
     // One more cycle so the end of the first paint reaches the DOM.
     fixture.detectChanges();
     const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]');
-    (tabs[4] as HTMLElement).click();
+    (tabs[5] as HTMLElement).click();
     fixture.detectChanges();
     await fixture.whenStable();
 
@@ -127,6 +128,7 @@ describe("AdminComponent", () => {
 
     expect(tabs.map((tab) => tab.getAttribute("aria-label"))).toEqual([
       "Usuarios",
+      "Registros pendientes",
       "Recuperación de cuentas",
       "Moderación",
       "Dominios",
@@ -165,7 +167,7 @@ describe("AdminComponent", () => {
     // way an operator reaches them.
     fixture.detectChanges();
     const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]');
-    (tabs[2] as HTMLElement).click();
+    (tabs[3] as HTMLElement).click();
     fixture.detectChanges();
     await fixture.whenStable();
     const queue = fixture.debugElement.query(By.directive(AdminReportsComponent))?.componentInstance as AdminReportsComponent | undefined;
@@ -202,6 +204,18 @@ describe("AdminComponent", () => {
       newerId: 202,
       firstId: () => component.users.rows()[0]?.id,
       total: () => component.users.total(),
+    },
+    {
+      name: "pending registrations",
+      select: (value: string) => component.pendingQuery.set(value),
+      load: () => component.pendingRegistrations.load(),
+      loading: () => component.pendingRegistrations.loading(),
+      firstResponse: { registrations: [{ id: 301 }], total: 1 },
+      secondResponse: { registrations: [{ id: 302 }], total: 2 },
+      olderId: 301,
+      newerId: 302,
+      firstId: () => component.pendingRegistrations.rows()[0]?.id,
+      total: () => component.pendingRegistrations.total(),
     },
     {
       name: "domains",

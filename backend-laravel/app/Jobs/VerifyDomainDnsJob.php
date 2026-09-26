@@ -94,7 +94,7 @@ class VerifyDomainDnsJob implements ShouldQueue
             $nextEdgeEligibility = $found
                 ? $this->previousState === 'active' && $wasEdgeEligible
                 : ($withinActiveGrace && (bool) $domain->edge_eligible);
-            $domain->update([
+            $updates = [
                 'state' => $nextState,
                 'verified_at' => $found ? $now : ($withinActiveGrace ? $domain->verified_at : null),
                 'ownership_verified_at' => $dns['ownership'] ? $now : null,
@@ -106,7 +106,25 @@ class VerifyDomainDnsJob implements ShouldQueue
                 'edge_eligible' => $nextEdgeEligibility,
                 'tls_ready_at' => $nextEdgeEligibility || $withinActiveGrace ? $domain->tls_ready_at : null,
                 'updated_at' => $now,
-            ]);
+            ];
+            // Auto-TLS: a person asked for this check and it just proved BOTH
+            // ownership and routing, so provisioning the certificate is the
+            // natural next step and must not need a second click. The periodic
+            // sweep (`requestedBy` null) never starts ACME on its own, a domain
+            // that was explicitly disabled stays disabled, and a domain already
+            // holding a live certificate is left alone.
+            $autoTlsVersion = null;
+            if ($found && $nextState === 'verified' && $this->requestedBy !== null
+                && $this->previousState !== 'disabled' && $domain->tls_ready_at === null) {
+                $autoTlsVersion = (int) $domain->tls_version + 1;
+                $nextState = 'provisioning';
+                $updates['state'] = 'provisioning';
+                $updates['edge_eligible'] = true;
+                $updates['tls_version'] = $autoTlsVersion;
+                $updates['tls_ready_at'] = null;
+                $updates['tls_error'] = null;
+            }
+            $domain->update($updates);
             if ($found && in_array($this->previousState, ['pending', 'error'], true)) {
                 WebhookService::dispatch($this->workspaceId, 'domain.verified', [
                     'domainId' => $this->domainId,
@@ -121,6 +139,7 @@ class VerifyDomainDnsJob implements ShouldQueue
                 'failureCount' => $failureCount,
                 'withinGrace' => $withinActiveGrace,
                 'firstVerification' => in_array($this->previousState, ['pending', 'error'], true),
+                'autoTlsVersion' => $autoTlsVersion,
             ];
         });
         if (! $result) {
@@ -130,6 +149,10 @@ class VerifyDomainDnsJob implements ShouldQueue
         }
 
         OperationalMetrics::increment($result['found'] ? 'dns.verified' : 'dns.failed');
+
+        if ($result['autoTlsVersion'] !== null) {
+            $this->startAutoTls((int) $result['autoTlsVersion']);
+        }
 
         try {
             try {
@@ -281,6 +304,42 @@ class VerifyDomainDnsJob implements ShouldQueue
         $parts = array_filter($entries, static fn ($part) => is_string($part));
 
         return trim(implode('', $parts), "\" \t\r\n");
+    }
+
+    /**
+     * Kick TLS provisioning for the verification that just proved ownership and
+     * routing. Same contract as the manual activation: a queue outage must not
+     * leave the domain parked in `provisioning` with no worker coming.
+     */
+    private function startAutoTls(int $tlsVersion): void
+    {
+        if ($this->requestedBy === null) {
+            return;
+        }
+        try {
+            ProvisionDomainTlsJob::dispatch(
+                $this->domainId,
+                $this->workspaceId,
+                $this->requestedBy,
+                $this->domain,
+                $tlsVersion,
+            );
+        } catch (Throwable $e) {
+            CustomDomain::where('id', $this->domainId)->where('workspace_id', $this->workspaceId)
+                ->where('state', 'provisioning')->where('tls_version', $tlsVersion)
+                ->update(['state' => 'verified', 'edge_eligible' => false, 'tls_error' => 'queue_unavailable', 'updated_at' => now()]);
+            report($e);
+
+            return;
+        }
+
+        try {
+            Audit::write($this->requestedBy, 'domain.tls_requested', 'domain', $this->domainId, [
+                'auto' => true,
+            ], workspaceId: $this->workspaceId);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     private function releaseDedupeLock(): void

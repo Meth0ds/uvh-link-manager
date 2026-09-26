@@ -207,7 +207,7 @@ Clasificación por nombre de limiter: `app/Support/UvhLimiters.php`.
 | Variable | | Por defecto | Efecto |
 |---|---|---|---|
 | `QUEUE_CONNECTION` | \* | `redis` | Producción rechaza `sync`, `null`, `background`, `deferred` y `failover`. |
-| `REDIS_QUEUE_RETRY_AFTER` | \* | `240` | Rango **200–3600 s**. El driver de Redis **no** hereda `DB_QUEUE_RETRY_AFTER`; sin esta clave toma 90 s del framework y un worker reclamaría un job que otro sigue ejecutando. |
+| `REDIS_QUEUE_RETRY_AFTER` | \* | `900` | Rango **200–3600 s**. El driver de Redis **no** hereda `DB_QUEUE_RETRY_AFTER`; sin esta clave toma 90 s del framework y un worker reclamaría un job que otro sigue ejecutando. El valor cubre el worker más largo (`queue-exports`, 660 s) con holgura para la generación de exportaciones grandes. |
 | `QUEUE_FAILED_DRIVER` | \* | `database-uuids` | Producción rechaza `null`: los jobs agotados se conservan para diagnóstico. |
 | `UVH_QUEUE_POOL` | † | vacío | Lo fija **cada** servicio worker del compose; alimenta su heartbeat en `/health`. Un valor que no sea `[a-z0-9-]{1,32}` se ignora. |
 
@@ -310,7 +310,7 @@ falla:
 
 La capa de **CDN/WAF por delante** no es configuración de este repositorio: es un
 requisito de despliegue que se verifica en el expediente de release
-([`todos.md`](todos.md), `EDGE-000`).
+([`archive/todos.md`](archive/todos.md), `EDGE-000`).
 
 ---
 

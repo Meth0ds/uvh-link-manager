@@ -24,7 +24,16 @@
     } @else if (error(); as message) {
       <div class="error" role="alert">
         <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <div><strong>No se pudo cargar el uso</strong><p>{{ message }}</p></div>
+        <div><strong>No se pudo cargar el uso</strong>
+          <p>
+            @if (waitSeconds() > 0) {
+              <!-- El contador se muestra pero no se anuncia en cada tick. -->
+              <span role="timer" aria-live="off">{{ message }}</span>
+            } @else {
+              {{ message }}
+            }
+          </p>
+        </div>
       </div>
     } @else if (data(); as snapshot) {
       <div class="cards" aria-label="Consumo por recurso">

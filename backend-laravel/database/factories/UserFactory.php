@@ -34,13 +34,9 @@ class UserFactory extends Factory
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
-    public function unverified(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
-    }
+    // No hay estado `unverified` a propósito: un registro sin verificar vive
+    // en `pending_registrations` y sólo la activación crea usuario. Una fila de
+    // usuario sin verificar es un residuo del modelo anterior que la migración
+    // `2026_09_24_000001` convierte; un test que necesite fabricar ese residuo
+    // lo hace con `create(['email_verified_at' => null])`, a sabiendas.
 }

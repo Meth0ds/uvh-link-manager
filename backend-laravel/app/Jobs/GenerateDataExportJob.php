@@ -3,19 +3,21 @@
 namespace App\Jobs;
 
 use App\Models\DataExportRequest;
-use App\Models\LegalAcceptance;
 use App\Models\User;
+use App\Support\AccountExportDocument;
 use App\Support\Audit;
+use App\Support\ExportTooLarge;
 use App\Support\Ids;
+use App\Support\NotificationInbox;
+use App\Support\NotificationKinds;
 use App\Support\OperationalMetrics;
+use App\Support\PrivateArtifact;
 use App\Support\PrivateArtifactCleanup;
-use App\Support\UvhCrypto;
 use App\Support\UvhMail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class GenerateDataExportJob implements ShouldQueue
 {
@@ -24,7 +26,15 @@ class GenerateDataExportJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public int $timeout = 120;
+    /**
+     * Por debajo del worker (`queue-exports`, 660 s) y éste por debajo del
+     * `retry_after` del broker (900 s): el job avisa de su propia muerte antes
+     * de que el worker lo corte, y el broker no reparte el trabajo a un
+     * segundo worker mientras el primero sigue en él. La generación por
+     * bloques sostiene cuentas grandes dentro de este presupuesto sin el límite
+     * de filas ni el de 12 MiB de antes.
+     */
+    public int $timeout = 600;
 
     /** @var array<int, int> */
     public array $backoff = [60, 300];
@@ -34,13 +44,6 @@ class GenerateDataExportJob implements ShouldQueue
      * artifact, and the owner is told the exact date in the notice.
      */
     private const DOWNLOAD_TTL_DAYS = 2;
-
-    // AES-GCM and Base64URL each require another in-memory representation.
-    // Keep the plaintext well below the 256 MiB production worker ceiling.
-    private const MAX_JSON_BYTES = 12 * 1024 * 1024;
-
-    /** Keep the automated export bounded before hydrating large collections. */
-    private const MAX_EXPORT_ROWS = 10_000;
 
     private const REQUIRED_MEMORY_HEADROOM = 96 * 1024 * 1024;
 
@@ -72,7 +75,7 @@ class GenerateDataExportJob implements ShouldQueue
                 : null;
             if (! $user || $user->deleted_at
                 || (int) $user->security_version !== (int) $request->security_version) {
-                $request->update(['status' => 'cancelled']);
+                $request->update(['status' => 'cancelled', 'stage' => null]);
 
                 return ['status' => 'cancelled', 'path' => $oldPath];
             }
@@ -107,7 +110,7 @@ class GenerateDataExportJob implements ShouldQueue
                 || $lockedRequest->artifact_path !== null) {
                 return false;
             }
-            $lockedRequest->update(['artifact_path' => $artifactPath, 'updated_at' => now()]);
+            $lockedRequest->update(['artifact_path' => $artifactPath, 'stage' => 'collecting', 'updated_at' => now()]);
 
             return true;
         });
@@ -115,69 +118,45 @@ class GenerateDataExportJob implements ShouldQueue
             return;
         }
 
-        // The final JSON byte limit is not enough on its own: hydrating several
-        // million analytics rows can exhaust a worker before json_encode() ever
-        // measures the payload. Large cases stay available through the managed
-        // privacy-rights workflow instead of destabilising the shared queue.
+        // El documento se construye por bloques con memoria acotada
+        // (`AccountExportDocument`): ya no hay presupuesto de filas ni tope de
+        // 12 MiB que convierta a una cuenta grande en «contacta soporte». El
+        // suelo de memoria que queda es sólo el seguro del proceso contra un
+        // OOM inminente; con la generación por bloques su tamaño ya no depende
+        // del de la cuenta.
         try {
             if (! $this->hasMemoryHeadroom(self::REQUIRED_MEMORY_HEADROOM)) {
                 OperationalMetrics::increment('export.memory_budget_rejected');
-                $payload = null;
-            } else {
-                $payload = $this->buildConsistentPayload($userId);
+                $this->failTooLarge($userId, $requestId, $artifactPath);
+
+                return;
             }
+
+            $plain = fopen('php://temp/maxmemory:8388608', 'r+b');
+            if (! is_resource($plain)) {
+                throw new \RuntimeException('Could not open the export document spool');
+            }
+            try {
+                AccountExportDocument::render($userId, $plain, function (string $phase) use ($userId, $requestId): void {
+                    $this->writeStage($userId, $requestId, $phase);
+                });
+                $this->writeStage($userId, $requestId, 'encrypting');
+                rewind($plain);
+                PrivateArtifact::write($artifactPath, $plain);
+            } finally {
+                fclose($plain);
+            }
+        } catch (ExportTooLarge) {
+            OperationalMetrics::increment('export.too_large');
+            $this->failTooLarge($userId, $requestId, $artifactPath);
+
+            return;
         } catch (\Throwable) {
             PrivateArtifactCleanup::attempt($requestId, $artifactPath);
             throw new \RuntimeException('No se pudo generar la exportación de datos');
         }
 
-        if ($payload === null) {
-            $failed = DB::transaction(function () use ($requestId, $userId, $artifactPath): bool {
-                User::where('id', $userId)->lockForUpdate()->first();
-                $request = DataExportRequest::where('id', $requestId)
-                    ->where('user_id', $userId)->lockForUpdate()->first();
-                if (! $request || $request->status !== 'processing'
-                    || ! is_string($request->artifact_path)
-                    || ! hash_equals($artifactPath, $request->artifact_path)) {
-                    return false;
-                }
-                $request->update([
-                    'status' => 'failed',
-                    'artifact_path' => null,
-                    'mail_generation_hash' => null,
-                    'failure_reason' => 'automated_size_limit',
-                    'updated_at' => now(),
-                ]);
-
-                return true;
-            });
-            if ($failed) {
-                OperationalMetrics::increment('export.too_large');
-                Audit::write($userId, 'account.data_export_failed', 'data_export', $requestId, [
-                    'reason' => 'automated_size_limit',
-                ]);
-            }
-
-            return;
-        }
-
         try {
-            if (! $this->hasMemoryHeadroom(self::REQUIRED_MEMORY_HEADROOM)) {
-                throw new \RuntimeException('Insufficient memory headroom for export encoding');
-            }
-            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-            // Release the database snapshot's materialized rows before allocating
-            // ciphertext; keeping all three representations inflates peak memory.
-            unset($payload);
-            if (strlen($json) > self::MAX_JSON_BYTES) {
-                throw new \RuntimeException('Export exceeds automated size limit');
-            }
-            $encrypted = UvhCrypto::encryptAtRest($json);
-            if (! Storage::disk('local')->put($artifactPath, $encrypted)) {
-                throw new \RuntimeException('Private artifact storage rejected write');
-            }
-            unset($json, $encrypted);
-
             // Recheck the account/request after generation. A password/email/MFA
             // rotation while the job was running invalidates this export.
             $eligible = DB::transaction(function () use ($requestId, $userId, $artifactPath): bool {
@@ -200,11 +179,13 @@ class GenerateDataExportJob implements ShouldQueue
                 return;
             }
 
+            $this->writeStage($userId, $requestId, 'finalizing');
+
             // The notice announces the file and names the section that serves
             // it. It carries no authority of its own: downloads are authorised
             // by the session plus a fresh step-up.
             $mailGeneration = Ids::sha256Hex(Ids::randomToken(32));
-            $url = rtrim((string) config('app.url'), '/').'/app/settings#privacy';
+            $url = rtrim((string) config('app.url'), '/').'/app/settings/privacy';
             $madeReady = DB::transaction(function () use ($requestId, $userId, $artifactPath, $mailGeneration, $url): bool {
                 $lockedUser = User::where('id', $userId)->lockForUpdate()->first();
                 $lockedRequest = DataExportRequest::where('id', $requestId)
@@ -221,6 +202,13 @@ class GenerateDataExportJob implements ShouldQueue
                 // announcing a replaced or cancelled export.
                 $now = now();
                 $downloadExpiresAt = $now->copy()->addDays(self::DOWNLOAD_TTL_DAYS);
+                NotificationInbox::record(
+                    $userId,
+                    NotificationKinds::DATA_EXPORT_READY,
+                    null,
+                    null,
+                    'data_export_ready:'.$lockedRequest->id.':'.$mailGeneration,
+                );
                 if (! UvhMail::dataExportReady(
                     $lockedUser->email,
                     $url,
@@ -232,6 +220,7 @@ class GenerateDataExportJob implements ShouldQueue
                 }
                 $lockedRequest->update([
                     'status' => 'ready',
+                    'stage' => null,
                     'artifact_path' => $artifactPath,
                     'mail_generation_hash' => $mailGeneration,
                     'download_expires_at' => $downloadExpiresAt,
@@ -251,25 +240,6 @@ class GenerateDataExportJob implements ShouldQueue
             PrivateArtifactCleanup::attempt($requestId, $artifactPath);
             throw new \RuntimeException('No se pudo generar la exportación de datos');
         }
-    }
-
-    /**
-     * Read the size budget and every export section from one PostgreSQL
-     * snapshot. The transaction is deliberately read-only and ends before JSON
-     * encoding, encryption, filesystem I/O or mail admission.
-     *
-     * @return array<string, mixed>|null Null means the automated row budget was exceeded.
-     */
-    private function buildConsistentPayload(int $userId): ?array
-    {
-        return DB::transaction(function () use ($userId): ?array {
-            DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
-            if (! $this->withinAutomatedRowBudget($userId)) {
-                return null;
-            }
-
-            return $this->buildPayload($userId);
-        });
     }
 
     public function failed(\Throwable $exception): void
@@ -292,6 +262,7 @@ class GenerateDataExportJob implements ShouldQueue
             // and can ask for a new one, never a silent dead state.
             $request->update([
                 'status' => 'failed',
+                'stage' => null,
                 'mail_generation_hash' => null,
                 'failure_reason' => 'generation_error',
             ]);
@@ -307,218 +278,70 @@ class GenerateDataExportJob implements ShouldQueue
         Audit::write($result['user_id'], 'account.data_export_failed', 'data_export', $result['request_id']);
     }
 
-    /** @return array<string, mixed> */
-    private function buildPayload(int $userId): array
-    {
-        $account = DB::table('users')->where('id', $userId)->first([
-            'id', 'email', 'name', 'email_verified_at', 'mfa_enabled', 'created_at', 'updated_at',
-        ]);
-        $memberships = DB::table('memberships')
-            ->join('workspaces', 'workspaces.id', '=', 'memberships.workspace_id')
-            ->where('memberships.user_id', $userId)
-            ->orderBy('memberships.id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'memberships.workspace_id', 'workspaces.name as workspace_name', 'workspaces.slug as workspace_slug',
-                'memberships.role', 'memberships.created_at',
-            ]);
-        $links = DB::table('links')->where('created_by', $userId)->orderBy('id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'id', 'workspace_id', 'domain_id', 'alias', 'destination', 'fallback_destination', 'state',
-                'max_clicks', 'click_count', 'single_use', 'used_at', 'scheduled_at', 'expires_at', 'notes',
-                'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'created_at', 'updated_at', 'deleted_at',
-            ]);
-        $rules = DB::table('redirect_rules')
-            ->join('links', 'links.id', '=', 'redirect_rules.link_id')
-            ->where('links.created_by', $userId)
-            ->orderBy('redirect_rules.id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'redirect_rules.id', 'redirect_rules.link_id', 'redirect_rules.priority', 'redirect_rules.country',
-                'redirect_rules.language', 'redirect_rules.device', 'redirect_rules.os', 'redirect_rules.time_from',
-                'redirect_rules.time_to', 'redirect_rules.referrer', 'redirect_rules.campaign',
-                'redirect_rules.destination', 'redirect_rules.created_at',
-            ]);
-        $tags = DB::table('link_tags')
-            ->join('links', 'links.id', '=', 'link_tags.link_id')
-            ->join('tags', 'tags.id', '=', 'link_tags.tag_id')
-            ->where('links.created_by', $userId)
-            ->orderBy('link_tags.link_id')->orderBy('tags.id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get(['link_tags.link_id', 'tags.name']);
-        $analytics = DB::table('metric_rollups')
-            ->join('links', 'links.id', '=', 'metric_rollups.link_id')
-            ->where('links.created_by', $userId)
-            ->orderBy('metric_rollups.day')->orderBy('metric_rollups.link_id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'metric_rollups.link_id', 'metric_rollups.day', 'metric_rollups.clicks', 'metric_rollups.visitors',
-                'metric_rollups.countries', 'metric_rollups.devices', 'metric_rollups.browsers',
-                'metric_rollups.os', 'metric_rollups.referrers', 'metric_rollups.campaigns',
-            ]);
-        $tokens = DB::table('api_tokens')->where('created_by', $userId)->orderBy('id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'id', 'workspace_id', 'name', 'scopes', 'last_used_at', 'expires_at', 'revoked_at', 'created_at',
-            ]);
-        $ownedDomains = DB::table('custom_domains')
-            ->join('workspaces', 'workspaces.id', '=', 'custom_domains.workspace_id')
-            ->where('workspaces.owner_user_id', $userId)
-            ->orderBy('custom_domains.id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'custom_domains.id', 'custom_domains.workspace_id', 'custom_domains.domain', 'custom_domains.state',
-                'custom_domains.verified_at', 'custom_domains.created_at', 'custom_domains.updated_at',
-            ]);
-        $ownedWebhooks = DB::table('webhooks')
-            ->join('workspaces', 'workspaces.id', '=', 'webhooks.workspace_id')
-            ->where('workspaces.owner_user_id', $userId)
-            ->orderBy('webhooks.id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'webhooks.id', 'webhooks.workspace_id', 'webhooks.url', 'webhooks.events',
-                'webhooks.active', 'webhooks.created_at', 'webhooks.updated_at',
-            ])->map(function ($webhook) {
-                $parts = parse_url((string) $webhook->url);
-                $hadSensitiveUrlParts = is_array($parts) && (isset($parts['query']) || isset($parts['user']) || isset($parts['pass']));
-                $host = is_array($parts) ? ($parts['host'] ?? null) : null;
-                if (is_string($host) && filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-                    $host = '['.$host.']';
-                }
-                $webhook->url = is_array($parts) && isset($parts['scheme'], $parts['host'])
-                    ? $parts['scheme'].'://'.$host.(isset($parts['port']) ? ':'.$parts['port'] : '').($parts['path'] ?? '/')
-                    : null;
-                $webhook->urlCredentialsOrQueryRedacted = $hadSensitiveUrlParts;
-
-                return $webhook;
-            });
-        $audit = DB::table('audit_events')->where('user_id', $userId)->orderBy('id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'id', 'action', 'resource_type', 'resource_id', 'created_at',
-            ]);
-        $privacyRequests = DB::table('privacy_rights_requests')->where('user_id', $userId)->orderBy('id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get([
-                'id', 'type', 'status', 'identity_verified_at', 'acknowledged_at', 'due_at',
-                'extended_until', 'extension_reason_code', 'completed_at', 'cancelled_at',
-                'created_at', 'updated_at',
-            ]);
-        $privacyMessages = DB::table('privacy_rights_messages as m')
-            ->join('privacy_rights_requests as r', 'r.id', '=', 'm.request_id')
-            ->where('r.user_id', $userId)
-            ->orderBy('m.request_id')->orderBy('m.created_at')->orderBy('m.id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get(['m.id', 'm.request_id', 'm.author_role', 'm.encrypted_body', 'm.created_at'])
-            ->map(function ($message) {
-                try {
-                    $message->body = UvhCrypto::decryptAtRest((string) $message->encrypted_body);
-                    $message->bodyUnavailable = false;
-                } catch (\Throwable) {
-                    // Preserve the record and its chronology without exposing
-                    // ciphertext or failing every other section of the export.
-                    $message->body = null;
-                    $message->bodyUnavailable = true;
-                    OperationalMetrics::increment('privacy.decrypt_failed');
-                }
-                unset($message->encrypted_body);
-
-                return $message;
-            });
-        $legalAcceptances = LegalAcceptance::where('user_id', $userId)
-            ->orderBy('accepted_at')->orderBy('id')
-            ->limit(self::MAX_EXPORT_ROWS + 1)
-            ->get(['document_type', 'version', 'source', 'accepted_at'])
-            // The artifact emits the stored timestamp verbatim, as every other
-            // section does. Export the raw attributes so moving this query onto
-            // the model cannot silently change the accepted_at date format.
-            ->map(fn (LegalAcceptance $row): array => $row->getAttributes());
-
-        return [
-            'format' => 'uvh-account-export-v1',
-            'generatedAt' => now()->toIso8601String(),
-            'scope' => [
-                'account data and memberships',
-                'links created by the account, including rules, tags and aggregate analytics',
-                'API token metadata without token hashes or bearer secrets',
-                'domain and webhook configuration for owned workspaces without verification/signing secrets',
-                'account audit action metadata without IP-derived identifiers',
-                'privacy-rights cases and messages addressed to this account without staff identifiers',
-                'legal document versions accepted or acknowledged by this account',
-            ],
-            'account' => $account,
-            'memberships' => $memberships,
-            'createdLinks' => $links,
-            'redirectRules' => $rules,
-            'linkTags' => $tags,
-            'aggregateAnalytics' => $analytics,
-            'aggregateAnalyticsDefinition' => [
-                // A rollup visitor is a daily rotating pseudonym. The same
-                // browser may appear once on each day and is never claimed as
-                // a unique person across the exported period.
-                'visitors' => 'distinct_daily_pseudonyms',
-                'crossDayIdentity' => false,
-            ],
-            'apiTokenMetadata' => $tokens,
-            'ownedWorkspaceDomains' => $ownedDomains,
-            'ownedWorkspaceWebhooks' => $ownedWebhooks,
-            'accountAuditTrail' => $audit,
-            'privacyRightsRequests' => $privacyRequests,
-            'privacyRightsMessages' => $privacyMessages,
-            'legalAcceptances' => $legalAcceptances,
-        ];
-    }
-
     /**
-     * Bound the total number of rows hydrated by the automated path. Counts are
-     * intentionally capped by selecting only IDs, avoiding an expensive full
-     * COUNT over multi-million-row analytics joins.
+     * El techo operativo se superó (o el proceso no tiene memoria de sobra):
+     * la solicitud termina con el motivo que el panel traduce al camino
+     * gestionado de derechos. El artefacto registrado se retira.
      */
-    private function withinAutomatedRowBudget(int $userId): bool
+    private function failTooLarge(int $userId, int $requestId, string $artifactPath): void
     {
-        $sections = [
-            [DB::table('memberships')->where('user_id', $userId), 'id'],
-            [DB::table('links')->where('created_by', $userId), 'id'],
-            [DB::table('redirect_rules')->join('links', 'links.id', '=', 'redirect_rules.link_id')
-                ->where('links.created_by', $userId), 'redirect_rules.id'],
-            [DB::table('link_tags')->join('links', 'links.id', '=', 'link_tags.link_id')
-                ->where('links.created_by', $userId), 'link_tags.link_id'],
-            [DB::table('metric_rollups')->join('links', 'links.id', '=', 'metric_rollups.link_id')
-                ->where('links.created_by', $userId), 'metric_rollups.id'],
-            [DB::table('api_tokens')->where('created_by', $userId), 'id'],
-            [DB::table('custom_domains')->join('workspaces', 'workspaces.id', '=', 'custom_domains.workspace_id')
-                ->where('workspaces.owner_user_id', $userId), 'custom_domains.id'],
-            [DB::table('webhooks')->join('workspaces', 'workspaces.id', '=', 'webhooks.workspace_id')
-                ->where('workspaces.owner_user_id', $userId), 'webhooks.id'],
-            [DB::table('audit_events')->where('user_id', $userId), 'id'],
-            [DB::table('privacy_rights_requests')->where('user_id', $userId), 'id'],
-            [DB::table('privacy_rights_messages as m')
-                ->join('privacy_rights_requests as r', 'r.id', '=', 'm.request_id')
-                ->where('r.user_id', $userId), 'm.id'],
-            // Deliberately left on the base builder: mixing an Eloquent builder
-            // into this query list makes the inferred type a union, which
-            // silences the Larastan collection-count finding for the whole
-            // loop. That would relax the gate instead of tightening it.
-            [DB::table('legal_acceptances')->where('user_id', $userId), 'id'],
-        ];
-
-        $remaining = self::MAX_EXPORT_ROWS;
-        foreach ($sections as [$query, $column]) {
-            $rows = (clone $query)->limit($remaining + 1)->pluck($column)->count();
-            if ($rows > $remaining) {
+        $failed = DB::transaction(function () use ($requestId, $userId, $artifactPath): bool {
+            User::where('id', $userId)->lockForUpdate()->first();
+            $request = DataExportRequest::where('id', $requestId)
+                ->where('user_id', $userId)->lockForUpdate()->first();
+            if (! $request || $request->status !== 'processing'
+                || ! is_string($request->artifact_path)
+                || ! hash_equals($artifactPath, $request->artifact_path)) {
                 return false;
             }
-            $remaining -= $rows;
-        }
+            $request->update([
+                'status' => 'failed',
+                'stage' => null,
+                'artifact_path' => null,
+                'mail_generation_hash' => null,
+                'failure_reason' => 'automated_size_limit',
+                'updated_at' => now(),
+            ]);
 
-        return true;
+            return true;
+        });
+        if ($failed) {
+            PrivateArtifactCleanup::attempt($requestId, $artifactPath);
+            Audit::write($userId, 'account.data_export_failed', 'data_export', $requestId, [
+                'reason' => 'automated_size_limit',
+            ]);
+        }
     }
 
     /**
-     * Refuse the bounded automated path before PHP approaches a fatal OOM.
-     * An unlimited CLI memory setting is accepted, while suffixes are parsed
-     * conservatively and malformed limits fail closed.
+     * Progreso visible en la fila. La etapa se escribe por una sesión aparte de
+     * la misma base: la recogida de secciones corre dentro de la transacción
+     * `REPEATABLE READ READ ONLY` del snapshot, donde no cabe ninguna
+     * escritura, y la etapa no es autoridad —si esta escritura falla, la
+     * generación sigue igual—.
+     */
+    private function writeStage(int $userId, int $requestId, string $stage): void
+    {
+        try {
+            $config = config('database.connections.'.config('database.default'));
+            if (! is_array($config)) {
+                return;
+            }
+            DB::connectUsing('export-stage', $config);
+            DB::connection('export-stage')->table('data_export_requests')
+                ->where('id', $requestId)
+                ->where('user_id', $userId)
+                ->where('status', 'processing')
+                ->update(['stage' => $stage]);
+        } catch (\Throwable) {
+            // Mejor-que-nada: el panel mostrará la última etapa conocida.
+        }
+    }
+
+    /**
+     * Refuse before PHP approaches a fatal OOM. An unlimited CLI memory setting
+     * is accepted, while suffixes are parsed conservatively and malformed
+     * limits fail closed.
      */
     private function hasMemoryHeadroom(int $requiredBytes): bool
     {

@@ -12,6 +12,7 @@ const facts: WorkspaceGettingStarted = {
   workspaceId: 1, role: "owner",
   facts: { linkPresent: false, redirectObserved: false, domainPresent: false, teammatePresent: false, invitationPending: false, mfaEnabled: false },
   capabilities: { createLink: true, addDomain: true, inviteTeam: true },
+  dismissedAt: null,
 };
 const user: AuthUser = { id: 10, name: "Ana", email: "ana@example.test", isAdmin: false, emailVerified: true, mfaEnabled: false };
 const workspace: Workspace = { id: 1, name: "Primero", slug: "first", role: "owner", createdAt: "2026-09-05T12:00:00Z" };
@@ -23,19 +24,14 @@ describe("GettingStartedComponent", () => {
   let identity: ReturnType<typeof signal<AuthUser | null>>;
   let selected: ReturnType<typeof signal<number | null>>;
   let workspaceList: ReturnType<typeof signal<Workspace[]>>;
-  let getPreference: jasmine.Spy;
-  let savePreference: jasmine.Spy;
-  let removePreference: jasmine.Spy;
 
   beforeEach(async () => {
-    getPreference = spyOn(localStorage, "getItem").and.returnValue(null);
-    savePreference = spyOn(localStorage, "setItem");
-    removePreference = spyOn(localStorage, "removeItem");
     identity = signal<AuthUser | null>({ ...user });
     selected = signal<number | null>(1);
     workspaceList = signal<Workspace[]>([workspace, { ...workspace, id: 2, name: "Segundo" }]);
-    api = jasmine.createSpyObj<ApiService>("ApiService", ["get"]);
+    api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "patch"]);
     api.get.and.resolveTo(facts);
+    api.patch.and.resolveTo({ ok: true, dismissedAt: "2026-09-26T10:00:00+00:00" });
     await TestBed.configureTestingModule({
       imports: [GettingStartedComponent],
       providers: [
@@ -64,19 +60,31 @@ describe("GettingStartedComponent", () => {
     }
   });
 
-  it("saves only a scoped omission preference and re-fetches when resuming", async () => {
-    component.dismiss();
+  it("saves the omission server-side and re-fetches when resuming", async () => {
+    await component.dismiss();
     fixture.detectChanges();
     expect(component.hidden()).toBeTrue();
-    expect(savePreference).toHaveBeenCalledOnceWith("uvh.getting-started.hidden.v1:10:1", "1");
+    expect(api.patch).toHaveBeenCalledOnceWith(
+      "/api/v1/workspaces/1/getting-started", { hidden: true }, jasmine.any(Function));
     expect(fixture.nativeElement.textContent).toContain("Reanudar guía");
+
     api.get.calls.reset();
-    component.resume();
+    api.patch.and.resolveTo({ ok: true, dismissedAt: null });
+    await component.resume();
     await fixture.whenStable();
-    expect(removePreference).toHaveBeenCalledWith("uvh.getting-started.hidden.v1:10:1");
+    expect(api.patch).toHaveBeenCalledWith(
+      "/api/v1/workspaces/1/getting-started", { hidden: false }, jasmine.any(Function));
     expect(api.get).toHaveBeenCalledTimes(1);
     expect(component.hidden()).toBeFalse();
     expect(component.observed()).toBe(0);
+  });
+
+  it("reads the dismissal the server already knows, whatever browser it was set from", async () => {
+    api.get.and.resolveTo({ ...facts, dismissedAt: "2026-09-26T10:00:00+00:00" });
+    await component.reload();
+    fixture.detectChanges();
+    expect(component.hidden()).toBeTrue();
+    expect(api.patch).not.toHaveBeenCalled();
   });
 
   it("hides the compact prompt when initial facts exist, without requiring a domain or teammates", async () => {
@@ -86,7 +94,7 @@ describe("GettingStartedComponent", () => {
     fixture.detectChanges();
     expect(component.complete()).toBeTrue();
     expect(fixture.nativeElement.querySelector(".guide")).toBeNull();
-    expect(savePreference).not.toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
   });
 
   it("discards an older workspace response even if it arrives after the new one", async () => {
@@ -109,7 +117,6 @@ describe("GettingStartedComponent", () => {
     expect(component.data()).toBeNull();
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(getPreference).toHaveBeenCalledWith("uvh.getting-started.hidden.v1:11:1");
     workspaceList.set([{ ...workspace, role: "viewer" }]);
     expect(component.data()).toBeNull();
   });
@@ -135,11 +142,13 @@ describe("GettingStartedComponent", () => {
     expect(fixture.nativeElement.textContent).toContain("Sin workspace seleccionado");
   });
 
-  it("remains usable if preference storage is denied", () => {
-    savePreference.and.throwError("Fixture: storage denied");
-    component.dismiss();
-    expect(component.hidden()).toBeTrue();
-    expect(component.storageWarning()).toBeTrue();
+  it("remains usable when the server refuses the preference", async () => {
+    api.patch.and.rejectWith(new ApiRequestError("Sin servicio", 503));
+    await component.dismiss();
+    fixture.detectChanges();
+    // No dismissal is claimed that did not happen; the server truth stays.
+    expect(component.hidden()).toBeFalse();
+    expect(component.preferenceError()).toBeTrue();
     expect(component.observed()).toBe(0);
   });
 
@@ -157,11 +166,14 @@ describe("GettingStartedComponent", () => {
     let finish!: (value: WorkspaceGettingStarted) => void;
     api.get.and.returnValue(new Promise<WorkspaceGettingStarted>((resolve) => { finish = resolve; }));
     const request = component.reload();
-    component.dismiss();
+    const omission = component.dismiss();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain("Has omitido esta guía");
     finish(facts);
     await request;
+    await omission;
+    // The mutation wins over the GET that was already in flight: its snapshot
+    // still says the guide is open, but the dismissal has already been saved.
     expect(component.hidden()).toBeTrue();
   });
 });
