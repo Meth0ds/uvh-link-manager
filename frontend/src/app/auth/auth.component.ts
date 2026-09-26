@@ -147,6 +147,14 @@ export class AuthComponent {
   readonly loginCaptchaToken = signal("");
   readonly registerCaptchaToken = signal("");
   readonly resendCaptchaToken = signal("");
+
+  /**
+   * Un intento de acceso fallido hace relevante la guía al buzón: es el
+   * momento en que una cuenta sin verificar se manifiesta. Estado local del
+   * cliente —condicionarlo a una señal del servidor reabriría el oráculo de
+   * enumeración que la respuesta neutra del login cierra.
+   */
+  readonly loginFailed = signal(false);
   readonly error = signal<string | null>(null);
   readonly info = signal<string | null>(null);
   readonly verificationEmail = signal<string | null>(null);
@@ -395,8 +403,9 @@ export class AuthComponent {
       this.interactiveAuthStarted = false;
       // A pending registration answers exactly like wrong credentials, so
       // there is no lifecycle signal to react to here. The path back to the
-      // mailbox is the always-visible «Reenviar verificación» entry, which
-      // needs nothing but the address.
+      // mailbox is the «Reenviar verificación» entry that THIS failure makes
+      // relevant: client-side state only, never a server signal.
+      this.loginFailed.set(true);
       this.error.set(
         err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
           ? err.message

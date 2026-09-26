@@ -35,8 +35,10 @@ class EmailToken extends Model
     }
 
     /**
-     * Un bearer `verify` nombra un registro pendiente; los demás kinds nombran
-     * un usuario. La base impone exactamente uno de los dos (`email_tokens_owner_check`).
+     * Un bearer `verify` nombra un registro pendiente —o, en el camino
+     * heredado de activación, una fila de usuario sin verificar—; los demás
+     * kinds nombran un usuario. La base impone exactamente uno de los dos
+     * (`email_tokens_owner_check`).
      *
      * @return BelongsTo<PendingRegistration, $this>
      */

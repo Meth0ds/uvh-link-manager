@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\DeliverMailOutboxJob;
 use App\Models\PendingRegistration;
 use App\Models\User;
+use App\Support\Ids;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -98,6 +99,86 @@ class AuthEmailTokenTest extends TestCase
                 "la rama '{$label}' debía respetar el suelo anti-oráculo y duró {$milliseconds} ms",
             );
         }
+    }
+
+    public function test_an_unverified_user_row_is_served_by_the_public_resend(): void
+    {
+        // Dato heredado o creado a mano: una fila de usuario sin verificar. El
+        // login le pide «Verifica tu email» y sin este reenvío no habría forma
+        // de cumplir esa frase. Mismo contrato neutro y mismo cooldown que el
+        // registro pendiente.
+        $user = User::factory()->create([
+            'email' => 'legacy-unverified@example.test',
+            'email_verified_at' => null,
+        ]);
+
+        $this->postJson('/api/v1/auth/resend-verification', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])->assertOk()->assertExactJson(['ok' => true]);
+        $tokenId = DB::table('email_tokens')->where('user_id', $user->id)->where('kind', 'verify')->value('id');
+        $this->assertIsString($tokenId);
+        $this->assertDatabaseCount('email_tokens', 1);
+
+        // El cooldown de 60 s no emite otro portador ni otro correo.
+        $this->postJson('/api/v1/auth/resend-verification', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])->assertOk()->assertExactJson(['ok' => true]);
+        $this->assertSame($tokenId, DB::table('email_tokens')->where('user_id', $user->id)->value('id'));
+        Queue::assertPushed(DeliverMailOutboxJob::class, 1);
+
+        // Una cuenta ya verificada no es material de verificación: respuesta
+        // neutra igual que una dirección desconocida, sin otro portador.
+        User::where('id', $user->id)->update(['email_verified_at' => now()]);
+        $this->postJson('/api/v1/auth/resend-verification', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])->assertOk()->assertExactJson(['ok' => true]);
+        $this->assertSame($tokenId, DB::table('email_tokens')->where('user_id', $user->id)->value('id'));
+    }
+
+    public function test_the_mailbox_activation_completes_an_unverified_user_row(): void
+    {
+        // El portador heredado nombra la fila de usuario: quien demuestra el
+        // buzón fija aquí la credencial y la cuenta queda verificada, sin
+        // crear andamio nuevo ni sustituir la cuenta existente.
+        $user = User::factory()->create([
+            'email' => 'legacy-activate@example.test',
+            'email_verified_at' => null,
+            'name' => 'Nombre Anterior',
+        ]);
+        $securityVersion = (int) $user->security_version;
+        $plain = 'verify-'.Ids::randomToken(16);
+        DB::table('email_tokens')->insert([
+            'id' => Ids::sha256Hex($plain),
+            'user_id' => $user->id,
+            'kind' => 'verify',
+            'expires_at' => now()->addHour(),
+            'created_at' => now(),
+        ]);
+        $activation = [
+            'token' => $plain,
+            'password' => 'Viento-Verde-42!',
+            'name' => 'Nombre Elegido',
+            'acceptTerms' => true,
+            'termsVersion' => '2026-08-30',
+            'privacyVersion' => '2026-08-30',
+        ];
+
+        $this->postJson('/api/v1/auth/verify-email', $activation)
+            ->assertOk()->assertExactJson(['ok' => true]);
+
+        $user->refresh();
+        $this->assertNotNull($user->email_verified_at);
+        $this->assertSame('Nombre Elegido', $user->name);
+        // La credencial acaba de fijarse: la generación avanza y las sesiones
+        // antiguas quedan atrás.
+        $this->assertSame($securityVersion + 1, (int) $user->security_version);
+        $this->assertNotNull(DB::table('email_tokens')->where('user_id', $user->id)->where('kind', 'verify')->value('used_at'));
+
+        // El portador se consume: repetir la activación no vuelve a abrir nada.
+        $this->postJson('/api/v1/auth/verify-email', $activation)->assertStatus(400);
     }
 
     public function test_password_reset_email_has_an_account_level_cooldown(): void

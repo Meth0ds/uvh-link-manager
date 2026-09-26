@@ -652,13 +652,14 @@ class AuthController
         $passwordHash = Hash::make($password);
         $tokenHash = Ids::sha256Hex($token);
         $snapshot = EmailToken::where('id', $tokenHash)
-            ->where('kind', 'verify')->whereNull('used_at')->first(['id', 'pending_registration_id']);
+            ->where('kind', 'verify')->whereNull('used_at')->first(['id', 'pending_registration_id', 'user_id']);
         // Pending registration first, bearer second is the global lifecycle
         // lock order. The preflight row is untrusted and every property is
         // checked again under lock, so replacement or consumption races fail
         // closed.
-        $userId = $snapshot && $snapshot->pending_registration_id
-            ? DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
+        $userId = null;
+        if ($snapshot && $snapshot->pending_registration_id) {
+            $userId = DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
                 $pending = PendingRegistration::where('id', $snapshot->pending_registration_id)->lockForUpdate()->first();
                 $row = EmailToken::where('id', $tokenHash)
                     ->where('pending_registration_id', $snapshot->pending_registration_id)
@@ -724,7 +725,43 @@ class AuthController
                 $pending->delete();
 
                 return (int) $user->id;
-            }) : null;
+            });
+        } elseif ($snapshot && $snapshot->user_id) {
+            // Camino heredado: el bearer nombra una FILA DE USUARIO sin
+            // verificar (dato anterior al modelo de registro pendiente, o
+            // creado a mano). El buzón se demuestra exactamente igual, pero la
+            // cuenta ya existe: se le fija la credencial elegida aquí y queda
+            // verificada, sin crear andamio nuevo.
+            $userId = DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
+                $user = User::where('id', $snapshot->user_id)->whereNull('deleted_at')->lockForUpdate()->first();
+                $row = EmailToken::where('id', $tokenHash)
+                    ->where('user_id', $snapshot->user_id)
+                    ->where('kind', 'verify')
+                    ->whereNull('used_at')
+                    ->lockForUpdate()
+                    ->first();
+                if (! $user || ! $row || $row->expires_at->isPast()) {
+                    return null;
+                }
+                if (! PasswordStrength::isAcceptable($password, $name, (string) $user->email)) {
+                    return -1;
+                }
+
+                $now = now();
+                $row->update(['used_at' => $now]);
+                $user->update([
+                    'name' => $name,
+                    'password_hash' => $passwordHash,
+                    'email_verified_at' => $now,
+                    // La credencial acaba de fijarse: nueva generación, como en
+                    // cualquier cambio de contraseña.
+                    'security_version' => (int) $user->security_version + 1,
+                ]);
+                $this->acceptRegistrationLegal((int) $user->id, $now);
+
+                return (int) $user->id;
+            });
+        }
         if ($userId === -1) {
             return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
         }
@@ -770,10 +807,21 @@ class AuthController
             // reenviar. El contrato de siempre para este caso.
             return response()->json(['error' => 'El email ya está verificado'], 400);
         }
-        $pending = $this->validEmail($requestedEmail)
+        $valid = $this->validEmail($requestedEmail);
+        // Una dirección vive en una sola autoridad: fila de usuario sin
+        // verificar (dato heredado o creado a mano) o registro pendiente. El
+        // usuario se mira primero porque es el caso que el login ya identifica
+        // («Verifica tu email») y sin reenvío no hay forma alguna de cumplir esa
+        // frase: sería un callejón sin salida.
+        $unverifiedUser = null;
+        if ($valid) {
+            $candidate = $this->findUserByEmail($requestedEmail);
+            $unverifiedUser = $candidate !== null && ! $candidate->email_verified_at ? $candidate : null;
+        }
+        $pending = ($unverifiedUser === null && $valid)
             ? $this->findPendingRegistrationByEmail($requestedEmail)
             : null;
-        if (! $pending) {
+        if (! $pending && ! $unverifiedUser) {
             // Unknown and already-consumed addresses are intentionally
             // indistinguishable on the public path.
             $this->equalizeResendVerificationDuration($startedAt);
@@ -784,7 +832,12 @@ class AuthController
         $token = Ids::randomToken(32);
         $tokenHash = Ids::sha256Hex($token);
         try {
-            DB::transaction(function () use ($pending, $token, $tokenHash): void {
+            DB::transaction(function () use ($pending, $unverifiedUser, $token, $tokenHash): void {
+                if ($unverifiedUser !== null) {
+                    $this->issueUserVerificationResend($unverifiedUser, $token, $tokenHash);
+
+                    return;
+                }
                 // The pending row lock makes cooldown, bearer replacement and
                 // outbox admission one commit; no crash can expose an
                 // undeliverable token.
@@ -848,6 +901,43 @@ class AuthController
         if ($remainingUs > 0) {
             usleep((int) round($remainingUs));
         }
+    }
+
+    /**
+     * Reenvío para una FILA DE USUARIO sin verificar (dato heredado o creado a
+     * mano): mismo candado, mismo cooldown de 60 s y misma sustitución de
+     * portadores que el registro pendiente. El contrato público no cambia —la
+     * rama que envía correo paga el mismo suelo anti-oráculo—.
+     */
+    private function issueUserVerificationResend(User $user, string $token, string $tokenHash): void
+    {
+        $locked = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
+        if (! $locked || $locked->email_verified_at) {
+            // Verificada o consumida mientras tanto: igual que una dirección
+            // desconocida, `ok` sin más.
+            return;
+        }
+        $last = EmailToken::where('user_id', $locked->id)
+            ->where('kind', 'verify')->latest('created_at')->first();
+        if ($last && $last->created_at->gt(now()->subSeconds(60))) {
+            return;
+        }
+
+        EmailToken::create([
+            'id' => $tokenHash,
+            'user_id' => (int) $locked->id,
+            'kind' => 'verify',
+            'expires_at' => now()->addDay(),
+        ]);
+        if (! UvhMail::verification(
+            $locked->email,
+            $this->appUrl().'/auth/verify-email#token='.rawurlencode($token),
+            $tokenHash,
+        )) {
+            throw new MailAdmissionException('Verification resend outbox admission failed');
+        }
+        EmailToken::where('user_id', $locked->id)->where('kind', 'verify')
+            ->whereNull('used_at')->where('id', '!=', $tokenHash)->delete();
     }
 
     public function forgotPassword(Request $request)

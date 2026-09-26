@@ -64,11 +64,20 @@
               </mat-form-field>
               <div class="form-row">
                 <button class="forgot" type="button" (click)="goForgot()" [disabled]="busy()">¿Olvidaste tu contraseña?</button>
-                <!-- Entrada pública al reenvío, siempre disponible: la guía al
-                     buzón no depende de ninguna señal del servidor (un registro
-                     pendiente contesta como unas credenciales incorrectas). -->
-                <button class="forgot" type="button" (click)="resendVerification()" [disabled]="busy() || verificationBusy() || !captchaReady()">Reenviar verificación</button>
+                <!-- La guía al buzón se revela con el primer intento de acceso
+                     fallido: es el momento en que una cuenta sin verificar se
+                     manifiesta. El servidor nunca revela el ciclo de vida de un
+                     registro pendiente (contesta como unas credenciales
+                     incorrectas), así que la entrada depende sólo del estado
+                     local —condicionarla a una señal del servidor reabriría el
+                     oráculo de enumeración que esa neutralidad cierra—. -->
+                @if (loginFailed()) {
+                  <button class="forgot" type="button" (click)="resendVerification()" [disabled]="busy() || verificationBusy() || !captchaReady()">{{ verificationBusy() ? 'Enviando…' : 'Reenviar verificación' }}</button>
+                }
               </div>
+              @if (loginFailed()) {
+                <p class="resend-hint">¿No puedes entrar? Si aún no has confirmado tu correo, reenvía la verificación.</p>
+              }
 
               @if (captchaConfigBusy()) {
                 <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>

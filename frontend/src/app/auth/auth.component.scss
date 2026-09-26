@@ -21,6 +21,8 @@
 .form mat-form-field { width: 100%; min-width: 0; }
 .form mat-icon[matPrefix] { color: var(--muted); font-size: 19px; width: 19px; height: 19px; }  .form-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: -8px; }
 .forgot { min-height: 36px; border: 0; background: transparent; color: var(--accent); font: 700 11px Manrope, sans-serif; cursor: pointer; }
+.forgot:disabled { color: var(--muted); cursor: not-allowed; }
+.resend-hint { margin: -6px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .submit { width: 100%; min-height: 50px; border-radius: 3px; margin-top: 6px; font-size: 13px; font-weight: 700; }
 .submit mat-icon { transition: transform 200ms ease; }
 .submit:hover:not(:disabled) mat-icon { transform: translateX(3px); }

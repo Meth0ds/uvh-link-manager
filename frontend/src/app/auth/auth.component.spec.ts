@@ -388,23 +388,26 @@ describe("AuthComponent registration flow", () => {
     expect(auth.resendVerification).toHaveBeenCalledWith("ana@example.com", "fresh-resend-token");
   });
 
-  it("keeps a failed login silent about lifecycle and offers the resend entry regardless", async () => {
+  it("keeps a failed login silent about lifecycle and reveals the resend entry for it", async () => {
     // Un registro pendiente contesta como unas credenciales incorrectas. Ni el
     // estado local ni la UI deben reaccionar con una señal de «sigue pendiente»
-    // —el 403 que antes la cargaba ya no existe—, y la entrada a «Reenviar
-    // verificación» se ofrece siempre, sin ningún desenlace del servidor.
+    // —el 403 que antes la cargaba ya no existe—, pero la entrada a «Reenviar
+    // verificación» se revela con el primer intento fallido: es el momento en
+    // que una cuenta sin verificar se manifiesta, y sólo con estado local.
+    const resendButton = (): HTMLButtonElement | undefined => Array.from(
+      fixture.nativeElement.querySelectorAll("button") as NodeListOf<HTMLButtonElement>,
+    ).find((button) => button.textContent?.trim() === "Reenviar verificación");
     component.loginForm.setValue({ email: "ana@example.com", password: "wrong-password" });
-    auth.login.and.rejectWith(new ApiRequestError("Credenciales incorrectas", 401));
+    fixture.detectChanges();
+    expect(resendButton()).toBeUndefined();
 
+    auth.login.and.rejectWith(new ApiRequestError("Credenciales incorrectas", 401));
     await component.onLogin();
     fixture.detectChanges();
 
     expect(component.verificationEmail()).toBeNull();
     expect(component.error()).toBe("Credenciales incorrectas");
-    const resend = Array.from(
-      fixture.nativeElement.querySelectorAll("button") as NodeListOf<HTMLButtonElement>,
-    ).find((button) => button.textContent?.trim() === "Reenviar verificación");
-    expect(resend).toBeDefined();
+    expect(resendButton()).toBeDefined();
   });
 
   it("asks for the address when the resend entry is used without one", async () => {
