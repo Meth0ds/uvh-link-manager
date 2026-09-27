@@ -136,6 +136,43 @@ revisión jurídica) se listan aparte porque no dependen del código.
   - [x] P3 y deuda previa **diferidos por decisión**: aviso en la revocación
     individual de sesión, step-up de `revokeOtherSessions` y bridge legacy
     `/auth/download-export#token=`.
+- [x] **Incremento 2026-09-27 — concurrencia, idempotencia e integridad de
+  artefactos** (lista de la segunda revisión externa), verificado con suite
+  backend completa (726 pruebas sobre `uvh_test`), `composer quality` (pint +
+  phpstan) y frontend (typecheck, lint, 541 pruebas):
+  - [x] Workspace correcto en frontend: `WORKSPACE_SCOPED` cubre
+    `tags`/`collections`/`link-templates`/`analytics/export` y `usesSession()`
+    deriva de la misma clasificación (fin del workspace por defecto al operar
+    en otro).
+  - [x] Mutadores F7 bajo `WorkspaceMutation::run()`: lock de membresía
+    (`getMembershipLocked`) dentro de la transacción —nada se escribe tras una
+    expulsión/degradación concurrente— y `linkChanged()` que sube
+    `links.version`, toca `updated_at` y emite `link.updated` (rename/merge de
+    tags y desagrupado por borrado de colección incluidos: una edición obsoleta
+    ya no resucita tags ni deja desagrupados sin notificar).
+  - [x] Lecturas fail-closed de artefactos (`Streams::readChunk`/`readLine`):
+    un `fread`/`fgets` fallido ya no es EOF —nunca más parciales servidos como
+    completos— y la rotación aborta sin publicar el temporal.
+  - [x] Artefacto `uvh-private-artifact-v3` con pie sellado
+    (`{chunks, plaintextBytes, sha256}` cifrado y autenticado): lo truncado en
+    un límite de bloque deja de ser indistinguible de lo íntegro; el último
+    bloque se entrega sólo tras verificar el pie, `Content-Length` va sellado
+    en la descarga y `v2`/legado siguen abriéndose en la ventana de
+    convivencia.
+  - [x] Idempotencia con relevo verificado: `commit()` exige sellar la fila o
+    lanza `IdempotencyLeaseLost` (revierte la transacción de negocio),
+    `renew()` como heartbeat dentro de la transacción y CSV releyendo el
+    registro persistido por fila tras cada fallo (el informe sellado nunca
+    contradice el ledger).
+  - [x] CSV: preflight real en dry-run (alias duplicados en archivo y
+    ocupados, cuota, dominios no preparados), columna `tags_json` (lista JSON
+    reversible con `;` en nombres; incompatible con `tags` legacy), y ventana
+    de lote de 24 h renovable junto con la reserva (`expires_at`).
+  - [x] Auth: el fallo de admisión de correo en el reenvío de verificación ya
+    no accede a `null` en la rama legacy (audit genérico + rollback) y cierra
+    el oráculo 500/200.
+  - [x] Bulk move bloquea la colección destino dentro de la transacción (fin
+    del `23503` → `500` frente a un borrado concurrente).
 - [ ] **F8 — Analítica medida antes de tocar**: eliminar la hot row
   `link/day` (o `lockForUpdate()` documentado) y caché 30–60 s por
   workspace/rango/filtro. Requiere medición previa con

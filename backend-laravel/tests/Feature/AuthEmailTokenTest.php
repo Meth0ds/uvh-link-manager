@@ -6,6 +6,7 @@ use App\Jobs\DeliverMailOutboxJob;
 use App\Models\PendingRegistration;
 use App\Models\User;
 use App\Support\Ids;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -136,6 +137,37 @@ class AuthEmailTokenTest extends TestCase
             'captchaToken' => self::CAPTCHA,
         ])->assertOk()->assertExactJson(['ok' => true]);
         $this->assertSame($tokenId, DB::table('email_tokens')->where('user_id', $user->id)->value('id'));
+    }
+
+    public function test_legacy_resend_mail_admission_failure_is_generic_and_rolls_back(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => null]);
+        $failAdmission = true;
+        DB::listen(function (QueryExecuted $event) use (&$failAdmission): void {
+            if ($failAdmission && str_starts_with(strtolower($event->sql), 'insert into "mail_outbox"')) {
+                throw new \RuntimeException('Fixture: mail admission failed');
+            }
+        });
+
+        $this->postJson('/api/v1/auth/resend-verification', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])->assertOk()->assertExactJson(['ok' => true]);
+        $this->assertDatabaseCount('email_tokens', 0);
+        $this->assertDatabaseCount('mail_outbox', 0);
+        $this->assertDatabaseHas('audit_events', [
+            'action' => 'auth.email_delivery_failed',
+            'resource_type' => 'user',
+            'resource_id' => (string) $user->id,
+        ]);
+
+        $failAdmission = false;
+        $this->postJson('/api/v1/auth/resend-verification', [
+            'email' => $user->email,
+            'captchaToken' => self::CAPTCHA,
+        ])->assertOk()->assertExactJson(['ok' => true]);
+        $this->assertDatabaseCount('email_tokens', 1);
+        $this->assertDatabaseCount('mail_outbox', 1);
     }
 
     public function test_the_mailbox_activation_completes_an_unverified_user_row(): void

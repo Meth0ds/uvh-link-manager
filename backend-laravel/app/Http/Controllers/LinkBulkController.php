@@ -117,6 +117,13 @@ class LinkBulkController
                     throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
                 }
 
+                Idempotency::renew((int) $user->id, $scope, $key, $hash, $lease);
+
+                if ($action === 'move' && $collectionId !== null && ! Collection::where('workspace_id', $workspaceId)
+                    ->where('id', $collectionId)->lockForUpdate()->first()) {
+                    throw new LinkException('Colección no encontrada', 422);
+                }
+
                 $applied = $this->apply($workspaceId, $user, $action, $ids, $tags ?? [], $collectionId);
 
                 $body = ['ok' => true, 'action' => $action, 'applied' => $applied];

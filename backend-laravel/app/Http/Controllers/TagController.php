@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\LinkException;
+use App\Models\Link;
 use App\Models\Tag;
 use App\Support\Audit;
 use App\Support\UvhRequest;
+use App\Support\WorkspaceMutation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,8 +17,8 @@ use Illuminate\Support\Facades\DB;
  * Gestor de etiquetas (F7): listarlas con su uso, renombrarlas y fusionarlas.
  *
  * Una etiqueta es sólo un nombre colgando de enlaces: renombrar cambia el
- * nombre donde quiera que aparezca y fusionar funde varias en una. Ninguna de
- * las dos operaciones toca enlaces ni pierde agrupaciones: la fusión mueve las
+ * nombre donde quiera que aparezca y fusionar funde varias en una. Ambas operaciones
+ * avanzan la versión de los enlaces afectados: la fusión mueve las
  * adhesiones antes de borrar las etiquetas de origen, en una sola transacción.
  */
 class TagController
@@ -71,7 +73,27 @@ class TagController
 
         $from = $tag->name;
         try {
-            $tag->update(['name' => $name]);
+            $from = WorkspaceMutation::run($request, function () use ($workspaceId, $id, $name): string {
+                $tag = Tag::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
+                if (! $tag) {
+                    throw new LinkException('Etiqueta no encontrada', 404);
+                }
+                $from = $tag->name;
+                if ($from === $name) {
+                    return $from;
+                }
+                $links = Link::withTrashed()->where('workspace_id', $workspaceId)
+                    ->whereHas('tags', fn ($q) => $q->where('tags.id', $id))
+                    ->orderBy('id')->lockForUpdate()->get();
+                $tag->update(['name' => $name]);
+                foreach ($links as $link) {
+                    WorkspaceMutation::linkChanged($link);
+                }
+
+                return $from;
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {
             // La comprobación previa y la escritura no son atómicas: si otra
             // petición tomó el nombre en ese hueco, el índice único es el que
@@ -123,7 +145,7 @@ class TagController
         }
 
         try {
-            $merged = DB::transaction(function () use ($workspaceId, $sources, $targetId): int {
+            [$merged, $targetName] = WorkspaceMutation::run($request, function () use ($workspaceId, $sources, $targetId): array {
                 // Candados en orden de id —destino incluido—: dos fusiones que
                 // comparten etiquetas las piden siempre en el mismo orden y no
                 // pueden bloquearse mutuamente.
@@ -144,6 +166,9 @@ class TagController
                     throw new LinkException('Etiqueta de origen no encontrada', 404);
                 }
 
+                $links = Link::withTrashed()->where('workspace_id', $workspaceId)
+                    ->whereHas('tags', fn ($q) => $q->whereIn('tags.id', array_keys($sources)))
+                    ->orderBy('id')->lockForUpdate()->get();
                 $moved = 0;
                 foreach ($lockIds as $sourceId) {
                     if ($sourceId === $targetId) {
@@ -161,7 +186,11 @@ class TagController
                     Tag::where('id', $sourceId)->where('workspace_id', $workspaceId)->delete();
                 }
 
-                return $moved;
+                foreach ($links as $link) {
+                    WorkspaceMutation::linkChanged($link);
+                }
+
+                return [$moved, $locked->get($targetId)->name];
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
@@ -172,7 +201,7 @@ class TagController
             'moved' => $merged,
         ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
-        return response()->json(['ok' => true, 'id' => $targetId, 'name' => $target->name, 'moved' => $merged]);
+        return response()->json(['ok' => true, 'id' => $targetId, 'name' => $targetName, 'moved' => $merged]);
     }
 
     private function invalidName(mixed $name): ?string

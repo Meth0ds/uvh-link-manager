@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\LinkException;
 use App\Models\Collection;
 use App\Models\LinkTemplate;
 use App\Support\Audit;
 use App\Support\LinkService;
 use App\Support\UvhRequest;
+use App\Support\WorkspaceMutation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -84,12 +86,20 @@ class LinkTemplateController
         }
 
         try {
-            $template = LinkTemplate::create([
-                'workspace_id' => $workspaceId,
-                'created_by' => (int) $user->id,
-                'name' => $name,
-                'payload' => $payload,
-            ]);
+            $template = WorkspaceMutation::run($request, function () use ($workspaceId, $user, $name, $payload, $collectionId): LinkTemplate {
+                if ($collectionId !== null && ! Collection::where('workspace_id', $workspaceId)->where('id', $collectionId)->lockForUpdate()->first()) {
+                    throw new LinkException('Colección no encontrada', 422);
+                }
+
+                return LinkTemplate::create([
+                    'workspace_id' => $workspaceId,
+                    'created_by' => (int) $user->id,
+                    'name' => $name,
+                    'payload' => $payload,
+                ]);
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {
             // La comprobación previa y la escritura no son atómicas: si otra
             // petición tomó el nombre en ese hueco, el índice único es el que
@@ -119,7 +129,17 @@ class LinkTemplateController
         if (! $template) {
             return response()->json(['error' => 'Plantilla no encontrada'], 404);
         }
-        $template->delete();
+        try {
+            WorkspaceMutation::run($request, function () use ($workspaceId, $id): void {
+                $template = LinkTemplate::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
+                if (! $template) {
+                    throw new LinkException('Plantilla no encontrada', 404);
+                }
+                $template->delete();
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
+        }
 
         Audit::write($user->id, 'link_template.delete', 'link_template', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 

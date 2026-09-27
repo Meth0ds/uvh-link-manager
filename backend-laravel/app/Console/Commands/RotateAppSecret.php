@@ -174,10 +174,17 @@ final class RotateAppSecret extends Command
                         try {
                             $changed = PrivateArtifact::reencryptStream($in, $out);
                             Streams::flush($out);
-                        } finally {
+                        } catch (\Throwable $error) {
+                            // Un artefacto truncado o manipulado lanza aquí: el
+                            // temporal se descarta y el original queda intacto,
+                            // nunca se publica un prefijo sobre él.
                             fclose($in);
                             fclose($out);
+                            $disk->delete($temporary);
+                            throw $error;
                         }
+                        fclose($in);
+                        fclose($out);
                         // Sin cambios = ya estaba con la clave actual: el
                         // temporal se descarta. En dry-run también, dejando
                         // intacto el original.

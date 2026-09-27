@@ -345,7 +345,7 @@ class AccountController
             // descarga —el navegador la reporta fallida—, y la exportación
             // sigue `ready` y reintentable, que es lo que un fallo de volumen
             // transitorio exige.
-            PrivateArtifact::validate($cipher);
+            $manifest = PrivateArtifact::validate($cipher);
         } catch (\Throwable) {
             // A transient volume failure or interrupted read does not consume
             // the export: it stays ready and the owner retries. Housekeeping
@@ -409,11 +409,13 @@ class AccountController
             foreach (PrivateArtifact::readChunks($cipher) as $chunk) {
                 echo $chunk;
             }
-            if (is_resource($cipher)) {
-                fclose($cipher);
-            }
+            fclose($cipher);
         }, 'uvh-datos-'.now()->format('Y-m-d').'.json', [
             'Content-Type' => 'application/json; charset=utf-8',
+            // Con el manifiesto del pie, el navegador comprueba la longitud
+            // exacta del documento: una respuesta truncada por un bloque que
+            // no cuadra NUNCA se descarga como completa.
+            ...($manifest !== null ? ['Content-Length' => (string) $manifest['plaintextBytes']] : []),
             'Cache-Control' => 'private, no-store, no-cache, max-age=0',
             'Pragma' => 'no-cache',
             'X-Content-Type-Options' => 'nosniff',

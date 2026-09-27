@@ -14,6 +14,41 @@ namespace App\Support;
  */
 final class Streams
 {
+    /** @param resource $stream */
+    public static function readChunk($stream, int $bytes): string
+    {
+        if ($bytes < 1) {
+            throw new \InvalidArgumentException('Read size must be positive');
+        }
+        $buffer = '';
+        while (strlen($buffer) < $bytes) {
+            $read = @fread($stream, $bytes - strlen($buffer));
+            if ($read === false) {
+                throw new \RuntimeException('Stream read failed');
+            }
+            if ($read === '') {
+                if (! feof($stream)) {
+                    throw new \RuntimeException('Stream read stalled before EOF');
+                }
+                break;
+            }
+            $buffer .= $read;
+        }
+
+        return $buffer;
+    }
+
+    /** @param resource $stream */
+    public static function readLine($stream): string|false
+    {
+        $line = @fgets($stream);
+        if ($line === false && ! feof($stream)) {
+            throw new \RuntimeException('Stream line read failed before EOF');
+        }
+
+        return $line;
+    }
+
     /**
      * Escribe exactamente `$data` en el stream o lanza. Nunca devuelve "a
      * medios": o quedaron todos los bytes o hay excepción.

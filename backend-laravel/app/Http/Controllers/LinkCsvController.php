@@ -9,8 +9,9 @@ use App\Support\Audit;
 use App\Support\Csv;
 use App\Support\Idempotency;
 use App\Support\LinkService;
+use App\Support\UrlUtil;
 use App\Support\UvhRequest;
-use Illuminate\Database\QueryException;
+use App\Support\WorkspaceMutation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -51,7 +52,7 @@ class LinkCsvController
     private const MAX_REPORTED_ERRORS = 100;
 
     /** Columnas que el archivo puede traer; una desconocida es un error. */
-    private const COLUMNS = ['alias', 'destination', 'fallback_destination', 'notes', 'tags', 'scheduled_at', 'expires_at', 'max_clicks', 'single_use'];
+    private const COLUMNS = ['alias', 'destination', 'fallback_destination', 'notes', 'tags', 'tags_json', 'scheduled_at', 'expires_at', 'max_clicks', 'single_use'];
 
     /**
      * Columnas del export que sólo informan: el archivo de UVH vuelve a entrar
@@ -80,7 +81,7 @@ class LinkCsvController
             ->orderBy('id')->get();
 
         // BOM para que Excel lea los acentos como UTF-8.
-        $lines = ["\xEF\xBB\xBF".Csv::line(['id', 'alias', 'domain', 'destination', 'fallback_destination', 'state', 'click_count', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'notes', 'tags', 'created_at'])];
+        $lines = ["\xEF\xBB\xBF".Csv::line(['id', 'alias', 'domain', 'destination', 'fallback_destination', 'state', 'click_count', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'notes', 'tags_json', 'created_at'])];
         foreach ($links as $link) {
             $lines[] = Csv::line([
                 (string) $link->id,
@@ -95,7 +96,7 @@ class LinkCsvController
                 (string) ($link->scheduled_at?->toIso8601String() ?? ''),
                 (string) ($link->expires_at?->toIso8601String() ?? ''),
                 (string) ($link->notes ?? ''),
-                implode(';', $link->tags->pluck('name')->all()),
+                json_encode($link->tags->pluck('name')->sort()->values()->all(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                 (string) ($link->created_at?->toIso8601String() ?? ''),
             ]);
         }
@@ -136,6 +137,9 @@ class LinkCsvController
                 return response()->json(['error' => 'Columna desconocida: '.$column], 422);
             }
         }
+        if (in_array('tags', $parsed['header'], true) && in_array('tags_json', $parsed['header'], true)) {
+            return response()->json(['error' => 'Usa tags o tags_json, no ambas columnas'], 422);
+        }
         if (! in_array('alias', $parsed['header'], true) || ! in_array('destination', $parsed['header'], true)) {
             return response()->json(['error' => 'El CSV necesita las columnas alias y destination'], 422);
         }
@@ -165,137 +169,79 @@ class LinkCsvController
             $lease = (string) ($begin['lease'] ?? '');
         }
 
-        // Lo que una ejecución anterior de ESTA clave ya resolvió: si el proceso
-        // murió a mitad de archivo, el reintento reanuda —reproduce los
-        // resultados registrados y sólo procesa el resto— en vez de duplicar.
         $batchId = 0;
-        $recorded = collect();
-        if (! $dryRun) {
-            DB::table('link_import_batches')->where('created_at', '<', now()->subDay())->delete();
-            $batchId = $this->openBatch((int) $user->id, $workspaceId, (string) $key, $hash);
-            $recorded = DB::table('link_import_rows')->where('batch_id', $batchId)
-                ->get(['row_number', 'status', 'error'])->keyBy('row_number');
-        }
-
-        $errors = [];
-        $truncated = false;
-        $created = 0;
-        $valid = 0;
-        $apiTokenContext = UvhRequest::apiToken($request);
-        $actorSecurityVersion = (int) $user->security_version;
-
         try {
-            foreach ($parsed['rows'] as $offset => $cells) {
-                $row = $offset + 2; // La cabecera es la fila 1 del archivo.
-                if ($recorded->has($row)) {
-                    // Fila ya resuelta por la ejecución anterior: se reproduce su
-                    // resultado registrado, sin tocar nada más.
-                    $outcome = $recorded->get($row);
-                    if ($outcome->status === 'created') {
-                        $valid++;
-                        $created++;
-                    } elseif ($outcome->status === 'failed') {
-                        $valid++;
-                    }
-                    if ($outcome->error !== null) {
-                        $errors = $this->pushError($errors, $row, (string) $outcome->error, $truncated);
+            if ($dryRun) {
+                $body = WorkspaceMutation::run($request, function () use ($request, $workspaceId, $parsed): array {
+                    $limit = DB::table('quotas')->where('workspace_id', $workspaceId)->value('links_limit');
+                    $preview = [
+                        'aliases' => [],
+                        'remaining' => $limit === null ? null : max(0, (int) $limit - Link::where('workspace_id', $workspaceId)->count()),
+                    ];
+                    $rows = [];
+                    foreach ($parsed['rows'] as $offset => $cells) {
+                        $rows[] = $this->resolveRow($request, $parsed['header'], $cells, $offset + 2, true, $preview);
                     }
 
-                    continue;
-                }
+                    return $this->summarizeRows($rows, true);
+                });
 
-                $input = $this->inputFromRow($parsed['header'], $cells);
-                // `domain` viaja como hostname en el export y se resuelve contra el
-                // workspace destino: vacío = dominio por defecto; un hostname que
-                // el destino no tiene es un error de fila, no un enlace a medias.
-                if (array_key_exists(self::DOMAIN_COLUMN, $input)) {
-                    $hostname = (string) $input[self::DOMAIN_COLUMN];
-                    unset($input[self::DOMAIN_COLUMN]);
-                    if ($hostname !== '') {
-                        $domain = CustomDomain::where('workspace_id', $workspaceId)
-                            ->whereRaw('lower(domain) = lower(?)', [$hostname])
-                            ->first(['id']);
-                        if (! $domain) {
-                            $reason = 'El dominio '.$hostname.' no existe en este workspace';
-                            $this->recordRow($batchId, $row, 'rejected', null, $reason, $dryRun);
-                            $errors = $this->pushError($errors, $row, $reason, $truncated);
-
-                            continue;
-                        }
-                        $input['domain_id'] = (int) $domain->id;
-                    }
-                }
-                $check = LinkService::validate($input);
-                if (! $check['ok']) {
-                    $this->recordRow($batchId, $row, 'rejected', null, (string) $check['error'], $dryRun);
-                    $errors = $this->pushError($errors, $row, (string) $check['error'], $truncated);
-
-                    continue;
-                }
-                $valid++;
-                if ($dryRun) {
-                    continue;
-                }
-                try {
-                    // Creación y anotación de la fila compilan juntas: o la fila
-                    // queda creada y registrada, o no existe en ningún lado. El
-                    // índice único (batch, fila) es además la valla contra un
-                    // segundo intento que corriera en paralelo tras un takeover.
-                    DB::transaction(function () use ($workspaceId, $user, $input, $apiTokenContext, $actorSecurityVersion, $batchId, $row): void {
-                        $made = LinkService::create($workspaceId, (int) $user->id, $input, $apiTokenContext, $actorSecurityVersion);
-                        DB::table('link_import_rows')->insert([
-                            'batch_id' => $batchId,
-                            'row_number' => $row,
-                            'status' => 'created',
-                            'created_link_id' => $made['id'],
-                            'error' => null,
-                            'created_at' => now(),
-                        ]);
-                    });
-                    $created++;
-                } catch (LinkException $e) {
-                    // Cada fila es independiente: un alias repetido o una cuota
-                    // agotada se reporta y el resto sigue.
-                    $this->recordRow($batchId, $row, 'failed', null, $e->getMessage(), $dryRun);
-                    $errors = $this->pushError($errors, $row, $e->getMessage(), $truncated);
-                } catch (QueryException $e) {
-                    if (($e->errorInfo[0] ?? null) !== '23505') {
-                        throw $e;
-                    }
-                    // Otro intento de la misma clave resolvió esta fila a la vez
-                    // (sólo posible tras un takeover de arriendo): su registro
-                    // manda y se cuenta su resultado.
-                    $outcome = DB::table('link_import_rows')->where('batch_id', $batchId)->where('row_number', $row)
-                        ->first(['status', 'error']);
-                    if ($outcome?->status === 'created') {
-                        $created++;
-                    }
-                    if ($outcome?->error !== null) {
-                        $errors = $this->pushError($errors, $row, (string) $outcome->error, $truncated);
-                    }
-                }
+                return response()->json($body);
             }
+            DB::table('link_import_batches')->where('expires_at', '<', now())->delete();
+            $batchId = WorkspaceMutation::run($request, function () use ($user, $workspaceId, $scope, $key, $hash, $lease): int {
+                Idempotency::renew((int) $user->id, $scope, (string) $key, $hash, $lease);
+
+                return $this->openBatch((int) $user->id, $workspaceId, (string) $key, $hash);
+            });
+            foreach ($parsed['rows'] as $offset => $cells) {
+                $row = $offset + 2;
+                WorkspaceMutation::run($request, function () use ($request, $user, $scope, $key, $hash, $lease, $batchId, $row, $parsed, $cells): void {
+                    // Account → workspace → reservation. Keep this lock through
+                    // link creation AND ledger insertion, even if the row is slow.
+                    Idempotency::renew((int) $user->id, $scope, (string) $key, $hash, $lease);
+                    DB::table('link_import_batches')->where('id', $batchId)->update(['expires_at' => now()->addHours(Idempotency::TTL_HOURS)]);
+                    $recorded = DB::table('link_import_rows')->where('batch_id', $batchId)->where('row_number', $row)->first();
+                    if ($recorded !== null) {
+                        return;
+                    }
+                    $outcome = $this->resolveRow($request, $parsed['header'], $cells, $row, false);
+                    DB::table('link_import_rows')->insert([
+                        'batch_id' => $batchId,
+                        'row_number' => $row,
+                        'status' => $outcome['status'],
+                        'created_link_id' => $outcome['link_id'],
+                        'error' => $outcome['error'],
+                        'created_at' => now(),
+                    ]);
+                    Idempotency::renew((int) $user->id, $scope, (string) $key, $hash, $lease);
+                });
+            }
+            $body = WorkspaceMutation::run($request, function () use ($user, $scope, $key, $hash, $lease, $batchId): array {
+                Idempotency::renew((int) $user->id, $scope, (string) $key, $hash, $lease);
+                DB::table('link_import_batches')->where('id', $batchId)->update(['expires_at' => now()->addHours(Idempotency::TTL_HOURS)]);
+                // The persisted ledger is authoritative, including rows
+                // completed by an earlier holder before this takeover.
+                $rows = DB::table('link_import_rows')->where('batch_id', $batchId)
+                    ->orderBy('row_number')->get()->map(fn ($row) => (array) $row)->all();
+                $body = $this->summarizeRows($rows, false);
+                Idempotency::commit((int) $user->id, $scope, (string) $key, $hash, 200, $body, $lease);
+
+                return $body;
+            });
         } catch (\Throwable $e) {
-            // Caída inesperada a mitad de archivo: la reserva se libera y el
-            // lote conserva lo ya resuelto —el reintento reanuda desde ahí—.
             if (! $dryRun) {
                 Idempotency::release((int) $user->id, $scope, (string) $key, $lease);
             }
+            if ($e instanceof LinkException) {
+                return response()->json(['error' => $e->getMessage()], $e->status);
+            }
             throw $e;
         }
+        $created = $body['created'];
+        $errors = $body['errors'];
 
-        $body = [
-            'dryRun' => $dryRun,
-            'valid' => $valid,
-            'created' => $created,
-            'errors' => $errors,
-            'truncated' => $truncated,
-        ];
-        if (! $dryRun) {
-            Idempotency::commit((int) $user->id, $scope, (string) $key, $hash, 200, $body, $lease);
-        }
-
-        if (! $dryRun && ($created > 0 || $errors !== [])) {
+        if ($created > 0 || $errors !== []) {
             Audit::write($user->id, 'link.import', 'link', null, [
                 'created' => $created,
                 'invalid' => count($errors),
@@ -312,50 +258,109 @@ class LinkCsvController
      */
     private function openBatch(int $userId, int $workspaceId, string $key, string $requestHash): int
     {
-        try {
-            return (int) DB::table('link_import_batches')->insertGetId([
-                'user_id' => $userId,
-                'workspace_id' => $workspaceId,
-                'idempotency_key' => $key,
-                'request_hash' => $requestHash,
-                'created_at' => now(),
-            ]);
-        } catch (QueryException $e) {
-            if (($e->errorInfo[0] ?? null) !== '23505') {
-                throw $e;
-            }
-
-            return (int) DB::table('link_import_batches')
-                ->where('user_id', $userId)->where('workspace_id', $workspaceId)->where('idempotency_key', $key)
-                ->value('id');
+        DB::table('link_import_batches')->insertOrIgnore([
+            'user_id' => $userId,
+            'workspace_id' => $workspaceId,
+            'idempotency_key' => $key,
+            'request_hash' => $requestHash,
+            'created_at' => now(),
+            'expires_at' => now()->addHours(Idempotency::TTL_HOURS),
+        ]);
+        $batch = DB::table('link_import_batches')
+            ->where('user_id', $userId)->where('workspace_id', $workspaceId)->where('idempotency_key', $key)->first();
+        if ($batch === null || ! hash_equals((string) $batch->request_hash, $requestHash)) {
+            throw new LinkException('Esta Idempotency-Key ya se usó con otra importación', 409);
         }
+
+        return (int) $batch->id;
     }
 
     /**
-     * Anota el resultado de una fila del lote. En dryRun no se escribe nada.
-     * Las filas fallidas usan `insertOrIgnore`: dos intentos de la misma clave
-     * sólo corren a la vez tras un takeover de arriendo, y el primero en anotar
-     * manda. Las filas creadas se anotan con `insert` dentro de la MISMA
-     * transacción que la creación, con el índice único como valla.
+     * @param  list<string>  $header
+     * @param  list<string>  $cells
+     * @param  array{aliases?: array<string, true>, remaining?: int|null}|null  $preview
+     * @return array{row_number: int, status: string, link_id: ?int, error: ?string}
      */
-    private function recordRow(int $batchId, int $row, string $status, ?int $linkId, ?string $error, bool $dryRun): void
+    private function resolveRow(Request $request, array $header, array $cells, int $row, bool $dryRun, ?array &$preview = null): array
     {
-        if ($dryRun || $batchId === 0) {
-            return;
+        $workspaceId = UvhRequest::workspaceId($request);
+        $input = $this->inputFromRow($header, $cells);
+        $rejected = fn (string $error): array => ['row_number' => $row, 'status' => 'rejected', 'link_id' => null, 'error' => $error];
+        if (array_key_exists(self::DOMAIN_COLUMN, $input)) {
+            $hostname = (string) $input[self::DOMAIN_COLUMN];
+            unset($input[self::DOMAIN_COLUMN]);
+            if ($hostname !== '') {
+                $domain = CustomDomain::where('workspace_id', $workspaceId)
+                    ->whereRaw('lower(domain) = lower(?)', [$hostname])->first(['id']);
+                if (! $domain) {
+                    return $rejected('El dominio '.$hostname.' no existe en este workspace');
+                }
+                $input['domain_id'] = (int) $domain->id;
+            }
         }
-        DB::table('link_import_rows')->insertOrIgnore([
-            'batch_id' => $batchId,
-            'row_number' => $row,
-            'status' => $status,
-            'created_link_id' => $linkId,
-            'error' => $error,
-            'created_at' => now(),
-        ]);
+        $check = LinkService::validate($input);
+        if (! $check['ok']) {
+            return $rejected((string) $check['error']);
+        }
+        if ($dryRun) {
+            $domainId = $input['domain_id'] ?? null;
+            if ($domainId !== null && ! CustomDomain::where('id', $domainId)->where('workspace_id', $workspaceId)
+                ->where('state', 'active')->where('edge_eligible', true)->whereNotNull('tls_ready_at')->exists()) {
+                return $rejected('Dominio no activado o sin acceso');
+            }
+            $alias = ! empty($input['alias']) ? UrlUtil::normalizeAlias($input['alias']) : null;
+            $identity = $domainId.':'.$alias;
+            if ($alias !== null && (isset($preview['aliases'][$identity]) || Link::where('domain_id', $domainId)->where('alias', $alias)->exists())) {
+                return $rejected('Este alias ya está en uso');
+            }
+            if (($preview['remaining'] ?? null) !== null && $preview['remaining'] < 1) {
+                return $rejected('Cuota de enlaces alcanzada');
+            }
+            if ($alias !== null) {
+                $preview['aliases'][$identity] = true;
+            }
+            if (($preview['remaining'] ?? null) !== null) {
+                $preview['remaining']--;
+            }
+
+            return ['row_number' => $row, 'status' => 'valid', 'link_id' => null, 'error' => null];
+        }
+        try {
+            $user = UvhRequest::user($request);
+            $made = LinkService::create($workspaceId, (int) $user->id, $input, UvhRequest::apiToken($request), (int) $user->security_version);
+
+            return ['row_number' => $row, 'status' => 'created', 'link_id' => (int) $made['id'], 'error' => null];
+        } catch (LinkException $e) {
+            return ['row_number' => $row, 'status' => 'failed', 'link_id' => null, 'error' => $e->getMessage()];
+        }
+    }
+
+    /** @param list<array<string, mixed>> $rows
+     * @return array{dryRun: bool, valid: int, created: int, errors: list<array{row: int, error: string}>, truncated: bool}
+     */
+    private function summarizeRows(array $rows, bool $dryRun): array
+    {
+        $valid = $created = 0;
+        $errors = [];
+        $truncated = false;
+        foreach ($rows as $row) {
+            if (in_array($row['status'], ['valid', 'created', 'failed'], true)) {
+                $valid++;
+            }
+            if ($row['status'] === 'created') {
+                $created++;
+            }
+            if ($row['error'] !== null) {
+                $errors = $this->pushError($errors, (int) $row['row_number'], (string) $row['error'], $truncated);
+            }
+        }
+
+        return compact('dryRun', 'valid', 'created', 'errors', 'truncated');
     }
 
     /**
      * Traduce una fila del CSV al contrato de creación de enlace. Las
-     * etiquetas viajan en una celda separadas por `;`.
+     * etiquetas del export viajan como JSON; `tags` conserva el formato legado con `;`.
      *
      * @param  list<string>  $header
      * @param  list<string>  $cells
@@ -376,7 +381,10 @@ class LinkCsvController
             if ($value === '') {
                 continue;
             }
-            if ($column === 'tags') {
+            if ($column === 'tags_json') {
+                $decoded = json_decode($value, true);
+                $input['tags'] = str_starts_with($value, '[') && is_array($decoded) && array_is_list($decoded) ? $decoded : $value;
+            } elseif ($column === 'tags') {
                 $input['tags'] = array_values(array_filter(array_map('trim', explode(';', $value))));
             } elseif ($column === 'max_clicks') {
                 $input['max_clicks'] = ctype_digit($value) ? (int) $value : $value;

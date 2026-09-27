@@ -870,7 +870,11 @@ class AuthController
                     ->whereNull('used_at')->where('id', '!=', $tokenHash)->delete();
             });
         } catch (MailAdmissionException) {
-            Audit::write(null, 'auth.email_delivery_failed', 'pending_registration', (string) $pending->id, ['kind' => 'verify']);
+            Audit::write(null, 'auth.email_delivery_failed',
+                $unverifiedUser !== null ? 'user' : 'pending_registration',
+                $unverifiedUser !== null ? (string) $unverifiedUser->id : (string) $pending?->id,
+                ['kind' => 'verify'],
+            );
 
             // The public path is uniform: a failure to enqueue is not a fact
             // about the address either.

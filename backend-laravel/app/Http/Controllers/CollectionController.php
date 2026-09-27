@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\LinkException;
 use App\Models\Collection;
+use App\Models\Link;
 use App\Models\LinkTemplate;
 use App\Support\Audit;
 use App\Support\UvhRequest;
+use App\Support\WorkspaceMutation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Colecciones de un nivel (F7): agrupar enlaces sin anidamiento. Borrar una
@@ -49,7 +51,9 @@ class CollectionController
         }
 
         try {
-            $collection = Collection::create(['workspace_id' => $workspaceId, 'name' => $name]);
+            $collection = WorkspaceMutation::run($request, fn () => Collection::create(['workspace_id' => $workspaceId, 'name' => $name]));
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {
             // La comprobación previa y la escritura no son atómicas: si otra
             // petición tomó el nombre en ese hueco, el índice único es el que
@@ -85,7 +89,15 @@ class CollectionController
         }
 
         try {
-            $collection->update(['name' => $name]);
+            WorkspaceMutation::run($request, function () use ($workspaceId, $id, $name): void {
+                $collection = Collection::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
+                if (! $collection) {
+                    throw new LinkException('Colección no encontrada', 404);
+                }
+                $collection->update(['name' => $name]);
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {
             if (($e->errorInfo[0] ?? null) === '23505') {
                 return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
@@ -113,22 +125,36 @@ class CollectionController
         // plantillas que apuntaban a la colección pierden esa referencia en la
         // MISMA transacción: ninguna plantilla puede quedar apuntando a un id
         // que ya no existe —ni sobrevivir un borrado a medias—.
-        [$moved, $cleared] = DB::transaction(function () use ($workspaceId, $collection, $id): array {
-            $moved = $collection->links()->update(['collection_id' => null]);
-            $cleared = 0;
-            foreach (LinkTemplate::where('workspace_id', $workspaceId)->get() as $template) {
-                $payload = $template->payload;
-                if (($payload['collection_id'] ?? null) !== $id) {
-                    continue;
+        try {
+            [$moved, $cleared] = WorkspaceMutation::run($request, function () use ($workspaceId, $id): array {
+                $collection = Collection::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
+                if (! $collection) {
+                    throw new LinkException('Colección no encontrada', 404);
                 }
-                unset($payload['collection_id']);
-                $template->update(['payload' => $payload]);
-                $cleared++;
-            }
-            $collection->delete();
+                $links = Link::withTrashed()->where('workspace_id', $workspaceId)->where('collection_id', $id)
+                    ->orderBy('id')->lockForUpdate()->get();
+                foreach ($links as $link) {
+                    $link->collection_id = null;
+                    WorkspaceMutation::linkChanged($link);
+                }
+                $moved = $links->count();
+                $cleared = 0;
+                foreach (LinkTemplate::where('workspace_id', $workspaceId)->orderBy('id')->lockForUpdate()->get() as $template) {
+                    $payload = $template->payload;
+                    if (($payload['collection_id'] ?? null) !== $id) {
+                        continue;
+                    }
+                    unset($payload['collection_id']);
+                    $template->update(['payload' => $payload]);
+                    $cleared++;
+                }
+                $collection->delete();
 
-            return [$moved, $cleared];
-        });
+                return [$moved, $cleared];
+            });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
+        }
 
         Audit::write($user->id, 'collection.delete', 'collection', $id, ['moved' => $moved, 'cleared_templates' => $cleared], UvhRequest::ip($request), workspaceId: $workspaceId);
 

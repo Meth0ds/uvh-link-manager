@@ -73,8 +73,14 @@ la acota entre 1 KiB y 256 MiB.
 ## Artefacto de entrega
 
 El documento no se guarda en claro: `PrivateArtifact` lo envuelve en un
-contenedor cifrado por bloques (`uvh-private-artifact-v2`, una línea `enc:v1:…`
-por bloque de 4 MiB) y la descarga lo descifra por streaming con `no-store`
-tras un step-up de contraseña y segundo factor. El acuse de recepción es lo
-único que consume la exportación y purga el artefacto; la ventana de descarga
-es de dos días.
+contenedor cifrado por bloques (`uvh-private-artifact-v3`, una línea `enc:v1:…`
+por bloque de 4 MiB) cerrado por un pie sellado —cifrado y autenticado como
+cualquier bloque— con `{chunks, plaintextBytes, sha256}` de todo el documento.
+El pie hace indistinguible lo truncado de lo íntegro: sin pie no hay fin de
+artefacto y un bloque que no cuadra con el manifiesto nunca se entrega como
+completo —ni se recifra en una rotación de `APP_SECRET`—. Los formatos
+anteriores (`v2` sin pie y el blob legado) siguen abriéndose durante la ventana
+de convivencia. La descarga lo descifra por streaming con `no-store` y
+`Content-Length` sellado, tras un step-up de contraseña y segundo factor. El
+acuse de recepción es lo único que consume la exportación y purga el artefacto;
+la ventana de descarga es de dos días.

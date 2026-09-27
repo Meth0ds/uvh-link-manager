@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Exceptions\IdempotencyLeaseLost;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -119,6 +120,7 @@ final class Idempotency
             $taken = DB::table('idempotency_keys')
                 ->where('user_id', $userId)->where('scope', $scope)->where('key', $key)
                 ->whereNull('response_status')
+                ->where('request_hash', $requestHash)
                 ->where(fn ($q) => $q->whereNull('lease_until')->orWhere('lease_until', '<=', now()))
                 ->update([
                     'request_hash' => $requestHash,
@@ -139,17 +141,41 @@ final class Idempotency
      * Sella la respuesta de una operación completada: la repetición de la
      * misma petición la recibirá tal cual sin volver a aplicar nada. Sólo el
      * poseedor del arriendo actual sella: el sellado de un intento cuya
-     * reserva fue tomada es un no-op, nunca una respuesta ajena.
+     * reserva fue tomada lanza y revierte la transacción de negocio.
      *
      * @param  array<string, mixed>  $body
      */
     public static function commit(int $userId, string $scope, string $key, string $requestHash, int $status, array $body, string $lease): void
     {
-        DB::table('idempotency_keys')
+        $updated = DB::table('idempotency_keys')
             ->where('user_id', $userId)->where('scope', $scope)->where('key', $key)
+            ->whereNull('response_status')
             ->where('request_hash', $requestHash)
             ->where('lease_token', $lease)
-            ->update(['response_status' => $status, 'response_body' => json_encode($body, JSON_UNESCAPED_UNICODE)]);
+            ->update(['response_status' => $status, 'response_body' => json_encode($body, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]);
+        if ($updated !== 1) {
+            throw new IdempotencyLeaseLost;
+        }
+    }
+
+    /**
+     * Renew inside the business transaction, after account/workspace locks.
+     * The row lock also prevents takeover during a slow transaction. Expiry
+     * permits recovery; only a changed token revokes the current holder.
+     */
+    public static function renew(int $userId, string $scope, string $key, string $requestHash, string $lease): void
+    {
+        $updated = DB::table('idempotency_keys')
+            ->where('user_id', $userId)->where('scope', $scope)->where('key', $key)
+            ->where('request_hash', $requestHash)->where('lease_token', $lease)
+            ->whereNull('response_status')
+            ->update([
+                'lease_until' => now()->addMinutes(self::LEASE_MINUTES),
+                'expires_at' => now()->addHours(self::TTL_HOURS),
+            ]);
+        if ($updated !== 1) {
+            throw new IdempotencyLeaseLost;
+        }
     }
 
     /**

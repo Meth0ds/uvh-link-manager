@@ -32,7 +32,7 @@ import type { ImportReport } from "../../core/models";
     <mat-dialog-content>
       <p class="message">
         Las columnas obligatorias son <b>alias</b> y <b>destination</b>; también se admiten
-        fallback_destination, notes, tags (separadas por <b>;</b>), scheduled_at, expires_at,
+        fallback_destination, notes, tags (separadas por <b>;</b>) o tags_json (lista JSON), scheduled_at, expires_at,
         max_clicks y single_use. Cada fila se valida con las mismas reglas que un enlace manual.
       </p>
       <textarea
@@ -53,7 +53,7 @@ import type { ImportReport } from "../../core/models";
         <div class="report" [class.ok]="!current.errors.length">
           @if (current.dryRun) {
             <b>Dry run: nada escrito todavía.</b>
-            <span>{{ current.valid }} filas válidas listas para importar.</span>
+            <span>{{ current.valid }} filas importables con el estado actual del workspace. La comprobación no reserva alias ni cuota.</span>
           } @else {
             <b>Importación completada.</b>
             <span>{{ current.created }} enlaces creados de {{ current.valid }} filas válidas.</span>

@@ -27,9 +27,9 @@ describe("apiInterceptor context isolation", () => {
     });
   });
 
-  async function intercept(path: string, error?: HttpErrorResponse): Promise<HttpRequest<unknown>> {
+  async function intercept(path: string, error?: HttpErrorResponse, method = "GET"): Promise<HttpRequest<unknown>> {
     let forwarded!: HttpRequest<unknown>;
-    const request = new HttpRequest("GET", path);
+    const request = new HttpRequest(method, path, null);
     await TestBed.runInInjectionContext(async () => {
       const result = apiInterceptor(request, (nextRequest) => {
         forwarded = nextRequest;
@@ -46,6 +46,38 @@ describe("apiInterceptor context isolation", () => {
     expect((await intercept("/api/v1/auth/me")).headers.has("X-Workspace-Id")).toBeFalse();
     expect((await intercept("/api/v1/config")).headers.has("X-Workspace-Id")).toBeFalse();
     expect((await intercept("/api/v1/admin/overview")).headers.has("X-Workspace-Id")).toBeFalse();
+  });
+
+  for (const path of ["/api/v1/tags", "/api/v1/collections", "/api/v1/link-templates", "/api/v1/analytics/export"]) {
+    it(`scopes ${path} and its child routes to the selected workspace`, async () => {
+      expect((await intercept(path)).headers.get("X-Workspace-Id")).toBe("42");
+      expect((await intercept(`${path}/7?format=csv`)).headers.get("X-Workspace-Id")).toBe("42");
+      for (const method of ["POST", "PATCH", "DELETE"]) {
+        expect((await intercept(path, undefined, method)).headers.get("X-Workspace-Id")).toBe("42");
+      }
+    });
+
+    it(`expires the session for ${path} failures`, async () => {
+      await intercept(path, new HttpErrorResponse({ status: 401 }));
+      expect(auth.sessionExpired).toHaveBeenCalledOnceWith(7);
+    });
+
+    it(`requires MFA again for ${path} when requested by the server`, async () => {
+      await intercept(path, new HttpErrorResponse({ status: 403, error: { details: { reason: "mfa_reauthentication_required" } } }));
+      expect(auth.requireAdminMfaReauthentication).toHaveBeenCalledOnceWith(7);
+    });
+  }
+
+  it("treats account notifications as session requests without a workspace", async () => {
+    expect((await intercept("/api/v1/notifications")).headers.has("X-Workspace-Id")).toBeFalse();
+    await intercept("/api/v1/notifications/unread", new HttpErrorResponse({ status: 401 }));
+    expect(auth.sessionExpired).toHaveBeenCalledOnceWith(7);
+  });
+
+  it("does not classify similar public names as tenant endpoints or invent a workspace", async () => {
+    expect((await intercept("/api/v1/tags-public")).headers.has("X-Workspace-Id")).toBeFalse();
+    workspaces.currentId = () => null;
+    expect((await intercept("/api/v1/collections")).headers.has("X-Workspace-Id")).toBeFalse();
   });
 
   it("invalidates only a session-authenticated request and passes its generation", async () => {

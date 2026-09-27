@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Support\Streams;
 use PHPUnit\Framework\TestCase;
+use Tests\Fixtures\FailedReadStream;
 
 /**
  * Escrituras streaming fail-closed: un sink que acepta a trozos recibe el
@@ -14,12 +15,52 @@ final class StreamsTest extends TestCase
 {
     protected function tearDown(): void
     {
-        foreach (['uvh-partial', 'uvh-stalled', 'uvh-unflushable'] as $scheme) {
+        foreach (['uvh-partial', 'uvh-stalled', 'uvh-unflushable', 'uvh-read-failure'] as $scheme) {
             if (in_array($scheme, stream_get_wrappers(), true)) {
                 stream_wrapper_unregister($scheme);
             }
         }
         parent::tearDown();
+    }
+
+    public function test_chunk_reads_distinguish_real_eof_from_failure_and_stall(): void
+    {
+        $stream = fopen('php://temp', 'r+b');
+        fwrite($stream, 'prefix');
+        rewind($stream);
+        $this->assertSame('prefix', Streams::readChunk($stream, 100));
+        $this->assertSame('', Streams::readChunk($stream, 100));
+        fclose($stream);
+
+        stream_wrapper_register('uvh-read-failure', FailedReadStream::class);
+        foreach ([false, true] as $stall) {
+            FailedReadStream::$stall = $stall;
+            FailedReadStream::$prefix = 'partial';
+            $stream = fopen('uvh-read-failure://source', 'rb');
+            try {
+                Streams::readChunk($stream, 100);
+                $this->fail('Partial data must never conceal a failed read');
+            } catch (\RuntimeException) {
+                $this->addToAssertionCount(1);
+            } finally {
+                fclose($stream);
+            }
+        }
+    }
+
+    public function test_line_reads_refuse_io_failure_after_a_complete_line(): void
+    {
+        stream_wrapper_register('uvh-read-failure', FailedReadStream::class);
+        FailedReadStream::$stall = false;
+        FailedReadStream::$prefix = "complete\n";
+        $stream = fopen('uvh-read-failure://source', 'rb');
+        try {
+            $this->assertSame("complete\n", Streams::readLine($stream));
+            $this->expectException(\RuntimeException::class);
+            Streams::readLine($stream);
+        } finally {
+            fclose($stream);
+        }
     }
 
     public function test_write_all_retries_until_the_whole_buffer_reaches_a_piecewise_sink(): void

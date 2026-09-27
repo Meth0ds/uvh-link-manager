@@ -4,7 +4,7 @@ import { catchError, throwError } from "rxjs";
 import { WorkspaceService } from "../services/workspace.service";
 import { AuthService } from "../services/auth.service";
 
-const WORKSPACE_SCOPED = /^\/api\/v1\/(?:links|domains|tokens|webhooks)(?:\/|$)|^\/api\/v1\/analytics\/overview(?:\/|$)/;
+const WORKSPACE_SCOPED = /^\/api\/v1\/(?:links|domains|tokens|webhooks|tags|collections|link-templates)(?:\/|$)|^\/api\/v1\/analytics\/(?:overview|export)(?:\/|$)/;
 const SESSIONLESS_AUTH_PATHS = new Set([
   "/api/v1/auth/register",
   "/api/v1/auth/change-registration-email",
@@ -35,8 +35,8 @@ function pathOf(url: string): string {
 function usesSession(path: string): boolean {
   if (SESSIONLESS_AUTH_PATHS.has(path)) return false;
   if (path.startsWith("/api/v1/auth/")) return true;
-  if (/^\/api\/v1\/(?:links|workspaces|domains|tokens|webhooks|admin)(?:\/|$)/.test(path)) return true;
-  if (path === "/api/v1/analytics/overview" || path.startsWith("/api/v1/analytics/overview/")) return true;
+  if (WORKSPACE_SCOPED.test(path)) return true;
+  if (/^\/api\/v1\/(?:workspaces|admin|notifications)(?:\/|$)/.test(path)) return true;
   return path === "/api/v1/link-intents/claim" || path === "/api/v1/link-intents/complete";
 }
 

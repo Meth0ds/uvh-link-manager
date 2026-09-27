@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\LinkCsvController;
 use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Ids;
 use App\Support\SessionManager;
+use App\Support\UvhRequest;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +74,31 @@ final class LinkCsvTransferTest extends TestCase
         $this->assertSame(0, Link::count());
     }
 
+    public function test_preflight_checks_duplicate_aliases_existing_aliases_quota_and_domain_readiness(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $workspace->quota()->update(['links_limit' => 2]);
+        Link::create([
+            'workspace_id' => $workspace->id, 'created_by' => $owner->id, 'alias' => 'existing',
+            'destination' => 'https://example.org', 'state' => 'active',
+        ]);
+        CustomDomain::create([
+            'workspace_id' => $workspace->id, 'domain' => 'not-ready.example.test',
+            'verification_token' => 'fixture', 'state' => 'pending',
+        ]);
+        $this->signIn($owner, $workspace);
+        $csv = "alias,domain,destination\nexisting,,https://example.org\nfresh,,https://example.org\nfresh,,https://example.org\nover-quota,,https://example.org\nunready,not-ready.example.test,https://example.org\n";
+        $response = $this->postJson('/api/v1/links/import', ['dryRun' => true, 'csv' => $csv]);
+        $response->assertOk()->assertJson(['valid' => 1, 'created' => 0]);
+        $this->assertSame([2, 4, 5, 6], array_column($response->json('errors'), 'row'));
+        $this->assertSame('Este alias ya está en uso', $response->json('errors.0.error'));
+        $this->assertSame('Cuota de enlaces alcanzada', $response->json('errors.2.error'));
+        $this->assertSame('Dominio no activado o sin acceso', $response->json('errors.3.error'));
+        $this->assertDatabaseCount('links', 1);
+        $this->assertDatabaseCount('idempotency_keys', 0);
+        $this->assertDatabaseCount('link_import_batches', 0);
+    }
+
     public function test_the_real_import_creates_the_valid_rows_reports_the_rest_and_replays(): void
     {
         [$owner, $workspace] = $this->workspace();
@@ -86,7 +113,7 @@ final class LinkCsvTransferTest extends TestCase
         $first->assertOk()->assertJson(['dryRun' => false, 'valid' => 2, 'created' => 1]);
         $this->assertSame(1, Link::count());
         // Fila 3: destino inválido. Fila 4: el alias repetido dentro del mismo
-        // archivo sólo falla al crear, y cada fallo es de una fila, no del lote.
+        // archivo se informa también en preflight; cada fallo afecta a su fila.
         $this->assertSame([3, 4], array_column($first->json('errors'), 'row'));
 
         // La repetición devuelve el resultado original y no crea nada más: una
@@ -142,7 +169,7 @@ final class LinkCsvTransferTest extends TestCase
             'destination' => 'https://example.org/dos', 'state' => 'active', 'version' => 1,
             'created_at' => now(), 'updated_at' => now(),
         ]);
-        foreach (['prensa', '2026'] as $name) {
+        foreach (['prensa', '2026', 'prensa;2026', '[literal]'] as $name) {
             DB::table('link_tags')->insert([[
                 'link_id' => $simple,
                 'tag_id' => DB::table('tags')->insertGetId(['workspace_id' => $workspace->id, 'name' => $name]),
@@ -170,7 +197,7 @@ final class LinkCsvTransferTest extends TestCase
         $this->assertSame('=SUM(A1:A9)', (string) $simpleAgain->notes);
         $this->assertSame(5, (int) $simpleAgain->max_clicks);
         $this->assertTrue((bool) $simpleAgain->single_use);
-        $this->assertSame(['2026', 'prensa'], $simpleAgain->tags->pluck('name')->sort()->values()->all());
+        $this->assertSame(['2026', '[literal]', 'prensa', 'prensa;2026'], $simpleAgain->tags->pluck('name')->sort()->values()->all());
         $onDomainAgain = $recreated['dominio'];
         $this->assertSame((int) $domain->id, (int) $onDomainAgain->domain_id, 'the domain column must resolve to the target workspace domain');
         $this->assertSame('https://example.org/dos', (string) $onDomainAgain->destination);
@@ -243,6 +270,80 @@ final class LinkCsvTransferTest extends TestCase
         // Y una repetición posterior recibe el resultado sellado, tal cual.
         $replay = $this->postJson('/api/v1/links/import', ['dryRun' => false, 'csv' => $csv], ['Idempotency-Key' => 'import-crash-1']);
         $replay->assertOk()->assertExactJson($retry->json())->assertHeader('Idempotent-Replay', 'true');
+    }
+
+    public function test_takeover_between_rows_replays_the_ledger_and_fences_the_old_attempt(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $this->signIn($owner, $workspace);
+        $payload = ['dryRun' => false, 'csv' => "alias,destination\none,https://example.org/1\ntwo,https://example.org/2\nthree,https://example.org/3\n"];
+        $takeover = true;
+        $replacement = null;
+        DB::listen(function (QueryExecuted $event) use (&$takeover, &$replacement, $owner, $workspace, $payload): void {
+            if (! $takeover || ! str_starts_with(strtolower($event->sql), 'insert into "link_import_rows"')) {
+                return;
+            }
+            $takeover = false;
+            DB::afterCommit(function () use (&$replacement, $owner, $workspace, $payload): void {
+                // A was suspended between committed rows beyond the lease.
+                DB::table('idempotency_keys')->where('key', 'import-takeover')->update(['lease_until' => now()->subMinute()]);
+                $retry = Request::create('/api/v1/links/import', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($payload));
+                $retry->headers->set('Idempotency-Key', 'import-takeover');
+                $retry->attributes->set(UvhRequest::USER, $owner);
+                $retry->attributes->set(UvhRequest::WORKSPACE_ID, (int) $workspace->id);
+                $replacement = (new LinkCsvController)->import($retry);
+            });
+        });
+        $this->postJson('/api/v1/links/import', $payload, ['Idempotency-Key' => 'import-takeover'])->assertStatus(409);
+        $this->assertNotNull($replacement);
+        $this->assertSame(200, $replacement->getStatusCode());
+        $this->assertSame(3, $replacement->getData(true)['created']);
+        $this->assertSame([], $replacement->getData(true)['errors']);
+        $this->assertSame(3, Link::count());
+        $this->assertDatabaseCount('link_import_rows', 3);
+        $this->postJson('/api/v1/links/import', $payload, ['Idempotency-Key' => 'import-takeover'])
+            ->assertOk()->assertExactJson($replacement->getData(true))->assertHeader('Idempotent-Replay', 'true');
+    }
+
+    public function test_active_import_renews_ledger_retention_alongside_its_reservation(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $this->signIn($owner, $workspace);
+        $rows = 0;
+        DB::listen(function (QueryExecuted $event) use (&$rows): void {
+            if (! str_starts_with(strtolower($event->sql), 'insert into "link_import_rows"')) {
+                return;
+            }
+            $rows++;
+            $committedRow = $rows;
+            DB::afterCommit(function () use ($committedRow): void {
+                if ($committedRow === 1) {
+                    $this->travel(23)->hours();
+                } elseif ($committedRow === 2) {
+                    $this->travel(2)->hours();
+                    $this->assertSame(0, DB::table('link_import_batches')->where('expires_at', '<', now())->delete());
+                }
+            });
+        });
+        $this->postJson('/api/v1/links/import', [
+            'dryRun' => false,
+            'csv' => "alias,destination\nfirst,https://example.org\nsecond,https://example.org\nthird,https://example.org\n",
+        ], ['Idempotency-Key' => 'import-renew-retention'])->assertOk()->assertJson(['created' => 3, 'errors' => []]);
+        $this->assertDatabaseCount('link_import_rows', 3);
+    }
+
+    public function test_json_tag_cells_require_a_list_and_cannot_mix_with_legacy_tags(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $this->signIn($owner, $workspace);
+        foreach (['{}', 'null', '{broken', '42'] as $invalid) {
+            $this->postJson('/api/v1/links/import', [
+                'dryRun' => true, 'csv' => "alias,destination,tags_json\na,https://example.org,".$invalid,
+            ])->assertOk()->assertJson(['valid' => 0]);
+        }
+        $this->postJson('/api/v1/links/import', [
+            'dryRun' => true, 'csv' => "alias,destination,tags,tags_json\na,https://example.org,legacy,[]",
+        ])->assertStatus(422);
     }
 
     /** @return array{0: User, 1: Workspace} */
