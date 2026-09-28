@@ -87,7 +87,7 @@ class PasswordPolicyTest extends TestCase
             'password_hash' => Hash::make('tiovivo-cobrizo-astilla-42'),
             'email_verified_at' => now(),
         ]);
-        $plain = 'reset-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'user_id' => $user->id,
@@ -118,7 +118,7 @@ class PasswordPolicyTest extends TestCase
         ], $this->captchaPayload()))->assertStatus(201);
 
         $pending = PendingRegistration::where('email', 'charlie@example.com')->firstOrFail();
-        $plain = 'verify-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'pending_registration_id' => $pending->id,

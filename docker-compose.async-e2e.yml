@@ -14,6 +14,12 @@
 #     not weakened for the test.
 name: uvh-async-e2e
 
+# Shared literals for the TLS harness: the ask secret travels from the
+# application to the shim that attaches it to Caddy's ask requests, and the
+# ACME contact is the same value Caddy registers with Pebble.
+x-edge-ask-secret: &edge-ask-secret uvh-async-e2e-edge-ask-secret-0123456789abcdef
+x-acme-email: &acme-email acme@tls.uvh
+
 x-php-service: &php-service
   build:
     context: .
@@ -25,6 +31,14 @@ x-php-service: &php-service
     # this stack runs with the same one. Without it a maximum-size export is
     # refused by its own memory guard before a crash drill can reach it.
     - ./docker/php/uvh-worker-ceiling.ini:/usr/local/etc/php/conf.d/zz-uvh-worker-ceiling.ini:ro
+    # TLS harness: the edge probe verifies against the local Pebble CA exactly
+    # the way production verifies against public CAs, and the zone document
+    # CoreDNS serves is written from the `app` lever. The trust file is
+    # assembled at bring-up (Pebble's issuing CA is generated per start), so
+    # it arrives through the shared `tls-trust` volume.
+    - ./docker/tls-e2e/uvh-tls-e2e-ca.ini:/usr/local/etc/php/conf.d/zz-uvh-tls-e2e-ca.ini:ro
+    - tls-trust:/usr/local/share/uvh:ro
+    - tls-dns-zone:/zones
   environment: &php-environment
     APP_ENV: testing
     APP_DEBUG: "false"
@@ -72,8 +86,17 @@ x-php-service: &php-service
     MAIL_FROM_ADDRESS: no-reply@e2e.uvh
     MAIL_FROM_NAME: UVH
     # Non-empty target: routing ownership must be proven by a real CNAME lookup
-    # instead of the local-development shortcut.
-    CUSTOM_DOMAIN_CNAME_TARGET: edge.e2e.uvh
+    # instead of the local-development shortcut. The name lives in the TLS
+    # harness zone and resolves to the edge, so the chain a user follows (CNAME
+    # to the edge) is the chain the ACME validator follows too.
+    CUSTOM_DOMAIN_CNAME_TARGET: edge.tls.uvh
+    # TLS harness wiring: the ask secret, the ACME contact and the internal
+    # edge the certificate probe pins and checks.
+    EDGE_ASK_SECRET: *edge-ask-secret
+    ACME_EMAIL: *acme-email
+    EDGE_INTERNAL_HOST: edge
+    EDGE_INTERNAL_CIDRS: 172.31.0.0/24
+    UVH_TLS_ZONE_FILE: /zones/db.tls.uvh
     HCAPTCHA_SITE_KEY: 10000000-ffff-ffff-ffff-000000000001
     HCAPTCHA_SECRET: uvh-e2e-hcaptcha-secret
     HCAPTCHA_VERIFY_URL: http://hcaptcha:8080/siteverify
@@ -218,8 +241,10 @@ services:
       fixture:
         ipv4_address: 11.0.0.10
 
-  # Authoritative for `.e2e.uvh`; forwards every other query to Docker's
-  # embedded resolver so internal names keep working.
+  # Authoritative for `.e2e.uvh`; forwards every other query to CoreDNS — the
+  # TLS harness authority for `tls.uvh`, which recurses to Docker's embedded
+  # resolver — so internal names keep working through the same chain the
+  # platform's own lookups use.
   dns-fixture:
     build:
       context: .
@@ -231,7 +256,7 @@ services:
     environment:
       UVH_FIXTURE_STATE: /state/dns.json
       UVH_DNS_ZONE: e2e.uvh
-      UVH_DNS_UPSTREAM: 127.0.0.11:53
+      UVH_DNS_UPSTREAM: 172.31.0.54:53
     ports:
       - "127.0.0.1:${UVH_ASYNC_DNS_CONTROL_PORT:-8091}:8081"
     command:
@@ -321,8 +346,87 @@ services:
         condition: service_healthy
     command: ["php", "artisan", "schedule:work"]
 
+  # Real DNS for the TLS chain. The scenario publishes one zone document
+  # (`domain-dns-serve`) holding the customer hostname, the edge address and
+  # the ownership TXT; the platform verifies through dns-fixture and Pebble's
+  # VA queries this server directly. An empty `/zones` at boot is fine: `auto`
+  # picks the file up within its reload window.
+  coredns:
+    image: coredns/coredns:1.12.1@sha256:e8c262566636e6bc340ece6473b0eed193cad045384401529721ddbe6463d31c
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - ./docker/tls-e2e/Corefile:/etc/coredns/Corefile:ro
+      - tls-dns-zone:/zones:ro
+    networks:
+      backend:
+        ipv4_address: 172.31.0.54
+
+  # The ACME CA for the TLS chain. Its validator answers challenges against
+  # the real edge ports (80/443) and resolves every name through the harness
+  # DNS, so an issuance here is a real issuance. What it signs comes from the
+  # Mini CA in docker/tls-e2e/pebble.minica.pem, which the edge serves and the
+  # platform's probe trusts.
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:latest@sha256:ddf230642b1a584f519f32e347de1b05a6e4c1f6c35c1863b33effeab5f78199
+    command: ["-config", "/test/config/pebble-config.json", "-dnsserver", "172.31.0.54:53"]
+    environment:
+      # No artificial validator sleeps and no random nonce rejections: the
+      # chain must fail on facts about DNS and TLS, never on Pebble's pacing.
+      PEBBLE_VA_NOSLEEP: "1"
+      PEBBLE_WFE_NONCEREJECT: "0"
+    volumes:
+      - ./docker/tls-e2e/pebble-config.json:/test/config/pebble-config.json:ro
+    networks:
+      - backend
+
+  # The secret-injection shim behind Caddy's ask (production's Nginx internal
+  # listener). Caddy cannot attach headers to its ask requests, and nothing
+  # without this shim's secret passes the application's gate. Before serving,
+  # it assembles the trust file every probe verifies with: Pebble's issuing
+  # hierarchy is generated per start, so the anchors are runtime facts fetched
+  # from its management API (verified against the static Mini CA).
+  edge-ask-shim:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend-laravel:/app:ro
+      - ./docker/tls-e2e/pebble.minica.pem:/certs/pebble.minica.pem:ro
+      - tls-trust:/usr/local/share/uvh
+    environment:
+      EDGE_ASK_SECRET: *edge-ask-secret
+      UVH_ASK_UPSTREAM: http://app:8000
+    command:
+      - sh
+      - -c
+      - php tests/E2E/pebble-ca-trust.php && exec php -S 0.0.0.0:8081 tests/E2E/edge-ask-shim.php
+    networks:
+      - backend
+
+  # The TLS edge: on-demand certificates from Pebble, with the ask gate on
+  # every handshake and again on every request. Its fixed address is what the
+  # zone publishes and what the platform's probe pins (`CURLOPT_RESOLVE`), so
+  # nothing depends on DNS round trips for the customer hostname.
+  edge:
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    environment:
+      ACME_EMAIL: *acme-email
+    volumes:
+      - ./docker/caddy/Caddyfile.tls-e2e:/etc/caddy/Caddyfile:ro
+      - ./docker/tls-e2e/pebble.minica.pem:/certs/pebble.minica.pem:ro
+    # Ephemeral ACME storage: every suite run earns its certificate again.
+    tmpfs:
+      - /data
+      - /config
+    networks:
+      backend:
+        ipv4_address: 172.31.0.80
+
 volumes:
   async-fixture-state:
+  tls-dns-zone:
+  tls-trust:
 
 networks:
   backend:

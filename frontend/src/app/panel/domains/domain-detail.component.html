@@ -30,10 +30,13 @@
   <div class="diagnostic-grid">
     <section class="diagnostic-card" aria-labelledby="ownership-title">
       <header><span class="step">1</span><div><h2 id="ownership-title">Propiedad</h2><p>Registro TXT</p></div><mat-icon [class.ready]="!!d.ownershipVerifiedAt">{{ d.ownershipVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon></header>
-      <p class="observed">{{ d.ownershipVerifiedAt ? 'Confirmada el ' + formatDate(d.ownershipVerifiedAt) : 'Aún no confirmada' }}</p>
+      <p class="observed">{{ d.ownershipVerifiedAt ? 'Confirmada el ' + formatDate(d.ownershipVerifiedAt) : d.ownershipTxtPresent === false ? 'No encontramos el registro TXT' : d.ownershipTxtPresent ? 'El registro TXT existe pero su valor no coincide' : 'Aún no confirmada' }}</p>
       @if (canEdit() && d.verificationHost && d.verificationToken) {
         <div class="record"><span>Nombre</span><code>{{ d.verificationHost }}</code><button mat-icon-button type="button" (click)="copy(d.verificationHost, 'Nombre TXT')" aria-label="Copiar nombre TXT"><mat-icon>content_copy</mat-icon></button></div>
         <div class="record"><span>Valor</span><code>{{ d.verificationToken }}</code><button mat-icon-button type="button" (click)="copy(d.verificationToken, 'Valor TXT')" aria-label="Copiar valor TXT"><mat-icon>content_copy</mat-icon></button></div>
+        <p class="warning" role="status"><strong>Mantén este registro TXT.</strong> UVH lo comprueba periódicamente para confirmar que sigues controlando el dominio. Si lo eliminas, el dominio puede dejar de servir enlaces tras el periodo de seguridad.</p>
+      } @else if (d.verificationHost) {
+        <div class="record"><span>Nombre</span><code>{{ d.verificationHost }}</code></div>
       }
     </section>
 
@@ -46,12 +49,21 @@
       } @else {
         <p class="warning">El destino CNAME no está configurado en este entorno.</p>
       }
+      @if (observedRoutingLabel(); as observed) {
+        <p class="observed" role="status">{{ observed }}</p>
+      }
+      @if (d.routingObservedProxied) {
+        <p class="warning" role="status">Parece haber un proxy DNS delante (p. ej. Cloudflare «naranja») o flattening. Este flujo sólo admite un CNAME directo.</p>
+      }
     </section>
 
     <section class="diagnostic-card" aria-labelledby="tls-title">
       <header><span class="step">3</span><div><h2 id="tls-title">HTTPS</h2><p>Certificado TLS</p></div><mat-icon [class.ready]="!!d.tlsReadyAt">{{ d.tlsReadyAt ? 'verified_user' : 'schedule' }}</mat-icon></header>
       <p class="observed">{{ d.tlsReadyAt ? 'Preparado el ' + formatDate(d.tlsReadyAt) : d.state === 'provisioning' ? 'Emisión en curso' : 'Todavía no preparado' }}</p>
       <p>Entrada pública en edge: <strong>{{ d.edgeEligible ? 'habilitada' : 'deshabilitada' }}</strong></p>
+      @if (tlsExpiryLabel(); as expiry) { <p class="observed" role="status">{{ expiry }}</p> }
+      @if (d.tlsIssuer) { <p class="observed">Emitido por {{ d.tlsIssuer }}.</p> }
+      @if (caaLabel(); as caa) { <p class="warning" role="status">{{ caa }}</p> }
       @if (tlsErrorLabel(d.tlsError); as tlsMessage) { <p class="warning" role="status">{{ tlsMessage }}</p> }
     </section>
   </div>
@@ -68,14 +80,46 @@
       <div><dt>Política actual</dt><dd>{{ d.automaticDnsRetry ? 'Cada ' + d.dnsRetryIntervalHours + ' h según el último resultado' : 'Sin reintento automático' }}</dd></div>
     </dl>
     @if (dnsErrorLabel(d.dnsError); as dnsMessage) { <p class="warning" role="status">{{ dnsMessage }}</p> }
+    @if (graceLabel(); as grace) { <p class="warning degraded" role="status">{{ grace }}</p> }
     @if (canEdit()) {
       <div class="actions">
         <button mat-flat-button color="primary" type="button" (click)="startDnsCheck()" [disabled]="actionBusy() || d.dnsCheckInProgress || d.state === 'provisioning'"><mat-icon>dns</mat-icon> {{ d.dnsCheckInProgress ? 'Comprobación en curso' : 'Comprobar ahora' }}</button>
         @if (d.state === 'verified') {
-          <button mat-stroked-button type="button" (click)="activate()" [disabled]="actionBusy() || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>https</mat-icon> Preparar HTTPS</button>
+          <button mat-stroked-button type="button" (click)="activate()" [disabled]="actionBusy() || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>https</mat-icon> {{ d.dnsCheckInProgress ? 'Preparar HTTPS (espera la comprobación)' : 'Preparar HTTPS' }}</button>
         }
       </div>
     }
-    <p class="scheduler-note">La fecha indica cuándo el planificador puede admitir el trabajo. La ejecución puede demorarse por cola; esta pantalla no realiza sondeos automáticos.</p>
+    <p class="scheduler-note">La fecha indica cuándo el planificador puede admitir el trabajo. La ejecución puede demorarse por cola. Mientras haya una comprobación o una emisión en curso, esta página se actualiza sola.</p>
+  </section>
+
+  <section class="schedule-card" aria-labelledby="surface-title">
+    <div>
+      <span class="eyebrow">Comportamiento del dominio</span>
+      <h2 id="surface-title">Superficie de visitante</h2>
+    </div>
+    <p class="scheduler-note">Qué ve quien llegue a este dominio fuera de los enlaces: hacia dónde va la raíz <code>/</code> y qué responde una ruta desconocida.</p>
+    @if (canEdit()) {
+      <div class="surface-form">
+        <mat-form-field appearance="outline" class="surface-root">
+          <mat-label>Destino raíz (/)</mat-label>
+          <input matInput [ngModel]="rootDestinationInput()" (ngModelChange)="onRootChange($event)" placeholder="https://tu-marca.com" />
+          <mat-hint>Vacío: la raíz responde «no encontrado».</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Rutas desconocidas</mat-label>
+          <mat-select [value]="notFoundModeInput()" (selectionChange)="onModeChange($event.value)">
+            <mat-option value="platform">Aviso de la plataforma</mat-option>
+            <mat-option value="redirect">Redirigir al destino raíz</mat-option>
+            <mat-option value="branded">Aviso con la marca del dominio</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="button" (click)="saveSurface()" [disabled]="actionBusy()"><mat-icon>save</mat-icon> Guardar</button>
+      </div>
+    } @else {
+      <dl>
+        <div><dt>Destino raíz</dt><dd>{{ d.rootDestination ?? 'Sin destino configurado' }}</dd></div>
+        <div><dt>Rutas desconocidas</dt><dd>{{ surfaceModeLabel(d.notFoundMode) }}</dd></div>
+      </dl>
+    }
   </section>
 }

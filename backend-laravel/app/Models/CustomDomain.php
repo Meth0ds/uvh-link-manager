@@ -18,6 +18,13 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $dns_check_completed_at
  * @property Carbon|null $dns_first_failed_at
  * @property Carbon|null $tls_ready_at
+ * @property Carbon|null $tls_checked_at
+ * @property Carbon|null $tls_not_after
+ * @property Carbon|null $tls_last_attempt_at
+ * @property Carbon|null $tls_next_retry_at
+ * @property Carbon|null $dns_observed_at
+ * @property array<array{tag: string, value: string}>|null $caa_records
+ * @property list<string>|null $routing_observed_addresses
  */
 class CustomDomain extends Model
 {
@@ -26,7 +33,11 @@ class CustomDomain extends Model
         'domain',
         'verification_token',
         'verification_version',
-        'state',
+        'verification_scheme',
+        'desired_state',
+        'ownership_status',
+        'routing_status',
+        'tls_status',
         'verified_at',
         'ownership_verified_at',
         'routing_verified_at',
@@ -35,16 +46,35 @@ class CustomDomain extends Model
         'dns_error',
         'dns_failure_count',
         'dns_first_failed_at',
+        'reputation_checked_at',
         'edge_eligible',
         'tls_version',
         'tls_ready_at',
         'tls_error',
+        'tls_checked_at',
+        'tls_not_after',
+        'tls_issuer',
+        'tls_last_attempt_at',
+        'tls_next_retry_at',
+        'root_destination',
+        'not_found_mode',
+        'is_default',
+        'dns_observed_at',
+        'ownership_txt_present',
+        'routing_observed_target',
+        'routing_observed_ttl',
+        'routing_observed_addresses',
+        'routing_observed_proxied',
+        'caa_records',
+        'caa_allows_issuer',
+        'tls_probe_failures',
     ];
 
     protected function casts(): array
     {
         return [
             'verification_version' => 'integer',
+            'verification_scheme' => 'integer',
             'verified_at' => 'datetime',
             'ownership_verified_at' => 'datetime',
             'routing_verified_at' => 'datetime',
@@ -52,9 +82,23 @@ class CustomDomain extends Model
             'dns_check_completed_at' => 'datetime',
             'dns_failure_count' => 'integer',
             'dns_first_failed_at' => 'datetime',
+            'reputation_checked_at' => 'datetime',
             'edge_eligible' => 'boolean',
             'tls_version' => 'integer',
             'tls_ready_at' => 'datetime',
+            'tls_checked_at' => 'datetime',
+            'tls_not_after' => 'datetime',
+            'tls_last_attempt_at' => 'datetime',
+            'tls_next_retry_at' => 'datetime',
+            'dns_observed_at' => 'datetime',
+            'ownership_txt_present' => 'boolean',
+            'routing_observed_ttl' => 'integer',
+            'routing_observed_addresses' => 'array',
+            'routing_observed_proxied' => 'boolean',
+            'caa_records' => 'array',
+            'caa_allows_issuer' => 'boolean',
+            'tls_probe_failures' => 'integer',
+            'is_default' => 'boolean',
         ];
     }
 

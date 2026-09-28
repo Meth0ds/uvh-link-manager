@@ -19,7 +19,7 @@ import { decodeAccountDeletionConfirmation } from "../core/services/public-actio
       <section class="card center" aria-labelledby="confirm-account-deletion-title">
         <span class="step-kicker">ELIMINACIÓN DE CUENTA</span>
         <mat-icon class="icon" aria-hidden="true" [class.ok]="done()" [class.bad]="error()">{{ done() ? 'event_available' : (error() ? 'error_outline' : 'person_remove') }}</mat-icon>
-        <h2 id="confirm-account-deletion-title">{{ done() ? 'Eliminación programada' : (error() ? 'No se pudo programar' : 'Última confirmación') }}</h2>
+        <h2 id="confirm-account-deletion-title">{{ done() ? 'Eliminación programada' : (!hasLink ? 'Enlace no disponible' : (error() ? 'No se pudo programar' : 'Última confirmación')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
         @if (!done() && !error()) {
           <button mat-flat-button class="danger-action" type="button" (click)="confirm()" [disabled]="busy()">{{ busy() ? 'Programando…' : 'Cerrar acceso y programar eliminación' }}</button>
@@ -40,6 +40,8 @@ export class ConfirmAccountDeletionComponent {
   private location = inject(Location);
   private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
+
+  get hasLink(): boolean { return this.token.length > 0; }
 
   readonly busy = signal(false);
   readonly done = signal(false);

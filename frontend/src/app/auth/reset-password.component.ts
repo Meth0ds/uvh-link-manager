@@ -22,8 +22,8 @@ import { LatestRequest } from "../core/services/latest-request";
     <app-auth-shell>
       <div class="card" aria-label="Recuperar el acceso">
         <span class="step-kicker">RECUPERAR EL ACCESO</span>
-        <h2 id="reset-password-title">Nueva contraseña</h2>
-        <p class="sub">Utiliza una frase larga y exclusiva para UVH. No necesitas recordar la contraseña anterior.</p>
+        <h2 id="reset-password-title">{{ hasResetLink ? 'Nueva contraseña' : 'Enlace no disponible' }}</h2>
+        @if (hasResetLink) { <p class="sub">Utiliza una frase larga y exclusiva para UVH. No necesitas recordar la contraseña anterior.</p> }
         @if (pendingLink()) {
           <p class="sub">Tu URL seguirá guardada cuando vuelvas a iniciar sesión.</p>
         } @else if (pendingInvitation()) {

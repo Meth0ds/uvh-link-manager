@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 import { check, until } from "./expect.mjs";
 import { fixture, fixtureSecret, hookUrl, messageMatching, setState, tokenFromUrl } from "./fixtures.mjs";
 import { api, login, password, register, uniqueEmail, workspaces } from "./session.mjs";
-import { control, docker, inspect, runningService } from "./topology.mjs";
+import { control, docker, edgeAddress, inspect, runningService } from "./topology.mjs";
 
 // ---------------------------------------------------------------------------
 // Scenarios
@@ -88,23 +88,40 @@ export async function domainChain({ session, workspaceId }) {
 
   await setState(control.dns, {
     txt: { "_uvh-verification.alfa.e2e.uvh": token },
-    cname: { "alfa.e2e.uvh": "edge.e2e.uvh" },
+    cname: { "alfa.e2e.uvh": "edge.tls.uvh" },
   });
-  const queued = await api("POST", `/api/v1/domains/${domainId}/verify`, { session, workspaceId });
-  check("dns: verification request accepted", queued.status === 200 || queued.status === 202, `HTTP ${queued.status}`);
+  // The scheduler admits pending domains on its own sweep (intent, not
+  // health), so the panel's explicit check and the background one coalesce
+  // behind the same lock: 409 means a check is already in flight, exactly what
+  // a user would be told. Retry like a user and settle on the facts whichever
+  // check applied them.
+  await until(
+    "dns: verification accepted or already in flight",
+    async () => {
+      const state = inspect("domain", String(domainId));
+      if (state.ownership_status === "verified") return state;
+      const request = await api("POST", `/api/v1/domains/${domainId}/verify`, { session, workspaceId });
+      return request.status === 200 || request.status === 202 || request.status === 409 ? request : undefined;
+    },
+    { deadlineMs: 30_000, intervalMs: 3_000 },
+  ).catch((error) => {
+    check("dns: verification accepted or already in flight", false, error.message);
+  });
 
-  const verified = await until("dns: domains worker reaches a verified state", () => {
+  const verified = await until("dns: ownership and routing were both proven", () => {
     const state = inspect("domain", String(domainId));
-    return state.state === "verified" ? state : undefined;
-  }, { deadlineMs: 30_000 }).catch((error) => {
-    check("dns: domains worker reaches a verified state", false, error.message);
+    // `verified` is a phase, not a resting place: auto-TLS moves a proven
+    // domain straight to `provisioning`. The durable facts are the assertion.
+    return state.ownership_status === "verified" && state.routing_status === "healthy" ? state : undefined;
+  }, { deadlineMs: 60_000 }).catch((error) => {
+    check("dns: ownership and routing were both proven", false, error.message);
     return null;
   });
   if (verified) {
     check(
-      "dns: ownership and routing were both proven",
-      Boolean(verified.ownership_verified_at) && Boolean(verified.routing_verified_at),
-      JSON.stringify({ ownership: verified.ownership_verified_at, routing: verified.routing_verified_at }),
+      "dns: the row records who proved what and when",
+      Boolean(verified.ownership_verified_at) && Boolean(verified.routing_verified_at) && Boolean(verified.verified_at),
+      JSON.stringify({ ownership: verified.ownership_verified_at, routing: verified.routing_verified_at, verified: verified.verified_at }),
     );
   }
 
@@ -121,6 +138,118 @@ export async function domainChain({ session, workspaceId }) {
   if (failed) {
     check("dns: the failure names the missing records", failed.dns_error === "ownership_and_routing_missing", `dns_error=${failed.dns_error}`);
   }
+}
+
+/**
+ * The TLS half of the domain story: controlled authoritative DNS -> ownership
+ * and routing proven -> activation -> a real ACME issuance at the edge -> the
+ * certificate proven from the only network path the platform trusts.
+ */
+export async function domainTlsChain({ session, workspaceId }) {
+  const domain = "shop.tls.uvh";
+  const added = await api("POST", "/api/v1/domains", { session, workspaceId, json: { domain } });
+  const domainId = added.body?.domain?.id;
+  const token = added.body?.domain?.verificationToken;
+  check("tls: domain admitted for verification", added.status === 201 && Boolean(domainId && token), `HTTP ${added.status}`);
+  if (!domainId || !token) return;
+
+  await until(
+    "tls: the authoritative zone answers like production",
+    () => {
+      const state = inspect("domain-dns-serve", JSON.stringify({ domain, token, edgeAddress }));
+      const seen = state.observed ?? {};
+      return (seen.txt ?? []).includes(token) && (seen.cname ?? []).includes("edge.tls.uvh") ? state : undefined;
+    },
+    { deadlineMs: 20_000 },
+  ).catch((error) => {
+    check("tls: the authoritative zone answers like production", false, error.message);
+  });
+
+  await until(
+    "tls: verification accepted or already in flight",
+    async () => {
+      const state = inspect("domain", String(domainId));
+      if (state.ownership_status === "verified") return state;
+      const request = await api("POST", `/api/v1/domains/${domainId}/verify`, { session, workspaceId });
+      return request.status === 200 || request.status === 202 || request.status === 409 ? request : undefined;
+    },
+    { deadlineMs: 30_000, intervalMs: 3_000 },
+  ).catch((error) => {
+    check("tls: verification accepted or already in flight", false, error.message);
+  });
+
+  await until(
+    "tls: the domains worker proves ownership and routing",
+    () => {
+      const state = inspect("domain", String(domainId));
+      return state.ownership_status === "verified" && state.routing_status === "healthy" ? state : undefined;
+    },
+    { deadlineMs: 60_000 },
+  ).catch((error) => {
+    check("tls: the domains worker proves ownership and routing", false, error.message);
+  });
+
+  // Activation is refused while a check is still in flight (409) — retry, as
+  // the panel's button does, until the intent is accepted and TLS moves to
+  // provisioning.
+  await until(
+    "tls: activation accepted",
+    async () => {
+      const state = inspect("domain", String(domainId));
+      if (state.tls_status === "provisioning" || state.tls_status === "ready") return state;
+      const request = await api("POST", `/api/v1/domains/${domainId}/activate`, { session, workspaceId });
+      return request.status === 200 || request.status === 202 ? request : undefined;
+    },
+    { deadlineMs: 30_000, intervalMs: 3_000 },
+  ).catch((error) => {
+    check("tls: activation accepted", false, error.message);
+  });
+
+  const ready = await until(
+    "tls: the edge earns a certificate and the probe confirms it",
+    () => {
+      const state = inspect("domain", String(domainId));
+      return state.state === "active" && state.tls_status === "ready" ? state : undefined;
+    },
+    // On-demand issuance happens inside the platform's own probe: the
+    // handshake waits for Caddy to earn the certificate from Pebble and to
+    // re-run the ask gate, and the job re-probes on its own backoff if the
+    // first attempt lands too early.
+    { deadlineMs: 120_000 },
+  ).catch((error) => {
+    check("tls: the edge earns a certificate and the probe confirms it", false, error.message);
+    return null;
+  });
+  if (ready) {
+    check(
+      "tls: the certificate carries its issuer and lifetime",
+      Boolean(ready.tls_issuer) && Boolean(ready.tls_not_after),
+      JSON.stringify({ issuer: ready.tls_issuer, notAfter: ready.tls_not_after }),
+    );
+  }
+
+  // The visitor path, for real: SNI and Host are the customer hostname, the
+  // edge address is pinned exactly the way the platform's probe pins it, and
+  // the handshake must verify against the issuing CA.
+  const visit = (() => {
+    try {
+      return String(
+        docker(
+          [
+            "exec", "-T", "app", "curl", "--silent", "--show-error",
+            "--output", "/dev/null", "--write-out", "%{http_code} %{ssl_verify_result}",
+            "--cacert", "/usr/local/share/uvh/pebble-ca.pem",
+            "--resolve", `${domain}:443:${edgeAddress}`,
+            `https://${domain}/health`,
+          ],
+          { capture: true },
+        ),
+      ).trim();
+    } catch (error) {
+      return `visitor request failed: ${error.message}`;
+    }
+  })();
+  check("tls: a visitor handshake verifies and the branded health answers 204", visit === "204 0", visit);
 }
 
 /**

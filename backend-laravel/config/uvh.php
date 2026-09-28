@@ -21,6 +21,7 @@ return [
     // Full origin used only to generate default short URLs. Production's
     // startup gate requires its exact PUBLIC_HOST over HTTPS.
     'public_origin' => env('PUBLIC_ORIGIN', 'https://'.env('PUBLIC_HOST', 'uvh.es')),
+    'frontend_url' => env('FRONTEND_URL'),
     'queue_pool' => env('UVH_QUEUE_POOL', ''),
     'legal' => [
         // Public legal identity. Production refuses to boot while any required
@@ -164,6 +165,26 @@ return [
         'failure_retry_hours' => (int) env('DOMAIN_FAILURE_RETRY_HOURS', 1),
         'failure_grace_hours' => (int) env('DOMAIN_FAILURE_GRACE_HOURS', 2),
         'max_failures' => (int) env('DOMAIN_MAX_FAILURES', 3),
+        // The CA that issues custom-domain certificates. Used to tell a user
+        // exactly which CAA record to allow instead of "revisa tu CAA".
+        'acme_issuer' => env('ACME_ISSUER', 'letsencrypt.org'),
+        // Vistas públicas del consenso DNS multi-resolver (nombres que
+        // `App\Jobs\DnsViews` sabe consultar por DNS-over-HTTPS). Vacío
+        // desactiva el consenso —sólo el resolvedor del sistema—, y es lo que
+        // usan desarrollo, tests y el stack E2E con su fixture DNS.
+        'public_resolvers' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('UVH_PUBLIC_RESOLVERS', '')),
+        ))),
+        // Certificate lifetime monitoring: a certificate this close to expiry
+        // is reported as `expiring`, and a probe that keeps failing withdraws
+        // the domain after `max_failures` attempts, like the DNS checks.
+        'tls_expiry_warn_days' => (int) env('DOMAIN_TLS_EXPIRY_WARN_DAYS', 20),
+        'tls_probe_interval_hours' => (int) env('DOMAIN_TLS_PROBE_INTERVAL_HOURS', 24),
+        'tls_probe_batch' => (int) env('DOMAIN_TLS_PROBE_BATCH', 20),
+        // Housekeeping sweep size. Configurable so a larger fleet can turn
+        // the dial without a deploy, and operators can alert on the backlog.
+        'revalidation_batch' => (int) env('DOMAIN_REVALIDATION_BATCH', 20),
     ],
     'housekeeping' => [
         'interval_minutes' => (int) env('HOUSEKEEPING_INTERVAL_MINUTES', 60),

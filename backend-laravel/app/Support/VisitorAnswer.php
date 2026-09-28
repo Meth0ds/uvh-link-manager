@@ -125,10 +125,14 @@ final class VisitorAnswer
     /**
      * Un aviso del enlace público: siempre página, nunca sobre. Un aviso no lo
      * provoca un formulario, y quien llega hasta él viene navegando.
+     *
+     * `$brandHost` sustituye la marca de la plataforma por el hostname: un
+     * dominio con 404 «de marca» responde como suyo, no como el servicio que
+     * hay detrás.
      */
-    public static function notice(string $title, string $body, int $status): Response
+    public static function notice(string $title, string $body, int $status, ?string $brandHost = null): Response
     {
-        return response(VisitorPage::notice($title, $body, $status), $status);
+        return response(VisitorPage::notice($title, $body, $status, $brandHost), $status);
     }
 
     /** Quien pide HTML está mirando la pantalla; cualquier otro es un cliente. */

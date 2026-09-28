@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\UvhSession;
 use App\Models\Workspace;
 use App\Support\Audit;
+use App\Support\FrontendUrl;
 use App\Support\Ids;
 use App\Support\InvitationBudgetExceeded;
 use App\Support\InvitationBudgetUnavailable;
@@ -1150,7 +1151,7 @@ class WorkspaceController
 
     private function appUrl(): string
     {
-        return rtrim((string) config('app.url'), '/');
+        return FrontendUrl::base();
     }
 
     private function iso(mixed $value): ?string

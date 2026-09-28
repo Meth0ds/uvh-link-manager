@@ -7,17 +7,19 @@ use App\Jobs\ProvisionDomainTlsJob;
 use App\Jobs\VerifyDomainDnsJob;
 use App\Models\CustomDomain;
 use App\Models\User;
+use App\Support\DomainStatus;
 use App\Support\Ids;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
- * Auto-TLS (F6): when a person asks for the ownership+routing check and it
- * proves both records, certificate provisioning starts in the same breath — no
- * second «Preparar HTTPS» click. The periodic sweep never starts ACME on its
- * own and a domain its owner disabled stays put. Prepared regression
- * contracts: run only with the isolated *_test DB guard.
+ * Auto-TLS: when a check proves ownership and routing, certificate
+ * provisioning starts in the same breath — no second «Preparar HTTPS» click.
+ * The scheduler completes a setup or a recovery unattended (the user asked for
+ * the domain to work; the platform finishes the job), bounded by the TLS
+ * cooldown, and a domain its owner disabled is never revived. Prepared
+ * regression contracts: run only with the isolated *_test DB guard.
  */
 final class AutoTlsProvisioningTest extends TestCase
 {
@@ -26,7 +28,7 @@ final class AutoTlsProvisioningTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp(); // Refuses non-*_test databases before fixture writes.
-        DB::statement('TRUNCATE users, workspaces, custom_domains, audit_events, operational_metrics RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, workspaces, custom_domains, custom_domain_claims, audit_events, operational_metrics RESTART IDENTITY CASCADE');
         require_once dirname(__DIR__).'/Support/dns-stub.php';
         DnsStub::reset();
         config(['uvh.custom_domains.cname_target' => 'edge.example.test']);
@@ -35,13 +37,13 @@ final class AutoTlsProvisioningTest extends TestCase
 
     public function test_a_user_requested_check_proving_both_records_starts_tls_provisioning(): void
     {
-        [$user, $domain] = $this->fixture('verifying');
+        [$user, $domain] = $this->fixture();
         $this->answerBoth();
 
-        $this->job($user, $domain, 'verifying')->handle();
+        $this->job($user, $domain)->handle();
 
         $fresh = $domain->refresh();
-        $this->assertSame('provisioning', $fresh->state);
+        $this->assertSame('provisioning', $fresh->tls_status);
         $this->assertTrue((bool) $fresh->edge_eligible);
         $this->assertSame(1, (int) $fresh->tls_version);
         $this->assertNotNull($fresh->ownership_verified_at);
@@ -55,63 +57,87 @@ final class AutoTlsProvisioningTest extends TestCase
 
     public function test_a_revalidation_that_proves_both_records_retries_a_failed_certificate(): void
     {
-        [$user, $domain] = $this->fixture('verified', [
-            'verified_at' => now(), 'tls_error' => 'certificate_provisioning_failed',
+        [$user, $domain] = $this->fixture([
+            'verified_at' => now(), 'tls_status' => 'error',
+            'tls_error' => 'certificate_provisioning_failed',
         ]);
         $this->answerBoth();
 
-        $this->job($user, $domain, 'verified')->handle();
+        $this->job($user, $domain)->handle();
 
         $fresh = $domain->refresh();
-        $this->assertSame('provisioning', $fresh->state);
+        $this->assertSame('provisioning', $fresh->tls_status);
         $this->assertNull($fresh->tls_error);
         $this->assertSame(1, (int) $fresh->tls_version);
         Queue::assertPushed(ProvisionDomainTlsJob::class, 1);
     }
 
-    public function test_the_periodic_sweep_never_starts_acme_on_its_own(): void
+    public function test_a_failed_certificate_outside_its_cooldown_window_is_not_retried_by_the_sweep(): void
     {
-        [, $domain] = $this->fixture('verifying');
+        [, $domain] = $this->fixture([
+            'verified_at' => now(), 'tls_status' => 'error',
+            'tls_error' => 'certificate_provisioning_failed',
+            'tls_next_retry_at' => now()->addHour(),
+        ]);
         $this->answerBoth();
 
-        $this->job(null, $domain, 'verifying')->handle();
+        $this->job(null, $domain)->handle();
 
         $fresh = $domain->refresh();
-        $this->assertSame('verified', $fresh->state);
-        $this->assertFalse((bool) $fresh->edge_eligible);
+        $this->assertSame('error', $fresh->tls_status);
         $this->assertSame(0, (int) $fresh->tls_version);
         Queue::assertNothingPushed();
+    }
+
+    public function test_the_scheduler_finishes_a_setup_or_recovery_without_a_click(): void
+    {
+        // Unattended recovery: the domain served before, DNS broke, and the
+        // sweep's check now proves everything again. The platform finishes.
+        [, $domain] = $this->fixture(['verified_at' => now()->subDay()]);
+        $this->answerBoth();
+
+        $this->job(null, $domain)->handle();
+
+        $fresh = $domain->refresh();
+        $this->assertSame('provisioning', $fresh->tls_status);
+        $this->assertTrue((bool) $fresh->edge_eligible);
+        $this->assertSame(1, (int) $fresh->tls_version);
+        Queue::assertPushed(ProvisionDomainTlsJob::class, fn (ProvisionDomainTlsJob $job) => $job->requestedBy === null);
     }
 
     public function test_a_domain_the_owner_disabled_is_never_revived_with_tls(): void
     {
-        [$user, $domain] = $this->fixture('disabled');
+        [$user, $domain] = $this->fixture(['desired_state' => 'disabled']);
         $this->answerBoth();
 
-        $this->job($user, $domain, 'disabled')->handle();
+        $this->job($user, $domain)->handle();
 
         $fresh = $domain->refresh();
-        $this->assertNotSame('provisioning', $fresh->state);
+        $this->assertSame('disabled', $fresh->desired_state);
+        $this->assertNotSame('provisioning', $fresh->tls_status);
         $this->assertSame(0, (int) $fresh->tls_version);
-        Queue::assertNothingPushed();
+        // Only the certificate is withheld; the outbox still fans out the
+        // domain's history.
+        Queue::assertNotPushed(ProvisionDomainTlsJob::class);
     }
 
     public function test_a_check_without_both_records_still_provisions_nothing(): void
     {
-        [$user, $domain] = $this->fixture('verifying');
+        [$user, $domain] = $this->fixture();
         // Ownership only: routing is missing, so nothing is proven.
         DnsStub::txt('_uvh-verification.shop.example.test', self::TOKEN);
 
-        $this->job($user, $domain, 'verifying')->handle();
+        $this->job($user, $domain)->handle();
 
         $fresh = $domain->refresh();
-        $this->assertSame('error', $fresh->state);
+        $this->assertSame('error', DomainStatus::legacyState($fresh));
         $this->assertSame('routing_missing', $fresh->dns_error);
-        Queue::assertNothingPushed();
+        $this->assertSame('failed', $fresh->routing_status);
+        Queue::assertNotPushed(ProvisionDomainTlsJob::class);
     }
 
     /** @return array{User, CustomDomain} */
-    private function fixture(string $state, array $extra = []): array
+    private function fixture(array $extra = []): array
     {
         $user = User::factory()->create();
         $workspace = $user->ownedWorkspaces()->create([
@@ -122,22 +148,28 @@ final class AutoTlsProvisioningTest extends TestCase
             'workspace_id' => $workspace->id,
             'domain' => 'shop.example.test',
             'verification_token' => self::TOKEN,
-            'state' => $state,
             'verification_version' => 1,
+            'verification_scheme' => 2,
+            'desired_state' => 'enabled',
+            'ownership_status' => 'pending',
+            'routing_status' => 'unknown',
+            'tls_status' => 'pending',
         ], $extra));
 
         return [$user, $domain];
     }
 
-    private function job(?User $requestedBy, CustomDomain $domain, string $previousState): VerifyDomainDnsJob
+    private function job(?User $requestedBy, CustomDomain $domain): VerifyDomainDnsJob
     {
         return new VerifyDomainDnsJob(
             domainId: (int) $domain->id,
             workspaceId: (int) $domain->workspace_id,
             requestedBy: $requestedBy === null ? null : (int) $requestedBy->id,
+            actorSecurityVersion: $requestedBy === null ? null : (int) $requestedBy->security_version,
+            apiTokenId: null,
             domain: 'shop.example.test',
             verificationToken: self::TOKEN,
-            previousState: $previousState,
+            verificationScheme: 2,
             verificationVersion: 1,
             dedupeKey: 'uvh:domain-verification:'.((int) $domain->workspace_id).':'.((int) $domain->id),
             dedupeOwner: 'auto-tls-test',

@@ -24,17 +24,26 @@ function fragmentParams(route: ActivatedRoute): URLSearchParams {
  * delivered before the change.
  */
 function fragmentBearer(route: ActivatedRoute, key: string): string {
-  const current = fragmentParams(route).get(key);
-  if (current) return current;
+  const params = fragmentParams(route);
+  if (params.has(key)) return params.get(key) ?? "";
 
   // Temporary compatibility for links emitted before bearer fragments were
   // introduced. New links never place credentials in the query string.
   return route.snapshot.queryParamMap.get(key) ?? "";
 }
 
+/** Distinguish an explicitly unusable link from a visit with no link at all. */
+export function hasAuthBearer(route: ActivatedRoute): boolean {
+  return fragmentParams(route).has("token") || route.snapshot.queryParamMap.has("token");
+}
+
 /** Read new fragment bearers while retaining compatibility with old query links. */
 export function authBearer(route: ActivatedRoute): string {
-  return fragmentBearer(route, "token");
+  const bearer = fragmentBearer(route, "token");
+  // Every email action issues 32 random bytes as unpadded base64url. An
+  // arbitrary string is not a usable link, even though only the server can
+  // determine whether a well-formed bearer exists or has expired.
+  return /^[A-Za-z0-9_-]{43}$/.test(bearer) ? bearer : "";
 }
 
 /** Deadline the link declares next to its bearer, if it declares one. */

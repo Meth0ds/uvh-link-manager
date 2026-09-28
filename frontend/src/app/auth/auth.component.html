@@ -64,20 +64,7 @@
               </mat-form-field>
               <div class="form-row">
                 <button class="forgot" type="button" (click)="goForgot()" [disabled]="busy()">¿Olvidaste tu contraseña?</button>
-                <!-- La guía al buzón se revela con el primer intento de acceso
-                     fallido: es el momento en que una cuenta sin verificar se
-                     manifiesta. El servidor nunca revela el ciclo de vida de un
-                     registro pendiente (contesta como unas credenciales
-                     incorrectas), así que la entrada depende sólo del estado
-                     local —condicionarla a una señal del servidor reabriría el
-                     oráculo de enumeración que esa neutralidad cierra—. -->
-                @if (loginFailed()) {
-                  <button class="forgot" type="button" (click)="resendVerification()" [disabled]="busy() || verificationBusy() || !captchaReady()">{{ verificationBusy() ? 'Enviando…' : 'Reenviar verificación' }}</button>
-                }
               </div>
-              @if (loginFailed()) {
-                <p class="resend-hint">¿No puedes entrar? Si aún no has confirmado tu correo, reenvía la verificación.</p>
-              }
 
               @if (captchaConfigBusy()) {
                 <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
@@ -128,7 +115,8 @@
 
             @if (registerStep() === 1) {
               <form class="form auth-step-panel" [formGroup]="registerForm" (ngSubmit)="nextRegisterStep()" novalidate>
-                <div class="section-label"><mat-icon aria-hidden="true">person_outline</mat-icon><span>Cuéntanos quién eres</span></div>
+                <div class="section-label"><mat-icon aria-hidden="true">{{ changeEmailMode() ? 'alternate_email' : 'person_outline' }}</mat-icon><span>{{ changeEmailMode() ? 'Escribe la dirección correcta' : 'Cuéntanos quién eres' }}</span></div>
+                @if (!changeEmailMode()) {
                 <mat-form-field appearance="outline">
                   <mat-label>Nombre completo</mat-label>
                   <input matInput formControlName="name" autocomplete="name" maxlength="80" />
@@ -140,6 +128,7 @@
                     <mat-error>Usa al menos 2 caracteres.</mat-error>
                   }
                 </mat-form-field>
+                }
                 <mat-form-field appearance="outline">
                   <mat-label>Email</mat-label>
                   <input matInput type="email" formControlName="email" autocomplete="email" maxlength="254" />
@@ -163,6 +152,9 @@
                   <span>Continuar</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
                 </button>
               </form>
+              @if (!changeEmailMode()) {
+                <button class="register-recovery" type="button" (click)="openVerificationRecovery()">¿Ya te registraste? Solicita otro enlace</button>
+              }
             }
 
             @if (registerStep() === 2) {
@@ -315,15 +307,31 @@
     }
 
     @if (step() === 'verify-pending') {
-      <section class="auth-step compact-step pending" aria-labelledby="pending-title">
-        <span class="mode-illustration success"><mat-icon aria-hidden="true">mark_email_read</mat-icon></span>
-        <span class="mode-kicker">Casi lo tienes</span>
-        <h2 class="card-title" id="pending-title">Revisa tu email</h2>
-        <p class="card-sub">Para continuar debes confirmar tu email. Hemos enviado el enlace a:</p>
-        @if (verificationEmail(); as pendingEmail) {
-          <div class="pending-email"><mat-icon aria-hidden="true">mail_outline</mat-icon><b>{{ pendingEmail }}</b></div>
+      <section class="auth-step pending-stage" aria-labelledby="pending-title">
+        @if (!verificationRecovery()) {
+        <div class="pending-progress" aria-label="Registro solicitado. Falta confirmar el email para entrar.">
+          <span class="pending-progress-done"><mat-icon aria-hidden="true">check</mat-icon> Registro</span>
+          <span class="pending-progress-rule" aria-hidden="true"></span>
+          <span class="pending-progress-current"><b>2</b> Confirma tu email</span>
+        </div>
         }
-        <div class="pending-success" role="status"><mat-icon aria-hidden="true">check_circle</mat-icon><span><b>Cuenta creada correctamente</b><small>{{ pendingLink() ? 'Cuando confirmes la dirección podrás iniciar sesión y crear el enlace que has guardado.' : 'Cuando confirmes la dirección podrás iniciar sesión y entrar en tu workspace.' }}</small></span></div>
+
+        <div class="pending-symbol" aria-hidden="true"><mat-icon>outgoing_mail</mat-icon><span></span></div>
+        <h2 class="card-title" id="pending-title">{{ verificationRecovery() ? 'Recupera tu verificación.' : 'Tu siguiente paso está en el correo.' }}</h2>
+        <p class="pending-intro">{{ verificationRecovery() ? 'Si ya solicitaste la cuenta, pide otro enlace para confirmar tu dirección. Lo enviaremos solo si sigue pendiente.' : (verificationEditable() ? 'Abre el enlace que te enviamos para confirmar tu dirección. Después elegirás tu contraseña y podrás entrar en tu espacio.' : 'Abre el enlace que te enviamos para confirmar tu dirección y poder acceder a tu espacio.') }}</p>
+
+        @if (verificationEmail(); as pendingEmail) {
+          <div class="pending-email">
+            <span>{{ verificationRecovery() ? 'Dirección indicada' : 'Correo enviado a' }}</span>
+            <strong>{{ pendingEmail }}</strong>
+            @if (verificationEditable()) {
+              <button type="button" (click)="changeRegistrationEmail()" [disabled]="verificationBusy()">¿Te equivocaste de dirección? Cámbiala</button>
+            }
+          </div>
+        }
+        @if (pendingLink()) {
+          <p class="pending-saved-link"><mat-icon aria-hidden="true">link</mat-icon> Tu enlace está guardado. Podrás crearlo cuando confirmes tu dirección.</p>
+        }
         @if (error()) {
           <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
         }
@@ -338,12 +346,15 @@
           <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
         }
         <div class="pending-actions">
-          <button mat-flat-button color="primary" (click)="resendVerification()" [disabled]="verificationBusy() || !captchaReady()">
-            <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
-            {{ verificationBusy() ? 'Enviando…' : 'Reenviar correo' }}
+          @if (localMailInbox; as inbox) {
+            <a mat-flat-button color="primary" class="pending-inbox" [href]="inbox" target="_blank" rel="noopener noreferrer"><mat-icon aria-hidden="true">open_in_new</mat-icon> Abrir bandeja local</a>
+          }
+          <p class="pending-help">¿No encuentras el mensaje? Revisa spam o solicita otro enlace.</p>
+          <button mat-stroked-button type="button" class="pending-resend" (click)="resendVerification()" [disabled]="verificationBusy() || !captchaReady()">
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            {{ verificationBusy() ? 'Enviando…' : 'Reenviar enlace' }}
           </button>
-          <button mat-stroked-button class="ghost" (click)="changeRegistrationEmail()" [disabled]="verificationBusy()"><mat-icon aria-hidden="true">edit</mat-icon> Cambiar email</button>
-          <button mat-button class="ghost" (click)="closeRegistration()" [disabled]="verificationBusy()"><mat-icon aria-hidden="true">logout</mat-icon> Cerrar sesión</button>
+          <button mat-button type="button" class="pending-exit" (click)="closeRegistration()" [disabled]="verificationBusy()">Volver al inicio de sesión</button>
         </div>
       </section>
     }

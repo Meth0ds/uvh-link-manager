@@ -18,7 +18,7 @@
     } @else if (snapshot(); as state) {
       <section class="state-card" [attr.data-status]="state.overall" role="status"><span class="state-icon" aria-hidden="true"><mat-icon>{{ statusIcon(state.overall) }}</mat-icon></span><div><span class="eyebrow">Resultado de la medición disponible</span><h2>{{ statusLabel(state.overall) }}</h2><p>Generada el <time [attr.datetime]="state.generatedAt">{{ state.generatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</time> · hora de tu dispositivo.</p></div></section>
       @if (loading()) { <p class="refresh-note" role="status">Consultando de nuevo. Mientras tanto se muestra la medición anterior.</p> }
-      <section class="components" aria-labelledby="components-title"><div class="section-heading"><h2 id="components-title">Servicio por servicio</h2><span>Tres componentes públicos</span></div>
+      <section class="components" aria-labelledby="components-title"><div class="section-heading"><h2 id="components-title">Servicio por servicio</h2><span>{{ state.components.length }} componentes públicos</span></div>
         <div class="component-grid">@for (component of state.components; track component.id) {
           <article [attr.data-status]="component.status"><span class="component-icon" aria-hidden="true"><mat-icon>{{ component.id === 'links' ? 'link' : component.id === 'panel' ? 'space_dashboard' : 'webhook' }}</mat-icon></span><h3>{{ component.label }}</h3><p class="component-state"><mat-icon aria-hidden="true">{{ statusIcon(component.status) }}</mat-icon>{{ statusLabel(component.status) }}</p></article>
         }</div>

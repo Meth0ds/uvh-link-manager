@@ -388,15 +388,10 @@ describe("AuthComponent registration flow", () => {
     expect(auth.resendVerification).toHaveBeenCalledWith("ana@example.com", "fresh-resend-token");
   });
 
-  it("keeps a failed login silent about lifecycle and reveals the resend entry for it", async () => {
-    // Un registro pendiente contesta como unas credenciales incorrectas. Ni el
-    // estado local ni la UI deben reaccionar con una señal de «sigue pendiente»
-    // —el 403 que antes la cargaba ya no existe—, pero la entrada a «Reenviar
-    // verificación» se revela con el primer intento fallido: es el momento en
-    // que una cuenta sin verificar se manifiesta, y sólo con estado local.
+  it("keeps a wrong password on login without a resend entry", async () => {
     const resendButton = (): HTMLButtonElement | undefined => Array.from(
       fixture.nativeElement.querySelectorAll("button") as NodeListOf<HTMLButtonElement>,
-    ).find((button) => button.textContent?.trim() === "Reenviar verificación");
+    ).find((button) => button.textContent?.trim() === "Reenviar enlace");
     component.loginForm.setValue({ email: "ana@example.com", password: "wrong-password" });
     fixture.detectChanges();
     expect(resendButton()).toBeUndefined();
@@ -407,7 +402,50 @@ describe("AuthComponent registration flow", () => {
 
     expect(component.verificationEmail()).toBeNull();
     expect(component.error()).toBe("Credenciales incorrectas");
-    expect(resendButton()).toBeDefined();
+    expect(component.step()).toBe("login");
+    expect(resendButton()).toBeUndefined();
+  });
+
+  it("opens verification when login identifies the browser's pending registration", async () => {
+    component.loginForm.setValue({ email: "ana@example.com", password: "unused-password" });
+    auth.login.and.rejectWith(new ApiRequestError("Confirma tu email para continuar", 403, undefined, undefined, "pending_registration"));
+
+    await component.onLogin();
+    fixture.detectChanges();
+
+    expect(component.step()).toBe("verify-pending");
+    expect(component.verificationEmail()).toBe("ana@example.com");
+    expect(component.verificationEditable()).toBeTrue();
+    expect(component.error()).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain("Reenviar enlace");
+  });
+
+  it("opens verification for a legacy unverified account without offering registration edits", async () => {
+    component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
+    auth.login.and.rejectWith(new ApiRequestError("Confirma tu email para continuar", 403, undefined, undefined, "email_verification_required"));
+
+    await component.onLogin();
+    fixture.detectChanges();
+
+    expect(component.step()).toBe("verify-pending");
+    expect(component.verificationEditable()).toBeFalse();
+    expect(fixture.nativeElement.textContent).not.toContain("¿Te equivocaste de dirección?");
+    expect(fixture.nativeElement.textContent).toContain("Reenviar enlace");
+  });
+
+  it("lets a visitor recover verification from the registration tab with an email only", () => {
+    component.onTabChange(1);
+    component.registerForm.controls.email.setValue("ANA@example.com");
+    fixture.detectChanges();
+
+    component.openVerificationRecovery();
+    fixture.detectChanges();
+
+    expect(component.step()).toBe("verify-pending");
+    expect(component.verificationEmail()).toBe("ana@example.com");
+    expect(component.verificationRecovery()).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain("Recupera tu verificación");
+    expect(fixture.nativeElement.textContent).not.toContain("Correo enviado a");
   });
 
   it("asks for the address when the resend entry is used without one", async () => {

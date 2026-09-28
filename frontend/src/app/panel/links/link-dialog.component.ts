@@ -144,6 +144,13 @@ export class LinkDialogComponent {
   readonly editDetailsLoaded = signal(!this.isEdit);
   readonly error = signal<string | null>(null);
   readonly domains = signal<DomainDto[]>([]);
+  /**
+   * The link's current domain when it is no longer activable (its domain fell
+   * to error or was disabled). It must stay visible and submittable — editing
+   * notes or a destination on a link whose domain is down cannot require
+   * changing the domain first — but it is not offered for *new* assignments.
+   */
+  readonly currentDomainUnavailable = signal<{ id: number; domain: string | null } | null>(null);
   readonly tags = signal<string[]>([]);
   readonly collections = signal<CollectionDto[]>([]);
   readonly templates = signal<LinkTemplateDto[]>([]);
@@ -225,9 +232,33 @@ export class LinkDialogComponent {
         { signal: request.signal },
       );
       if (!this.domainRequests.isCurrent(request, "link-dialog-domains")) return;
-      this.domains.set(domains.filter((d) => d.state === "active" && d.edgeEligible && d.tlsReadyAt !== null));
+      const eligible = domains.filter((d) => d.state === "active" && d.edgeEligible && d.tlsReadyAt !== null);
+      const currentId = this.data.link?.domainId ?? null;
+      const current = currentId === null ? null : domains.find((d) => d.id === currentId) ?? null;
+      // El dominio predeterminado del workspace es con lo que nace un enlace
+      // nuevo; si no puede servir ahora, el selector lo muestra como no
+      // disponible en vez de callarse y caer en la plataforma.
+      const preferred = domains.find((d) => d.isDefault) ?? null;
+      const unavailableId = this.isEdit ? currentId : preferred?.id ?? null;
+      this.domains.set(eligible);
+      this.currentDomainUnavailable.set(
+        unavailableId !== null && !eligible.some((e) => e.id === unavailableId)
+          ? { id: unavailableId, domain: (this.isEdit ? current?.domain : preferred?.domain) ?? this.data.link?.domain ?? null }
+          : null,
+      );
+      if (!this.isEdit && this.form.controls.domainId.pristine) {
+        this.form.controls.domainId.setValue(eligible.some((e) => e.isDefault) ? (preferred?.id ?? null) : null);
+      }
     } catch {
-      if (this.domainRequests.isCurrent(request, "link-dialog-domains")) this.domains.set([]);
+      if (this.domainRequests.isCurrent(request, "link-dialog-domains")) {
+        // The current domain is still known from the link itself: losing the
+        // domain list must not blank the selection the edit is about.
+        const currentId = this.data.link?.domainId ?? null;
+        this.domains.set([]);
+        this.currentDomainUnavailable.set(
+          currentId === null ? null : { id: currentId, domain: this.data.link?.domain ?? null },
+        );
+      }
     }
   }
 

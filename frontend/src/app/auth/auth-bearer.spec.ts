@@ -1,5 +1,5 @@
 import type { ActivatedRoute } from "@angular/router";
-import { authBearer, bearerExpiry, intentBearer } from "./auth-bearer";
+import { authBearer, bearerExpiry, hasAuthBearer, intentBearer } from "./auth-bearer";
 
 /** Minimal route stub: the two carriers a link can arrive in. */
 function route(fragment: string | null, query: Record<string, string> = {}): ActivatedRoute {
@@ -9,7 +9,10 @@ function route(fragment: string | null, query: Record<string, string> = {}): Act
       // `ParamMap.get` answers `null` for a key that is not there; a `Map`
       // answers `undefined`, and that difference is the one this stub has to
       // keep or it would test a contract the router does not have.
-      queryParamMap: { get: (key: string) => query[key] ?? null } as never,
+      queryParamMap: {
+        get: (key: string) => query[key] ?? null,
+        has: (key: string) => Object.hasOwn(query, key),
+      } as never,
     },
   } as unknown as ActivatedRoute;
 }
@@ -40,5 +43,24 @@ describe("auth-bearer", () => {
   it("reports nothing when the link carries neither", () => {
     expect(authBearer(route(null))).toBe("");
     expect(bearerExpiry(route(null))).toBeNull();
+  });
+
+  it("rejects malformed email-action bearers from fragments and legacy query links", () => {
+    expect(authBearer(route("token=preview-only"))).toBe("");
+    expect(authBearer(route(null, { token: "preview-only" }))).toBe("");
+    expect(authBearer(route(`token=${"a".repeat(44)}`))).toBe("");
+    expect(authBearer(route(`token=${"a".repeat(42)}!`))).toBe("");
+  });
+
+  it("distinguishes an explicit bad bearer from an absent bearer", () => {
+    expect(hasAuthBearer(route("token=preview-only"))).toBeTrue();
+    expect(hasAuthBearer(route("token="))).toBeTrue();
+    expect(hasAuthBearer(route(null, { token: "" }))).toBeTrue();
+    expect(hasAuthBearer(route(null))).toBeFalse();
+  });
+
+  it("does not substitute a query bearer when the fragment explicitly has an empty bearer", () => {
+    expect(authBearer(route("token=", { token }))).toBe("");
+    expect(authBearer(route("token=preview-only", { token }))).toBe("");
   });
 });

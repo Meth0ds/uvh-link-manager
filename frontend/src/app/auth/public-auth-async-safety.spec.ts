@@ -68,6 +68,16 @@ describe("public auth views async safety", () => {
     expect(fixture.nativeElement.textContent).toContain("Solicitar otro enlace");
   });
 
+  it("does not ask for a new password for a malformed reset link", () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    TestBed.configureTestingModule({ imports: [ResetPasswordComponent], providers: sharedProviders(api, "token=preview-only") });
+    const fixture = TestBed.createComponent(ResetPasswordComponent);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector("form")).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain("Solicitar otro enlace");
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
   it("does not repeat a completed password reset", async () => {
     const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
     api.post.and.resolveTo({});
@@ -90,6 +100,17 @@ describe("public auth views async safety", () => {
     expect(api.post).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain("Confirmar mi email");
     expect(fixture.nativeElement.textContent).not.toContain(TOKEN);
+  });
+
+  it("rejects a preview-only verification link before showing the activation form", () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    TestBed.configureTestingModule({ imports: [VerifyEmailComponent], providers: sharedProviders(api, "token=preview-only") });
+    const fixture = TestBed.createComponent(VerifyEmailComponent);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain("Enlace no disponible");
+    expect(fixture.nativeElement.textContent).toContain("no es válido");
+    expect(fixture.nativeElement.querySelector("form")).toBeNull();
+    expect(api.post).not.toHaveBeenCalled();
   });
 
   it("does not claim administrator approval on an invalid recovery completion link", () => {

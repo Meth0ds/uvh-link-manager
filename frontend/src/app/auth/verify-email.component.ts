@@ -129,7 +129,7 @@ export class VerifyEmailComponent {
     this.location.replaceState("/auth/verify-email");
     if (!this.token) {
       this.done.set(true);
-      this.message.set("El enlace no contiene una credencial válida. Solicita un correo de verificación nuevo.");
+      this.message.set("Este enlace de verificación no es válido. Solicita un correo de verificación nuevo.");
     }
   }
 

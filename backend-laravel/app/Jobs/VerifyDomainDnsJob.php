@@ -4,8 +4,10 @@ namespace App\Jobs;
 
 use App\Models\CustomDomain;
 use App\Support\Audit;
+use App\Support\DomainClaims;
+use App\Support\DomainEvents;
+use App\Support\DomainStatus;
 use App\Support\OperationalMetrics;
-use App\Support\WebhookService;
 use App\Support\WorkspaceAccess;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,6 +16,25 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
+/**
+ * One DNS verification attempt for a custom domain.
+ *
+ * The job applies its result to the four status columns — ownership, routing,
+ * TLS and intent — and records domain events in the same transaction, so the
+ * state a human sees and the history that explains it are one fact. Three
+ * rules shape the writes:
+ *
+ *  - The result is only applied while the generation still matches: a newer
+ *    check or a cancellation bumped `verification_version` and this answer is
+ *    stale by definition.
+ *  - Ownership is proven by the TXT challenge *and* the claim: publishing the
+ *    token claims the hostname atomically, and a fresh claim held by another
+ *    workspace is reported as `domain_claimed_elsewhere` rather than stolen.
+ *  - Authorization is re-checked at execution, not only at admission: the
+ *    actor's membership, security version and API token scope are carried here
+ *    and revalidated before anything is written. A revoked credential cancels
+ *    the operation cleanly instead of completing it.
+ */
 class VerifyDomainDnsJob implements ShouldQueue
 {
     use Dispatchable;
@@ -32,9 +53,11 @@ class VerifyDomainDnsJob implements ShouldQueue
         public int $domainId,
         public int $workspaceId,
         public ?int $requestedBy,
+        public ?int $actorSecurityVersion,
+        public ?int $apiTokenId,
         public string $domain,
         public string $verificationToken,
-        public string $previousState,
+        public int $verificationScheme,
         public int $verificationVersion,
         public string $dedupeKey,
         public string $dedupeOwner,
@@ -45,104 +68,166 @@ class VerifyDomainDnsJob implements ShouldQueue
     public function handle(): void
     {
         $dns = $this->checkDns();
-        $result = DB::transaction(function () use ($dns): ?array {
-            $membership = $this->requestedBy === null
+        $eventIds = [];
+        $result = DB::transaction(function () use ($dns, &$eventIds): ?array {
+            $authorized = $this->requestedBy === null
                 ? true
-                : WorkspaceAccess::getMembershipLocked($this->requestedBy, $this->workspaceId, 'editor') !== null;
+                : WorkspaceAccess::getMembershipLocked(
+                    $this->requestedBy,
+                    $this->workspaceId,
+                    'editor',
+                    $this->apiTokenContext(),
+                    'domains:write',
+                    $this->actorSecurityVersion,
+                ) !== null;
             $domain = CustomDomain::where('id', $this->domainId)
                 ->where('workspace_id', $this->workspaceId)->lockForUpdate()->first();
             if (! $domain || $domain->domain !== $this->domain || $domain->verification_token !== $this->verificationToken) {
                 return null;
             }
             if ((int) $domain->verification_version !== $this->verificationVersion) {
+                // A newer check or a cancellation owns this domain now.
                 return null;
             }
-            $expectedState = $this->previousState === 'pending' || $this->previousState === 'error'
-                ? 'verifying'
-                : $this->previousState;
-            if ($domain->state !== $expectedState) {
-                return null;
-            }
-            if (! $membership) {
-                $cancelled = [
-                    'dns_check_completed_at' => now(),
-                    'dns_error' => 'verification_cancelled',
-                    'updated_at' => now(),
-                ];
-                if ($domain->state === 'verifying') {
-                    $cancelled['state'] = $this->previousState;
-                }
-                $domain->update($cancelled);
+            if (! $authorized) {
+                $domain->update(DomainStatus::cancelDnsCheck($domain, 'verification_cancelled'));
 
                 return null;
             }
 
             $now = now();
-            $found = $dns['ownership'] && $dns['routing'];
+            $wasServing = DomainStatus::servingReady($domain);
+            $firstVerification = $domain->verified_at === null;
+            $previouslyDegraded = $domain->dns_error !== null;
+
+            // Ownership: the TXT proves control of the name and claims it. A
+            // fresh claim held elsewhere means this workspace may keep its
+            // request but the hostname belongs to someone else today.
+            $ownershipProven = $dns['ownership'];
+            $claimOutcome = null;
+            $previousWorkspaceId = null;
+            if ($ownershipProven) {
+                $claim = DomainClaims::prove($this->workspaceId, $this->domain);
+                $claimOutcome = $claim['outcome'];
+                $previousWorkspaceId = $claim['previous_workspace_id'];
+            }
+            $claimed = $claimOutcome !== 'conflict';
+            $routingOk = $dns['routing'];
+            $found = $ownershipProven && $claimed && $routingOk;
+            $error = match (true) {
+                $ownershipProven && ! $claimed => 'domain_claimed_elsewhere',
+                ! $ownershipProven && ! $routingOk => 'ownership_and_routing_missing',
+                ! $ownershipProven => 'ownership_missing',
+                ! $routingOk => 'routing_missing',
+                default => null,
+            };
+
             $failureCount = $found ? 0 : (int) $domain->dns_failure_count + 1;
             $firstFailedAt = $found ? null : ($domain->dns_first_failed_at ?? $now);
             $graceHours = max(1, min(24, (int) config('uvh.custom_domains.failure_grace_hours', 2)));
             $maxFailures = max(2, min(10, (int) config('uvh.custom_domains.max_failures', 3)));
-            $wasEdgeEligible = (bool) $domain->edge_eligible;
-            $withinActiveGrace = $this->previousState === 'active'
-                && $wasEdgeEligible
-                && ($failureCount < $maxFailures
-                    || $firstFailedAt->gt($now->copy()->subHours($graceHours)));
-            $nextState = $found
-                ? ($this->previousState === 'active' && $wasEdgeEligible ? 'active' : 'verified')
-                : ($withinActiveGrace ? 'active' : 'error');
-            $nextEdgeEligibility = $found
-                ? $this->previousState === 'active' && $wasEdgeEligible
-                : ($withinActiveGrace && (bool) $domain->edge_eligible);
+            $withinGrace = $wasServing
+                && ($failureCount < $maxFailures || $firstFailedAt->gt($now->copy()->subHours($graceHours)));
+
+            // Auto-TLS: the domain wants to serve and DNS now says it can. A
+            // first check from a person and an unattended recovery both finish
+            // the job; the cooldown keeps a broken CA from being hammered.
+            $autoTls = false;
+            if ($found && ! $wasServing && $domain->desired_state === 'enabled'
+                && $domain->tls_ready_at === null
+                && in_array($domain->tls_status, ['pending', 'error'], true)
+                && DomainStatus::tlsAutoRetryAllowed($domain)) {
+                $autoTls = true;
+            }
+            $servingAfter = $found
+                ? ($wasServing || $autoTls)
+                : ($withinGrace && (bool) $domain->edge_eligible);
+
             $updates = [
-                'state' => $nextState,
-                'verified_at' => $found ? $now : ($withinActiveGrace ? $domain->verified_at : null),
-                'ownership_verified_at' => $dns['ownership'] ? $now : null,
-                'routing_verified_at' => $dns['routing'] ? $now : null,
+                'ownership_status' => $ownershipProven ? 'verified' : ($domain->ownership_verified_at !== null ? 'lost' : 'pending'),
+                'ownership_verified_at' => $ownershipProven ? $now : null,
+                'routing_status' => $routingOk ? 'healthy' : ($wasServing ? ($withinGrace ? 'degraded' : 'failed') : 'failed'),
+                'routing_verified_at' => $routingOk ? $now : null,
                 'dns_check_completed_at' => $now,
-                'dns_error' => $found ? null : $dns['error'],
+                'dns_error' => $error,
                 'dns_failure_count' => $failureCount,
                 'dns_first_failed_at' => $firstFailedAt,
-                'edge_eligible' => $nextEdgeEligibility,
-                'tls_ready_at' => $nextEdgeEligibility || $withinActiveGrace ? $domain->tls_ready_at : null,
+                'verified_at' => $found ? $now : ($withinGrace ? $domain->verified_at : null),
+                'edge_eligible' => $servingAfter,
+                // What was observed travels with the verdict it produced, so
+                // the diagnostic panel can say what the resolver answered.
+                'dns_observed_at' => $now,
+                'ownership_txt_present' => $dns['ownershipTxtPresent'],
+                'routing_observed_target' => $dns['routingObservedTarget'],
+                'routing_observed_ttl' => $dns['routingObservedTtl'],
+                'routing_observed_addresses' => $dns['routingObservedAddresses'] === [] ? null : $dns['routingObservedAddresses'],
+                'routing_observed_proxied' => $dns['routingObservedProxied'],
+                'caa_records' => $dns['caaRecords'] === [] ? null : $dns['caaRecords'],
+                'caa_allows_issuer' => $dns['caaAllowsIssuer'],
                 'updated_at' => $now,
             ];
-            // Auto-TLS: a person asked for this check and it just proved BOTH
-            // ownership and routing, so provisioning the certificate is the
-            // natural next step and must not need a second click. The periodic
-            // sweep (`requestedBy` null) never starts ACME on its own, a domain
-            // that was explicitly disabled stays disabled, and a domain already
-            // holding a live certificate is left alone.
             $autoTlsVersion = null;
-            if ($found && $nextState === 'verified' && $this->requestedBy !== null
-                && $this->previousState !== 'disabled' && $domain->tls_ready_at === null) {
+            if ($autoTls) {
                 $autoTlsVersion = (int) $domain->tls_version + 1;
-                $nextState = 'provisioning';
-                $updates['state'] = 'provisioning';
-                $updates['edge_eligible'] = true;
+                $updates += DomainStatus::beginTlsProvisioning($domain);
                 $updates['tls_version'] = $autoTlsVersion;
-                $updates['tls_ready_at'] = null;
-                $updates['tls_error'] = null;
             }
             $domain->update($updates);
-            if ($found && in_array($this->previousState, ['pending', 'error'], true)) {
-                WebhookService::dispatch($this->workspaceId, 'domain.verified', [
+
+            // History and integrations are recorded with the state they
+            // describe; delivery happens after commit and can never decide
+            // whether the DNS result stands.
+            if ($firstVerification && $found) {
+                $eventIds[] = DomainEvents::record($this->workspaceId, $this->domainId, $this->domain, 'domain.verified', [
                     'domainId' => $this->domainId,
                     'domain' => $this->domain,
                 ]);
             }
+            if ($claimOutcome === 'takeover' && $previousWorkspaceId !== null) {
+                $eventIds[] = DomainEvents::record($previousWorkspaceId, $this->domainId, $this->domain, 'domain.claim_transferred', [
+                    'domainId' => $this->domainId,
+                    'domain' => $this->domain,
+                    'previousWorkspaceId' => $previousWorkspaceId,
+                    'newWorkspaceId' => $this->workspaceId,
+                ]);
+            }
+            if ($found && $wasServing && $previouslyDegraded) {
+                $eventIds[] = DomainEvents::record($this->workspaceId, $this->domainId, $this->domain, 'domain.recovered', [
+                    'domainId' => $this->domainId,
+                    'domain' => $this->domain,
+                ]);
+            }
+            if (! $found && $wasServing) {
+                if ($servingAfter) {
+                    $eventIds[] = DomainEvents::record($this->workspaceId, $this->domainId, $this->domain, 'domain.degraded', [
+                        'domainId' => $this->domainId,
+                        'domain' => $this->domain,
+                        'reason' => $error,
+                        'failureCount' => $failureCount,
+                        'graceExpiresAt' => $firstFailedAt->copy()->addHours($graceHours)->toIso8601String(),
+                    ]);
+                } else {
+                    $eventIds[] = DomainEvents::record($this->workspaceId, $this->domainId, $this->domain, 'domain.offline', [
+                        'domainId' => $this->domainId,
+                        'domain' => $this->domain,
+                        'reason' => $error,
+                    ]);
+                }
+            }
 
             return [
                 'found' => $found,
-                'state' => $nextState,
-                'dnsError' => $found ? null : $dns['error'],
+                'dnsError' => $error,
                 'failureCount' => $failureCount,
-                'withinGrace' => $withinActiveGrace,
-                'firstVerification' => in_array($this->previousState, ['pending', 'error'], true),
+                'withinGrace' => $withinGrace,
+                'firstVerification' => $firstVerification,
                 'autoTlsVersion' => $autoTlsVersion,
+                'legacyState' => DomainStatus::legacyState($domain),
+                'claimOutcome' => $claimOutcome,
             ];
         });
-        if (! $result) {
+        if ($result === null) {
+            DomainEvents::scheduleDispatch($eventIds);
             $this->releaseDedupeLock();
 
             return;
@@ -163,45 +248,32 @@ class VerifyDomainDnsJob implements ShouldQueue
                     $this->domainId,
                     [
                         'found' => $result['found'],
-                        'state' => $result['state'],
+                        'state' => $result['legacyState'],
                         'dns_error' => $result['dnsError'],
                         'failure_count' => $result['failureCount'],
                         'within_grace' => $result['withinGrace'],
+                        'claim' => $result['claimOutcome'],
                     ],
                     workspaceId: $this->workspaceId,
                 );
             } catch (Throwable $e) {
                 report($e);
             }
-        } catch (Throwable $e) {
-            // DNS state is authoritative. Auxiliary notifications must never
-            // turn a completed verification into a misleading failed job.
-            report($e);
         } finally {
+            DomainEvents::scheduleDispatch($eventIds);
             $this->releaseDedupeLock();
         }
     }
 
     public function failed(?Throwable $exception): void
     {
-        $initialVerification = in_array($this->previousState, ['pending', 'error'], true);
         $updates = [
             'dns_check_completed_at' => now(),
             'dns_error' => 'resolver_unavailable',
             'updated_at' => now(),
         ];
-        if ($initialVerification) {
-            $updates['state'] = 'error';
-            $updates['verified_at'] = null;
-            $updates['edge_eligible'] = false;
-        }
         $updated = CustomDomain::where('id', $this->domainId)->where('workspace_id', $this->workspaceId)
             ->where('verification_version', $this->verificationVersion)
-            ->when(
-                $initialVerification,
-                fn ($query) => $query->where('state', 'verifying'),
-                fn ($query) => $query->where('state', $this->previousState),
-            )
             ->update($updates);
         $this->releaseDedupeLock();
         if ($updated > 0) {
@@ -216,36 +288,70 @@ class VerifyDomainDnsJob implements ShouldQueue
         }
     }
 
-    /** @return array{ownership: bool, routing: bool, error: ?string} */
+    /**
+     * What was asked and what answered, not just the verdict: a user fixing a
+     * broken CNAME needs "the resolver returns cname.bitly.com", and a user
+     * whose TLS fails needs to know whether CAA blocks the issuer.
+     *
+     * @return array{
+     *   ownership: bool,
+     *   ownershipTxtPresent: bool,
+     *   routing: bool,
+     *   routingObservedTarget: ?string,
+     *   routingObservedTtl: ?int,
+     *   routingObservedAddresses: list<string>,
+     *   routingObservedProxied: ?bool,
+     *   caaRecords: list<array{tag: string, value: string}>,
+     *   caaAllowsIssuer: ?bool,
+     *   error: ?string,
+     * }
+     */
     private function checkDns(): array
     {
         $ownership = $this->checkTxt();
         $routing = $this->checkCname();
-        $error = match (true) {
-            ! $ownership && ! $routing => 'ownership_and_routing_missing',
-            ! $ownership => 'ownership_missing',
-            ! $routing => 'routing_missing',
-            default => null,
-        };
+        $caa = $this->checkCaa();
 
-        return ['ownership' => $ownership, 'routing' => $routing, 'error' => $error];
+        return [
+            'ownership' => $ownership['matched'],
+            'ownershipTxtPresent' => $ownership['present'],
+            'routing' => $routing['ok'],
+            'routingObservedTarget' => $routing['target'],
+            'routingObservedTtl' => $routing['ttl'],
+            'routingObservedAddresses' => $routing['addresses'],
+            'routingObservedProxied' => $routing['proxied'],
+            'caaRecords' => $caa['records'],
+            'caaAllowsIssuer' => $caa['allowsIssuer'],
+            'error' => null,
+        ];
     }
 
-    private function checkTxt(): bool
+    /** @return array{matched: bool, present: bool} */
+    private function checkTxt(): array
     {
-        // A TXT record cannot coexist with a CNAME at the same owner name.
-        // New integrations therefore use a dedicated TXT label. The bare
-        // hostname remains as a temporary compatibility fallback for domains
-        // created before this convention was introduced.
+        // A TXT record cannot coexist with a CNAME at the same owner name, so
+        // integrations use a dedicated label. Rows created before that
+        // convention carry `verification_scheme = 1` and may still prove
+        // ownership at the bare hostname; scheme 2 retires the fallback so it
+        // cannot stay "temporary" forever.
+        $names = ['_uvh-verification.'.$this->domain];
+        if ($this->verificationScheme < 2) {
+            $names[] = $this->domain;
+        }
         $resolverFailed = false;
-        foreach (['_uvh-verification.'.$this->domain, $this->domain] as $name) {
-            $records = dns_get_record($name, DNS_TXT);
+        $present = false;
+        foreach ($names as $name) {
+            // The answer the resolvers agree on (multi-resolver consensus); a
+            // disagreement is `false`, the same "no reliable answer" a resolver
+            // outage gives, so a poisoned single view can never prove ownership.
+            $records = DnsViews::records($name, DNS_TXT);
             if ($records === false) {
                 $resolverFailed = true;
 
                 continue;
             }
             foreach ($records as $record) {
+                $present = true;
                 $txt = $this->txtValue($record);
                 // Case-insensitive on purpose: the token is copied into a DNS
                 // panel by a person and some providers normalise the case of a
@@ -254,7 +360,7 @@ class VerifyDomainDnsJob implements ShouldQueue
                 // is reported as absent ownership, not as a case mismatch.
                 // The CNAME check below compares provider data the same way.
                 if ($txt !== '' && hash_equals(strtolower($this->verificationToken), strtolower($txt))) {
-                    return true;
+                    return ['matched' => true, 'present' => true];
                 }
             }
         }
@@ -263,24 +369,107 @@ class VerifyDomainDnsJob implements ShouldQueue
             throw new \RuntimeException('No se pudo consultar DNS');
         }
 
-        return false;
+        return ['matched' => false, 'present' => $present];
     }
 
-    private function checkCname(): bool
+    /**
+     * @return array{
+     *   ok: bool,
+     *   target: ?string,
+     *   ttl: ?int,
+     *   addresses: list<string>,
+     *   proxied: ?bool,
+     * }
+     */
+    private function checkCname(): array
     {
         $expected = strtolower(trim((string) config('uvh.custom_domains.cname_target'), '.'));
         if ($expected === '') {
             // Local development remains usable without a production edge.
-            return ! app()->environment('production');
+            return [
+                'ok' => ! app()->environment('production'),
+                'target' => null,
+                'ttl' => null,
+                'addresses' => [],
+                'proxied' => null,
+            ];
         }
 
-        $records = dns_get_record($this->domain, DNS_CNAME);
+        $records = DnsViews::records($this->domain, DNS_CNAME);
         if ($records === false) {
             throw new \RuntimeException('No se pudo consultar la ruta DNS');
         }
+        $target = null;
+        $ttl = null;
+        $ok = false;
         foreach ($records as $record) {
-            $target = $record['target'] ?? null;
-            if (is_string($target) && hash_equals($expected, strtolower(rtrim($target, '.')))) {
+            $observed = $record['target'] ?? null;
+            if (! is_string($observed) || $observed === '') {
+                continue;
+            }
+            $observed = strtolower(rtrim($observed, '.'));
+            $target ??= $observed;
+            $ttl ??= isset($record['ttl']) && is_numeric($record['ttl']) ? (int) $record['ttl'] : null;
+            if (hash_equals($expected, $observed)) {
+                $ok = true;
+            }
+        }
+        if ($target !== null) {
+            return [
+                'ok' => $ok,
+                'target' => $target,
+                'ttl' => $ttl,
+                'addresses' => [],
+                // A CNAME straight to the expected target cannot be a proxy;
+                // anything else may be, and the suffixes below certainly are.
+                'proxied' => $ok ? false : $this->looksProxied($target),
+            ];
+        }
+
+        // No CNAME at the hostname. If addresses answer instead, the name is
+        // behind a proxy or a flattening setup — precisely the configurations
+        // the product does not support and the user must be told about.
+        $addresses = $this->lookupAddresses();
+
+        return [
+            'ok' => false,
+            'target' => null,
+            'ttl' => null,
+            'addresses' => $addresses,
+            'proxied' => $addresses === [] ? null : true,
+        ];
+    }
+
+    /** @return list<string> */
+    private function lookupAddresses(): array
+    {
+        $addresses = [];
+        foreach ([DNS_A, DNS_AAAA] as $type) {
+            // An unreachable resolver here is advisory-only: the verdict
+            // already came from the CNAME query above.
+            $records = DnsViews::records($this->domain, $type);
+            if ($records === false) {
+                continue;
+            }
+            foreach ($records as $record) {
+                $ip = $record['ip'] ?? $record['ipv6'] ?? null;
+                if (is_string($ip) && $ip !== '') {
+                    $addresses[] = $ip;
+                }
+            }
+        }
+
+        return array_values(array_unique($addresses));
+    }
+
+    private function looksProxied(string $target): bool
+    {
+        foreach ([
+            'cloudflare.net', 'edgesuite.net', 'edgekey.net', 'akamai.net',
+            'akamaiedge.net', 'fastly.net', 'azureedge.net', 'trafficmanager.net',
+            'stackpathdns.com', 'cdngc.net', 'googleusercontent.com',
+        ] as $suffix) {
+            if ($target === $suffix || str_ends_with($target, '.'.$suffix)) {
                 return true;
             }
         }
@@ -288,12 +477,54 @@ class VerifyDomainDnsJob implements ShouldQueue
         return false;
     }
 
+    /**
+     * CAA is advisory here: it never decides ownership, it explains a TLS
+     * failure. `null` means no CAA restriction was observed, which is the
+     * common case and must not be confused with "denied".
+     *
+     * @return array{records: list<array{tag: string, value: string}>, allowsIssuer: ?bool}
+     */
+    private function checkCaa(): array
+    {
+        $records = DnsViews::records($this->domain, DNS_CAA);
+        if ($records === false) {
+            return ['records' => [], 'allowsIssuer' => null];
+        }
+        $issuer = strtolower(trim((string) config('uvh.custom_domains.acme_issuer', 'letsencrypt.org'), '.'));
+        $observed = [];
+        $allows = null;
+        foreach ($records as $record) {
+            $tag = strtolower((string) ($record['tag'] ?? ''));
+            $value = trim((string) ($record['value'] ?? ''));
+            if ($tag === '' || $value === '') {
+                continue;
+            }
+            $observed[] = ['tag' => $tag, 'value' => $value];
+            // The product has no wildcard hostnames, so only `issue` binds
+            // them; `issuewild` alone restricts nothing here.
+            if ($tag !== 'issue') {
+                continue;
+            }
+            $property = strtolower(trim(explode(';', $value, 2)[0]));
+            if ($property === $issuer) {
+                $allows = true;
+            } elseif ($allows === null) {
+                $allows = false;
+            }
+        }
+
+        return ['records' => $observed, 'allowsIssuer' => $allows];
+    }
+
     /** @param array<string, mixed> $record */
     private function txtValue(array $record): string
     {
+        // Whitespace and the quote style some panels wrap values in — nothing
+        // else. An older charlist spelled `\\t` literally and silently ate a
+        // trailing `t`, `r` or `n` of the token itself.
         $value = $record['txt'] ?? '';
         if (is_string($value) && $value !== '') {
-            return trim($value, "\" \t\r\n");
+            return trim($value, " \t\r\n\"");
         }
 
         $entries = $record['entries'] ?? null;
@@ -303,7 +534,7 @@ class VerifyDomainDnsJob implements ShouldQueue
 
         $parts = array_filter($entries, static fn ($part) => is_string($part));
 
-        return trim(implode('', $parts), "\" \t\r\n");
+        return trim(implode('', $parts), " \t\r\n\"");
     }
 
     /**
@@ -313,21 +544,25 @@ class VerifyDomainDnsJob implements ShouldQueue
      */
     private function startAutoTls(int $tlsVersion): void
     {
-        if ($this->requestedBy === null) {
-            return;
-        }
         try {
             ProvisionDomainTlsJob::dispatch(
                 $this->domainId,
                 $this->workspaceId,
                 $this->requestedBy,
+                $this->actorSecurityVersion,
+                $this->apiTokenId,
                 $this->domain,
                 $tlsVersion,
             );
         } catch (Throwable $e) {
             CustomDomain::where('id', $this->domainId)->where('workspace_id', $this->workspaceId)
-                ->where('state', 'provisioning')->where('tls_version', $tlsVersion)
-                ->update(['state' => 'verified', 'edge_eligible' => false, 'tls_error' => 'queue_unavailable', 'updated_at' => now()]);
+                ->where('tls_status', 'provisioning')->where('tls_version', $tlsVersion)
+                ->update([
+                    'tls_status' => 'error',
+                    'edge_eligible' => false,
+                    'tls_error' => 'queue_unavailable',
+                    'updated_at' => now(),
+                ]);
             report($e);
 
             return;
@@ -340,6 +575,12 @@ class VerifyDomainDnsJob implements ShouldQueue
         } catch (Throwable $e) {
             report($e);
         }
+    }
+
+    /** @return array{token_id: int}|null */
+    private function apiTokenContext(): ?array
+    {
+        return $this->apiTokenId === null ? null : ['token_id' => $this->apiTokenId];
     }
 
     private function releaseDedupeLock(): void

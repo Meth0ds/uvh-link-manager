@@ -27,6 +27,47 @@ class AuthEmailTokenTest extends TestCase
         Queue::fake();
     }
 
+    public function test_malformed_email_action_bearers_are_rejected_before_activation_or_reset(): void
+    {
+        $this->postJson('/api/v1/auth/verify-email', [
+            'token' => 'preview-only',
+            'password' => 'correct-horse-battery-74',
+            'name' => 'Example User',
+            'acceptTerms' => true,
+            'termsVersion' => 'ignored',
+            'privacyVersion' => 'ignored',
+        ])->assertStatus(422)->assertJsonPath('error', 'Token inválido');
+
+        $this->postJson('/api/v1/auth/reset-password', [
+            'token' => 'preview-only',
+            'password' => 'correct-horse-battery-74',
+        ])->assertStatus(422)->assertJsonPath('error', 'Datos inválidos');
+
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('email_tokens', 0);
+    }
+
+    public function test_well_formed_but_unknown_email_action_bearers_never_activate_or_reset(): void
+    {
+        $token = Ids::randomToken(32);
+        $this->postJson('/api/v1/auth/verify-email', [
+            'token' => $token,
+            'password' => 'correct-horse-battery-74',
+            'name' => 'Example User',
+            'acceptTerms' => true,
+            'termsVersion' => '2026-08-30',
+            'privacyVersion' => '2026-08-30',
+        ])->assertStatus(400)->assertJsonPath('error', 'Token inválido o caducado');
+
+        $this->postJson('/api/v1/auth/reset-password', [
+            'token' => $token,
+            'password' => 'correct-horse-battery-74',
+        ])->assertStatus(400)->assertJsonPath('error', 'Token inválido o caducado');
+
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('email_tokens', 0);
+    }
+
     public function test_verification_resend_replaces_old_bearer_and_enforces_account_cooldown(): void
     {
         // Un registro sin verificar vive en `pending_registrations`; su bearer
@@ -181,7 +222,7 @@ class AuthEmailTokenTest extends TestCase
             'name' => 'Nombre Anterior',
         ]);
         $securityVersion = (int) $user->security_version;
-        $plain = 'verify-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'user_id' => $user->id,

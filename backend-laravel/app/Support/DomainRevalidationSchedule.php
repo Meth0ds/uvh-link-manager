@@ -10,6 +10,11 @@ use Carbon\CarbonInterface;
  *
  * Keeping this calculation outside the HTTP layer prevents the diagnostic UI
  * from promising a retry time that differs from the housekeeping worker.
+ *
+ * The scheduler follows intent, not health: any domain the user wants enabled
+ * keeps being checked — including one that fell to `failed` — so a repaired DNS
+ * configuration is picked up without anyone opening the panel. A disabled
+ * domain is off, and nothing is checked until it is wanted again.
  */
 final class DomainRevalidationSchedule
 {
@@ -23,9 +28,7 @@ final class DomainRevalidationSchedule
 
     public static function isInProgress(CustomDomain $domain): bool
     {
-        return $domain->dns_check_started_at !== null
-            && ($domain->dns_check_completed_at === null
-                || $domain->dns_check_started_at->gt($domain->dns_check_completed_at));
+        return DomainStatus::dnsCheckInProgress($domain);
     }
 
     /**
@@ -34,7 +37,7 @@ final class DomainRevalidationSchedule
      */
     public static function nextAt(CustomDomain $domain): ?CarbonInterface
     {
-        if ($domain->state !== 'active' || self::isInProgress($domain)) {
+        if ($domain->desired_state !== 'enabled' || self::isInProgress($domain)) {
             return null;
         }
 
@@ -47,7 +50,7 @@ final class DomainRevalidationSchedule
 
     public static function isDue(CustomDomain $domain, ?CarbonInterface $at = null): bool
     {
-        if ($domain->state !== 'active' || self::isInProgress($domain)) {
+        if ($domain->desired_state !== 'enabled' || self::isInProgress($domain)) {
             return false;
         }
 

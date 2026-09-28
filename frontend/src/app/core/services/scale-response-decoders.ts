@@ -180,6 +180,7 @@ export function decodeImportReport(value: unknown): ImportReport {
     dryRun: boolean(source["dryRun"], "import report"),
     valid: integer(source["valid"], "import report"),
     created: integer(source["created"], "import report"),
+    failed: integer(source["failed"], "import report"),
     errors,
     truncated: boolean(source["truncated"], "import report"),
   };

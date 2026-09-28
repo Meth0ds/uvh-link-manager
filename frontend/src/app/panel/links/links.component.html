@@ -61,6 +61,14 @@
       </mat-select>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
+      <mat-select [value]="domainId()" (selectionChange)="onDomain($event.value)" aria-label="Dominio">
+        <mat-option [value]="null">Todos los dominios</mat-option>
+        @for (d of domainOptions(); track d.id) {
+          <mat-option [value]="d.id">{{ d.domain }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
       <mat-select [value]="sort()" (selectionChange)="onSort($event.value)" aria-label="Ordenar">
         <mat-option value="created_at_desc">Más recientes</mat-option>
         <mat-option value="created_at_asc">Más antiguos</mat-option>
@@ -102,6 +110,7 @@
       <button mat-stroked-button type="button" (click)="openBulkPanel('tag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'tag'"><mat-icon>sell</mat-icon> Etiquetar</button>
       <button mat-stroked-button type="button" (click)="openBulkPanel('untag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'untag'"><mat-icon>sell</mat-icon> Quitar etiqueta</button>
       <button mat-stroked-button type="button" (click)="openBulkPanel('move')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'move'"><mat-icon>drive_file_move</mat-icon> Mover</button>
+      <button mat-stroked-button type="button" (click)="openBulkPanel('domain')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'domain'"><mat-icon>language</mat-icon> Cambiar dominio</button>
       <button mat-stroked-button type="button" class="bulk-danger" (click)="bulkTrash()" [disabled]="actionId() !== null"><mat-icon>delete</mat-icon> Eliminar</button>
     </div>
     @if (bulkPanel() === 'tag' || bulkPanel() === 'untag') {
@@ -125,6 +134,20 @@
           </mat-select>
         </mat-form-field>
         <button mat-flat-button color="primary" type="button" (click)="applyBulkMove()" [disabled]="actionId() !== null">Mover</button>
+      </div>
+    }
+    @if (bulkPanel() === 'domain') {
+      <div class="bulk-inline">
+        <mat-form-field appearance="outline" class="bulk-collection">
+          <mat-label>Dominio de destino</mat-label>
+          <mat-select [value]="bulkDomainId()" (selectionChange)="bulkDomainId.set($event.value)" aria-label="Dominio de destino">
+            <mat-option [value]="null">Dominio de plataforma (uvh.es)</mat-option>
+            @for (d of bulkDomainOptions(); track d.id) {
+              <mat-option [value]="d.id">{{ d.domain }}{{ d.isDefault ? ' — Predeterminado' : '' }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="button" (click)="applyBulkDomain()" [disabled]="actionId() !== null">Cambiar dominio</button>
       </div>
     }
   </section>

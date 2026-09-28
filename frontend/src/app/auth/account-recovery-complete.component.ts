@@ -21,8 +21,8 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
     <app-auth-shell>
       <section class="card recovery-complete" aria-labelledby="complete-title">
         <span class="step-kicker">Recuperación / proteger la cuenta</span>
-        <h2 id="complete-title">Protege de nuevo tu cuenta</h2>
-        <p class="sub">El enlace funciona una sola vez. Al finalizar se cerrarán las sesiones, se revocarán los tokens API, se retirará el MFA perdido y tendrás que configurarlo de nuevo.</p>
+        <h2 id="complete-title">{{ token ? 'Protege de nuevo tu cuenta' : 'Enlace no disponible' }}</h2>
+        @if (token) { <p class="sub">El enlace funciona una sola vez. Al finalizar se cerrarán las sesiones, se revocarán los tokens API, se retirará el MFA perdido y tendrás que configurarlo de nuevo.</p> }
 
         @if (!done()) {
           <form class="form" [formGroup]="form" (ngSubmit)="complete()">

@@ -23,7 +23,7 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="done() && !ok()">
           {{ ok() ? 'verified_user' : (done() ? 'error_outline' : 'gpp_maybe') }}
         </mat-icon>
-        <h2 id="security-incident-title">{{ ok() ? 'Accesos revocados' : (done() ? 'No se pudo usar el enlace' : 'Cerrar accesos de emergencia') }}</h2>
+        <h2 id="security-incident-title">{{ ok() ? 'Accesos revocados' : (!token ? 'Enlace no disponible' : (done() ? 'No se pudo usar el enlace' : 'Cerrar accesos de emergencia')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
 
         @if (!done()) {

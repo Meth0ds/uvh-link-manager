@@ -99,10 +99,53 @@ final class PublicStatusTest extends TestCase
         $this->getJson('/api/v1/public-status')->assertStatus(503)->assertExactJson($this->unavailable());
     }
 
-    private function feed(string $generatedAt): array
+    /**
+     * El componente de dominios personalizados es cosa del monitor: cuando lo
+     * reporta se publica; cuando un feed antiguo no lo trae, se omite en vez de
+     * inventar un estado local; y si lo trae con un valor desconocido, la
+     * superficie entera falla cerrada.
+     */
+    public function test_the_custom_domains_component_is_published_when_the_monitor_reports_it(): void
+    {
+        config(['uvh.public_status.feed_url' => self::FEED]);
+        Http::fake([self::FEED => Http::response($this->feed(now()->toIso8601String(), [
+            'links' => 'operational', 'panel' => 'operational',
+            'webhooks' => 'operational', 'domains' => 'degraded',
+        ]))]);
+
+        $this->getJson('/api/v1/public-status')->assertOk()
+            ->assertJsonPath('overall', 'degraded')
+            ->assertJsonPath('components.3.id', 'domains')
+            ->assertJsonPath('components.3.label', 'Dominios personalizados')
+            ->assertJsonCount(4, 'components');
+    }
+
+    public function test_an_absent_domains_component_is_omitted_not_invented(): void
+    {
+        config(['uvh.public_status.feed_url' => self::FEED]);
+        Http::fake([self::FEED => Http::response($this->feed(now()->toIso8601String()))]);
+
+        $this->getJson('/api/v1/public-status')->assertOk()
+            ->assertJsonPath('overall', 'operational')
+            ->assertJsonCount(3, 'components');
+    }
+
+    public function test_an_unknown_domains_status_fails_closed(): void
+    {
+        config(['uvh.public_status.feed_url' => self::FEED]);
+        Http::fake([self::FEED => Http::response($this->feed(now()->toIso8601String(), [
+            'links' => 'operational', 'panel' => 'operational',
+            'webhooks' => 'operational', 'domains' => 'onfire',
+        ]))]);
+
+        $this->getJson('/api/v1/public-status')->assertStatus(503)->assertExactJson($this->unavailable());
+    }
+
+    /** @param  array<string, string>|null  $components @return array<string, mixed> */
+    private function feed(string $generatedAt, ?array $components = null): array
     {
         return ['generatedAt' => $generatedAt,
-            'components' => ['links' => 'operational', 'panel' => 'operational', 'webhooks' => 'operational'],
+            'components' => $components ?? ['links' => 'operational', 'panel' => 'operational', 'webhooks' => 'operational'],
             'incidents' => []];
     }
 

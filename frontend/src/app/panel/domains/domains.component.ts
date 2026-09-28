@@ -16,6 +16,7 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { AsyncPoller } from "../../core/async-poller";
+import { IdempotentIntent } from "../../core/idempotent-intent";
 import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { domainStateLabel } from "../../core/domain-state-label";
@@ -78,6 +79,8 @@ export class DomainsComponent {
   readonly verifyingId = signal<number | null>(null);
   /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
   private readonly mutations = new OwnedMutations();
+  /** Clave de idempotencia por intención para crear/activar/desactivar. */
+  private readonly intent = new IdempotentIntent();
   readonly actionId = this.mutations.value;
   readonly newDomain = signal("");
   readonly error = signal<string | null>(null);
@@ -87,10 +90,35 @@ export class DomainsComponent {
     return role === "owner" || role === "admin" || role === "editor";
   };
 
+  /** Desactivar/Eliminar apagan o borran todos los enlaces del dominio: admin+. */
+  readonly canAdmin = (): boolean => {
+    const role = this.workspaces.currentRole();
+    return role === "owner" || role === "admin";
+  };
+
   readonly stateLabel = (d: DomainDto): string => {
     if (this.isChecking(d)) return "Comprobando DNS…";
+    // Degraded keeps serving on grace — the label must say "act now", not
+    // pretend the green state still applies.
+    if (d.trafficStatus === "degraded") return "Requiere atención";
     if (d.state === "active" && !d.edgeEligible) return "Revalidación necesaria";
     return domainStateLabel(d.state);
+  };
+
+  /**
+   * The grace countdown: a degraded domain still serves, and the owner needs
+   * to know for how long before links on it go dark.
+   */
+  readonly graceLabel = (d: DomainDto): string | null => {
+    if (!d.graceExpiresAt || d.trafficStatus !== "degraded") return null;
+    const remainingMs = Date.parse(d.graceExpiresAt) - Date.now();
+    if (!Number.isFinite(remainingMs)) return null;
+    if (remainingMs <= 0) {
+      return "El periodo de seguridad está terminando. El dominio puede dejar de servir enlaces en cualquier momento.";
+    }
+    const minutes = Math.round(remainingMs / 60_000);
+    const human = minutes >= 90 ? `aproximadamente ${Math.round(minutes / 60)} h` : `aproximadamente ${Math.max(1, minutes)} min`;
+    return `El dominio sigue funcionando durante el periodo de seguridad. Podría desconectarse en ${human}.`;
   };
 
   readonly dnsErrorLabel = (error: string | null): string | null => error
@@ -167,10 +195,13 @@ export class DomainsComponent {
     // first result would publish over the second and clear ITS busy slot.
     const action = this.addMutation.begin(0);
     try {
-      const { domain: created } = await this.api.post<{ domain: DomainDto }>(
-        "/api/v1/domains",
-        { domain },
-        decodeCreatedDomainResponse,
+      const { domain: created } = await this.intent.run(`domains.create:${domain}`, (key) =>
+        this.api.post<{ domain: DomainDto }>(
+          "/api/v1/domains",
+          { domain },
+          decodeCreatedDomainResponse,
+          { "Idempotency-Key": key },
+        ),
       );
       // The created row carries a one-time ownership TXT token. Publish it only
       // into the workspace it was created for AND only if this create still
@@ -190,7 +221,9 @@ export class DomainsComponent {
   }
 
   async verify(d: DomainDto): Promise<void> {
-    if (this.actionId() || !this.canEdit()) return;
+    // El botón se desactiva mientras hay una comprobación; el método lo espeja
+    // para que ningún llamante encole una revalidación inútil detrás de otra.
+    if (this.actionId() || !this.canEdit() || this.isChecking(d) || d.dnsCheckInProgress) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
     const action = this.mutations.begin(d.id);
@@ -210,6 +243,12 @@ export class DomainsComponent {
         "Cerrar",
         { duration: 5000 },
       );
+      // 409 = ya hay una comprobación en vuelo (la del planificador o la de
+      // otro miembro): el estado ya evoluciona solo y el panel lo sigue en
+      // vez de quedarse esperando otra pulsación.
+      if (err instanceof ApiRequestError && err.status === 409) {
+        this.pollVerification(d.id);
+      }
       void this.load();
     } finally {
       if (target.isCurrent() && this.mutations.isCurrent(action)) {
@@ -221,9 +260,12 @@ export class DomainsComponent {
 
   private pollVerification(id: number): void {
     this.pollDomainState(id, {
-      attempts: 15,
-      settled: (domain) => !this.isChecking(domain),
-      exhausted: "La comprobación sigue en cola. Puedes actualizar el estado dentro de unos minutos.",
+      attempts: 30,
+      // The chain follows DNS into TLS on its own: a check that proves both
+      // records starts auto-TLS in the same breath, so "settled" is only true
+      // once nothing is in flight — not merely when the DNS answer landed.
+      settled: (domain) => !this.isChecking(domain) && domain.tlsStatus !== "provisioning",
+      exhausted: "La operación sigue en curso. Puedes actualizar el estado dentro de unos minutos.",
     });
   }
 
@@ -232,6 +274,10 @@ export class DomainsComponent {
    * agotan los intentos. La espera vive en `AsyncPoller`: una sola espera
    * armada, pausa con la pestaña oculta, reanudación al volver y corte al
    * cambiar de workspace (el guardián `pollRequests` manda sobre la sonda).
+   *
+   * Un fallo de red no mata la sonda: el aviso de «actualizaremos el estado
+   * automáticamente» se cumple con reintento y backoff, y sólo el presupuesto
+   * de intentos agotado —no un 502 transitorio— termina la espera.
    */
   private pollDomainState(
     id: number,
@@ -243,20 +289,25 @@ export class DomainsComponent {
     let remaining = options.attempts;
     const poller = new AsyncPoller({
       destroyRef: this.destroyRef,
-      delays: [2_000],
+      // 2s, 2s, 4s, 8s… saturando en 8s: el estado DNS tarda lo que tarda el
+      // worker, y un error transitorio no debe costar un intento entero.
+      delays: [2_000, 2_000, 4_000, 8_000],
       wantsMore: () => remaining > 0,
       attempt: async () => {
         remaining -= 1;
         if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
+        let settled = false;
         try {
           const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, (value) => decodeDomainsResponse(value, this.canEdit()), { signal: request.signal });
           if (!this.pollRequests.isCurrent(request, this.workspaces.currentId())) return;
           this.domains.set(domains);
           const current = domains.find((domain) => domain.id === id);
-          if (!current || options.settled(current)) return;
+          settled = !current || options.settled(current);
         } catch {
-          return;
+          // A failed read is not a settled operation: keep polling until the
+          // budget runs out instead of silently abandoning the promise.
         }
+        if (settled) return;
         if (remaining <= 0) {
           if (this.pollRequests.isCurrent(request, this.workspaces.currentId())) {
             this.snackbar.open(options.exhausted, "Cerrar", { duration: 5000 });
@@ -270,15 +321,21 @@ export class DomainsComponent {
   }
 
   async activate(d: DomainDto): Promise<void> {
-    if (this.actionId() || !this.canEdit()) return;
+    // Espejo cliente de la guardia de carrera del servidor: mientras una
+    // comprobación DNS corre, su resultado puede degradar el dominio, y
+    // preparar HTTPS ahora gastaría una emisión en una fila a punto de cambiar.
+    if (this.actionId() || !this.canEdit() || this.isChecking(d) || d.dnsCheckInProgress) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
     const action = this.mutations.begin(d.id);
     try {
-      const result = await this.api.post<{ state: DomainState }>(
-        `/api/v1/domains/${d.id}/activate`,
-        undefined,
-        decodeDomainStateResponse,
+      const result = await this.intent.run(`domains.activate:${d.id}`, (key) =>
+        this.api.post<{ state: DomainState }>(
+          `/api/v1/domains/${d.id}/activate`,
+          undefined,
+          decodeDomainStateResponse,
+          { "Idempotency-Key": key },
+        ),
       );
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
@@ -291,6 +348,11 @@ export class DomainsComponent {
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      // Misma lectura que en verify: un 409 significa trabajo en curso cuyo
+      // estado conviene seguir, no un final.
+      if (err instanceof ApiRequestError && err.status === 409) {
+        this.pollVerification(d.id);
+      }
     } finally {
       this.mutations.settle(action);
     }
@@ -299,18 +361,20 @@ export class DomainsComponent {
   private pollActivation(id: number): void {
     this.pollDomainState(id, {
       attempts: 30,
-      settled: (domain) => domain.state !== "provisioning",
+      settled: (domain) => domain.tlsStatus !== "provisioning",
       exhausted: "La emisión continúa en segundo plano. El estado se actualizará al terminar.",
     });
   }
 
   async disable(d: DomainDto): Promise<void> {
-    if (this.actionId() || !this.canEdit()) return;
+    if (this.actionId() || !this.canAdmin()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
     const action = this.mutations.begin(d.id);
     try {
-      await this.api.post(`/api/v1/domains/${d.id}/disable`);
+      await this.intent.run(`domains.disable:${d.id}`, (key) =>
+        this.api.post(`/api/v1/domains/${d.id}/disable`, undefined, undefined, { "Idempotency-Key": key }),
+      );
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Dominio desactivado", "Cerrar", { duration: 2500 });
       void this.load();
@@ -324,8 +388,35 @@ export class DomainsComponent {
     }
   }
 
+  /**
+   * Marca (o desmarca) el dominio como predeterminado del workspace: el que
+   * preseleccionan los enlaces nuevos. Requiere que esté sirviendo de verdad,
+   * la misma regla que para crear un enlace sobre él.
+   */
+  async setDefault(d: DomainDto, isDefault: boolean): Promise<void> {
+    if (this.actionId() || !this.canEdit()) return;
+    const target = targetWorkspace(this.workspaces);
+    if (target.workspaceId === null) return;
+    const action = this.mutations.begin(d.id);
+    try {
+      await this.api.patch(`/api/v1/domains/${d.id}`, { isDefault });
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
+      this.snackbar.open(
+        isDefault ? "Dominio predeterminado para los enlaces nuevos" : "Preferencia eliminada",
+        "Cerrar",
+        { duration: 2500 },
+      );
+      void this.load();
+    } catch (err) {
+      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.mutations.settle(action);
+    }
+  }
+
   async remove(d: DomainDto): Promise<void> {
-    if (!this.canEdit()) return;
+    if (!this.canAdmin()) return;
     const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({
       title: "Eliminar dominio",

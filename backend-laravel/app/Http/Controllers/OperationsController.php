@@ -78,35 +78,58 @@ final class OperationsController
             'uvh_webhook_oldest_pending_age_seconds',
             $oldestPendingWebhook === null ? 0 : max(0, time() - Carbon::parse($oldestPendingWebhook)->getTimestamp()),
         );
-        foreach (['pending', 'verifying', 'verified', 'provisioning', 'active', 'error', 'disabled'] as $state) {
-            $this->appendGauge($lines, 'uvh_domains_'.$state, DB::table('custom_domains')->where('state', $state)->count());
+        foreach (['enabled', 'disabled'] as $intent) {
+            $this->appendGauge($lines, 'uvh_domains_desired_'.$intent, DB::table('custom_domains')->where('desired_state', $intent)->count());
         }
-        // Revalidation deliberately keeps the public state active/verified/
-        // disabled. The timestamp comparison is therefore the authoritative
-        // in-progress marker, while updated_at covers legacy verifying rows
-        // created before dns_check_started_at existed.
+        foreach (['pending', 'provisioning', 'ready', 'expiring', 'error'] as $status) {
+            $this->appendGauge($lines, 'uvh_domains_tls_'.$status, DB::table('custom_domains')->where('tls_status', $status)->count());
+        }
+        $this->appendGauge(
+            $lines,
+            'uvh_domains_serving',
+            DB::table('custom_domains')->where('desired_state', 'enabled')->where('edge_eligible', true)->whereNotNull('tls_ready_at')->count(),
+        );
+        // A check is in progress while its start is newer than its completion.
         $oldestDnsCheck = DB::table('custom_domains')
-            ->where(function ($query) {
-                $query->where('state', 'verifying')
-                    ->orWhere(function ($revalidation) {
-                        $revalidation->whereIn('state', ['active', 'verified', 'disabled'])
-                            ->whereNotNull('dns_check_started_at')
-                            ->where(function ($inProgress) {
-                                $inProgress->whereNull('dns_check_completed_at')
-                                    ->orWhereColumn('dns_check_started_at', '>', 'dns_check_completed_at');
-                            });
-                    });
+            ->whereNotNull('dns_check_started_at')
+            ->where(function ($inProgress) {
+                $inProgress->whereNull('dns_check_completed_at')
+                    ->orWhereColumn('dns_check_started_at', '>', 'dns_check_completed_at');
             })
-            ->min(DB::raw('COALESCE(dns_check_started_at, updated_at)'));
+            ->min('dns_check_started_at');
         $this->appendGauge(
             $lines,
             'uvh_dns_oldest_in_progress_age_seconds',
             $oldestDnsCheck === null ? 0 : max(0, time() - Carbon::parse($oldestDnsCheck)->getTimestamp()),
         );
+        // The standing alarm for the scheduler: a domain the scheduler should
+        // already have re-checked and has not. Queue latency is normal; this
+        // growing means the round trip is not keeping up with the fleet.
+        $overdueCutoff = now()->subHours(max(1, (int) config('uvh.custom_domains.revalidation_hours', 24)));
+        $overdueFailureCutoff = now()->subHours(max(1, (int) config('uvh.custom_domains.failure_retry_hours', 1)));
+        $overdueDnsChecks = DB::table('custom_domains')
+            ->where('desired_state', 'enabled')
+            ->where(function ($inProgress) {
+                $inProgress->whereNull('dns_check_started_at')
+                    ->orWhere('dns_check_completed_at', '>=', DB::raw('dns_check_started_at'));
+            })
+            ->where(function ($query) use ($overdueCutoff, $overdueFailureCutoff) {
+                $query->where(function ($healthy) use ($overdueCutoff) {
+                    $healthy->whereNull('dns_error')->where(function ($due) use ($overdueCutoff) {
+                        $due->whereNull('dns_check_completed_at')->orWhere('dns_check_completed_at', '<=', $overdueCutoff);
+                    });
+                })->orWhere(function ($failed) use ($overdueFailureCutoff) {
+                    $failed->whereNotNull('dns_error')->where(function ($due) use ($overdueFailureCutoff) {
+                        $due->whereNull('dns_check_completed_at')->orWhere('dns_check_completed_at', '<=', $overdueFailureCutoff);
+                    });
+                });
+            })
+            ->count();
+        $this->appendGauge($lines, 'uvh_dns_overdue_checks', $overdueDnsChecks);
         // Provisioning has no separate claim timestamp. updated_at is written
         // when the generation enters provisioning and is not refreshed while
         // the edge request runs, so it is the appropriate age anchor.
-        $oldestTlsProvisioning = DB::table('custom_domains')->where('state', 'provisioning')->min('updated_at');
+        $oldestTlsProvisioning = DB::table('custom_domains')->where('tls_status', 'provisioning')->min('updated_at');
         $this->appendGauge(
             $lines,
             'uvh_tls_oldest_provisioning_age_seconds',

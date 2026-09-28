@@ -3,7 +3,7 @@
 #
 # Uso:
 #   cp .env.docker.local.example .env.docker.local
-#   docker compose -f docker-compose.local.yml --env-file .env.docker.local up -d postgres
+#   docker compose -f docker-compose.local.yml --env-file .env.docker.local up -d postgres adminer mailpit
 #   docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php composer --version
 #
 # El perfil "laravel" (app/queue/schedule) exige que backend-laravel/ ya exista
@@ -26,13 +26,14 @@ x-php-service: &php-service
     # árbol no fallan: recorren el sistema de ficheros del contenedor, que es
     # como `composer test` dejó de terminar. Sólo se lee de aquí.
     - ./:/repo:ro
-  environment:
+  environment: &php-environment
     COMPOSER_ALLOW_SUPERUSER: "1"
     # Dónde encuentra `Tests\Support\RepositoryRoot` el repositorio cuando la
     # suite corre dentro de este contenedor.
     UVH_REPO_ROOT: /repo
     APP_ENV: local
     APP_URL: http://localhost:8000
+    FRONTEND_URL: http://localhost:4200
     DB_CONNECTION: pgsql
     DB_HOST: postgres
     DB_PORT: "5432"
@@ -85,6 +86,27 @@ services:
       timeout: 5s
       retries: 20
 
+  # Interfaz web SQL compatible con PostgreSQL. Adminer se enlaza sólo a
+  # localhost y se conecta al servicio postgres dentro de esta red de Compose.
+  adminer:
+    image: adminer:4.8.1-standalone@sha256:34d37131366c5aa84e1693dbed48593ed6f95fb450b576c1a7a59d3a9c9e8802
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "127.0.0.1:${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Buzón de desarrollo: el SMTP queda sólo en la red interna; la interfaz
+  # web se publica en localhost para abrir enlaces de verificación y reset.
+  mailpit:
+    image: axllent/mailpit@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
+
   # Herramienta puntual: composer / artisan / php one-off.
   php:
     <<: *php-service
@@ -97,6 +119,20 @@ services:
   app:
     <<: *php-service
     profiles: ["laravel"]
+    environment:
+      <<: *php-environment
+      # En desarrollo, los correos transaccionales van al buzón local, nunca a
+      # un destinatario externo. La app y el worker comparten este transporte.
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_FROM_ADDRESS: no-reply@uvh.local
+      MAIL_FROM_NAME: UVH Local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
     ports:
       - "127.0.0.1:8000:8000"
     command: ["php", "-d", "opcache.enable_cli=1", "-d", "opcache.validate_timestamps=1", "-S", "0.0.0.0:8000", "-t", "public", "public/index.php"]
@@ -106,6 +142,20 @@ services:
   queue:
     <<: *php-service
     profiles: ["laravel"]
+    environment:
+      <<: *php-environment
+      # En desarrollo, los correos transaccionales van al buzón local, nunca a
+      # un destinatario externo. La app y el worker comparten este transporte.
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_FROM_ADDRESS: no-reply@uvh.local
+      MAIL_FROM_NAME: UVH Local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
     # `security` is the pool the reputation checks run on: without it, blocking
     # a destination never reanalyses the links that point at it.
     command: ["php", "artisan", "queue:work", "--queue=mail,webhooks,domains,exports,analytics,security,default", "--timeout=660", "--tries=3"]

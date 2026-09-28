@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\CustomDomain;
+use App\Models\Link;
 use App\Models\User;
 use App\Support\Ids;
 use Illuminate\Support\Facades\DB;
@@ -322,6 +324,93 @@ class AdminConsoleTest extends TestCase
     }
 
     /** @return array{User, string} */
+    /**
+     * El inspector de dominios: la salud de un vistazo y nunca el reto DNS —
+     * un admin diagnostica, no prueba control del nombre. El `state` de cada
+     * fila se deriva como `DomainStatus::legacyState` y el filtro debe decidir
+     * lo mismo que esa derivación: el CASE del SQL y el PHP se mantienen
+     * juntos o la paginación miente.
+     */
+    public function test_the_domain_inspector_reports_health_and_never_the_challenge(): void
+    {
+        [, $token] = $this->adminSession();
+        $owner = $this->user('dominios-owner@example.test');
+        $workspace = $owner->ownedWorkspaces()->create(['name' => 'Inspector', 'slug' => 'inspector-'.Ids::randomToken(8)]);
+        $workspace->memberships()->create(['user_id' => $owner->id, 'role' => 'owner']);
+
+        $active = $this->inspectorDomain($workspace->id, 'activo.example.test', [
+            'desired_state' => 'enabled', 'ownership_status' => 'verified', 'routing_status' => 'healthy',
+            'tls_status' => 'ready', 'edge_eligible' => true, 'tls_ready_at' => now(),
+            'verified_at' => now(), 'ownership_verified_at' => now(), 'routing_verified_at' => now(),
+        ]);
+        $pending = $this->inspectorDomain($workspace->id, 'pendiente.example.test', [
+            'desired_state' => 'enabled', 'ownership_status' => 'pending', 'routing_status' => 'unknown',
+            'tls_status' => 'pending', 'edge_eligible' => false,
+        ]);
+        $disabled = $this->inspectorDomain($workspace->id, 'parado.example.test', [
+            'desired_state' => 'disabled', 'ownership_status' => 'verified', 'routing_status' => 'healthy',
+            'tls_status' => 'ready', 'edge_eligible' => false, 'tls_ready_at' => now(), 'verified_at' => now(),
+        ]);
+        $broken = $this->inspectorDomain($workspace->id, 'roto.example.test', [
+            'desired_state' => 'enabled', 'ownership_status' => 'verified', 'routing_status' => 'failed',
+            'tls_status' => 'error', 'edge_eligible' => false, 'verified_at' => now(),
+            'dns_error' => 'routing_missing', 'tls_error' => 'certificate_provisioning_failed',
+        ]);
+        Link::insertGetId([
+            'workspace_id' => $workspace->id,
+            'created_by' => $owner->id,
+            'domain_id' => $active,
+            'alias' => 'inspector-'.Ids::randomToken(4),
+            'destination' => 'https://example.org/x',
+            'state' => 'active',
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withCookie('uvh_session', $token)->getJson('/api/v1/admin/domains');
+        $response->assertOk()->assertJsonStructure(['domains', 'total', 'page', 'perPage']);
+        $rows = collect($response->json('domains'))->keyBy('domain');
+        $this->assertSame('active', $rows['activo.example.test']['state']);
+        $this->assertSame('online', $rows['activo.example.test']['traffic_status']);
+        $this->assertSame('pending', $rows['pendiente.example.test']['state']);
+        $this->assertSame('disabled', $rows['parado.example.test']['state']);
+        $this->assertSame('error', $rows['roto.example.test']['state']);
+        $this->assertSame('routing_missing', $rows['roto.example.test']['dns_error']);
+        $this->assertSame('certificate_provisioning_failed', $rows['roto.example.test']['tls_error']);
+        $this->assertSame(1, $rows['activo.example.test']['links_count']);
+        $this->assertSame(0, $rows['pendiente.example.test']['links_count']);
+        $this->assertStringNotContainsString('verification_token', $response->getContent());
+        $this->assertStringNotContainsString('uvh-verify=', $response->getContent());
+
+        // El filtro decide exactamente lo que deriva el PHP, fila a fila.
+        foreach (['active' => 'activo.example.test', 'pending' => 'pendiente.example.test', 'disabled' => 'parado.example.test', 'error' => 'roto.example.test'] as $state => $host) {
+            $filtered = $this->withCookie('uvh_session', $token)->getJson('/api/v1/admin/domains?state='.$state);
+            $filtered->assertOk();
+            $this->assertSame([$host], array_column($filtered->json('domains'), 'domain'), "El filtro {$state} debe devolver exactamente {$host}");
+        }
+
+        $this->withCookie('uvh_session', $token)->getJson('/api/v1/admin/domains?state=no-existe')
+            ->assertUnprocessable()->assertJson(['error' => 'Filtro de dominio inválido']);
+    }
+
+    /** @param  array<string, mixed>  $overrides */
+    private function inspectorDomain(int $workspaceId, string $host, array $overrides): int
+    {
+        return (int) CustomDomain::create(array_merge([
+            'workspace_id' => $workspaceId,
+            'domain' => $host,
+            'verification_token' => 'uvh-verify=Inspector123',
+            'verification_version' => 1,
+            'verification_scheme' => 2,
+            'desired_state' => 'enabled',
+            'ownership_status' => 'pending',
+            'routing_status' => 'unknown',
+            'tls_status' => 'pending',
+            'edge_eligible' => false,
+        ], $overrides))->id;
+    }
+
     private function adminSession(bool $mfaVerified = true): array
     {
         $admin = User::create([

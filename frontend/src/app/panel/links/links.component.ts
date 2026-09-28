@@ -23,13 +23,14 @@ import { LinkDialogService } from "./link-dialog.service";
 import { QrDialogComponent } from "./qr-dialog.component";
 import { ActionDialogService } from "../action-dialog.service";
 import { PendingLinkIntentService } from "../../core/services/pending-link-intent.service";
-import type { BulkAction, CollectionDto, LinksResponse, LinkDto, LinkState } from "../../core/models";
+import type { BulkAction, CollectionDto, DomainDto, LinksResponse, LinkDto, LinkState } from "../../core/models";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeLinksResponse } from "../../core/services/link-response-decoders";
+import { decodeDomainsResponse } from "../../core/services/domain-response-decoders";
 import { decodeBulkActionResponse, decodeCollectionsResponse } from "../../core/services/scale-response-decoders";
 import { downloadBlob } from "../../core/services/browser-download";
 import { linkStateLabel } from "../../core/link-state-label";
@@ -89,24 +90,37 @@ export class LinksComponent {
   /** Selección de la página visible; los ids viajan a la acción masiva. */
   readonly selected = signal<ReadonlySet<number>>(new Set());
   /** Panel inline de la barra masiva: etiquetar, quitar etiqueta o mover. */
-  readonly bulkPanel = signal<"none" | "tag" | "untag" | "move">("none");
+  readonly bulkPanel = signal<"none" | "tag" | "untag" | "move" | "domain">("none");
   bulkTagsInput = "";
   readonly bulkCollectionId = signal<number | null>(null);
+  /** Destino de «cambiar dominio»; null es el dominio de plataforma. */
+  readonly bulkDomainId = signal<number | null>(null);
+  /** Sólo dominios sirviendo pueden recibir enlaces; el resto no se ofrece. */
+  readonly bulkDomainOptions = computed(() => this.domainOptions().filter((d) => d.servingReady));
   readonly collections = signal<CollectionDto[]>([]);
   readonly exporting = signal(false);
   /**
    * Clave de idempotencia de la última acción masiva y su firma. Se reutiliza
-   * cuando un intento quedó sin respuesta (red o 5xx): el reintento debe
-   * reproducir la respuesta original, nunca aplicar el efecto dos veces. Una
-   * respuesta definitiva del servidor la descarta.
+   * cuando un intento quedó sin respuesta (red, 5xx o `409` de relevo): el
+   * reintento debe reproducir la respuesta original, nunca aplicar el efecto
+   * dos veces. Una respuesta definitiva del servidor la descarta.
    */
   private lastBulk: { signature: string; key: string } | null = null;
+  /**
+   * Reintento ofrecido tras un `409`: mismo cuerpo y misma clave congelados,
+   * porque el contrato (docs/api.md) pide repetir exactamente la petición
+   * desplazada aunque la selección haya cambiado después.
+   */
+  private bulkRetry: { signature: string; body: Record<string, unknown>; key: string } | null = null;
 
   readonly q = signal("");
   readonly state = signal<StateFilter>("");
   readonly tag = signal("");
   readonly sort = signal("created_at_desc");
-  readonly hasFilters = computed(() => Boolean(this.q().trim() || this.state() || this.tag()));
+  /** null es «uvh.es»: los enlaces sin dominio personalizado. */
+  readonly domainId = signal<number | null>(null);
+  readonly domainOptions = signal<DomainDto[]>([]);
+  readonly hasFilters = computed(() => Boolean(this.q().trim() || this.state() || this.tag() || this.domainId() !== null));
   readonly someOnPage = computed(() => this.links().some(link => this.selected().has(link.id)) && !this.allOnPage());
   readonly page = signal(0);
   readonly pageSizeOptions = [20, 50, 100];
@@ -153,10 +167,15 @@ export class LinksComponent {
       // `finally` no va a liberar este hueco, así que lo libera el contexto.
       this.mutations.reset();
       this.pendingAutoHandled = false;
+      // El filtro por dominio es por workspace: la selección previa apuntaría
+      // a un dominio de otro tenant.
+      this.domainId.set(null);
+      this.domainOptions.set([]);
       if (workspaceId === null) {
         this.loading.set(false);
         return;
       }
+      void this.loadDomainOptions();
       void this.reload();
     });
   }
@@ -183,6 +202,7 @@ export class LinksComponent {
         q: this.q(),
         state: this.state(),
         tag: this.tag(),
+        domainId: this.domainId() ?? "",
         sort: this.sort(),
         page,
         perPage,
@@ -209,6 +229,7 @@ export class LinksComponent {
     this.q.set("");
     this.state.set("");
     this.tag.set("");
+    this.domainId.set(null);
     this.page.set(0);
     void this.reload();
   }
@@ -217,6 +238,23 @@ export class LinksComponent {
     this.state.set(value);
     this.page.set(0);
     void this.reload();
+  }
+
+  onDomain(value: number | null): void {
+    this.domainId.set(value);
+    this.page.set(0);
+    void this.reload();
+  }
+
+  /** Opciones del filtro por dominio; sólo necesitan id y nombre. */
+  private async loadDomainOptions(): Promise<void> {
+    try {
+      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+      this.domainOptions.set(domains);
+    } catch {
+      // El filtro queda sin opciones, nunca a medias.
+      this.domainOptions.set([]);
+    }
   }
 
   /**
@@ -273,9 +311,14 @@ export class LinksComponent {
     this.bulkTagsInput = "";
   }
 
-  openBulkPanel(mode: "tag" | "untag" | "move"): void {
+  openBulkPanel(mode: "tag" | "untag" | "move" | "domain"): void {
     this.bulkPanel.set(this.bulkPanel() === mode ? "none" : mode);
     if (this.bulkPanel() === "move") void this.loadCollections();
+    // El dominio predeterminado del workspace es el destino que casi siempre
+    // se quiere; la elección queda visible antes de aplicar nada.
+    if (this.bulkPanel() === "domain") {
+      this.bulkDomainId.set(this.bulkDomainOptions().find((d) => d.isDefault)?.id ?? null);
+    }
   }
 
   applyBulkTags(): Promise<void> {
@@ -286,6 +329,10 @@ export class LinksComponent {
 
   applyBulkMove(): Promise<void> {
     return this.runBulk("move", { collectionId: this.bulkCollectionId() });
+  }
+
+  applyBulkDomain(): Promise<void> {
+    return this.runBulk("set-domain", { domainId: this.bulkDomainId() });
   }
 
   bulkState(action: "pause" | "activate" | "archive"): Promise<void> {
@@ -310,24 +357,51 @@ export class LinksComponent {
    * respuesta original en vez de duplicar el efecto.
    */
   private async runBulk(action: BulkAction, extra: Record<string, unknown> = {}): Promise<void> {
+    const ids = [...this.selected()].sort((a, b) => a - b);
+    if (!ids.length) return;
+    await this.sendBulk(JSON.stringify({ action, ids, ...extra }), { action, linkIds: ids, ...extra });
+  }
+
+  /**
+   * Repite la acción masiva que un `409` desplazó: el mismo cuerpo con la
+   * misma clave, tal y como pide el contrato de reintento. Se repite la
+   * intención congelada aunque la selección haya cambiado después.
+   */
+  async retryBulk(): Promise<void> {
+    const pending = this.bulkRetry;
+    if (pending === null) return;
+    this.bulkRetry = null;
+    await this.sendBulk(pending.signature, pending.body);
+  }
+
+  private async sendBulk(signature: string, body: Record<string, unknown>): Promise<void> {
     if (this.actionId() !== null) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
-    const ids = [...this.selected()].sort((a, b) => a - b);
-    if (!ids.length) return;
-    const signature = JSON.stringify({ action, ids, ...extra });
     const key = this.lastBulk?.signature === signature ? this.lastBulk.key : crypto.randomUUID();
     this.lastBulk = { signature, key };
     const op = this.mutations.begin(0);
     try {
-      await this.api.post("/api/v1/links/bulk", { action, linkIds: ids, ...extra }, decodeBulkActionResponse, { "Idempotency-Key": key });
+      await this.api.post("/api/v1/links/bulk", body, decodeBulkActionResponse, { "Idempotency-Key": key });
       if (!target.isCurrent() || !this.mutations.isCurrent(op)) return;
       this.lastBulk = null;
+      this.bulkRetry = null;
       this.clearSelection();
       this.snackbar.open("Acción aplicada", "Cerrar", { duration: 2500 });
       void this.reload();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(op)) return;
+      if (err instanceof ApiRequestError && err.status === 409) {
+        // El `409` pide repetir el mismo cuerpo con la misma clave: no se
+        // descarta nada y se ofrece el reintento real en vez de abrir una
+        // intención nueva que volvería a ejecutar lo ya aplicado.
+        this.bulkRetry = { signature, body, key };
+        this.snackbar
+          .open(err.message, "Reintentar", { duration: 8000 })
+          .onAction()
+          .subscribe(() => void this.retryBulk());
+        return;
+      }
       // Una respuesta del servidor es definitiva: se descarta la clave y un
       // nuevo intento es una nueva intención. Sin respuesta (red o 5xx) se
       // conserva para que el reintento reproduzca en vez de aplicar dos veces.

@@ -17,9 +17,22 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Cookie;
+use Symfony\Component\HttpFoundation\Response;
 
 class RedirectController
 {
+    /**
+     * The bare root of a hostname: only custom domains answer here — their
+     * owner configured what a stray visit sees.
+     */
+    public function root(Request $request): Response
+    {
+        $ctx = ['host' => $request->getHost()];
+        $outcome = RedirectService::root($ctx);
+
+        return $this->answer($request, '', $ctx, $outcome);
+    }
+
     public function resolve(Request $request, ?string $alias = null)
     {
         $alias = $alias ?? (string) $request->route('alias', '');
@@ -36,6 +49,23 @@ class RedirectController
         ];
 
         $outcome = RedirectService::resolve($ctx);
+
+        return $this->answer($request, $alias, $ctx, $outcome);
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     * @param  array<string, mixed>  $outcome
+     */
+    private function answer(Request $request, string $alias, array $ctx, array $outcome): Response
+    {
+        if ($outcome['kind'] === 'root_redirect') {
+            return response('', 302, [
+                'Location' => (string) $outcome['location'],
+                'Cache-Control' => 'no-store',
+                'Pragma' => 'no-cache',
+            ]);
+        }
 
         if ($outcome['kind'] === 'redirect') {
             $this->recordClick($outcome['link_id'], $ctx, $outcome['campaign'] ?? null);
@@ -67,6 +97,13 @@ class RedirectController
             [$title, $body] = $labels[$outcome['reason']] ?? ['No disponible', 'Este enlace no está disponible.'];
 
             return VisitorAnswer::notice($title, $body, 404);
+        }
+
+        // A `branded` domain answers as itself: the page names the hostname,
+        // not the platform behind it.
+        $brandedHost = $outcome['branded_host'] ?? null;
+        if (is_string($brandedHost) && $brandedHost !== '') {
+            return VisitorAnswer::notice('Enlace no encontrado', 'El enlace que buscas no existe o fue eliminado.', 404, $brandedHost);
         }
 
         return VisitorAnswer::notice('Enlace no encontrado', 'El enlace que buscas no existe o fue eliminado.', 404);

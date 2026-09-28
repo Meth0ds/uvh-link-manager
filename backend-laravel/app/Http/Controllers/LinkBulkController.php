@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\LinkException;
 use App\Models\Collection;
+use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Models\Tag;
 use App\Models\User;
@@ -37,7 +38,7 @@ class LinkBulkController
 
     private const MAX_TAGS = 20;
 
-    private const ACTIONS = ['pause', 'activate', 'archive', 'trash', 'restore', 'tag', 'untag', 'move'];
+    private const ACTIONS = ['pause', 'activate', 'archive', 'trash', 'restore', 'tag', 'untag', 'move', 'set-domain'];
 
     private const STATES = ['pause' => 'paused', 'activate' => 'active', 'archive' => 'archived'];
 
@@ -87,6 +88,19 @@ class LinkBulkController
             }
         }
 
+        // `set-domain` re-homes the selection's public URLs. Null is the
+        // platform domain (no custom domain); a real id is re-checked under
+        // lock inside the transaction, where the serving state is decided.
+        $domainId = $request->input('domainId');
+        if ($action === 'set-domain') {
+            if ($domainId !== null && (! is_int($domainId) || $domainId < 1)) {
+                return response()->json(['error' => 'Dominio inválido'], 422);
+            }
+            if ($domainId !== null && ! CustomDomain::where('id', $domainId)->where('workspace_id', $workspaceId)->exists()) {
+                return response()->json(['error' => 'Dominio no encontrado'], 422);
+            }
+        }
+
         // La identidad de la intención incluye el workspace: la misma clave en
         // otro workspace es otra intención, jamás un replay cross-tenant.
         $scope = self::SCOPE.':'.$workspaceId;
@@ -105,7 +119,7 @@ class LinkBulkController
         $lease = (string) ($begin['lease'] ?? '');
         $apiTokenContext = UvhRequest::apiToken($request);
         try {
-            $body = DB::transaction(function () use ($workspaceId, $user, $action, $ids, $tags, $collectionId, $scope, $key, $hash, $lease, $apiTokenContext): array {
+            $body = DB::transaction(function () use ($workspaceId, $user, $action, $ids, $tags, $collectionId, $domainId, $scope, $key, $hash, $lease, $apiTokenContext): array {
                 if (! WorkspaceAccess::getMembershipLocked(
                     $user->id,
                     $workspaceId,
@@ -124,7 +138,7 @@ class LinkBulkController
                     throw new LinkException('Colección no encontrada', 422);
                 }
 
-                $applied = $this->apply($workspaceId, $user, $action, $ids, $tags ?? [], $collectionId);
+                $applied = $this->apply($workspaceId, $user, $action, $ids, $tags ?? [], $collectionId, is_int($domainId) ? $domainId : null);
 
                 $body = ['ok' => true, 'action' => $action, 'applied' => $applied];
                 // La respuesta se sella en la misma transacción que el efecto:
@@ -162,7 +176,7 @@ class LinkBulkController
      * @param  list<int>  $ids
      * @param  list<mixed>  $tags
      */
-    private function apply(int $workspaceId, User $user, string $action, array $ids, array $tags, mixed $collectionId): int
+    private function apply(int $workspaceId, User $user, string $action, array $ids, array $tags, mixed $collectionId, ?int $domainId): int
     {
         // Link usa SoftDeletes: sin withTrashed() el alcance global metería
         // su propio whereNull('deleted_at') y la restauración nunca vería la
@@ -288,6 +302,67 @@ class LinkBulkController
                     continue;
                 }
                 $link->update(['version' => (int) $link->version + 1, 'updated_at' => now()]);
+                WebhookService::dispatch($workspaceId, 'link.updated', [
+                    'linkId' => (int) $link->id,
+                    'alias' => (string) $link->alias,
+                ]);
+                $applied++;
+            }
+
+            return $applied;
+        }
+
+        if ($action === 'set-domain') {
+            // Mover enlaces de dominio re-apunta sus URLs públicas: el destino
+            // debe estar sirviendo, igual que en el cambio de dominio de un
+            // enlace suelto. Null es el dominio de plataforma, siempre válido.
+            if ($domainId !== null && ! CustomDomain::where('id', $domainId)
+                ->where('workspace_id', $workspaceId)
+                ->where('desired_state', 'enabled')->where('edge_eligible', true)->whereNotNull('tls_ready_at')
+                ->lockForUpdate()->first(['id'])) {
+                throw new LinkException('Dominio no activado o sin acceso', 403);
+            }
+            $onTarget = static fn (Link $link): bool => $domainId === null
+                ? $link->domain_id === null
+                : $link->domain_id !== null && (int) $link->domain_id === $domainId;
+            /** @var \Illuminate\Support\Collection<int, Link> $moving */
+            $moving = $found->filter(fn (Link $link): bool => ! $onTarget($link));
+            foreach ($moving as $link) {
+                if ($link->state === 'blocked') {
+                    throw new LinkException('El bloqueo de enlaces solo se gestiona desde la administración de la plataforma', 403);
+                }
+            }
+            // Una colisión de alias aborta la operación entera: mover media
+            // selección dejaría URLs re-asignadas sin que nadie auditó cuáles.
+            $seen = [];
+            foreach ($moving as $link) {
+                if (isset($seen[$link->alias])) {
+                    throw new LinkException("El alias {$link->alias} se duplicaría en el destino", 409);
+                }
+                $seen[$link->alias] = true;
+            }
+            // El alias es único por dominio: los enlaces que ya viven en el
+            // destino —aunque estén en la selección— siguen ocupándolo.
+            $takenQuery = Link::query()->where('workspace_id', $workspaceId)->whereNull('deleted_at')
+                ->whereNotIn('id', $moving->keys()->all());
+            if ($domainId === null) {
+                $takenQuery->whereNull('domain_id');
+            } else {
+                $takenQuery->where('domain_id', $domainId);
+            }
+            $taken = $takenQuery->pluck('alias')->flip();
+            foreach ($moving as $link) {
+                if (isset($taken[$link->alias])) {
+                    throw new LinkException("El alias {$link->alias} ya está en uso en el destino", 409);
+                }
+            }
+            $applied = 0;
+            foreach ($moving as $link) {
+                $link->update([
+                    'domain_id' => $domainId,
+                    'version' => (int) $link->version + 1,
+                    'updated_at' => now(),
+                ]);
                 WebhookService::dispatch($workspaceId, 'link.updated', [
                     'linkId' => (int) $link->id,
                     'alias' => (string) $link->alias,

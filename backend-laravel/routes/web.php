@@ -22,5 +22,10 @@ Route::post('/r/{alias}/unlock', [RedirectController::class, 'unlock'])->middlew
 // página 405 del framework en lugar de su formulario. Devuelve a la puerta.
 Route::get('/r/{alias}/unlock', fn (string $alias) => redirect('/r/'.rawurlencode($alias), 302));
 
+// The bare root of a hostname. First-party roots are served by the SPA before
+// Laravel; a custom domain's root is its owner's choice (root redirect or its
+// not-found mode) and lives here with the rest of the redirect surface.
+Route::get('/', [RedirectController::class, 'root'])->middleware('throttle:uvh-resolve');
+
 // Canonical public surface: /{alias}.
 Route::get('/{alias}', [RedirectController::class, 'resolve'])->middleware('throttle:uvh-resolve');

@@ -287,3 +287,25 @@ equivalentes:
 - **Listo para producción:** además se han completado infraestructura real,
   restauración de backups, TLS/DNS, observabilidad, accesibilidad y revisión
   legal.
+
+## Abrir PostgreSQL local en el navegador
+
+La base local es PostgreSQL; phpMyAdmin solo admite MySQL/MariaDB. El stack incluye Adminer, una interfaz web compatible con PostgreSQL:
+
+```sh
+docker compose -f docker-compose.local.yml --env-file .env.docker.local up -d postgres adminer
+```
+
+Abre [http://localhost:8080](http://localhost:8080) y usa el sistema **PostgreSQL**, servidor `postgres` y las credenciales `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` de `.env.docker.local` (por defecto local: `uvh_local`). El servicio web está enlazado solo a `127.0.0.1`; cambia el puerto con `ADMINER_PORT`.
+
+## Correo en desarrollo local
+
+La app y el worker de Docker entregan los correos a Mailpit, un buzón de pruebas interno. Arranca el stack con:
+
+```sh
+docker compose -f docker-compose.local.yml --env-file .env.docker.local --profile laravel up -d
+```
+
+Abre [http://localhost:8025](http://localhost:8025). Tras registrarte, abre ahí el mensaje de verificación y sigue el enlace. Si ya te registraste cuando `MAIL_MAILER=log`, pulsa **Reenviar enlace** en la pantalla de verificación: aquel correo se marcó como entregado por el transporte de desarrollo, pero nunca llegó a una bandeja. Desde el navegador donde te registraste, el login te llevará a esa pantalla; desde otro, usa **Crear cuenta → ¿Ya te registraste? Solicita otro enlace** e indica tu dirección. El reenvío tiene un intervalo mínimo de 60 segundos. La dirección pública no recibe estos correos; solo aparecen en Mailpit. El SMTP no se publica fuera de la red de Docker y la interfaz web solo escucha en localhost. El puerto web se puede cambiar con `MAILPIT_PORT` (el acceso directo de la pantalla usa el puerto predeterminado 8025).
+
+En este stack, `APP_URL` sigue siendo el servidor Laravel (`localhost:8000`) y `FRONTEND_URL` dirige los enlaces de los correos al frontend (`localhost:4200`).

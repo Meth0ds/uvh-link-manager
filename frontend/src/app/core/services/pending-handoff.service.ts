@@ -61,6 +61,8 @@ export class PendingHandoffService {
   private readonly revisions = signal<Record<HandoffKind, number>>({ invitation: 0, "link-intent": 0 });
   private readonly outcomes = signal<Record<HandoffKind, boolean | null>>({ invitation: null, "link-intent": null });
   private readonly parking = new Map<HandoffKind, Promise<boolean>>();
+  /** Cookie writes of one kind must arrive in the same order as user actions. */
+  private readonly writes = new Map<HandoffKind, Promise<void>>();
   private refreshing: Promise<void> | null = null;
 
   readonly invitation = computed(() => this.states().invitation);
@@ -111,12 +113,11 @@ export class PendingHandoffService {
     // hidden must not put it back. Every park carries the revision it was issued
     // at, and an answer whose revision moved is dropped.
     const issued = this.revision(kind);
-    const request = this.api
-      .post<ParkReceipt>(
+    const request = this.write(kind, () => this.api.post<ParkReceipt>(
         `/api/v1/pending/${kind}`,
         declared === null ? { token: bearer } : { token: bearer, expiresAt: declared },
         decodeParkReceipt,
-      )
+      ))
       .then((receipt) => {
         if (this.superseded(kind, issued)) return false;
         this.adopt(kind, { pending: true, expiresAt: receipt.expiresAt });
@@ -148,7 +149,7 @@ export class PendingHandoffService {
   async forget(kind: HandoffKind): Promise<void> {
     this.commit(kind, NOT_PARKED);
     try {
-      await this.api.delete(`/api/v1/pending/${kind}`);
+      await this.write(kind, () => this.api.delete(`/api/v1/pending/${kind}`));
     } catch {
       // The handoff is already hidden here, and a request that failed leaves the
       // cookie in place: the next `refresh()` restores the truth, which is the
@@ -170,27 +171,25 @@ export class PendingHandoffService {
    */
   refresh(): Promise<void> {
     if (this.refreshing) return this.refreshing;
-    // The answer describes the world as it was when the request left, and a
-    // caller can easily change that world before it comes back: the panel boots
-    // without awaiting this read, so a bearer that arrives in the URL in the
-    // meantime is parked while the request is still on the wire. An answer that
-    // says "nothing parked" must therefore not undo it — per kind, because the
-    // two handoffs are parked independently.
-    const issued: Record<HandoffKind, number> = {
-      invitation: this.revision("invitation"),
-      "link-intent": this.revision("link-intent"),
+    // A read started during a cookie write could report the state just before
+    // that write. Wait for writes already underway, then protect the response
+    // against any newer action taken while the read is on the wire.
+    const pendingWrites = [...this.writes.values()];
+    const read = (): Promise<void> => {
+      const issued: Record<HandoffKind, number> = {
+        invitation: this.revision("invitation"),
+        "link-intent": this.revision("link-intent"),
+      };
+      return this.api.get<ParkedHandoffs>("/api/v1/pending", undefined, decodeParkedHandoffs)
+        .then((parked) => {
+          for (const kind of HANDOFF_KINDS) {
+            if (!this.superseded(kind, issued[kind])) this.adopt(kind, parked[kind]);
+          }
+        })
+        .catch(() => undefined);
     };
-    this.refreshing = this.api
-      .get<ParkedHandoffs>("/api/v1/pending", undefined, decodeParkedHandoffs)
-      .then((parked) => {
-        for (const kind of HANDOFF_KINDS) {
-          if (!this.superseded(kind, issued[kind])) this.adopt(kind, parked[kind]);
-        }
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        this.refreshing = null;
-      });
+    const request = pendingWrites.length > 0 ? Promise.all(pendingWrites).then(read) : read();
+    this.refreshing = request.finally(() => { this.refreshing = null; });
 
     return this.refreshing;
   }
@@ -198,6 +197,18 @@ export class PendingHandoffService {
   /** Whether the park a request belongs to has been replaced since it started. */
   private superseded(kind: HandoffKind, issued: number): boolean {
     return this.revision(kind) !== issued;
+  }
+
+  /** Serialize writes so an older Set-Cookie cannot replace a newer decision. */
+  private write<T>(kind: HandoffKind, operation: () => Promise<T>): Promise<T> {
+    const previous = this.writes.get(kind);
+    const request = previous ? previous.then(operation) : operation();
+    const settled = request.then(() => undefined, () => undefined);
+    this.writes.set(kind, settled);
+    void settled.then(() => {
+      if (this.writes.get(kind) === settled) this.writes.delete(kind);
+    });
+    return request;
   }
 
   /** The deadline a caller declared, normalized, or null when it is unusable. */

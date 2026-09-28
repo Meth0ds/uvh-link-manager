@@ -190,7 +190,9 @@ final class AccountExportDocument
                 ->where('workspaces.owner_user_id', $userId)
                 ->orderBy('custom_domains.id')
                 ->select([
-                    'custom_domains.id', 'custom_domains.workspace_id', 'custom_domains.domain', 'custom_domains.state',
+                    'custom_domains.id', 'custom_domains.workspace_id', 'custom_domains.domain',
+                    'custom_domains.desired_state', 'custom_domains.ownership_status',
+                    'custom_domains.routing_status', 'custom_domains.tls_status',
                     'custom_domains.verified_at', 'custom_domains.created_at', 'custom_domains.updated_at',
                 ])->cursor(),
             'ownedWorkspaceWebhooks' => static fn (): iterable => self::webhookRows($userId),

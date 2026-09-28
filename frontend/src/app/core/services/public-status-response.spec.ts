@@ -30,4 +30,24 @@ describe("decodePublicStatus", () => {
     expect(() => decodePublicStatus({ ...healthy, generatedAt: "not-a-date" })).toThrow();
     expect(() => decodePublicStatus({ ...healthy, incidents: [{ id: "i1", title: "Incidente", message: "Detalle", status: "open", startedAt: healthy.generatedAt, updatedAt: healthy.generatedAt }] })).toThrow();
   });
+
+  it("publishes the custom domains component when the monitor reports it", () => {
+    const withDomains: PublicStatusSnapshot = {
+      ...healthy,
+      overall: "degraded",
+      components: [...healthy.components, { id: "domains", label: "Dominios personalizados", status: "degraded" }],
+    };
+    expect(decodePublicStatus(withDomains)).toEqual(withDomains);
+  });
+
+  it("requires the core components and nothing beyond the four known", () => {
+    // Un feed antiguo sin dominios sigue siendo válido; uno sin un componente
+    // histórico, o con un quinto inventado, no lo es.
+    expect(decodePublicStatus(healthy).components.length).toBe(3);
+    expect(() => decodePublicStatus({ ...healthy, components: [healthy.components[0], healthy.components[1]] })).toThrow();
+    expect(() => decodePublicStatus({
+      ...healthy,
+      components: [...healthy.components, { id: "unknown", label: "Inventado", status: "operational" }],
+    })).toThrow();
+  });
 });

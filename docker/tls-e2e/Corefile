@@ -1,0 +1,23 @@
+# TLS harness DNS for the async E2E stack.
+#
+# One authoritative zone (`tls.uvh`) holds the customer hostname, the edge
+# address and the ownership TXT the platform verifies; `dns-fixture` forwards
+# here every query outside its own `.e2e.uvh` zone, and Pebble's VA points at
+# this server directly. Everything else is recursion to Docker's embedded
+# resolver, so internal service names keep working.
+tls.uvh:53 {
+    # The scenario publishes a complete zone document through
+    # `async-inspect.php domain-dns-serve`. `auto` notices the new or replaced
+    # file within its reload window, so an empty directory at boot is fine and
+    # no restart is ever needed.
+    auto tls.uvh {
+        directory /zones
+        reload 1s
+    }
+    errors
+}
+
+.:53 {
+    forward . 127.0.0.11
+    errors
+}

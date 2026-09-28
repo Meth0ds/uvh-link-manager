@@ -244,6 +244,7 @@ class LinkCsvController
         if ($created > 0 || $errors !== []) {
             Audit::write($user->id, 'link.import', 'link', null, [
                 'created' => $created,
+                'failed' => $body['failed'],
                 'invalid' => count($errors),
             ], UvhRequest::ip($request), workspaceId: $workspaceId);
         }
@@ -305,7 +306,7 @@ class LinkCsvController
         if ($dryRun) {
             $domainId = $input['domain_id'] ?? null;
             if ($domainId !== null && ! CustomDomain::where('id', $domainId)->where('workspace_id', $workspaceId)
-                ->where('state', 'active')->where('edge_eligible', true)->whereNotNull('tls_ready_at')->exists()) {
+                ->where('desired_state', 'enabled')->where('edge_eligible', true)->whereNotNull('tls_ready_at')->exists()) {
                 return $rejected('Dominio no activado o sin acceso');
             }
             $alias = ! empty($input['alias']) ? UrlUtil::normalizeAlias($input['alias']) : null;
@@ -335,27 +336,36 @@ class LinkCsvController
         }
     }
 
-    /** @param list<array<string, mixed>> $rows
-     * @return array{dryRun: bool, valid: int, created: int, errors: list<array{row: int, error: string}>, truncated: bool}
+    /**
+     * Los contadores no se solapan: `valid` son las filas que se importaron (o
+     * importarían en dry run) —una fila que falló al crear no es válida—,
+     * `created` son los enlaces de verdad creados y `failed` las filas que
+     * superaron la validación pero no llegaron a crear su enlace. Las filas
+     * rechazadas en validación sólo aparecen en `errors`.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return array{dryRun: bool, valid: int, created: int, failed: int, errors: list<array{row: int, error: string}>, truncated: bool}
      */
     private function summarizeRows(array $rows, bool $dryRun): array
     {
-        $valid = $created = 0;
+        $valid = $created = $failed = 0;
         $errors = [];
         $truncated = false;
         foreach ($rows as $row) {
-            if (in_array($row['status'], ['valid', 'created', 'failed'], true)) {
-                $valid++;
-            }
             if ($row['status'] === 'created') {
+                $valid++;
                 $created++;
+            } elseif ($row['status'] === 'valid') {
+                $valid++;
+            } elseif ($row['status'] === 'failed') {
+                $failed++;
             }
             if ($row['error'] !== null) {
                 $errors = $this->pushError($errors, (int) $row['row_number'], (string) $row['error'], $truncated);
             }
         }
 
-        return compact('dryRun', 'valid', 'created', 'errors', 'truncated');
+        return compact('dryRun', 'valid', 'created', 'failed', 'errors', 'truncated');
     }
 
     /**

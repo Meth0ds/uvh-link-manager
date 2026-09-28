@@ -51,7 +51,7 @@ class AbuseReportTest extends TestCase
             'workspace_id' => $this->workspaceId,
             'domain' => 'go.example.test',
             'verification_token' => 'uvh-verify=test',
-            'state' => 'disabled',
+            'desired_state' => 'disabled',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

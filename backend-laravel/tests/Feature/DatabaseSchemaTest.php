@@ -53,6 +53,8 @@ class DatabaseSchemaTest extends TestCase
             'idempotency_keys',
             'collections',
             'link_templates',
+            'custom_domain_claims',
+            'domain_events',
         ];
 
         foreach ($tables as $table) {
@@ -71,7 +73,12 @@ class DatabaseSchemaTest extends TestCase
             'invitations' => ['workspace_id', 'email', 'role', 'token', 'status', 'expires_at'],
             'invitation_mail_budgets' => ['budget_key', 'used', 'expires_at_epoch'],
             'quotas' => ['workspace_id', 'links_limit'],
-            'custom_domains' => ['workspace_id', 'domain', 'verification_token', 'state', 'verified_at'],
+            // El estado ya no es una columna: intención, propiedad, ruta y TLS
+            // son hechos separados (la exclusividad del hostname vive en las
+            // claims, no en un índice único sobre peticiones).
+            'custom_domains' => ['workspace_id', 'domain', 'verification_token', 'desired_state', 'ownership_status', 'routing_status', 'tls_status', 'verified_at', 'is_default'],
+            'custom_domain_claims' => ['id', 'workspace_id', 'domain', 'claimed_at', 'last_proven_at'],
+            'domain_events' => ['id', 'workspace_id', 'domain_id', 'domain', 'event', 'payload', 'created_at', 'dispatched_at'],
             'links' => ['workspace_id', 'created_by', 'domain_id', 'collection_id', 'alias', 'destination', 'state', 'state_before_delete', 'password_hash', 'password_version', 'version', 'max_clicks', 'click_count', 'single_use', 'expires_at', 'deleted_at', 'reputation_blocked_at', 'reputation_block_source', 'reputation_block_prior_state', 'reputation_checked_at'],
             'idempotency_keys' => ['user_id', 'scope', 'key', 'request_hash', 'response_body', 'response_status', 'expires_at'],
             'collections' => ['id', 'workspace_id', 'name'],
@@ -164,5 +171,11 @@ class DatabaseSchemaTest extends TestCase
         ] as $table => $index) {
             $this->assertTrue(Schema::hasIndex($table, $index), "Missing index: {$index}");
         }
+        // El dominio predeterminado es una preferencia única por workspace:
+        // lo garantiza un índice parcial, no la buena fe de la ruta que escriba.
+        $this->assertTrue(
+            Schema::hasIndex('custom_domains', 'custom_domains_one_default_per_workspace_idx'),
+            'Missing index: custom_domains_one_default_per_workspace_idx',
+        );
     }
 }

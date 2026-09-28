@@ -8,7 +8,7 @@ import { AuthShellComponent } from "./auth-shell.component";
 import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { AuthService } from "../core/services/auth.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
-import { authBearer, bearerExpiry } from "./auth-bearer";
+import { authBearer, bearerExpiry, hasAuthBearer } from "./auth-bearer";
 import { LatestRequest } from "../core/services/latest-request";
 
 /**
@@ -45,7 +45,10 @@ const NOT_PARKED = "No hemos podido guardar la invitación en este navegador. Vu
         @if (done() && !ok() && needsLogin()) {
           <a mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="{ returnTo: returnTo }">Iniciar sesión para continuar</a>
         }
-        @if (!busy() && done() && !ok() && !rejected() && !needsLogin() && !ready()) {
+        @if (invalidIncoming || (!busy() && done() && !ok() && !rejected() && !needsLogin() && !hasParkedInvitation)) {
+          <a mat-stroked-button routerLink="/app">Volver a mi panel</a>
+        }
+        @if (!busy() && done() && !ok() && !rejected() && !needsLogin() && !ready() && hasParkedInvitation) {
           <div class="invitation-actions">
           <button mat-flat-button color="primary" type="button" (click)="switchAccount()" [disabled]="busy()">Cambiar de cuenta</button>
           <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()">Descartar de este navegador</button>
@@ -68,6 +71,7 @@ export class InvitationAcceptComponent {
   /** Whether this browser is holding an invitation, and which park it was. */
   private parked = false;
   private revision = 0;
+  readonly invalidIncoming: boolean;
 
   readonly busy = signal(true);
   readonly done = signal(false);
@@ -77,6 +81,7 @@ export class InvitationAcceptComponent {
   readonly needsLogin = signal(false);
   readonly message = signal("");
   readonly returnTo = "/invitations/accept";
+  get hasParkedInvitation(): boolean { return this.parked && this.invitations.pending(); }
 
   constructor() {
     const incoming = authBearer(this.route);
@@ -85,6 +90,7 @@ export class InvitationAcceptComponent {
     // server still has to take it. `initialize()` waits for that before the
     // component offers to spend it.
     this.parked = incoming ? this.invitations.capture(incoming, fragmentExpiry) : false;
+    this.invalidIncoming = hasAuthBearer(this.route) && !this.parked;
     this.revision = this.invitations.revision();
     this.location.replaceState("/invitations/accept");
     // This async setup is the only path to a usable screen: an unexpected
@@ -206,6 +212,14 @@ export class InvitationAcceptComponent {
   }
 
   private async initialize(): Promise<void> {
+    if (this.invalidIncoming) {
+      // An explicit bad link must never silently resume a different invitation
+      // that this browser happened to park on an earlier visit.
+      this.busy.set(false);
+      this.done.set(true);
+      this.message.set("Este enlace de invitación no es válido o ha caducado. Vuelve a abrir el enlace del correo.");
+      return;
+    }
     if (!this.parked) {
       // No bearer in the URL: this visit is the login round-trip, and the park
       // made on the first visit is what brought the visitor back. Only the

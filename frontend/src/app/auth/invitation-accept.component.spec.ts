@@ -40,6 +40,7 @@ describe("InvitationAcceptComponent async safety", () => {
   let parked: WritableSignal<boolean>;
   let revision: WritableSignal<number>;
   let persistent: WritableSignal<boolean | null>;
+  let routeFragment: string | null;
   let invitations: {
     pending: WritableSignal<boolean>;
     revision: WritableSignal<number>;
@@ -69,6 +70,7 @@ describe("InvitationAcceptComponent async safety", () => {
     router = jasmine.createSpyObj<Router>("Router", ["navigate"]);
     router.navigate.and.resolveTo(true);
     parked = signal(false);
+    routeFragment = `token=${tokenA}`;
     revision = signal(0);
     persistent = signal<boolean | null>(null);
     invitations = {
@@ -106,8 +108,8 @@ describe("InvitationAcceptComponent async safety", () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: {
-              fragment: `token=${tokenA}`,
-              queryParamMap: { get: () => null },
+              get fragment() { return routeFragment; },
+              queryParamMap: { get: () => null, has: () => false },
             },
           },
         },
@@ -132,6 +134,41 @@ describe("InvitationAcceptComponent async safety", () => {
     expect(invitations.capture).toHaveBeenCalledOnceWith(tokenA, null);
     expect(component.ready()).toBeTrue();
     expect(component.busy()).toBeFalse();
+  });
+
+  it("does not substitute an older parked invitation for an explicitly invalid link", async () => {
+    parked.set(true);
+    routeFragment = "token=preview-only";
+    await create();
+
+    expect(invitations.capture).not.toHaveBeenCalled();
+    expect(invitations.refresh).not.toHaveBeenCalled();
+    expect(component.ready()).toBeFalse();
+    expect(component.invalidIncoming).toBeTrue();
+    expect(component.message()).toContain("no es válido o ha caducado");
+    expect(invitations.forget).not.toHaveBeenCalled();
+  });
+
+  it("does not substitute an older invitation when a new park refuses an expired link", async () => {
+    parked.set(true);
+    routeFragment = `token=${tokenA}&expiresAt=2020-01-01T00%3A00%3A00Z`;
+    invitations.capture.and.returnValue(false);
+    await create();
+
+    expect(invitations.capture).toHaveBeenCalledOnceWith(tokenA, "2020-01-01T00:00:00Z");
+    expect(invitations.refresh).not.toHaveBeenCalled();
+    expect(component.ready()).toBeFalse();
+    expect(component.invalidIncoming).toBeTrue();
+  });
+
+  it("continues a parked invitation after an ordinary login round trip with no bearer", async () => {
+    parked.set(true);
+    routeFragment = null;
+    await create();
+
+    expect(invitations.refresh).toHaveBeenCalled();
+    expect(component.ready()).toBeTrue();
+    expect(component.invalidIncoming).toBeFalse();
   });
 
   it("offers nothing until the server has actually taken the park", async () => {

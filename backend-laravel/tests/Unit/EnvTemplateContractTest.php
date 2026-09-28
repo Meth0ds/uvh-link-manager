@@ -52,6 +52,7 @@ class EnvTemplateContractTest extends TestCase
         'TRUSTED_PROXIES' => 'the deployment proxy network; empty by default, which trusts nobody',
         'EDGE_INTERNAL_CIDRS' => 'the deployment network the edge accepts internal traffic from',
         'HSTS_ENABLED' => 'only safe behind TLS termination; off by default so local HTTP keeps working',
+        'UVH_PUBLIC_RESOLVERS' => 'production turns on the multi-resolver DNS consensus; empty by default so development, tests and the E2E fixture stack never send a query off the host',
     ];
 
     /**

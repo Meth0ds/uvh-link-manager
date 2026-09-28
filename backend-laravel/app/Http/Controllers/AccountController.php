@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\UvhSession;
 use App\Support\AccountRecoveryLifecycle;
 use App\Support\Audit;
+use App\Support\FrontendUrl;
 use App\Support\Ids;
 use App\Support\LinkIntentRegistry;
 use App\Support\MailAdmissionException;
@@ -555,7 +556,7 @@ class AccountController
             return MfaAttempts::tooManyResponse($user->id, $purpose);
         }
         $token = Ids::randomToken(32);
-        $url = rtrim((string) config('app.url'), '/').'/auth/confirm-account-deletion#token='.rawurlencode($token);
+        $url = FrontendUrl::base().'/auth/confirm-account-deletion#token='.rawurlencode($token);
         $sessionId = UvhRequest::sessionId($request);
 
         try {
@@ -732,7 +733,7 @@ class AccountController
                 $now = now();
                 $executeAfter = $now->copy()->addDays(7);
                 $cancelToken = Ids::randomToken(32);
-                $cancelUrl = rtrim((string) config('app.url'), '/').'/auth/cancel-account-deletion#token='.rawurlencode($cancelToken);
+                $cancelUrl = FrontendUrl::base().'/auth/cancel-account-deletion#token='.rawurlencode($cancelToken);
                 NotificationInbox::record((int) $user->id, NotificationKinds::ACCOUNT_DELETION_SCHEDULED);
                 if (! UvhMail::accountDeletionScheduled(
                     $user->email,

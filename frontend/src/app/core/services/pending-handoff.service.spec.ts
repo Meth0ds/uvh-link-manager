@@ -98,6 +98,48 @@ describe("PendingHandoffService", () => {
     expect(await confirmation).toBeTrue();
   });
 
+  it("finishes an older cookie write before parking a newer bearer of the same kind", async () => {
+    const first = deferred<unknown>();
+    api.post.and.returnValues(first.promise as never, Promise.resolve({ pending: true, expiresAt: SOON() }) as never);
+
+    service.park("invitation", BEARER);
+    service.park("invitation", "b".repeat(43));
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    first.resolve({ pending: true, expiresAt: SOON() });
+    expect(await service.confirmed("invitation")).toBeTrue();
+    expect(api.post).toHaveBeenCalledTimes(2);
+    expect(api.post.calls.mostRecent().args[1]).toEqual({ token: "b".repeat(43) });
+  });
+
+  it("deletes a pending cookie only after its in-flight park has finished", async () => {
+    const response = deferred<unknown>();
+    api.post.and.returnValue(response.promise as never);
+
+    service.park("invitation", BEARER);
+    const forgetting = service.forget("invitation");
+    expect(api.delete).not.toHaveBeenCalled();
+
+    response.resolve({ pending: true, expiresAt: SOON() });
+    await forgetting;
+    expect(api.delete).toHaveBeenCalledOnceWith("/api/v1/pending/invitation");
+    expect(service.parked("invitation")).toBeFalse();
+  });
+
+  it("parks a new bearer only after an earlier cookie deletion has finished", async () => {
+    const deleted = deferred<unknown>();
+    api.delete.and.returnValue(deleted.promise as never);
+
+    const forgetting = service.forget("invitation");
+    service.park("invitation", BEARER);
+    expect(api.post).not.toHaveBeenCalled();
+
+    deleted.resolve({ pending: false });
+    await forgetting;
+    expect(await service.confirmed("invitation")).toBeTrue();
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
   it("adopts what the server says is parked, without ever holding a bearer", async () => {
     const expiresAt = SOON();
     api.get.and.resolveTo(parked({ pending: true, expiresAt }, { pending: false, expiresAt: null }));
@@ -131,6 +173,22 @@ describe("PendingHandoffService", () => {
     await Promise.all([first, second]);
 
     expect(api.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for an in-flight discard before reading the server's parked state", async () => {
+    service.park("invitation", BEARER);
+    await service.confirmed("invitation");
+    const deleted = deferred<unknown>();
+    api.delete.and.returnValue(deleted.promise as never);
+
+    const forgetting = service.forget("invitation");
+    const refreshing = service.refresh();
+    expect(api.get).not.toHaveBeenCalled();
+
+    deleted.resolve({ pending: false });
+    await Promise.all([forgetting, refreshing]);
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(service.parked("invitation")).toBeFalse();
   });
 
   it("does not let a start-up read undo a handoff parked while it was in flight", async () => {

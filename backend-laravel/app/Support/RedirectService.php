@@ -32,6 +32,11 @@ class RedirectService
         return $host === "www.{$publicHost}" ? $publicHost : $host;
     }
 
+    private static function domainRow(int $domainId): ?CustomDomain
+    {
+        return CustomDomain::where('id', $domainId)->first(['id', 'not_found_mode', 'root_destination']);
+    }
+
     /**
      * Map a Host header to a domain_id (null = default public host, -1 = unknown).
      */
@@ -42,12 +47,67 @@ class RedirectService
             return null;
         }
         $row = CustomDomain::where('domain', $h)
-            ->where('state', 'active')
+            ->where('desired_state', 'enabled')
             ->where('edge_eligible', true)
             ->whereNotNull('tls_ready_at')
+            ->whereExists(function ($claim) {
+                $claim->selectRaw('1')->from('custom_domain_claims')
+                    ->whereColumn('custom_domain_claims.workspace_id', 'custom_domains.workspace_id')
+                    ->whereRaw('lower(custom_domain_claims.domain) = lower(custom_domains.domain)');
+            })
             ->value('id');
 
         return $row ?? -1;
+    }
+
+    /**
+     * The bare root of a hostname. The public host's root is the landing site
+     * and never reaches the redirect surface; a custom domain's root is its
+     * owner's choice: forward to `root_destination` when set, otherwise answer
+     * with the mode's not-found page.
+     *
+     * @param  array{host: string}  $ctx
+     * @return array<string, mixed>
+     */
+    public static function root(array $ctx): array
+    {
+        $host = self::normalizeHost($ctx['host']);
+        $domainId = self::resolveDomainId($host);
+        if ($domainId === -1) {
+            return ['kind' => 'unavailable', 'reason' => 'domain'];
+        }
+        if ($domainId === null) {
+            return ['kind' => 'not_found'];
+        }
+
+        $domain = CustomDomain::where('id', $domainId)->first(['not_found_mode', 'root_destination']);
+        // The root is the owner's landing: whenever they configured a
+        // destination, `/` goes there regardless of the not-found mode.
+        if (is_string($domain?->root_destination) && $domain->root_destination !== '') {
+            return ['kind' => 'root_redirect', 'location' => $domain->root_destination];
+        }
+
+        return self::domainFallback($domain, $host);
+    }
+
+    /**
+     * What a visit that matches no link on this domain gets. The mode is the
+     * owner's, applied only to their own hostname.
+     *
+     * @return array<string, mixed>
+     */
+    private static function domainFallback(?CustomDomain $domain, string $host): array
+    {
+        $mode = $domain?->not_found_mode;
+        $rootDestination = $domain?->root_destination;
+        if ($mode === 'redirect' && is_string($rootDestination) && $rootDestination !== '') {
+            return ['kind' => 'root_redirect', 'location' => $rootDestination];
+        }
+        if ($mode === 'branded') {
+            return ['kind' => 'not_found', 'branded_host' => $host];
+        }
+
+        return ['kind' => 'not_found'];
     }
 
     /**
@@ -56,14 +116,15 @@ class RedirectService
      */
     public static function resolve(array $ctx): array
     {
-        $alias = UrlUtil::normalizeAlias((string) ($ctx['alias'] ?? ''));
-        if ($alias === '' || strlen($alias) > 64 || UrlUtil::isReservedAlias($alias) || ! UrlUtil::isValidCustomAlias($alias)) {
-            return ['kind' => 'not_found'];
-        }
-
-        $domainId = self::resolveDomainId((string) ($ctx['host'] ?? ''));
+        $host = self::normalizeHost((string) ($ctx['host'] ?? ''));
+        $domainId = self::resolveDomainId($host);
         if ($domainId === -1) {
             return ['kind' => 'unavailable', 'reason' => 'domain'];
+        }
+
+        $alias = UrlUtil::normalizeAlias((string) ($ctx['alias'] ?? ''));
+        if ($alias === '' || strlen($alias) > 64 || UrlUtil::isReservedAlias($alias) || ! UrlUtil::isValidCustomAlias($alias)) {
+            return $domainId === null ? ['kind' => 'not_found'] : self::domainFallback(self::domainRow($domainId), $host);
         }
 
         $query = Link::whereNull('deleted_at')->where('alias', $alias);
@@ -75,7 +136,7 @@ class RedirectService
         $link = $query->first();
 
         if (! $link) {
-            return ['kind' => 'not_found'];
+            return $domainId === null ? ['kind' => 'not_found'] : self::domainFallback(self::domainRow($domainId), $host);
         }
 
         $id = $link->id;
@@ -188,7 +249,7 @@ class RedirectService
                 // preserves the previous atomic eligibility boundary without the
                 // unnecessary exclusive-lock bottleneck.
                 if ($freshDomainId !== null && ! CustomDomain::where('id', $freshDomainId)
-                    ->where('state', 'active')->where('edge_eligible', true)
+                    ->where('desired_state', 'enabled')->where('edge_eligible', true)
                     ->whereNotNull('tls_ready_at')->sharedLock()->first(['id'])) {
                     $outcome = ['kind' => 'unavailable', 'reason' => 'domain'];
 

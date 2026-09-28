@@ -18,7 +18,9 @@ import type { ImportReport } from "../../core/models";
  * nada) y decidir después con el informe de errores por fila delante. La
  * importación real viaja con una `Idempotency-Key` por intención: si la red se
  * cae sin respuesta, el reintento reproduce el resultado de la primera en vez
- * de crear los enlaces dos veces.
+ * de crear los enlaces dos veces. Un `409` tampoco descarta la intención —pide
+ * repetir el mismo cuerpo con la misma clave (docs/api.md)—, así que clave y
+ * cuerpo quedan congelados hasta que el reintento real se ejecuta.
  */
 @Component({
   selector: "app-csv-import-dialog",
@@ -32,15 +34,21 @@ import type { ImportReport } from "../../core/models";
     <mat-dialog-content>
       <p class="message">
         Las columnas obligatorias son <b>alias</b> y <b>destination</b>; también se admiten
-        fallback_destination, notes, tags (separadas por <b>;</b>) o tags_json (lista JSON), scheduled_at, expires_at,
+        fallback_destination, notes, tags (nombres separados por <b>;</b>), scheduled_at, expires_at,
         max_clicks y single_use. Cada fila se valida con las mismas reglas que un enlace manual.
+      </p>
+      <p class="message">
+        La columna <b>tags</b> separa los nombres por <b>;</b>: un nombre que contenga ese separador
+        se partiría en varias etiquetas. Para esos nombres usa <b>tags_json</b>, una lista JSON de
+        nombres —<b>["prensa;2026"]</b> es una sola etiqueta—, que es además la columna que emite el
+        export. Las dos columnas no se pueden usar a la vez en el mismo archivo.
       </p>
       <textarea
         class="csv-input"
         [(ngModel)]="csv"
-        (ngModelChange)="report.set(null)"
+        (ngModelChange)="onCsvInput()"
         aria-label="Contenido CSV"
-        placeholder="alias,destination,tags&#10;oferta-1,https://example.org/oferta,prensa;2026"
+        placeholder="alias,destination,tags&#10;oferta-1,https://example.org/oferta,prensa;2026&#10;alias,destination,tags_json&#10;oferta-2,https://example.org/oferta,&quot;[&quot;&quot;prensa;2026&quot;&quot;]&quot;"
       ></textarea>
       <div class="inline-form">
         <button mat-stroked-button type="button" (click)="pick.click()">
@@ -56,7 +64,12 @@ import type { ImportReport } from "../../core/models";
             <span>{{ current.valid }} filas importables con el estado actual del workspace. La comprobación no reserva alias ni cuota.</span>
           } @else {
             <b>Importación completada.</b>
-            <span>{{ current.created }} enlaces creados de {{ current.valid }} filas válidas.</span>
+            <span>
+              {{ current.created }} enlaces creados de {{ current.valid }} filas válidas.
+              @if (current.failed > 0) {
+                <b>{{ current.failed }} filas</b> no se pudieron crear.
+              }
+            </span>
           }
           @if (current.errors.length) {
             <ul class="row-errors">
@@ -71,7 +84,14 @@ import type { ImportReport } from "../../core/models";
         </div>
       }
       @if (error()) {
-        <div class="error" role="alert">{{ error() }}</div>
+        <div class="error" role="alert">
+          <span>{{ error() }}</span>
+          @if (retryImport()) {
+            <button mat-stroked-button type="button" (click)="retry()" [disabled]="busy()">
+              <mat-icon>replay</mat-icon> Reintentar
+            </button>
+          }
+        </div>
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -104,6 +124,12 @@ export class CsvImportDialogComponent {
   private created = 0;
   /** Misma política que la barra masiva: la clave sobrevive a fallos sin respuesta. */
   private lastImport: { signature: string; key: string } | null = null;
+  /**
+   * Reintento congelado tras un `409`: el contrato (docs/api.md) pide repetir
+   * el MISMO cuerpo con la MISMA clave, así que ambos quedan aquí tal cual
+   * salieron. Cambiar el CSV es otra intención y lo descarta.
+   */
+  readonly retryImport = signal<{ body: { dryRun: false; csv: string }; key: string } | null>(null);
 
   constructor() {
     // El selector global sigue usable con el modal abierto: si cambia, el
@@ -120,6 +146,13 @@ export class CsvImportDialogComponent {
     this.csv = await file.text();
     this.report.set(null);
     this.error.set(null);
+    this.retryImport.set(null);
+  }
+
+  /** El texto cambió: el informe y el reintento congelado ya no describen lo que hay delante. */
+  onCsvInput(): void {
+    this.report.set(null);
+    this.retryImport.set(null);
   }
 
   async validate(): Promise<void> {
@@ -130,35 +163,48 @@ export class CsvImportDialogComponent {
     await this.send(false);
   }
 
+  /** Repite la importación desplazada por un `409`: mismo cuerpo y misma clave. */
+  async retry(): Promise<void> {
+    const pending = this.retryImport();
+    if (this.busy() || pending === null) return;
+    if (!this.stillInOpenedWorkspace()) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.sendImport(pending.body, pending.key);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   close(): void {
     this.dialogRef.close(this.created);
   }
 
-  private async send(dryRun: boolean): Promise<void> {
-    if (this.busy() || !this.csv.trim()) return;
-    // Comprobación síncrona antes de enviar: el interceptor pone el workspace
-    // ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
+  /**
+   * Comprobación síncrona antes de enviar: el interceptor pone el workspace
+   * ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
+   */
+  private stillInOpenedWorkspace(): boolean {
     if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
       this.dialogRef.close(this.created);
-      return;
+      return false;
     }
+    return true;
+  }
+
+  private async send(dryRun: boolean): Promise<void> {
+    if (this.busy() || !this.csv.trim()) return;
+    if (!this.stillInOpenedWorkspace()) return;
     this.busy.set(true);
     this.error.set(null);
     if (!dryRun) {
+      const body = { dryRun: false as const, csv: this.csv };
       const signature = this.csv;
       const key = this.lastImport?.signature === signature ? this.lastImport.key : crypto.randomUUID();
       this.lastImport = { signature, key };
       try {
-        const report = await this.api.post("/api/v1/links/import", { dryRun: false, csv: this.csv }, decodeImportReport, {
-          "Idempotency-Key": key,
-        });
-        this.lastImport = null;
-        this.report.set(report);
-        this.created = report.created;
-        this.done.set(true);
-      } catch (err) {
-        if (err instanceof ApiRequestError && err.status > 0 && err.status < 500) this.lastImport = null;
-        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo importar el CSV");
+        await this.sendImport(body, key);
       } finally {
         this.busy.set(false);
       }
@@ -170,6 +216,33 @@ export class CsvImportDialogComponent {
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo validar el CSV");
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  /**
+   * Envía la importación real y decide qué hacer con la intención según la
+   * respuesta. Un `409` no cierra nada: pide repetir el mismo cuerpo con la
+   * misma clave, y ambos se congelan para el reintento real. Cualquier otra
+   * respuesta del servidor es definitiva y descarta la clave; sin respuesta
+   * (red o 5xx) también se conserva, para que el reintento reproduzca en vez
+   * de abrir un lote nuevo que re-ejecutaría filas ya persistidas.
+   */
+  private async sendImport(body: { dryRun: false; csv: string }, key: string): Promise<void> {
+    try {
+      const report = await this.api.post("/api/v1/links/import", body, decodeImportReport, { "Idempotency-Key": key });
+      this.lastImport = null;
+      this.retryImport.set(null);
+      this.report.set(report);
+      this.created = report.created;
+      this.done.set(true);
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 409) {
+        this.retryImport.set({ body, key });
+      } else if (err instanceof ApiRequestError && err.status > 0 && err.status < 500) {
+        this.lastImport = null;
+        this.retryImport.set(null);
+      }
+      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo importar el CSV");
     }
   }
 }

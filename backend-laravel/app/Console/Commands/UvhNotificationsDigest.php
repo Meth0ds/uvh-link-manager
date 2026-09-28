@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\FrontendUrl;
 use App\Support\IsoDate;
 use App\Support\NotificationKinds;
 use App\Support\NotificationPreferences;
@@ -173,7 +174,7 @@ class UvhNotificationsDigest extends Command
      */
     private function render(array $rows, int $hidden): array
     {
-        $panelUrl = rtrim((string) config('app.url'), '/').'/app/notifications';
+        $panelUrl = FrontendUrl::base().'/app/notifications';
         $html = '';
         $text = [];
         foreach ($rows as $row) {
@@ -181,14 +182,14 @@ class UvhNotificationsDigest extends Command
             $subject = is_string($row->subject) && $row->subject !== '' ? ' — '.$row->subject : '';
             $when = IsoDate::format($row->created_at) ?? '';
             $html .= '<p><strong>'.$this->esc($title).'</strong>'.$this->esc($subject)
-                .'<br><span style="color:#667085;font-size:12px">'.$this->esc($when).'</span></p>';
+                .'<br><span style="color:#626357;font-size:12px">'.$this->esc($when).'</span></p>';
             $text[] = $title.$subject.' ('.$when.')';
         }
         if ($hidden > 0) {
             $html .= '<p>…y '.$hidden.' avisos más en tu bandeja.</p>';
             $text[] = '…y '.$hidden.' avisos más en tu bandeja.';
         }
-        $html .= '<p><a href="'.$this->esc($panelUrl).'">Ver tu bandeja de notificaciones</a></p>';
+        $html .= '<p><a href="'.$this->esc($panelUrl).'" style="color:#b53c20;text-decoration:underline;">Ver tu bandeja de notificaciones</a></p>';
         $text[] = 'Bandeja: '.$panelUrl;
 
         return [$html, implode("\n", $text)];

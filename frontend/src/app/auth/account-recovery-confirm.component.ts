@@ -22,7 +22,7 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
         <mat-icon class="icon" [class.ok]="ok()" [class.bad]="done() && !ok()" aria-hidden="true">
           {{ ok() ? 'task_alt' : (done() ? 'error_outline' : 'fact_check') }}
         </mat-icon>
-        <h2 id="account-recovery-confirm-title">{{ ok() ? 'Expediente abierto' : (done() ? 'No se pudo confirmar' : 'Confirmar recuperación') }}</h2>
+        <h2 id="account-recovery-confirm-title">{{ ok() ? 'Expediente abierto' : (!token ? 'Enlace no disponible' : (done() ? 'No se pudo confirmar' : 'Confirmar recuperación')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
         @if (!done()) {
           <div class="alert info">Este paso sólo acredita el acceso al email. No inicia sesión, no cambia la contraseña y no desactiva MFA.</div>

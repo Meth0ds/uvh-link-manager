@@ -352,6 +352,18 @@ class AppServiceProvider extends ServiceProvider
                 ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas comprobaciones DNS. Espera un minuto antes de reintentar.'], 429)->withHeaders($headers));
         });
 
+        // TLS activation spends ACME capacity, not just local CPU: its budget is
+        // per domain and tight. The job carries its own cooldown on top, this
+        // limiter only stops a person or script from stacking attempts.
+        RateLimiter::for('uvh-domain-tls', function (Request $request) {
+            $session = UvhRequest::sessionId($request) ?? $request->ip();
+            $domainId = (string) ($request->route('id') ?? 'new');
+
+            return Limit::perMinute(3)
+                ->by('domain-tls:'.$session.'|'.$domainId)
+                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas solicitudes de certificado. Espera un minuto antes de reintentar.'], 429)->withHeaders($headers));
+        });
+
         RateLimiter::for('uvh-invitation', function (Request $request) {
             // Sessions rotate on login and cannot define an account's budget.
             // Both routes receive the SAME actor/workspace key; neither a new

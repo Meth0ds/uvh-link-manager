@@ -43,8 +43,18 @@ describe("admin response decoders", () => {
 
     expect(decodeAdminDomainsPage(page("domains", {
       id: 8, workspace_id: 5, domain: "go.example.test", state: "verified",
-      verified_at: timestamp, created_at: timestamp, updated_at: timestamp, workspace_name: "Main",
-    }), context).domains?.[0].state).toBe("verified");
+      traffic_status: "offline", desired_state: "enabled", ownership_status: "verified",
+      routing_status: "healthy", tls_status: "ready", edge_eligible: false,
+      dns_error: null, tls_error: null, verified_at: timestamp, tls_not_after: null,
+      links_count: 3, created_at: timestamp, updated_at: timestamp, workspace_name: "Main",
+    }), context).domains?.[0]).toEqual(jasmine.objectContaining({
+      state: "verified",
+      traffic_status: "offline",
+      ownership_status: "verified",
+      routing_status: "healthy",
+      tls_status: "ready",
+      links_count: 3,
+    }));
 
     expect(decodeAdminAuditPage(page("events", {
       id: 9, user_id: null, action: "admin.review", resource_type: "report",

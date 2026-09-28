@@ -15,11 +15,37 @@ use Illuminate\Support\Facades\Http;
 
 class PublicController
 {
-    public function health()
+    public function health(Request $request)
     {
         DB::select('SELECT 1');
 
+        // A branded hostname answers with an empty 204: the TLS provisioner
+        // probes this path through the edge and only needs a 2xx, while a
+        // customer's domain must not advertise the platform that serves it.
+        // Monitors hit the first-party hosts and keep the service JSON.
+        if (! $this->isFirstPartyHost($request->getHost())) {
+            return response('', 204);
+        }
+
         return response()->json(['ok' => true, 'service' => 'uvh-api', 'time' => now()->toIso8601String()]);
+    }
+
+    private function isFirstPartyHost(string $host): bool
+    {
+        $host = strtolower(preg_replace('/:\d+$/', '', $host) ?? $host);
+        // Loopback is only ever the platform talking to itself (container
+        // healthchecks, local development).
+        if (in_array($host, ['localhost', '127.0.0.1', '[::1]', '::1'], true)) {
+            return true;
+        }
+        foreach (['public_host', 'app_host'] as $key) {
+            $firstParty = strtolower(trim((string) config('uvh.'.$key), '.'));
+            if ($firstParty !== '' && ($host === $firstParty || $host === 'www.'.$firstParty)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function robots()
@@ -218,10 +244,18 @@ class PublicController
             'links' => 'Enlaces y redirecciones',
             'panel' => 'Panel y API',
             'webhooks' => 'Entrega de webhooks',
+            // The custom-domains edge surface, reported by the monitor like the
+            // rest. A feed that predates it simply publishes no fourth
+            // component: inventing a local status here is exactly what this
+            // surface forbids.
+            'domains' => 'Dominios personalizados',
         ];
         $components = [];
         foreach ($componentLabels as $id => $label) {
             $status = $input['components'][$id] ?? null;
+            if ($status === null && $id === 'domains') {
+                continue;
+            }
             if (! is_string($status) || ! in_array($status, $statuses, true)) {
                 return null;
             }
@@ -410,7 +444,27 @@ class PublicController
                 return -1;
             }
             if ($host !== $publicHost && $host !== 'www.'.$publicHost) {
-                $domainId = DB::table('custom_domains')->whereRaw('lower(domain) = ?', [$host])->value('id');
+                // Prefer the claim holder's serving row, so a reported URL is
+                // interpreted exactly as it is served. But abuse does not wait
+                // for DNS: a domain that is down — or held by a request that
+                // never served — must still resolve to its links.
+                $domainId = DB::table('custom_domains')
+                    ->whereRaw('lower(domain) = ?', [$host])
+                    ->where('desired_state', 'enabled')
+                    ->where('edge_eligible', true)
+                    ->whereNotNull('tls_ready_at')
+                    ->whereExists(function ($claim) {
+                        $claim->selectRaw('1')->from('custom_domain_claims')
+                            ->whereColumn('custom_domain_claims.workspace_id', 'custom_domains.workspace_id')
+                            ->whereRaw('lower(custom_domain_claims.domain) = lower(custom_domains.domain)');
+                    })
+                    ->value('id');
+                if (! $domainId) {
+                    $domainId = DB::table('custom_domains')
+                        ->whereRaw('lower(domain) = ?', [$host])
+                        ->orderBy('id')
+                        ->value('id');
+                }
                 if (! $domainId) {
                     return null;
                 }

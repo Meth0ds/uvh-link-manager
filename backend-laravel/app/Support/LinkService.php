@@ -192,7 +192,7 @@ class LinkService
                 throw new LinkException('Tu acceso al workspace cambió. Recarga antes de crear el enlace.', 403);
             }
             if ($domainId !== null && ! CustomDomain::where('id', $domainId)
-                ->where('workspace_id', $workspaceId)->where('state', 'active')
+                ->where('workspace_id', $workspaceId)->where('desired_state', 'enabled')
                 ->where('edge_eligible', true)->whereNotNull('tls_ready_at')->lockForUpdate()->first(['id'])) {
                 throw new LinkException('Dominio no activado o sin acceso', 403);
             }
@@ -293,10 +293,21 @@ class LinkService
             }
 
             $domainId = array_key_exists('domain_id', $input) ? $input['domain_id'] : $link->domain_id;
-            if ($domainId !== null && ! CustomDomain::where('id', $domainId)
-                ->where('workspace_id', $workspaceId)->where('state', 'active')
-                ->where('edge_eligible', true)->whereNotNull('tls_ready_at')->lockForUpdate()->first(['id'])) {
-                throw new LinkException('Dominio no activado o sin acceso', 403);
+            // Only *moving* a link to another domain requires that domain to be
+            // serving. A link that keeps its current domain stays editable even
+            // if that domain fell over: editing notes or a destination is not
+            // the moment to hold the link hostage to someone else's DNS.
+            $changingDomain = $domainId !== null && (int) $domainId !== (int) $link->domain_id;
+            if ($domainId !== null) {
+                $domainGuard = CustomDomain::where('id', $domainId)
+                    ->where('workspace_id', $workspaceId);
+                if ($changingDomain) {
+                    $domainGuard->where('desired_state', 'enabled')
+                        ->where('edge_eligible', true)->whereNotNull('tls_ready_at');
+                }
+                if (! $domainGuard->lockForUpdate()->first(['id'])) {
+                    throw new LinkException('Dominio no activado o sin acceso', 403);
+                }
             }
             $collectionId = array_key_exists('collection_id', $input) ? $input['collection_id'] : $link->collection_id;
             if ($collectionId !== null && ! Collection::where('id', $collectionId)

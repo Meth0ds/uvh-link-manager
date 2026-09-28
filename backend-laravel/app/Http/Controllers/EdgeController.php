@@ -36,13 +36,17 @@ final class EdgeController
             return response('', 204)->header('Cache-Control', 'no-store');
         }
 
+        // One indexed lookup: the hostname must belong to a claim holder whose
+        // row is enabled and eligible — a certificate may be issued or served
+        // only for the workspace that proved ownership.
         $allowed = CustomDomain::whereRaw('lower(domain) = ?', [$domain])
+            ->where('desired_state', 'enabled')
             ->where('edge_eligible', true)
-            ->where(function ($query) {
-                $query->where('state', 'provisioning')
-                    ->orWhere(function ($active) {
-                        $active->where('state', 'active')->whereNotNull('tls_ready_at');
-                    });
+            ->whereIn('tls_status', ['provisioning', 'ready', 'expiring'])
+            ->whereExists(function ($claim) {
+                $claim->selectRaw('1')->from('custom_domain_claims')
+                    ->whereColumn('custom_domain_claims.workspace_id', 'custom_domains.workspace_id')
+                    ->whereRaw('lower(custom_domain_claims.domain) = lower(custom_domains.domain)');
             })
             ->exists();
 

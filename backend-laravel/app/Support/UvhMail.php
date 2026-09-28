@@ -120,13 +120,13 @@ class UvhMail
 
     public static function verification(string $to, string $url, string $tokenHash): bool
     {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Verificar email</a>';
+        $link = self::action($url, 'Verificar mi email');
 
         return self::send(
             'verification',
             $to,
             'Verifica tu email en UVH',
-            self::layout('Verifica tu cuenta', '<p>Haz clic para confirmar tu dirección de correo y activar tu cuenta.</p><p style="margin:18px 0">'.$link.'</p><p style="word-break:break-all;font-size:12px;color:#8A94A6">'.self::esc($url).'</p>'),
+            self::layout('Verifica tu cuenta', '<p>Confirma tu dirección de correo para continuar con tu cuenta en UVH.</p>'.$link.self::fallbackUrl($url)),
             "Verifica tu cuenta en UVH: {$url}",
             'email_token',
             $tokenHash,
@@ -136,13 +136,13 @@ class UvhMail
 
     public static function resetPassword(string $to, string $url, string $tokenHash): bool
     {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Restablecer contraseña</a>';
+        $link = self::action($url, 'Restablecer contraseña');
 
         return self::send(
             'password_reset',
             $to,
             'Restablece tu contraseña en UVH',
-            self::layout('Restablecer contraseña', '<p>Recibimos una solicitud para restablecer tu contraseña. El enlace caduca en 60 minutos.</p><p style="margin:18px 0">'.$link.'</p>'),
+            self::layout('Restablecer contraseña', '<p>Recibimos una solicitud para restablecer tu contraseña. El enlace caduca en 60 minutos.</p>'.$link),
             "Restablece tu contraseña en UVH: {$url}",
             'email_token',
             $tokenHash,
@@ -152,13 +152,13 @@ class UvhMail
 
     public static function passwordChanged(string $to, string $incidentUrl, string $tokenHash): bool
     {
-        $link = '<a href="'.self::esc($incidentUrl).'" style="display:inline-block;background:#B42318;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Cerrar accesos de emergencia</a>';
+        $link = self::action($incidentUrl, 'Cerrar accesos de emergencia', true);
 
         return self::send(
             'password_changed',
             $to,
             'Contraseña actualizada en UVH',
-            self::layout('Contraseña actualizada', '<p>La contraseña de tu cuenta se ha actualizado y el resto de sesiones han quedado cerradas.</p><p>Si no reconoces esta acción, usa el control de emergencia durante las próximas 24 horas. Revocará sesiones, tokens API y cambios pendientes, pero no iniciará sesión ni desactivará MFA.</p><p style="margin:18px 0">'.$link.'</p>'),
+            self::layout('Contraseña actualizada', '<p>La contraseña de tu cuenta se ha actualizado y el resto de sesiones han quedado cerradas.</p><p>Si no reconoces esta acción, usa el control de emergencia durante las próximas 24 horas. Revocará sesiones, tokens API y cambios pendientes, pero no iniciará sesión ni desactivará MFA.</p>'.$link),
             "La contraseña de tu cuenta UVH se ha actualizado. Si no reconoces la acción, revoca los accesos durante las próximas 24 horas: {$incidentUrl}",
             'email_token',
             $tokenHash,
@@ -173,7 +173,7 @@ class UvhMail
      */
     public static function sessionsRevoked(string $to, string $incidentUrl, string $tokenHash, bool $all): bool
     {
-        $link = '<a href="'.self::esc($incidentUrl).'" style="display:inline-block;background:#B42318;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Cerrar accesos de emergencia</a>';
+        $link = self::action($incidentUrl, 'Cerrar accesos de emergencia', true);
         $body = $all
             ? '<p>Se han cerrado todas las sesiones abiertas de tu cuenta, incluida la desde la que se realizó la acción. Tendrás que iniciar sesión de nuevo en cada dispositivo.</p>'
             : '<p>Se han cerrado las demás sesiones abiertas de tu cuenta. La sesión desde la que se realizó la acción permanece activa.</p>';
@@ -184,7 +184,7 @@ class UvhMail
             $all ? 'Todas las sesiones cerradas en UVH' : 'Sesiones cerradas en UVH',
             self::layout(
                 $all ? 'Todas las sesiones cerradas' : 'Sesiones cerradas',
-                $body.'<p>Si no reconoces esta acción, usa el control de emergencia durante las próximas 24 horas. Revocará sesiones, tokens API y cambios pendientes, pero no iniciará sesión ni desactivará MFA.</p><p style="margin:18px 0">'.$link.'</p>',
+                $body.'<p>Si no reconoces esta acción, usa el control de emergencia durante las próximas 24 horas. Revocará sesiones, tokens API y cambios pendientes, pero no iniciará sesión ni desactivará MFA.</p>'.$link,
             ),
             ($all ? 'Se han cerrado todas las sesiones de tu cuenta UVH.' : 'Se han cerrado las demás sesiones abiertas de tu cuenta UVH.')
                 .' Si no reconoces la acción, revoca los accesos durante las próximas 24 horas: '.$incidentUrl,
@@ -196,13 +196,13 @@ class UvhMail
 
     public static function accountRecoveryConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
     {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Confirmar solicitud</a>';
+        $link = self::action($url, 'Confirmar solicitud');
 
         return self::send(
             'account_recovery_confirmation',
             $to,
             'Confirma tu solicitud de recuperación UVH',
-            self::layout('Recuperación reforzada', '<p>Se ha solicitado recuperar una cuenta sin acceso al autenticador ni a sus códigos de recuperación.</p><p>Confirmar el email sólo abre un expediente: no inicia sesión ni desactiva MFA. Dos administradores distintos deberán verificar la identidad por el procedimiento de soporte.</p><p style="margin:18px 0">'.$link.'</p>'),
+            self::layout('Recuperación reforzada', '<p>Se ha solicitado recuperar una cuenta sin acceso al autenticador ni a sus códigos de recuperación.</p><p>Confirmar el email sólo abre un expediente: no inicia sesión ni desactiva MFA. Dos administradores distintos deberán verificar la identidad por el procedimiento de soporte.</p>'.$link),
             "Confirma la solicitud de recuperación reforzada UVH durante la próxima hora: {$url}",
             'account_recovery',
             $requestId,
@@ -212,13 +212,13 @@ class UvhMail
 
     public static function accountRecoveryApproved(string $to, string $url, int $requestId, string $generationHash): bool
     {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Finalizar recuperación</a>';
+        $link = self::action($url, 'Finalizar recuperación');
 
         return self::send(
             'account_recovery_approved',
             $to,
             'Tu recuperación reforzada UVH ha sido aprobada',
-            self::layout('Recuperación aprobada', '<p>Dos administradores distintos han aprobado el expediente después de verificar la identidad por el procedimiento de soporte.</p><p>El enlace caduca en 30 minutos, funciona una sola vez y exige establecer una contraseña nueva. Al completarlo se cerrarán accesos y se retirará el MFA perdido.</p><p style="margin:18px 0">'.$link.'</p>'),
+            self::layout('Recuperación aprobada', '<p>Dos administradores distintos han aprobado el expediente después de verificar la identidad por el procedimiento de soporte.</p><p>El enlace caduca en 30 minutos, funciona una sola vez y exige establecer una contraseña nueva. Al completarlo se cerrarán accesos y se retirará el MFA perdido.</p>'.$link),
             "Finaliza la recuperación reforzada UVH durante los próximos 30 minutos: {$url}",
             'account_recovery',
             $requestId,
@@ -239,13 +239,13 @@ class UvhMail
 
     public static function emailChangeVerification(string $to, string $url, string $tokenHash): bool
     {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Confirmar nuevo email</a>';
+        $link = self::action($url, 'Confirmar nuevo email');
 
         return self::send(
             'email_change_verification',
             $to,
             'Confirma tu nuevo email en UVH',
-            self::layout('Confirma tu nuevo email', '<p>Se ha solicitado usar esta dirección en una cuenta de UVH. Confírmala durante la próxima hora para completar el cambio.</p><p style="margin:18px 0">'.$link.'</p><p style="word-break:break-all;font-size:12px;color:#8A94A6">'.self::esc($url).'</p>'),
+            self::layout('Confirma tu nuevo email', '<p>Se ha solicitado usar esta dirección en una cuenta de UVH. Confírmala durante la próxima hora para completar el cambio.</p>'.$link.self::fallbackUrl($url)),
             "Confirma tu nuevo email en UVH durante la próxima hora: {$url}",
             'email_change',
             $tokenHash,
@@ -283,13 +283,13 @@ class UvhMail
      */
     public static function dataExportReady(string $to, string $url, string $expiresOn, int $requestId, string $generationHash): bool
     {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#00A99D;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Ir a mis exportaciones</a>';
+        $link = self::action($url, 'Ir a mis exportaciones');
 
         return self::send(
             'data_export_ready',
             $to,
             'Tu exportación de datos UVH está lista',
-            self::layout('Exportación lista', '<p>Tu archivo cifrado ya está preparado en tu sección de exportaciones.</p><p style="margin:18px 0">'.$link.'</p><p>Descárgalo antes del '.self::esc($expiresOn).'; después el archivo se elimina automáticamente. Al descargarlo te pediremos la contraseña de la cuenta y, si está activo, el segundo factor.</p>'),
+            self::layout('Exportación lista', '<p>Tu archivo cifrado ya está preparado en tu sección de exportaciones.</p>'.$link.'<p>Descárgalo antes del '.self::esc($expiresOn).'; después el archivo se elimina automáticamente. Al descargarlo te pediremos la contraseña de la cuenta y, si está activo, el segundo factor.</p>'),
             "Tu exportación UVH está lista. Abre {$url} e inicia sesión para descargarla antes del {$expiresOn}.",
             'data_export',
             $requestId,
@@ -299,13 +299,13 @@ class UvhMail
 
     public static function accountDeletionConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
     {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#B42318;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Revisar eliminación</a>';
+        $link = self::action($url, 'Revisar eliminación', true);
 
         return self::send(
             'account_deletion_confirmation',
             $to,
             'Confirma la eliminación de tu cuenta UVH',
-            self::layout('Solicitud de eliminación', '<p>Se ha solicitado eliminar tu cuenta. Abre el enlace durante la próxima hora y confirma de nuevo para programar la eliminación.</p><p style="margin:18px 0">'.$link.'</p><p>No se borrará nada si no completas ese segundo paso.</p>'),
+            self::layout('Solicitud de eliminación', '<p>Se ha solicitado eliminar tu cuenta. Abre el enlace durante la próxima hora y confirma de nuevo para programar la eliminación.</p>'.$link.'<p>No se borrará nada si no completas ese segundo paso.</p>'),
             "Revisa y confirma la eliminación de tu cuenta UVH durante la próxima hora: {$url}",
             'account_deletion',
             $requestId,
@@ -315,13 +315,13 @@ class UvhMail
 
     public static function accountDeletionScheduled(string $to, string $cancelUrl, string $executeAt, int $requestId, string $generationHash): bool
     {
-        $link = '<a href="'.self::esc($cancelUrl).'" style="display:inline-block;background:#2457F5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Cancelar eliminación</a>';
+        $link = self::action($cancelUrl, 'Cancelar eliminación');
 
         return self::send(
             'account_deletion_scheduled',
             $to,
             'Tu cuenta UVH está programada para eliminación',
-            self::layout('Eliminación programada', '<p>El acceso se ha cerrado y la cuenta se anonimizará a partir de <strong>'.self::esc($executeAt).'</strong>.</p><p style="margin:18px 0">'.$link.'</p><p>El enlace de cancelación funciona hasta que empiece la ejecución.</p>'),
+            self::layout('Eliminación programada', '<p>El acceso se ha cerrado y la cuenta se anonimizará a partir de <strong>'.self::esc($executeAt).'</strong>.</p>'.$link.'<p>El enlace de cancelación funciona hasta que empiece la ejecución.</p>'),
             "Tu cuenta UVH se eliminará a partir de {$executeAt}. Puedes cancelarlo antes desde: {$cancelUrl}",
             'account_deletion',
             $requestId,
@@ -452,6 +452,25 @@ class UvhMail
     }
 
     /**
+     * Un dominio propio dejó de servir enlaces. Es el único aviso de dominios
+     * que además va por correo: la caída corta tráfico real ahora mismo y el
+     * propietario puede no volver al panel en días.
+     */
+    public static function domainOffline(string $to, string $domain, int $domainId, string $reason): bool
+    {
+        return self::send(
+            'domain_offline',
+            $to,
+            'Tu dominio '.$domain.' dejó de servir enlaces en UVH',
+            self::layout('Dominio fuera de servicio', '<p>El dominio <strong>'.self::esc($domain).'</strong> ha dejado de servir sus enlaces.</p><p>Motivo: '.self::esc($reason).'</p><p>Los enlaces no se han eliminado: revisa la configuración DNS del dominio y vuelve a activarlo desde el panel.</p>'),
+            "El dominio {$domain} ha dejado de servir enlaces en UVH ({$reason}). Los enlaces siguen existiendo; revisa la configuración DNS y vuelve a activarlo desde el panel.",
+            'domain',
+            $domainId,
+            'offline',
+        );
+    }
+
+    /**
      * El resumen diario del centro de notificaciones. Sin recurso asociado: es
      * un aviso de la propia cuenta, siempre vigente, que sólo lista títulos y
      * rutas internas — nunca secretos, URLs bearer ni contenido ajeno.
@@ -481,13 +500,13 @@ class UvhMail
         int $invitationId,
         string $generationHash,
     ): bool {
-        $link = '<a href="'.self::esc($url).'" style="display:inline-block;background:#00A99D;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Aceptar invitación</a>';
+        $link = self::action($url, 'Aceptar invitación');
 
         return self::send(
             'invitation',
             $to,
             'Tienes una invitación de equipo en UVH',
-            self::layout('Invitación de equipo', '<p>Has sido invitado a <strong>'.self::esc($workspace).'</strong> con rol <strong>'.self::esc($role).'</strong>.</p><p style="margin:18px 0">'.$link.'</p>'),
+            self::layout('Invitación de equipo', '<p>Has sido invitado a <strong>'.self::esc($workspace).'</strong> con rol <strong>'.self::esc($role).'</strong>.</p>'.$link),
             "Te invitaron a {$workspace} (rol {$role}) en UVH: {$url}",
             'invitation',
             $invitationId,
@@ -497,13 +516,83 @@ class UvhMail
 
     private static function layout(string $title, string $body): string
     {
-        return '<!doctype html><html><body style="font-family:Manrope,Segoe UI,Arial,sans-serif;background:#F6F8FC;padding:24px">'
-            .'<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E3E8F0;border-radius:14px;padding:28px">'
-            .'<p style="font-weight:800;color:#07111F;font-size:18px;margin:0 0 4px">UVH <span style="color:#2457F5">·</span> <span style="color:#00A99D">Enlaces cortos. Control total.</span></p>'
-            .'<h1 style="color:#07111F;font-size:20px;margin:18px 0 8px">'.$title.'</h1>'
-            .'<div style="color:#33415C;line-height:1.6">'.$body.'</div>'
-            .'<p style="color:#667085;font-size:12px;margin-top:24px">Si no reconoces esta actividad, revisa la seguridad de tu cuenta antes de continuar.</p>'
-            .'</div></body></html>';
+        $safeTitle = self::esc($title);
+        $helpUrl = self::esc(FrontendUrl::base().'/help');
+
+        // Tables and inline styles keep the hierarchy intact in Gmail, Apple
+        // Mail and Outlook. No remote fonts or images are needed to read it.
+        return <<<HTML
+            <!doctype html>
+            <html lang="es">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <meta name="color-scheme" content="light">
+              <title>{$safeTitle} · UVH</title>
+              <style>
+                @media only screen and (max-width: 480px) {
+                  .uvh-mail-outer { padding: 20px 12px !important; }
+                  .uvh-mail-content { padding: 31px 24px 29px !important; }
+                  .uvh-mail-title { font-size: 27px !important; }
+                  .uvh-mail-footer { padding: 22px 24px !important; }
+                }
+                .uvh-mail-copy p { margin: 0 0 18px; }
+                .uvh-mail-copy p:last-child { margin-bottom: 0; }
+              </style>
+            </head>
+            <body style="margin:0;padding:0;background-color:#f5f2e9;color:#262821;font-family:Manrope,Arial,Helvetica,sans-serif;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#f5f2e9" style="border-collapse:collapse;background-color:#f5f2e9;">
+                <tr><td align="center" class="uvh-mail-outer" style="padding:34px 20px 42px;">
+                  <!--[if mso]><table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" width="600"><tr><td><![endif]-->
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:600px;border-collapse:collapse;">
+                    <tr><td style="padding:0 2px 22px;">
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+                        <tr>
+                          <td valign="bottom" style="color:#262821;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:35px;line-height:1;font-weight:800;letter-spacing:-2.5px;">uvh<span style="color:#b53c20;">.</span></td>
+                          <td align="right" valign="bottom" style="color:#626357;font-family:Georgia,serif;font-size:13px;font-style:italic;line-height:1.4;">Enlaces con recorrido.</td>
+                        </tr>
+                      </table>
+                    </td></tr>
+                    <tr><td bgcolor="#fffcf5" style="background-color:#fffcf5;border:1px solid #cecec0;border-top:3px solid #262821;">
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+                        <tr><td class="uvh-mail-content" style="padding:43px 42px 39px;">
+                          <h1 class="uvh-mail-title" style="margin:0;color:#262821;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:32px;line-height:1.16;font-weight:800;letter-spacing:-1.2px;">{$safeTitle}</h1>
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:25px 0 26px;border-collapse:collapse;"><tr><td bgcolor="#b53c20" width="52" height="3" style="width:52px;height:3px;background-color:#b53c20;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>
+                          <div class="uvh-mail-copy" style="color:#44483e;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:15px;line-height:1.7;">{$body}</div>
+                        </td></tr>
+                        <tr><td class="uvh-mail-footer" style="padding:22px 42px 25px;border-top:1px solid #cecec0;color:#626357;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;">
+                          Este correo se envió por una acción relacionada con UVH. Si necesitas ayuda, visita <a href="{$helpUrl}" style="color:#b53c20;text-decoration:underline;">el centro de ayuda</a>.
+                        </td></tr>
+                      </table>
+                    </td></tr>
+                    <tr><td style="padding:20px 2px 0;color:#626357;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:11px;line-height:1.5;">UVH / Enlaces con recorrido.</td></tr>
+                  </table>
+                  <!--[if mso]></td></tr></table><![endif]-->
+                </td></tr>
+              </table>
+            </body>
+            </html>
+            HTML;
+    }
+
+    private static function action(string $url, string $label, bool $destructive = false): string
+    {
+        $color = $destructive ? '#b12e30' : '#b53c20';
+
+        return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
+            .'<tr><td height="20" style="height:20px;font-size:1px;line-height:20px;">&nbsp;</td></tr>'
+            .'<tr><td bgcolor="'.$color.'" style="background-color:'.$color.';border-radius:3px;padding:14px 20px;">'
+            .'<a href="'.self::esc($url).'" style="color:#fffcf5;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:14px;line-height:1.35;font-weight:700;text-decoration:none;">'.self::esc($label).'</a>'
+            .'</td></tr>'
+            .'<tr><td height="20" style="height:20px;font-size:1px;line-height:20px;">&nbsp;</td></tr>'
+            .'</table>';
+    }
+
+    private static function fallbackUrl(string $url): string
+    {
+        $safeUrl = self::esc($url);
+
+        return '<p style="margin:0;color:#626357;font-size:12px;line-height:1.6;">Si el botón no funciona, copia este enlace:<br><a href="'.$safeUrl.'" style="color:#b53c20;text-decoration:underline;overflow-wrap:anywhere;word-break:break-all;">'.$safeUrl.'</a></p>';
     }
 
     private static function esc(string $v): string

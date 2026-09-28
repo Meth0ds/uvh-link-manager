@@ -226,6 +226,25 @@
   }
 }
 
+// Formulario de superficie de visitante: campos en línea, alineados con las
+// tarjetas de diagnóstico sin convertirse en un panel de ajustes pesado.
+.surface-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 14px;
+
+  .surface-root {
+    flex: 1 1 260px;
+    min-width: 0;
+  }
+
+  > button {
+    margin-top: 8px;
+  }
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

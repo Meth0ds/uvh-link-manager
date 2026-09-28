@@ -261,6 +261,29 @@ export class AdminComponent {
   // vocabulary of the entity it describes, so a badge and the filter that selects
   // it cannot name the same state differently.
   readonly domainLabel = domainStateLabel;
+
+  /** Rótulos compactos de las tres columnas de salud del inspector. */
+  healthLabel(value: string): string {
+    return AdminComponent.HEALTH_LABELS[value] ?? value;
+  }
+
+  private static readonly HEALTH_LABELS: Record<string, string> = {
+    pending: "pendiente",
+    verified: "verificada",
+    lost: "perdida",
+    unknown: "desconocida",
+    healthy: "sana",
+    degraded: "degradada",
+    failed: "fallida",
+    provisioning: "emitiendo",
+    ready: "lista",
+    expiring: "por caducar",
+    error: "con error",
+    enabled: "activado",
+    disabled: "desactivado",
+    online: "en línea",
+    offline: "fuera de servicio",
+  };
   readonly recoveryLabel = accountRecoveryStateLabel;
   readonly mailStatusLabel = mailOutboxStateLabel;
   readonly privacyStatusLabel = privacyRightStatusLabel;

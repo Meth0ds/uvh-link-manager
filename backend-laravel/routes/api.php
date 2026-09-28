@@ -46,10 +46,12 @@ Route::prefix('v1')->middleware('throttle:uvh-api')->group(function () {
         Route::get('/', [DomainController::class, 'index'])->middleware(['uvh.apitoken:domains:read', 'throttle:uvh-api-token']);
         Route::post('/', [DomainController::class, 'store'])->middleware(['uvh.apitoken:domains:write', 'throttle:uvh-api-token']);
         Route::post('{id}/verify', [DomainController::class, 'verify'])->middleware(['uvh.apitoken:domains:write', 'throttle:uvh-api-token', 'throttle:uvh-domain-dns'])->where('id', '[0-9]+');
-        Route::post('{id}/activate', [DomainController::class, 'activate'])->middleware(['uvh.apitoken:domains:write', 'throttle:uvh-api-token'])->where('id', '[0-9]+');
+        Route::post('{id}/activate', [DomainController::class, 'activate'])->middleware(['uvh.apitoken:domains:write', 'throttle:uvh-api-token', 'throttle:uvh-domain-tls'])->where('id', '[0-9]+');
+        Route::get('{id}/activity', [DomainController::class, 'activity'])->middleware(['uvh.apitoken:domains:read', 'throttle:uvh-api-token'])->where('id', '[0-9]+');
         Route::post('{id}/disable', [DomainController::class, 'disable'])->middleware(['uvh.apitoken:domains:write', 'throttle:uvh-api-token'])->where('id', '[0-9]+');
         Route::delete('{id}', [DomainController::class, 'destroy'])->middleware(['uvh.apitoken:domains:write', 'throttle:uvh-api-token'])->where('id', '[0-9]+');
         Route::post('{id}/revalidate', [DomainController::class, 'revalidate'])->middleware(['uvh.apitoken:domains:write', 'throttle:uvh-api-token', 'throttle:uvh-domain-dns'])->where('id', '[0-9]+');
+        Route::patch('{id}', [DomainController::class, 'update'])->middleware(['uvh.apitoken:domains:write', 'throttle:uvh-api-token'])->where('id', '[0-9]+');
     });
 });
 
@@ -225,10 +227,12 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::get('{id}', [DomainController::class, 'show'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->where('id', '[0-9]+');
         Route::post('/', [DomainController::class, 'store'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor']);
         Route::post('{id}/verify', [DomainController::class, 'verify'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor', 'throttle:uvh-domain-dns'])->where('id', '[0-9]+');
-        Route::post('{id}/activate', [DomainController::class, 'activate'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor'])->where('id', '[0-9]+');
+        Route::post('{id}/activate', [DomainController::class, 'activate'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor', 'throttle:uvh-domain-tls'])->where('id', '[0-9]+');
+        Route::get('{id}/activity', [DomainController::class, 'activity'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->where('id', '[0-9]+');
         Route::post('{id}/disable', [DomainController::class, 'disable'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor'])->where('id', '[0-9]+');
         Route::delete('{id}', [DomainController::class, 'destroy'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor'])->where('id', '[0-9]+');
         Route::post('{id}/revalidate', [DomainController::class, 'revalidate'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor', 'throttle:uvh-domain-dns'])->where('id', '[0-9]+');
+        Route::patch('{id}', [DomainController::class, 'update'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor'])->where('id', '[0-9]+');
     });
 
     // API tokens.

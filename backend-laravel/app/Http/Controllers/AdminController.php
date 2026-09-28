@@ -3,13 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\AccountRecoveryRequest;
+use App\Models\CustomDomain;
 use App\Models\User;
 use App\Support\AccountRecoveryLifecycle;
 use App\Support\AdminText;
 use App\Support\Audit;
 use App\Support\DestinationDenylist;
 use App\Support\DestinationReputationService;
+use App\Support\DomainStatus;
+use App\Support\FrontendUrl;
 use App\Support\Ids;
+use App\Support\IsoDate;
 use App\Support\LinkIntentRegistry;
 use App\Support\MailAdmissionException;
 use App\Support\MailDeliveryEligibility;
@@ -36,6 +40,27 @@ use Illuminate\Support\Facades\DB;
 class AdminController
 {
     private const MAIL_MANUAL_RETRY_MAX_AGE_HOURS = 168;
+
+    /**
+     * `DomainStatus::legacyState` as SQL, used only to *filter*: each row's
+     * label is derived in PHP from the model, never from this CASE. Keep the
+     * two in step — `DomainAdminInspectorTest` compares them across fixtures.
+     */
+    private const LEGACY_STATE_CASE = <<<'SQL'
+        CASE
+            WHEN d.desired_state <> 'enabled' THEN 'disabled'
+            WHEN d.edge_eligible AND d.tls_status = 'provisioning' THEN 'provisioning'
+            WHEN d.desired_state = 'enabled' AND d.edge_eligible AND d.tls_ready_at IS NOT NULL THEN 'active'
+            WHEN d.verified_at IS NULL AND d.ownership_status = 'pending'
+                AND d.dns_check_started_at IS NOT NULL
+                AND (d.dns_check_completed_at IS NULL OR d.dns_check_started_at > d.dns_check_completed_at)
+                THEN 'verifying'
+            WHEN d.verified_at IS NULL AND d.dns_error IS NOT NULL THEN 'error'
+            WHEN d.verified_at IS NULL THEN 'pending'
+            WHEN d.dns_error IS NOT NULL THEN 'error'
+            ELSE 'verified'
+        END
+        SQL;
 
     public function overview()
     {
@@ -695,7 +720,7 @@ class AdminController
 
                 $token = Ids::randomToken(32);
                 $generation = Ids::sha256Hex($token);
-                $url = rtrim((string) config('app.url'), '/').'/auth/account-recovery/complete#token='.rawurlencode($token);
+                $url = FrontendUrl::base().'/auth/account-recovery/complete#token='.rawurlencode($token);
                 $row->update([
                     'status' => 'approved',
                     'completion_token_hash' => $generation,
@@ -742,6 +767,14 @@ class AdminController
         ]);
     }
 
+    /**
+     * The cross-workspace domain inspector: health first, never the DNS
+     * challenge (an admin views diagnosis, not the token that proves control).
+     *
+     * `state` is the pre-redesign label, derived from the status columns the
+     * way `DomainStatus::legacyState` derives it; the SQL CASE only pushes the
+     * same filter into the database so pagination stays honest.
+     */
     public function domains(Request $request)
     {
         [$page, $perPage] = $this->pagination($request);
@@ -754,9 +787,16 @@ class AdminController
 
         $query = DB::table('custom_domains as d')
             ->join('workspaces as w', 'w.id', '=', 'd.workspace_id')
-            ->select('d.id', 'd.workspace_id', 'd.domain', 'd.state', 'd.verified_at', 'd.created_at', 'd.updated_at', 'w.name as workspace_name');
+            ->select(
+                'd.id', 'd.workspace_id', 'd.domain', 'd.desired_state', 'd.ownership_status',
+                'd.routing_status', 'd.tls_status', 'd.edge_eligible', 'd.tls_ready_at',
+                'd.verified_at', 'd.dns_error', 'd.tls_error', 'd.tls_not_after',
+                'd.dns_check_started_at', 'd.dns_check_completed_at',
+                'd.created_at', 'd.updated_at', 'w.name as workspace_name',
+                DB::raw('(SELECT COUNT(*) FROM links l WHERE l.domain_id = d.id AND l.deleted_at IS NULL) as links_count'),
+            );
         if ($state !== '') {
-            $query->where('d.state', $state);
+            $query->whereRaw('('.self::LEGACY_STATE_CASE.') = ?', [$state]);
         }
         if ($search !== '') {
             $query->where(fn ($q) => $q->where('d.domain', 'ilike', $search)->orWhere('w.name', 'ilike', $search));
@@ -769,11 +809,45 @@ class AdminController
             ->get();
 
         return response()->json([
-            'domains' => $rows,
+            'domains' => $rows->map(fn ($row) => $this->domainInspectorRow($row))->values(),
             'total' => $total,
             'page' => $page,
             'perPage' => $perPage,
         ]);
+    }
+
+    /**
+     * One inspector row: the derived labels plus the raw facts an operator
+     * needs to see *why* a domain is not serving.
+     *
+     * @return array<string, mixed>
+     */
+    private function domainInspectorRow(\stdClass $row): array
+    {
+        // The derived labels read model attributes (dates included); the row
+        // is hydrated exactly as the ORM would from the same columns.
+        $model = (new CustomDomain)->newFromBuilder((array) $row);
+
+        return [
+            'id' => (int) $row->id,
+            'workspace_id' => (int) $row->workspace_id,
+            'domain' => (string) $row->domain,
+            'state' => DomainStatus::legacyState($model),
+            'traffic_status' => DomainStatus::trafficStatus($model),
+            'desired_state' => (string) $row->desired_state,
+            'ownership_status' => (string) $row->ownership_status,
+            'routing_status' => (string) $row->routing_status,
+            'tls_status' => (string) $row->tls_status,
+            'edge_eligible' => (bool) $row->edge_eligible,
+            'dns_error' => $row->dns_error === null ? null : (string) $row->dns_error,
+            'tls_error' => $row->tls_error === null ? null : (string) $row->tls_error,
+            'verified_at' => IsoDate::format($row->verified_at),
+            'tls_not_after' => IsoDate::format($row->tls_not_after),
+            'links_count' => (int) $row->links_count,
+            'created_at' => IsoDate::format($row->created_at),
+            'updated_at' => IsoDate::format($row->updated_at),
+            'workspace_name' => (string) $row->workspace_name,
+        ];
     }
 
     public function audit(Request $request)
@@ -942,27 +1016,23 @@ class AdminController
             'El correo pendiente más antiguo supera los diez minutos.',
             $production,
         );
-        $domainCounts = $this->countsByState('custom_domains', 'state');
-        // Revalidations keep their visible domain state. Compare the check
-        // timestamps to include them, and fall back to updated_at for legacy
-        // rows that entered verifying before dns_check_started_at was added.
+        $domainCounts = $this->countsByState('custom_domains', 'desired_state');
+        foreach ($this->countsByState('custom_domains', 'tls_status') as $status => $count) {
+            $domainCounts['tls_'.$status] = $count;
+        }
+        // A check is in progress while its start is newer than its completion —
+        // the state label no longer knows about checks, the timestamps do.
         $oldestDnsCheck = DB::table('custom_domains')
-            ->where(function ($query) {
-                $query->where('state', 'verifying')
-                    ->orWhere(function ($revalidation) {
-                        $revalidation->whereIn('state', ['active', 'verified', 'disabled'])
-                            ->whereNotNull('dns_check_started_at')
-                            ->where(function ($inProgress) {
-                                $inProgress->whereNull('dns_check_completed_at')
-                                    ->orWhereColumn('dns_check_started_at', '>', 'dns_check_completed_at');
-                            });
-                    });
+            ->whereNotNull('dns_check_started_at')
+            ->where(function ($inProgress) {
+                $inProgress->whereNull('dns_check_completed_at')
+                    ->orWhereColumn('dns_check_started_at', '>', 'dns_check_completed_at');
             })
-            ->min(DB::raw('COALESCE(dns_check_started_at, updated_at)'));
+            ->min('dns_check_started_at');
         $oldestDnsCheckAge = $oldestDnsCheck !== null
             ? max(0, time() - Carbon::parse($oldestDnsCheck)->getTimestamp())
             : null;
-        $oldestTlsProvisioning = DB::table('custom_domains')->where('state', 'provisioning')->min('updated_at');
+        $oldestTlsProvisioning = DB::table('custom_domains')->where('tls_status', 'provisioning')->min('updated_at');
         $oldestTlsProvisioningAge = $oldestTlsProvisioning !== null
             ? max(0, time() - Carbon::parse($oldestTlsProvisioning)->getTimestamp())
             : null;

@@ -11,6 +11,7 @@ const dryRunReport: ImportReport = {
   dryRun: true,
   valid: 2,
   created: 0,
+  failed: 0,
   errors: [{ row: 3, error: "Alias inválido" }],
   truncated: false,
 };
@@ -73,15 +74,78 @@ describe("CsvImportDialogComponent", () => {
     await component.import();
     expect(importKey(1)).toBe(first);
 
-    // El servidor respondió y negó: la clave se descarta con la intención.
-    api.post.and.rejectWith(new ApiRequestError("Este alias ya está en uso", 409));
+    // El servidor respondió y negó de forma definitiva: la clave se descarta
+    // con la intención y el siguiente clic es una intención nueva.
+    api.post.and.rejectWith(new ApiRequestError("CSV inválido (vacío o demasiado grande)", 422));
     await component.import();
     expect(importKey(2)).toBe(first);
-    api.post.and.resolveTo({ dryRun: false, valid: 1, created: 1, errors: [], truncated: false });
+    api.post.and.rejectWith(new ApiRequestError("No se pudo conectar con el servidor", 0));
     await component.import();
     expect(importKey(3)).not.toBe(first);
+  });
+
+  it("repeats the exact request after a 409: same body and same key, never a new batch", async () => {
+    component.csv = "alias,destination\nok,https://example.test";
+
+    // El 409 del contrato («Reintenta con la misma clave») no puede descartar
+    // la intención: hacerlo abriría un lote nuevo que re-ejecuta filas ya
+    // persistidas y las reporta como «alias ya está en uso».
+    api.post.and.rejectWith(new ApiRequestError("La operación ha sido retomada por otro intento. Reintenta con la misma clave.", 409));
+    await component.import();
+
+    const key = importKey(0);
+    const body = api.post.calls.argsFor(0)[1];
+    expect(key).toBeTruthy();
+    expect(component.retryImport()).not.toBeNull();
+
+    // El reintento real vuelve a salir idéntico: mismo cuerpo, misma clave.
+    api.post.and.resolveTo({ dryRun: false, valid: 1, created: 1, failed: 0, errors: [], truncated: false });
+    await component.retry();
+    expect(importKey(1)).toBe(key);
+    expect(api.post.calls.argsFor(1)[1]).toEqual(body);
     expect(component.done()).toBeTrue();
-    expect(component.report()?.created).toBe(1);
+    expect(component.retryImport()).toBeNull();
+    expect(component.report()?.failed).toBe(0);
+  });
+
+  it("drops the frozen retry when the CSV changes: that is another body, hence another intention", async () => {
+    component.csv = "alias,destination\nok,https://example.test";
+    api.post.and.rejectWith(new ApiRequestError("La operación ha sido retomada por otro intento. Reintenta con la misma clave.", 409));
+    await component.import();
+    expect(component.retryImport()).not.toBeNull();
+
+    component.csv = "alias,destination\notra,https://example.test";
+    component.onCsvInput();
+
+    expect(component.retryImport()).toBeNull();
+  });
+
+  it("makes tags_json discoverable and warns that ';' splits names in tags", () => {
+    const root = fixture.nativeElement as HTMLElement;
+    const help = root.textContent ?? "";
+    // La capacidad existía en el contrato pero era inalcanzable: la ayuda
+    // tiene que nombrar la columna y su forma, y avisar de lo que «;» hace
+    // con la columna tags (el nombre se partiría en varias etiquetas).
+    expect(help).toContain("tags_json");
+    expect(help).toContain("[\"prensa;2026\"]");
+    expect(help).toContain("se partiría en varias etiquetas");
+    // Y el ejemplo del textarea la muestra, no sólo la forma con «;».
+    expect(root.querySelector("textarea")?.getAttribute("placeholder")).toContain("tags_json");
+  });
+
+  it("carries a tag name containing ';' through tags_json to the API without splitting it", async () => {
+    // El export de UVH emite tags_json justamente para nombres con «;»; el
+    // diálogo debe transportar la celda tal cual: el nombre viaja como UNA
+    // etiqueta dentro de la lista JSON, jamás partido por el separador.
+    const csv = "alias,destination,tags_json\noferta-2,https://example.org/oferta,\"[\"\"prensa;2026\"\"]\"";
+    component.csv = csv;
+
+    await component.validate();
+    expect(api.post.calls.mostRecent().args[1]).toEqual({ dryRun: true, csv });
+
+    api.post.and.resolveTo({ dryRun: false, valid: 1, created: 1, failed: 0, errors: [], truncated: false });
+    await component.import();
+    expect(api.post.calls.mostRecent().args[1]).toEqual({ dryRun: false, csv });
   });
 
   it("refuses to import into a workspace selected after the dialog opened", async () => {
@@ -106,7 +170,7 @@ describe("CsvImportDialogComponent", () => {
   });
 
   it("closes reporting how many links the import created", async () => {
-    api.post.and.resolveTo({ dryRun: false, valid: 2, created: 2, errors: [], truncated: false });
+    api.post.and.resolveTo({ dryRun: false, valid: 2, created: 2, failed: 0, errors: [], truncated: false });
     component.csv = "alias,destination\nok,https://example.test";
     await component.import();
     component.close();

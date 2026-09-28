@@ -66,6 +66,19 @@ final class NotificationKinds
 
     public const ACCOUNT_RECOVERY_REJECTED = 'account_recovery_rejected';
 
+    // Dominios personalizados: salud del servicio que el workspace publica.
+    public const DOMAIN_DNS_DEGRADED = 'domain_dns_degraded';
+
+    public const DOMAIN_OFFLINE = 'domain_offline';
+
+    public const DOMAIN_RECOVERED = 'domain_recovered';
+
+    public const DOMAIN_TLS_FAILED = 'domain_tls_failed';
+
+    public const DOMAIN_TLS_EXPIRING = 'domain_tls_expiring';
+
+    public const DOMAIN_CLAIM_TRANSFERRED = 'domain_claim_transferred';
+
     /** @var array<string, array{category: string, workspace: bool, route: ?string, title: string}> */
     private const CATALOG = [
         self::PASSWORD_CHANGED => ['category' => self::CATEGORY_MANDATORY, 'workspace' => false, 'route' => '/app/settings/security', 'title' => 'Cambiaste tu contraseña'],
@@ -87,6 +100,17 @@ final class NotificationKinds
         self::WORKSPACE_OWNERSHIP_TRANSFER => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/team', 'title' => 'Cambió la propiedad del workspace'],
         self::WORKSPACE_DELETED => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => null, 'title' => 'Se eliminó un workspace'],
         self::ACCOUNT_RECOVERY_REJECTED => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => false, 'route' => '/app/settings/security', 'title' => 'Se rechazó una recuperación de cuenta'],
+
+        // Perder un dominio propio deja sin servicio a todos sus enlaces: el
+        // aviso de caída y el cambio de propiedad son de contrato, no
+        // opcionales. La degradación previa y la recuperación sí son
+        // operativos, como el resto de actividad de producto.
+        self::DOMAIN_OFFLINE => ['category' => self::CATEGORY_MANDATORY, 'workspace' => true, 'route' => '/app/domains', 'title' => 'Tu dominio dejó de servir enlaces'],
+        self::DOMAIN_CLAIM_TRANSFERRED => ['category' => self::CATEGORY_MANDATORY, 'workspace' => true, 'route' => '/app/domains', 'title' => 'La propiedad de un dominio cambió'],
+        self::DOMAIN_DNS_DEGRADED => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/domains', 'title' => 'La configuración DNS de tu dominio falla'],
+        self::DOMAIN_RECOVERED => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/domains', 'title' => 'Tu dominio se recuperó'],
+        self::DOMAIN_TLS_FAILED => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/domains', 'title' => 'No se pudo preparar el HTTPS de tu dominio'],
+        self::DOMAIN_TLS_EXPIRING => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/domains', 'title' => 'El certificado de tu dominio está por caducar'],
     ];
 
     /** @return array<string, array{category: string, workspace: bool, route: ?string, title: string}> */

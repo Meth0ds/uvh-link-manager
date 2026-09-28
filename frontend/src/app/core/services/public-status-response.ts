@@ -3,7 +3,9 @@ import { boolean, boundedArray, literal, nullableText, record, text } from "./re
 
 const OVERALL = new Set<PublicServiceStatus>(["operational", "degraded", "major_outage", "maintenance", "unknown"]);
 const COMPONENT_STATUS = new Set<Exclude<PublicServiceStatus, "unknown">>(["operational", "degraded", "major_outage", "maintenance"]);
-const COMPONENT_IDS = new Set<"links" | "panel" | "webhooks">(["links", "panel", "webhooks"]);
+const COMPONENT_IDS = new Set<PublicStatusSnapshot["components"][number]["id"]>(["links", "panel", "webhooks", "domains"]);
+/** Los tres históricos son obligatorios; `domains` puede no llegar de un feed antiguo. */
+const CORE_COMPONENT_IDS = ["links", "panel", "webhooks"] as const;
 const INCIDENT_STATUS = new Set<PublicStatusSnapshot["incidents"][number]["status"]>(["investigating", "identified", "monitoring", "resolved"]);
 const SOURCES = new Set<PublicStatusSnapshot["source"]>(["external_monitor", "external_monitor_unavailable"]);
 
@@ -18,11 +20,18 @@ export function decodePublicStatus(value: unknown): PublicStatusSnapshot {
   const overall = literal(source["overall"], OVERALL, "public status");
   const stale = boolean(source["stale"], "public status stale flag");
   const feed = literal(source["source"], SOURCES, "public status source");
-  const components = boundedArray(source["components"], "public status components", 3).map((item) => {
+  const components = boundedArray(source["components"], "public status components", 4).map((item) => {
     const row = record(item, "public status component");
     return { id: literal(row["id"], COMPONENT_IDS, "public status component"), label: text(row["label"], "public status component", 80), status: literal(row["status"], COMPONENT_STATUS, "public status component") };
   });
-  if (new Set(components.map((item) => item.id)).size !== components.length || (feed === "external_monitor" && components.length !== 3)) throw new Error("Invalid public status response");
+  if (new Set(components.map((item) => item.id)).size !== components.length) throw new Error("Invalid public status response");
+  // El contrato del monitor: los tres componentes históricos siempre, el de
+  // dominios cuando el feed ya lo publica. Nunca más de los cuatro.
+  if (feed === "external_monitor"
+    && (components.length < CORE_COMPONENT_IDS.length || components.length > 4
+      || CORE_COMPONENT_IDS.some((id) => !components.some((item) => item.id === id)))) {
+    throw new Error("Invalid public status response");
+  }
   const incidents = boundedArray(source["incidents"], "public status incidents", 20).map((item) => {
     const row = record(item, "public status incident");
     return { id: text(row["id"], "public status incident", 80), title: text(row["title"], "public status incident", 160), message: text(row["message"], "public status incident", 1000), status: literal(row["status"], INCIDENT_STATUS, "public status incident"), startedAt: date(row["startedAt"])!, updatedAt: date(row["updatedAt"])! };

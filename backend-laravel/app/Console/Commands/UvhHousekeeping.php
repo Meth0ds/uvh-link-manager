@@ -3,13 +3,17 @@
 namespace App\Console\Commands;
 
 use App\Jobs\GenerateDataExportJob;
+use App\Jobs\ProbeDomainTlsJob;
 use App\Jobs\VerifyDomainDnsJob;
 use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\DestinationReputationService;
+use App\Support\DomainClaims;
+use App\Support\DomainEvents;
 use App\Support\DomainRevalidationSchedule;
+use App\Support\DomainStatus;
 use App\Support\Ids;
 use App\Support\InvitationMailBudget;
 use App\Support\LinkIntentRegistry;
@@ -45,27 +49,13 @@ class UvhHousekeeping extends Command
         $run('link_lifecycle', fn () => $this->transitionDueLinks());
 
         $run('stale_dns_claims', function (): void {
-            // A queue outage after admission must not strand a domain in an
-            // endless verifying state. Jobs have a 15-second timeout; ten
-            // minutes leaves ample queue latency while providing recovery.
-            DB::table('custom_domains')
-                ->where('state', 'verifying')
-                ->where('updated_at', '<=', now()->subMinutes(10))
-                ->update([
-                    'state' => 'error',
-                    'verified_at' => null,
-                    'edge_eligible' => false,
-                    'dns_check_completed_at' => now(),
-                    'dns_error' => 'queue_timeout',
-                    'updated_at' => now(),
-                ]);
-
-            // Revalidations keep their visible state (active/verified/disabled)
-            // while a worker runs. Recover their in-progress marker too; the
-            // older verifier only handled the initial `verifying` state and a
-            // lost queue job could otherwise suppress all future checks.
-            $staleRevalidations = DB::table('custom_domains')
-                ->whereIn('state', ['active', 'verified', 'disabled'])
+            // A queue outage after admission must not strand a domain with a
+            // check that never finishes — the marker would suppress every
+            // future retry. Jobs have a 15-second timeout; ten minutes leaves
+            // ample queue latency while providing recovery. First checks and
+            // revalidations are one condition now: an unfinished check is an
+            // unfinished check, whatever the domain's health is.
+            $stale = DB::table('custom_domains')
                 ->whereNotNull('dns_check_started_at')
                 ->where(function ($query) {
                     $query->whereNull('dns_check_completed_at')
@@ -77,26 +67,34 @@ class UvhHousekeeping extends Command
                     'dns_error' => 'queue_timeout',
                     'updated_at' => now(),
                 ]);
-            if ($staleRevalidations > 0) {
-                OperationalMetrics::increment('dns.job_stale', $staleRevalidations);
+            if ($stale > 0) {
+                OperationalMetrics::increment('dns.job_stale', $stale);
             }
         });
 
         $run('stale_tls_provisioning', function (): void {
             DB::table('custom_domains')
-                ->where('state', 'provisioning')
+                ->where('tls_status', 'provisioning')
                 ->where('updated_at', '<=', now()->subHour())
                 ->update([
-                    'state' => 'verified',
+                    'tls_status' => 'error',
                     'edge_eligible' => false,
                     'tls_ready_at' => null,
                     'tls_error' => 'provisioning_timeout',
                     'tls_version' => DB::raw('tls_version + 1'),
+                    'tls_next_retry_at' => now()->addHours(max(1, (int) config('uvh.custom_domains.tls_auto_retry_hours', 6))),
                     'updated_at' => now(),
                 ]);
         });
 
         $run('domain_revalidation', fn () => $this->queueDomainRevalidations());
+        $run('domain_tls_probe', fn () => $this->queueTlsProbeChecks());
+
+        // Domain event delivery and claim hygiene live with the rest of the
+        // recovery work: an outbox row a crash left behind, or a claim whose
+        // holder deleted its request, heals here without anyone acting.
+        $run('domain_events', fn () => DomainEvents::sweep());
+        $run('domain_claims', fn () => DomainClaims::purgeOrphans());
 
         $run('destination_reputation', fn () => $this->queueDestinationRechecks());
 
@@ -737,12 +735,23 @@ class UvhHousekeeping extends Command
         }
 
         // A short blocklist that can take the whole domain offline deserves a
-        // standing signal, not a manual check after the phone rings.
+        // standing signal, not a manual check after the phone rings. The batch
+        // rotates through the least recently monitored domains: with more
+        // domains than fit in one batch, every domain still gets monitored
+        // instead of the same first rows being re-read forever.
         $hosts = [(string) config('uvh.public_host'), (string) config('uvh.app_host')];
-        $custom = DB::table('custom_domains')->where('state', 'active')->orderBy('id')->limit(25)->pluck('domain');
-        foreach ($custom as $domain) {
-            if (is_string($domain)) {
-                $hosts[] = $domain;
+        $batch = max(1, min(100, (int) config('uvh.reputation.domain_monitor_batch', 25)));
+        $monitored = [];
+        $custom = DB::table('custom_domains')
+            ->where('desired_state', 'enabled')
+            ->orderByRaw('reputation_checked_at NULLS FIRST')
+            ->orderBy('id')
+            ->limit($batch)
+            ->get(['id', 'domain']);
+        foreach ($custom as $row) {
+            if (is_string($row->domain) && trim($row->domain) !== '') {
+                $hosts[] = $row->domain;
+                $monitored[] = (int) $row->id;
             }
         }
 
@@ -754,6 +763,11 @@ class UvhHousekeeping extends Command
             if (in_array($verdict->verdict(), [ReputationVerdict::MALICIOUS, ReputationVerdict::SUSPICIOUS], true)) {
                 OperationalMetrics::increment('reputation.domain_listed');
             }
+        }
+        if ($monitored !== []) {
+            // The rotation marker only: `updated_at` anchors the stale-job
+            // recovery sweeps and must not be refreshed by monitoring.
+            DB::table('custom_domains')->whereIn('id', $monitored)->update(['reputation_checked_at' => now()]);
         }
     }
 
@@ -777,7 +791,10 @@ class UvhHousekeeping extends Command
         $healthyCutoff = now()->subHours(max(1, (int) config('uvh.custom_domains.revalidation_hours', 24)));
         $failureCutoff = now()->subHours(max(1, (int) config('uvh.custom_domains.failure_retry_hours', 1)));
 
-        $ids = CustomDomain::where('state', 'active')
+        // Intent, not health: every domain the user wants enabled is checked,
+        // including one that fell to `failed`. That is what makes a repaired
+        // DNS configuration come back without anyone opening the panel.
+        $ids = CustomDomain::where('desired_state', 'enabled')
             ->where(function ($query) {
                 $query->whereNull('dns_check_started_at')
                     ->orWhereColumn('dns_check_completed_at', '>=', 'dns_check_started_at');
@@ -799,7 +816,7 @@ class UvhHousekeeping extends Command
             })
             ->orderByRaw('dns_check_completed_at NULLS FIRST')
             ->orderBy('id')
-            ->limit(20)
+            ->limit(max(1, min(500, (int) config('uvh.custom_domains.revalidation_batch', 20))))
             ->pluck('id');
 
         foreach ($ids as $id) {
@@ -819,25 +836,21 @@ class UvhHousekeeping extends Command
                 $prepared = DB::transaction(function () use ($id, $workspaceId): ?array {
                     $domain = CustomDomain::where('id', $id)
                         ->where('workspace_id', $workspaceId)
-                        ->where('state', 'active')
+                        ->where('desired_state', 'enabled')
                         ->lockForUpdate()
                         ->first();
                     if (! $domain || $this->dnsCheckInProgress($domain) || ! $this->dnsCheckDue($domain)) {
                         return null;
                     }
 
-                    $version = (int) $domain->verification_version + 1;
-                    $domain->update([
-                        'verification_version' => $version,
-                        'dns_check_started_at' => now(),
-                        'dns_error' => null,
-                        'updated_at' => now(),
-                    ]);
+                    $updates = DomainStatus::beginDnsCheck($domain);
+                    $domain->update($updates);
 
                     return [
                         'domain' => $domain->domain,
                         'token' => $domain->verification_token,
-                        'version' => $version,
+                        'scheme' => (int) $domain->verification_scheme,
+                        'version' => $updates['verification_version'],
                     ];
                 });
                 if (! $prepared) {
@@ -849,9 +862,11 @@ class UvhHousekeeping extends Command
                         (int) $id,
                         $workspaceId,
                         null,
+                        null,
+                        null,
                         $prepared['domain'],
                         $prepared['token'],
-                        'active',
+                        $prepared['scheme'],
                         $prepared['version'],
                         $dedupeKey,
                         $lock->owner(),
@@ -861,7 +876,6 @@ class UvhHousekeeping extends Command
                     CustomDomain::where('id', $id)
                         ->where('workspace_id', $workspaceId)
                         ->where('verification_version', $prepared['version'])
-                        ->where('state', 'active')
                         ->update([
                             'dns_check_completed_at' => now(),
                             'dns_error' => 'queue_unavailable',
@@ -880,6 +894,43 @@ class UvhHousekeeping extends Command
                         report($e);
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Re-prove the certificates of serving domains on a rotation.
+     *
+     * Caddy renews certificates by itself; this is the platform noticing when
+     * it does not. The batch rotates through the least recently probed domains
+     * so a fleet larger than one batch is still fully covered, and only the
+     * handshake speaks against a certificate — a platform outage must never
+     * withdraw customer domains (the job itself enforces that).
+     */
+    private function queueTlsProbeChecks(): void
+    {
+        $cutoff = now()->subHours(max(1, (int) config('uvh.custom_domains.tls_probe_interval_hours', 24)));
+        $batch = max(1, min(100, (int) config('uvh.custom_domains.tls_probe_batch', 20)));
+
+        $rows = DB::table('custom_domains')
+            ->where('desired_state', 'enabled')
+            ->where('edge_eligible', true)
+            ->whereIn('tls_status', ['ready', 'expiring'])
+            ->where(function ($query) use ($cutoff) {
+                $query->whereNull('tls_checked_at')->orWhere('tls_checked_at', '<=', $cutoff);
+            })
+            ->orderByRaw('tls_checked_at NULLS FIRST')
+            ->orderBy('id')
+            ->limit($batch)
+            ->get(['id', 'workspace_id', 'domain']);
+
+        foreach ($rows as $row) {
+            try {
+                ProbeDomainTlsJob::dispatch((int) $row->id, (int) $row->workspace_id, (string) $row->domain)->afterCommit();
+            } catch (\Throwable $e) {
+                // The next sweep retries; monitoring must never break the
+                // rest of housekeeping.
+                report($e);
             }
         }
     }

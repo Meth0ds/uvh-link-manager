@@ -22,7 +22,7 @@ import { LatestRequest } from "../core/services/latest-request";
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="done() && !ok()">
           {{ ok() ? 'mark_email_read' : (done() ? 'error_outline' : 'mark_email_unread') }}
         </mat-icon>
-        <h2 id="confirm-email-change-title">{{ ok() ? 'Email actualizado' : (done() ? 'No se pudo completar' : 'Confirmar nuevo email') }}</h2>
+        <h2 id="confirm-email-change-title">{{ ok() ? 'Email actualizado' : (!hasLink ? 'Enlace no disponible' : (done() ? 'No se pudo completar' : 'Confirmar nuevo email')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
         @if (!done()) {
           <button mat-flat-button color="primary" type="button" (click)="confirm()" [disabled]="busy()">
@@ -45,6 +45,8 @@ export class ConfirmEmailChangeComponent {
   private location = inject(Location);
   private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
+
+  get hasLink(): boolean { return this.token.length > 0; }
 
   readonly busy = signal(false);
   readonly done = signal(false);

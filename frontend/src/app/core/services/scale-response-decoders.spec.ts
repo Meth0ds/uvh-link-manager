@@ -96,6 +96,7 @@ describe("scale response decoders", () => {
       dryRun: true,
       valid: 8,
       created: 0,
+      failed: 0,
       errors: [{ row: 3, error: "Alias inválido" }, { row: 4, error: "Destino obligatorio" }],
       truncated: false,
     });
@@ -104,10 +105,38 @@ describe("scale response decoders", () => {
       { row: 4, error: "Destino obligatorio" },
     ]);
     expect(report.valid).toBe(8);
+    expect(report.failed).toBe(0);
+    // Los contadores se leen separados: una fila fallida tiene su propio
+    // número y nunca se cuela entre las válidas.
+    const real = decodeImportReport({
+      dryRun: false,
+      valid: 1,
+      created: 1,
+      failed: 1,
+      errors: [{ row: 4, error: "Este alias ya está en uso" }],
+      truncated: false,
+    });
+    expect(real).toEqual({
+      dryRun: false,
+      valid: 1,
+      created: 1,
+      failed: 1,
+      errors: [{ row: 4, error: "Este alias ya está en uso" }],
+      truncated: false,
+    });
+    // Sin el contador de fallidas no hay informe: la semántica es contrato.
+    expect(() => decodeImportReport({
+      dryRun: true,
+      valid: 8,
+      created: 0,
+      errors: [],
+      truncated: false,
+    })).toThrow();
     expect(() => decodeImportReport({
       dryRun: false,
       valid: 1,
       created: 1,
+      failed: 1,
       errors: Array.from({ length: 101 }, (_, i) => ({ row: i + 2, error: "x" })),
       truncated: true,
     })).toThrow();

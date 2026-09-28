@@ -40,7 +40,10 @@
         <div class="domain-head">
           <span class="domain-icon" aria-hidden="true"><mat-icon>language</mat-icon></span>
           <div><span>Dominio personalizado</span><b class="tnum">{{ d.domain }}</b></div>
-          <span class="state-chip" [class]="'st-' + d.state" [class.needs-attention]="d.state === 'active' && !d.edgeEligible">{{ stateLabel(d) }}</span>
+          @if (d.isDefault) {
+            <span class="default-badge" title="Los enlaces nuevos se preseleccionan con este dominio"><mat-icon>star</mat-icon> Predeterminado</span>
+          }
+          <span class="state-chip" [class]="'st-' + d.state" [class.needs-attention]="d.trafficStatus === 'degraded' || (d.state === 'active' && !d.edgeEligible)">{{ stateLabel(d) }}</span>
         </div>
         @if (dnsErrorLabel(d.dnsError); as dnsMessage) {
           <p class="dns-message" [class.degraded]="d.state === 'active'" role="status">{{ dnsMessage }}</p>
@@ -76,11 +79,12 @@
             } @else {
               <p class="dns-message">El destino CNAME todavía no está configurado en este entorno.</p>
             }
+            <p class="verify-title keep-txt">Mantén este registro TXT mientras uses UVH: no lo borres tras verificar, lo comprobamos periódicamente.</p>
             @if (isChecking(d)) {
               <p class="verify-title step-title" role="status">Comprobando propiedad y ruta DNS…</p>
             } @else {
               <p class="verify-title step-title">3 · Cuando ambos registros propaguen, compruébalos</p>
-              <button mat-stroked-button color="primary" (click)="verify(d)" [disabled]="actionId() === d.id">
+              <button mat-stroked-button color="primary" (click)="verify(d)" [disabled]="actionId() === d.id || isChecking(d)">
                 <mat-icon>verified_user</mat-icon>
                 {{ verifyingId() === d.id ? "Iniciando…" : "Verificar dominio" }}
               </button>
@@ -93,19 +97,33 @@
             <span [class.ready]="d.routingVerifiedAt"><mat-icon>{{ d.routingVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> Ruta DNS</span>
             <span [class.ready]="d.tlsReadyAt"><mat-icon>{{ d.tlsReadyAt ? 'check_circle' : 'schedule' }}</mat-icon> Certificado HTTPS</span>
           </div>
+          @if (d.verificationHost) {
+            <p class="dns-message" role="status"><strong>Mantén el registro TXT</strong> en <code>{{ d.verificationHost }}</code>: lo comprobamos periódicamente para confirmar que sigues controlando el dominio. Si lo eliminas, el dominio puede dejar de servir enlaces tras el periodo de seguridad.</p>
+          }
+        }
+        @if (graceLabel(d); as grace) {
+          <p class="dns-message degraded" role="status">{{ grace }}</p>
         }
         @if (canEdit() && (d.state === 'verified' || d.state === 'provisioning' || d.state === 'active' || d.state === 'disabled')) {
           <div class="domain-actions">
             @if (d.state === 'verified') {
-              <button mat-stroked-button (click)="activate(d)" [disabled]="actionId() === d.id || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>play_arrow</mat-icon> Activar</button>
+              <button mat-stroked-button (click)="activate(d)" [disabled]="actionId() === d.id || isChecking(d) || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>play_arrow</mat-icon> Activar</button>
             }
-            @if (d.state === 'active' || d.state === 'verified' || d.state === 'provisioning') {
+            @if ((d.state === 'active' || d.state === 'verified' || d.state === 'provisioning') && canAdmin()) {
               <button mat-stroked-button (click)="disable(d)" [disabled]="actionId() === d.id"><mat-icon>pause</mat-icon> Desactivar</button>
             }
             @if (d.state === 'verified' || d.state === 'active' || d.state === 'disabled') {
-              <button mat-stroked-button (click)="verify(d)" [disabled]="actionId() === d.id"><mat-icon>refresh</mat-icon> Revalidar</button>
+              <button mat-stroked-button (click)="verify(d)" [disabled]="actionId() === d.id || isChecking(d)"><mat-icon>refresh</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Revalidar' }}</button>
             }
-            <button mat-stroked-button class="danger" (click)="remove(d)" [disabled]="actionId() === d.id"><mat-icon>delete</mat-icon> Eliminar</button>
+            @if (d.servingReady && !d.isDefault) {
+              <button mat-stroked-button (click)="setDefault(d, true)" [disabled]="actionId() === d.id"><mat-icon>star</mat-icon> Usar como predeterminado</button>
+            }
+            @if (d.isDefault) {
+              <button mat-stroked-button (click)="setDefault(d, false)" [disabled]="actionId() === d.id"><mat-icon>star_border</mat-icon> Quitar predeterminado</button>
+            }
+            @if (canAdmin()) {
+              <button mat-stroked-button class="danger" (click)="remove(d)" [disabled]="actionId() === d.id"><mat-icon>delete</mat-icon> Eliminar</button>
+            }
           </div>
         }
         <div class="domain-actions details-action">

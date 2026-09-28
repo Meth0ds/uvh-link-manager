@@ -41,9 +41,16 @@ const domain: DomainDto = {
   id: 6,
   domain: "go.example.test",
   state: "pending",
+  desiredState: "enabled",
+  ownershipStatus: "pending",
+  routingStatus: "unknown",
+  tlsStatus: "pending",
+  trafficStatus: "offline",
+  servingReady: false,
   verificationHost: "_uvh-verification.go.example.test",
   verificationToken: "opaque-token",
   cnameTarget: "edge.example.test",
+  verificationScheme: 2,
   verifiedAt: null,
   ownershipVerifiedAt: null,
   routingVerifiedAt: null,
@@ -51,13 +58,36 @@ const domain: DomainDto = {
   dnsCheckCompletedAt: null,
   dnsError: null,
   dnsCheckInProgress: false,
-  automaticDnsRetry: false,
-  dnsRetryIntervalHours: null,
-  nextDnsCheckAt: null,
+  automaticDnsRetry: true,
+  dnsRetryIntervalHours: 24,
+  nextDnsCheckAt: "2026-09-07T10:00:00Z",
   dnsCheckDue: false,
+  dnsFailureCount: 0,
+  dnsMaxFailures: 3,
+  dnsFirstFailedAt: null,
+  graceExpiresAt: null,
+  dnsObservedAt: null,
+  ownershipTxtPresent: null,
+  routingObservedTarget: null,
+  routingObservedTtl: null,
+  routingObservedAddresses: null,
+  routingObservedProxied: null,
+  caaRecords: null,
+  caaAllowsIssuer: null,
+  acmeIssuer: "letsencrypt.org",
   edgeEligible: false,
   tlsReadyAt: null,
   tlsError: null,
+  tlsCheckedAt: null,
+  tlsNotAfter: null,
+  tlsIssuer: null,
+  tlsDaysRemaining: null,
+  tlsLastAttemptAt: null,
+  tlsNextRetryAt: null,
+  tlsProbeFailures: 0,
+  rootDestination: null,
+  notFoundMode: null,
+  isDefault: false,
   createdAt: "2026-09-06T10:00:00Z",
 };
 
@@ -175,10 +205,23 @@ describe("resource response decoders", () => {
 
   it("binds domain detail identity and enforces viewer challenge redaction", () => {
     expect(decodeDomainDetailResponse({ domain }, domain.id, true)).toEqual({ domain });
-    const viewerDomain = { ...domain, verificationHost: null, verificationToken: null };
+    // The challenge *host* is deterministic and diagnostics need it; only the
+    // secret value is withheld from read-only views.
+    const viewerDomain = { ...domain, verificationToken: null };
     expect(decodeDomainDetailResponse({ domain: viewerDomain }, domain.id, false)).toEqual({ domain: viewerDomain });
     expect(() => decodeDomainDetailResponse({ domain }, domain.id, false)).toThrow();
     expect(() => decodeDomainDetailResponse({ domain }, domain.id + 1, true)).toThrow();
+    expect(() => decodeDomainDetailResponse({ domain: viewerDomain }, domain.id, true)).toThrow();
+  });
+
+  it("rejects payloads whose derived serving state contradicts the columns", () => {
+    expect(() => decodeDomainsResponse({ domains: [{ ...domain, servingReady: true }] })).toThrow();
+    expect(() => decodeDomainsResponse({ domains: [{ ...domain, automaticDnsRetry: false }] })).toThrow();
+    expect(() => decodeDomainsResponse({ domains: [{ ...domain, trafficStatus: "unknown" }] })).toThrow();
+    // The default-domain preference is exclusive per workspace: two defaults
+    // in one list is a broken invariant, not a value to render.
+    expect(() => decodeDomainsResponse({ domains: [{ ...domain, isDefault: true }, { ...domain, id: 7, isDefault: true }] })).toThrow();
+    expect(decodeDomainsResponse({ domains: [{ ...domain, isDefault: true }, { ...domain, id: 7 }] }).domains.map((d) => d.isDefault)).toEqual([true, false]);
   });
 
   it("accepts only context-bound trash rows with ordered ISO purge dates", () => {

@@ -34,7 +34,8 @@ gestor de secretos y rotarse como cualquier credencial de lectura.
   "components": {
     "links": "operational",
     "panel": "operational",
-    "webhooks": "degraded"
+    "webhooks": "degraded",
+    "domains": "operational"
   },
   "incidents": [
     {
@@ -53,6 +54,13 @@ Estados de componente: `operational`, `maintenance`, `degraded` o
 `major_outage`. Estados de incidente: `investigating`, `identified`,
 `monitoring` o `resolved`. Se admiten como máximo 20 incidentes; los textos son
 UTF-8, no vacíos, sin controles y con cotas de 160/1000 caracteres.
+
+Los componentes `links`, `panel` y `webhooks` son obligatorios. El componente
+`domains` (superficie de dominios personalizados) es **opcional**: un feed que
+aún no lo publica sigue siendo válido y la página simplemente no muestra ese
+cuarto componente. Si aparece, su valor es obligatorio y desconocido falla
+cerrado como el resto: nunca se inventa un estado local que el monitor no
+midió.
 
 La API ignora cualquier `overall`, nombre de componente, versión, topología o
 campo adicional. Publica etiquetas fijas y recalcula el agregado según el peor

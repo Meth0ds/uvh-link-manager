@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\AccountExportDocument;
 use App\Support\Audit;
 use App\Support\ExportTooLarge;
+use App\Support\FrontendUrl;
 use App\Support\Ids;
 use App\Support\NotificationInbox;
 use App\Support\NotificationKinds;
@@ -186,7 +187,7 @@ class GenerateDataExportJob implements ShouldQueue
             // it. It carries no authority of its own: downloads are authorised
             // by the session plus a fresh step-up.
             $mailGeneration = Ids::sha256Hex(Ids::randomToken(32));
-            $url = rtrim((string) config('app.url'), '/').'/app/settings/privacy';
+            $url = FrontendUrl::base().'/app/settings/privacy';
             $madeReady = DB::transaction(function () use ($requestId, $userId, $artifactPath, $mailGeneration, $url): bool {
                 $lockedUser = User::where('id', $userId)->lockForUpdate()->first();
                 $lockedRequest = DataExportRequest::where('id', $requestId)

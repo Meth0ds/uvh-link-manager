@@ -180,7 +180,7 @@ export interface LinkTemplatesResponse {
   templates: LinkTemplateDto[];
 }
 
-export type BulkAction = "pause" | "activate" | "archive" | "trash" | "restore" | "tag" | "untag" | "move";
+export type BulkAction = "pause" | "activate" | "archive" | "trash" | "restore" | "tag" | "untag" | "move" | "set-domain";
 
 export interface BulkActionResponse {
   ok: boolean;
@@ -193,10 +193,18 @@ export interface ImportRowError {
   error: string;
 }
 
+/**
+ * Informe de una importación CSV. Los contadores nunca se solapan: `valid` son
+ * las filas que se importaron —o importarían en un dry run— y jamás incluye
+ * las que fallaron al crear, `created` son los enlaces de verdad creados y
+ * `failed` las filas que superaron la validación pero no llegaron a crear su
+ * enlace. Las filas rechazadas en validación sólo aparecen en `errors`.
+ */
 export interface ImportReport {
   dryRun: boolean;
   valid: number;
   created: number;
+  failed: number;
   errors: ImportRowError[];
   truncated: boolean;
 }
@@ -246,13 +254,34 @@ export type DomainState =
   | "error"
   | "disabled";
 
+export type DomainDesiredState = "enabled" | "disabled";
+export type DomainOwnershipStatus = "pending" | "verified" | "lost";
+export type DomainRoutingStatus = "unknown" | "healthy" | "degraded" | "failed";
+export type DomainTlsStatus = "pending" | "provisioning" | "ready" | "expiring" | "error";
+/** What the redirect surface is doing right now; derived, never stored. */
+export type DomainTrafficStatus = "online" | "degraded" | "provisioning" | "offline";
+
+export interface DomainCaaRecord {
+  tag: string;
+  value: string;
+}
+
 export interface DomainDto {
   id: number;
   domain: string;
+  /** Legacy label derived from the four statuses; kept for API consumers. */
   state: DomainState;
+  desiredState: DomainDesiredState;
+  ownershipStatus: DomainOwnershipStatus;
+  routingStatus: DomainRoutingStatus;
+  tlsStatus: DomainTlsStatus;
+  trafficStatus: DomainTrafficStatus;
+  servingReady: boolean;
   verificationHost: string | null;
+  /** The one-time TXT challenge value; only for roles that may change DNS. */
   verificationToken: string | null;
   cnameTarget: string | null;
+  verificationScheme: number;
   verifiedAt: string | null;
   ownershipVerifiedAt: string | null;
   routingVerifiedAt: string | null;
@@ -264,9 +293,36 @@ export interface DomainDto {
   dnsRetryIntervalHours: number | null;
   nextDnsCheckAt: string | null;
   dnsCheckDue: boolean;
+  dnsFailureCount: number;
+  dnsMaxFailures: number;
+  dnsFirstFailedAt: string | null;
+  /** When a serving-but-degraded domain loses its grace, if anything. */
+  graceExpiresAt: string | null;
+  // What the resolver actually answered — the difference between
+  // "routing_missing" and an instruction the user can act on.
+  dnsObservedAt: string | null;
+  ownershipTxtPresent: boolean | null;
+  routingObservedTarget: string | null;
+  routingObservedTtl: number | null;
+  routingObservedAddresses: string[] | null;
+  routingObservedProxied: boolean | null;
+  caaRecords: DomainCaaRecord[] | null;
+  caaAllowsIssuer: boolean | null;
+  acmeIssuer: string;
   edgeEligible: boolean;
   tlsReadyAt: string | null;
   tlsError: string | null;
+  tlsCheckedAt: string | null;
+  tlsNotAfter: string | null;
+  tlsIssuer: string | null;
+  tlsDaysRemaining: number | null;
+  tlsLastAttemptAt: string | null;
+  tlsNextRetryAt: string | null;
+  tlsProbeFailures: number;
+  rootDestination: string | null;
+  notFoundMode: string | null;
+  /** The workspace's default domain: what new links are preselected with. */
+  isDefault: boolean;
   createdAt: string;
 }
 
@@ -472,7 +528,7 @@ export interface PublicStatusSnapshot {
   generatedAt: string | null;
   stale: boolean;
   source: "external_monitor" | "external_monitor_unavailable";
-  components: Array<{ id: "links" | "panel" | "webhooks"; label: string; status: Exclude<PublicServiceStatus, "unknown"> }>;
+  components: Array<{ id: "links" | "panel" | "webhooks" | "domains"; label: string; status: Exclude<PublicServiceStatus, "unknown"> }>;
   incidents: Array<{ id: string; title: string; message: string; status: "investigating" | "identified" | "monitoring" | "resolved"; startedAt: string; updatedAt: string }>;
 }
 
@@ -553,8 +609,19 @@ export interface AdminDomain {
   id: number;
   workspace_id: number;
   domain: string;
+  /** Legacy label derived from the status columns, as in the panel. */
   state: DomainState;
+  traffic_status: DomainTrafficStatus;
+  desired_state: DomainDesiredState;
+  ownership_status: DomainOwnershipStatus;
+  routing_status: DomainRoutingStatus;
+  tls_status: DomainTlsStatus;
+  edge_eligible: boolean;
+  dns_error: string | null;
+  tls_error: string | null;
   verified_at: string | null;
+  tls_not_after: string | null;
+  links_count: number;
   created_at: string;
   updated_at: string;
   workspace_name: string;

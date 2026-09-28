@@ -68,7 +68,7 @@ final class LinkCsvTransferTest extends TestCase
             "MAL ALIAS!!,https://example.org/x,\n";
 
         $response = $this->postJson('/api/v1/links/import', ['dryRun' => true, 'csv' => $csv]);
-        $response->assertOk()->assertJson(['dryRun' => true, 'valid' => 1, 'created' => 0]);
+        $response->assertOk()->assertJson(['dryRun' => true, 'valid' => 1, 'created' => 0, 'failed' => 0]);
         $errors = $response->json('errors');
         $this->assertSame([3, 4], array_column($errors, 'row'));
         $this->assertSame(0, Link::count());
@@ -84,7 +84,9 @@ final class LinkCsvTransferTest extends TestCase
         ]);
         CustomDomain::create([
             'workspace_id' => $workspace->id, 'domain' => 'not-ready.example.test',
-            'verification_token' => 'fixture', 'state' => 'pending',
+            'verification_token' => 'fixture',
+            'desired_state' => 'enabled', 'ownership_status' => 'pending',
+            'routing_status' => 'unknown', 'tls_status' => 'pending',
         ]);
         $this->signIn($owner, $workspace);
         $csv = "alias,domain,destination\nexisting,,https://example.org\nfresh,,https://example.org\nfresh,,https://example.org\nover-quota,,https://example.org\nunready,not-ready.example.test,https://example.org\n";
@@ -110,10 +112,12 @@ final class LinkCsvTransferTest extends TestCase
             "valido,https://example.org/duplicado,\n";
 
         $first = $this->postJson('/api/v1/links/import', ['dryRun' => false, 'csv' => $csv], ['Idempotency-Key' => 'import-clave-1']);
-        $first->assertOk()->assertJson(['dryRun' => false, 'valid' => 2, 'created' => 1]);
+        // Los contadores no se solapan: la fila 4 falló al crear y NO cuenta
+        // como válida —sólo la fila 2 creó su enlace—. Fila 3: destino
+        // inválido (rechazada en validación). Fila 4: alias repetido dentro
+        // del mismo archivo, ya creado por la fila 2 (fallida al crear).
+        $first->assertOk()->assertJson(['dryRun' => false, 'valid' => 1, 'created' => 1, 'failed' => 1]);
         $this->assertSame(1, Link::count());
-        // Fila 3: destino inválido. Fila 4: el alias repetido dentro del mismo
-        // archivo se informa también en preflight; cada fallo afecta a su fila.
         $this->assertSame([3, 4], array_column($first->json('errors'), 'row'));
 
         // La repetición devuelve el resultado original y no crea nada más: una
@@ -151,7 +155,9 @@ final class LinkCsvTransferTest extends TestCase
         [$owner, $workspace] = $this->workspace();
         $domain = CustomDomain::create([
             'workspace_id' => $workspace->id, 'domain' => 'go.example.test',
-            'verification_token' => 'uvh-verify='.Ids::randomToken(24), 'state' => 'active',
+            'verification_token' => 'uvh-verify='.Ids::randomToken(24),
+            'desired_state' => 'enabled', 'ownership_status' => 'verified',
+            'routing_status' => 'healthy', 'tls_status' => 'ready',
             'verified_at' => now()->subDay(), 'ownership_verified_at' => now()->subDay(),
             'routing_verified_at' => now()->subDay(), 'edge_eligible' => true,
             'tls_ready_at' => now()->subDay(),
@@ -184,10 +190,10 @@ final class LinkCsvTransferTest extends TestCase
         DB::statement('TRUNCATE links, link_tags RESTART IDENTITY CASCADE');
 
         $this->postJson('/api/v1/links/import', ['dryRun' => true, 'csv' => $csv])
-            ->assertOk()->assertJson(['dryRun' => true, 'valid' => 2, 'created' => 0, 'errors' => []]);
+            ->assertOk()->assertJson(['dryRun' => true, 'valid' => 2, 'created' => 0, 'failed' => 0, 'errors' => []]);
 
         $this->postJson('/api/v1/links/import', ['dryRun' => false, 'csv' => $csv], ['Idempotency-Key' => 'import-roundtrip-1'])
-            ->assertOk()->assertJson(['dryRun' => false, 'valid' => 2, 'created' => 2, 'errors' => []]);
+            ->assertOk()->assertJson(['dryRun' => false, 'valid' => 2, 'created' => 2, 'failed' => 0, 'errors' => []]);
 
         $recreated = Link::with('tags')->orderBy('id')->get()->keyBy('alias');
         $this->assertCount(2, $recreated);
@@ -208,7 +214,9 @@ final class LinkCsvTransferTest extends TestCase
         [$owner, $workspace] = $this->workspace();
         $domain = CustomDomain::create([
             'workspace_id' => $workspace->id, 'domain' => 'go.example.test',
-            'verification_token' => 'uvh-verify='.Ids::randomToken(24), 'state' => 'active',
+            'verification_token' => 'uvh-verify='.Ids::randomToken(24),
+            'desired_state' => 'enabled', 'ownership_status' => 'verified',
+            'routing_status' => 'healthy', 'tls_status' => 'ready',
             'verified_at' => now()->subDay(), 'ownership_verified_at' => now()->subDay(),
             'routing_verified_at' => now()->subDay(), 'edge_eligible' => true,
             'tls_ready_at' => now()->subDay(),
@@ -298,6 +306,8 @@ final class LinkCsvTransferTest extends TestCase
         $this->assertNotNull($replacement);
         $this->assertSame(200, $replacement->getStatusCode());
         $this->assertSame(3, $replacement->getData(true)['created']);
+        $this->assertSame(3, $replacement->getData(true)['valid']);
+        $this->assertSame(0, $replacement->getData(true)['failed']);
         $this->assertSame([], $replacement->getData(true)['errors']);
         $this->assertSame(3, Link::count());
         $this->assertDatabaseCount('link_import_rows', 3);

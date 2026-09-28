@@ -99,8 +99,10 @@ class UvhHostGuard
 
     private function isPublicPath(string $path): bool
     {
-        return $path === '/'
-            || $path === '/help'
+        // `/` is deliberately absent: first-party roots are served by the SPA
+        // before Laravel, and a custom domain's root is redirect-surface work
+        // (its owner's root redirect or not-found mode).
+        return $path === '/help'
             || $path === '/status'
             || $path === '/legal'
             || str_starts_with($path, '/legal/')

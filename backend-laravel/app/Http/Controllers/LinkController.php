@@ -159,7 +159,7 @@ class LinkController
             $dom = DB::table('custom_domains')
                 ->where('id', $domainId)
                 ->where('workspace_id', $workspaceId)
-                ->where('state', 'active')
+                ->where('desired_state', 'enabled')
                 ->exists();
             if (! $dom) {
                 return response()->json(['available' => false, 'reason' => 'domain']);
@@ -192,7 +192,7 @@ class LinkController
             $dom = DB::table('custom_domains')
                 ->where('id', $input['domain_id'])
                 ->where('workspace_id', $workspaceId)
-                ->where('state', 'active')
+                ->where('desired_state', 'enabled')
                 ->exists();
             if (! $dom) {
                 return response()->json(['error' => 'Dominio no activado o sin acceso'], 403);
@@ -314,11 +314,17 @@ class LinkController
         // supplied them. An explicit empty array clears; absence preserves.
         $input['lifecycle_dates_changed'] = $request->has('scheduledAt') || $request->has('expiresAt');
 
-        if ($request->has('domainId') && $request->input('domainId') !== null) {
+        // Only a link that *moves* to a domain requires that domain to be
+        // serving; a link keeping its current domain stays editable even while
+        // that domain is down (see LinkService::update).
+        $targetDomainId = $request->has('domainId') && $request->input('domainId') !== null
+            ? (int) $request->input('domainId')
+            : null;
+        if ($targetDomainId !== null && $targetDomainId !== (int) $current->domain_id) {
             $dom = DB::table('custom_domains')
-                ->where('id', (int) $request->input('domainId'))
+                ->where('id', $targetDomainId)
                 ->where('workspace_id', $workspaceId)
-                ->where('state', 'active')
+                ->where('desired_state', 'enabled')
                 ->exists();
             if (! $dom) {
                 return response()->json(['error' => 'Dominio no activado o sin acceso'], 403);

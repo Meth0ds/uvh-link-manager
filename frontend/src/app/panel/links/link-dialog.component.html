@@ -62,6 +62,9 @@
                 <mat-label>Dominio</mat-label>
                 <mat-select formControlName="domainId">
                   <mat-option [value]="null">uvh.es</mat-option>
+                  @if (currentDomainUnavailable(); as unavailable) {
+                    <mat-option [value]="unavailable.id" disabled>{{ unavailable.domain ?? 'Dominio' }} — No disponible</mat-option>
+                  }
                   @for (d of domains(); track d) {
                     <mat-option [value]="d.id">{{ d.domain }}</mat-option>
                   }

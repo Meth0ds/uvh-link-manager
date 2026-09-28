@@ -121,7 +121,9 @@ Por encima de la suite de navegador hay dos puertas que no miran pantallas:
   outbox → worker → aceptación SMTP → enlace utilizable; evento → entrega → 500
   → reintento programado por el scheduler → 200 → cuerpo firmado y entregado;
   302 → evento de clic → rollup; exportación → artefacto cifrado → descarga →
-  consumo y retirada; dominio → TXT y CNAME controlados → transición de estado.
+  consumo y retirada; dominio → TXT y CNAME controlados → transición de estado,
+  y de ahí al TLS: activación → emisión ACME real en el edge → sonda de la
+  plataforma en verde.
   El fallo del proveedor y su reintento se comprueban de verdad: el primer
   intento se rechaza a propósito y el segundo debe conservar el mismo
   `event_id` y superar la verificación HMAC de la firma.
@@ -195,6 +197,19 @@ Por encima de la suite de navegador hay dos puertas que no miran pantallas:
   como una diferencia del producto—. Cuando
   el semillero lo llevaba escrito a mano, el ensayo se saboteaba —sembraba más
   bytes de los que el job acepta y medía su negativa—.
+- La cadena de dominios llega al TLS con la misma pila: DNS autoritativo real
+  (CoreDNS para `tls.uvh`), una CA ACME real (Pebble) y el edge real (Caddy) con
+  su puerta *ask* —el mismo endpoint indexado de producción, detrás del shim de
+  secreto que en producción es el listener interno de Nginx—. El escenario
+  publica la zona (dominio de cliente → edge más el TXT de propiedad) y espera
+  a que el resolutor que usa el producto la vea antes de pedir la verificación;
+  después activa el dominio y deja que la emisión ocurra de verdad dentro de la
+  sonda de la plataforma: Caddy gana el certificado contra Pebble, el validador
+  de Pebble resuelve por CoreDNS y responde el reto contra el edge, y un
+  apretón de manos del visitante —con la IP del edge fijada como en
+  producción— cierra el camino verificando contra la CA emisora. Lo que el
+  escenario afirma del certificado (emisor y caducidad) viene de la propia
+  sonda del producto, no de un lector propio.
 - `npm run e2e:backup` destruye una base a propósito, restaura la copia cifrada
   en una instancia aislada, compara la huella del contenido, rechaza una copia
   manipulada y mide el RPO/RTO logrados. Detalles en `backup-and-restore.md`.
@@ -207,7 +222,9 @@ workers parados. Esa laguna es la que cubren estas dos puertas.
 
 La suite no convierte el proyecto en listo para producción. Siguen requiriendo
 evidencia separada el navegador y dispositivo reales adicionales, accesibilidad
-manual, DNS/TLS, proxy y cookies de producción, correo y webhooks externos,
+manual, el DNS y el TLS de producción (propagación real, límites y políticas de
+la CA pública, el parque de edges), proxy y cookies de producción, correo y
+webhooks externos,
 concurrencia multiproceso fuera de las carreras y cadenas ya cubiertas, el
 cableado de backups, alertas y observabilidad al entorno real (gestor de
 secretos, almacenamiento independiente, servicio de guardia) y la revisión

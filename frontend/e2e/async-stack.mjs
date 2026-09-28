@@ -19,7 +19,7 @@
 
 import crypto from "node:crypto";
 import { analyticsContentionDrill } from "./async/analytics-contention.mjs";
-import { analyticsChain, domainChain, exportChain, mailChain, mailRetryChain, webhookChain } from "./async/chains.mjs";
+import { analyticsChain, domainChain, domainTlsChain, exportChain, mailChain, mailRetryChain, webhookChain } from "./async/chains.mjs";
 import { exportCrashDrill } from "./async/drills/export-crash.mjs";
 import { mailOutboxOutageDrill } from "./async/drills/outbox-outage.mjs";
 import { schedulerRecoveryDrill } from "./async/drills/scheduler-recovery.mjs";
@@ -77,6 +77,7 @@ async function main() {
 
   await analyticsChain(context);
   await domainChain(context);
+  await domainTlsChain(context);
   await exportChain(context);
 
   const hook = await webhookChain(context);

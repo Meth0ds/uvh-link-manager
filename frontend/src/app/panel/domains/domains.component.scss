@@ -250,6 +250,27 @@
   color: var(--uvh-warn);
 }
 
+// La preferencia de dominio predeterminado: una marca discreta, no un estado
+// de salud más —el chip de estado sigue siendo el que manda.
+.default-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface-raised);
+  color: var(--uvh-muted);
+  font: 10.5px/1.6 "Courier New", monospace;
+  letter-spacing: .04em;
+
+  mat-icon {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+  }
+}
+
 .domain-actions {
   display: flex;
   gap: 8px;

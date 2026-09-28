@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\UvhSession;
 use App\Support\AccountRecoveryLifecycle;
 use App\Support\Audit;
+use App\Support\FrontendUrl;
 use App\Support\HCaptcha;
 use App\Support\Ids;
 use App\Support\IsoDate;
@@ -95,11 +96,10 @@ class AuthController
         // aceptación legal, ni contraseña —la activación decide todo eso con lo
         // que escribe el que abre el buzón—.
         //
-        // Sin propuesta guardada, `login` no puede distinguir a un registrante
-        // de una dirección desconocida: mismísima respuesta 401, mismo bcrypt
-        // de señuelo. La orientación al buzón no es una señal de ciclo de vida
-        // que el servidor revela —«sigue pendiente / ya no»—, sino la entrada
-        // pública «Reenviar verificación», siempre disponible en la UI.
+        // Sin propuesta guardada, una dirección por sí sola no demuestra el
+        // registro: login devuelve el mismo 401 que para una desconocida. Solo
+        // el navegador que conserva el secreto de edición del registro puede
+        // recibir la orientación específica a la pantalla de verificación.
         $token = Ids::randomToken(32);
         $tokenHash = Ids::sha256Hex($token);
         try {
@@ -355,12 +355,20 @@ class AuthController
         }
 
         $user = $this->findUserByEmail($email);
-        // Un registro pendiente no es una cuenta y no guarda nada que
-        // reconocer —ni siquiera la propuesta de contraseña—: su correo cae en
-        // la misma rama que una dirección desconocida, con el mismo bcrypt de
-        // señuelo y el mismo 401. El servidor no revela «sigue pendiente / ya
-        // no»: la guía al buzón es la entrada pública «Reenviar verificación».
+        // A pending registration stores no password. Always pay the same hash
+        // cost as an unknown address before checking whether this browser owns
+        // its registration edit secret; a bare email must never reveal it.
         $ok = Hash::check($password, $user ? $user->password_hash : self::DUMMY_PASSWORD_HASH);
+
+        if ($user === null) {
+            $pending = $this->findPendingRegistrationByEmail($email);
+            if ($pending && RegistrationEdit::authorizes($request, $pending)) {
+                return response()->json([
+                    'error' => 'Confirma tu email para continuar',
+                    'reason' => 'pending_registration',
+                ], 403);
+            }
+        }
 
         if (! $ok || $user === null) {
             return response()->json(['error' => 'Credenciales incorrectas'], 401);
@@ -370,7 +378,10 @@ class AuthController
         // been consumed. Check before MFA so an unverified account receives
         // neither a challenge nor a session.
         if (! $user->email_verified_at) {
-            return response()->json(['error' => 'Verifica tu email para continuar'], 403);
+            return response()->json([
+                'error' => 'Confirma tu email para continuar',
+                'reason' => 'email_verification_required',
+            ], 403);
         }
 
         if ($user->mfa_enabled) {
@@ -630,7 +641,7 @@ class AuthController
         // the person reading the message —"your link is no good" versus
         // "choose a password of 10 to 72 characters"— and none describes the
         // account, only the request that carried it.
-        if ($token === '' || strlen($token) > 256) {
+        if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1) {
             return response()->json(['error' => 'Token inválido'], 422);
         }
         if (! $this->validPassword($password)) {
@@ -999,7 +1010,7 @@ class AuthController
         $token = UvhRequest::inputString($request, 'token');
         $password = UvhRequest::inputString($request, 'password');
 
-        if ($token === '' || strlen($token) > 256 || ! $this->validPassword($password)) {
+        if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1 || ! $this->validPassword($password)) {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
         if (! PasswordStrength::isAcceptable($password)) {
@@ -2755,7 +2766,7 @@ class AuthController
 
     private function appUrl(): string
     {
-        return rtrim((string) config('app.url'), '/');
+        return FrontendUrl::base();
     }
 
     /**

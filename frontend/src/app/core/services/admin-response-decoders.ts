@@ -13,7 +13,12 @@ import type {
   AuditEvent,
   DestinationMatchKind,
   DestinationSource,
+  DomainDesiredState,
+  DomainOwnershipStatus,
+  DomainRoutingStatus,
   DomainState,
+  DomainTlsStatus,
+  DomainTrafficStatus,
   MailOutboxStatus,
 } from "../models";
 import { LINK_APPEAL_STATUSES } from "../link-appeal-status";
@@ -55,6 +60,11 @@ export interface AdminPageContext {
 const REPORT_STATUSES = new Set<AdminReport["status"]>(["open", "reviewed", "actioned", "dismissed"]);
 const RECOVERY_STATUSES = new Set<AccountRecoveryStatus>(["requested", "email_confirmed", "in_review", "approved", "rejected", "completed", "expired", "cancelled"]);
 const DOMAIN_STATES = new Set<DomainState>(["pending", "verifying", "verified", "provisioning", "active", "error", "disabled"]);
+const DESIRED_STATES = new Set<DomainDesiredState>(["enabled", "disabled"]);
+const OWNERSHIP_STATUSES = new Set<DomainOwnershipStatus>(["pending", "verified", "lost"]);
+const ROUTING_STATUSES = new Set<DomainRoutingStatus>(["unknown", "healthy", "degraded", "failed"]);
+const TLS_STATUSES = new Set<DomainTlsStatus>(["pending", "provisioning", "ready", "expiring", "error"]);
+const TRAFFIC_STATUSES = new Set<DomainTrafficStatus>(["online", "degraded", "provisioning", "offline"]);
 const DESTINATION_KINDS = new Set<DestinationMatchKind>(["host", "url"]);
 const DESTINATION_SOURCES = new Set<DestinationSource>(["manual", "provider", "report"]);
 const MAIL_STATUSES = new Set<MailOutboxStatus>(["pending", "queued", "processing", "sent", "failed", "obsolete", "comp_pending", "compensating", "compensated"]);
@@ -232,7 +242,17 @@ export function decodeAdminDomainsPage(value: unknown, expected: AdminPageContex
       workspace_id: integer(source["workspace_id"], "admin domain workspace", 1),
       domain: text(source["domain"], "admin domain", 253),
       state: literal(source["state"], DOMAIN_STATES, "admin domain state"),
+      traffic_status: literal(source["traffic_status"], TRAFFIC_STATUSES, "admin domain traffic status"),
+      desired_state: literal(source["desired_state"], DESIRED_STATES, "admin domain desired state"),
+      ownership_status: literal(source["ownership_status"], OWNERSHIP_STATUSES, "admin domain ownership status"),
+      routing_status: literal(source["routing_status"], ROUTING_STATUSES, "admin domain routing status"),
+      tls_status: literal(source["tls_status"], TLS_STATUSES, "admin domain TLS status"),
+      edge_eligible: boolean(source["edge_eligible"], "admin domain edge eligibility"),
+      dns_error: nullableText(source["dns_error"], "admin domain DNS error", 2048, true),
+      tls_error: nullableText(source["tls_error"], "admin domain TLS error", 2048, true),
       verified_at: nullableText(source["verified_at"], "admin domain timestamp", 64),
+      tls_not_after: nullableText(source["tls_not_after"], "admin domain timestamp", 64),
+      links_count: integer(source["links_count"], "admin domain links count", 0),
       created_at: text(source["created_at"], "admin domain timestamp", 64),
       updated_at: text(source["updated_at"], "admin domain timestamp", 64),
       workspace_name: text(source["workspace_name"], "admin domain workspace name", 80),

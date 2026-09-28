@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ViewChild, computed, effect, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ViewChild, computed, effect, inject, isDevMode, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
@@ -148,16 +148,11 @@ export class AuthComponent {
   readonly registerCaptchaToken = signal("");
   readonly resendCaptchaToken = signal("");
 
-  /**
-   * Un intento de acceso fallido hace relevante la guía al buzón: es el
-   * momento en que una cuenta sin verificar se manifiesta. Estado local del
-   * cliente —condicionarlo a una señal del servidor reabriría el oráculo de
-   * enumeración que la respuesta neutra del login cierra.
-   */
-  readonly loginFailed = signal(false);
   readonly error = signal<string | null>(null);
   readonly info = signal<string | null>(null);
   readonly verificationEmail = signal<string | null>(null);
+  readonly verificationEditable = signal(false);
+  readonly verificationRecovery = signal(false);
   readonly registeredEmail = signal<string | null>(null);
   readonly changeEmailMode = signal(false);
   readonly verificationBusy = signal(false);
@@ -166,6 +161,10 @@ export class AuthComponent {
   readonly hidePassword = signal(true);
   readonly tabIndex = signal(0);
   readonly pendingLink = this.intents.pending;
+  readonly localMailInbox = isDevMode() && typeof window !== "undefined"
+    && ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    ? "http://localhost:8025"
+    : null;
 
   /**
    * Hold the card back until the startup probe has answered. A visitor arriving
@@ -289,8 +288,8 @@ export class AuthComponent {
       void this.router.navigateByUrl(this.returnTo());
     });
 
-    // La corrección de email comparte formulario con el registro pero no pide
-    // credencial ni contrato: sus reglas se suspenden mientras el modo está
+    // La corrección de email comparte formulario con el registro pero solo
+    // pide la dirección: sus otras reglas se suspenden mientras el modo está
     // activo. Un `effect` cubre los cuatro caminos que entran y salen del modo
     // —pestaña, cierre, corrección completada y modo inicial— sin repetir la
     // llamada en ninguno de ellos.
@@ -305,10 +304,12 @@ export class AuthComponent {
    * alta las vuelve a exigir exactamente como estaban.
    */
   private applyCredentialRules(required: boolean): void {
-    const { password, confirmPassword, acceptTerms } = this.registerForm.controls;
+    const { name, password, confirmPassword, acceptTerms } = this.registerForm.controls;
+    name.setValidators(required ? [Validators.required, Validators.minLength(2), Validators.maxLength(80)] : null);
     password.setValidators(required ? AuthComponent.PASSWORD_RULES : null);
     confirmPassword.setValidators(required ? AuthComponent.CONFIRMATION_RULES : null);
     acceptTerms.setValidators(required ? AuthComponent.TERMS_RULES : null);
+    name.updateValueAndValidity();
     password.updateValueAndValidity();
     confirmPassword.updateValueAndValidity();
     acceptTerms.updateValueAndValidity();
@@ -321,6 +322,8 @@ export class AuthComponent {
     this.registerStep.set(1);
     this.changeEmailMode.set(false);
     this.verificationEmail.set(null);
+    this.verificationEditable.set(false);
+    this.verificationRecovery.set(false);
     this.error.set(null);
     this.info.set(null);
   }
@@ -343,7 +346,9 @@ export class AuthComponent {
   }
 
   async nextRegisterStep(): Promise<void> {
-    const fields = [this.registerForm.controls.name, this.registerForm.controls.email];
+    const fields = this.changeEmailMode()
+      ? [this.registerForm.controls.email]
+      : [this.registerForm.controls.name, this.registerForm.controls.email];
     fields.forEach((control) => control.markAsTouched());
     if (fields.some((control) => control.invalid)) return;
 
@@ -401,11 +406,19 @@ export class AuthComponent {
     } catch (err) {
       if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
       this.interactiveAuthStarted = false;
-      // A pending registration answers exactly like wrong credentials, so
-      // there is no lifecycle signal to react to here. The path back to the
-      // mailbox is the «Reenviar verificación» entry that THIS failure makes
-      // relevant: client-side state only, never a server signal.
-      this.loginFailed.set(true);
+      if (err instanceof ApiRequestError && err.status === 403
+        && (err.reason === "pending_registration" || err.reason === "email_verification_required")) {
+        const email = this.loginForm.controls.email.value.trim().toLowerCase();
+        this.verificationEmail.set(email);
+        this.registeredEmail.set(err.reason === "pending_registration" ? email : null);
+        this.verificationEditable.set(err.reason === "pending_registration");
+        this.verificationRecovery.set(false);
+        this.step.set("verify-pending");
+        this.info.set(null);
+        this.loginCaptchaToken.set("");
+        this.loginCaptchaWidget?.reset();
+        return;
+      }
       this.error.set(
         err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
           ? err.message
@@ -568,6 +581,8 @@ export class AuthComponent {
       if (!stillCurrent()) return;
       this.registeredEmail.set(email);
       this.verificationEmail.set(email);
+      this.verificationEditable.set(true);
+      this.verificationRecovery.set(false);
       this.changeEmailMode.set(false);
       this.step.set("verify-pending");
       this.info.set(
@@ -640,6 +655,21 @@ export class AuthComponent {
     }
   }
 
+  openVerificationRecovery(): void {
+    const emailControl = this.registerForm.controls.email;
+    emailControl.markAsTouched();
+    if (emailControl.invalid) return;
+
+    this.invalidateFlow();
+    this.verificationEmail.set(emailControl.value.trim().toLowerCase());
+    this.registeredEmail.set(null);
+    this.verificationEditable.set(false);
+    this.verificationRecovery.set(true);
+    this.step.set("verify-pending");
+    this.error.set(null);
+    this.info.set(null);
+  }
+
   changeRegistrationEmail(): void {
     const email = this.registeredEmail() ?? this.verificationEmail();
     if (!email) return;
@@ -661,6 +691,8 @@ export class AuthComponent {
     this.changeEmailMode.set(false);
     this.registeredEmail.set(null);
     this.verificationEmail.set(null);
+    this.verificationEditable.set(false);
+    this.verificationRecovery.set(false);
     this.loginCaptchaToken.set("");
     this.registerCaptchaToken.set("");
     this.registerStep.set(1);

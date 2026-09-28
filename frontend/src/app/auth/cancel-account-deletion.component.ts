@@ -17,7 +17,7 @@ import { LatestRequest } from "../core/services/latest-request";
       <section class="card center" aria-labelledby="cancel-account-deletion-title">
         <span class="step-kicker">CONSERVAR TU CUENTA</span>
         <mat-icon class="icon" aria-hidden="true" [class.ok]="done()" [class.bad]="error()">{{ done() ? 'restore' : (error() ? 'error_outline' : 'undo') }}</mat-icon>
-        <h2 id="cancel-account-deletion-title">{{ done() ? 'Eliminación cancelada' : (error() ? 'No se pudo cancelar' : 'Conservar mi cuenta') }}</h2>
+        <h2 id="cancel-account-deletion-title">{{ done() ? 'Eliminación cancelada' : (!hasLink ? 'Enlace no disponible' : (error() ? 'No se pudo cancelar' : 'Conservar mi cuenta')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
         @if (!done() && !error()) {
           <button mat-flat-button color="primary" type="button" (click)="cancel()" [disabled]="busy()">{{ busy() ? 'Restaurando…' : 'Cancelar eliminación' }}</button>
@@ -36,6 +36,8 @@ export class CancelAccountDeletionComponent {
   private location = inject(Location);
   private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly token: string;
+
+  get hasLink(): boolean { return this.token.length > 0; }
 
   readonly busy = signal(false);
   readonly done = signal(false);

@@ -50,7 +50,7 @@ final class DomainDiagnosticsTest extends TestCase
         $this->assertSame($completed->copy()->addHours(2)->format('Y-m-d\TH:i:s.v\Z'), $response->json('domain.nextDnsCheckAt'));
     }
 
-    public function test_viewer_never_receives_the_ownership_challenge(): void
+    public function test_viewer_sees_the_record_names_but_never_the_challenge_value(): void
     {
         [$owner, $workspace] = $this->workspace();
         $viewer = User::factory()->create();
@@ -59,7 +59,9 @@ final class DomainDiagnosticsTest extends TestCase
 
         $this->signIn($viewer, $workspace);
         $response = $this->getJson($this->path($workspace, $domain))->assertOk()
-            ->assertJsonPath('domain.verificationHost', null)
+            // The record host and the CNAME target are not secrets: a viewer
+            // debugging DNS must see what to look for. The token value is.
+            ->assertJsonPath('domain.verificationHost', '_uvh-verification.'.$domain->domain)
             ->assertJsonPath('domain.verificationToken', null)
             ->assertJsonPath('domain.cnameTarget', 'edge.example.test');
         $this->assertStringNotContainsString((string) $domain->verification_token, $response->getContent());
@@ -109,7 +111,10 @@ final class DomainDiagnosticsTest extends TestCase
             'workspace_id' => $workspace->id,
             'domain' => 'go-'.Ids::randomToken(6).'.example.test',
             'verification_token' => 'uvh-verify='.Ids::randomToken(24),
-            'state' => 'active',
+            'desired_state' => 'enabled',
+            'ownership_status' => 'verified',
+            'routing_status' => 'healthy',
+            'tls_status' => 'ready',
             'verified_at' => now()->subDay(),
             'ownership_verified_at' => now()->subDay(),
             'routing_verified_at' => now()->subDay(),

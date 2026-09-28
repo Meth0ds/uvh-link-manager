@@ -69,11 +69,7 @@ class ApiParityTest extends TestCase
             'password' => self::PASSWORD,
         ], $this->captchaPayload()))->assertStatus(201)->assertExactJson(['user' => null]);
 
-        // Registration never creates a session, and a pending registration is
-        // not an account: login answers exactly like wrong credentials —same
-        // 401, same body, no session— so the server never signals «sigue
-        // pendiente / ya no». La vuelta al buzón es una entrada pública de la
-        // UI, no un oráculo de ciclo de vida.
+        // An address alone must not reveal a pending registration.
         $blocked = $this->postJson('/api/v1/auth/login', [
             'email' => 'parity@example.com',
             'password' => self::PASSWORD,
@@ -81,6 +77,26 @@ class ApiParityTest extends TestCase
         ]);
         $blocked->assertStatus(401)->assertExactJson(['error' => 'Credenciales incorrectas']);
         $this->assertNull($this->cookieFrom($blocked, 'uvh_session'));
+
+        // The browser that registered owns an authenticated edit secret. Its
+        // login can safely guide the visitor back to verification.
+        $editSecret = (string) $this->cookieFrom($register, 'uvh_registration_edit');
+        $this->withCookie('uvh_registration_edit', 'invalid-'.$editSecret);
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'parity@example.com',
+            'password' => self::PASSWORD,
+            'captchaToken' => 'test-login-passcode',
+        ])->assertStatus(401)->assertExactJson(['error' => 'Credenciales incorrectas']);
+
+        $this->withCookie('uvh_registration_edit', $editSecret);
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'parity@example.com',
+            'password' => self::PASSWORD,
+            'captchaToken' => 'test-login-passcode',
+        ])->assertStatus(403)->assertExactJson([
+            'error' => 'Confirma tu email para continuar',
+            'reason' => 'pending_registration',
+        ]);
 
         // Before the mailbox is proven there is no account at all: no user row,
         // no workspace, no legal acceptance — and therefore no session a stale
@@ -90,7 +106,7 @@ class ApiParityTest extends TestCase
         $this->assertSame(0, User::whereRaw('lower(email) = ?', ['parity@example.com'])->count());
         $this->assertSame(0, (int) DB::table('workspaces')->count());
         $this->assertSame(0, (int) DB::table('legal_acceptances')->count());
-        $plain = 'verify-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'pending_registration_id' => $pending->id,
@@ -144,7 +160,7 @@ class ApiParityTest extends TestCase
         // one the mailbox opener types— and shares the 80-code-point contract
         // with ordinary workspace writes, multibyte included.
         $pending = PendingRegistration::where('email', 'long-workspace-name@example.com')->firstOrFail();
-        $plain = 'verify-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'pending_registration_id' => $pending->id,
@@ -340,7 +356,7 @@ class ApiParityTest extends TestCase
         $this->assertNull($this->cookieFrom($changed, 'uvh_session'));
 
         $pending = PendingRegistration::where('email', $newEmail)->firstOrFail();
-        $plain = 'verify-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'pending_registration_id' => $pending->id,
@@ -475,7 +491,7 @@ class ApiParityTest extends TestCase
 
         // The owner opens their mailbox and decides the account's identity,
         // legal acceptance and password…
-        $plain = 'verify-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'pending_registration_id' => $parked->id,
@@ -557,7 +573,7 @@ class ApiParityTest extends TestCase
             ->where('kind', 'verify')->whereNull('used_at')->value('id'));
         $this->assertSame(0, User::whereRaw('lower(email) = ?', ['target@example.com'])->count());
 
-        $plain = 'verify-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'pending_registration_id' => $pending->id,
@@ -1587,16 +1603,17 @@ class ApiParityTest extends TestCase
         $authorized->postJson('/api/v1/domains/'.$domainId.'/verify')
             ->assertStatus(202)->assertJson(['ok' => true, 'state' => 'verifying']);
         Queue::assertPushed(VerifyDomainDnsJob::class, fn (VerifyDomainDnsJob $job) => $job->domainId === $domainId);
-        $this->assertDatabaseHas('custom_domains', ['id' => $domainId, 'state' => 'verifying']);
+        $this->assertDatabaseHas('custom_domains', ['id' => $domainId, 'ownership_status' => 'pending']);
 
         Cache::lock('uvh:domain-verification:'.$workspaceId.':'.$domainId)->forceRelease();
         // Simulate the successful, version-matched DNS worker result. A
         // domain must never become edge-active from a stale `disabled` row:
         // activation first requires fresh ownership and routing evidence.
         DB::table('custom_domains')->where('id', $domainId)->update([
-            'state' => 'verified',
             'verified_at' => now(),
+            'ownership_status' => 'verified',
             'ownership_verified_at' => now(),
+            'routing_status' => 'healthy',
             'routing_verified_at' => now(),
             'dns_check_completed_at' => now(),
             'dns_error' => null,
@@ -1613,7 +1630,7 @@ class ApiParityTest extends TestCase
         Cache::lock('uvh:domain-verification:'.$workspaceId.':'.$domainId)->forceRelease();
         $authorized->postJson('/api/v1/domains/'.$domainId.'/revalidate')
             ->assertStatus(202)->assertJson(['ok' => true, 'state' => 'disabled']);
-        $this->assertDatabaseHas('custom_domains', ['id' => $domainId, 'state' => 'disabled', 'edge_eligible' => false]);
+        $this->assertDatabaseHas('custom_domains', ['id' => $domainId, 'desired_state' => 'disabled', 'edge_eligible' => false]);
     }
 
     public function test_queue_admission_failure_does_not_undo_a_created_link(): void
@@ -1692,7 +1709,7 @@ class ApiParityTest extends TestCase
             'workspace_id' => $workspaceId,
             'domain' => 'stale.example.test',
             'verification_token' => 'uvh-verify=stale',
-            'state' => 'verifying',
+            'dns_check_started_at' => now()->subHour(),
             'created_at' => now()->subHour(),
             'updated_at' => now()->subHour(),
         ]);
@@ -1703,7 +1720,10 @@ class ApiParityTest extends TestCase
         $this->assertDatabaseMissing('webhook_deliveries', ['event_id' => 'old-failed']);
         $this->assertDatabaseMissing('webhook_deliveries', ['event_id' => 'old-success']);
         $this->assertDatabaseMissing('failed_jobs', ['uuid' => '00000000-0000-4000-8000-000000000001']);
-        $this->assertDatabaseHas('custom_domains', ['id' => $staleDomainId, 'state' => 'error']);
+        // The abandoned check is closed with a visible timeout instead of
+        // staying "in progress" forever and suppressing future checks.
+        $this->assertDatabaseHas('custom_domains', ['id' => $staleDomainId, 'dns_error' => 'queue_timeout']);
+        $this->assertNotNull(DB::table('custom_domains')->where('id', $staleDomainId)->value('dns_check_completed_at'));
         $this->assertDatabaseMissing('links', ['id' => $oldTrashId]);
         $this->assertDatabaseHas('links', ['id' => $freshTrashId, 'state' => 'deleted']);
     }
@@ -1754,7 +1774,7 @@ class ApiParityTest extends TestCase
         ], $this->captchaPayload()))->assertStatus(201);
 
         $pending = PendingRegistration::where('email', $email)->firstOrFail();
-        $plain = 'verify-'.Ids::randomToken(16);
+        $plain = Ids::randomToken(32);
         DB::table('email_tokens')->insert([
             'id' => Ids::sha256Hex($plain),
             'pending_registration_id' => $pending->id,

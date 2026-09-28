@@ -108,14 +108,19 @@ final class VisitorPage
      * el dominio corto, donde `/r/*` es lo único con ruta servida —un enlace a
      * `/status` o al panel aquí sería un callejón disfrazado de ayuda—. Lo que
      * sí cabe es decirle al visitante qué puede pedir y a quién.
+     *
+     * `$brandHost` sustituye la marca de la plataforma por el hostname: un
+     * dominio configurado para responder «de marca» no debe anunciar al
+     * servicio que hay detrás.
      */
-    public static function notice(string $title, string $body, int $status = 404): string
+    public static function notice(string $title, string $body, int $status = 404, ?string $brandHost = null): string
     {
         $code = $status >= 400 ? (string) $status : null;
         $chip = $status >= 500 ? 'Incidencia del servicio' : ($status >= 400 ? 'Enlace no disponible' : 'Aviso del enlace');
+        $brand = $brandHost ?? self::BRAND;
 
         $plate = '<main class="plate">'
-            .'<p class="brand">'.self::escape(self::BRAND).'</p>'
+            .'<p class="brand">'.self::escape($brand).'</p>'
             .'<p class="chip">'.self::icon('info').self::escape($chip).'</p>'
             .($code !== null ? '<p class="ghost" aria-hidden="true">'.$code.'</p>' : '')
             .'<h1'.($code !== null ? ' class="tight"' : '').'>'.self::escape($title).'</h1>'
@@ -123,10 +128,10 @@ final class VisitorPage
             .'<p class="foot">Puedes pedir un enlace nuevo a quien te lo compartió.</p>'
             .'</main>';
 
-        return self::document($title, $plate);
+        return self::document($title, $plate, '', $brandHost);
     }
 
-    private static function document(string $title, string $body, string $head = ''): string
+    private static function document(string $title, string $body, string $head = '', ?string $brandHost = null): string
     {
         // El título y el cuerpo se escapan por separado: `<title>` es texto
         // crudo, así que interpolar ahí sin escapar sería una inyección aunque
@@ -136,7 +141,7 @@ final class VisitorPage
             .'<meta name="color-scheme" content="light dark">'
             .'<meta name="robots" content="noindex">'
             .$head
-            .'<title>'.self::escape($title).' · UVH</title>'
+            .'<title>'.self::escape($title).' · '.self::escape($brandHost ?? 'UVH').'</title>'
             .'<style>'.self::styles().'</style></head><body>'.$body.'</body></html>';
     }
 

@@ -44,6 +44,11 @@ export const control = {
   dns: `http://127.0.0.1:${process.env.UVH_ASYNC_DNS_CONTROL_PORT ?? "8091"}`,
   mail: `http://127.0.0.1:${process.env.UVH_ASYNC_MAIL_CONTROL_PORT ?? "8092"}`,
 };
+// The TLS edge's fixed address inside the compose network (the `edge`
+// service): the published zone resolves the customer hostname to it and the
+// platform's probe pins it with CURLOPT_RESOLVE, so neither depends on DNS
+// round trips for the hostname under test.
+export const edgeAddress = "172.31.0.80";
 export const schedulerDeadlineMs = Number(process.env.UVH_ASYNC_SCHEDULER_DEADLINE_MS ?? 150_000);
 /**
  * Windows reports a failed process *creation* as 0xC0000142 (3221225794),

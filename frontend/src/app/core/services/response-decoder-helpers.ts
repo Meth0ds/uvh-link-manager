@@ -83,6 +83,14 @@ export function nullableInteger(value: unknown, contract: string, minimum = 0): 
   return value === null ? null : integer(value, contract, minimum);
 }
 
+export function nullableBoolean(value: unknown, contract: string): boolean | null {
+  return value === null ? null : boolean(value, contract);
+}
+
+export function nullableBoundedArray(value: unknown, contract: string, maximum: number): unknown[] | null {
+  return value === null ? null : boundedArray(value, contract, maximum);
+}
+
 export function countRecord(value: unknown, contract: string, maximumKeys = 64): Record<string, number> {
   const source = record(value, contract);
   const entries = Object.entries(source);
