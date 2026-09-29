@@ -16,7 +16,7 @@
     <div>
       <span class="eyebrow">Dominio observado</span>
       <h2 id="domain-name" class="tnum">{{ d.domain }}</h2>
-      <p>Estado guardado: <strong>{{ stateLabel(d.state) }}</strong></p>
+      <p>Tráfico: <strong>{{ trafficStatusLabel(d) }}</strong></p>
       <p>Topología admitida: subdominio con CNAME directo. No se validan apex, flattening ni proxies DNS.</p>
     </div>
     <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
@@ -60,7 +60,6 @@
     <section class="diagnostic-card" aria-labelledby="tls-title">
       <header><span class="step">3</span><div><h2 id="tls-title">HTTPS</h2><p>Certificado TLS</p></div><mat-icon [class.ready]="!!d.tlsReadyAt">{{ d.tlsReadyAt ? 'verified_user' : 'schedule' }}</mat-icon></header>
       <p class="observed">{{ d.tlsReadyAt ? 'Preparado el ' + formatDate(d.tlsReadyAt) : d.state === 'provisioning' ? 'Emisión en curso' : 'Todavía no preparado' }}</p>
-      <p>Entrada pública en edge: <strong>{{ d.edgeEligible ? 'habilitada' : 'deshabilitada' }}</strong></p>
       @if (tlsExpiryLabel(); as expiry) { <p class="observed" role="status">{{ expiry }}</p> }
       @if (d.tlsIssuer) { <p class="observed">Emitido por {{ d.tlsIssuer }}.</p> }
       @if (caaLabel(); as caa) { <p class="warning" role="status">{{ caa }}</p> }
@@ -90,6 +89,34 @@
       </div>
     }
     <p class="scheduler-note">La fecha indica cuándo el planificador puede admitir el trabajo. La ejecución puede demorarse por cola. Mientras haya una comprobación o una emisión en curso, esta página se actualiza sola.</p>
+  </section>
+
+  <section class="schedule-card activity-card" aria-labelledby="activity-title">
+    <div>
+      <span class="eyebrow">Historial</span>
+      <h2 id="activity-title">Actividad del dominio</h2>
+    </div>
+    <p class="scheduler-note">Lo que ha pasado con este dominio y por qué: los mismos eventos que reciben las integraciones, sin datos internos.</p>
+    @if (activityError(); as message) {
+      <p class="warning" role="status">{{ message }}</p>
+    } @else if (activityLoading() && !activity().length) {
+      <p class="scheduler-note" role="status">Cargando actividad…</p>
+    } @else if (!activity().length) {
+      <p class="scheduler-note">Todavía no hay eventos registrados para este dominio.</p>
+    }
+    @if (activity().length) {
+      <ul class="activity-list">
+        @for (entry of activity(); track entry.id) {
+          <li class="activity-item" [class]="'activity-' + activityTone(entry)">
+            <mat-icon aria-hidden="true">{{ activityIcon(entry) }}</mat-icon>
+            <div>
+              <b>{{ activityLabel(entry.event) }}</b>@if (activityDetail(entry); as detail) { <span class="activity-detail"> — {{ detail }}</span> }
+              <p class="scheduler-note">{{ formatDate(entry.createdAt) }}</p>
+            </div>
+          </li>
+        }
+      </ul>
+    }
   </section>
 
   <section class="schedule-card" aria-labelledby="surface-title">

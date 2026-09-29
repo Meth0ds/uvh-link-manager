@@ -43,6 +43,7 @@
           @if (d.isDefault) {
             <span class="default-badge" title="Los enlaces nuevos se preseleccionan con este dominio"><mat-icon>star</mat-icon> Predeterminado</span>
           }
+          <span class="links-count" title="Enlaces activos en este dominio"><mat-icon>link</mat-icon> {{ linksLabel(d) }}</span>
           <span class="state-chip" [class]="'st-' + d.state" [class.needs-attention]="d.trafficStatus === 'degraded' || (d.state === 'active' && !d.edgeEligible)">{{ stateLabel(d) }}</span>
         </div>
         @if (dnsErrorLabel(d.dnsError); as dnsMessage) {
@@ -128,6 +129,9 @@
         }
         <div class="domain-actions details-action">
           <a mat-stroked-button [routerLink]="['/app/domains', d.id]"><mat-icon>monitor_heart</mat-icon> Ver diagnóstico</a>
+          @if (d.linksCount > 0) {
+            <a mat-stroked-button [routerLink]="['/app/links']" [queryParams]="{ domainId: d.id }"><mat-icon>link</mat-icon> Ver {{ linksLabel(d) }}</a>
+          }
         </div>
       </article>
     }

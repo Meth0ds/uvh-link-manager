@@ -323,11 +323,32 @@ export interface DomainDto {
   notFoundMode: string | null;
   /** The workspace's default domain: what new links are preselected with. */
   isDefault: boolean;
+  /** How many live links the domain carries — the impact of every action. */
+  linksCount: number;
   createdAt: string;
 }
 
 export interface DomainDetailResponse {
   domain: DomainDto;
+}
+
+/** One row of a domain's activity timeline, payload strictly projected. */
+export interface DomainActivityEvent {
+  id: number;
+  event: string;
+  /** Only the documented keys per event; never internal outbox fields. */
+  payload: {
+    reason?: string;
+    failureCount?: number;
+    graceExpiresAt?: string;
+    notAfter?: string;
+    daysRemaining?: number;
+  };
+  createdAt: string;
+}
+
+export interface DomainActivityResponse {
+  events: DomainActivityEvent[];
 }
 
 export interface ApiTokenDto {

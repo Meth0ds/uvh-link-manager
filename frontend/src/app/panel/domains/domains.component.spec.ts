@@ -5,6 +5,7 @@ import { provideRouter } from "@angular/router";
 import { DomainsComponent } from "./domains.component";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { ActionDialogService } from "../action-dialog.service";
 import type { DomainDto } from "../../core/models";
 
 interface Deferred<T> {
@@ -64,6 +65,7 @@ function domainDto(overrides: Partial<DomainDto> = {}): DomainDto {
     rootDestination: null,
     notFoundMode: null,
     isDefault: false,
+    linksCount: 0,
     createdAt: "2026-09-28T09:00:00Z",
     ...overrides,
   };
@@ -306,5 +308,74 @@ describe("DomainsComponent idempotent mutations", () => {
     api.post.and.rejectWith(new ApiRequestError("No se pudo conectar con el servidor", 0));
     await component.activate(d);
     expect(keyFor(2)).toBe(first);
+  });
+});
+
+describe("DomainsComponent impact disclosure and destructive confirmation", () => {
+  let fixture: ComponentFixture<DomainsComponent>;
+  let api: jasmine.SpyObj<ApiService>;
+  const role = signal("owner");
+  const workspace = signal(1);
+
+  beforeEach(async () => {
+    role.set("owner");
+    workspace.set(1);
+    api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post", "patch", "delete"]);
+    api.get.and.resolveTo({ domains: [domainDto({ id: 7, linksCount: 137 })] });
+    api.post.and.resolveTo(undefined as never);
+    await TestBed.configureTestingModule({
+      imports: [DomainsComponent],
+      providers: [
+        provideRouter([]),
+        provideNoopAnimations(),
+        { provide: ApiService, useValue: api },
+        { provide: WorkspaceService, useValue: { currentId: workspace, currentRole: role } },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(DomainsComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  });
+  afterEach(() => fixture.destroy());
+
+  it("shows how many links each domain carries and links to its filtered library", () => {
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector(".links-count")?.textContent).toContain("137 enlaces");
+    const link = host.querySelector<HTMLAnchorElement>('a[href*="domainId=7"]');
+    expect(link?.textContent).toContain("Ver 137 enlaces");
+    expect(link?.getAttribute("href")).toBe("/app/links?domainId=7");
+  });
+
+  it("desactivation states its impact and only proceeds when confirmed", async () => {
+    const component = fixture.componentInstance;
+    const actions = TestBed.inject(ActionDialogService);
+    const confirm = spyOn(actions, "confirm").and.resolveTo(false);
+
+    await component.disable(domainDto({ id: 7, linksCount: 137 }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    const message = confirm.calls.mostRecent().args[0]?.message ?? "";
+    expect(message).toContain("137 enlaces dejarán de responder");
+    expect(message).toContain("no se eliminarán");
+    expect(api.post).not.toHaveBeenCalled();
+
+    confirm.and.resolveTo(true);
+    await component.disable(domainDto({ id: 7, linksCount: 137 }));
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/domains/7/disable",
+      undefined,
+      undefined,
+      jasmine.objectContaining({ "Idempotency-Key": jasmine.any(String) }),
+    );
+  });
+
+  it("phrases the impact in singular when a single link is affected", async () => {
+    const component = fixture.componentInstance;
+    const actions = TestBed.inject(ActionDialogService);
+    const confirm = spyOn(actions, "confirm").and.resolveTo(false);
+
+    await component.disable(domainDto({ id: 7, linksCount: 1 }));
+    expect(confirm.calls.mostRecent().args[0]?.message).toContain("1 enlace dejará de responder");
+    expect(api.post).not.toHaveBeenCalled();
   });
 });

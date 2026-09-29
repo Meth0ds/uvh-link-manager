@@ -134,4 +134,55 @@ class DnsViewsTest extends TestCase
         $this->assertIsArray($records);
         $this->assertSame('edge.example.test', $records[0]['target']);
     }
+
+    public function test_one_answering_view_is_inconclusive_when_two_are_required(): void
+    {
+        // La excepción que reduce la garantía a la de un único resolvedor:
+        // dos vistas mudas y una que «ve» un TXT que nadie publicó. Con
+        // mínimo 2 esa lectura no decide nada.
+        DnsViews::usePublicResolvers(['cloudflare', 'google']);
+        DnsStub::txt(self::NAME, 'uvh-verify=attacker');
+        DnsViews::fakePublicResolver(static fn (): array|false => false);
+
+        $this->assertFalse(DnsViews::records(self::NAME, DNS_TXT, 2));
+    }
+
+    public function test_two_of_three_equal_answers_meet_a_minimum_of_two(): void
+    {
+        DnsViews::usePublicResolvers(['cloudflare', 'google']);
+        DnsStub::txt(self::NAME, 'uvh-verify=real');
+        DnsViews::fakePublicResolver(static fn (string $host, int $type, string $source): array|false => $source === 'google'
+            ? [['txt' => 'uvh-verify=real']]
+            : false);
+
+        $records = DnsViews::records(self::NAME, DNS_TXT, 2);
+
+        $this->assertIsArray($records);
+        $this->assertSame('uvh-verify=real', $records[0]['txt']);
+    }
+
+    public function test_a_single_view_still_decides_when_the_minimum_is_one(): void
+    {
+        // Desarrollo, tests y el stack E2E: una sola vista, mínimo 1.
+        DnsViews::usePublicResolvers([]);
+        DnsStub::txt(self::NAME, 'uvh-verify=token');
+
+        $records = DnsViews::records(self::NAME, DNS_TXT, 1);
+
+        $this->assertIsArray($records);
+        $this->assertSame('uvh-verify=token', $records[0]['txt']);
+    }
+
+    public function test_a_diagnostic_query_may_lower_the_minimum_explicitly(): void
+    {
+        // CAA y direcciones explican un fallo, no deciden estado: pueden
+        // responder con una sola vista aunque el despliegue exija dos.
+        DnsViews::usePublicResolvers([]);
+        DnsStub::answer('go.example.test', DNS_CAA, [['host' => 'go.example.test', 'type' => 'CAA', 'flags' => 0, 'tag' => 'issue', 'value' => 'letsencrypt.org']]);
+
+        $records = DnsViews::records('go.example.test', DNS_CAA, 1);
+
+        $this->assertIsArray($records);
+        $this->assertSame('issue', $records[0]['tag']);
+    }
 }

@@ -47,6 +47,21 @@ class ProductionSecurityTest extends TestCase
         $this->assertContains('HCAPTCHA_DEV_FALLBACK debe ser false en producción', ProductionSecurity::errors($settings));
     }
 
+    public function test_production_requires_the_multi_resolver_dns_consensus(): void
+    {
+        // Ownership is granted by DNS consensus: no single view —poisoned or
+        // simply down— may prove a domain in production. Both halves are boot
+        // gates: the public resolvers on, and at least two answers required.
+        $settings = $this->validSettings();
+        $settings['domain_public_resolvers'] = [];
+        $settings['domain_dns_min_consensus_responses'] = 1;
+
+        $errors = ProductionSecurity::errors($settings);
+
+        $this->assertContains('UVH_PUBLIC_RESOLVERS debe activar el consenso multi-resolver en producción', $errors);
+        $this->assertContains('DOMAIN_DNS_MIN_CONSENSUS_RESPONSES debe exigir al menos dos vistas DNS en producción', $errors);
+    }
+
     #[DataProvider('unsafeProxyProvider')]
     public function test_unsafe_trusted_proxy_configuration_is_rejected(string $proxy): void
     {
@@ -385,6 +400,8 @@ class ProductionSecurityTest extends TestCase
             'acme_email' => 'operaciones@uvh.es',
             'edge_internal_host' => 'edge',
             'edge_internal_cidrs' => ['172.29.0.0/24'],
+            'domain_public_resolvers' => ['cloudflare', 'google'],
+            'domain_dns_min_consensus_responses' => 2,
             'domain_verification_fresh_hours' => 24,
             'domain_revalidation_hours' => 24,
             'domain_failure_retry_hours' => 1,

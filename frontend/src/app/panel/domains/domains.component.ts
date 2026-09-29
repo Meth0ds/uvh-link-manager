@@ -19,6 +19,7 @@ import { AsyncPoller } from "../../core/async-poller";
 import { IdempotentIntent } from "../../core/idempotent-intent";
 import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
+import { countLabel } from "../../core/count-label";
 import { domainStateLabel } from "../../core/domain-state-label";
 import {
   decodeCreatedDomainResponse,
@@ -95,6 +96,9 @@ export class DomainsComponent {
     const role = this.workspaces.currentRole();
     return role === "owner" || role === "admin";
   };
+
+  /** «1 enlace» / «137 enlaces»: el impacto de cada acción sobre el dominio. */
+  readonly linksLabel = (d: DomainDto): string => countLabel(d.linksCount, "enlace", "enlaces");
 
   readonly stateLabel = (d: DomainDto): string => {
     if (this.isChecking(d)) return "Comprobando DNS…";
@@ -370,6 +374,15 @@ export class DomainsComponent {
     if (this.actionId() || !this.canAdmin()) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
+    // Desactivar apaga todos los enlaces del dominio a la vez: la confirmación
+    // dice cuántos y que ninguno se elimina.
+    const confirmed = await this.actions.confirm({
+      title: "Desactivar dominio",
+      message: `¿Quieres desactivar ${d.domain}? ${d.linksCount === 1 ? "1 enlace dejará" : `${d.linksCount} enlaces dejarán`} de responder mientras el dominio esté desactivado. Los enlaces no se eliminarán.`,
+      confirmLabel: "Desactivar dominio",
+      destructive: true,
+    });
+    if (!confirmed || this.actionId() || !target.isCurrent()) return;
     const action = this.mutations.begin(d.id);
     try {
       await this.intent.run(`domains.disable:${d.id}`, (key) =>

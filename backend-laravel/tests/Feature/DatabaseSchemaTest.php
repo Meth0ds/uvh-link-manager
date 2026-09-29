@@ -78,7 +78,7 @@ class DatabaseSchemaTest extends TestCase
             // claims, no en un índice único sobre peticiones).
             'custom_domains' => ['workspace_id', 'domain', 'verification_token', 'desired_state', 'ownership_status', 'routing_status', 'tls_status', 'verified_at', 'is_default'],
             'custom_domain_claims' => ['id', 'workspace_id', 'domain', 'claimed_at', 'last_proven_at'],
-            'domain_events' => ['id', 'workspace_id', 'domain_id', 'domain', 'event', 'payload', 'created_at', 'dispatched_at'],
+            'domain_events' => ['id', 'workspace_id', 'domain_id', 'domain', 'event', 'payload', 'created_at', 'dispatched_at', 'event_uuid', 'locked_at', 'webhook_dispatched_at', 'notice_dispatched_at', 'notice_attempts', 'notice_next_attempt_at'],
             'links' => ['workspace_id', 'created_by', 'domain_id', 'collection_id', 'alias', 'destination', 'state', 'state_before_delete', 'password_hash', 'password_version', 'version', 'max_clicks', 'click_count', 'single_use', 'expires_at', 'deleted_at', 'reputation_blocked_at', 'reputation_block_source', 'reputation_block_prior_state', 'reputation_checked_at'],
             'idempotency_keys' => ['user_id', 'scope', 'key', 'request_hash', 'response_body', 'response_status', 'expires_at'],
             'collections' => ['id', 'workspace_id', 'name'],

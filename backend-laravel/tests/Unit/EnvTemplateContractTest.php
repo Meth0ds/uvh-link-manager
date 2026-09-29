@@ -53,6 +53,7 @@ class EnvTemplateContractTest extends TestCase
         'EDGE_INTERNAL_CIDRS' => 'the deployment network the edge accepts internal traffic from',
         'HSTS_ENABLED' => 'only safe behind TLS termination; off by default so local HTTP keeps working',
         'UVH_PUBLIC_RESOLVERS' => 'production turns on the multi-resolver DNS consensus; empty by default so development, tests and the E2E fixture stack never send a query off the host',
+        'DOMAIN_DNS_MIN_CONSENSUS_RESPONSES' => 'production requires at least two DNS views to agree before ownership is granted; the default of 1 keeps single-view development, tests and the E2E fixture stack working',
     ];
 
     /**

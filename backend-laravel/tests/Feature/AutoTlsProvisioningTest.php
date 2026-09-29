@@ -86,7 +86,7 @@ final class AutoTlsProvisioningTest extends TestCase
         $fresh = $domain->refresh();
         $this->assertSame('error', $fresh->tls_status);
         $this->assertSame(0, (int) $fresh->tls_version);
-        Queue::assertNothingPushed();
+        Queue::assertNotPushed(ProvisionDomainTlsJob::class);
     }
 
     public function test_the_scheduler_finishes_a_setup_or_recovery_without_a_click(): void

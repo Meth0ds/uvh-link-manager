@@ -274,6 +274,16 @@ final class ProductionSecurity
             || ! self::inRange($settings['domain_max_failures'] ?? null, 2, 10)) {
             $errors[] = 'Los intervalos de verificación DNS deben permanecer dentro de límites seguros';
         }
+        // Ownership se concede por consenso DNS: en producción ninguna vista
+        // única —envenenada o caída— puede dar por probado un dominio. El
+        // mínimo de 2 sólo tiene sentido con resolvedores públicos activos, y
+        // ambos son requisito de arranque.
+        if ((array) ($settings['domain_public_resolvers'] ?? []) === []) {
+            $errors[] = 'UVH_PUBLIC_RESOLVERS debe activar el consenso multi-resolver en producción';
+        }
+        if (! self::inRange($settings['domain_dns_min_consensus_responses'] ?? null, 2, 5)) {
+            $errors[] = 'DOMAIN_DNS_MIN_CONSENSUS_RESPONSES debe exigir al menos dos vistas DNS en producción';
+        }
 
         $mailLeaves = MailTransportPolicy::deliveryLeaves($settings['mail_config'] ?? null);
         if ($mailLeaves === null) {

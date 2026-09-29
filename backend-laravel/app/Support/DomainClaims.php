@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\CustomDomain;
 use App\Models\CustomDomainClaim;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Ownership claims on hostnames: the exclusive right to serve a domain.
@@ -26,13 +27,20 @@ use App\Models\CustomDomainClaim;
  */
 final class DomainClaims
 {
-    /** @return array{outcome: 'claimed'|'yours'|'conflict'|'takeover', previous_workspace_id: ?int} */
+    /**
+     * @return array{
+     *   outcome: 'claimed'|'yours'|'conflict'|'takeover',
+     *   previous_workspace_id: ?int,
+     *   previous_domain_ids: list<int>,
+     * }
+     */
     public static function prove(int $workspaceId, string $domain): array
     {
         $normalized = strtolower(rtrim($domain, '.'));
         $now = now();
         $freshDays = max(1, (int) config('uvh.custom_domains.claim_fresh_days', 30));
 
+        self::lockHostname($normalized);
         $claim = CustomDomainClaim::whereRaw('lower(domain) = ?', [$normalized])->lockForUpdate()->first();
         if ($claim === null) {
             CustomDomainClaim::create([
@@ -42,17 +50,17 @@ final class DomainClaims
                 'last_proven_at' => $now,
             ]);
 
-            return ['outcome' => 'claimed', 'previous_workspace_id' => null];
+            return ['outcome' => 'claimed', 'previous_workspace_id' => null, 'previous_domain_ids' => []];
         }
 
         if ((int) $claim->workspace_id === $workspaceId) {
             $claim->forceFill(['last_proven_at' => $now])->save();
 
-            return ['outcome' => 'yours', 'previous_workspace_id' => null];
+            return ['outcome' => 'yours', 'previous_workspace_id' => null, 'previous_domain_ids' => []];
         }
 
         if ($claim->last_proven_at->gt($now->copy()->subDays($freshDays))) {
-            return ['outcome' => 'conflict', 'previous_workspace_id' => (int) $claim->workspace_id];
+            return ['outcome' => 'conflict', 'previous_workspace_id' => (int) $claim->workspace_id, 'previous_domain_ids' => []];
         }
 
         // The previous holder has not proven ownership within the freshness
@@ -66,9 +74,47 @@ final class DomainClaims
             'claimed_at' => $now,
             'last_proven_at' => $now,
         ])->save();
-        self::demoteHolder($previousWorkspaceId, $normalized);
+        $previousDomainIds = self::demoteHolder($previousWorkspaceId, $normalized);
 
-        return ['outcome' => 'takeover', 'previous_workspace_id' => $previousWorkspaceId];
+        return [
+            'outcome' => 'takeover',
+            'previous_workspace_id' => $previousWorkspaceId,
+            'previous_domain_ids' => $previousDomainIds,
+        ];
+    }
+
+    /**
+     * The canonical lock order for hostname state: workspace auth → **this
+     * hostname lock** → domain rows (own first, then foreign rows in id order).
+     *
+     * Every transaction that touches both a claim and the domain rows of a
+     * hostname takes this lock first. Without it, two workspaces verifying the
+     * same hostname could invert: one holding its own domain row while waiting
+     * for the claim, the other holding the claim while demoting that row — a
+     * reproducible deadlock right at a takeover. With a transaction-scoped
+     * advisory lock keyed by hostname, those transactions serialize instead.
+     *
+     * Re-acquiring in the same transaction is free: PostgreSQL advisory locks
+     * are re-entrant per session, so `prove()`/`release()` may assert the order
+     * defensively even when the caller already holds it.
+     */
+    public static function lockHostname(string $domain): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::select('SELECT pg_advisory_xact_lock(?)', [self::hostnameLockKey($domain)]);
+
+            return;
+        }
+        // Non-PostgreSQL stores keep the row-level fallback: the claim row
+        // lock serializes claim writers at the cost of a null read when no
+        // claim exists yet (the create race is guarded by the unique index).
+        CustomDomainClaim::whereRaw('lower(domain) = ?', [strtolower(rtrim($domain, '.'))])->lockForUpdate()->first();
+    }
+
+    /** The advisory lock key for one hostname. */
+    public static function hostnameLockKey(string $domain): int
+    {
+        return (int) hexdec(substr(hash('sha256', 'uvh:domain-claim:'.strtolower(rtrim($domain, '.'))), 0, 15));
     }
 
     /**
@@ -77,6 +123,7 @@ final class DomainClaims
      */
     public static function release(int $workspaceId, string $domain): void
     {
+        self::lockHostname($domain);
         CustomDomainClaim::whereRaw('lower(domain) = ?', [strtolower(rtrim($domain, '.'))])
             ->where('workspace_id', $workspaceId)
             ->delete();
@@ -98,19 +145,40 @@ final class DomainClaims
             ->delete();
     }
 
-    private static function demoteHolder(int $workspaceId, string $domain): void
+    /**
+     * Demote every request the displaced holder kept for this hostname and
+     * return their ids. The transfer event is recorded against these rows —
+     * the *old* workspace's rows — so the old owner's activity timeline and
+     * notification route name resources that actually exist in their
+     * workspace instead of the new owner's ids.
+     *
+     * @return list<int>
+     */
+    private static function demoteHolder(int $workspaceId, string $domain): array
     {
-        CustomDomain::where('workspace_id', $workspaceId)
+        $ids = CustomDomain::where('workspace_id', $workspaceId)
             ->whereRaw('lower(domain) = ?', [$domain])
-            ->where('desired_state', 'enabled')
-            ->update([
-                'ownership_status' => 'lost',
-                'ownership_verified_at' => null,
-                'edge_eligible' => false,
-                'tls_ready_at' => null,
-                'tls_status' => 'pending',
-                'dns_error' => 'claim_transferred',
-                'updated_at' => now(),
-            ]);
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+        // One row at a time, in id order: row-lock acquisition is deterministic
+        // even against transactions that lock several domain rows at once.
+        foreach ($ids as $id) {
+            CustomDomain::where('id', $id)
+                ->where('workspace_id', $workspaceId)
+                ->where('desired_state', 'enabled')
+                ->update([
+                    'ownership_status' => 'lost',
+                    'ownership_verified_at' => null,
+                    'edge_eligible' => false,
+                    'tls_ready_at' => null,
+                    'tls_status' => 'pending',
+                    'dns_error' => 'claim_transferred',
+                    'updated_at' => now(),
+                ]);
+        }
+
+        return $ids;
     }
 }

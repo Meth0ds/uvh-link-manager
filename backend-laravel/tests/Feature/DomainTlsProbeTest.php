@@ -150,13 +150,109 @@ final class DomainTlsProbeTest extends TestCase
         Queue::assertNotPushed(ProbeDomainTlsJob::class, fn (ProbeDomainTlsJob $job) => $job->domainId === (int) $untouched->id);
     }
 
+    public function test_repeated_housekeeping_passes_enqueue_one_probe_per_round(): void
+    {
+        $domain = $this->domain(['tls_checked_at' => now()->subDays(3)]);
+
+        // Three passes with no worker draining the queue: one round, one job.
+        $sweep = new ReflectionMethod(UvhHousekeeping::class, 'queueTlsProbeChecks');
+        $sweep->invoke(new UvhHousekeeping);
+        $sweep->invoke(new UvhHousekeeping);
+        $sweep->invoke(new UvhHousekeeping);
+
+        Queue::assertPushed(ProbeDomainTlsJob::class, 1);
+        $fresh = $domain->refresh();
+        $this->assertSame(1, (int) $fresh->tls_probe_version);
+        $this->assertNotNull($fresh->tls_probe_started_at);
+        $this->assertNull($fresh->tls_probe_completed_at);
+    }
+
+    public function test_duplicate_jobs_of_one_round_only_count_one_failure(): void
+    {
+        $domain = $this->domain(['tls_probe_failures' => 0]);
+        $this->apply($domain, ['status' => 0, 'cert' => null]);
+        $claimed = $domain->refresh();
+        $version = (int) $claimed->tls_probe_version;
+        $this->assertSame(1, (int) $claimed->tls_probe_failures);
+
+        // Two more copies of the same queued round arrive late.
+        foreach ([0, 1] as $_) {
+            (new ReflectionMethod(ProbeDomainTlsJob::class, 'apply'))->invoke(
+                new ProbeDomainTlsJob((int) $domain->id, (int) $domain->workspace_id, $domain->domain, $version),
+                ['status' => 0, 'cert' => null],
+            );
+        }
+
+        $fresh = $domain->refresh();
+        $this->assertSame(1, (int) $fresh->tls_probe_failures);
+        $this->assertSame('ready', $fresh->tls_status);
+        $this->assertTrue((bool) $fresh->edge_eligible);
+    }
+
+    public function test_a_job_from_a_superseded_round_writes_nothing(): void
+    {
+        $domain = $this->domain();
+        $this->apply($domain, ['status' => 204, 'cert' => ['notAfter' => now()->addDays(60), 'issuer' => 'R3']]);
+        $observedAt = (string) $domain->refresh()->tls_checked_at;
+
+        // Housekeeping reclaimed the row (expired lease): a newer round exists.
+        DB::table('custom_domains')->where('id', $domain->id)->update([
+            'tls_probe_version' => DB::raw('tls_probe_version + 1'),
+            'tls_probe_started_at' => now(),
+            'tls_probe_completed_at' => null,
+        ]);
+        $version = (int) $domain->refresh()->tls_probe_version;
+
+        (new ReflectionMethod(ProbeDomainTlsJob::class, 'apply'))->invoke(
+            new ProbeDomainTlsJob((int) $domain->id, (int) $domain->workspace_id, $domain->domain, $version - 1),
+            ['status' => 0, 'cert' => null],
+        );
+
+        $fresh = $domain->refresh();
+        $this->assertSame(0, (int) $fresh->tls_probe_failures);
+        $this->assertSame($observedAt, (string) $fresh->tls_checked_at);
+    }
+
+    public function test_an_expired_probe_lease_is_reclaimed_by_a_later_pass(): void
+    {
+        $domain = $this->domain([
+            'tls_checked_at' => now()->subDays(3),
+            'tls_probe_started_at' => now()->subHours(2),
+            'tls_probe_completed_at' => null,
+        ]);
+
+        (new ReflectionMethod(UvhHousekeeping::class, 'queueTlsProbeChecks'))->invoke(new UvhHousekeeping);
+
+        Queue::assertPushed(ProbeDomainTlsJob::class, 1);
+        $fresh = $domain->refresh();
+        $this->assertSame(1, (int) $fresh->tls_probe_version);
+    }
+
     /**
+     * One probe result applied to the domain. `$newRound` claims a fresh
+     * monitoring round first (what the housekeeping sweep does before
+     * dispatching); passing `false` replays a job of the *current* round, the
+     * way a duplicated queue entry would.
+     *
      * @param  array{status: int, cert: array{notAfter: CarbonInterface|null, issuer: ?string}|null}  $probe
      */
-    private function apply(CustomDomain $domain, array $probe): void
+    private function apply(CustomDomain $domain, array $probe, bool $newRound = true): void
     {
+        if ($newRound) {
+            DB::table('custom_domains')->where('id', $domain->id)->update([
+                'tls_probe_version' => DB::raw('tls_probe_version + 1'),
+                'tls_probe_started_at' => now(),
+                'tls_probe_completed_at' => null,
+            ]);
+            $domain->refresh();
+        }
         (new ReflectionMethod(ProbeDomainTlsJob::class, 'apply'))->invoke(
-            new ProbeDomainTlsJob((int) $domain->id, (int) $domain->workspace_id, $domain->domain),
+            new ProbeDomainTlsJob(
+                (int) $domain->id,
+                (int) $domain->workspace_id,
+                $domain->domain,
+                (int) $domain->tls_probe_version,
+            ),
             $probe,
         );
     }

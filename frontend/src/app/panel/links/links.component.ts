@@ -32,6 +32,7 @@ import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeLinksResponse } from "../../core/services/link-response-decoders";
 import { decodeDomainsResponse } from "../../core/services/domain-response-decoders";
 import { decodeBulkActionResponse, decodeCollectionsResponse } from "../../core/services/scale-response-decoders";
+import { parseRouteId } from "../../core/strict-wire";
 import { downloadBlob } from "../../core/services/browser-download";
 import { linkStateLabel } from "../../core/link-state-label";
 import { TagsDialogComponent } from "./tags-dialog.component";
@@ -126,6 +127,15 @@ export class LinksComponent {
   readonly pageSizeOptions = [20, 50, 100];
   readonly pageSize = signal(20);
   private readonly legacyDestination = this.route.snapshot.queryParamMap.get("destination")?.trim() ?? "";
+  /**
+   * Filtro de dominio que llega en la URL («Ver N enlaces» desde la pantalla
+   * de dominios). Es una entrada de un solo uso: se aplica al primer
+   * workspace que carga la pantalla y queda consumida, porque al cambiar de
+   * workspace el dominio apuntaría a un tenant ajeno. La URL no se limpia, de
+   * modo que compartir o recargar la vista conserva el filtro.
+   */
+  private readonly initialDomainFilter = parseRouteId(this.route.snapshot.queryParamMap.get("domainId"));
+  private initialDomainFilterApplied = false;
   private pendingClaimInFlight = false;
   private pendingDialogOpen = false;
   private pendingAutoHandled = false;
@@ -174,6 +184,13 @@ export class LinksComponent {
       if (workspaceId === null) {
         this.loading.set(false);
         return;
+      }
+      if (this.initialDomainFilter !== null && !this.initialDomainFilterApplied) {
+        // El primer workspace que carga es el único que puede aplicar el
+        // filtro de la URL: consume la entrada para que un cambio de workspace
+        // no vuelva a filtrar por un dominio de otro tenant.
+        this.initialDomainFilterApplied = true;
+        this.domainId.set(this.initialDomainFilter);
       }
       void this.loadDomainOptions();
       void this.reload();

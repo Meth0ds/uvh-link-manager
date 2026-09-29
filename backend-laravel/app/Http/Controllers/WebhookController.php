@@ -9,6 +9,7 @@ use App\Support\IsoDate;
 use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
+use App\Support\WebhookEvents;
 use App\Support\WebhookService;
 use App\Support\WorkspaceAccess;
 use App\Support\WorkspaceLimits;
@@ -40,8 +41,8 @@ class WebhookController
             || count(array_filter($events, fn ($event) => ! is_string($event))) > 0
             || count(array_unique($events)) !== count($events)
             || strlen($url) > 2048
-            || count($events) < 1 || count($events) > 10
-            || count(array_diff($events, WebhookService::EVENTS)) > 0) {
+            || count($events) < 1 || count($events) > count(WebhookEvents::all())
+            || count(array_diff($events, WebhookEvents::all())) > 0) {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
 
@@ -117,8 +118,8 @@ class WebhookController
         if ($events !== null && (! is_array($events)
             || count(array_filter($events, fn ($event) => ! is_string($event))) > 0
             || count(array_unique($events)) !== count($events)
-            || count($events) < 1 || count($events) > 10
-            || count(array_diff($events, WebhookService::EVENTS)) > 0)) {
+            || count($events) < 1 || count($events) > count(WebhookEvents::all())
+            || count(array_diff($events, WebhookEvents::all())) > 0)) {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
         if ($secret !== null && (! is_string($secret) || mb_strlen($secret) < 16 || mb_strlen($secret) > 128)) {
@@ -365,21 +366,17 @@ class WebhookController
     /**
      * Rebuild a bounded, documented preview instead of returning stored JSON.
      * Unknown keys and invalid values are dropped, so a future producer cannot
-     * accidentally turn the inspector into a secret-exfiltration surface.
+     * accidentally turn the inspector into a secret-exfiltration surface. The
+     * allowlist is the shared event catalog: cross-tenant ids and future
+     * internal fields cannot leak through a delivery preview either.
      */
     private function redactedPayload(mixed $payload, string $event, string $eventId): array
     {
         $source = is_array($payload) ? $payload : [];
         $data = is_array($source['data'] ?? null) ? $source['data'] : [];
-        $allowed = match ($event) {
-            'link.created' => ['linkId' => 'integer', 'alias' => 'text'],
-            'link.updated' => ['linkId' => 'integer', 'alias' => 'text', 'state' => 'text'],
-            'link.deleted' => ['linkId' => 'integer'],
-            'link.threshold_reached' => ['linkId' => 'integer', 'threshold' => 'integer'],
-            'domain.verified' => ['domainId' => 'integer', 'domain' => 'text'],
-            'ping' => ['message' => 'text'],
-            default => [],
-        };
+        $allowed = $event === WebhookEvents::PING
+            ? ['message' => 'text']
+            : WebhookEvents::projection($event);
         $safeData = [];
         foreach ($allowed as $key => $type) {
             $value = $data[$key] ?? null;
@@ -387,6 +384,9 @@ class WebhookController
                 $safeData[$key] = $value;
             } elseif ($type === 'text' && is_string($value) && mb_strlen($value) <= 255
                 && ! preg_match('/[\x00-\x1F\x7F]/u', $value)) {
+                $safeData[$key] = $value;
+            } elseif ($type === 'timestamp' && is_string($value) && strlen($value) <= 64
+                && strtotime($value) !== false) {
                 $safeData[$key] = $value;
             }
         }
@@ -397,7 +397,7 @@ class WebhookController
         }
 
         return [
-            'event' => in_array($event, array_merge(WebhookService::EVENTS, ['ping']), true) ? $event : 'unknown',
+            'event' => WebhookEvents::exists($event) || $event === WebhookEvents::PING ? $event : 'unknown',
             'eventId' => mb_substr($eventId, 0, 255),
             'timestamp' => $timestamp,
             'data' => $safeData,

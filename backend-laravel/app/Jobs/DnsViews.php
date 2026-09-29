@@ -17,16 +17,19 @@ namespace App\Jobs;
  * Contrato deliberado:
  *  - Una vista que falla es silencio, no disenso: jamás desautoriza una
  *    respuesta, pero tampoco la avala. La regla efectiva es **mayoría estricta
- *    de las vistas que respondieron**; con una sola vista (desarrollo, tests,
- *    el stack E2E sin resolvedores públicos) esa vista decide sola.
+ *    de las vistas que respondieron**, además de un mínimo de respuestas
+ *    independientes (`min_consensus_responses`). Con una sola vista
+ *    (desarrollo, tests, el stack E2E sin resolvedores públicos) y mínimo 1
+ *    esa vista decide sola; en producción el mínimo es 2, para que una única
+ *    vista —envenenada o caída— nunca conceda ownership por sí misma.
  *  - Un NXDOMAIN desde un resolvedor público es una *respuesta* —la vacía—, no
  *    un fallo: debe poder desautorizar un positivo envenenado, cosa que una
  *    vista muda no puede hacer. Es deliberadamente asimétrico con la vista del
  *    sistema, cuyo `dns_get_record` no distingue «no existe» de «no pude
  *    consultar» y devuelve `false` para ambas.
- *  - Empate o unanimidad imposible (dos vistas que discrepan sin mayoría)
- *    devuelve `false`: la respuesta «fiable» que ya entienden las llamadas como
- *    caída del resolvedor. Una lectura inconclusa nunca mueve el estado de un
+ *  - Empate, unanimidad imposible o menos respuestas que el mínimo devuelve
+ *    `false`: la respuesta «fiable» que ya entienden las llamadas como caída
+ *    del resolvedor. Una lectura inconclusa nunca mueve el estado de un
  *    dominio.
  *  - El TTL y el orden varían entre resolvedores; la respuesta no. La firma de
  *    consenso sólo mira los datos semánticos del registro.
@@ -72,11 +75,17 @@ final class DnsViews
 
     /**
      * El conjunto de registros en el que las vistas acuerdan, o `false` cuando
-     * no hay respuesta fiable (todo falló, o las vistas discrepan sin mayoría).
+     * no hay respuesta fiable (todo falló, menos respuestas que el mínimo, o
+     * las vistas discrepan sin mayoría).
+     *
+     * `$minResponses` fuerza el mínimo de vistas que deben responder: las
+     * consultas que mueven estado (ownership, ruta) usan el de la config (2 en
+     * producción, 1 en desarrollo/tests); las diagnósticas (CAA, direcciones)
+     * pasan 1 explícito, porque sólo explican un fallo y no deciden nada.
      *
      * @return list<array<string, mixed>>|false
      */
-    public static function records(string $hostname, int $type): array|false
+    public static function records(string $hostname, int $type, ?int $minResponses = null): array|false
     {
         /** @var array<string, list<array<string, mixed>>> $groups */
         $groups = [];
@@ -95,6 +104,11 @@ final class DnsViews
             $total++;
         }
         if ($total === 0) {
+            return false;
+        }
+        // Sin suficientes respuestas independientes no hay consenso que valga:
+        // una sola voz nunca decide cuando el mínimo exige dos.
+        if ($total < ($minResponses ?? self::minResponses())) {
             return false;
         }
 
@@ -141,6 +155,18 @@ final class DnsViews
         }
 
         return $views;
+    }
+
+    /** Mínimo de respuestas independientes que el despliegue exige. */
+    private static function minResponses(): int
+    {
+        try {
+            return max(1, (int) config('uvh.custom_domains.min_consensus_responses', 1));
+        } catch (\Throwable) {
+            // Sin contenedor (tests unitarios aislados) el mínimo es 1: la
+            // vista del sistema decide sola, como en desarrollo.
+            return 1;
+        }
     }
 
     /** @return list<string> */

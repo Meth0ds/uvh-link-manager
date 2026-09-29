@@ -11,10 +11,10 @@ import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSelectModule } from "@angular/material/select";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { dateTimeMediumLabel } from "../../core/date-time-label";
-import type { DomainDetailResponse, DomainDto, DomainState } from "../../core/models";
+import type { DomainActivityEvent, DomainActivityResponse, DomainDetailResponse, DomainDto, DomainState, DomainTrafficStatus } from "../../core/models";
 import { IdempotentIntent } from "../../core/idempotent-intent";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
-import { decodeDomainDetailResponse, decodeDomainStateResponse } from "../../core/services/domain-response-decoders";
+import { decodeDomainActivityResponse, decodeDomainDetailResponse, decodeDomainStateResponse } from "../../core/services/domain-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
 import { OwnedMutations } from "../../core/services/owned-mutations";
 import { WorkspaceService } from "../../core/services/workspace.service";
@@ -33,6 +33,28 @@ const DNS_ERROR: Record<string, string> = {
   queue_unavailable: "La comprobación no pudo entrar en cola. Puedes reintentarlo.",
   queue_timeout: "La comprobación superó el tiempo previsto. Puedes iniciarla de nuevo.",
   verification_cancelled: "La comprobación se canceló porque cambió la autorización.",
+};
+
+/** Qué hace el dominio con el tráfico ahora mismo; el usuario no necesita el modelo interno. */
+const TRAFFIC_LABEL: Record<DomainTrafficStatus, string> = {
+  online: "En línea",
+  degraded: "En línea, requiere atención",
+  provisioning: "Preparando HTTPS",
+  offline: "Fuera de servicio",
+};
+
+const ACTIVITY_LABEL: Record<string, string> = {
+  "domain.claimed": "Propiedad del dominio obtenida",
+  "domain.claim_transferred": "Propiedad transferida a otro workspace",
+  "domain.verified": "Dominio verificado",
+  "domain.degraded": "Configuración DNS degradada",
+  "domain.offline": "Dominio fuera de servicio",
+  "domain.recovered": "Dominio recuperado",
+  "domain.activated": "Dominio activado",
+  "domain.disabled": "Dominio desactivado",
+  "domain.tls_failed": "Certificado HTTPS retirado",
+  "domain.tls_expiring": "Certificado por caducar",
+  "domain.deleted": "Dominio eliminado",
 };
 
 const TLS_ERROR: Record<string, string> = {
@@ -83,6 +105,11 @@ export class DomainDetailComponent {
 
   readonly domain = signal<DomainDto | null>(null);
   readonly loading = signal(true);
+  /** Historial del dominio: los mismos eventos que las integraciones reciben, proyectados. */
+  readonly activity = signal<DomainActivityEvent[]>([]);
+  readonly activityLoading = signal(false);
+  readonly activityError = signal<string | null>(null);
+  private readonly activityRequests = new LatestRequest(inject(DestroyRef));
   /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
   private readonly mutations = new OwnedMutations();
   /** Clave de idempotencia por intención para la activación. */
@@ -121,8 +148,11 @@ export class DomainDetailComponent {
       if (context === this.loadedContext) return;
       this.loadedContext = context;
       this.requests.invalidate();
+      this.activityRequests.invalidate();
       this.domain.set(null);
       this.error.set(null);
+      this.activity.set([]);
+      this.activityError.set(null);
       this.surfaceDirty.set(false);
       // An action still in flight belongs to the context that left the screen;
       // its guarded `finally` will not clear the flag here, so the new context
@@ -179,6 +209,7 @@ export class DomainDetailComponent {
       this.domain.set(response.domain);
       this.syncSurface(response.domain);
       this.error.set(null);
+      if (!silent) void this.loadActivity();
     } catch (err) {
       if (!this.requests.isCurrent(request, this.currentContext())) return;
       if (silent && this.domain() !== null) {
@@ -196,6 +227,33 @@ export class DomainDetailComponent {
       // nothing is in flight. The silent path chains through the poller's own
       // attempt so a failed read cannot strand the ladder.
       if (!silent) this.poller.schedule();
+    }
+  }
+
+  /** La línea de tiempo del dominio. Los errores son propios: el diagnóstico no depende de ellos. */
+  async loadActivity(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    const role = this.workspaces.currentRole();
+    const domainId = this.domainId();
+    if (workspaceId === null || role === null || domainId === null) return;
+    const request = this.activityRequests.begin(`${workspaceId}:${role}:${domainId}`);
+    this.activityLoading.set(true);
+    try {
+      const response = await this.api.get<DomainActivityResponse>(
+        `/api/v1/domains/${domainId}/activity`,
+        undefined,
+        decodeDomainActivityResponse,
+        { signal: request.signal },
+      );
+      if (!this.activityRequests.isCurrent(request, this.currentContext())) return;
+      this.activity.set(response.events);
+      this.activityError.set(null);
+    } catch {
+      if (!this.activityRequests.isCurrent(request, this.currentContext())) return;
+      // Una lectura fallida del historial no debe empañar el diagnóstico.
+      if (this.activity().length === 0) this.activityError.set("No se pudo cargar la actividad del dominio");
+    } finally {
+      if (this.activityRequests.isCurrent(request, this.currentContext())) this.activityLoading.set(false);
     }
   }
 
@@ -314,6 +372,45 @@ export class DomainDetailComponent {
   }
 
   readonly stateLabel = domainStateLabel;
+
+  /** «Tráfico: En línea» — el estado derivado que el usuario necesita, no `edgeEligible`. */
+  trafficStatusLabel(d: DomainDto): string {
+    return TRAFFIC_LABEL[d.trafficStatus];
+  }
+
+  activityLabel(event: string): string {
+    return ACTIVITY_LABEL[event] ?? "Evento de dominio";
+  }
+
+  activityIcon(entry: DomainActivityEvent): string {
+    const tone = this.activityTone(entry);
+    return tone === "bad" ? "error_outline" : tone === "warn" ? "warning" : tone === "good" ? "check_circle" : "info";
+  }
+
+  activityTone(entry: DomainActivityEvent): "good" | "warn" | "bad" | "neutral" {
+    if (entry.event === "domain.offline" || entry.event === "domain.tls_failed" || entry.event === "domain.claim_transferred") return "bad";
+    if (entry.event === "domain.degraded" || entry.event === "domain.tls_expiring") return "warn";
+    if (entry.event === "domain.recovered" || entry.event === "domain.verified" || entry.event === "domain.claimed" || entry.event === "domain.activated") return "good";
+    return "neutral";
+  }
+
+  /** El detalle proyectado del evento, en una frase; nunca campos internos. */
+  activityDetail(entry: DomainActivityEvent): string | null {
+    const parts: string[] = [];
+    if (entry.payload.reason) parts.push(this.activityReasonLabel(entry.payload.reason));
+    if (entry.payload.daysRemaining !== undefined) parts.push(`quedan ${entry.payload.daysRemaining} días`);
+    if (entry.payload.failureCount !== undefined && entry.payload.failureCount > 1) {
+      parts.push(`${entry.payload.failureCount} comprobaciones fallidas`);
+    }
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  private activityReasonLabel(reason: string): string {
+    return DNS_ERROR[reason] ?? TLS_ERROR[reason] ?? (reason === "claim_transferred"
+      ? "Otro workspace probó el control del nombre."
+      : "La configuración DNS dejó de ser válida.");
+  }
+
   dnsErrorLabel(error: string | null): string | null { return error ? (DNS_ERROR[error] ?? "No se pudo confirmar la configuración DNS.") : null; }
   tlsErrorLabel(error: string | null): string | null { return error ? (TLS_ERROR[error] ?? "No se pudo completar la preparación HTTPS.") : null; }
 

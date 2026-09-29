@@ -464,6 +464,8 @@ class AppServiceProvider extends ServiceProvider
             'acme_email' => config('uvh.custom_domains.acme_email'),
             'edge_internal_host' => config('uvh.custom_domains.edge_internal_host'),
             'edge_internal_cidrs' => config('uvh.custom_domains.edge_internal_cidrs'),
+            'domain_public_resolvers' => config('uvh.custom_domains.public_resolvers'),
+            'domain_dns_min_consensus_responses' => config('uvh.custom_domains.min_consensus_responses'),
             'domain_verification_fresh_hours' => config('uvh.custom_domains.verification_fresh_hours'),
             'domain_revalidation_hours' => config('uvh.custom_domains.revalidation_hours'),
             'domain_failure_retry_hours' => config('uvh.custom_domains.failure_retry_hours'),

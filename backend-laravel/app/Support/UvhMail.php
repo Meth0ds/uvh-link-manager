@@ -452,21 +452,75 @@ class UvhMail
     }
 
     /**
-     * Un dominio propio dejó de servir enlaces. Es el único aviso de dominios
-     * que además va por correo: la caída corta tráfico real ahora mismo y el
-     * propietario puede no volver al panel en días.
+     * Un aviso de salud de dominio para una persona concreta. La preferencia
+     * de notificaciones del destinatario decide si esto se ejecuta (`immediate`
+     * y los kinds obligatorios); es un mensaje por persona y evento, con
+     * identidad (usuario, evento) para que una reentrega del outbox jamás
+     * pueda duplicar el correo.
      */
-    public static function domainOffline(string $to, string $domain, int $domainId, string $reason): bool
-    {
+    public static function domainNotice(
+        string $to,
+        string $kind,
+        string $domain,
+        int $domainId,
+        string $reason,
+        int $userId,
+        string $eventGeneration,
+    ): bool {
+        [$subject, $title, $body, $text] = match ($kind) {
+            'domain_offline' => [
+                'Tu dominio '.$domain.' dejó de servir enlaces en UVH',
+                'Dominio fuera de servicio',
+                '<p>El dominio <strong>'.self::esc($domain).'</strong> ha dejado de servir sus enlaces.</p><p>Motivo: '.self::esc($reason).'</p><p>Los enlaces no se han eliminado: revisa la configuración DNS del dominio y vuelve a activarlo desde el panel.</p>',
+                "El dominio {$domain} ha dejado de servir enlaces en UVH ({$reason}). Los enlaces siguen existiendo; revisa la configuración DNS y vuelve a activarlo desde el panel.",
+            ],
+            'domain_dns_degraded' => [
+                'La configuración DNS de '.$domain.' está fallando',
+                'Dominio degradado',
+                '<p>La comprobación periódica del dominio <strong>'.self::esc($domain).'</strong> ha fallado.</p><p>Motivo: '.self::esc($reason).'</p><p>El dominio sigue sirviendo durante un periodo de gracia. Corrige la configuración DNS para evitar que deje de servir enlaces.</p>',
+                "La comprobación del dominio {$domain} ha fallado ({$reason}). El dominio sigue sirviendo durante un periodo de gracia; corrige la configuración DNS.",
+            ],
+            'domain_recovered' => [
+                'Tu dominio '.$domain.' se recuperó',
+                'Dominio recuperado',
+                '<p>El dominio <strong>'.self::esc($domain).'</strong> vuelve a servir sus enlaces con normalidad.</p>',
+                "El dominio {$domain} vuelve a servir sus enlaces con normalidad.",
+            ],
+            'domain_tls_failed' => [
+                'No se pudo preparar el HTTPS de '.$domain,
+                'HTTPS no disponible',
+                '<p>No pudimos mantener el certificado HTTPS del dominio <strong>'.self::esc($domain).'</strong>.</p><p>Motivo: '.self::esc($reason).'</p><p>El dominio deja de servir enlaces hasta que el certificado vuelva a estar disponible.</p>',
+                "No pudimos mantener el certificado HTTPS del dominio {$domain} ({$reason}). El dominio deja de servir enlaces hasta que el certificado vuelva a estar disponible.",
+            ],
+            'domain_tls_expiring' => [
+                'El certificado de '.$domain.' está por caducar',
+                'Certificado por caducar',
+                '<p>El certificado HTTPS del dominio <strong>'.self::esc($domain).'</strong> está cerca de caducar.</p><p>UVH renueva los certificados automáticamente; si este mensaje se repite, revisa la configuración DNS y los registros CAA del dominio.</p>',
+                "El certificado HTTPS del dominio {$domain} está cerca de caducar. La renovación es automática; si este mensaje se repite, revisa la configuración DNS y los registros CAA.",
+            ],
+            'domain_claim_transferred' => [
+                'La propiedad de '.$domain.' cambió de workspace',
+                'Propiedad de dominio transferida',
+                '<p>Otro workspace ha probado el control del dominio <strong>'.self::esc($domain).'</strong> y ahora le pertenece.</p><p>Motivo: '.self::esc($reason).'</p><p>El dominio queda desactivado en tu workspace; los enlaces que usaban ese dominio dejan de responder hasta que los asignes a otro.</p>',
+                "Otro workspace ha probado el control del dominio {$domain} y ahora le pertenece ({$reason}). El dominio queda desactivado en tu workspace.",
+            ],
+            default => [
+                'Aviso de dominio en UVH',
+                'Aviso de dominio',
+                '<p>Hay una novedad sobre el dominio <strong>'.self::esc($domain).'</strong>.</p>',
+                "Hay una novedad sobre el dominio {$domain}.",
+            ],
+        };
+
         return self::send(
-            'domain_offline',
+            $kind,
             $to,
-            'Tu dominio '.$domain.' dejó de servir enlaces en UVH',
-            self::layout('Dominio fuera de servicio', '<p>El dominio <strong>'.self::esc($domain).'</strong> ha dejado de servir sus enlaces.</p><p>Motivo: '.self::esc($reason).'</p><p>Los enlaces no se han eliminado: revisa la configuración DNS del dominio y vuelve a activarlo desde el panel.</p>'),
-            "El dominio {$domain} ha dejado de servir enlaces en UVH ({$reason}). Los enlaces siguen existiendo; revisa la configuración DNS y vuelve a activarlo desde el panel.",
+            $subject,
+            self::layout($title, $body),
+            $text,
             'domain',
             $domainId,
-            'offline',
+            $userId.':'.$eventGeneration,
         );
     }
 

@@ -271,6 +271,27 @@
   }
 }
 
+// El impacto del dominio: cuántos enlaces dependen de él. El mismo peso
+// visual que la marca de predeterminado — no es un estado de salud.
+.links-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 3px;
+  background: var(--uvh-surface-raised);
+  color: var(--uvh-muted);
+  font: 10.5px/1.6 "Courier New", monospace;
+  letter-spacing: .04em;
+
+  mat-icon {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+  }
+}
+
 .domain-actions {
   display: flex;
   gap: 8px;

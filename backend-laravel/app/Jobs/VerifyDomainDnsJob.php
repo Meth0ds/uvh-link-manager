@@ -80,6 +80,11 @@ class VerifyDomainDnsJob implements ShouldQueue
                     'domains:write',
                     $this->actorSecurityVersion,
                 ) !== null;
+            // Canonical lock order: auth (above), then the hostname's claim
+            // lock, then domain rows. Taking the hostname lock before any row
+            // of that hostname is what makes a concurrent takeover serialize
+            // instead of deadlocking on the claim/row inversion.
+            DomainClaims::lockHostname($this->domain);
             $domain = CustomDomain::where('id', $this->domainId)
                 ->where('workspace_id', $this->workspaceId)->lockForUpdate()->first();
             if (! $domain || $domain->domain !== $this->domain || $domain->verification_token !== $this->verificationToken) {
@@ -106,10 +111,12 @@ class VerifyDomainDnsJob implements ShouldQueue
             $ownershipProven = $dns['ownership'];
             $claimOutcome = null;
             $previousWorkspaceId = null;
+            $previousDomainIds = [];
             if ($ownershipProven) {
                 $claim = DomainClaims::prove($this->workspaceId, $this->domain);
                 $claimOutcome = $claim['outcome'];
                 $previousWorkspaceId = $claim['previous_workspace_id'];
+                $previousDomainIds = $claim['previous_domain_ids'];
             }
             $claimed = $claimOutcome !== 'conflict';
             $routingOk = $dns['routing'];
@@ -183,12 +190,27 @@ class VerifyDomainDnsJob implements ShouldQueue
                     'domain' => $this->domain,
                 ]);
             }
+            // The displaced holder hears about the loss as their own fact,
+            // recorded against *their* rows: their activity timeline and the
+            // notification route must name resources that exist in their
+            // workspace, never the new owner's ids. Cross-tenant ids do not
+            // travel in the payload either.
             if ($claimOutcome === 'takeover' && $previousWorkspaceId !== null) {
-                $eventIds[] = DomainEvents::record($previousWorkspaceId, $this->domainId, $this->domain, 'domain.claim_transferred', [
+                foreach ($previousDomainIds as $previousDomainId) {
+                    $eventIds[] = DomainEvents::record($previousWorkspaceId, $previousDomainId, $this->domain, 'domain.claim_transferred', [
+                        'domainId' => $previousDomainId,
+                        'domain' => $this->domain,
+                        'reason' => 'claim_transferred',
+                    ]);
+                }
+            }
+            // The workspace that acquired (or re-acquired) the hostname gets
+            // its own fact. Recorded on the transition only — a routine
+            // revalidation of a claim that is already yours is not news.
+            if ($claimOutcome === 'claimed' || $claimOutcome === 'takeover') {
+                $eventIds[] = DomainEvents::record($this->workspaceId, $this->domainId, $this->domain, 'domain.claimed', [
                     'domainId' => $this->domainId,
                     'domain' => $this->domain,
-                    'previousWorkspaceId' => $previousWorkspaceId,
-                    'newWorkspaceId' => $this->workspaceId,
                 ]);
             }
             if ($found && $wasServing && $previouslyDegraded) {
@@ -446,8 +468,9 @@ class VerifyDomainDnsJob implements ShouldQueue
         $addresses = [];
         foreach ([DNS_A, DNS_AAAA] as $type) {
             // An unreachable resolver here is advisory-only: the verdict
-            // already came from the CNAME query above.
-            $records = DnsViews::records($this->domain, $type);
+            // already came from the CNAME query above. Diagnostics may not
+            // hold a state decision hostage to the consensus minimum.
+            $records = DnsViews::records($this->domain, $type, 1);
             if ($records === false) {
                 continue;
             }
@@ -486,7 +509,9 @@ class VerifyDomainDnsJob implements ShouldQueue
      */
     private function checkCaa(): array
     {
-        $records = DnsViews::records($this->domain, DNS_CAA);
+        // CAA is diagnostic: it explains a TLS failure, it never decides
+        // ownership or routing, so it does not raise the consensus minimum.
+        $records = DnsViews::records($this->domain, DNS_CAA, 1);
         if ($records === false) {
             return ['records' => [], 'allowsIssuer' => null];
         }

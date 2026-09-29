@@ -47,6 +47,18 @@ describe("credential response decoders", () => {
     expect(() => decodeWebhooksResponse({ webhooks: [{ ...webhook, events: ["unknown"] }] })).toThrow();
   });
 
+  it("accepts the full webhook event catalog shared with the backend", () => {
+    // Copy of the backend `WebhookEvents::CATALOG` names: the backend contract
+    // test pins this side too, so a drift in either copy fails a suite.
+    const events = [
+      "link.created", "link.updated", "link.deleted", "link.threshold_reached",
+      "domain.claimed", "domain.claim_transferred", "domain.verified", "domain.degraded",
+      "domain.offline", "domain.recovered", "domain.activated", "domain.disabled",
+      "domain.tls_failed", "domain.tls_expiring", "domain.deleted",
+    ];
+    expect(decodeWebhooksResponse({ webhooks: [{ ...webhook, events }] })).toEqual({ webhooks: [{ ...webhook, events }] });
+  });
+
   it("keeps valid user-supplied secrets while rejecting missing or short values", () => {
     expect(decodeCreatedWebhookResponse({ webhook, secret: "a secure value 123" })).toEqual({
       webhook,
@@ -79,6 +91,8 @@ describe("credential response decoders", () => {
     expect(decodeWebhookDeliveriesResponse(page)).toEqual(page);
     expect(() => decodeWebhookDeliveriesResponse({ ...page, deliveries: [{ ...delivery, status: "unknown" }] })).toThrow();
     expect(() => decodeWebhookDeliveriesResponse({ ...page, deliveries: [{ ...delivery, attempts: -1 }] })).toThrow();
-    expect(() => decodeWebhookDeliveriesResponse({ ...page, deliveries: [{ ...delivery, payloadPreview: { ...delivery.payloadPreview, data: { secret: "must-not-pass", a: 1, b: 2, c: 3, d: 4 } } }] })).toThrow();
+    // The widest catalog projection (`domain.degraded`) carries five keys;
+    // six is a preview the server never produces.
+    expect(() => decodeWebhookDeliveriesResponse({ ...page, deliveries: [{ ...delivery, payloadPreview: { ...delivery.payloadPreview, data: { secret: "must-not-pass", a: 1, b: 2, c: 3, d: 4, e: 5 } } }] })).toThrow();
   });
 });

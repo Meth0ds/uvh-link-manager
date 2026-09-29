@@ -27,12 +27,24 @@ import {
   decodeWebhooksResponse,
 } from "../../core/services/credential-response-decoders";
 
+// Copy of the backend `WebhookEvents::CATALOG` names: a contract test pins
+// both sides together so the picker cannot offer an event the API rejects.
 const EVENTS = [
   "link.created",
   "link.updated",
   "link.deleted",
   "link.threshold_reached",
+  "domain.claimed",
+  "domain.claim_transferred",
   "domain.verified",
+  "domain.degraded",
+  "domain.offline",
+  "domain.recovered",
+  "domain.activated",
+  "domain.disabled",
+  "domain.tls_failed",
+  "domain.tls_expiring",
+  "domain.deleted",
 ] as const;
 
 @Component({
@@ -88,7 +100,18 @@ export class WebhooksComponent {
   readonly canEdit = computed(() => ["owner", "admin", "editor"].includes(this.workspaces.currentRole() ?? ""));
   readonly eventDescriptions: Record<string, string> = {
     "link.created": "Se crea un enlace", "link.updated": "Se modifica un enlace", "link.deleted": "Se elimina un enlace",
-    "link.threshold_reached": "Un enlace alcanza su umbral", "domain.verified": "Se verifica un dominio",
+    "link.threshold_reached": "Un enlace alcanza su umbral",
+    "domain.claimed": "Tu workspace obtiene la propiedad de un dominio",
+    "domain.claim_transferred": "La propiedad de un dominio cambia de workspace",
+    "domain.verified": "Se verifica un dominio",
+    "domain.degraded": "La configuración DNS de un dominio empieza a fallar",
+    "domain.offline": "Un dominio deja de servir enlaces",
+    "domain.recovered": "Un dominio se recupera",
+    "domain.activated": "Se activa un dominio",
+    "domain.disabled": "Se desactiva un dominio",
+    "domain.tls_failed": "Falla el certificado HTTPS de un dominio",
+    "domain.tls_expiring": "El certificado de un dominio está por caducar",
+    "domain.deleted": "Se elimina un dominio",
   };
 
   private loadedContext: string | undefined;

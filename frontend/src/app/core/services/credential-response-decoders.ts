@@ -9,12 +9,25 @@ const TOKEN_SCOPES = new Set([
   "domains:read",
   "domains:write",
 ]);
+// Copy of the backend `WebhookEvents::CATALOG` names: a contract test pins
+// both sides together so a new event cannot exist in one and be rejected by
+// the other.
 const WEBHOOK_EVENTS = new Set([
   "link.created",
   "link.updated",
   "link.deleted",
   "link.threshold_reached",
+  "domain.claimed",
+  "domain.claim_transferred",
   "domain.verified",
+  "domain.degraded",
+  "domain.offline",
+  "domain.recovered",
+  "domain.activated",
+  "domain.disabled",
+  "domain.tls_failed",
+  "domain.tls_expiring",
+  "domain.deleted",
 ]);
 const DELIVERY_STATUSES = new Set<WebhookDelivery["status"]>(["pending", "processing", "success", "failed"]);
 const INSPECTOR_EVENTS = new Set([...WEBHOOK_EVENTS, "ping", "unknown"]);
@@ -75,7 +88,7 @@ function webhook(value: unknown): WebhookDto {
   return {
     id: integer(source["id"], "webhook", 1),
     url: safeText(source["url"], "webhook", 2048),
-    events: uniqueAllowedStrings(source["events"], WEBHOOK_EVENTS, "webhook events", 10),
+    events: uniqueAllowedStrings(source["events"], WEBHOOK_EVENTS, "webhook events", WEBHOOK_EVENTS.size),
     active: boolean(source["active"]),
     hasSecret: boolean(source["hasSecret"]),
     createdAt: safeText(source["createdAt"], "webhook", 64),
@@ -97,7 +110,7 @@ function delivery(value: unknown): WebhookDelivery {
   const errorSource = source["error"] === null ? null : record(source["error"], "webhook delivery error");
   const payload = record(source["payloadPreview"], "webhook payload preview");
   const payloadData = record(payload["data"], "webhook payload data");
-  if (Object.keys(payloadData).length > 4 || payload["redacted"] !== true) invalid("webhook payload preview");
+  if (Object.keys(payloadData).length > 5 || payload["redacted"] !== true) invalid("webhook payload preview");
   const data: Record<string, string | number> = {};
   for (const [key, item] of Object.entries(payloadData)) {
     const safeKey = safeText(key, "webhook payload key", 32);

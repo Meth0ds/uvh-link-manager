@@ -1,5 +1,5 @@
 import type { AnalyticsOverview, DomainDto, LinkDto, LinkTrashResponse } from "../models";
-import { decodeCreatedDomainResponse, decodeDomainDetailResponse, decodeDomainsResponse, decodeDomainStateResponse } from "./domain-response-decoders";
+import { decodeCreatedDomainResponse, decodeDomainActivityResponse, decodeDomainDetailResponse, decodeDomainsResponse, decodeDomainStateResponse } from "./domain-response-decoders";
 import {
   decodeAliasAvailability,
   decodeAnalyticsOverview,
@@ -88,6 +88,7 @@ const domain: DomainDto = {
   rootDestination: null,
   notFoundMode: null,
   isDefault: false,
+  linksCount: 4,
   createdAt: "2026-09-06T10:00:00Z",
 };
 
@@ -222,6 +223,26 @@ describe("resource response decoders", () => {
     // in one list is a broken invariant, not a value to render.
     expect(() => decodeDomainsResponse({ domains: [{ ...domain, isDefault: true }, { ...domain, id: 7, isDefault: true }] })).toThrow();
     expect(decodeDomainsResponse({ domains: [{ ...domain, isDefault: true }, { ...domain, id: 7 }] }).domains.map((d) => d.isDefault)).toEqual([true, false]);
+  });
+
+  it("projects domain activity payloads to the documented keys only", () => {
+    const events = [{
+      id: 3,
+      event: "domain.tls_expiring",
+      payload: { reason: "certificate_expired", daysRemaining: 12, notAfter: "2026-10-08T10:00:00Z" },
+      createdAt: "2026-09-28T10:00:00Z",
+    }];
+    expect(decodeDomainActivityResponse({ events })).toEqual({ events: [{
+      id: 3,
+      event: "domain.tls_expiring",
+      payload: { reason: "certificate_expired", daysRemaining: 12, notAfter: "2026-10-08T10:00:00Z" },
+      createdAt: "2026-09-28T10:00:00Z",
+    }] });
+    // Unknown events and out-of-catalog payload keys are contract drift, never
+    // a value to render: the outbox payload is internal and can grow fields.
+    expect(() => decodeDomainActivityResponse({ events: [{ ...events[0], event: "domain.exploded" }] })).toThrow();
+    expect(() => decodeDomainActivityResponse({ events: [{ ...events[0], payload: { previousWorkspaceId: 2 } }] })).toThrow();
+    expect(() => decodeDomainActivityResponse({ events: [{ ...events[0], payload: { failureCount: "tres" } }] })).toThrow();
   });
 
   it("accepts only context-bound trash rows with ordered ISO purge dates", () => {

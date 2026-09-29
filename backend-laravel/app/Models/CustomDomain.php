@@ -19,6 +19,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $dns_first_failed_at
  * @property Carbon|null $tls_ready_at
  * @property Carbon|null $tls_checked_at
+ * @property Carbon|null $tls_probe_started_at
+ * @property Carbon|null $tls_probe_completed_at
  * @property Carbon|null $tls_not_after
  * @property Carbon|null $tls_last_attempt_at
  * @property Carbon|null $tls_next_retry_at
@@ -68,6 +70,9 @@ class CustomDomain extends Model
         'caa_records',
         'caa_allows_issuer',
         'tls_probe_failures',
+        'tls_probe_version',
+        'tls_probe_started_at',
+        'tls_probe_completed_at',
     ];
 
     protected function casts(): array
@@ -98,6 +103,9 @@ class CustomDomain extends Model
             'caa_records' => 'array',
             'caa_allows_issuer' => 'boolean',
             'tls_probe_failures' => 'integer',
+            'tls_probe_version' => 'integer',
+            'tls_probe_started_at' => 'datetime',
+            'tls_probe_completed_at' => 'datetime',
             'is_default' => 'boolean',
         ];
     }

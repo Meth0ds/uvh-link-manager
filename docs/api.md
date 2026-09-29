@@ -411,6 +411,8 @@ PRODUCT-001 implementada y conectada a la pantalla de primeros pasos; validació
 | POST | `/:id/disable` | **admin** | Desactiva (corta todos los enlaces del dominio a la vez). |
 | POST | `/:id/revalidate` | editor | Revalida DNS de forma asíncrona conservando el estado visible anterior; devuelve `202`. |
 | DELETE | `/:id` | **admin** | Elimina (exige que ningún enlace —ni en papelera— lo use). |
+| GET | `/:id` | viewer | `{ domain }` con el diagnóstico completo; `verificationToken` sólo tiene valor para `editor` o superior. |
+| GET | `/:id/activity` | viewer | `{ events[] }`, los 50 eventos más recientes del dominio: `{ id, event, payload, createdAt }`. El `payload` está **proyectado** por tipo de evento: sólo `reason`, `failureCount` y `graceExpiresAt` (degradación/caída) o `notAfter` y `daysRemaining` (caducidad TLS); nunca IDs de otros workspaces ni campos internos del outbox. |
 
 `POST /`, `/:id/activate` y `/:id/disable` aceptan una `Idempotency-Key` opcional
 (8–64 caracteres): una repetición exacta recibe la respuesta original con la
@@ -449,13 +451,20 @@ Scopes: `links:read`, `links:write`, `analytics:read`, `domains:read`, `domains:
 | POST | `/:id/deliveries/:deliveryId/resend` | editor | Reenvío manual. |
 | POST | `/:id/test` | editor | Entrega de prueba. |
 
-Eventos: `link.created`, `link.updated`, `link.deleted`,
-`link.threshold_reached`, `domain.verified` y `ping` para pruebas. El body tiene
+Eventos de enlaces: `link.created`, `link.updated`, `link.deleted`,
+`link.threshold_reached`. Eventos de dominios: `domain.claimed`,
+`domain.claim_transferred`, `domain.verified`, `domain.degraded`,
+`domain.offline`, `domain.recovered`, `domain.activated`, `domain.disabled`,
+`domain.tls_failed`, `domain.tls_expiring`, `domain.deleted`. Y `ping` para
+pruebas manuales. Un webhook puede suscribirse a cualquiera de ellos (máximo
+uno por evento, sin duplicados). El body tiene
 `{ event, event_id, timestamp, data }`. UVH considera correcta una respuesta
 HTTP 2xx; en los demás casos reintenta hasta cinco intentos con backoff. La
 entrega es **al menos una vez**: si el receptor procesó la petición pero UVH no
 pudo persistir el éxito, el mismo `event_id` puede volver a recibirse. El
-receptor debe deduplicar por `event_id` y hacer idempotente su efecto.
+`event_id` es la identidad estable del evento —todos los reintentos y las
+reeentregas llevan el mismo—, así que el receptor debe deduplicar por
+`event_id` y hacer idempotente su efecto.
 
 Cada intento envía `X-UVH-Event`, `X-UVH-Event-Id` y:
 

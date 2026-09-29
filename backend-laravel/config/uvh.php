@@ -176,6 +176,11 @@ return [
             'trim',
             explode(',', (string) env('UVH_PUBLIC_RESOLVERS', '')),
         ))),
+        // Mínimo de vistas que deben responder para que una respuesta DNS sea
+        // fiable. Producción exige 2 (gate de arranque) para que una única
+        // vista —envenenada o caída— nunca conceda ownership; 1 mantiene el
+        // comportamiento de una sola vista en desarrollo, tests y el stack E2E.
+        'min_consensus_responses' => (int) env('DOMAIN_DNS_MIN_CONSENSUS_RESPONSES', 1),
         // Certificate lifetime monitoring: a certificate this close to expiry
         // is reported as `expiring`, and a probe that keeps failing withdraws
         // the domain after `max_failures` attempts, like the DNS checks.

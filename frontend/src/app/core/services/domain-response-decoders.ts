@@ -1,4 +1,4 @@
-import type { DomainCaaRecord, DomainDesiredState, DomainDto, DomainOwnershipStatus, DomainRoutingStatus, DomainState, DomainTlsStatus, DomainTrafficStatus } from "../models";
+import type { DomainActivityEvent, DomainActivityResponse, DomainCaaRecord, DomainDesiredState, DomainDto, DomainOwnershipStatus, DomainRoutingStatus, DomainState, DomainTlsStatus, DomainTrafficStatus } from "../models";
 import {
   boolean,
   boundedArray,
@@ -98,6 +98,7 @@ function domain(value: unknown, canEdit?: boolean): DomainDto {
     rootDestination: nullableText(source["rootDestination"], "domain root destination", 2048, true),
     notFoundMode: nullableText(source["notFoundMode"], "domain not-found mode", 16),
     isDefault: boolean(source["isDefault"], "domain default flag"),
+    linksCount: integer(source["linksCount"], "domain links count", 0),
     createdAt: timestamp(source["createdAt"], "domain creation timestamp", false)!,
   };
 
@@ -149,4 +150,57 @@ export function decodeDomainDetailResponse(value: unknown, expectedId: number, c
 export function decodeDomainStateResponse(value: unknown): { state: DomainState } {
   const source = record(value, "domain state response");
   return { state: literal(source["state"], DOMAIN_STATES, "domain state") };
+}
+
+const DOMAIN_EVENTS = new Set([
+  "domain.claimed",
+  "domain.claim_transferred",
+  "domain.verified",
+  "domain.degraded",
+  "domain.offline",
+  "domain.recovered",
+  "domain.activated",
+  "domain.disabled",
+  "domain.tls_failed",
+  "domain.tls_expiring",
+  "domain.deleted",
+]);
+
+// The documented projection of `GET /domains/:id/activity`, mirrored from the
+// backend `DomainActivityCatalog`: any other payload key is a contract drift,
+// never a value to render.
+const ACTIVITY_PAYLOAD_KEYS = new Set(["reason", "failureCount", "graceExpiresAt", "notAfter", "daysRemaining"]);
+
+export function decodeDomainActivityResponse(value: unknown): DomainActivityResponse {
+  const source = record(value, "domain activity");
+  return {
+    events: boundedArray(source["events"], "domain activity events", 50).map((item) => {
+      const row = record(item, "domain activity event");
+      const event = text(row["event"], "domain activity event", 64);
+      if (!DOMAIN_EVENTS.has(event)) throw new Error("Invalid domain activity response");
+      const payload = record(row["payload"], "domain activity payload");
+      const decoded: DomainActivityEvent["payload"] = {};
+      for (const [key, raw] of Object.entries(payload)) {
+        if (!ACTIVITY_PAYLOAD_KEYS.has(key)) throw new Error("Invalid domain activity response");
+        if (key === "reason") {
+          decoded.reason = text(raw, "domain activity reason", 64);
+          if (!/^[a-z0-9_]+$/.test(decoded.reason)) throw new Error("Invalid domain activity response");
+        } else if (key === "failureCount" || key === "daysRemaining") {
+          decoded[key] = integer(raw, `domain activity ${key}`, 0);
+        } else if (key === "graceExpiresAt" || key === "notAfter") {
+          const iso = timestamp(raw, `domain activity ${key}`, false);
+          if (iso === null) throw new Error("Invalid domain activity response");
+          decoded[key] = iso;
+        } else {
+          throw new Error("Invalid domain activity response");
+        }
+      }
+      return {
+        id: integer(row["id"], "domain activity event", 1),
+        event,
+        payload: decoded,
+        createdAt: timestamp(row["createdAt"], "domain activity timestamp", false)!,
+      };
+    }),
+  };
 }

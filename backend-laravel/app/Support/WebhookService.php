@@ -17,23 +17,21 @@ class WebhookService
 
     private const QUEUE_LEASE_MINUTES = 10;
 
-    public const EVENTS = [
-        'link.created',
-        'link.updated',
-        'link.deleted',
-        'link.threshold_reached',
-        'domain.verified',
-    ];
-
     /**
      * @param  array<string, mixed>  $data
+     * @param  ?string  $eventUuid  external identity of the event. Producers
+     *                              that own a durable event row (the domain
+     *                              outbox) pass its stable id so retries and
+     *                              re-deliveries carry the same `event_id` and
+     *                              the receiver can deduplicate; ad-hoc
+     *                              producers get a fresh id per call.
      */
-    public static function dispatch(int $workspaceId, string $event, array $data): void
+    public static function dispatch(int $workspaceId, string $event, array $data, ?string $eventUuid = null): void
     {
         if (DB::transactionLevel() < 1) {
             throw new WebhookAdmissionUnavailable('Webhook events must be admitted inside the business transaction');
         }
-        $eventId = self::uuid();
+        $eventId = $eventUuid ?? self::uuid();
         $payload = [
             'event' => $event,
             'event_id' => $eventId,

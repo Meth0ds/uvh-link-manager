@@ -259,6 +259,48 @@
   line-height: 1.7;
 }
 
+// La línea de tiempo del dominio: una fila por hecho, con el tono del evento
+// en el icono — sin adornos, que el texto es lo que importa.
+.activity-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.activity-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 0;
+  border-top: 1px solid var(--uvh-border);
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    margin-top: 2px;
+    color: var(--uvh-muted);
+  }
+
+  b {
+    color: var(--uvh-ink);
+    font-size: 12.5px;
+  }
+
+  .activity-detail {
+    color: var(--uvh-muted);
+    font-size: 12px;
+  }
+
+  .scheduler-note {
+    margin: 2px 0 0;
+  }
+
+  &.activity-good mat-icon { color: var(--uvh-success); }
+  &.activity-warn mat-icon { color: var(--uvh-warn); }
+  &.activity-bad mat-icon { color: var(--uvh-danger); }
+}
+
 @container (max-width: 950px) {
   .diagnostic-grid {
     grid-template-columns: minmax(0, 1fr);

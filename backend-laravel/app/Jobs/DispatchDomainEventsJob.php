@@ -51,10 +51,15 @@ class DispatchDomainEventsJob implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         // Leave the rows pending: the housekeeping sweep delivers them. The
-        // job failing must not lose events, only delay them.
+        // job failing must not lose events, only delay them. Each channel
+        // keeps its own schedule; the delivery claim lease recovers the row
+        // this crashed job was holding.
         DB::table('domain_events')
             ->whereIn('id', $this->eventIds)
             ->whereNull('dispatched_at')
-            ->update(['next_attempt_at' => now()]);
+            ->update([
+                'next_attempt_at' => now(),
+                'notice_next_attempt_at' => now(),
+            ]);
     }
 }

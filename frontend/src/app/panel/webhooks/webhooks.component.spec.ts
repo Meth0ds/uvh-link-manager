@@ -31,7 +31,8 @@ describe("WebhooksComponent presentation and capability", () => {
     fixture.componentInstance.startCreate(); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('input[name="receiverUrl"]').required).toBeTrue();
     expect(fixture.nativeElement.querySelector("fieldset legend").textContent).toContain("Qué eventos");
-    expect(fixture.nativeElement.querySelectorAll(".event-label").length).toBe(5);
+    // The unified catalog: 4 link events + 11 domain events.
+    expect(fixture.nativeElement.querySelectorAll(".event-label").length).toBe(15);
     expect(fixture.nativeElement.querySelector('button[type="submit"]').disabled).toBeTrue();
   });
   it("explains that editing without a new secret preserves the existing one", () => {

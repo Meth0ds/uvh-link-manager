@@ -8,6 +8,7 @@ use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Support\Audit;
 use App\Support\DestinationDenylist;
+use App\Support\DomainActivityCatalog;
 use App\Support\DomainAdmission;
 use App\Support\DomainClaims;
 use App\Support\DomainEvents;
@@ -97,12 +98,21 @@ class DomainController
             ->orderByDesc('id')
             ->limit(50)
             ->get()
-            ->map(fn ($e) => [
-                'id' => (int) $e->id,
-                'event' => (string) $e->event,
-                'payload' => json_decode((string) $e->payload, true),
-                'createdAt' => IsoDate::format($e->created_at),
-            ]);
+            ->map(function ($e) {
+                $payload = json_decode((string) $e->payload, true);
+
+                return [
+                    'id' => (int) $e->id,
+                    'event' => (string) $e->event,
+                    // The payload is an internal record; the timeline sees the
+                    // documented projection only (see `DomainActivityCatalog`).
+                    'payload' => DomainActivityCatalog::project(
+                        (string) $e->event,
+                        is_array($payload) ? $payload : [],
+                    ),
+                    'createdAt' => IsoDate::format($e->created_at),
+                ];
+            });
 
         return response()->json(['events' => $events]);
     }
@@ -570,6 +580,14 @@ class DomainController
             )) {
                 return 'forbidden';
             }
+            // Read the hostname first, then take the claim lock before the
+            // domain row — canonical order (auth → hostname → rows). A domain
+            // cannot be renamed, so the unlocked read is stable.
+            $hostname = CustomDomain::where('id', $id)->where('workspace_id', $workspaceId)->value('domain');
+            if ($hostname === null) {
+                return 'not_found';
+            }
+            DomainClaims::lockHostname((string) $hostname);
             $domain = CustomDomain::where('id', $id)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
             if (! $domain) {
                 return 'not_found';

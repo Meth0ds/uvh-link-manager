@@ -906,11 +906,21 @@ class UvhHousekeeping extends Command
      * so a fleet larger than one batch is still fully covered, and only the
      * handshake speaks against a certificate — a platform outage must never
      * withdraw customer domains (the job itself enforces that).
+     *
+     * Each row is **claimed** before dispatch: the claim opens one monitoring
+     * round (`tls_probe_version` generation) and every later pass skips the
+     * row until the round closes or its lease expires. Without this, a delayed
+     * `domains` queue made each minute's pass enqueue the same round again and
+     * three copies of one incident could count as three probe failures —
+     * enough to withdraw a domain that was actually serving.
      */
     private function queueTlsProbeChecks(): void
     {
         $cutoff = now()->subHours(max(1, (int) config('uvh.custom_domains.tls_probe_interval_hours', 24)));
         $batch = max(1, min(100, (int) config('uvh.custom_domains.tls_probe_batch', 20)));
+        // A claimed round holds the row for at least an hour; a job lost with
+        // the queue is recovered when the lease expires.
+        $leaseBefore = now()->subHours(1);
 
         $rows = DB::table('custom_domains')
             ->where('desired_state', 'enabled')
@@ -919,6 +929,11 @@ class UvhHousekeeping extends Command
             ->where(function ($query) use ($cutoff) {
                 $query->whereNull('tls_checked_at')->orWhere('tls_checked_at', '<=', $cutoff);
             })
+            ->where(function ($query) use ($leaseBefore) {
+                $query->whereNull('tls_probe_started_at')
+                    ->orWhereNotNull('tls_probe_completed_at')
+                    ->orWhere('tls_probe_started_at', '<=', $leaseBefore);
+            })
             ->orderByRaw('tls_checked_at NULLS FIRST')
             ->orderBy('id')
             ->limit($batch)
@@ -926,7 +941,37 @@ class UvhHousekeeping extends Command
 
         foreach ($rows as $row) {
             try {
-                ProbeDomainTlsJob::dispatch((int) $row->id, (int) $row->workspace_id, (string) $row->domain)->afterCommit();
+                // The atomic claim elects one dispatcher per round even if two
+                // housekeeping runs overlap.
+                $claimed = DB::table('custom_domains')
+                    ->where('id', $row->id)
+                    ->where('desired_state', 'enabled')
+                    ->where('edge_eligible', true)
+                    ->whereIn('tls_status', ['ready', 'expiring'])
+                    ->where(function ($query) use ($cutoff) {
+                        $query->whereNull('tls_checked_at')->orWhere('tls_checked_at', '<=', $cutoff);
+                    })
+                    ->where(function ($query) use ($leaseBefore) {
+                        $query->whereNull('tls_probe_started_at')
+                            ->orWhereNotNull('tls_probe_completed_at')
+                            ->orWhere('tls_probe_started_at', '<=', $leaseBefore);
+                    })
+                    ->update([
+                        'tls_probe_version' => DB::raw('tls_probe_version + 1'),
+                        'tls_probe_started_at' => now(),
+                        'tls_probe_completed_at' => null,
+                        'updated_at' => now(),
+                    ]);
+                if ($claimed !== 1) {
+                    continue;
+                }
+                $version = (int) DB::table('custom_domains')->where('id', $row->id)->value('tls_probe_version');
+                ProbeDomainTlsJob::dispatch(
+                    (int) $row->id,
+                    (int) $row->workspace_id,
+                    (string) $row->domain,
+                    $version,
+                )->afterCommit();
             } catch (\Throwable $e) {
                 // The next sweep retries; monitoring must never break the
                 // rest of housekeeping.
