@@ -53,6 +53,7 @@ backup-drill-evidence.json
 .agents/
 skills-lock.json
 .uvh-runtime/
+.planning/
 
 # ── Editors / OS ─────────────────────────────────────────────
 .vscode/*
