@@ -36,7 +36,8 @@ describe("Link library presentation", () => {
   it("keeps row actions outside a link and does not hijack their keyboard events", () => {
     const host: HTMLElement = fixture.nativeElement;
     const navigation = spyOn(TestBed.inject(Router), "navigate");
-    const action = host.querySelector<HTMLButtonElement>('button[aria-label="Más acciones"]')!;
+    const action = host.querySelector<HTMLButtonElement>('button[aria-label="Más acciones para uvh.test/example-1"]')!;
+    expect(action).not.toBeNull();
     action.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     action.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
     expect(navigation).not.toHaveBeenCalled();

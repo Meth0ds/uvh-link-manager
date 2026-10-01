@@ -29,7 +29,11 @@ final class WorkspaceMutation
                 throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
             }
 
-            return $mutation();
+            $result = $mutation();
+            Audit::write((int) $user->id, 'workspace.mutation_committed', 'workspace', $workspaceId,
+                ['route' => $request->route()?->uri()], workspaceId: $workspaceId);
+
+            return $result;
         });
     }
 

@@ -14,21 +14,23 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $execute_after
  * @property Carbon|null $confirmed_at
  * @property Carbon|null $cancelled_at
+ * @property bool $cancellation_audit_pending
  * @property Carbon|null $executed_at
  */
 class AccountDeletionRequest extends Model
 {
     protected $fillable = [
         'user_id', 'security_version', 'status', 'confirmation_token_hash', 'cancel_token_hash',
-        'confirmation_expires_at', 'execute_after', 'confirmed_at', 'cancelled_at', 'executed_at',
+        'confirmation_expires_at', 'execute_after', 'confirmed_at', 'cancelled_at', 'executed_at', 'cancellation_audit_pending',
     ];
 
-    protected $hidden = ['confirmation_token_hash', 'cancel_token_hash'];
+    protected $hidden = ['confirmation_token_hash', 'cancel_token_hash', 'cancellation_audit_pending'];
 
     protected function casts(): array
     {
         return [
             'security_version' => 'integer',
+            'cancellation_audit_pending' => 'boolean',
             'confirmation_expires_at' => 'datetime',
             'execute_after' => 'datetime',
             'confirmed_at' => 'datetime',

@@ -31,8 +31,6 @@ use Illuminate\Support\Facades\DB;
 
 class DomainController
 {
-    private const MAX_DOMAINS_PER_WORKSPACE = WorkspaceLimits::DOMAINS;
-
     private const VERIFICATION_LOCK_SECONDS = 600;
 
     public function index(Request $request)
@@ -289,7 +287,7 @@ class DomainController
                     return ['status' => 'forbidden'];
                 }
                 $this->renewIdempotency($guard);
-                if (CustomDomain::where('workspace_id', $workspaceId)->count() >= self::MAX_DOMAINS_PER_WORKSPACE) {
+                if (CustomDomain::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('domains')) {
                     return ['status' => 'limit'];
                 }
 

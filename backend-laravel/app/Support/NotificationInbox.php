@@ -60,7 +60,7 @@ final class NotificationInbox
 
         $digestible = $delivery === NotificationPreferences::DELIVERY_DAILY_DIGEST;
 
-        DB::table('notifications')->insertOrIgnore([
+        $inserted = DB::table('notifications')->insertOrIgnore([
             'user_id' => $userId,
             'workspace_id' => $workspaceId,
             'kind' => $kind,
@@ -74,7 +74,7 @@ final class NotificationInbox
             'digested_at' => $digestible ? null : now(),
         ]);
 
-        return $delivery;
+        return $inserted === 1 ? $delivery : null;
     }
 
     /** Cuántos avisos sin leer tiene la cuenta. */

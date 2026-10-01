@@ -37,7 +37,7 @@ import { LatestRequest } from "../core/services/latest-request";
         <p class="sub">Vas a entrar en administración. Confirma tu contraseña y un segundo factor para realizar acciones sensibles con una verificación reciente.</p>
         @if (initializing()) { <p class="auth-note" role="status">Comprobando la sesión y los requisitos de acceso. Todavía no necesitas introducir ningún código.</p> }
 
-        @if (!initializing()) {
+        @if (!initializing() && ready()) {
           <form class="form" [formGroup]="form" (ngSubmit)="submit()">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>Contraseña</mat-label>
@@ -65,6 +65,10 @@ import { LatestRequest } from "../core/services/latest-request";
           </form>
         }
 
+        @if (!initializing() && !ready() && error()) {
+          <div class="alert error" role="alert">{{ error() }}</div>
+          <button mat-flat-button type="button" (click)="retryInitialization()">Reintentar comprobación</button>
+        }
         <a class="back" routerLink="/app/dashboard"><mat-icon aria-hidden="true">arrow_back</mat-icon>Volver al panel</a>
         <p class="auth-note">Esta comprobación no cierra tu sesión general. Solo confirma el acceso reciente a la consola administrativa.</p>
       </section>
@@ -81,8 +85,10 @@ export class MfaReauthenticateComponent {
   private readonly initializeRequests = new LatestRequest(inject(DestroyRef));
   private readonly submitRequests = new LatestRequest(inject(DestroyRef));
   private terminalNavigation = false;
+  private verifiedContext: string | null = null;
 
   readonly initializing = signal(true);
+  readonly ready = signal(false);
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   readonly hidePassword = signal(true);
@@ -97,11 +103,11 @@ export class MfaReauthenticateComponent {
   }
 
   async submit(): Promise<void> {
-    if (this.form.invalid || this.busy()) {
+    if (!this.ready() || this.initializing() || this.verifiedContext !== this.context() || this.form.invalid || this.busy()) {
       this.form.markAllAsTouched();
       return;
     }
-    const request = this.submitRequests.begin(this.returnTo);
+    const request = this.submitRequests.begin(this.context());
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -109,27 +115,44 @@ export class MfaReauthenticateComponent {
         this.form.controls.password.value,
         this.form.controls.factorCode.value,
       );
-      if (!this.submitRequests.isCurrent(request, this.returnTo)) return;
+      if (!this.submitRequests.isCurrent(request, this.context())) return;
       this.form.reset();
       await this.navigateOnce(
         () => this.router.navigateByUrl(this.returnTo),
-        () => this.submitRequests.isCurrent(request, this.returnTo),
+        () => this.submitRequests.isCurrent(request, this.context()),
       );
     } catch (error) {
-      if (!this.submitRequests.isCurrent(request, this.returnTo)) return;
+      if (!this.submitRequests.isCurrent(request, this.context())) return;
       this.form.controls.factorCode.reset();
       this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar tu identidad");
     } finally {
-      if (this.submitRequests.isCurrent(request, this.returnTo)) this.busy.set(false);
+      if (this.submitRequests.isCurrent(request, this.context())) this.busy.set(false);
     }
   }
 
+  retryInitialization(): void {
+    if (this.initializing() || this.busy() || this.terminalNavigation) return;
+    void this.initialize();
+  }
+
+  private context(): string {
+    return `${this.returnTo}:${this.auth.sessionGeneration()}`;
+  }
+
   private async initialize(): Promise<void> {
-    const request = this.initializeRequests.begin(this.returnTo);
-    const current = () => this.initializeRequests.isCurrent(request, this.returnTo);
+    this.initializing.set(true);
+    this.ready.set(false);
+    this.verifiedContext = null;
+    this.error.set(null);
+    const request = this.initializeRequests.begin(this.context());
+    const current = () => this.initializeRequests.isCurrent(request, this.context());
     try {
       if (!this.auth.loaded()) await this.auth.init();
       if (!current()) return;
+      if (!this.auth.loaded()) {
+        this.error.set("No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.");
+        return;
+      }
       if (!this.auth.authenticated()) {
         await this.navigateOnce(
           () => this.router.navigate(["/auth"], { queryParams: { returnTo: this.returnTo } }),
@@ -150,7 +173,10 @@ export class MfaReauthenticateComponent {
       if (status.fresh) {
         this.auth.clearAdminMfaReauthentication();
         await this.navigateOnce(() => this.router.navigateByUrl(this.returnTo), current);
+        return;
       }
+      this.verifiedContext = this.context();
+      this.ready.set(true);
     } catch (error) {
       if (current()) {
         this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo comprobar el estado de la sesión");

@@ -203,18 +203,18 @@
           }
         </div>
         <div class="link-actions">
-          <button mat-icon-button matTooltip="Copiar" (click)="$event.stopPropagation(); copy(link.shortUrl)" aria-label="Copiar enlace">
+          <button mat-icon-button matTooltip="Copiar" (click)="$event.stopPropagation(); copy(link.shortUrl)" [attr.aria-label]="'Copiar enlace ' + displayUrl(link.shortUrl)">
             <mat-icon>content_copy</mat-icon>
           </button>
-          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr(link.shortUrl)" aria-label="Generar QR">
+          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr(link.shortUrl)" [attr.aria-label]="'Generar QR para ' + displayUrl(link.shortUrl)">
             <mat-icon>qr_code_2</mat-icon>
           </button>
           @if (canWrite()) {
-            <button mat-icon-button matTooltip="Editar" (click)="$event.stopPropagation(); edit(link)" aria-label="Editar enlace" [disabled]="actionId() === link.id">
+            <button mat-icon-button matTooltip="Editar" (click)="$event.stopPropagation(); edit(link)" [attr.aria-label]="'Editar enlace ' + displayUrl(link.shortUrl)" [disabled]="actionId() === link.id">
               <mat-icon>edit</mat-icon>
             </button>
           }
-          <button mat-icon-button [matMenuTriggerFor]="menu" (click)="$event.stopPropagation()" aria-label="Más acciones" [disabled]="actionId() === link.id">
+          <button mat-icon-button [matMenuTriggerFor]="menu" (click)="$event.stopPropagation()" [attr.aria-label]="'Más acciones para ' + displayUrl(link.shortUrl)" [disabled]="actionId() === link.id">
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">

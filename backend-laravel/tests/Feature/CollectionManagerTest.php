@@ -30,6 +30,31 @@ final class CollectionManagerTest extends TestCase
         $this->withCookie('uvh_csrf', self::CSRF)->withHeaders(['X-CSRF-Token' => self::CSRF]);
     }
 
+    public function test_tag_capacity_allows_reuse_but_rejects_growth_atomically(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $this->signIn($owner, $workspace);
+        config(['entitlements.limits.tags' => 1]);
+        $this->postJson('/api/v1/links', ['alias' => 'tag-one', 'destination' => 'https://example.org/', 'tags' => ['existing']])->assertCreated();
+        $this->postJson('/api/v1/links', ['alias' => 'tag-two', 'destination' => 'https://example.org/', 'tags' => ['existing']])->assertCreated();
+        $this->postJson('/api/v1/links', ['alias' => 'tag-three', 'destination' => 'https://example.org/', 'tags' => ['new']])->assertStatus(409);
+        $this->assertDatabaseMissing('links', ['alias' => 'tag-three']);
+        $this->assertSame(1, DB::table('tags')->where('workspace_id', $workspace->id)->count());
+    }
+
+    public function test_catalog_capacity_rejects_growth_but_keeps_existing_rows_readable(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $this->signIn($owner, $workspace);
+        $rows = [];
+        for ($i = 0; $i < 501; $i++) {
+            $rows[] = ['workspace_id' => $workspace->id, 'name' => 'Elemento '.$i];
+        }
+        DB::table('collections')->insert($rows);
+        $this->postJson('/api/v1/collections', ['name' => 'Otra'])->assertStatus(409);
+        $this->getJson('/api/v1/collections')->assertOk()->assertJsonCount(501, 'collections');
+    }
+
     public function test_collections_round_trip_with_their_live_link_counts(): void
     {
         [$owner, $workspace] = $this->workspace();

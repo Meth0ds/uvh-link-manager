@@ -71,10 +71,13 @@ services:
     # production branch never runs here. It decides by $1, and `sh` never matches
     # `php-fpm`, so `uvh:release-check` is skipped without any visible symptom.
     # That is harmless while APP_ENV=testing and is asserted by the release-boot
-    # contract, which keeps the image CMD intact.
+    # contract, which keeps the image CMD intact. The shell must stay a
+    # non-login `sh -c`: a login shell re-runs /etc/profile, which resets PATH
+    # and drops /usr/local/sbin for non-root users, so `php-fpm` — shipped there
+    # by the upstream image — is never found and the app exits 127.
     command:
       - sh
-      - -lc
+      - -c
       - |
         case "$$DB_DATABASE" in
           *_test) ;;

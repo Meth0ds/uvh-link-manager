@@ -134,6 +134,7 @@ return [
         'domain_monitor' => filter_var(env('REPUTATION_DOMAIN_MONITOR', true), FILTER_VALIDATE_BOOLEAN),
     ],
     'analytics' => [
+        'overview_cache_seconds' => (int) env('ANALYTICS_OVERVIEW_CACHE_SECONDS', 30),
         // Valores distintos conservados por dimensión y día en el rollup. Es un
         // tope necesario (`referrers` lo controla quien visita, con cualquier
         // cabecera Referer) y se aplica al recortar por frecuencia, no por orden

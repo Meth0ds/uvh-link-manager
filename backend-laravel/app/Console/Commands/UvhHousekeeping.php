@@ -8,6 +8,7 @@ use App\Jobs\VerifyDomainDnsJob;
 use App\Models\CustomDomain;
 use App\Models\Link;
 use App\Models\User;
+use App\Support\AccountDeletionAudit;
 use App\Support\Audit;
 use App\Support\DestinationReputationService;
 use App\Support\DomainClaims;
@@ -20,6 +21,7 @@ use App\Support\LinkIntentRegistry;
 use App\Support\MailOutboxCompensation;
 use App\Support\MailOutboxDispatcher;
 use App\Support\OperationalMetrics;
+use App\Support\OperationalNotices;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\ReputationVerdict;
 use App\Support\UvhCrypto;
@@ -45,6 +47,16 @@ class UvhHousekeeping extends Command
 
             return $ok;
         };
+
+        $run('protective_deletion_audits', fn () => AccountDeletionAudit::reconcile());
+
+        $run('audit_outbox', function (): void {
+            if (! Audit::drain()) {
+                throw new \RuntimeException('Audit materialization unavailable');
+            }
+        });
+
+        $run('operational_notices', fn () => OperationalNotices::sweep());
 
         $run('link_lifecycle', fn () => $this->transitionDueLinks());
 
@@ -471,6 +483,7 @@ class UvhHousekeeping extends Command
         });
 
         $run('governance_records', function () use ($batch, $cutoff): void {
+            DB::table('operational_notice_events')->where('created_at', '<', now()->subDays(31))->delete();
             $auditCutoff = $cutoff($this->days('audit_purge_days', 365));
             $this->purgeInBatches('audit_events', 'id', 'created_at < ?', [$auditCutoff], $batch);
 
@@ -493,6 +506,13 @@ class UvhHousekeeping extends Command
             $this->purgeInBatches('click_events', 'id', 'occurred_at < ?', [$retentionCutoff], $batch);
             $this->purgeInBatches('metric_rollups', 'id', 'day < ?', [$retentionCutoff], $batch);
             DB::delete('DELETE FROM metric_unique_visitors WHERE day < ?', [substr($retentionCutoff, 0, 10)]);
+            if (Cache::put('uvh:retention:analytics', [
+                'completed_at' => time(),
+                'retention_days' => WorkspaceLimits::analyticsRetentionDays(),
+                'cutoff' => $retentionCutoff,
+            ], now()->addMinutes(max(10, (int) config('uvh.housekeeping.interval_minutes', 60) * 2))) !== true) {
+                throw new \RuntimeException('No se pudo guardar la verificación de purga analítica');
+            }
         });
 
         return $ok;

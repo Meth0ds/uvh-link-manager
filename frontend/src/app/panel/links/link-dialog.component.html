@@ -181,11 +181,11 @@
                         <mat-option value="tablet">Tablet</mat-option>
                       </mat-select>
                     </mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>SO (contiene)</mat-label><input matInput formControlName="os" placeholder="Android" maxlength="40" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>SO (contiene)</mat-label><input matInput formControlName="os" placeholder="Android" maxlength="80" /></mat-form-field>
                     <mat-form-field appearance="outline"><mat-label>Desde (HH:mm UTC)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" />@if (rule.controls.timeFrom.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
                     <mat-form-field appearance="outline"><mat-label>Hasta (HH:mm UTC)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" />@if (rule.controls.timeTo.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="twitter.com" maxlength="200" /></mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" maxlength="100" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="twitter.com" maxlength="400" /></mat-form-field>
+                    <mat-form-field appearance="outline"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" maxlength="200" /></mat-form-field>
                   </div>
                   <mat-form-field appearance="outline" class="full">
                     <mat-label>Destino de la regla</mat-label>

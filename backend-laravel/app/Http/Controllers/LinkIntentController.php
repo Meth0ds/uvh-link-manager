@@ -227,8 +227,9 @@ class LinkIntentController
     private function intentSource(Request $request): ?array
     {
         $body = $this->bodyIntent($request);
-        if ($body !== null) {
-            return ['intent' => $body, 'parked' => false];
+        if ($request->has('intent')) {
+            // An invalid explicit bearer must never spend a different parked one.
+            return $body === null ? null : ['intent' => $body, 'parked' => false];
         }
 
         $parked = PendingHandoff::bearer($request, PendingHandoff::INTENT);

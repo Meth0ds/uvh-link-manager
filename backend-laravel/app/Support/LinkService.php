@@ -515,6 +515,9 @@ class LinkService
                 ->whereRaw('lower(name) = lower(?)', [$name])
                 ->first();
             if (! $tag) {
+                if (Tag::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('tags')) {
+                    throw new LinkException('Límite de etiquetas alcanzado. Reutiliza o fusiona etiquetas existentes.', 409);
+                }
                 try {
                     $tag = Tag::create(['workspace_id' => $workspaceId, 'name' => $name]);
                 } catch (QueryException $e) {

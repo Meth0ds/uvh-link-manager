@@ -19,8 +19,8 @@ import { LatestRequest } from "../core/services/latest-request";
         <mat-icon class="icon" aria-hidden="true" [class.ok]="done()" [class.bad]="error()">{{ done() ? 'restore' : (error() ? 'error_outline' : 'undo') }}</mat-icon>
         <h2 id="cancel-account-deletion-title">{{ done() ? 'Eliminación cancelada' : (!hasLink ? 'Enlace no disponible' : (error() ? 'No se pudo cancelar' : 'Conservar mi cuenta')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
-        @if (!done() && !error()) {
-          <button mat-flat-button color="primary" type="button" (click)="cancel()" [disabled]="busy()">{{ busy() ? 'Restaurando…' : 'Cancelar eliminación' }}</button>
+        @if (!done() && (!error() || retryable())) {
+          <button mat-flat-button color="primary" type="button" (click)="cancel()" [disabled]="busy()">{{ busy() ? 'Restaurando…' : (retryable() ? 'Reintentar cancelación' : 'Cancelar eliminación') }}</button>
         } @else {
           <a mat-flat-button color="primary" routerLink="/auth">{{ done() ? 'Iniciar sesión de nuevo' : 'Volver al acceso' }}</a>
         }
@@ -42,6 +42,7 @@ export class CancelAccountDeletionComponent {
   readonly busy = signal(false);
   readonly done = signal(false);
   readonly error = signal(false);
+  readonly retryable = signal(false);
   readonly message = signal("La cuenta volverá a estar disponible. Tendrás que iniciar sesión de nuevo. Los tokens API revocados y las invitaciones canceladas no se restaurarán.");
 
   constructor() {
@@ -54,9 +55,11 @@ export class CancelAccountDeletionComponent {
   }
 
   async cancel(): Promise<void> {
-    if (this.busy() || this.done() || this.error()) return;
+    if (this.busy() || this.done() || (this.error() && !this.retryable())) return;
     const request = this.requests.begin(this.token);
     this.busy.set(true);
+    this.error.set(false);
+    this.retryable.set(false);
     try {
       await this.api.post("/api/v1/auth/account-deletion/cancel", { token: this.token });
       if (!this.requests.isCurrent(request, this.token)) return;
@@ -65,6 +68,7 @@ export class CancelAccountDeletionComponent {
     } catch (error) {
       if (!this.requests.isCurrent(request, this.token)) return;
       this.error.set(true);
+      this.retryable.set(!(error instanceof ApiRequestError) || error.status === 0 || error.status === 429 || error.status >= 500);
       this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo cancelar la eliminación.");
     } finally {
       if (this.requests.isCurrent(request, this.token)) this.busy.set(false);

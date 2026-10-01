@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from "@angular/core";
+import { Component, ChangeDetectionStrategy, ElementRef, viewChild } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import { PublicThemeToggleComponent } from "../core/public-theme-toggle.component";
 
@@ -11,6 +11,7 @@ import { PublicThemeToggleComponent } from "../core/public-theme-toggle.componen
   imports: [RouterLink, PublicThemeToggleComponent],
   template: `
     <div class="auth-shell">
+      <button class="skip-form" type="button" (click)="skipToForm()">Saltar al formulario</button>
       <header class="auth-header">
         <a class="brand" routerLink="/" aria-label="UVH, inicio">uvh<span>.</span></a>
         <a class="back-link" routerLink="/">Volver a la web <span aria-hidden="true">↗</span></a>
@@ -25,11 +26,21 @@ import { PublicThemeToggleComponent } from "../core/public-theme-toggle.componen
         <div class="brand-note"><span class="note-index">01 / UN ENLACE CON RECORRIDO</span><div class="note-alias">uvh.es/<b>tu-proximo-paso</b></div><div class="note-path" aria-hidden="true">└───────────→</div><p>La dirección se queda.<br />Tú decides adónde lleva.</p></div>
         <div class="brand-footer"><span>ENLACES CON RECORRIDO.</span><a routerLink="/help">¿Necesitas ayuda? ↗</a></div>
       </aside>
-      <main class="auth-main"><ng-content /></main>
+      <main #mainContent class="auth-main" tabindex="-1"><ng-content /></main>
       <footer class="auth-footer"><span>UVH / ACCESO A TU CUENTA</span><nav aria-label="Información legal"><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos</a><a routerLink="/help">Ayuda</a></nav></footer>
     </div>
   `,
   styleUrl: "./auth-shell.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AuthShellComponent {}
+export class AuthShellComponent {
+  private readonly mainContent = viewChild.required<ElementRef<HTMLElement>>("mainContent");
+
+  skipToForm(): void {
+    const main = this.mainContent().nativeElement;
+    // Auth links can carry credentials in the fragment; jumping by focus must
+    // preserve the URL rather than replacing it with an anchor fragment.
+    main.focus({ preventScroll: true });
+    main.scrollIntoView({ block: "start", behavior: "auto" });
+  }
+}

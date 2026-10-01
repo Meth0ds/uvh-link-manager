@@ -8,6 +8,7 @@ use App\Support\MailDeliveryEligibility;
 use App\Support\MailLifecycleCompensator;
 use App\Support\MailOutboxCompensation;
 use App\Support\OperationalMetrics;
+use App\Support\RequestTrace;
 use App\Support\UvhCrypto;
 use App\Support\UvhMail;
 use Illuminate\Bus\Queueable;
@@ -111,7 +112,12 @@ final class DeliverMailOutboxJob implements ShouldQueue
                 throw new \RuntimeException('Invalid encrypted mail envelope');
             }
             $errorCode = 'transport_unavailable';
-            $delivered = UvhMail::sendNow($message['to'], $message['subject'], $message['html'], $message['text']);
+            RequestTrace::push(is_string($message['correlation_id'] ?? null) ? $message['correlation_id'] : null);
+            try {
+                $delivered = UvhMail::sendNow($message['to'], $message['subject'], $message['html'], $message['text']);
+            } finally {
+                RequestTrace::pop();
+            }
         } catch (\Throwable) {
             // Never copy decrypted fields or bearer URLs into job exceptions.
             $delivered = false;

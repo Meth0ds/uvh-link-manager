@@ -18,7 +18,7 @@ export async function registerFromBrowser(
   await page.getByLabel("Repite la contraseña").fill(password);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Crear cuenta" }).click();
-  await expect(page.getByRole("heading", { name: "Revisa tu email" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tu siguiente paso está en el correo." })).toBeVisible();
 }
 
 export async function loginFromBrowser(page: Page, email: string, password = E2E_PASSWORD): Promise<void> {

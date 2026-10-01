@@ -117,9 +117,13 @@ services:
         condition: service_healthy
       hcaptcha:
         condition: service_started
+    # The shell must stay a non-login `sh -c`: a login shell re-runs
+    # /etc/profile, which resets PATH and drops /usr/local/sbin for non-root
+    # users, so `php-fpm` — shipped there by the upstream image — is never
+    # found and the app exits 127.
     command:
       - sh
-      - -lc
+      - -c
       - |
         case "$$DB_DATABASE" in
           *_test) ;;

@@ -295,9 +295,13 @@ services:
       timeout: 30s
       retries: 30
       start_period: 10s
+    # The shell must stay a non-login `sh -c`: a login shell re-runs
+    # /etc/profile, which resets PATH and drops /usr/local/sbin for non-root
+    # users, so `php-fpm` — shipped there by the upstream image — is never
+    # found and the app exits 127.
     command:
       - sh
-      - -lc
+      - -c
       - |
         case "$$DB_DATABASE" in
           *_test) ;;
@@ -352,7 +356,7 @@ services:
   # VA queries this server directly. An empty `/zones` at boot is fine: `auto`
   # picks the file up within its reload window.
   coredns:
-    image: coredns/coredns:1.12.1@sha256:e8c262566636e6bc340ece6473b0eed193cad045384401529721ddbe6463d31c
+    image: coredns/coredns:1.14.7@sha256:7efd3c635b03efd68c4e8398fc45f0d993d0e9ab016f72c1cefb0fd6d01aa286
     command: ["-conf", "/etc/coredns/Corefile"]
     volumes:
       - ./docker/tls-e2e/Corefile:/etc/coredns/Corefile:ro
@@ -367,7 +371,9 @@ services:
   # Mini CA in docker/tls-e2e/pebble.minica.pem, which the edge serves and the
   # platform's probe trusts.
   pebble:
-    image: ghcr.io/letsencrypt/pebble:latest@sha256:ddf230642b1a584f519f32e347de1b05a6e4c1f6c35c1863b33effeab5f78199
+    build:
+      context: .
+      dockerfile: docker/tls-e2e/Dockerfile.pebble
     command: ["-config", "/test/config/pebble-config.json", "-dnsserver", "172.31.0.54:53"]
     environment:
       # No artificial validator sleeps and no random nonce rejections: the

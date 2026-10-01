@@ -46,6 +46,19 @@ describe("CollectionsDialogComponent", () => {
 
   afterEach(() => fixture.destroy());
 
+  it("never reloads another workspace after a delayed creation", async () => {
+    let resolve!: (value: unknown) => void;
+    api.post.and.returnValue(new Promise((done) => { resolve = done; }));
+    component.newName = "Pendiente";
+    const pending = component.create();
+    workspaceId.set(2);
+    fixture.detectChanges();
+    resolve({ collection: { id: 2, name: "Pendiente", links: 0 } });
+    await pending;
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(component.collections()[0].name).toBe("Campaña");
+  });
+
   it("creates a collection with the store contract and reloads the list", async () => {
     component.newName = "Nueva";
     await component.create();

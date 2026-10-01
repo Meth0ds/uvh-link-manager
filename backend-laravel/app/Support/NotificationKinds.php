@@ -29,6 +29,8 @@ final class NotificationKinds
     public const CATEGORY_OPERATIONAL = 'operational';
 
     // Obligatorios: seguridad de la cuenta o respuesta a una solicitud propia.
+    public const SESSION_REVOKED = 'session_revoked';
+
     public const PASSWORD_CHANGED = 'password_changed';
 
     public const SESSIONS_REVOKED_OTHERS = 'sessions_revoked_others';
@@ -66,6 +68,16 @@ final class NotificationKinds
 
     public const ACCOUNT_RECOVERY_REJECTED = 'account_recovery_rejected';
 
+    public const WEBHOOK_EXHAUSTED = 'webhook_exhausted';
+
+    public const LINK_EXPIRING = 'link_expiring';
+
+    public const LINK_LIMIT_APPROACHING = 'link_limit_approaching';
+
+    public const API_TOKEN_EXPIRING = 'api_token_expiring';
+
+    public const INVITATION_EXPIRING = 'invitation_expiring';
+
     // Dominios personalizados: salud del servicio que el workspace publica.
     public const DOMAIN_DNS_DEGRADED = 'domain_dns_degraded';
 
@@ -81,6 +93,7 @@ final class NotificationKinds
 
     /** @var array<string, array{category: string, workspace: bool, route: ?string, title: string}> */
     private const CATALOG = [
+        self::SESSION_REVOKED => ['category' => self::CATEGORY_MANDATORY, 'workspace' => false, 'route' => '/app/security', 'title' => 'Se revocó una sesión de tu cuenta'],
         self::PASSWORD_CHANGED => ['category' => self::CATEGORY_MANDATORY, 'workspace' => false, 'route' => '/app/settings/security', 'title' => 'Cambiaste tu contraseña'],
         self::SESSIONS_REVOKED_OTHERS => ['category' => self::CATEGORY_MANDATORY, 'workspace' => false, 'route' => '/app/security', 'title' => 'Cerraste las demás sesiones de tu cuenta'],
         self::SESSIONS_REVOKED_ALL => ['category' => self::CATEGORY_MANDATORY, 'workspace' => false, 'route' => '/app/security', 'title' => 'Cerraste todas las sesiones de tu cuenta'],
@@ -100,6 +113,12 @@ final class NotificationKinds
         self::WORKSPACE_OWNERSHIP_TRANSFER => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/team', 'title' => 'Cambió la propiedad del workspace'],
         self::WORKSPACE_DELETED => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => null, 'title' => 'Se eliminó un workspace'],
         self::ACCOUNT_RECOVERY_REJECTED => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => false, 'route' => '/app/settings/security', 'title' => 'Se rechazó una recuperación de cuenta'],
+
+        self::WEBHOOK_EXHAUSTED => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/webhooks', 'title' => 'Una entrega de webhook requiere revisión'],
+        self::LINK_EXPIRING => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/links', 'title' => 'Un enlace está próximo a caducar'],
+        self::LINK_LIMIT_APPROACHING => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/links', 'title' => 'Un enlace está próximo a agotar sus clics'],
+        self::API_TOKEN_EXPIRING => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/tokens', 'title' => 'Un token API está próximo a caducar'],
+        self::INVITATION_EXPIRING => ['category' => self::CATEGORY_OPERATIONAL, 'workspace' => true, 'route' => '/app/team', 'title' => 'Una invitación está próxima a caducar'],
 
         // Perder un dominio propio deja sin servicio a todos sus enlaces: el
         // aviso de caída y el cambio de propiedad son de contrato, no

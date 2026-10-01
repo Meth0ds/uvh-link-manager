@@ -9,6 +9,7 @@ use App\Support\Ids;
 use App\Support\SessionManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -53,6 +54,46 @@ final class AnalyticsExportTest extends TestCase
             'updated_at' => now(),
         ]);
         $this->signIn();
+    }
+
+    public function test_cached_overview_expires_and_does_not_cross_link_scope(): void
+    {
+        config(['uvh.analytics.overview_cache_seconds' => 30]);
+        $path = '/api/v1/analytics/overview?period=custom&from='.urlencode(now()->subDay()->toIso8601String()).'&to='.urlencode(now()->addHour()->toIso8601String());
+        $this->getJson($path)->assertOk()->assertJsonPath('totals.clicks', 0);
+        AnalyticsService::recordClick($this->linkId, $this->meta('ES', 'cached'));
+        $this->getJson($path)->assertOk()->assertJsonPath('totals.clicks', 0);
+        $this->getJson($path.'&linkId='.$this->linkId)->assertOk()->assertJsonPath('totals.clicks', 1);
+        $this->travel(31)->seconds();
+        $this->getJson($path)->assertOk()->assertJsonPath('totals.clicks', 1);
+        $this->travelBack();
+    }
+
+    public function test_overview_uses_one_snapshot_when_ingestion_commits_between_queries(): void
+    {
+        AnalyticsService::recordClick($this->linkId, $this->meta('ES', 'first'));
+        config(['database.connections.analytics-race' => config('database.connections.pgsql')]);
+        $inserted = false;
+        DB::listen(function ($query) use (&$inserted): void {
+            if ($inserted || ! str_contains($query->sql, 'count(*)')
+                || ! str_contains($query->sql, 'click_events')) {
+                return;
+            }
+            $inserted = true;
+            DB::connection('analytics-race')->table('click_events')->insert([
+                'event_id' => (string) Str::uuid(),
+                'link_id' => $this->linkId, 'occurred_at' => now(), 'password_ok' => true,
+            ]);
+        });
+        try {
+            $response = $this->getJson('/api/v1/analytics/overview')->assertOk();
+            $this->assertTrue($inserted);
+            $this->assertSame(1, $response->json('totals.clicks'));
+            $this->assertSame(1, array_sum(array_column($response->json('series'), 'clicks')));
+            $this->assertSame(2, DB::table('click_events')->count());
+        } finally {
+            DB::purge('analytics-race');
+        }
     }
 
     public function test_the_csv_export_carries_only_aggregates_and_guards_formulas(): void

@@ -78,13 +78,17 @@ async function acceptInvitation(page: Page, email: string, invitationUrl: string
   await page.getByRole("link", { name: "Ir a mi panel" }).click();
   await page.getByRole("button", { name: "Cambiar workspace" }).click();
   await page.getByRole("menuitem", { name: workspaceName }).click();
-  await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
+  // Anclado al picker superior: el nombre también vive en el resumen del
+  // sidenav, que se oculta a propósito en ventanas bajas.
+  await expect(page.getByRole("button", { name: "Cambiar workspace" }).getByText(workspaceName, { exact: true })).toBeVisible();
 }
 
 async function selectWorkspace(page: Page, workspaceName: string): Promise<void> {
   await page.getByRole("button", { name: "Cambiar workspace" }).click();
   await page.getByRole("menuitem", { name: workspaceName }).click();
-  await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
+  // Anclado al picker superior: el nombre también vive en el resumen del
+  // sidenav, que se oculta a propósito en ventanas bajas.
+  await expect(page.getByRole("button", { name: "Cambiar workspace" }).getByText(workspaceName, { exact: true })).toBeVisible();
 }
 
 async function changeMemberRole(page: Page, email: string, role: InvitableRole): Promise<void> {
@@ -492,6 +496,7 @@ test("una sesión MFA caducada reautentica administración y registra el evento"
 
   // Recovery codes are single-display credentials. Keep two only in process:
   // one creates a fresh admin session and the other performs the step-up.
+  await expect(page.locator("[aria-label='Códigos de recuperación'] code").nth(1)).toBeVisible();
   const recoveryCodes = await page.locator("[aria-label='Códigos de recuperación'] code").evaluateAll((codes) =>
     codes.slice(0, 2).map((code) => code.textContent?.trim() ?? ""));
   expect(recoveryCodes).toHaveLength(2);
@@ -544,6 +549,7 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   // The purge step-up refuses a replayed TOTP counter and enabling MFA already
   // spent this window's one, so a second TOTP here would race the 30-second
   // rollover. A single-use recovery code keeps the irreversible step exact.
+  await expect(page.locator("[aria-label='Códigos de recuperación'] code").first()).toBeVisible();
   const recoveryCodes = await page.locator("[aria-label='Códigos de recuperación'] code").evaluateAll((codes) =>
     codes.slice(0, 1).map((code) => code.textContent?.trim() ?? ""));
   // `.every(Boolean)` on an empty capture is vacuously true; assert the length
@@ -556,7 +562,9 @@ test("la purga irreversible exige frase y contraseña y elimina el enlace", asyn
   await createWorkspaceFromBrowser(page, "Purga E2E");
 
   await page.goto("/app/links");
-  await page.getByRole("main").getByRole("button", { name: "Nuevo enlace" }).click();
+  // "Crear enlace" también nombra la acción del estado vacío dentro de main y
+  // los botones del shell; el punto de entrada bajo prueba es el del encabezado.
+  await page.getByRole("main").locator("app-page-header").getByRole("button", { name: "Crear enlace" }).click();
   const alias = `purge-${Date.now()}`;
   await page.getByLabel("URL de destino").fill("https://example.com/disposable");
   await page.getByLabel("Alias (opcional)").fill(alias);

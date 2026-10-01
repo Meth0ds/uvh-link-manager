@@ -30,7 +30,7 @@ const NOT_PARKED = "No hemos podido guardar la invitación en este navegador. Vu
           <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.invitation-neutral]="rejected()" [class.bad]="!busy() && !ok() && !rejected() && done() && !needsLogin()">{{ busy() ? 'hourglass_empty' : ok() ? 'group_add' : (rejected() ? 'person_remove' : (done() && !needsLogin() ? 'error_outline' : 'group_add')) }}</mat-icon>
-        <h2 id="invitation-accept-title">{{ busy() ? 'Procesando invitación' : ok() ? 'Ya formas parte del equipo' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Tú decides si te unes' : (done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
+        <h2 id="invitation-accept-title">{{ busy() ? 'Procesando invitación' : ok() ? 'Ya formas parte del equipo' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Tú decides si te unes' : (sessionUnavailable() ? 'No se pudo comprobar la sesión' : done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
         <p class="sub" role="status">{{ busy() ? 'Espera a que termine la comprobación. No cierres la página mientras se procesa una acción.' : message() }}</p>
         @if (ready()) {
           <div class="decision-guide"><div><h3>Si aceptas</h3><p>Se añadirá tu cuenta al workspace de la invitación. El servidor comprobará que corresponde a tu cuenta.</p></div><div><h3>Si rechazas</h3><p>Este enlace de invitación quedará invalidado. Tendrás que pedir una nueva invitación si cambias de opinión.</p></div></div>
@@ -42,13 +42,16 @@ const NOT_PARKED = "No hemos podido guardar la invitación en este navegador. Vu
         @if (ok() || rejected()) {
           <a mat-flat-button color="primary" routerLink="/app">Ir a mi panel</a>
         }
+        @if (sessionUnavailable() && !busy()) {
+          <button mat-flat-button color="primary" type="button" (click)="retrySession()">Reintentar comprobación</button>
+        }
         @if (done() && !ok() && needsLogin()) {
           <a mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="{ returnTo: returnTo }">Iniciar sesión para continuar</a>
         }
         @if (invalidIncoming || (!busy() && done() && !ok() && !rejected() && !needsLogin() && !hasParkedInvitation)) {
           <a mat-stroked-button routerLink="/app">Volver a mi panel</a>
         }
-        @if (!busy() && done() && !ok() && !rejected() && !needsLogin() && !ready() && hasParkedInvitation) {
+        @if (!busy() && done() && !ok() && !rejected() && !needsLogin() && !ready() && !sessionUnavailable() && hasParkedInvitation) {
           <div class="invitation-actions">
           <button mat-flat-button color="primary" type="button" (click)="switchAccount()" [disabled]="busy()">Cambiar de cuenta</button>
           <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()">Descartar de este navegador</button>
@@ -67,7 +70,8 @@ export class InvitationAcceptComponent {
   private router = inject(Router);
   private location = inject(Location);
   private invitations = inject(PendingInvitationService);
-  private readonly operations = new LatestRequest(inject(DestroyRef));
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly operations = new LatestRequest(this.destroyRef);
   /** Whether this browser is holding an invitation, and which park it was. */
   private parked = false;
   private revision = 0;
@@ -79,6 +83,7 @@ export class InvitationAcceptComponent {
   readonly rejected = signal(false);
   readonly ready = signal(false);
   readonly needsLogin = signal(false);
+  readonly sessionUnavailable = signal(false);
   readonly message = signal("");
   readonly returnTo = "/invitations/accept";
   get hasParkedInvitation(): boolean { return this.parked && this.invitations.pending(); }
@@ -96,6 +101,7 @@ export class InvitationAcceptComponent {
     // This async setup is the only path to a usable screen: an unexpected
     // failure has to end in a message, never in a view stuck on "Procesando".
     void this.initialize().catch((error: unknown) => {
+      if (this.destroyRef.destroyed) return;
       this.busy.set(false);
       this.ready.set(false);
       this.done.set(true);
@@ -103,6 +109,23 @@ export class InvitationAcceptComponent {
         ? error.message
         : "No se pudo preparar la invitación. Vuelve a abrir el enlace del correo.");
     });
+  }
+
+  async retrySession(): Promise<void> {
+    if (this.busy() || !this.sessionUnavailable() || this.destroyRef.destroyed) return;
+    this.busy.set(true);
+    this.done.set(false);
+    this.needsLogin.set(false);
+    this.sessionUnavailable.set(false);
+    try {
+      await this.initialize();
+    } catch {
+      if (this.destroyRef.destroyed) return;
+      this.sessionUnavailable.set(true);
+      this.busy.set(false);
+      this.done.set(true);
+      this.message.set("No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.");
+    }
   }
 
   async reject(): Promise<void> {
@@ -113,13 +136,15 @@ export class InvitationAcceptComponent {
     this.busy.set(true);
     this.ready.set(false);
     try {
-      if (!await this.parkIsSpendable()) {
+      const spendable = await this.parkIsSpendable();
+      if (!this.operations.isCurrent(request, this.context()) || !this.stillParked()) return;
+      if (!spendable) {
         this.message.set(NOT_PARKED);
         return;
       }
       // The bearer is in the server's cookie now, so the body carries none.
       await this.api.post("/api/v1/workspaces/invitations/reject", {});
-      if (!this.operations.isCurrent(request, context)
+      if (!this.operations.isCurrent(request, this.context())
         || this.auth.sessionGeneration() !== generation
         || !this.stillParked()) return;
       // A terminal answer drops the cookie on the server side as well.
@@ -129,11 +154,11 @@ export class InvitationAcceptComponent {
       this.needsLogin.set(false);
       this.message.set("La invitación ha sido rechazada.");
     } catch (err) {
-      if (this.operations.isCurrent(request, context)) {
+      if (this.operations.isCurrent(request, this.context()) && this.stillParked()) {
         this.message.set(err instanceof ApiRequestError ? err.message : "No se pudo rechazar la invitación.");
       }
     } finally {
-      if (this.operations.isCurrent(request, context)) {
+      if (this.operations.isCurrent(request, this.context())) {
         this.busy.set(false);
         this.done.set(true);
       }
@@ -175,12 +200,14 @@ export class InvitationAcceptComponent {
     this.busy.set(true);
     this.ready.set(false);
     try {
-      if (!await this.parkIsSpendable()) {
+      const spendable = await this.parkIsSpendable();
+      if (!this.operations.isCurrent(request, this.context()) || !this.stillParked()) return;
+      if (!spendable) {
         this.message.set(NOT_PARKED);
         return;
       }
       await this.api.post<{ workspaceId: number }>("/api/v1/workspaces/invitations/accept", {});
-      if (!this.operations.isCurrent(request, context)
+      if (!this.operations.isCurrent(request, this.context())
         || this.auth.sessionGeneration() !== generation
         || !this.stillParked()) return;
       this.invitations.hide();
@@ -188,23 +215,23 @@ export class InvitationAcceptComponent {
       this.message.set("Te has unido al workspace. Ya puedes colaborar en sus enlaces.");
       try {
         const refreshed = await this.auth.refreshWorkspaces(generation);
-        if (!refreshed && this.operations.isCurrent(request, context)) {
+        if (!refreshed && this.operations.isCurrent(request, this.context())) {
           this.message.set("La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.");
         }
       } catch {
-        if (this.operations.isCurrent(request, context)) {
+        if (this.operations.isCurrent(request, this.context())) {
           this.message.set("La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.");
         }
       }
     } catch (err) {
-      if (this.operations.isCurrent(request, context)) {
+      if (this.operations.isCurrent(request, this.context()) && this.stillParked()) {
         this.ok.set(false);
         // 400 is the server's terminal answer, and it drops the cookie with it.
         if (err instanceof ApiRequestError && err.status === 400) this.invitations.hide();
         this.message.set(err instanceof ApiRequestError ? err.message : "La invitación no es válida o ha caducado.");
       }
     } finally {
-      if (this.operations.isCurrent(request, context)) {
+      if (this.operations.isCurrent(request, this.context())) {
         this.busy.set(false);
         this.done.set(true);
       }
@@ -225,6 +252,7 @@ export class InvitationAcceptComponent {
       // made on the first visit is what brought the visitor back. Only the
       // server can say whether it is still there.
       await this.invitations.refresh();
+      if (this.destroyRef.destroyed) return;
       this.parked = this.invitations.pending();
       this.revision = this.invitations.revision();
     }
@@ -238,7 +266,9 @@ export class InvitationAcceptComponent {
     // the deadline it confirms. Both settle here, and the ordering key is taken
     // afterwards: adopting the confirmed park is the point of waiting, not a
     // handoff that changed under the request.
-    if (!await this.invitations.confirmed()) {
+    const confirmed = await this.invitations.confirmed();
+    if (this.destroyRef.destroyed) return;
+    if (!confirmed) {
       this.busy.set(false);
       this.done.set(true);
       this.message.set(NOT_PARKED);
@@ -259,6 +289,7 @@ export class InvitationAcceptComponent {
         if (this.operations.isCurrent(request, this.context())) {
           this.busy.set(false);
           this.done.set(true);
+          this.sessionUnavailable.set(true);
           this.message.set(error instanceof ApiRequestError
             ? error.message
             : "No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.");
@@ -267,6 +298,14 @@ export class InvitationAcceptComponent {
       }
     }
     if (!this.operations.isCurrent(request, this.context()) || !this.stillParked()) return;
+    if (!this.auth.loaded()) {
+      this.busy.set(false);
+      this.done.set(true);
+      this.needsLogin.set(false);
+      this.sessionUnavailable.set(true);
+      this.message.set("No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.");
+      return;
+    }
     if (!this.auth.authenticated()) {
       this.busy.set(false);
       this.done.set(true);

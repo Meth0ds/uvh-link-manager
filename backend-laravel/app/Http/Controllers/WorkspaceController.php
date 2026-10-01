@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\LinkException;
 use App\Models\Invitation;
 use App\Models\Membership;
 use App\Models\User;
@@ -37,8 +38,6 @@ use Illuminate\Support\Facades\DB;
 class WorkspaceController
 {
     private const MAX_OWNED_WORKSPACES = 20;
-
-    private const MAX_ACTIVE_INVITATIONS = WorkspaceLimits::ACTIVE_INVITATIONS;
 
     public function index(Request $request)
     {
@@ -692,8 +691,12 @@ class WorkspaceController
                 // The workspace row serializes admission by different admins;
                 // expired/terminal invitations do not occupy an active slot.
                 if (Invitation::where('workspace_id', $id)->where('status', 'pending')
-                    ->where('expires_at', '>', now())->count() >= self::MAX_ACTIVE_INVITATIONS) {
+                    ->where('expires_at', '>', now())->count() >= WorkspaceLimits::limit('invitations')) {
                     return ['status' => 'limit'];
+                }
+
+                if (Membership::where('workspace_id', $id)->count() >= WorkspaceLimits::limit('members')) {
+                    return ['status' => 'members_limit'];
                 }
 
                 // Reserve after authorization/conflicts, before changing bearer.
@@ -752,6 +755,9 @@ class WorkspaceController
         if ($result['status'] === 'forbidden') {
             return response()->json(['error' => 'Tu acceso o rol en el workspace cambió. Recarga antes de continuar.'], 403);
         }
+        if ($result['status'] === 'members_limit') {
+            return response()->json(['error' => 'Límite de miembros alcanzado en este workspace'], 409);
+        }
         if ($result['status'] !== 'created') {
             if ($result['status'] === 'limit') {
                 return response()->json(['error' => 'Límite de invitaciones activas alcanzado en este workspace'], 429);
@@ -772,7 +778,7 @@ class WorkspaceController
         // still wins when present — that is the documented API, and it is what
         // every client that is not this panel uses.
         $token = UvhRequest::inputString($request, 'token');
-        $fromParked = $token === '';
+        $fromParked = ! $request->has('token');
         if ($fromParked) {
             $token = PendingHandoff::bearer($request, PendingHandoff::INVITATION) ?? '';
         }
@@ -783,50 +789,57 @@ class WorkspaceController
         $tokenHash = Ids::sha256Hex($token);
         $snapshot = Invitation::where('token', $tokenHash)->first(['workspace_id', 'invited_by']);
         $workspaceId = $snapshot ? (int) $snapshot->workspace_id : null;
-        $inv = $snapshot ? DB::transaction(function () use ($tokenHash, $workspaceId, $snapshot, $user): ?Invitation {
-            // Global mutation order is users -> workspace -> child resources.
-            // Transfer of ownership follows this order too; locking the issuer
-            // only after the workspace created a deterministic deadlock cycle.
-            $userIds = array_values(array_unique([(int) $user->id, (int) $snapshot->invited_by]));
-            sort($userIds, SORT_NUMERIC);
-            $lockedUsers = User::whereIn('id', $userIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-            $target = $lockedUsers->get((int) $user->id);
-            $issuer = $lockedUsers->get((int) $snapshot->invited_by);
-            if (! $target || $target->deleted_at || ! $target->email_verified_at
-                || (int) $target->security_version !== (int) $user->security_version) {
-                return null;
-            }
-            if (! Workspace::where('id', $workspaceId)->lockForUpdate()->first()) {
-                return null;
-            }
-            $locked = Invitation::where('token', $tokenHash)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
-            if (! $locked || $locked->status !== 'pending' || $locked->expires_at->lte(now())
-                || (int) $locked->invited_by !== (int) $snapshot->invited_by
-                || strtolower($locked->email) !== strtolower($target->email)) {
-                return null;
-            }
-            // An invitation is not a permanent delegation of authority. Its
-            // issuer must still be active and retain the role needed for the
-            // invited role at the instant the capability is consumed.
-            $issuerMembership = Membership::where('workspace_id', $workspaceId)
-                ->where('user_id', $locked->invited_by)->first();
-            $issuerCanInvite = $issuer && ! $issuer->deleted_at && $issuer->email_verified_at && $issuerMembership
-                && ($locked->role === 'admin'
-                    ? $issuerMembership->role === 'owner'
-                    : WorkspaceAccess::roleAtLeast($issuerMembership->role, 'admin'));
-            if (! $issuerCanInvite) {
-                $locked->update(['status' => 'cancelled']);
+        try {
+            $inv = $snapshot ? DB::transaction(function () use ($tokenHash, $workspaceId, $snapshot, $user): ?Invitation {
+                // Global mutation order is users -> workspace -> child resources.
+                // Transfer of ownership follows this order too; locking the issuer
+                // only after the workspace created a deterministic deadlock cycle.
+                $userIds = array_values(array_unique([(int) $user->id, (int) $snapshot->invited_by]));
+                sort($userIds, SORT_NUMERIC);
+                $lockedUsers = User::whereIn('id', $userIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                $target = $lockedUsers->get((int) $user->id);
+                $issuer = $lockedUsers->get((int) $snapshot->invited_by);
+                if (! $target || $target->deleted_at || ! $target->email_verified_at
+                    || (int) $target->security_version !== (int) $user->security_version) {
+                    return null;
+                }
+                if (! Workspace::where('id', $workspaceId)->lockForUpdate()->first()) {
+                    return null;
+                }
+                $locked = Invitation::where('token', $tokenHash)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
+                if (! $locked || $locked->status !== 'pending' || $locked->expires_at->lte(now())
+                    || (int) $locked->invited_by !== (int) $snapshot->invited_by
+                    || strtolower($locked->email) !== strtolower($target->email)) {
+                    return null;
+                }
+                // An invitation is not a permanent delegation of authority. Its
+                // issuer must still be active and retain the role needed for the
+                // invited role at the instant the capability is consumed.
+                $issuerMembership = Membership::where('workspace_id', $workspaceId)
+                    ->where('user_id', $locked->invited_by)->first();
+                $issuerCanInvite = $issuer && ! $issuer->deleted_at && $issuer->email_verified_at && $issuerMembership
+                    && ($locked->role === 'admin'
+                        ? $issuerMembership->role === 'owner'
+                        : WorkspaceAccess::roleAtLeast($issuerMembership->role, 'admin'));
+                if (! $issuerCanInvite) {
+                    $locked->update(['status' => 'cancelled']);
 
-                return null;
-            }
-            if (Membership::where('workspace_id', $workspaceId)->where('user_id', $target->id)->exists()) {
-                return null;
-            }
-            $locked->update(['status' => 'accepted']);
-            Membership::create(['workspace_id' => $locked->workspace_id, 'user_id' => $target->id, 'role' => $locked->role]);
+                    return null;
+                }
+                if (Membership::where('workspace_id', $workspaceId)->where('user_id', $target->id)->exists()) {
+                    return null;
+                }
+                if (Membership::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('members')) {
+                    throw new LinkException('Límite de miembros alcanzado. Pide al propietario que libere una plaza.', 409);
+                }
+                $locked->update(['status' => 'accepted']);
+                Membership::create(['workspace_id' => $locked->workspace_id, 'user_id' => $target->id, 'role' => $locked->role]);
 
-            return $locked->fresh();
-        }) : null;
+                return $locked->fresh();
+            }) : null;
+        } catch (LinkException $error) {
+            return response()->json(['error' => $error->getMessage()], $error->status);
+        }
         if (! $inv) {
             $rejected = response()->json(['error' => 'Invitación inválida, cancelada o caducada'], 400);
 
@@ -849,7 +862,7 @@ class WorkspaceController
         // Same two sources as `acceptInvitation`: the parked cookie when the
         // request carries no bearer, the body when it does.
         $token = UvhRequest::inputString($request, 'token');
-        $fromParked = $token === '';
+        $fromParked = ! $request->has('token');
         if ($fromParked) {
             $token = PendingHandoff::bearer($request, PendingHandoff::INVITATION) ?? '';
         }
@@ -975,7 +988,7 @@ class WorkspaceController
                 $asOf = now();
                 if (($invitation->status !== 'pending' || $invitation->expires_at->lte($asOf))
                     && Invitation::where('workspace_id', $id)->where('status', 'pending')
-                        ->where('expires_at', '>', $asOf)->count() >= self::MAX_ACTIVE_INVITATIONS) {
+                        ->where('expires_at', '>', $asOf)->count() >= WorkspaceLimits::limit('invitations')) {
                     return ['status' => 'limit'];
                 }
                 // The recipient comes from the locked invitation, NEVER from a

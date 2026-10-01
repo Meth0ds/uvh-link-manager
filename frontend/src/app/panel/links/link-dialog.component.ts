@@ -1,3 +1,4 @@
+import { unicodeMaxLength } from "../../core/unicode-validators";
 import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
@@ -176,13 +177,13 @@ export class LinkDialogComponent {
     singleUse: [false],
     scheduledAt: ["", [localDateTimeValidator]],
     expiresAt: ["", [localDateTimeValidator, ...(this.isEdit ? [] : [futureLocalDateTime])]],
-    notes: ["", [Validators.maxLength(1000), noControlCharacters]],
+    notes: ["", [unicodeMaxLength(1000), noControlCharacters]],
     utm: this.fb.nonNullable.group({
-      source: ["", [Validators.maxLength(100), noControlCharacters]],
-      medium: ["", [Validators.maxLength(100), noControlCharacters]],
-      campaign: ["", [Validators.maxLength(100), noControlCharacters]],
-      term: ["", [Validators.maxLength(100), noControlCharacters]],
-      content: ["", [Validators.maxLength(100), noControlCharacters]],
+      source: ["", [unicodeMaxLength(100), noControlCharacters]],
+      medium: ["", [unicodeMaxLength(100), noControlCharacters]],
+      campaign: ["", [unicodeMaxLength(100), noControlCharacters]],
+      term: ["", [unicodeMaxLength(100), noControlCharacters]],
+      content: ["", [unicodeMaxLength(100), noControlCharacters]],
     }),
   }, { validators: lifecycleOrderValidator });
 
@@ -372,7 +373,7 @@ export class LinkDialogComponent {
     // PostgreSQL resolves tag identity case-insensitively in LinkService, so
     // mirror that rule before presenting what would be the same server tag.
     const duplicate = this.tags().some((tag) => tag.toLowerCase() === value.toLowerCase());
-    if (value && !CONTROL_CHARACTERS.test(value) && !duplicate && this.tags().length < 20) {
+    if (value && Array.from(value).length <= 40 && !CONTROL_CHARACTERS.test(value) && !duplicate && this.tags().length < 20) {
       this.tags.update((t) => [...t, value]);
     }
     event.chipInput.clear();
@@ -484,11 +485,11 @@ export class LinkDialogComponent {
         country: [initial.country ?? "", [Validators.pattern(/^[a-zA-Z]{2}$/)]],
         language: [initial.language ?? "", [Validators.maxLength(8), Validators.pattern(/^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,4})?$/)]],
         device: [initial.device ?? ""],
-        os: [initial.os ?? "", [Validators.maxLength(40), noControlCharacters]],
+        os: [initial.os ?? "", [unicodeMaxLength(40), noControlCharacters]],
         timeFrom: [initial.timeFrom ?? raw.time_from ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
         timeTo: [initial.timeTo ?? raw.time_to ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
-        referrer: [initial.referrer ?? "", [Validators.maxLength(200), noControlCharacters]],
-        campaign: [initial.campaign ?? "", [Validators.maxLength(100), noControlCharacters]],
+        referrer: [initial.referrer ?? "", [unicodeMaxLength(200), noControlCharacters]],
+        campaign: [initial.campaign ?? "", [unicodeMaxLength(100), noControlCharacters]],
         // Empty means delete/omit the row. Non-empty destinations must still
         // satisfy exactly the same URL contract as the primary destination.
         destination: [initial.destination ?? "", [Validators.maxLength(2048), httpUrlValidator]],

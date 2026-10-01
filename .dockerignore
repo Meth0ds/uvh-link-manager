@@ -19,3 +19,7 @@ backend-laravel/storage/framework/cache/data/*
 backend-laravel/storage/framework/sessions/*
 backend-laravel/storage/framework/views/*
 backend-laravel/.phpunit.cache
+
+# Local QA artefacts and regenerable caches are not release source.
+.planning
+.uvh-runtime

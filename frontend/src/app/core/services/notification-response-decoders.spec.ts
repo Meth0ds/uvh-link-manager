@@ -1,3 +1,4 @@
+import { NOTIFICATION_KINDS } from "../notification-kinds";
 import {
   decodeNotificationInbox,
   decodeNotificationPreferences,
@@ -18,6 +19,13 @@ function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 }
 
 describe("notification response decoders", () => {
+  it("accepts every backend-aligned domain and reminder kind in inbox and preferences", () => {
+    for (const [kind, definition] of Object.entries(NOTIFICATION_KINDS)) {
+      expect(decodeNotificationInbox({ notifications: [row({ kind, workspaceId: 1 })], unread: 1, nextCursor: null }).notifications[0].kind).toBe(kind);
+      expect(decodeNotificationPreferences({ preferences: [{ kind, category: definition.category, delivery: "immediate" }] }).preferences[0].kind).toBe(kind);
+    }
+  });
+
   it("decodes an inbox page and its cursor", () => {
     const page = decodeNotificationInbox({ notifications: [row()], unread: 1, nextCursor: 9 });
     expect(page.notifications).toEqual([{

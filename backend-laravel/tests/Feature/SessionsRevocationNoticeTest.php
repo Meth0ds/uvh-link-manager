@@ -2,17 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\AuthController;
 use App\Jobs\DeliverMailOutboxJob;
 use App\Models\User;
+use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\MailDeliveryEligibility;
 use App\Support\SessionManager;
 use App\Support\UvhCrypto;
+use App\Support\UvhRequest;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -26,6 +31,8 @@ final class SessionsRevocationNoticeTest extends TestCase
 
     private bool $failNoticeInsert = false;
 
+    private bool $failExactAudit = false;
+
     /** @var list<int> */
     private array $noticeTransactionLevels = [];
 
@@ -33,13 +40,21 @@ final class SessionsRevocationNoticeTest extends TestCase
     {
         // The parent's database-name guard runs BEFORE any fixture truncation.
         parent::setUp();
-        DB::statement('TRUNCATE users, sessions, workspaces, email_tokens, mail_outbox, audit_events, notifications, operational_metrics RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, sessions, workspaces, email_tokens, mail_outbox, audit_events, audit_outbox, notifications, operational_metrics RESTART IDENTITY CASCADE');
         $this->disableCookieEncryption();
         $this->withCredentials();
         $this->withCookie('uvh_csrf', 'sessions-notice-csrf')->withHeaders(['X-CSRF-Token' => 'sessions-notice-csrf']);
         Queue::fake();
 
         DB::listen(function (QueryExecuted $event): void {
+            if ($this->failExactAudit && str_starts_with(strtolower($event->sql), 'insert') && str_contains($event->sql, '"audit_outbox"')) {
+                foreach ($event->bindings as $binding) {
+                    $row = is_string($binding) ? json_decode($binding, true) : null;
+                    if (is_array($row) && in_array($row['action'] ?? null, ['auth.sessions_revoked_others', 'auth.sessions_revoked_all'], true)) {
+                        throw new \RuntimeException('Fixture: exact session audit admission interrupted');
+                    }
+                }
+            }
             if (! str_starts_with(strtolower($event->sql), 'insert')
                 || ! str_contains($event->sql, '"mail_outbox"')) {
                 return;
@@ -51,6 +66,28 @@ final class SessionsRevocationNoticeTest extends TestCase
                 throw new \RuntimeException('Fixture: notice admission interrupted');
             }
         });
+    }
+
+    public function test_individual_revocation_admits_one_notice_and_is_idempotent(): void
+    {
+        [$user, $current, $other] = $this->account();
+        $path = '/api/v1/auth/sessions/'.Ids::sha256Hex($other).'/revoke';
+        $this->withCookie('uvh_session', $current)->postJson($path)->assertOk();
+        $this->withCookie('uvh_session', $current)->postJson($path)->assertOk();
+        $this->assertNotNull(DB::table('sessions')->where('id', Ids::sha256Hex($other))->value('revoked_at'));
+        $this->assertSame(1, DB::table('mail_outbox')->count());
+        $this->assertSame(1, DB::table('notifications')->where('user_id', $user->id)->where('kind', 'session_revoked')->count());
+        $this->assertSame([1], $this->noticeTransactionLevels);
+    }
+
+    public function test_individual_revocation_rolls_back_when_notice_admission_fails(): void
+    {
+        [$user, $current, $other] = $this->account();
+        $this->failNoticeInsert = true;
+        $this->withCookie('uvh_session', $current)->postJson('/api/v1/auth/sessions/'.Ids::sha256Hex($other).'/revoke')->assertStatus(503);
+        $this->assertNull(DB::table('sessions')->where('id', Ids::sha256Hex($other))->value('revoked_at'));
+        $this->assertDatabaseCount('mail_outbox', 0);
+        $this->assertDatabaseCount('notifications', 0);
     }
 
     public function test_closing_other_sessions_admits_one_incident_notice_with_the_template_and_bearer(): void
@@ -143,6 +180,91 @@ final class SessionsRevocationNoticeTest extends TestCase
             $user,
         );
         Queue::assertPushed(DeliverMailOutboxJob::class, 1);
+    }
+
+    public static function staleActors(): array
+    {
+        $cases = [];
+        foreach (['individual', 'others', 'all'] as $surface) {
+            foreach (['revoked', 'expired', 'version'] as $reason) {
+                $cases[$surface.' '.$reason] = [$surface, $reason];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('staleActors')]
+    public function test_pre_authorized_requests_cannot_revoke_sessions_after_the_actor_changes(string $surface, string $reason): void
+    {
+        [$user, $current, $other] = $this->account();
+        $request = Request::create('/');
+        $request->attributes->set(UvhRequest::USER, $user);
+        $request->attributes->set(UvhRequest::SESSION_ID, Ids::sha256Hex($current));
+        match ($reason) {
+            'revoked' => DB::table('sessions')->where('id', Ids::sha256Hex($current))->update(['revoked_at' => now()]),
+            'expired' => DB::table('sessions')->where('id', Ids::sha256Hex($current))->update(['expires_at' => now()->subSecond()]),
+            'version' => DB::table('users')->where('id', $user->id)->update(['security_version' => 2]),
+        };
+        // Simulate the interleaving AFTER middleware authorized its snapshot.
+        $controller = app(AuthController::class);
+        $response = match ($surface) {
+            'individual' => $controller->revokeSession($request, Ids::sha256Hex($other)),
+            'others' => $controller->revokeOtherSessions($request),
+            'all' => $controller->revokeAllSessions($request),
+        };
+        $this->assertSame($surface === 'individual' ? 404 : 409, $response->getStatusCode());
+        $this->assertDatabaseHas('sessions', ['id' => Ids::sha256Hex($other), 'revoked_at' => null]);
+        $this->assertDatabaseCount('mail_outbox', 0);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertDatabaseCount('audit_outbox', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public static function bulkAuditCases(): array
+    {
+        return [['others', true], ['all', true], ['others', false], ['all', false]];
+    }
+
+    #[DataProvider('bulkAuditCases')]
+    public function test_bulk_revocation_admits_its_exact_audit_in_the_commit(string $surface, bool $admissionFails): void
+    {
+        [$user, $current, $other] = $this->account();
+        $this->failExactAudit = $admissionFails;
+        if (! $admissionFails) {
+            Schema::rename('audit_events', 'audit_events_unavailable');
+        }
+        try {
+            $response = $this->postJson('/api/v1/auth/sessions/revoke-'.$surface);
+            if ($admissionFails) {
+                $response->assertServerError();
+                foreach ([$current, $other] as $token) {
+                    $this->assertDatabaseHas('sessions', ['id' => Ids::sha256Hex($token), 'revoked_at' => null]);
+                }
+                $this->assertDatabaseCount('mail_outbox', 0);
+                $this->assertDatabaseCount('notifications', 0);
+                Queue::assertNothingPushed();
+            } else {
+                $response->assertOk();
+                $rows = DB::table('audit_outbox')->get()->map(static fn ($row) => json_decode($row->event, true, flags: JSON_THROW_ON_ERROR));
+                $event = $rows->where('action', 'auth.sessions_revoked_'.$surface)->values();
+                $this->assertCount(1, $event);
+                $this->assertSame($user->id, $event[0]['user_id']);
+                $metadata = json_decode($event[0]['metadata'], true, flags: JSON_THROW_ON_ERROR);
+                $this->assertSame($surface === 'all' ? 2 : 1, $metadata['revoked']);
+            }
+        } finally {
+            $this->failExactAudit = false;
+            if (! $admissionFails) {
+                Schema::rename('audit_events_unavailable', 'audit_events');
+            }
+        }
+        if (! $admissionFails) {
+            $this->assertTrue(Audit::drain());
+            $this->assertTrue(Audit::drain());
+            $this->assertSame(1, DB::table('audit_events')->where('action', 'auth.sessions_revoked_'.$surface)->count());
+            $this->assertDatabaseCount('audit_outbox', 0);
+        }
     }
 
     /** @return array{User, string, string} */

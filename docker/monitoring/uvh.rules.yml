@@ -1,0 +1,47 @@
+groups:
+  - name: uvh-operational
+    interval: 30s
+    rules:
+      - alert: UvhMailWorkerUnavailable
+        expr: uvh_queue_mail_heartbeat_age_seconds > 120
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: El worker de correo no publica heartbeat
+          description: Revisar queue-mail, conectividad con Redis y logs por correlation_id.
+      - alert: UvhSchedulerUnavailable
+        expr: uvh_scheduler_heartbeat_age_seconds > 180
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: El scheduler de UVH está detenido
+      - alert: UvhMailBacklogAge
+        expr: uvh_mail_outbox_oldest_pending_age_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Hay correo pendiente desde hace más de cinco minutos
+      - alert: UvhAuditNotMaterialized
+        expr: uvh_audit_outbox_pending > 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: Hay auditoría durable pendiente de materializar
+      - alert: UvhPreparationLatency
+        expr: histogram_quantile(0.95, sum by (le) (uvh_http_duration_seconds_60m_bucket{phase="prepare"})) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: La preparación HTTP supera un segundo en p95
+      - alert: UvhMetricsUnavailable
+        expr: up{job="uvh"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: No se puede consultar la monitorización privada de UVH

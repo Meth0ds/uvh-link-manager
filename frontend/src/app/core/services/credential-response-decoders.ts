@@ -48,7 +48,7 @@ function integer(value: unknown, contract: string, minimum = 0): number {
 }
 
 function text(value: unknown, contract: string, maximum: number, allowEmpty = false): string {
-  if (typeof value !== "string" || (!allowEmpty && value.length === 0) || value.length > maximum) invalid(contract);
+  if (typeof value !== "string" || (!allowEmpty && value.length === 0) || Array.from(value).length > maximum) invalid(contract);
   return value;
 }
 
@@ -116,7 +116,7 @@ function delivery(value: unknown): WebhookDelivery {
     const safeKey = safeText(key, "webhook payload key", 32);
     if ((typeof item !== "string" && typeof item !== "number")
       || (typeof item === "number" && (!Number.isSafeInteger(item) || item < 0))
-      || (typeof item === "string" && (item.length > 255 || /[\u0000-\u001f\u007f]/.test(item)))) invalid("webhook payload data");
+      || (typeof item === "string" && (Array.from(item).length > 255 || /[\u0000-\u001f\u007f]/.test(item)))) invalid("webhook payload data");
     data[safeKey] = item;
   }
   const payloadEvent = safeText(payload["event"], "webhook payload event", 64);

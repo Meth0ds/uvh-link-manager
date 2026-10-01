@@ -43,6 +43,7 @@ coverage/
 *.lcov
 playwright-report/
 test-results/
+test-results-release/
 blob-report/
 
 # ── Backup drill evidence (generated) ────────────────────────

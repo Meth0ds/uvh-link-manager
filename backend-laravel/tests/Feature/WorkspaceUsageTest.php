@@ -40,6 +40,18 @@ final class WorkspaceUsageTest extends TestCase
         return [['owner', true, true], ['admin', true, true], ['editor', true, false], ['viewer', false, false]];
     }
 
+    public function test_purge_verification_requires_recent_execution_with_matching_policy(): void
+    {
+        Cache::forget('uvh:retention:analytics');
+        $this->assertFalse(WorkspaceLimits::analyticsPurgeVerified());
+        Cache::put('uvh:retention:analytics', [
+            'completed_at' => time(), 'retention_days' => WorkspaceLimits::analyticsRetentionDays(),
+        ]);
+        $this->assertTrue(WorkspaceLimits::analyticsPurgeVerified());
+        config(['uvh.housekeeping.analytics_retention_days' => 11]);
+        $this->assertFalse(WorkspaceLimits::analyticsPurgeVerified());
+    }
+
     #[DataProvider('roles')]
     public function test_role_projection_exposes_only_manageable_aggregate_categories(string $role, bool $editor, bool $admin): void
     {
@@ -54,8 +66,8 @@ final class WorkspaceUsageTest extends TestCase
             ->assertJsonPath('resources.domains.canManage', $editor)
             ->assertJsonPath('resources.webhooks.canManage', $editor)
             ->assertJsonPath('resources.members.canManage', $admin)
-            ->assertJsonPath('resources.members.limit', null)
-            ->assertJsonPath('resources.members.policy', 'not_configured')
+            ->assertJsonPath('resources.members.limit', 1000)
+            ->assertJsonPath('resources.members.policy', 'enforced')
             ->assertJsonPath('basis', 'snapshot_not_reservation');
         if ($editor) {
             $response->assertJsonPath('resources.tokens.limit', WorkspaceLimits::ACTIVE_TOKENS);

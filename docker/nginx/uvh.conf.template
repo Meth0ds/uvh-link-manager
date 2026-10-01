@@ -58,7 +58,7 @@ map $limit_req_status $uvh_edge_retry_after {
 # and which of the two limiters answered. Plain `$remote_addr` is the restored
 # client address, which is also how a spoofed forwarding header is caught in
 # review.
-log_format uvh_edge '$remote_addr - [$time_local] "$request" $status limit=$limit_req_status conn=$limit_conn_status';
+log_format uvh_edge '$remote_addr - [$time_local] "$request" $status limit=$limit_req_status conn=$limit_conn_status request_id=$request_id';
 access_log /var/log/nginx/access.log uvh_edge;
 
 server_tokens off;
@@ -131,6 +131,7 @@ server {
 
     location @laravel {
         include fastcgi_params;
+        fastcgi_param UVH_REQUEST_ID $request_id;
         fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
         fastcgi_param SCRIPT_NAME /index.php;
         fastcgi_param HTTP_HOST $host;
@@ -207,6 +208,7 @@ server {
 
     location @laravel_public {
         include fastcgi_params;
+        fastcgi_param UVH_REQUEST_ID $request_id;
         fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
         fastcgi_param SCRIPT_NAME /index.php;
         fastcgi_param HTTP_HOST $host;
@@ -235,6 +237,7 @@ server {
     location ^~ /internal/ { return 404; }
     location / {
         include fastcgi_params;
+        fastcgi_param UVH_REQUEST_ID $request_id;
         fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
         fastcgi_param SCRIPT_NAME /index.php;
         fastcgi_param HTTP_HOST $host;
@@ -255,6 +258,7 @@ server {
     location = /internal/caddy/ask {
         limit_except GET { deny all; }
         include fastcgi_params;
+        fastcgi_param UVH_REQUEST_ID $request_id;
         fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
         fastcgi_param SCRIPT_NAME /index.php;
         fastcgi_param HTTP_HOST internal.uvh;
@@ -268,6 +272,7 @@ server {
     location = /internal/metrics {
         limit_except GET { deny all; }
         include fastcgi_params;
+        fastcgi_param UVH_REQUEST_ID $request_id;
         fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
         fastcgi_param SCRIPT_NAME /index.php;
         fastcgi_param HTTP_HOST internal.uvh;

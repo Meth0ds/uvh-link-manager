@@ -54,7 +54,7 @@ function session(id: string, current = false): Session {
 describe("SettingsComponent async safety", () => {
   type AuthMethods = Pick<AuthService,
     "sessionGeneration" | "listSessions" | "dataExportStatus" | "dataExportHistory" | "accountDeletionImpact"
-    | "updateProfile" | "changePassword" | "refreshUser" | "revokeSession">;
+    | "updateProfile" | "changePassword" | "refreshUser" | "revokeSession" | "mfaSetup" | "mfaEnable" | "mfaDisable" | "mfaCancelSetup" | "mfaRegenerateRecoveryCodes">;
   let auth: jasmine.SpyObj<AuthMethods> & { user: WritableSignal<AuthUser | null> };
   let api: jasmine.SpyObj<ApiService>;
   let snackbar: jasmine.SpyObj<MatSnackBar>;
@@ -69,7 +69,7 @@ describe("SettingsComponent async safety", () => {
   beforeEach(async () => {
     const authSpy = jasmine.createSpyObj<AuthMethods>("AuthService", [
       "sessionGeneration", "listSessions", "dataExportStatus", "dataExportHistory", "accountDeletionImpact",
-      "updateProfile", "changePassword", "refreshUser", "revokeSession",
+      "updateProfile", "changePassword", "refreshUser", "revokeSession", "mfaSetup", "mfaEnable", "mfaDisable", "mfaCancelSetup", "mfaRegenerateRecoveryCodes",
     ]);
     auth = Object.assign(authSpy, { user: signal<AuthUser | null>({
       id: 1, email: "user@example.test", name: "User", isAdmin: false,
@@ -368,6 +368,124 @@ describe("SettingsComponent async safety", () => {
     const messages = snackbar.open.calls.allArgs().map((args) => args[0]);
     expect(messages).toContain("La sesión quedó revocada. Abre la pantalla de acceso para continuar.");
     expect(messages).not.toContain("No se pudo revocar la sesión");
+  });
+
+  for (const action of ["disable", "regenerate"] as const) {
+    it(`does not ${action} MFA after the account changes while confirmation is open`, async () => {
+      const answer = deferred<boolean>();
+      const actions = TestBed.inject(ActionDialogService) as jasmine.SpyObj<ActionDialogService>;
+      actions.confirm.and.returnValue(answer.promise);
+      component.mfaDisableForm.setValue({ password: "fixture-password", factorCode: "123456" });
+      component.recoveryRegenerateForm.setValue({ password: "fixture-password", factorCode: "123456" });
+      const operation = action === "disable" ? component.disableMfa() : component.regenerateRecoveryCodes();
+      auth.sessionGeneration.and.returnValue(2);
+      answer.resolve(true);
+      await operation;
+      expect(auth.mfaDisable).not.toHaveBeenCalled();
+      expect(auth.mfaRegenerateRecoveryCodes).not.toHaveBeenCalled();
+    });
+  }
+
+  it("does not expose a staged MFA secret from a previous account context", async () => {
+    const response = deferred<{ secret: string; uri: string }>();
+    auth.mfaSetup.and.returnValue(response.promise);
+    component.mfaPasswordForm.setValue({ password: "fixture-password" });
+    const operation = component.startMfaSetup();
+    auth.sessionGeneration.and.returnValue(2);
+    response.resolve({ secret: "FIXTURESECRET", uri: "otpauth://totp/Fixture?secret=FIXTURESECRET" });
+    await operation;
+    expect(component.mfaSecret()).toBeNull();
+    expect(component.mfaQr()).toBeNull();
+    expect(snackbar.open).not.toHaveBeenCalled();
+  });
+
+  it("clears MFA secrets, recovery codes and passwords when the identity is removed", () => {
+    component.mfaSecret.set("FIXTURESECRET");
+    component.mfaUri.set("otpauth://totp/Fixture?secret=FIXTURESECRET");
+    component.mfaQr.set("data:image/png;base64,fixture");
+    component.recoveryCodes.set(["FIXTURE-RECOVERY"]);
+    component.mfaPasswordForm.setValue({ password: "fixture-password" });
+    component.mfaDisableForm.setValue({ password: "fixture-password", factorCode: "123456" });
+    auth.sessionGeneration.and.returnValue(2);
+    auth.user.set(null);
+    TestBed.tick();
+    expect(component.mfaSecret()).toBeNull();
+    expect(component.mfaUri()).toBeNull();
+    expect(component.mfaQr()).toBeNull();
+    expect(component.recoveryCodes()).toEqual([]);
+    expect(component.mfaPasswordForm.controls.password.value).toBe("");
+    expect(component.mfaDisableForm.controls.password.value).toBe("");
+  });
+
+  it("does not publish an old account refresh failure after confirming MFA", async () => {
+    const refresh = deferred<void>();
+    auth.mfaEnable.and.resolveTo({ recoveryCodes: ["FIXTURE-RECOVERY"] });
+    auth.refreshUser.and.returnValue(refresh.promise.then(() => { throw new Error("old session offline"); }));
+    component.mfaCodeForm.setValue({ code: "123456" });
+    const operation = component.enableMfa();
+    await Promise.resolve();
+    expect(auth.refreshUser).toHaveBeenCalled();
+    snackbar.open.calls.reset();
+    auth.sessionGeneration.and.returnValue(2);
+    refresh.resolve();
+    await operation;
+    expect(snackbar.open).not.toHaveBeenCalled();
+  });
+
+  it("does not report a profile update after the account context changes", async () => {
+    const response = deferred<AuthUser>();
+    auth.updateProfile.and.returnValue(response.promise);
+    component.profileForm.setValue({ name: "Updated user" });
+    const operation = component.saveProfile();
+    auth.sessionGeneration.and.returnValue(2);
+    response.resolve(auth.user()!);
+    await operation;
+    expect(snackbar.open).not.toHaveBeenCalled();
+  });
+
+  it("does not restore the old workspace after navigation settles under another account", async () => {
+    const response = deferred<boolean>();
+    router.navigate.and.returnValue(response.promise);
+    const operation = component.openOwnedWorkspace(9);
+    auth.sessionGeneration.and.returnValue(2);
+    selected.set(9);
+    response.resolve(false);
+    await operation;
+    expect(selected()).toBe(9);
+  });
+
+  it("does not reload sessions or report an old revocation in another account", async () => {
+    const response = deferred<boolean>();
+    auth.revokeSession.and.returnValue(response.promise);
+    auth.listSessions.calls.reset();
+    const operation = component.revokeSession(session("other", false));
+    auth.sessionGeneration.and.returnValue(2);
+    response.resolve(false);
+    await operation;
+    expect(snackbar.open).not.toHaveBeenCalled();
+    expect(auth.listSessions).not.toHaveBeenCalled();
+  });
+
+  it("still navigates to login after deliberately revoking this browser's session", async () => {
+    auth.revokeSession.and.callFake(async () => {
+      auth.sessionGeneration.and.returnValue(2);
+      auth.user.set(null);
+      return true;
+    });
+    await component.revokeSession(session("current", true));
+    expect(router.navigate).toHaveBeenCalledWith(["/auth"]);
+  });
+
+  it("does not navigate for an old current-session result after a newer login", async () => {
+    const response = deferred<boolean>();
+    auth.revokeSession.and.returnValue(response.promise);
+    const operation = component.revokeSession(session("current", true));
+    auth.sessionGeneration.and.returnValue(3);
+    auth.user.set({ ...auth.user()!, id: 2 });
+    response.resolve(true);
+    await operation;
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(snackbar.open).not.toHaveBeenCalled();
   });
 
   it("polls the export status with bounded backoff and stops at a final state", fakeAsync(() => {

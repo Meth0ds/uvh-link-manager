@@ -29,6 +29,19 @@ final class LinkTemplateTest extends TestCase
         $this->withCookie('uvh_csrf', self::CSRF)->withHeaders(['X-CSRF-Token' => self::CSRF]);
     }
 
+    public function test_catalog_capacity_rejects_growth_but_keeps_existing_rows_readable(): void
+    {
+        [$owner, $workspace] = $this->workspace();
+        $this->signIn($owner, $workspace);
+        $rows = [];
+        for ($i = 0; $i < 201; $i++) {
+            $rows[] = ['workspace_id' => $workspace->id, 'created_by' => $owner->id, 'payload' => '{}', 'name' => 'Elemento '.$i];
+        }
+        DB::table('link_templates')->insert($rows);
+        $this->postJson('/api/v1/link-templates', ['name' => 'Otra', 'payload' => ['destination' => 'https://example.org/']])->assertStatus(409);
+        $this->getJson('/api/v1/link-templates')->assertOk()->assertJsonCount(201, 'templates');
+    }
+
     public function test_a_template_round_trips_and_never_saves_an_alias(): void
     {
         [$owner, $workspace] = $this->workspace();

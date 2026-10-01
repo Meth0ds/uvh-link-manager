@@ -32,6 +32,11 @@ const BULK_ACTIONS = new Set<BulkAction>([
 /** The server reports at most 100 row errors and flags the rest as truncated. */
 const MAX_IMPORT_ERRORS = 100;
 
+function catalog(value: unknown, contract: string): unknown[] {
+  if (!Array.isArray(value)) invalid(contract);
+  return value;
+}
+
 function namedCount(value: unknown, contract: string, maximum: number): { id: number; name: string; links: number } {
   const source = record(value, contract);
   return {
@@ -43,7 +48,7 @@ function namedCount(value: unknown, contract: string, maximum: number): { id: nu
 
 export function decodeTagsResponse(value: unknown): TagsResponse {
   const source = record(value, "tags response");
-  const tags = boundedArray(source["tags"], "tags response", 500).map((tag): TagDto => namedCount(tag, "tag", 40));
+  const tags = catalog(source["tags"], "tags response").map((tag): TagDto => namedCount(tag, "tag", 40));
   if (new Set(tags.map((tag) => tag.name.toLocaleLowerCase())).size !== tags.length) invalid("tag names");
   return { tags };
 }
@@ -69,7 +74,7 @@ export function decodeTagMergeResponse(value: unknown): { ok: boolean; id: numbe
 
 export function decodeCollectionsResponse(value: unknown): CollectionsResponse {
   const source = record(value, "collections response");
-  const collections = boundedArray(source["collections"], "collections response", 500)
+  const collections = catalog(source["collections"], "collections response")
     .map((collection): CollectionDto => namedCount(collection, "collection", 60));
   if (new Set(collections.map((collection) => collection.name.toLocaleLowerCase())).size !== collections.length) {
     invalid("collection names");
@@ -150,7 +155,7 @@ function template(value: unknown): LinkTemplateDto {
 
 export function decodeTemplatesResponse(value: unknown): LinkTemplatesResponse {
   const source = record(value, "link templates response");
-  return { templates: boundedArray(source["templates"], "link templates response", 200).map(template) };
+  return { templates: catalog(source["templates"], "link templates response").map(template) };
 }
 
 export function decodeTemplateResponse(value: unknown): { template: LinkTemplateDto } {

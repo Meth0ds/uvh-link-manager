@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder } from "@angular/forms";
 import { ActivatedRoute, provideRouter } from "@angular/router";
 
-import { ApiService } from "../core/services/api.service";
+import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { AccountRecoveryCompleteComponent } from "./account-recovery-complete.component";
@@ -367,13 +367,14 @@ describe("public auth views async safety", () => {
     const api = jasmine.createSpyObj<ApiService>("ApiService", ["get"]);
     const status = deferred<{ enabled: boolean; fresh: boolean; verifiedAt: null; expiresAt: null }>();
     const auth = jasmine.createSpyObj<AuthService>("AuthService", [
-      "init", "mfaSessionStatus", "reauthenticateMfa", "clearAdminMfaReauthentication",
+      "init", "mfaSessionStatus", "reauthenticateMfa", "clearAdminMfaReauthentication", "sessionGeneration",
     ]);
     Object.assign(auth, {
       loaded: signal(true),
       authenticated: signal(true),
       user: signal({ id: 1, email: "admin@example.test", name: "Admin", isAdmin: true, emailVerified: true, mfaEnabled: true }),
     });
+    auth.sessionGeneration.and.returnValue(1);
     auth.mfaSessionStatus.and.returnValue(status.promise);
     const router = jasmine.createSpyObj<Router>("Router", ["navigate", "navigateByUrl"]);
     router.navigate.and.resolveTo(true);
@@ -396,4 +397,56 @@ describe("public auth views async safety", () => {
     expect(router.navigate).not.toHaveBeenCalled();
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
+  for (const action of ["confirm", "cancel"] as const) {
+    for (const status of [0, 429, 503]) {
+      it(`can retry deletion ${action} after a transient ${status} response`, async () => {
+        const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+        const auth = { sessionGeneration: () => 1, accountSignedOut: jasmine.createSpy("accountSignedOut") };
+        TestBed.configureTestingModule({ imports: [ConfirmAccountDeletionComponent, CancelAccountDeletionComponent], providers: [
+          ...sharedProviders(api, `token=${TOKEN}`), { provide: AuthService, useValue: auth },
+        ] });
+        const component = action === "confirm" ? TestBed.createComponent(ConfirmAccountDeletionComponent).componentInstance : TestBed.createComponent(CancelAccountDeletionComponent).componentInstance;
+        const perform = () => component instanceof ConfirmAccountDeletionComponent ? component.confirm() : component.cancel();
+        api.post.and.rejectWith(new ApiRequestError("Temporalmente no disponible", status));
+        await perform();
+        expect(component.busy()).toBeFalse();
+        api.post.and.resolveTo({ ok: true, executeAfter: new Date(Date.now() + 7 * 86400000).toISOString() } as never);
+        await perform();
+        expect(api.post).toHaveBeenCalledTimes(2);
+        expect(component.done()).toBeTrue();
+      });
+    }
+    it(`does not retry deletion ${action} after an invalid-link response`, async () => {
+      const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+      TestBed.configureTestingModule({ imports: [ConfirmAccountDeletionComponent, CancelAccountDeletionComponent], providers: [
+        ...sharedProviders(api, `token=${TOKEN}`), { provide: AuthService, useValue: { sessionGeneration: () => 1, accountSignedOut: jasmine.createSpy("accountSignedOut") } },
+      ] });
+      const component = action === "confirm" ? TestBed.createComponent(ConfirmAccountDeletionComponent).componentInstance : TestBed.createComponent(CancelAccountDeletionComponent).componentInstance;
+      const perform = () => component instanceof ConfirmAccountDeletionComponent ? component.confirm() : component.cancel();
+      api.post.and.rejectWith(new ApiRequestError("Enlace inválido", 400));
+      await perform(); await perform();
+      expect(api.post).toHaveBeenCalledTimes(1);
+      expect(component.done()).toBeFalse();
+    });
+  }
+
+  for (const status of [0, 429, 503, 400]) {
+    it(`email confirmation retries only transient failures (${status})`, async () => {
+      const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+      const auth = { sessionGeneration: () => 1, accountSignedOut: jasmine.createSpy("accountSignedOut") };
+      TestBed.configureTestingModule({ imports: [ConfirmEmailChangeComponent], providers: [
+        ...sharedProviders(api, `token=${TOKEN}`), { provide: AuthService, useValue: auth },
+      ] });
+      const component = TestBed.createComponent(ConfirmEmailChangeComponent).componentInstance;
+      api.post.and.rejectWith(new ApiRequestError("No disponible", status));
+      await component.confirm();
+      expect(auth.accountSignedOut).not.toHaveBeenCalled();
+      api.post.and.resolveTo({ ok: true } as never);
+      await component.confirm();
+      expect(api.post).toHaveBeenCalledTimes(status === 400 ? 1 : 2);
+      expect(component.ok()).toBe(status !== 400);
+      if (status !== 400) expect(auth.accountSignedOut).toHaveBeenCalledOnceWith(1);
+    });
+  }
+
 });

@@ -2,21 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\AuthController;
 use App\Jobs\DeliverMailOutboxJob;
 use App\Models\AccountRecoveryRequest;
 use App\Models\EmailChangeRequest;
+use App\Models\EmailToken;
 use App\Models\User;
+use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\MailDeliveryEligibility;
 use App\Support\SessionManager;
 use App\Support\Totp;
 use App\Support\UvhCrypto;
+use App\Support\UvhRequest;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -37,7 +42,7 @@ final class SecurityNoticeAtomicityTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp(); // Refuses non-*_test databases before fixture writes.
-        DB::statement('TRUNCATE users, sessions, workspaces, email_tokens, mail_outbox, audit_events, operational_metrics RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, sessions, workspaces, email_tokens, mail_outbox, audit_events, audit_outbox, operational_metrics RESTART IDENTITY CASCADE');
         config(['cache.default' => 'array']);
         $this->disableCookieEncryption();
         $this->withCredentials();
@@ -135,6 +140,124 @@ final class SecurityNoticeAtomicityTest extends TestCase
         Queue::assertPushed(DeliverMailOutboxJob::class, 1);
     }
 
+    public static function mfaAuditCases(): array
+    {
+        $cases = [];
+        foreach (['setup', 'cancel', 'enable', 'reconfigure', 'regenerate', 'disable'] as $action) {
+            $cases[$action.' admission unavailable'] = [$action, true];
+            $cases[$action.' history unavailable'] = [$action, false];
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('mfaAuditCases')]
+    public function test_mfa_mutation_and_exact_audit_event_share_one_commit(string $action, bool $admissionFails): void
+    {
+        [$user, $current, $other] = $this->account($action !== 'enable');
+        $user->update([
+            'mfa_pending_secret' => UvhCrypto::encryptAtRest(self::PENDING_SECRET),
+            'mfa_pending_expires_at' => now()->addMinutes(5),
+        ]);
+        $before = $this->securityState($user);
+        $case = $this->recoveryCase($user);
+        [$url, $payload, $event] = match ($action) {
+            'setup' => ['/api/v1/auth/mfa/setup', ['password' => self::PASSWORD, 'code' => self::RECOVERY_CODE], 'auth.mfa_setup'],
+            'cancel' => ['/api/v1/auth/mfa/cancel-setup', [], 'auth.mfa_setup_cancel'],
+            'enable', 'reconfigure' => ['/api/v1/auth/mfa/enable', ['code' => $this->pendingCode()], $action === 'enable' ? 'auth.mfa_enable' : 'auth.mfa_reconfigured'],
+            'regenerate' => ['/api/v1/auth/mfa/recovery-codes/regenerate', ['password' => self::PASSWORD, 'factorCode' => self::RECOVERY_CODE], 'auth.mfa_recovery_regenerate'],
+            'disable' => ['/api/v1/auth/mfa/disable', ['password' => self::PASSWORD, 'code' => self::RECOVERY_CODE], 'auth.mfa_disable'],
+        };
+        $table = $admissionFails ? 'audit_outbox' : 'audit_events';
+        Schema::rename($table, $table.'_unavailable');
+        try {
+            $response = $this->postJson($url, $payload);
+            if ($admissionFails) {
+                $response->assertServerError()->assertJsonMissingPath('recoveryCodes')->assertJsonMissingPath('secret');
+                $this->assertSame($before, $this->securityState($user));
+                $this->assertSessionsUnchanged($current, $other);
+                $this->assertSame('requested', $case->refresh()->status);
+                $this->assertDatabaseCount('mail_outbox', 0);
+                Queue::assertNothingPushed();
+            } else {
+                $response->assertOk();
+                $pending = DB::table('audit_outbox')->get()->map(static fn ($row) => json_decode($row->event, true, flags: JSON_THROW_ON_ERROR));
+                $exact = $pending->where('action', $event)->values();
+                $this->assertCount(1, $exact);
+                $this->assertSame($user->id, $exact[0]['user_id']);
+                $this->assertSame((string) $user->id, $exact[0]['resource_id']);
+                $serialized = json_encode($exact[0], JSON_THROW_ON_ERROR);
+                $this->assertStringNotContainsString(self::PASSWORD, $serialized);
+                $this->assertStringNotContainsString(self::RECOVERY_CODE, $serialized);
+                $this->assertStringNotContainsString(self::PENDING_SECRET, $serialized);
+            }
+        } finally {
+            Schema::rename($table.'_unavailable', $table);
+        }
+        if (! $admissionFails) {
+            $this->assertTrue(Audit::drain());
+            $this->assertTrue(Audit::drain());
+            $this->assertSame(1, DB::table('audit_events')->where('action', $event)->count());
+            $this->assertDatabaseCount('audit_outbox', 0);
+        }
+    }
+
+    public static function staleMfaActors(): array
+    {
+        $cases = [];
+        foreach (['setup', 'cancel', 'enable', 'reconfigure', 'regenerate', 'disable'] as $action) {
+            foreach (['expired', 'revoked', 'version'] as $reason) {
+                $cases[$action.' '.$reason] = [$action, $reason];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('staleMfaActors')]
+    public function test_pre_authorized_mfa_requests_cannot_mutate_after_the_session_changes(string $action, string $reason): void
+    {
+        [$user, $current, $other] = $this->account($action !== 'enable');
+        $user->update(['mfa_pending_secret' => UvhCrypto::encryptAtRest(self::PENDING_SECRET), 'mfa_pending_expires_at' => now()->addMinutes(5)]);
+        $snapshot = clone $user;
+        $currentId = Ids::sha256Hex($current);
+        if ($reason === 'expired') {
+            DB::table('sessions')->where('id', $currentId)->update(['expires_at' => now()->subSecond()]);
+        } elseif ($reason === 'revoked') {
+            DB::table('sessions')->where('id', $currentId)->update(['revoked_at' => now()]);
+        } else {
+            // A newer legitimate operation refreshed SQL's session/version;
+            // this request still owns the earlier middleware snapshot.
+            DB::table('users')->where('id', $user->id)->update(['security_version' => 2]);
+            DB::table('sessions')->where('id', $currentId)->update(['security_version' => 2]);
+        }
+        $before = $this->securityState($user);
+        $sessions = DB::table('sessions')->orderBy('id')->get()->toJson();
+        $request = Request::create('/', 'POST', match ($action) {
+            'setup' => ['password' => self::PASSWORD, 'code' => self::RECOVERY_CODE],
+            'enable', 'reconfigure' => ['code' => $this->pendingCode()],
+            'regenerate' => ['password' => self::PASSWORD, 'factorCode' => self::RECOVERY_CODE],
+            'disable' => ['password' => self::PASSWORD, 'code' => self::RECOVERY_CODE],
+            'cancel' => [],
+        });
+        $request->attributes->set(UvhRequest::USER, $snapshot);
+        $request->attributes->set(UvhRequest::SESSION_ID, $currentId);
+        $controller = app(AuthController::class);
+        $response = match ($action) {
+            'setup' => $controller->mfaSetup($request),
+            'cancel' => $controller->mfaCancelSetup($request),
+            'enable', 'reconfigure' => $controller->mfaEnable($request),
+            'regenerate' => $controller->mfaRegenerateRecoveryCodes($request),
+            'disable' => $controller->mfaDisable($request),
+        };
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame($before, $this->securityState($user));
+        $this->assertSame($sessions, DB::table('sessions')->orderBy('id')->get()->toJson());
+        $this->assertDatabaseCount('mail_outbox', 0);
+        $this->assertDatabaseCount('notifications', 0);
+        Queue::assertNothingPushed();
+    }
+
     public static function emailCases(): array
     {
         return ['request replacement' => [false], 'confirm new identity' => [true]];
@@ -188,6 +311,141 @@ final class SecurityNoticeAtomicityTest extends TestCase
             $this->assertMessages([['email_change_verification', $newEmail], ['email_change_requested', $oldEmail]]);
         }
         Queue::assertPushed(DeliverMailOutboxJob::class, 2);
+    }
+
+    public static function identityActors(): array
+    {
+        $cases = [];
+        foreach (['password', 'request', 'cancel'] as $action) {
+            foreach (['expired', 'revoked', 'version'] as $reason) {
+                $cases[$action.' '.$reason] = [$action, $reason];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('identityActors')]
+    public function test_identity_mutations_reject_obsolete_middleware_authorization(string $action, string $reason): void
+    {
+        [$user, $current] = $this->account(true);
+        EmailChangeRequest::create([
+            'id' => Ids::sha256Hex(Ids::randomToken(32)), 'user_id' => $user->id,
+            'security_version' => 1, 'new_email' => 'reserved@example.test', 'expires_at' => now()->addHour(),
+        ]);
+        $snapshot = clone $user;
+        $sessionId = Ids::sha256Hex($current);
+        if ($reason === 'version') {
+            DB::table('users')->where('id', $user->id)->update(['security_version' => 2]);
+            DB::table('sessions')->where('id', $sessionId)->update(['security_version' => 2]);
+        } else {
+            DB::table('sessions')->where('id', $sessionId)->update([$reason === 'expired' ? 'expires_at' : 'revoked_at' => now()->subSecond()]);
+        }
+        $before = $user->refresh()->getRawOriginal();
+        $sessions = DB::table('sessions')->orderBy('id')->get()->toJson();
+        $reservation = DB::table('email_change_requests')->get()->toJson();
+        $request = Request::create('/', 'POST', [
+            'password' => self::PASSWORD, 'current' => self::PASSWORD,
+            'newPassword' => 'novel-copper-magnolia-73', 'newEmail' => 'next@example.test',
+            'factorCode' => self::RECOVERY_CODE,
+        ]);
+        $request->attributes->set(UvhRequest::USER, $snapshot);
+        $request->attributes->set(UvhRequest::SESSION_ID, $sessionId);
+        $controller = app(AuthController::class);
+        $response = match ($action) {
+            'password' => $controller->changePassword($request),
+            'request' => $controller->requestEmailChange($request),
+            'cancel' => $controller->cancelEmailChange($request),
+        };
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame($before, $user->refresh()->getRawOriginal());
+        $this->assertSame($sessions, DB::table('sessions')->orderBy('id')->get()->toJson());
+        $this->assertSame($reservation, DB::table('email_change_requests')->get()->toJson());
+        $this->assertDatabaseCount('mail_outbox', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public static function identityAudits(): array
+    {
+        $cases = [];
+        foreach (['password', 'request', 'cancel', 'confirm', 'reset'] as $action) {
+            foreach ([true, false] as $fail) {
+                $cases[$action.($fail ? ' admission' : ' history')] = [$action, $fail];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('identityAudits')]
+    public function test_identity_exact_event_is_atomic_and_recoverable(string $action, bool $admissionFails): void
+    {
+        [$user] = $this->account(true);
+        $token = Ids::randomToken(32);
+        EmailChangeRequest::create([
+            'id' => Ids::sha256Hex($token), 'user_id' => $user->id,
+            'security_version' => 1, 'new_email' => 'reserved@example.test', 'expires_at' => now()->addHour(),
+        ]);
+        EmailToken::create(['id' => Ids::sha256Hex($token), 'user_id' => $user->id, 'kind' => 'reset', 'expires_at' => now()->addHour()]);
+        [$url, $payload, $event] = match ($action) {
+            'password' => ['/api/v1/auth/change-password', ['current' => self::PASSWORD, 'newPassword' => 'novel-copper-magnolia-73', 'factorCode' => self::RECOVERY_CODE], 'auth.password_change'],
+            'request' => ['/api/v1/auth/change-email', ['password' => self::PASSWORD, 'newEmail' => 'next@example.test', 'factorCode' => self::RECOVERY_CODE], 'auth.email_change_requested'],
+            'cancel' => ['/api/v1/auth/change-email/cancel', ['password' => self::PASSWORD, 'factorCode' => self::RECOVERY_CODE], 'auth.email_change_cancelled'],
+            'confirm' => ['/api/v1/auth/confirm-email-change', ['token' => $token], 'auth.email_change_confirmed'],
+            'reset' => ['/api/v1/auth/reset-password', ['token' => $token, 'password' => 'novel-copper-magnolia-73'], 'auth.password_reset'],
+        };
+        $before = $user->refresh()->getRawOriginal();
+        $sessions = DB::table('sessions')->orderBy('id')->get()->toJson();
+        $reservation = DB::table('email_change_requests')->get()->toJson();
+        $tokens = DB::table('email_tokens')->get()->toJson();
+        if ($admissionFails) {
+            DB::listen(static function (QueryExecuted $query) use ($event): void {
+                if (! str_starts_with(strtolower($query->sql), 'insert') || ! str_contains($query->sql, '"audit_outbox"')) {
+                    return;
+                }
+                foreach ($query->bindings as $binding) {
+                    if (is_string($binding) && str_contains($binding, '"action":"'.$event.'"')) {
+                        throw new \RuntimeException('Fixture: exact identity audit admission interrupted');
+                    }
+                }
+            });
+        } else {
+            Schema::rename('audit_events', 'audit_events_unavailable');
+        }
+        try {
+            $response = $this->postJson($url, $payload);
+            if ($admissionFails) {
+                $response->assertServerError();
+                $this->assertSame($before, $user->refresh()->getRawOriginal());
+                $this->assertSame($sessions, DB::table('sessions')->orderBy('id')->get()->toJson());
+                $this->assertSame($reservation, DB::table('email_change_requests')->get()->toJson());
+                $this->assertSame($tokens, DB::table('email_tokens')->get()->toJson());
+                $this->assertDatabaseCount('mail_outbox', 0);
+                $this->assertDatabaseCount('audit_outbox', 0);
+                Queue::assertNothingPushed();
+            } else {
+                $response->assertOk();
+                $events = DB::table('audit_outbox')->get()->map(static fn ($row) => json_decode($row->event, true, flags: JSON_THROW_ON_ERROR));
+                $exact = $events->where('action', $event)->values();
+                $this->assertCount(1, $exact);
+                $this->assertSame($user->id, $exact[0]['user_id']);
+                $this->assertSame((string) $user->id, $exact[0]['resource_id']);
+                $serialized = json_encode($exact[0], JSON_THROW_ON_ERROR);
+                foreach ([self::PASSWORD, self::RECOVERY_CODE, $token, 'novel-copper-magnolia-73'] as $secret) {
+                    $this->assertStringNotContainsString($secret, $serialized);
+                }
+            }
+        } finally {
+            if (! $admissionFails) {
+                Schema::rename('audit_events_unavailable', 'audit_events');
+            }
+        }
+        if (! $admissionFails) {
+            $this->assertTrue(Audit::drain());
+            $this->assertTrue(Audit::drain());
+            $this->assertSame(1, DB::table('audit_events')->where('action', $event)->count());
+            $this->assertDatabaseCount('audit_outbox', 0);
+        }
     }
 
     private function account(bool $active): array

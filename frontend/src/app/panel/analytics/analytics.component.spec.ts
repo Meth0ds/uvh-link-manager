@@ -22,7 +22,7 @@ describe("AnalyticsComponent request isolation", () => {
 
   beforeEach(async () => {
     workspaceId.set(1);
-    api = jasmine.createSpyObj<ApiService>("ApiService", ["get"]);
+    api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "getBlob"]);
     await TestBed.configureTestingModule({
       imports: [AnalyticsComponent],
       providers: [
@@ -108,4 +108,36 @@ describe("AnalyticsComponent request isolation", () => {
     expect(component.customRangeError()).toBe("La fecha inicial debe ser anterior o igual a la final.");
     expect(component.overview()).toBeNull();
   });
+  it("does not download an export after changing workspace", async () => {
+    api.get.and.resolveTo(overview(1));
+    let resolve!: (blob: Blob) => void;
+    api.getBlob.and.returnValue(new Promise((done) => { resolve = done; }));
+    const download = spyOn(URL, "createObjectURL").and.returnValue("blob:test");
+    fixture = TestBed.createComponent(AnalyticsComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const pending = fixture.componentInstance.export("csv");
+    workspaceId.set(2);
+    fixture.detectChanges();
+    resolve(new Blob(["private"]));
+    await pending;
+    expect(download).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.exporting()).toBeFalse();
+  });
+
+  it("does not download an export after the view is destroyed", async () => {
+    api.get.and.resolveTo(overview(1));
+    let resolve!: (blob: Blob) => void;
+    api.getBlob.and.returnValue(new Promise((done) => { resolve = done; }));
+    const download = spyOn(URL, "createObjectURL").and.returnValue("blob:test");
+    fixture = TestBed.createComponent(AnalyticsComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const pending = fixture.componentInstance.export("json");
+    fixture.destroy();
+    resolve(new Blob(["private"]));
+    await pending;
+    expect(download).not.toHaveBeenCalled();
+  });
+
 });

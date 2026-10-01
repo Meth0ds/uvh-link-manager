@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\DestinationDenylist;
+use App\Support\HttpLatency;
 use App\Support\OperationalMetrics;
 use App\Support\QueueBacklog;
 use Illuminate\Http\Request;
@@ -27,7 +28,9 @@ final class OperationsController
             '# TYPE uvh_up gauge',
             'uvh_up 1',
         ];
-        foreach (OperationalMetrics::totals(60) as $metric => $total) {
+        $totals = OperationalMetrics::totals(60);
+        $lines = [...$lines, ...HttpLatency::prometheus($totals)];
+        foreach ($totals as $metric => $total) {
             $name = 'uvh_event_'.str_replace('.', '_', $metric).'_60m_total';
             $lines[] = '# TYPE '.$name.' gauge';
             $lines[] = $name.' '.$total;
@@ -56,6 +59,7 @@ final class OperationsController
         foreach (['pending', 'queued', 'processing', 'sent', 'failed', 'obsolete', 'comp_pending', 'compensating', 'compensated'] as $status) {
             $this->appendGauge($lines, 'uvh_mail_outbox_'.$status, DB::table('mail_outbox')->where('status', $status)->count());
         }
+        $this->appendGauge($lines, 'uvh_audit_outbox_pending', DB::table('audit_outbox')->count());
         $oldestPendingMail = DB::table('mail_outbox')
             ->whereIn('status', ['pending', 'queued', 'processing', 'comp_pending', 'compensating'])
             ->min('created_at');

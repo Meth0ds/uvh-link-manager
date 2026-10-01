@@ -8,6 +8,7 @@ use App\Models\LinkTemplate;
 use App\Support\Audit;
 use App\Support\LinkService;
 use App\Support\UvhRequest;
+use App\Support\WorkspaceLimits;
 use App\Support\WorkspaceMutation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -89,6 +90,10 @@ class LinkTemplateController
             $template = WorkspaceMutation::run($request, function () use ($workspaceId, $user, $name, $payload, $collectionId): LinkTemplate {
                 if ($collectionId !== null && ! Collection::where('workspace_id', $workspaceId)->where('id', $collectionId)->lockForUpdate()->first()) {
                     throw new LinkException('Colección no encontrada', 422);
+                }
+
+                if (LinkTemplate::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('templates')) {
+                    throw new LinkException('Límite de plantillas alcanzado. Elimina una antes de crear otra.', 409);
                 }
 
                 return LinkTemplate::create([

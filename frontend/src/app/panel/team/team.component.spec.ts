@@ -33,7 +33,7 @@ describe("TeamComponent invitation retry guards", () => {
         { provide: ApiService, useValue: api },
         { provide: MatSnackBar, useValue: jasmine.createSpyObj("MatSnackBar", ["open"]) },
         { provide: Router, useValue: jasmine.createSpyObj("Router", ["navigate"]) },
-        { provide: AuthService, useValue: { user: signal(null) } },
+        { provide: AuthService, useValue: { user: signal(null), sessionGeneration: () => 0 } },
         { provide: WorkspaceService, useValue: { currentId: signal(1) } },
         { provide: ActionDialogService, useValue: {} },
       ],
@@ -111,7 +111,7 @@ describe("TeamComponent ownership transfer picker", () => {
         { provide: MatSnackBar, useValue: jasmine.createSpyObj("MatSnackBar", ["open"]) },
         { provide: Router, useValue: jasmine.createSpyObj("Router", ["navigate"]) },
         { provide: AuthService, useValue: {
-          user: signal(null),
+          user: signal(null), sessionGeneration: () => 0,
           refreshWorkspaces: () => Promise.resolve(),
           refreshUser: () => Promise.resolve(),
         } },
@@ -199,4 +199,35 @@ describe("TeamComponent ownership transfer picker", () => {
       "/api/v1/workspaces/1/transfer-ownership",
       { targetUserId: 11, password: "correct horse" });
   });
+  it("does not publish or reload a late ownership transfer after switching workspace", async () => {
+    let resolve!: (value: unknown) => void;
+    api.post.and.returnValue(new Promise((done) => { resolve = done; }));
+    component.transferTarget.set(candidate);
+    component.transferPassword.set("correct horse");
+    const pending = component.transferOwnership();
+    await Promise.resolve();
+    expect(api.post).toHaveBeenCalledTimes(1);
+    TestBed.inject(WorkspaceService).currentId.set(2);
+    api.get.and.resolveTo({ ...detail, workspace: { ...detail.workspace, id: 2 } });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    api.get.calls.reset();
+    resolve({ ok: true });
+    await pending;
+    expect(TestBed.inject(MatSnackBar).open).not.toHaveBeenCalled();
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate from a destroyed view after a late leave succeeds", async () => {
+    let resolve!: (value: unknown) => void;
+    api.post.and.returnValue(new Promise((done) => { resolve = done; }));
+    const pending = component.leave();
+    await Promise.resolve();
+    expect(api.post).toHaveBeenCalledTimes(1);
+    fixture.destroy();
+    resolve({ ok: true });
+    await pending;
+    expect(TestBed.inject(Router).navigate).not.toHaveBeenCalled();
+  });
+
 });

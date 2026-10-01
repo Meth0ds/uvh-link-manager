@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CorrelateRequest;
 use App\Http\Middleware\RecordOperationalResponse;
 use App\Http\Middleware\RequireApiToken;
 use App\Http\Middleware\RequireMfa;
@@ -59,6 +60,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // Global: security headers, session hydration, host separation.
+        $middleware->append(CorrelateRequest::class);
         $middleware->append(RecordOperationalResponse::class);
         $middleware->append(SecurityHeaders::class);
         $middleware->append(UvhHostGuard::class);

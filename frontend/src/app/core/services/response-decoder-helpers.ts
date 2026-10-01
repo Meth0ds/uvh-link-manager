@@ -25,7 +25,7 @@ export function boolean(value: unknown, contract: string): boolean {
 }
 
 export function text(value: unknown, contract: string, maximum: number, allowEmpty = false): string {
-  if (typeof value !== "string" || (!allowEmpty && value.length === 0) || value.length > maximum
+  if (typeof value !== "string" || (!allowEmpty && value.length === 0) || Array.from(value).length > maximum
     || /[\x00-\x1f\x7f]/.test(value)) {
     invalid(contract);
   }
@@ -46,7 +46,7 @@ export function nullableText(value: unknown, contract: string, maximum: number, 
  */
 export function nullableMultiline(value: unknown, contract: string, maximum: number, allowEmpty = false): string | null {
   if (value === null) return null;
-  if (typeof value !== "string" || (!allowEmpty && value.length === 0) || value.length > maximum
+  if (typeof value !== "string" || (!allowEmpty && value.length === 0) || Array.from(value).length > maximum
     || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value)) {
     invalid(contract);
   }

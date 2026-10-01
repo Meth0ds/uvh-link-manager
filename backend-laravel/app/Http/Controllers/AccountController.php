@@ -9,6 +9,7 @@ use App\Models\EmailChangeRequest;
 use App\Models\EmailToken;
 use App\Models\User;
 use App\Models\UvhSession;
+use App\Support\AccountDeletionAudit;
 use App\Support\AccountRecoveryLifecycle;
 use App\Support\Audit;
 use App\Support\FrontendUrl;
@@ -82,7 +83,7 @@ class AccountController
         $sessionId = UvhRequest::sessionId($request);
         try {
             $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $purpose): array {
-                $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
+                $lockedUser = $this->lockVerifiedActor($user, $sessionId);
                 $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
                     ->whereNull('revoked_at')->lockForUpdate()->first();
                 if (! $lockedUser || ! $lockedUser->email_verified_at || ! $session
@@ -127,6 +128,8 @@ class AccountController
                     'security_version' => (int) $lockedUser->security_version,
                     'status' => 'processing',
                 ]);
+
+                Audit::write($lockedUser->id, 'account.data_export_requested', 'data_export', $row->id, ['factor' => $stepUp['factor']]);
 
                 return [
                     'status' => 'created',
@@ -174,9 +177,6 @@ class AccountController
                 $result['expired_artifact']['path'],
             );
         }
-        Audit::write($user->id, 'account.data_export_requested', 'data_export', $result['export']->id, [
-            'factor' => $result['factor'],
-        ]);
 
         // Queue publication can fail even though the request is durable. The
         // processing row is its own recovery marker and housekeeping re-admits
@@ -194,7 +194,11 @@ class AccountController
     public function cancelExport(Request $request)
     {
         $user = UvhRequest::user($request);
-        $result = DB::transaction(function () use ($user): array {
+        $sessionId = UvhRequest::sessionId($request);
+        $result = DB::transaction(function () use ($user, $sessionId): array {
+            if (! $this->lockVerifiedActor($user, $sessionId)) {
+                return ['status' => 'stale'];
+            }
             $row = DataExportRequest::where('user_id', $user->id)
                 ->whereIn('status', ['processing', 'ready'])
                 ->lockForUpdate()->first();
@@ -207,19 +211,23 @@ class AccountController
                 'mail_generation_hash' => null,
             ]);
 
+            Audit::write($user->id, 'account.data_export_cancelled', 'data_export', $row->id);
+
             return [
                 'status' => 'cancelled',
                 'id' => (int) $row->id,
                 'path' => is_string($path) ? $path : null,
             ];
         });
+        if ($result['status'] === 'stale') {
+            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+        }
         if ($result['status'] === 'missing') {
             return response()->json(['error' => 'No hay una exportación activa'], 409);
         }
         if (is_string($result['path']) && $result['path'] !== '') {
             PrivateArtifactCleanup::attempt($result['id'], $result['path']);
         }
-        Audit::write($user->id, 'account.data_export_cancelled', 'data_export', null);
 
         return response()->json(['ok' => true]);
     }
@@ -248,7 +256,7 @@ class AccountController
         $sessionId = UvhRequest::sessionId($request);
         try {
             $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $purpose): array {
-                $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
+                $lockedUser = $this->lockVerifiedActor($user, $sessionId);
                 $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
                     ->whereNull('revoked_at')->lockForUpdate()->first();
                 if (! $lockedUser || ! $session
@@ -364,13 +372,17 @@ class AccountController
         try {
             $stillEligible = DB::transaction(function () use ($result, $servedBy): bool {
                 $lockedUser = User::where('id', $result['user_id'])->lockForUpdate()->first();
+                $session = UvhSession::where('id', $servedBy)->where('user_id', $result['user_id'])
+                    ->whereNull('revoked_at')->where('expires_at', '>', now())->lockForUpdate()->first();
                 $row = DataExportRequest::where('id', $result['request_id'])
                     ->where('user_id', $result['user_id'])
                     ->where('status', 'ready')->lockForUpdate()->first();
 
                 $eligible = $row !== null
                     && $lockedUser !== null
+                    && $session !== null
                     && ! $lockedUser->deleted_at
+                    && (int) $session->security_version === (int) $lockedUser->security_version
                     && (int) $lockedUser->security_version === (int) $row->security_version
                     && $row->download_expires_at?->isFuture() === true
                     && is_string($row->artifact_path)
@@ -384,11 +396,13 @@ class AccountController
                         'download_served_at' => now(),
                         'download_served_session_id' => $servedBy,
                     ]);
+                    Audit::write($lockedUser->id, 'account.data_export_served', 'data_export', $row->id);
                 }
 
                 return $eligible;
             });
         } catch (\Throwable) {
+            fclose($cipher);
             OperationalMetrics::increment('export.download_unavailable');
 
             return response()->json([
@@ -396,13 +410,14 @@ class AccountController
             ], 503);
         }
         if (! $stillEligible) {
+            fclose($cipher);
+
             return response()->json(['error' => 'La exportación cambió de estado antes de poder entregarse'], 409);
         }
 
         // "Served" means that the response is about to leave PHP. It is not a
         // claim that the browser received every byte; the client acknowledges
         // that separately after postBlob has completed.
-        Audit::write($result['user_id'], 'account.data_export_served', 'data_export', $result['request_id']);
 
         // El cuerpo se descifra por bloques al salir: la memoria viva de una
         // descarga es la de un bloque, sea el documento del tamaño que sea.
@@ -430,7 +445,10 @@ class AccountController
         try {
             $result = DB::transaction(function () use ($user, $sessionId): array {
                 // Preserve the global lock order: user before user-owned state.
-                $lockedUser = User::where('id', $user->id)->lockForUpdate()->first();
+                $lockedUser = $this->lockVerifiedActor($user, $sessionId);
+                if (! $lockedUser) {
+                    return ['status' => 'stale'];
+                }
                 $row = DataExportRequest::where('user_id', $user->id)
                     ->where('status', 'ready')->lockForUpdate()->first();
                 if (! $row) {
@@ -443,8 +461,7 @@ class AccountController
 
                     return ['status' => 'expired', 'path' => $path, 'request_id' => (int) $row->id];
                 }
-                if (! $lockedUser || $lockedUser->deleted_at
-                    || (int) $lockedUser->security_version !== (int) $row->security_version) {
+                if ((int) $lockedUser->security_version !== (int) $row->security_version) {
                     $row->update(['status' => 'cancelled', 'mail_generation_hash' => null]);
 
                     return ['status' => 'invalid', 'path' => $path, 'request_id' => (int) $row->id];
@@ -474,6 +491,7 @@ class AccountController
                     'status' => 'downloaded',
                     'downloaded_at' => now(),
                 ]);
+                Audit::write($lockedUser->id, 'account.data_export_downloaded', 'data_export', $row->id);
 
                 return [
                     'status' => 'ok',
@@ -493,6 +511,9 @@ class AccountController
         if (isset($result['request_id']) && is_string($result['path'] ?? null)) {
             PrivateArtifactCleanup::attempt((int) $result['request_id'], $result['path']);
         }
+        if ($result['status'] === 'stale') {
+            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+        }
         if ($result['status'] === 'expired') {
             return response()->json(['error' => 'La exportación ha caducado'], 400);
         }
@@ -508,8 +529,6 @@ class AccountController
         if ($result['status'] !== 'ok') {
             return response()->json(['error' => 'No hay ninguna exportación disponible para esta cuenta'], 404);
         }
-
-        Audit::write($result['user_id'], 'account.data_export_downloaded', 'data_export', $result['request_id']);
 
         return response()->json(['ok' => true]);
     }
@@ -561,7 +580,7 @@ class AccountController
 
         try {
             $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $purpose, $token, $url): array {
-                $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
+                $lockedUser = $this->lockVerifiedActor($user, $sessionId);
                 $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
                     ->whereNull('revoked_at')->lockForUpdate()->first();
                 if (! $lockedUser || ! $session || ! $lockedUser->email_verified_at
@@ -584,6 +603,9 @@ class AccountController
                 }
 
                 $existing = AccountDeletionRequest::where('user_id', $lockedUser->id)->lockForUpdate()->first();
+                if ($existing && ! AccountDeletionAudit::admit($existing)) {
+                    return ['status' => 'audit_pending'];
+                }
                 if ($existing && $existing->status === 'requested'
                     && (int) $existing->security_version !== (int) $lockedUser->security_version) {
                     $existing->update(['status' => 'cancelled', 'confirmation_token_hash' => null]);
@@ -627,6 +649,10 @@ class AccountController
                     throw new MailAdmissionException('Account deletion confirmation queue admission failed');
                 }
 
+                Audit::write($lockedUser->id, 'account.deletion_requested', 'account_deletion', $row->id, [
+                    'factor' => $stepUp['factor'], 'grace_days_after_confirmation' => 7,
+                ]);
+
                 return ['status' => 'created', 'request_id' => (int) $row->id, 'expires_at' => $expiresAt, 'factor' => $stepUp['factor']];
             });
         } catch (MailAdmissionException) {
@@ -635,6 +661,9 @@ class AccountController
             return response()->json(['error' => 'No se pudo enviar la confirmación. Inténtalo de nuevo más tarde'], 503);
         }
 
+        if ($result['status'] === 'audit_pending') {
+            return response()->json(['error' => 'La cancelación anterior está guardada. Espera a que se complete su registro antes de solicitar otro borrado.'], 503);
+        }
         if ($result['status'] === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
         }
@@ -675,10 +704,6 @@ class AccountController
 
             return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
         }
-
-        Audit::write($user->id, 'account.deletion_requested', 'account_deletion', $result['request_id'], [
-            'factor' => $result['factor'], 'grace_days_after_confirmation' => 7,
-        ]);
 
         return response()->json([
             'status' => 'requested',
@@ -793,6 +818,10 @@ class AccountController
                         'updated_at' => $now,
                     ]);
 
+                Audit::write($user->id, 'account.deletion_scheduled', 'account_deletion', $row->id, [
+                    'execute_after' => $executeAfter->toIso8601String(),
+                ]);
+
                 return [
                     'status' => 'ok', 'user_id' => (int) $user->id, 'request_id' => (int) $row->id,
                     'execute_after' => $executeAfter, 'artifacts' => $artifacts,
@@ -822,7 +851,7 @@ class AccountController
         } catch (\Throwable) {
             $intentRevocation = ['revoked' => 0, 'busy' => -1];
         }
-        Audit::write($result['user_id'], 'account.deletion_scheduled', 'account_deletion', $result['request_id'], [
+        Audit::write($result['user_id'], 'account.deletion_link_intents_reconciled', 'account_deletion', $result['request_id'], [
             'execute_after' => $result['execute_after']->toIso8601String(),
             'link_intents_revoked' => $intentRevocation['revoked'],
             'link_intents_busy' => $intentRevocation['busy'],
@@ -866,6 +895,7 @@ class AccountController
                 'status' => 'cancelled',
                 'cancel_token_hash' => null,
                 'cancelled_at' => $now,
+                'cancellation_audit_pending' => true,
             ]);
 
             // Cancellation is a protective operation: a mail failure must not
@@ -885,6 +915,8 @@ class AccountController
                 $noticeAdmitted = false;
             }
 
+            AccountDeletionAudit::admit($row);
+
             return [
                 'status' => 'ok', 'user_id' => (int) $user->id, 'request_id' => (int) $row->id,
                 'notice_admitted' => $noticeAdmitted,
@@ -897,9 +929,25 @@ class AccountController
         if (! $result['notice_admitted']) {
             Audit::write($result['user_id'], 'auth.email_delivery_failed', 'user', $result['user_id'], ['kind' => 'account_deletion_cancelled']);
         }
-        Audit::write($result['user_id'], 'account.deletion_cancelled', 'account_deletion', $result['request_id']);
 
         return response()->json(['ok' => true]);
+    }
+
+    /** Revalidate the verified middleware identity while holding account/session locks. */
+    private function lockVerifiedActor(User $snapshot, ?string $sessionId): ?User
+    {
+        $account = User::where('id', $snapshot->id)->whereNull('deleted_at')->lockForUpdate()->first();
+        if (! $account || ! $account->email_verified_at || $sessionId === null
+            || (int) $account->security_version !== (int) $snapshot->security_version) {
+            return null;
+        }
+        $session = UvhSession::where('id', $sessionId)->where('user_id', $account->id)
+            ->whereNull('revoked_at')->where('expires_at', '>', now())->lockForUpdate()->first();
+        if (! $session || (int) $session->security_version !== (int) $account->security_version) {
+            return null;
+        }
+
+        return $account;
     }
 
     private function isExpired(DataExportRequest $request): bool

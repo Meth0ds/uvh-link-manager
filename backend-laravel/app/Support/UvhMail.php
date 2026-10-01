@@ -32,6 +32,7 @@ class UvhMail
                 'subject' => $subject,
                 'html' => $html,
                 'text' => $text,
+                'correlation_id' => RequestTrace::current(),
             ], JSON_THROW_ON_ERROR));
             $idempotencyKey = self::idempotencyKey($kind, $resourceType, $resourceId, $resourceGeneration);
             DB::table('mail_outbox')->insertOrIgnore([
@@ -171,6 +172,25 @@ class UvhMail
      * de contraseña: si no reconoces el cierre, el mismo control de emergencia
      * sigue disponible durante las próximas 24 horas.
      */
+    public static function sessionRevoked(string $to, string $incidentUrl, string $tokenHash): bool
+    {
+        $body = '<p>Se ha revocado el acceso de un dispositivo a tu cuenta.</p><p>Si no reconoces esta acción, revisa tus sesiones y utiliza el control de emergencia.</p>';
+
+        return self::send('session_revoked', $to, 'Sesión revocada en UVH',
+            self::layout('Sesión revocada', $body.self::action($incidentUrl, 'Revisar el incidente', true)),
+            'Se ha revocado una sesión de tu cuenta UVH. Control de emergencia: '.$incidentUrl,
+            'email_token', $tokenHash, $tokenHash);
+    }
+
+    public static function operationalNotice(string $to, string $kind, string $subject): bool
+    {
+        $title = NotificationKinds::all()[$kind]['title'];
+
+        return self::send($kind, $to, $title.' · UVH',
+            self::layout($title, '<p>'.self::esc($subject).'</p><p>Entra en UVH para revisar este aviso.</p>'),
+            $title.'. '.$subject.'. Entra en UVH para revisar este aviso.');
+    }
+
     public static function sessionsRevoked(string $to, string $incidentUrl, string $tokenHash, bool $all): bool
     {
         $link = self::action($incidentUrl, 'Cerrar accesos de emergencia', true);

@@ -47,7 +47,9 @@ test("una invitación sólo concede acceso tras aceptarla con el destinatario ve
   // current workspace. Select the new membership explicitly before asserting.
   await page.getByRole("button", { name: "Cambiar workspace" }).click();
   await page.getByRole("menuitem", { name: workspaceName }).click();
-  await expect(page.getByText(workspaceName, { exact: true }).first()).toBeVisible();
+  // Anclado al picker superior: el nombre también vive en el resumen del
+  // sidenav, que se oculta a propósito en ventanas bajas.
+  await expect(page.getByRole("button", { name: "Cambiar workspace" }).getByText(workspaceName, { exact: true })).toBeVisible();
 
   // Keep the issuer identifier live in the scenario so accidental account
   // reuse or a future test refactor cannot silently erase that boundary.

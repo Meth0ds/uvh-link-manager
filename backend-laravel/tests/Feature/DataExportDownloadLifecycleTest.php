@@ -2,16 +2,23 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\AccountController;
 use App\Models\DataExportRequest;
 use App\Models\User;
+use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\PrivateArtifact;
 use App\Support\SessionManager;
 use App\Support\UvhCrypto;
+use App\Support\UvhRequest;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -36,7 +43,8 @@ final class DataExportDownloadLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement('TRUNCATE users RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, audit_events, audit_outbox RESTART IDENTITY CASCADE');
+        Queue::fake();
         Storage::fake('local');
         config(['cache.default' => 'array']);
         $this->disableCookieEncryption();
@@ -76,6 +84,28 @@ final class DataExportDownloadLifecycleTest extends TestCase
         // Every serve spent exactly one recovery code and nothing more.
         $this->assertSame([], $user->refresh()->recovery_codes);
         Storage::disk('local')->assertMissing('account-exports/'.str_repeat('B', 32).'.uvh');
+    }
+
+    public function test_session_revoked_during_artifact_io_cannot_receive_the_download(): void
+    {
+        $user = $this->mfaUser();
+        $export = $this->readyExport($user, '{"private":true}');
+        $disk = Storage::disk('local');
+        $proxy = \Mockery::mock($disk);
+        $proxy->shouldReceive('readStream')->once()->with($export->artifact_path)
+            ->andReturnUsing(function (string $path) use ($disk, $user) {
+                // Revoking one session does not rotate the account generation.
+                DB::table('sessions')->where('user_id', $user->id)->update(['revoked_at' => now()]);
+
+                return $disk->readStream($path);
+            });
+        Storage::shouldReceive('disk')->with('local')->andReturn($proxy);
+
+        $this->post('/api/v1/auth/data-export/download', $this->credentials())->assertStatus(409);
+        $export->refresh();
+        $this->assertSame('ready', $export->status);
+        $this->assertNull($export->download_served_at);
+        $this->assertSame((int) $user->security_version, (int) $user->refresh()->security_version);
     }
 
     public function test_only_the_session_that_downloaded_can_acknowledge_it(): void
@@ -258,6 +288,138 @@ final class DataExportDownloadLifecycleTest extends TestCase
 
         // El historial es sólo lectura: no toca la exportación que describe.
         $this->assertSame(12, DB::table('data_export_requests')->where('user_id', $user->id)->count());
+    }
+
+    public static function exportActors(): array
+    {
+        $cases = [];
+        foreach (['request', 'cancel', 'download', 'acknowledge'] as $action) {
+            foreach (['expired', 'revoked', 'version'] as $reason) {
+                $cases[$action.' '.$reason] = [$action, $reason];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('exportActors')]
+    public function test_export_mutations_revalidate_the_pre_authorized_session(string $action, string $reason): void
+    {
+        $user = $this->mfaUser();
+        $snapshot = clone $user;
+        $sessionId = DB::table('sessions')->where('user_id', $user->id)->value('id');
+        $export = $action === 'request' ? null : $this->readyExport($user, '{"private":true}');
+        if ($export) {
+            $export->update(['download_served_at' => now(), 'download_served_session_id' => $sessionId]);
+        }
+        if ($reason === 'version') {
+            DB::table('users')->where('id', $user->id)->update(['security_version' => 2]);
+            DB::table('sessions')->where('id', $sessionId)->update(['security_version' => 2]);
+            $export?->update(['security_version' => 2]);
+        } else {
+            DB::table('sessions')->where('id', $sessionId)->update($reason === 'revoked' ? ['revoked_at' => now()] : ['expires_at' => now()->subSecond()]);
+        }
+        $before = DB::table('data_export_requests')->orderBy('id')->get()->toJson();
+        $codes = $user->refresh()->recovery_codes;
+        $request = Request::create('/', 'POST', $this->credentials());
+        $request->attributes->set(UvhRequest::USER, $snapshot);
+        $request->attributes->set(UvhRequest::SESSION_ID, $sessionId);
+        $controller = app(AccountController::class);
+        $response = match ($action) {
+            'request' => $controller->requestExport($request),
+            'cancel' => $controller->cancelExport($request),
+            'download' => $controller->downloadExport($request),
+            'acknowledge' => $controller->acknowledgeExportDownload($request),
+        };
+        $this->assertGreaterThanOrEqual(400, $response->getStatusCode());
+        $this->assertLessThan(500, $response->getStatusCode());
+        $this->assertSame($before, DB::table('data_export_requests')->orderBy('id')->get()->toJson());
+        $this->assertSame($codes, $user->refresh()->recovery_codes);
+        if ($export) {
+            Storage::disk('local')->assertExists($export->artifact_path);
+        }
+        Queue::assertNothingPushed();
+    }
+
+    public static function exportAudits(): array
+    {
+        $cases = [];
+        foreach (['request', 'cancel', 'download', 'acknowledge'] as $action) {
+            $cases[$action.' exact admission fails'] = [$action, true];
+            $cases[$action.' history fails'] = [$action, false];
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('exportAudits')]
+    public function test_export_mutations_admit_the_exact_audit_with_the_state_change(string $action, bool $fail): void
+    {
+        $user = $this->mfaUser();
+        $sessionId = DB::table('sessions')->where('user_id', $user->id)->value('id');
+        $export = $action === 'request' ? null : $this->readyExport($user, '{"private":true}');
+        if ($action === 'acknowledge') {
+            $export->update(['download_served_at' => now(), 'download_served_session_id' => $sessionId]);
+        }
+        $event = match ($action) {
+            'request' => 'account.data_export_requested', 'cancel' => 'account.data_export_cancelled',
+            'download' => 'account.data_export_served', 'acknowledge' => 'account.data_export_downloaded',
+        };
+        if ($fail) {
+            DB::listen(static function (QueryExecuted $query) use ($event): void {
+                if (! str_starts_with(strtolower($query->sql), 'insert') || ! str_contains($query->sql, '"audit_outbox"')) {
+                    return;
+                }
+                foreach ($query->bindings as $binding) {
+                    $row = is_string($binding) ? json_decode($binding, true) : null;
+                    if (is_array($row) && ($row['action'] ?? null) === $event) {
+                        throw new \RuntimeException('Fixture: exact export audit admission unavailable');
+                    }
+                }
+            });
+        } else {
+            Schema::rename('audit_events', 'audit_events_unavailable');
+        }
+        try {
+            $url = '/api/v1/auth/data-export'.match ($action) {
+                'request' => '', 'cancel' => '/cancel', 'download' => '/download', 'acknowledge' => '/download/acknowledge'
+            };
+            $response = $this->post($url, $this->credentials());
+            if ($fail) {
+                $response->assertServerError();
+                if ($export) {
+                    $this->assertSame('ready', $export->refresh()->status);
+                    Storage::disk('local')->assertExists($export->artifact_path);
+                    if ($action === 'download') {
+                        $this->assertNull($export->download_served_at);
+                    }
+                } else {
+                    $this->assertDatabaseCount('data_export_requests', 0);
+                    $this->assertCount(2, $user->refresh()->recovery_codes);
+                }
+                Queue::assertNothingPushed();
+            } else {
+                $response->assertSuccessful();
+                $pending = DB::table('audit_outbox')->get()->map(static fn ($row) => json_decode($row->event, true, flags: JSON_THROW_ON_ERROR));
+                $exact = $pending->where('action', $event)->values();
+                $this->assertCount(1, $exact);
+                $this->assertSame($user->id, $exact[0]['user_id']);
+                $this->assertSame((string) ($export?->id ?? $response->json('export.id')), $exact[0]['resource_id']);
+                $serialized = json_encode($exact[0], JSON_THROW_ON_ERROR);
+                $this->assertStringNotContainsString(self::PASSWORD, $serialized);
+                $this->assertStringNotContainsString(self::RECOVERY, $serialized);
+            }
+        } finally {
+            if (! $fail) {
+                Schema::rename('audit_events_unavailable', 'audit_events');
+            }
+        }
+        if (! $fail) {
+            $this->assertTrue(Audit::drain());
+            $this->assertTrue(Audit::drain());
+            $this->assertSame(1, DB::table('audit_events')->where('action', $event)->count());
+            $this->assertDatabaseCount('audit_outbox', 0);
+        }
     }
 
     /** @return array{password: string, factorCode: string} */

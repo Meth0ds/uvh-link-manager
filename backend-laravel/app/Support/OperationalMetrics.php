@@ -9,6 +9,26 @@ use Illuminate\Support\Facades\Log;
 final class OperationalMetrics
 {
     public const ALLOWED = [
+        'http.prepare_le_50',
+        'http.prepare_le_100',
+        'http.prepare_le_250',
+        'http.prepare_le_500',
+        'http.prepare_le_1000',
+        'http.prepare_le_2000',
+        'http.prepare_le_5000',
+        'http.prepare_le_inf',
+        'http.stream_le_50',
+        'http.stream_le_100',
+        'http.stream_le_250',
+        'http.stream_le_500',
+        'http.stream_le_1000',
+        'http.stream_le_2000',
+        'http.stream_le_5000',
+        'http.stream_le_inf',
+        'http.prepare_duration_ms',
+        'http.stream_duration_ms',
+        'http.stream_completed',
+        'http.stream_failed',
         'http.server_error',
         'http.slow_request',
         // Aggregate every HTTP 429 without a route/account label. Operators
@@ -132,6 +152,34 @@ final class OperationalMetrics
             // Metrics are auxiliary and must never turn an authentication or
             // delivery result into a failure. Emit one generic diagnostic and
             // avoid recursion if the logging pipeline itself reports errors.
+            self::logFailure($error);
+        }
+    }
+
+    /** One round trip for a bounded histogram sample, rather than one write per bucket. */
+    /** @param array<array-key, mixed> $counts */
+    public static function incrementBatch(array $counts): void
+    {
+        $counts = array_filter($counts, static fn ($amount, $metric): bool => is_string($metric) && in_array($metric, self::ALLOWED, true)
+            && is_int($amount) && $amount >= 1 && $amount <= 1000000, ARRAY_FILTER_USE_BOTH);
+        if ($counts === []) {
+            return;
+        }
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit(static fn () => self::incrementBatch($counts));
+
+            return;
+        }
+        try {
+            $bindings = [];
+            $bucket = now()->utc()->startOfMinute();
+            foreach ($counts as $metric => $amount) {
+                array_push($bindings, $metric, $bucket, $amount);
+            }
+            DB::statement('INSERT INTO operational_metrics (metric, bucket_at, count) VALUES '
+                .implode(',', array_fill(0, count($counts), '(?,?,?)'))
+                .' ON CONFLICT (metric, bucket_at) DO UPDATE SET count = LEAST(9223372036854775807, operational_metrics.count + EXCLUDED.count)', $bindings);
+        } catch (\Throwable $error) {
             self::logFailure($error);
         }
     }

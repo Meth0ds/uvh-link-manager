@@ -15,7 +15,9 @@ test("workspace y enlace recorren creación, edición, pausa, papelera y restaur
 
   await page.goto("/app/links");
   await expect(page.getByRole("heading", { name: "Enlaces" })).toBeVisible();
-  await page.getByRole("main").getByRole("button", { name: "Nuevo enlace" }).click();
+  // "Crear enlace" también nombra la acción del estado vacío dentro de main y
+  // los botones del shell; el punto de entrada bajo prueba es el del encabezado.
+  await page.getByRole("main").locator("app-page-header").getByRole("button", { name: "Crear enlace" }).click();
 
   const alias = `e2e-${Date.now()}`;
   const originalDestination = "https://example.com/original";

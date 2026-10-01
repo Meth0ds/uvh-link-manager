@@ -2,6 +2,9 @@ import { signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import type { NotificationItem, NotificationPreference } from "../../core/models";
 import { NotificationService } from "../../core/services/notification.service";
+import { AuthService } from "../../core/services/auth.service";
+import { WorkspaceService } from "../../core/services/workspace.service";
+import { Router } from "@angular/router";
 import { NotificationsComponent } from "./notifications.component";
 
 function item(overrides: Partial<NotificationItem> = {}): NotificationItem {
@@ -46,7 +49,12 @@ describe("NotificationsComponent", () => {
     notifications.refreshUnread.and.resolveTo(0);
 
     TestBed.configureTestingModule({
-      providers: [{ provide: NotificationService, useValue: notifications }],
+      providers: [
+        { provide: NotificationService, useValue: notifications },
+        { provide: AuthService, useValue: { sessionGeneration: () => 0 } },
+        { provide: WorkspaceService, useValue: { list: signal([{ id: 2 }]), select: jasmine.createSpy("select") } },
+        { provide: Router, useValue: { navigateByUrl: jasmine.createSpy("navigateByUrl").and.resolveTo(true) } },
+      ],
     });
     component = TestBed.runInInjectionContext(() => new NotificationsComponent());
     await Promise.resolve();
@@ -87,7 +95,7 @@ describe("NotificationsComponent", () => {
     notifications.list.calls.reset();
 
     await component.loadMore();
-    expect(notifications.list).toHaveBeenCalledOnceWith(1);
+    expect(notifications.list).toHaveBeenCalledOnceWith(1, jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
     expect(component.items().map((row) => row.id)).toEqual([2, 1]);
     expect(component.hasMore()).toBeFalse();
   });
@@ -123,6 +131,28 @@ describe("NotificationsComponent", () => {
     expect(notifications.markRead).not.toHaveBeenCalled();
     expect(notifications.markAllRead).not.toHaveBeenCalled();
     expect(notifications.list).not.toHaveBeenCalled();
+  });
+
+  it("opens the notification workspace and refuses a workspace no longer accessible", async () => {
+    await component.openDetail(item({ workspaceId: 2, route: "/app/team" }));
+    expect(TestBed.inject(WorkspaceService).select).toHaveBeenCalledWith(2);
+    expect(TestBed.inject(Router).navigateByUrl).toHaveBeenCalledWith("/app/team");
+    const router = TestBed.inject(Router).navigateByUrl as jasmine.Spy;
+    router.calls.reset();
+    await component.openDetail(item({ workspaceId: 3 }));
+    expect(router).not.toHaveBeenCalled();
+    expect(component.error()).toContain("Ya no tienes acceso");
+  });
+
+  it("discards an older load after a newer page is displayed", async () => {
+    let resolve!: (page: { notifications: NotificationItem[]; unread: number; nextCursor: null }) => void;
+    notifications.list.and.returnValues(new Promise((done) => { resolve = done; }),
+      Promise.resolve({ notifications: [item({ id: 2 })], unread: 1, nextCursor: null }));
+    const old = component.load();
+    await component.load();
+    resolve({ notifications: [item({ id: 1 })], unread: 1, nextCursor: null });
+    await old;
+    expect(component.items().map((row) => row.id)).toEqual([2]);
   });
 
 });

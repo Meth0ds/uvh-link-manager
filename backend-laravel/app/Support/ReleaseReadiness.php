@@ -39,6 +39,13 @@ final class ReleaseReadiness
             if (! Schema::hasColumns('invitation_mail_budgets', ['budget_key', 'used', 'expires_at_epoch'])) {
                 $errors[] = 'Falta el esquema de presupuestos de invitación (000032).';
             }
+            if (! Schema::hasColumns('audit_outbox', ['id', 'event', 'created_at'])
+                || ! Schema::hasColumns('operational_notice_events', ['kind', 'resource_id', 'generation', 'created_at'])) {
+                $errors[] = 'Falta el esquema de auditoría durable o avisos operativos (2026_09_30).';
+            }
+            if (! Schema::hasColumn('account_deletion_requests', 'cancellation_audit_pending')) {
+                $errors[] = 'Falta el esquema de recuperación de auditoría de cancelación (2026_10_01).';
+            }
             if (! Schema::hasColumn('audit_events', 'workspace_id')) {
                 $errors[] = 'Falta la atribución de actividad por workspace (000033).';
             }

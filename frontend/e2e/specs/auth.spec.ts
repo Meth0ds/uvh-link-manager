@@ -34,17 +34,21 @@ test("un registro pendiente no abre sesión ni reto MFA y el reenvío vive en un
   await registerFromBrowser(page, email);
   await loginFromBrowser(page, email);
 
-  // Un registro pendiente no es una cuenta: el login contesta como unas
-  // credenciales incorrectas —sin sesión y sin reto MFA— y con ello NO revela
-  // si esa dirección sigue pendiente (señal de ciclo de vida cerrada).
+  // Un registro pendiente no es una cuenta: el login desde el navegador que lo
+  // creó no da sesión ni reta MFA, y el servidor sólo abre la pantalla de
+  // verificación, su señal de ciclo de vida cerrada. La frontera
+  // anti-enumeración es el secreto de edición del registro solo —una
+  // capability de ese navegador—: la contraseña no forma parte de ella y su
+  // resultado ni se consulta antes de revelar. Sin secreto (o con uno
+  // inválido) la respuesta es siempre la genérica «Credenciales incorrectas»;
+  // esa frontera la fija el contrato del backend (ApiParityTest), no este spec.
   await expect(page).toHaveURL(/\/auth$/);
-  await expect(page.getByRole("alert")).toContainText("Credenciales incorrectas");
   await expect(page.getByRole("heading", { name: "Confirma que eres tú" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Tu siguiente paso está en el correo." })).toBeVisible();
 
-  // La vuelta al buzón es una entrada pública del panel de acceso, siempre
-  // disponible y sin depender de ninguna señal del servidor.
-  await expect(page.getByRole("button", { name: "Reenviar verificación" })).toBeVisible();
-  await page.getByRole("button", { name: "Reenviar verificación" }).click();
+  // El reenvío vive en una entrada propia de esa pantalla: nunca se dispara
+  // solo, se solicita a mano y el resultado se anuncia sin más.
+  await page.getByRole("button", { name: "Reenviar enlace" }).click();
   await expect(page.getByText("recibirás un nuevo correo en breve")).toBeVisible();
 });
 
@@ -61,6 +65,6 @@ test("registro duplicado conserva la respuesta anti-enumeración", async ({ page
   await registerFromBrowser(page, email);
   const response = await duplicateResponse;
   expect(response.status()).toBe(201);
-  await expect(page.getByRole("heading", { name: "Revisa tu email" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tu siguiente paso está en el correo." })).toBeVisible();
   await expect(page).toHaveURL(/\/auth\?mode=register$/);
 });

@@ -13,6 +13,7 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { decodeAnalyticsOverview } from "../../core/services/link-response-decoders";
+import { AuthService } from "../../core/services/auth.service";
 import { downloadBlob } from "../../core/services/browser-download";
 
 @Component({
@@ -38,6 +39,8 @@ export class AnalyticsComponent {
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
   private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly exports = new LatestRequest(inject(DestroyRef));
+  private readonly auth = inject(AuthService);
   readonly overview = signal<AnalyticsOverview | null>(null);
   readonly period = signal("7d");
   readonly customFrom = signal("");
@@ -69,6 +72,8 @@ export class AnalyticsComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.exports.invalidate();
+      this.exporting.set(false);
       // Never retain metrics from the previous authorization context.
       this.requests.invalidate();
       this.overview.set(null);
@@ -118,6 +123,8 @@ export class AnalyticsComponent {
   }
 
   async onPeriod(value: string): Promise<void> {
+    this.exports.invalidate();
+    this.exporting.set(false);
     // Never relabel an old snapshot with the newly selected period. Clearing
     // first also leaves an unambiguous error state if the replacement fails.
     this.requests.invalidate();
@@ -127,6 +134,8 @@ export class AnalyticsComponent {
   }
 
   async onCustomDate(side: "from" | "to", value: string): Promise<void> {
+    this.exports.invalidate();
+    this.exporting.set(false);
     this.requests.invalidate();
     this.overview.set(null);
     if (side === "from") this.customFrom.set(value);
@@ -166,9 +175,16 @@ export class AnalyticsComponent {
    */
   async export(format: "csv" | "json"): Promise<void> {
     if (this.exporting() || this.awaitingCustomRange() || this.customRangeError() !== null) return;
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
+    const generation = this.auth.sessionGeneration();
+    const request = this.exports.begin(workspaceId);
+    const current = (): boolean => this.exports.isCurrent(request, this.workspaces.currentId())
+      && generation === this.auth.sessionGeneration();
     this.exporting.set(true);
     try {
       const blob = await this.api.getBlob("/api/v1/analytics/export", { ...this.query(), format });
+      if (!current()) return;
       const stamp = new Date().toISOString().slice(0, 10);
       if (!downloadBlob(blob, `uvh-analytics-${stamp}.${format}`)) {
         this.snackbar.open("No se pudo iniciar la descarga", "Cerrar", { duration: 3000 });
@@ -176,9 +192,10 @@ export class AnalyticsComponent {
       }
       this.snackbar.open(`Export ${format.toUpperCase()} descargado`, "Cerrar", { duration: 2500 });
     } catch (err) {
+      if (!current()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo exportar la analítica", "Cerrar", { duration: 3500 });
     } finally {
-      this.exporting.set(false);
+      if (current()) this.exporting.set(false);
     }
   }
 }

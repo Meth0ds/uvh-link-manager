@@ -9,6 +9,7 @@ use App\Support\WorkspaceLimits;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AnalyticsController
@@ -42,7 +43,7 @@ class AnalyticsController
             }
         }
 
-        return response()->json($this->buildOverview($workspaceId, $linkId, $range['start'], $range['end']));
+        return response()->json($this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end']));
     }
 
     public function publicOverview(Request $request)
@@ -71,7 +72,7 @@ class AnalyticsController
             }
         }
 
-        return response()->json($this->buildOverview($workspaceId, $linkId, $range['start'], $range['end']));
+        return response()->json($this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end']));
     }
 
     /**
@@ -111,7 +112,7 @@ class AnalyticsController
             }
         }
 
-        $overview = $this->buildOverview($workspaceId, $linkId, $range['start'], $range['end']);
+        $overview = $this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end']);
         $filename = 'uvh-analytics-'.now()->format('Ymd').'.'.$format;
 
         if ($format === 'json') {
@@ -188,8 +189,46 @@ class AnalyticsController
         return ['ok' => true, 'start' => $start->toIso8601String(), 'end' => $end->toIso8601String()];
     }
 
+    /** @return array<string, mixed> */
+    private function cachedOverview(int $workspaceId, ?int $linkId, string $start, string $end): array
+    {
+        $ttl = max(0, min(60, (int) config('uvh.analytics.overview_cache_seconds', 30)));
+        if ($ttl === 0) {
+            return $this->buildOverview($workspaceId, $linkId, $start, $end);
+        }
+        // Rolling periods advance every request. A 30-second bucket makes their
+        // cache reusable while bounding staleness; custom ranges retain exact bounds.
+        $rolling = abs((IsoDate::parse($end)?->getTimestamp() ?? 0) - time()) < 2;
+        $keyStart = $rolling ? intdiv(IsoDate::parse($start)->getTimestamp(), $ttl) : $start;
+        $keyEnd = $rolling ? intdiv(IsoDate::parse($end)->getTimestamp(), $ttl) : $end;
+        $key = 'uvh:analytics:overview:v1:'.hash('sha256', json_encode([$workspaceId, $linkId, $keyStart, $keyEnd], JSON_THROW_ON_ERROR));
+        try {
+            $cached = Cache::get($key);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        } catch (\Throwable) {
+            // Cache is an optimization; authorization still ran before this method.
+        }
+        $overview = $this->buildOverview($workspaceId, $linkId, $start, $end);
+        try {
+            Cache::put($key, $overview, $ttl);
+        } catch (\Throwable) {
+            // Serve the coherent database snapshot if the cache is unavailable.
+        }
+
+        return $overview;
+    }
+
     private function buildOverview(int $workspaceId, ?int $linkId, string $start, string $end): array
     {
+        if (DB::transactionLevel() === 0) {
+            return DB::transaction(function () use ($workspaceId, $linkId, $start, $end): array {
+                DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+
+                return $this->buildOverview($workspaceId, $linkId, $start, $end);
+            });
+        }
         // Event rows are the source of truth for arbitrary time ranges. Daily
         // rollups remain a bounded acceleration structure for retention/jobs,
         // but summing daily visitors would double-count the same person across

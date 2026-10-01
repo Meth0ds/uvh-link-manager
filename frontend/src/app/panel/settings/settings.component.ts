@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
+import { Component, computed, effect, inject, signal, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
 import { Location } from "@angular/common";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
@@ -94,6 +94,10 @@ export class SettingsComponent implements AfterViewInit {
   private emailDialog?: MatDialogRef<EmailAccessDialogComponent, boolean>;
   private passwordDialog?: MatDialogRef<PasswordChangeDialogComponent, boolean>;
   private exportDialog?: MatDialogRef<DataExportDialogComponent, DataExportDialogResult>;
+  private mfaRequests = new LatestRequest(this.destroyRef);
+  private profileRequests = new LatestRequest(this.destroyRef);
+  private workspaceNavigationRequests = new LatestRequest(this.destroyRef);
+  private sessionRevocationRequests = new LatestRequest(this.destroyRef);
   private sessionsRequest = new LatestRequest(this.destroyRef);
   private exportRequest = new LatestRequest(this.destroyRef);
   private exportHistoryRequest = new LatestRequest(this.destroyRef);
@@ -296,7 +300,18 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   constructor() {
+    let identity = this.accountContext();
+    effect(() => {
+      const nextIdentity = this.accountContext();
+      if (identity !== nextIdentity) {
+        identity = nextIdentity;
+        this.clearSensitiveMfaUi();
+        this.profileBusy.set(false);
+        this.profileForm.reset({ name: this.user()?.name ?? "" });
+      }
+    });
     this.destroyRef.onDestroy(() => {
+      this.clearSensitiveMfaUi();
       this.deletionDialog?.close();
       this.emailDialog?.close();
       this.passwordDialog?.close();
@@ -327,22 +342,27 @@ export class SettingsComponent implements AfterViewInit {
 
   /** A committed security change must never be reported as rolled back. */
   private async settleAfterConfirmedMutation(tasks: Promise<unknown>[]): Promise<void> {
+    const context = this.accountContext();
     const results = await Promise.allSettled(tasks);
-    if (!this.destroyRef.destroyed && results.some((result) => result.status === "rejected")) {
+    if (context === this.accountContext() && !this.destroyRef.destroyed && results.some((result) => result.status === "rejected")) {
       this.snackbar.open("El cambio se aplicó, pero no se pudo actualizar toda la vista. Recárgala antes de repetir la operación.", "Cerrar", { duration: 5000 });
     }
   }
 
   async saveProfile(): Promise<void> {
     if (this.profileForm.invalid || this.profileBusy()) return;
+    const request = this.profileRequests.begin(this.accountContext());
+    const current = () => this.profileRequests.isCurrent(request, this.accountContext());
     this.profileBusy.set(true);
     try {
       await this.auth.updateProfile(this.profileForm.controls.name.value.trim());
+      if (!current()) return;
       this.snackbar.open("Perfil actualizado", "Cerrar", { duration: 2500 });
     } catch (err) {
+      if (!current()) return;
       this.toast(err, "");
     } finally {
-      this.profileBusy.set(false);
+      if (current()) this.profileBusy.set(false);
     }
   }
 
@@ -735,31 +755,47 @@ export class SettingsComponent implements AfterViewInit {
   readonly privacyTypeOptions = PRIVACY_RIGHT_TYPE_ORDER;
 
   async openOwnedWorkspace(id: number): Promise<void> {
+    const request = this.workspaceNavigationRequests.begin(this.accountContext());
+    const current = () => this.workspaceNavigationRequests.isCurrent(request, this.accountContext());
     const previous = this.workspaces.currentId();
     this.workspaces.select(id);
     try {
       const navigated = await this.router.navigate(["/app/team"]);
+      if (!current()) return;
       if (!navigated && this.workspaces.currentId() === id) this.workspaces.select(previous);
     } catch (error) {
+      if (!current()) return;
       if (this.workspaces.currentId() === id) this.workspaces.select(previous);
       this.toast(error, "No se pudo abrir el workspace");
     }
   }
 
   async revokeSession(session: Session): Promise<void> {
+    const generation = this.auth.sessionGeneration();
+    const context = this.accountContext();
+    const request = this.sessionRevocationRequests.begin(context);
+    const live = () => this.sessionRevocationRequests.isCurrent(request, context);
     let revokedCurrent: boolean;
     try {
       revokedCurrent = await this.auth.revokeSession(session.id, session.current);
     } catch (err) {
-      this.toast(err, "No se pudo revocar la sesión");
+      if (live() && this.accountContext() === context) this.toast(err, "No se pudo revocar la sesión");
       return;
     }
+    if (!live()) return;
+    const completedContext = this.accountContext();
+    // Revoking this browser deliberately expires its own local identity. Only
+    // that single transition may navigate; a newer login owns its own route.
+    const ownLogout = revokedCurrent && this.auth.sessionGeneration() === generation + 1 && this.auth.user() === null;
+    if (completedContext !== context && !ownLogout) return;
+    const current = () => live() && this.accountContext() === completedContext;
     if (revokedCurrent) {
       try {
         const navigated = await this.router.navigate(["/auth"]);
+        if (!current()) return;
         if (!navigated) this.snackbar.open("La sesión quedó revocada. Abre la pantalla de acceso para continuar.", "Cerrar", { duration: 5000 });
       } catch {
-        this.snackbar.open("La sesión quedó revocada, pero no se pudo abrir la pantalla de acceso.", "Cerrar", { duration: 5000 });
+        if (current()) this.snackbar.open("La sesión quedó revocada, pero no se pudo abrir la pantalla de acceso.", "Cerrar", { duration: 5000 });
       }
       return;
     }
@@ -781,14 +817,20 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   private async stageMfaSetup(password: string, code?: string): Promise<void> {
+    const request = this.mfaRequests.begin(this.accountContext());
+    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     this.mfaBusy.set(true);
     try {
       const { secret, uri } = await this.auth.mfaSetup(password, code);
+      if (!current()) return;
       this.mfaSecret.set(secret);
       this.mfaUri.set(uri);
       try {
-        this.mfaQr.set(await QRCode.toDataURL(uri, { width: 240, margin: 1 }));
+        const qr = await QRCode.toDataURL(uri, { width: 240, margin: 1 });
+        if (!current()) return;
+        this.mfaQr.set(qr);
       } catch {
+        if (!current()) return;
         // The server-side setup already exists. Preserve the manual secret
         // instead of inviting a retry that could rotate it again.
         this.mfaQr.set(null);
@@ -796,9 +838,10 @@ export class SettingsComponent implements AfterViewInit {
       }
       this.mfaCodeForm.reset();
     } catch (err) {
+      if (!current()) return;
       this.toast(err, "");
     } finally {
-      this.mfaBusy.set(false);
+      if (current()) this.mfaBusy.set(false);
     }
   }
 
@@ -810,36 +853,43 @@ export class SettingsComponent implements AfterViewInit {
 
   async enableMfa(): Promise<void> {
     if (this.mfaCodeForm.invalid || this.mfaBusy()) return;
+    const request = this.mfaRequests.begin(this.accountContext());
+    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     this.mfaBusy.set(true);
     try {
       const { recoveryCodes } = await this.auth.mfaEnable(this.mfaCodeForm.controls.code.value);
+      if (!current()) return;
       this.recoveryCodes.set(recoveryCodes);
       this.recoveryCodesAcknowledged.set(false);
       this.clearMfaSetupUi();
       this.snackbar.open("MFA activado", "Cerrar", { duration: 2500 });
       await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
     } catch (err) {
+      if (!current()) return;
       this.toast(err, "");
     } finally {
-      this.mfaBusy.set(false);
+      if (current()) this.mfaBusy.set(false);
     }
   }
 
   async disableMfa(): Promise<void> {
     if (this.mfaDisableForm.invalid || this.mfaBusy()) return;
+    const request = this.mfaRequests.begin(this.accountContext());
+    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     const confirmed = await this.actions.confirm({
       title: "Desactivar MFA",
-      message: "Tu cuenta perderá la verificación en dos pasos. Solo podrás continuar con tu contraseña y el código TOTP actual.",
+      message: "Tu cuenta perderá la verificación en dos pasos. Confirma con tu contraseña y un código de tu aplicación o de recuperación.",
       confirmLabel: "Desactivar MFA",
       destructive: true,
     });
-    if (!confirmed || this.mfaBusy()) return;
+    if (!confirmed || !current() || this.mfaBusy()) return;
     this.mfaBusy.set(true);
     try {
       await this.auth.mfaDisable(
         this.mfaDisableForm.controls.password.value,
         this.mfaDisableForm.controls.factorCode.value,
       );
+      if (!current()) return;
       this.mfaSecret.set(null);
       this.mfaUri.set(null);
       this.mfaQr.set(null);
@@ -852,22 +902,27 @@ export class SettingsComponent implements AfterViewInit {
       this.snackbar.open("MFA desactivado", "Cerrar", { duration: 2500 });
       await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
     } catch (err) {
+      if (!current()) return;
       this.toast(err, "");
     } finally {
-      this.mfaBusy.set(false);
+      if (current()) this.mfaBusy.set(false);
     }
   }
 
   async cancelMfaSetup(): Promise<void> {
     if (this.mfaBusy()) return;
+    const request = this.mfaRequests.begin(this.accountContext());
+    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     this.mfaBusy.set(true);
     try {
       await this.auth.mfaCancelSetup();
+      if (!current()) return;
       this.clearMfaSetupUi();
     } catch (err) {
+      if (!current()) return;
       this.toast(err, "");
     } finally {
-      this.mfaBusy.set(false);
+      if (current()) this.mfaBusy.set(false);
     }
   }
 
@@ -875,6 +930,21 @@ export class SettingsComponent implements AfterViewInit {
     if (this.mfaBusy()) return;
     this.mfaReconfiguring.set(false);
     this.mfaReconfigureForm.reset();
+  }
+
+  private accountContext(): string {
+    return `${this.auth.user()?.id}:${this.auth.sessionGeneration()}`;
+  }
+
+  private clearSensitiveMfaUi(): void {
+    this.mfaRequests.invalidate();
+    this.clearMfaSetupUi();
+    this.recoveryCodes.set([]);
+    this.recoveryCodesAcknowledged.set(false);
+    this.recoveryRegenerating.set(false);
+    this.recoveryRegenerateForm.reset();
+    this.mfaDisableForm.reset();
+    this.mfaBusy.set(false);
   }
 
   private clearMfaSetupUi(): void {
@@ -911,13 +981,15 @@ export class SettingsComponent implements AfterViewInit {
       this.recoveryRegenerateForm.markAllAsTouched();
       return;
     }
+    const request = this.mfaRequests.begin(this.accountContext());
+    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     const confirmed = await this.actions.confirm({
       title: "Regenerar códigos de recuperación",
       message: "Los códigos anteriores dejarán de funcionar y se cerrarán las demás sesiones de tu cuenta.",
       confirmLabel: "Regenerar códigos",
       destructive: true,
     });
-    if (!confirmed || this.mfaBusy()) return;
+    if (!confirmed || !current() || this.mfaBusy()) return;
 
     this.mfaBusy.set(true);
     try {
@@ -925,6 +997,7 @@ export class SettingsComponent implements AfterViewInit {
         this.recoveryRegenerateForm.controls.password.value,
         this.recoveryRegenerateForm.controls.factorCode.value,
       );
+      if (!current()) return;
       this.recoveryCodes.set(recoveryCodes);
       this.recoveryCodesAcknowledged.set(false);
       this.recoveryRegenerating.set(false);
@@ -932,9 +1005,10 @@ export class SettingsComponent implements AfterViewInit {
       this.snackbar.open("Códigos regenerados", "Cerrar", { duration: 2500 });
       await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
+      if (!current()) return;
       this.toast(err, "");
     } finally {
-      this.mfaBusy.set(false);
+      if (current()) this.mfaBusy.set(false);
     }
   }
 

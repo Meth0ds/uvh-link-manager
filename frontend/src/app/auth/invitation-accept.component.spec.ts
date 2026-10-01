@@ -216,6 +216,44 @@ describe("InvitationAcceptComponent async safety", () => {
     expect(component.message()).toContain("No se pudo comprobar la sesión");
   });
 
+  it("does not mistake an absorbed session transport failure for an anonymous session", async () => {
+    loaded.set(false);
+    authenticated.set(false);
+    await create();
+    expect(component.needsLogin()).toBeFalse();
+    expect(component.ready()).toBeFalse();
+    expect(component.message()).toContain("No se pudo comprobar la sesión");
+    await component.accept();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(invitations.forget).not.toHaveBeenCalled();
+  });
+
+  it("retries an unknown session without spending or discarding the invitation", async () => {
+    loaded.set(false);
+    authenticated.set(false);
+    await create();
+    expect(component.sessionUnavailable()).toBeTrue();
+    auth.init.and.callFake(async () => { loaded.set(true); authenticated.set(true); });
+    await component.retrySession();
+    expect(component.sessionUnavailable()).toBeFalse();
+    expect(component.ready()).toBeTrue();
+    expect(component.needsLogin()).toBeFalse();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(invitations.forget).not.toHaveBeenCalled();
+  });
+
+  it("only offers login after retry definitively establishes an anonymous session", async () => {
+    loaded.set(false);
+    authenticated.set(false);
+    await create();
+    auth.init.and.callFake(async () => { loaded.set(true); });
+    await component.retrySession();
+    expect(component.sessionUnavailable()).toBeFalse();
+    expect(component.needsLogin()).toBeTrue();
+    expect(component.ready()).toBeFalse();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
   it("does not clear a newer invitation when an older acceptance finishes", async () => {
     const response = deferred<{ workspaceId: number }>();
     api.post.and.returnValue(response.promise);
@@ -244,6 +282,34 @@ describe("InvitationAcceptComponent async safety", () => {
     expect(invitations.hide).not.toHaveBeenCalled();
     expect(auth.refreshWorkspaces).not.toHaveBeenCalled();
   });
+
+  for (const action of ["accept", "reject"] as const) {
+    it(`does not submit ${action} after the session changes during park confirmation`, async () => {
+      await create();
+      const confirmation = deferred<boolean>();
+      invitations.confirmed.and.returnValue(confirmation.promise);
+      const operation = component[action]();
+      generation = 2;
+      confirmation.resolve(true);
+      await operation;
+      expect(api.post).not.toHaveBeenCalled();
+      expect(invitations.hide).not.toHaveBeenCalled();
+    });
+
+    it(`ignores a late ${action} failure from a different session`, async () => {
+      const response = deferred<{ workspaceId: number }>();
+      api.post.and.returnValue(response.promise);
+      await create();
+      const operation = component[action]();
+      await settle();
+      const message = component.message();
+      generation = 2;
+      response.reject(new ApiRequestError("Old session invitation invalid", 400));
+      await operation;
+      expect(component.message()).toBe(message);
+      expect(invitations.hide).not.toHaveBeenCalled();
+    });
+  }
 
   it("keeps acceptance confirmed when the workspace refresh cannot complete", async () => {
     auth.refreshWorkspaces.and.resolveTo(false);

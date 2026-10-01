@@ -34,7 +34,7 @@ describe("LinksComponent bulk idempotency", () => {
   }
 
   beforeEach(async () => {
-    api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post", "delete"]);
+    api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post", "delete", "getBlob"]);
     api.get.and.rejectWith(new Error("offline"));
     api.post.and.rejectWith(new ApiRequestError("No se pudo conectar con el servidor", 0));
     snackbarAction = null;
@@ -66,6 +66,27 @@ describe("LinksComponent bulk idempotency", () => {
   });
 
   afterEach(() => fixture.destroy());
+
+  it("discards an export after A to B to A and after view destruction", async () => {
+    let resolve!: (blob: Blob) => void;
+    api.getBlob.and.returnValue(new Promise((done) => { resolve = done; }));
+    const download = spyOn(URL, "createObjectURL").and.returnValue("blob:test");
+    const pending = component.exportCsv();
+    const workspace = TestBed.inject(WorkspaceService).currentId as ReturnType<typeof signal<number>>;
+    workspace.set(2);
+    fixture.detectChanges();
+    workspace.set(1);
+    fixture.detectChanges();
+    resolve(new Blob(["private"]));
+    await pending;
+    expect(download).not.toHaveBeenCalled();
+    api.getBlob.and.returnValue(new Promise((done) => { resolve = done; }));
+    const destroyed = component.exportCsv();
+    fixture.destroy();
+    resolve(new Blob(["private"]));
+    await destroyed;
+    expect(download).not.toHaveBeenCalled();
+  });
 
   it("sends the selection with one key and reuses it only while the outcome is unknown", async () => {
     component.toggleSelected(1);

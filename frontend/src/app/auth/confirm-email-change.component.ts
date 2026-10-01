@@ -24,9 +24,9 @@ import { LatestRequest } from "../core/services/latest-request";
         </mat-icon>
         <h2 id="confirm-email-change-title">{{ ok() ? 'Email actualizado' : (!hasLink ? 'Enlace no disponible' : (done() ? 'No se pudo completar' : 'Confirmar nuevo email')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
-        @if (!done()) {
+        @if (!done() || retryable()) {
           <button mat-flat-button color="primary" type="button" (click)="confirm()" [disabled]="busy()">
-            {{ busy() ? 'Confirmando…' : 'Confirmar y cerrar sesiones' }}
+            {{ busy() ? 'Confirmando…' : (retryable() ? 'Reintentar confirmación' : 'Confirmar y cerrar sesiones') }}
           </button>
           <a class="back" routerLink="/auth">No cambiar mi email</a>
         } @else {
@@ -51,6 +51,7 @@ export class ConfirmEmailChangeComponent {
   readonly busy = signal(false);
   readonly done = signal(false);
   readonly ok = signal(false);
+  readonly retryable = signal(false);
   readonly message = signal("Al confirmar, el nuevo email sustituirá al actual y todas las sesiones quedarán cerradas.");
 
   constructor() {
@@ -63,10 +64,12 @@ export class ConfirmEmailChangeComponent {
   }
 
   async confirm(): Promise<void> {
-    if (this.busy() || this.done() || !this.token) return;
+    if (this.busy() || (this.done() && !this.retryable()) || !this.token) return;
     const generation = this.auth.sessionGeneration();
     const request = this.requests.begin(this.token);
     this.busy.set(true);
+    this.done.set(false);
+    this.retryable.set(false);
     try {
       await this.api.post("/api/v1/auth/confirm-email-change", { token: this.token });
       // The response clears the session cookie. Reconcile global auth even if
@@ -78,7 +81,8 @@ export class ConfirmEmailChangeComponent {
     } catch (error) {
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(false);
-      this.message.set(error instanceof ApiRequestError ? error.message : "El enlace no es válido o ha caducado.");
+      this.retryable.set(!(error instanceof ApiRequestError) || error.status === 0 || error.status === 429 || error.status >= 500);
+      this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo conectar con el servidor. Inténtalo de nuevo.");
     } finally {
       if (this.requests.isCurrent(request, this.token)) {
         this.busy.set(false);

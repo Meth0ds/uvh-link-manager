@@ -21,28 +21,6 @@ class Audit
         ?string $ip = null,
         ?int $workspaceId = null,
     ): void {
-        // A caught PostgreSQL statement error still leaves the surrounding
-        // transaction aborted. Audit is intentionally non-blocking, so defer
-        // it until the business transaction has committed instead of creating
-        // a hidden commit-time failure for moderation or lifecycle actions.
-        if (DB::transactionLevel() > 0) {
-            try {
-                DB::afterCommit(static fn () => self::write(
-                    $userId,
-                    $action,
-                    $resourceType,
-                    $resourceId,
-                    $metadata,
-                    $ip,
-                    $workspaceId,
-                ));
-            } catch (Throwable $e) {
-                self::reportFailure($e, $userId, $action, $resourceType, $resourceId);
-            }
-
-            return;
-        }
-
         try {
             // Only an explicit resource identity can establish attribution.
             // Never look up a deleted child, read request headers, infer from
@@ -57,6 +35,9 @@ class Audit
             if ($workspaceId !== null && $workspaceId < 1) {
                 throw new \InvalidArgumentException('Invalid audit workspace identity');
             }
+            if (RequestTrace::current() !== null) {
+                $metadata = [...($metadata ?? []), 'correlation_id' => RequestTrace::current()];
+            }
             $row = [
                 'user_id' => $userId,
                 'action' => $action,
@@ -66,16 +47,62 @@ class Audit
                     ? json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
                     : null,
                 'ip_hash' => $ip ? UvhCrypto::hashIp($ip) : null,
-                'created_at' => now(),
+                'created_at' => now()->toIso8601String(),
             ];
             // Global/legacy callers remain unattributed. A scoped insert must
             // fail visibly if 000033 is absent: never retry it without the scope.
             if ($workspaceId !== null) {
                 $row['workspace_id'] = $workspaceId;
             }
-            DB::table('audit_events')->insert($row);
+            $admit = static function () use ($row): void {
+                $id = DB::table('audit_outbox')->insertGetId([
+                    'event' => json_encode($row, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
+                // The durable row exists in the business commit. A crash before
+                // this optimization is harmless: housekeeping recovers it.
+                DB::afterCommit(static fn () => self::drain($id));
+            };
+            if (DB::transactionLevel() > 0) {
+                $admit();
+            } else {
+                DB::transaction($admit);
+            }
         } catch (Throwable $e) {
             self::reportFailure($e, $userId, $action, $resourceType, $resourceId);
+            if (DB::transactionLevel() > 0) {
+                // A mutation cannot commit after durable audit admission failed.
+                throw $e;
+            }
+        }
+    }
+
+    /** Materialize a bounded batch atomically; a failed insert keeps the event retryable. */
+    public static function drain(?int $id = null): bool
+    {
+        try {
+            DB::transaction(static function () use ($id): void {
+                $query = DB::table('audit_outbox')->orderBy('id')->limit(100)->lock('FOR UPDATE SKIP LOCKED');
+                if ($id !== null) {
+                    $query->where('id', $id);
+                }
+                foreach ($query->get() as $pending) {
+                    $row = json_decode($pending->event, true, 32, JSON_THROW_ON_ERROR);
+                    // Match audit_events' ON DELETE SET NULL contract even when
+                    // account deletion committed before this recovery pass.
+                    if ($row['user_id'] !== null && ! DB::table('users')->where('id', $row['user_id'])->exists()) {
+                        $row['user_id'] = null;
+                    }
+                    DB::table('audit_events')->insert($row);
+                    DB::table('audit_outbox')->where('id', $pending->id)->delete();
+                }
+            });
+
+            return true;
+        } catch (Throwable $error) {
+            self::reportFailure($error, null, 'audit.materialization_failed', 'audit', $id);
+
+            return false;
         }
     }
 

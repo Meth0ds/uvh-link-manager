@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
@@ -89,6 +89,12 @@ import type { TagDto } from "../../core/models";
 })
 export class TagsDialogComponent {
   private readonly api = inject(ApiService);
+  private readonly destroyRef = inject(DestroyRef);
+  private active = true;
+
+  private isCurrent(): boolean {
+    return this.active && !this.destroyRef.destroyed && this.openedIn.isCurrent();
+  }
   private readonly workspaces = inject(WorkspaceService);
   private readonly actions = inject(ActionDialogService);
   private readonly dialogRef = inject(MatDialogRef<TagsDialogComponent, boolean>);
@@ -116,7 +122,10 @@ export class TagsDialogComponent {
     // El selector global sigue usable con el modal abierto: si cambia, el
     // gestor se cierra en vez de tocar etiquetas de otro workspace.
     effect(() => {
-      if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) this.dialogRef.close(this.changed);
+      if (!this.openedIn.isCurrent()) {
+        this.active = false;
+        this.dialogRef.close(this.changed);
+      }
     });
     void this.reload();
   }
@@ -143,7 +152,7 @@ export class TagsDialogComponent {
       inputMaxLength: 40,
     });
     if (name === null || name === tag.name) return;
-    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+    if (!this.isCurrent()) {
       this.dialogRef.close(this.changed);
       return;
     }
@@ -151,12 +160,14 @@ export class TagsDialogComponent {
     this.error.set(null);
     try {
       const res = await this.api.post(`/api/v1/tags/${tag.id}/rename`, { name }, decodeTagRenameResponse);
+      if (!this.isCurrent()) return;
       this.tags.update((tags) => tags.map((item) => (item.id === tag.id ? { ...item, name: res.name } : item)));
       this.changed = true;
     } catch (err) {
+      if (!this.isCurrent()) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo renombrar la etiqueta");
     } finally {
-      this.busy.set(false);
+      if (this.isCurrent()) this.busy.set(false);
     }
   }
 
@@ -172,7 +183,7 @@ export class TagsDialogComponent {
       destructive: true,
     });
     if (!confirmed) return;
-    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+    if (!this.isCurrent()) {
       this.dialogRef.close(this.changed);
       return;
     }
@@ -180,28 +191,34 @@ export class TagsDialogComponent {
     this.error.set(null);
     try {
       await this.api.post("/api/v1/tags/merge", { sourceIds, targetId }, decodeTagMergeResponse);
+      if (!this.isCurrent()) return;
       this.changed = true;
       this.selected.set(new Set());
       this.mergeTargetId.set(null);
       await this.reload();
     } catch (err) {
+      if (!this.isCurrent()) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron fusionar las etiquetas");
     } finally {
-      this.busy.set(false);
+      if (this.isCurrent()) this.busy.set(false);
     }
   }
 
   close(): void {
+    this.active = false;
     this.dialogRef.close(this.changed);
   }
 
   private async reload(): Promise<void> {
+    if (!this.isCurrent()) return;
     this.loading.set(true);
     try {
       const res = await this.api.get("/api/v1/tags", undefined, decodeTagsResponse);
+      if (!this.isCurrent()) return;
       this.tags.set(res.tags);
       this.loading.set(false);
     } catch (err) {
+      if (!this.isCurrent()) return;
       this.loading.set(false);
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las etiquetas");
     }

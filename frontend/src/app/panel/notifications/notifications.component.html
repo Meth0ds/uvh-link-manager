@@ -45,7 +45,7 @@
           </div>
           <div class="notification-actions">
             @if (item.route) {
-              <a mat-stroked-button [routerLink]="item.route">Ver detalle</a>
+              <button mat-stroked-button type="button" (click)="openDetail(item)">Ver detalle</button>
             }
             @if (item.readAt === null) {
               <button mat-button type="button" (click)="markRead(item)" [disabled]="loading() || busy()">Marcar como leída</button>

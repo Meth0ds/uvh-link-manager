@@ -21,8 +21,8 @@ import { decodeAccountDeletionConfirmation } from "../core/services/public-actio
         <mat-icon class="icon" aria-hidden="true" [class.ok]="done()" [class.bad]="error()">{{ done() ? 'event_available' : (error() ? 'error_outline' : 'person_remove') }}</mat-icon>
         <h2 id="confirm-account-deletion-title">{{ done() ? 'Eliminación programada' : (!hasLink ? 'Enlace no disponible' : (error() ? 'No se pudo programar' : 'Última confirmación')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
-        @if (!done() && !error()) {
-          <button mat-flat-button class="danger-action" type="button" (click)="confirm()" [disabled]="busy()">{{ busy() ? 'Programando…' : 'Cerrar acceso y programar eliminación' }}</button>
+        @if (!done() && (!error() || retryable())) {
+          <button mat-flat-button class="danger-action" type="button" (click)="confirm()" [disabled]="busy()">{{ busy() ? 'Programando…' : (retryable() ? 'Reintentar confirmación' : 'Cerrar acceso y programar eliminación') }}</button>
           <a class="back" routerLink="/app/settings">No eliminar mi cuenta</a>
         } @else {
           <a mat-flat-button color="primary" routerLink="/auth">Volver al acceso</a>
@@ -46,6 +46,7 @@ export class ConfirmAccountDeletionComponent {
   readonly busy = signal(false);
   readonly done = signal(false);
   readonly error = signal(false);
+  readonly retryable = signal(false);
   readonly message = signal("Al confirmar se cerrarán todas las sesiones y se cancelarán las invitaciones pendientes enviadas y recibidas. Recibirás un enlace para cancelar la eliminación durante los próximos 7 días; las invitaciones no se restaurarán.");
 
   constructor() {
@@ -58,10 +59,12 @@ export class ConfirmAccountDeletionComponent {
   }
 
   async confirm(): Promise<void> {
-    if (this.busy() || this.done() || this.error()) return;
+    if (this.busy() || this.done() || (this.error() && !this.retryable())) return;
     const generation = this.auth.sessionGeneration();
     const request = this.requests.begin(this.token);
     this.busy.set(true);
+    this.error.set(false);
+    this.retryable.set(false);
     try {
       const result = await this.api.post<{ ok: true; executeAfter: string }>(
         "/api/v1/auth/account-deletion/confirm",
@@ -75,6 +78,7 @@ export class ConfirmAccountDeletionComponent {
     } catch (error) {
       if (!this.requests.isCurrent(request, this.token)) return;
       this.error.set(true);
+      this.retryable.set(!(error instanceof ApiRequestError) || error.status === 0 || error.status === 429 || error.status >= 500);
       this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo completar la confirmación.");
     } finally {
       if (this.requests.isCurrent(request, this.token)) this.busy.set(false);

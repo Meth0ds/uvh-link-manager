@@ -1,0 +1,16 @@
+# Same upstream Pebble 2.10.1 source, rebuilt with a patched Go runtime.
+# The source archive is verified independently of its immutable commit URL.
+FROM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS builder
+ENV GOTOOLCHAIN=local CGO_ENABLED=0
+ADD --checksum=sha256:645e1d4ffb2e09002f645ea0a0251b9a93cf3b587ae1b880366f768a229e75b5 https://codeload.github.com/letsencrypt/pebble/tar.gz/b1e1ca4f3c30abb64111adaca4544bc5374cc306 /tmp/pebble.tgz
+RUN mkdir /src && tar -xzf /tmp/pebble.tgz -C /src --strip-components=1
+WORKDIR /src
+RUN go build -mod=readonly -trimpath -o /pebble ./cmd/pebble
+
+FROM scratch
+COPY --from=builder /pebble /app
+COPY --from=builder /src/test /test
+EXPOSE 14000 15000
+USER 65532:65532
+ENTRYPOINT ["/app"]
+CMD ["-config", "/test/config/pebble-config.json"]

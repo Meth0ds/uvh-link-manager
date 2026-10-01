@@ -181,6 +181,9 @@ jobs:
       # Docker Hub como segunda vía, porque ambas limitan la tasa por separado:
       # en una IP de runner compartida, una sola vía da 429 y deja la puerta sin
       # contenido. Lo que no pudo comprobar lo declara en vez de callarlo.
+      - name: Verify digest availability regression without a registry
+        run: node --test scripts/check-image-digests.test.mjs
+
       - name: Verify that every pinned base image still resolves
         run: node scripts/check-image-digests.mjs --json=image-digests.json
 
@@ -462,6 +465,9 @@ jobs:
     # 30 minutes so the measurement does not turn into a flaky timeout.
     timeout-minutes: 45
 
+    env:
+      TRIVY_IMAGE: aquasec/trivy:0.74.0
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -481,6 +487,13 @@ jobs:
       - name: Drive the real workers and scheduler end to end
         working-directory: frontend
         run: npm run e2e:async
+
+      - name: Scan the rebuilt ACME fixture that the workers exercised
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          "$TRIVY_IMAGE" image --image-src docker --scanners vuln
+          --severity CRITICAL --ignore-unfixed --exit-code 1
+          uvh-async-e2e-pebble:latest
 
       - name: Preserve container logs on failure
         if: failure()

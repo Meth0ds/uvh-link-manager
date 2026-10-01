@@ -39,7 +39,7 @@ export type ActionDialogResult = true | string | null;
             <input
               matInput
               [placeholder]="data.inputPlaceholder ?? ''"
-              [maxlength]="data.inputMaxLength ?? null"
+              [maxlength]="data.inputMaxLength ? data.inputMaxLength * 2 : null"
               [required]="data.inputRequired === true"
               [(ngModel)]="value"
               name="actionValue"
@@ -76,8 +76,8 @@ export class ActionDialogComponent {
 
   validInput(): boolean {
     const value = this.value.trim();
-    return value.length >= (this.data.inputMinLength ?? 0)
-      && value.length <= (this.data.inputMaxLength ?? Number.MAX_SAFE_INTEGER);
+    return Array.from(value).length >= (this.data.inputMinLength ?? 0)
+      && Array.from(value).length <= (this.data.inputMaxLength ?? Number.MAX_SAFE_INTEGER);
   }
 
   submit(): void {

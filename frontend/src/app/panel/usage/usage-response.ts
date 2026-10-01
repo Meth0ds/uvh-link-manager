@@ -53,7 +53,7 @@ export function decodeWorkspaceUsage(value: unknown, workspaceId: number, expect
   const links = quota(resources["links"]);
   if (links.policy !== "enforced" && links.policy !== "unavailable") invalid();
   const domains = quota(resources["domains"], "enforced");
-  const members = quota(resources["members"], "not_configured");
+  const members = quota(resources["members"]);
   const webhooks = quota(resources["webhooks"], "enforced");
   const tokens = resources["tokens"] === null ? null : quota(resources["tokens"], "enforced");
   const invitations = resources["invitations"] === null ? null : quota(resources["invitations"], "enforced");

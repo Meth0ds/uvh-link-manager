@@ -132,7 +132,9 @@ function references() {
 
       if (from) {
         const token = from[1].split(/\s+AS\s+/i)[0].trim().replace(/^(?:--\S+\s+)+/, "");
-        found.push({ file, line: index + 1, reference: token });
+        if (token.toLowerCase() !== "scratch") {
+          found.push({ file, line: index + 1, reference: token });
+        }
 
         return;
       }
@@ -445,7 +447,8 @@ const failures = [
 ];
 
 const drifted = report.filter((image) => image.status === "drift");
-const unavailable = report.filter((image) => image.status === "unavailable");
+const unavailable = report.filter((image) => image.status === "unavailable"
+  || (image.status === "drift" && !image.pinVerified));
 
 if (strictDrift) {
   failures.push(...drifted.map((image) => ({

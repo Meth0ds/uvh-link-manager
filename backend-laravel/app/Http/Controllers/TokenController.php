@@ -26,8 +26,6 @@ class TokenController
 {
     private const SCOPES = ['links:read', 'links:write', 'analytics:read', 'domains:read', 'domains:write'];
 
-    private const MAX_ACTIVE_TOKENS = WorkspaceLimits::ACTIVE_TOKENS;
-
     public function index(Request $request)
     {
         $workspaceId = UvhRequest::workspaceId($request);
@@ -78,7 +76,7 @@ class TokenController
             }
         }
         try {
-            $result = DB::transaction(function () use ($workspaceId, $name, $plain, $scopes, $expiresAtValue, $user, $sessionId, $password, $factorCode): array {
+            $result = DB::transaction(function () use ($workspaceId, $name, $plain, $scopes, $expiresAtValue, $user, $sessionId, $password, $factorCode, $request): array {
                 // Keep the global lock order user -> session -> workspace. Account
                 // deletion holds the user row before revoking workspace resources;
                 // reversing this order here could deadlock both operations.
@@ -102,7 +100,7 @@ class TokenController
                 $active = ApiToken::where('workspace_id', $workspaceId)->whereNull('revoked_at')
                     ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
                     ->count();
-                if ($active >= self::MAX_ACTIVE_TOKENS) {
+                if ($active >= WorkspaceLimits::limit('tokens')) {
                     return ['status' => 'limit'];
                 }
                 $stepUp = MfaStepUp::verify($lockedUser, $session, $password, $factorCode);
@@ -138,6 +136,9 @@ class TokenController
                     throw new MailAdmissionException('API token notice outbox admission failed');
                 }
 
+                Audit::write($user->id, 'api_token.create', 'api_token', $token->id,
+                    ['scopes' => $scopes, 'factor' => $stepUp['factor']], ip: UvhRequest::ip($request), workspaceId: $workspaceId);
+
                 return ['status' => 'created', 'factor' => $stepUp['factor'], 'token' => $token];
             });
         } catch (MailAdmissionException) {
@@ -169,11 +170,6 @@ class TokenController
         /** @var ApiToken $token */
         $token = $result['token'];
 
-        Audit::write($user->id, 'api_token.create', 'api_token', $token->id, [
-            'scopes' => $scopes,
-            'factor' => $result['factor'],
-        ], UvhRequest::ip($request), workspaceId: $workspaceId);
-
         return response()->json(['token' => $this->dto($token->refresh()), 'plainToken' => $plain], 201);
     }
 
@@ -182,7 +178,7 @@ class TokenController
         $workspaceId = UvhRequest::workspaceId($request);
         $user = UvhRequest::user($request);
 
-        $result = DB::transaction(function () use ($workspaceId, $user, $id): string {
+        $result = DB::transaction(function () use ($workspaceId, $user, $id, $request): string {
             if (! WorkspaceAccess::getMembershipLocked(
                 $user->id,
                 $workspaceId,
@@ -196,6 +192,7 @@ class TokenController
                 return 'not_found';
             }
             $token->update(['revoked_at' => now()]);
+            Audit::write($user->id, 'api_token.revoke', 'api_token', $id, ip: UvhRequest::ip($request), workspaceId: $workspaceId);
 
             return 'revoked';
         });
@@ -205,7 +202,6 @@ class TokenController
         if ($result === 'not_found') {
             return response()->json(['error' => 'Token no encontrado'], 404);
         }
-        Audit::write($user->id, 'api_token.revoke', 'api_token', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }

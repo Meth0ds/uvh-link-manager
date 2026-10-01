@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
@@ -40,7 +40,7 @@ import type { CollectionDto } from "../../core/models";
         <div class="inline-form">
           <mat-form-field appearance="outline">
             <mat-label>Nueva colección</mat-label>
-            <input matInput [ngModel]="newName" (ngModelChange)="newName = $event" maxlength="60" placeholder="Campaña navidad" (keyup.enter)="create()" aria-label="Nombre de la nueva colección" />
+            <input matInput [ngModel]="newName" (ngModelChange)="newName = $event" maxlength="120" placeholder="Campaña navidad" (keyup.enter)="create()" aria-label="Nombre de la nueva colección" />
           </mat-form-field>
           <button mat-flat-button color="primary" type="button" (click)="create()" [disabled]="busy() || !newName.trim()">
             <mat-icon>create_new_folder</mat-icon> Crear
@@ -80,6 +80,12 @@ import type { CollectionDto } from "../../core/models";
 })
 export class CollectionsDialogComponent {
   private readonly api = inject(ApiService);
+  private readonly destroyRef = inject(DestroyRef);
+  private active = true;
+
+  private isCurrent(): boolean {
+    return this.active && !this.destroyRef.destroyed && this.openedIn.isCurrent();
+  }
   private readonly workspaces = inject(WorkspaceService);
   private readonly actions = inject(ActionDialogService);
   private readonly dialogRef = inject(MatDialogRef<CollectionsDialogComponent, boolean>);
@@ -103,7 +109,10 @@ export class CollectionsDialogComponent {
     // El selector global sigue usable con el modal abierto: si cambia, el
     // gestor se cierra en vez de tocar colecciones de otro workspace.
     effect(() => {
-      if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) this.dialogRef.close(this.changed);
+      if (!this.openedIn.isCurrent()) {
+        this.active = false;
+        this.dialogRef.close(this.changed);
+      }
     });
     void this.reload();
   }
@@ -111,10 +120,15 @@ export class CollectionsDialogComponent {
   async create(): Promise<void> {
     const name = this.newName.trim();
     if (!name || this.busy()) return;
+    if (Array.from(name).length > 60) {
+      this.error.set("El nombre admite hasta 60 caracteres.");
+      return;
+    }
     await this.mutate(
       () => this.api.post("/api/v1/collections", { name }, decodeCollectionResponse),
       "No se pudo crear la colección",
     );
+    if (!this.isCurrent()) return;
     this.newName = "";
     await this.reload();
   }
@@ -153,13 +167,14 @@ export class CollectionsDialogComponent {
   }
 
   close(): void {
+    this.active = false;
     this.dialogRef.close(this.changed);
   }
 
   private async mutate<T>(run: () => Promise<T>, fallback: string): Promise<void> {
     // Comprobación síncrona antes de enviar: el interceptor pone el workspace
     // ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
-    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+    if (!this.isCurrent()) {
       this.dialogRef.close(this.changed);
       return;
     }
@@ -167,21 +182,26 @@ export class CollectionsDialogComponent {
     this.error.set(null);
     try {
       await run();
+      if (!this.isCurrent()) return;
       this.changed = true;
     } catch (err) {
+      if (!this.isCurrent()) return;
       this.error.set(err instanceof ApiRequestError ? err.message : fallback);
     } finally {
-      this.busy.set(false);
+      if (this.isCurrent()) this.busy.set(false);
     }
   }
 
   private async reload(): Promise<void> {
+    if (!this.isCurrent()) return;
     this.loading.set(true);
     try {
       const res = await this.api.get("/api/v1/collections", undefined, decodeCollectionsResponse);
+      if (!this.isCurrent()) return;
       this.collections.set(res.collections);
       this.loading.set(false);
     } catch (err) {
+      if (!this.isCurrent()) return;
       this.loading.set(false);
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las colecciones");
     }

@@ -141,7 +141,9 @@ class ImageSupplyChainContractTest extends TestCase
                 // `--platform=$TARGETPLATFORM` and friends precede the image.
                 $token = preg_replace('/^(?:--\S+\s+)+/', '', trim($token));
 
-                $references[] = ['file' => $file, 'line' => $offset + 1, 'reference' => $token];
+                if (strtolower($token) !== 'scratch') {
+                    $references[] = ['file' => $file, 'line' => $offset + 1, 'reference' => $token];
+                }
 
                 continue;
             }

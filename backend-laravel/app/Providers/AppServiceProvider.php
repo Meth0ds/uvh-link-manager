@@ -6,10 +6,12 @@ use App\Cache\UvhRateLimiter;
 use App\Support\OperationalMetrics;
 use App\Support\ProductionSecurity;
 use App\Support\RedirectService;
+use App\Support\RequestTrace;
 use App\Support\UrlUtil;
 use App\Support\UvhLimiters;
 use App\Support\UvhRequest;
 use App\Support\VisitorAnswer;
+use App\Support\WorkspaceLimits;
 use Illuminate\Cache\Events\CacheFailedOver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -57,6 +59,13 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->assertProductionSecurityConfiguration();
+
+        Queue::createPayloadUsing(static fn () => ['uvh_trace_id' => RequestTrace::current()]);
+        Queue::before(static function ($event): void {
+            RequestTrace::push($event->job->payload()['uvh_trace_id'] ?? null);
+        });
+        Queue::after(static fn () => RequestTrace::pop());
+        Queue::exceptionOccurred(static fn () => RequestTrace::pop());
 
         // Availability limiters count on the configured limiter store, which
         // production points at a failover store (Redis, then PostgreSQL).
@@ -488,6 +497,14 @@ class AppServiceProvider extends ServiceProvider
             'audit_purge_days' => config('uvh.housekeeping.audit_purge_days'),
             'analytics_retention_days' => config('uvh.housekeeping.analytics_retention_days'),
         ]);
+
+        foreach (['members', 'domains', 'tokens', 'webhooks', 'invitations', 'collections', 'tags', 'templates'] as $resource) {
+            try {
+                WorkspaceLimits::limit($resource);
+            } catch (\LogicException) {
+                $errors[] = 'Límite de workspace inválido: '.$resource;
+            }
+        }
 
         // Capabilities of the running PHP are release gates too: a missing
         // extension is as fatal as a missing setting, and quieter.

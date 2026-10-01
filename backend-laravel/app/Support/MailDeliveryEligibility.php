@@ -28,6 +28,12 @@ final class MailDeliveryEligibility
         // El resumen diario de la bandeja no nace de un recurzo: es siempre
         // un aviso vigente de la propia cuenta.
         'notification_digest',
+        'webhook_exhausted',
+        'link_expiring',
+        'link_limit_approaching',
+        'api_token_expiring',
+        'invitation_expiring',
+
     ];
 
     public static function isCurrent(object $row): bool
@@ -66,6 +72,7 @@ final class MailDeliveryEligibility
             // control de emergencia mientras su bearer siga vivo.
             'password_changed' => 'security_revoke',
             'sessions_revoked_others' => 'security_revoke',
+            'session_revoked' => 'security_revoke',
             'sessions_revoked_all' => 'security_revoke',
             default => null,
         };

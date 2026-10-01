@@ -98,6 +98,19 @@ class ApiParityTest extends TestCase
             'reason' => 'pending_registration',
         ]);
 
+        // The edit secret alone is the boundary: the reveal runs before the
+        // password is consulted, so a wrong password lands on the same 403 and
+        // the generic answer stays reserved for requests without the secret.
+        $this->withCookie('uvh_registration_edit', $editSecret);
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'parity@example.com',
+            'password' => 'wrong-'.self::PASSWORD,
+            'captchaToken' => 'test-login-passcode',
+        ])->assertStatus(403)->assertExactJson([
+            'error' => 'Confirma tu email para continuar',
+            'reason' => 'pending_registration',
+        ]);
+
         // Before the mailbox is proven there is no account at all: no user row,
         // no workspace, no legal acceptance — and therefore no session a stale
         // cookie could ever hold. The revocation the old model needed at

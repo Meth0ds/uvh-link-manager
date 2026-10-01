@@ -1,6 +1,6 @@
 # UVH — Backlog vigente
 
-Última revisión: 26 de septiembre de 2026.
+Última revisión: 1 de octubre de 2026.
 
 Este archivo es el backlog **vigente** del producto. Sustituye a
 [`todos.md`](archive/todos.md), archivado como registro histórico (su contenido
@@ -10,6 +10,16 @@ Una casilla marcada sólo acredita implementación revisada. No acredita E2E,
 despliegue, conformidad jurídica ni preparación para producción. Los bloqueos
 externos (CI con cuenta de GitHub bloqueada por facturación, DNS/TLS reales,
 revisión jurídica) se listan aparte porque no dependen del código.
+
+## Continuación de revisión de código —01/10
+
+- [x] Solicitud/confirmación de borrado con actor vigente y auditoría exacta transaccional.
+- [x] Cancelación protectora con marcador durable y recuperación en housekeeping; migración requerida2026_10_01.
+- [x] Reintento de confirmación/cancelación ante conexión fallida,429 y5xx; enlaces inválidos definitivos.
+- [x] Cambio de contraseña y solicitud/cancelación de email revalidan autorización vigente; eventos exactos de contraseña/reset/email comparten transacción.
+- [x] Confirmación de email permite reintento de errores temporales sin publicar un cierre de sesión fallido.
+- [ ] Completar revisión de recuperación con soporte y auditoría de ejecución/compensación automática.
+- Evidencia actual:951 backend/7220 aserciones,629 frontend, calidad y compilación correctas; [informe y límites](project-completion-audit-2026-09-30.md). Objetivo amplio aún abierto.
 
 ## P0 — Invariantes y exportación de datos
 
@@ -47,8 +57,8 @@ revisión jurídica) se listan aparte porque no dependen del código.
 
 - [x] **F3 — Centro de notificaciones**: tabla `notifications` (user_id,
   workspace_id, kind, dedupe_key, route, created_at, read_at, digested_at) y
-  `notification_preferences`, allowlist de kinds (12 obligatorios de seguridad
-  o solicitud propia y 4 operativos, espejada en el frontend), campana 🔔 en
+  `notification_preferences`, allowlist de kinds (avisos obligatorios de seguridad
+  o solicitud propia y avisos operativos, espejada en el frontend), campana 🔔 en
   topbar, `/app/notifications`, y preferencias por canal (obligatorias vs
   operativas: Inmediato / Resumen diario / Solo UVH / Desactivado).
   - [x] Productores de seguridad cableados junto al aviso de correo (password,
@@ -173,23 +183,16 @@ revisión jurídica) se listan aparte porque no dependen del código.
     el oráculo 500/200.
   - [x] Bulk move bloquea la colección destino dentro de la transacción (fin
     del `23503` → `500` frente a un borrado concurrente).
-- [ ] **F8 — Analítica medida antes de tocar**: eliminar la hot row
-  `link/day` (o `lockForUpdate()` documentado) y caché 30–60 s por
-  workspace/rango/filtro. Requiere medición previa con
-  `docker-compose.analytics-drill.yml` (ver
-  [`analytics-rollup-capacity.md`](analytics-rollup-capacity.md)).
-- [ ] **F9 — Entitlements y límites**: Plan → entitlements → límites,
-  incluido `members` (hoy `not_configured` en `WorkspaceUsageController`),
-  sin proveedor de pagos; purga verificada configurable (`purgeVerified`).
-- [ ] **F10 — Observabilidad**: correlation ID edge→jobs→outbox/logs, SLOs
-  escritos, alertas Prometheus→Grafana→canal con ensayo «mato queue-mail ⇒
-  alerta», monitor externo sobre `/status`.
+- [x] **F8 — Analítica medida y caché** (01/10/2026): dos rondas locales de contención dentro de async 128/128; conservar lock link/día por corrección y documentar variabilidad. Caché configurable 0–60 s (30 por defecto) por workspace/enlace/rango y snapshot coherente. Capacidad en hardware real sigue en F11.
+- [x] **F9 — Entitlements y límites** (01/10/2026): modalidad standard sin pagos, cuotas configurables compartidas, admisión transaccional de miembros y prueba reciente de purga ligada a la política vigente.
+- [ ] **F10 — Observabilidad**: correlation ID edge→jobs→outbox/logs, buckets separados de preparación/streaming, SLOs iniciales y reglas Prometheus implementados (01/10/2026). Falta conectar el canal real, demostrar alerta recibida al detener queue-mail y configurar monitor externo de `/status`.
+- [x] **Corrección de auditoría 30/09–01/10**: B01–B19 y ocho hallazgos adicionales corregidos; avisos operativos, revocación individual y outbox de auditoría críticos implementados. Alcance y límites en [el informe](project-completion-audit-2026-09-30.md) y [el runbook](remediation-operations-2026-09-30.md).
 
 ## Bloqueos externos (no código)
 
 - [ ] **F11 — Operación real** (requiere infraestructura/cuentas):
-  - [ ] CI remoto de GitHub Actions (§42): la cuenta está bloqueada por
-    facturación; los PRs se mergean con `--admin` como medida temporal.
+  - [ ] CI remoto de GitHub Actions (§42): el bloqueo por
+    facturación consta en la evidencia histórica; su estado actual no se ha vuelto a comprobar. Las puertas locales no acreditan el resultado remoto.
   - [ ] Backups con cron y restauración periódica medida (RPO/RTO).
   - [ ] Migraciones con volumen real sobre copia representativa.
   - [ ] Cosign/provenance y promoción de artefactos por digest (ver

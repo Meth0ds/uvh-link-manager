@@ -141,4 +141,18 @@ describe("scale response decoders", () => {
       truncated: true,
     })).toThrow();
   });
+  it("keeps oversized legacy catalogs readable without truncation", () => {
+    const rows = Array.from({ length: 501 }, (_, index) => ({ id: index + 1, name: `item-${index}`, links: 0 }));
+    expect(decodeTagsResponse({ tags: rows }).tags.length).toBe(501);
+    expect(decodeCollectionsResponse({ collections: rows }).collections.length).toBe(501);
+    const templates = rows.slice(0, 201).map((row) => ({ ...row, payload: {}, createdAt: "2026-09-30T10:00:00Z" }));
+    expect(decodeTemplatesResponse({ templates }).templates.length).toBe(201);
+  });
+
+  it("counts Unicode code points exactly as Laravel does", () => {
+    const name = "😀".repeat(40);
+    expect(decodeTagsResponse({ tags: [{ id: 1, name, links: 0 }] }).tags[0].name).toBe(name);
+    expect(() => decodeTagsResponse({ tags: [{ id: 1, name: name + "😀", links: 0 }] })).toThrow();
+  });
+
 });

@@ -9,6 +9,7 @@
  * ambos lados a la vez, igual que las etapas de exportación.
  */
 export const NOTIFICATION_KINDS = {
+  session_revoked: { category: "mandatory", icon: "logout", label: "Se revocó una sesión de tu cuenta" },
   password_changed: { category: "mandatory", icon: "password", label: "Cambiaste tu contraseña" },
   sessions_revoked_others: { category: "mandatory", icon: "logout", label: "Cerraste las demás sesiones de tu cuenta" },
   sessions_revoked_all: { category: "mandatory", icon: "logout", label: "Cerraste todas las sesiones de tu cuenta" },
@@ -28,6 +29,17 @@ export const NOTIFICATION_KINDS = {
   workspace_ownership_transfer: { category: "operational", icon: "groups", label: "Cambió la propiedad del workspace" },
   workspace_deleted: { category: "operational", icon: "workspaces", label: "Se eliminó un workspace" },
   account_recovery_rejected: { category: "operational", icon: "lock_reset", label: "Se rechazó una recuperación de cuenta" },
+  domain_offline: { category: "mandatory", icon: "language", label: "Tu dominio dejó de servir enlaces" },
+  domain_claim_transferred: { category: "mandatory", icon: "language", label: "La propiedad de un dominio cambió" },
+  domain_dns_degraded: { category: "operational", icon: "language", label: "La configuración DNS de tu dominio falla" },
+  domain_recovered: { category: "operational", icon: "language", label: "Tu dominio se recuperó" },
+  domain_tls_failed: { category: "operational", icon: "language", label: "No se pudo preparar el HTTPS de tu dominio" },
+  domain_tls_expiring: { category: "operational", icon: "language", label: "El certificado de tu dominio está por caducar" },
+  webhook_exhausted: { category: "operational", icon: "notifications", label: "Una entrega de webhook requiere revisión" },
+  link_expiring: { category: "operational", icon: "notifications", label: "Un enlace está próximo a caducar" },
+  link_limit_approaching: { category: "operational", icon: "notifications", label: "Un enlace está próximo a agotar sus clics" },
+  api_token_expiring: { category: "operational", icon: "notifications", label: "Un token API está próximo a caducar" },
+  invitation_expiring: { category: "operational", icon: "notifications", label: "Una invitación está próxima a caducar" },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;

@@ -33,6 +33,7 @@ import { decodeLinksResponse } from "../../core/services/link-response-decoders"
 import { decodeDomainsResponse } from "../../core/services/domain-response-decoders";
 import { decodeBulkActionResponse, decodeCollectionsResponse } from "../../core/services/scale-response-decoders";
 import { parseRouteId } from "../../core/strict-wire";
+import { AuthService } from "../../core/services/auth.service";
 import { downloadBlob } from "../../core/services/browser-download";
 import { linkStateLabel } from "../../core/link-state-label";
 import { TagsDialogComponent } from "./tags-dialog.component";
@@ -79,6 +80,8 @@ export class LinksComponent {
   private actions = inject(ActionDialogService);
   private intents = inject(PendingLinkIntentService);
   private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly exports = new LatestRequest(inject(DestroyRef));
+  private readonly auth = inject(AuthService);
 
   readonly links = signal<LinkDto[]>([]);
   readonly total = signal(0);
@@ -164,6 +167,8 @@ export class LinksComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.exports.invalidate();
+      this.exporting.set(false);
       this.requests.invalidate();
       // Link titles and destinations are workspace-confidential; clear them
       // synchronously instead of waiting for the next HTTP response.
@@ -431,9 +436,16 @@ export class LinksComponent {
 
   async exportCsv(): Promise<void> {
     if (this.exporting()) return;
+    const workspaceId = this.workspaces.currentId();
+    if (workspaceId === null) return;
+    const generation = this.auth.sessionGeneration();
+    const request = this.exports.begin(workspaceId);
+    const current = (): boolean => this.exports.isCurrent(request, this.workspaces.currentId())
+      && generation === this.auth.sessionGeneration();
     this.exporting.set(true);
     try {
       const blob = await this.api.getBlob("/api/v1/links/export.csv");
+      if (!current()) return;
       const stamp = new Date().toISOString().slice(0, 10);
       if (!downloadBlob(blob, `uvh-links-${stamp}.csv`)) {
         this.snackbar.open("No se pudo iniciar la descarga", "Cerrar", { duration: 3000 });
@@ -441,9 +453,10 @@ export class LinksComponent {
       }
       this.snackbar.open("Export CSV descargado", "Cerrar", { duration: 2500 });
     } catch (err) {
+      if (!current()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo exportar el CSV", "Cerrar", { duration: 3500 });
     } finally {
-      this.exporting.set(false);
+      if (current()) this.exporting.set(false);
     }
   }
 

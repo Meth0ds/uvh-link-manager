@@ -58,21 +58,20 @@ final class WorkspaceUsageController
                 $validLinksLimit = $linksLimit !== null && (int) $linksLimit >= 0;
 
                 return response()->json([
-                    'workspaceId' => $id, 'role' => $membership->role, 'measuredAt' => $asOf->toIso8601String(),
+                    'plan' => config('entitlements.plan'), 'workspaceId' => $id, 'role' => $membership->role, 'measuredAt' => $asOf->toIso8601String(),
                     'resources' => [
                         'links' => $this->quota((int) $row->links_used, $validLinksLimit ? (int) $linksLimit : null,
                             $validLinksLimit ? 'enforced' : 'unavailable', $editor),
-                        'domains' => $this->quota((int) $row->domains_used, WorkspaceLimits::DOMAINS, 'enforced', $editor),
-                        // There is no implemented member-cap policy. A null limit
-                        // means no configured cap, not infinite service capacity.
-                        'members' => $this->quota((int) $row->members_used, null, 'not_configured', $admin),
-                        'tokens' => $editor ? $this->quota((int) $row->tokens_used, WorkspaceLimits::ACTIVE_TOKENS, 'enforced', true) : null,
-                        'webhooks' => $this->quota((int) $row->webhooks_used, WorkspaceLimits::WEBHOOKS, 'enforced', $editor),
-                        'invitations' => $admin ? $this->quota((int) $row->invitations_used, WorkspaceLimits::ACTIVE_INVITATIONS, 'enforced', true) : null,
+                        'domains' => $this->quota((int) $row->domains_used, WorkspaceLimits::limit('domains'), 'enforced', $editor),
+                        // Membership admission uses this exact effective plan limit.
+                        'members' => $this->quota((int) $row->members_used, WorkspaceLimits::limit('members'), 'enforced', $admin),
+                        'tokens' => $editor ? $this->quota((int) $row->tokens_used, WorkspaceLimits::limit('tokens'), 'enforced', true) : null,
+                        'webhooks' => $this->quota((int) $row->webhooks_used, WorkspaceLimits::limit('webhooks'), 'enforced', $editor),
+                        'invitations' => $admin ? $this->quota((int) $row->invitations_used, WorkspaceLimits::limit('invitations'), 'enforced', true) : null,
                     ],
                     'analytics' => ['retentionDays' => WorkspaceLimits::analyticsRetentionDays(),
                         'maximumQueryRangeDays' => WorkspaceLimits::ANALYTICS_RANGE_DAYS,
-                        'basis' => 'configured_policy', 'purgeVerified' => false],
+                        'basis' => 'configured_policy', 'purgeVerified' => WorkspaceLimits::analyticsPurgeVerified()],
                     'basis' => 'snapshot_not_reservation',
                 ]);
             });

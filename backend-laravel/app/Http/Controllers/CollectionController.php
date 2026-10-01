@@ -8,6 +8,7 @@ use App\Models\Link;
 use App\Models\LinkTemplate;
 use App\Support\Audit;
 use App\Support\UvhRequest;
+use App\Support\WorkspaceLimits;
 use App\Support\WorkspaceMutation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -51,7 +52,13 @@ class CollectionController
         }
 
         try {
-            $collection = WorkspaceMutation::run($request, fn () => Collection::create(['workspace_id' => $workspaceId, 'name' => $name]));
+            $collection = WorkspaceMutation::run($request, function () use ($workspaceId, $name): Collection {
+                if (Collection::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('collections')) {
+                    throw new LinkException('Límite de colecciones alcanzado. Elimina una antes de crear otra.', 409);
+                }
+
+                return Collection::create(['workspace_id' => $workspaceId, 'name' => $name]);
+            });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {

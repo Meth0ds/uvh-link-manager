@@ -6,6 +6,12 @@ pregunta abierta en `F17/F18`: si la fila diaria de `metric_rollups`
 techo del pool. No es evidencia de capacidad productiva; es el mecanismo, medido
 y repetible, más el inventario explícito de lo que no acredita.
 
+## Nueva comprobación local — 01/10/2026
+
+`npm run e2e:async`: **128/128 comprobaciones**, con dos rondas, 120 peticiones arrival y 600 jobs flood por pase. Medianas de drenaje: arrival hot@1 771 ms, flood hot@1 3719 ms, flood hot@4 1362 ms, flood spread@4 1875 ms, arrival spread@4 845 ms, arrival hot@4 7791 ms y arrival hot@4/fill70 745 ms. Cada pase conserva igualdad de clics y rollups y la suite termina con todas las colas vacías.
+
+La variabilidad de arrival hot@4 (15163 ms y 418 ms) impide atribuir el resultado a fillfactor con confianza. La ejecución compartía recursos Docker locales con otros ensayos. Se mantiene el lock que protege los agregados y no se altera el fillfactor de producción; capacidad y frescura objetivo requieren medición aislada sobre hardware representativo. Overview incorpora ahora caché por scope de 30 s configurable y snapshot coherente; no elimina el coste de reconstrucción sobre eventos crudos.
+
 ## El mecanismo bajo sospecha
 
 `AnalyticsService` escribe cada clic en tres sitios dentro de la misma

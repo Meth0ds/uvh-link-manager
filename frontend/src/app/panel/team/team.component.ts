@@ -55,6 +55,7 @@ export class TeamComponent {
   readonly invitationRetry = inject(InvitationRetryService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly requests = new LatestRequest(this.destroyRef);
+  private readonly mutationContexts = new LatestRequest(this.destroyRef);
   // The picker searches independently of the paged team snapshot, so a slow
   // lookup must never cancel (or be cancelled by) the page load.
   private readonly transferRequests = new LatestRequest(this.destroyRef);
@@ -110,10 +111,18 @@ export class TeamComponent {
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
       this.requests.invalidate();
+      this.mutationContexts.invalidate();
       this.detail.set(null);
       this.memberPageIndex.set(0);
       this.invitationPageIndex.set(0);
       this.resetTransferPicker();
+      this.deleteOpen.set(false);
+      this.deleteConfirmation.set("");
+      this.deletePassword.set("");
+      this.deleteFactorCode.set("");
+      this.transferOpen.set(false);
+      this.transferPassword.set("");
+      this.transferFactorCode.set("");
       if (workspaceId === null) {
         this.loading.set(false);
         return;
@@ -126,6 +135,7 @@ export class TeamComponent {
     const wid = this.workspaces.currentId();
     if (wid == null) {
       this.requests.invalidate();
+      this.mutationContexts.invalidate();
       this.detail.set(null);
       this.loading.set(false);
       return;
@@ -315,9 +325,14 @@ export class TeamComponent {
   }
 
   async leave(): Promise<void> {
+    if (this.saving()) return;
     // Leaving is irreversible from the panel, so it must target the workspace
     // the confirmation was opened for, not whichever one is selected now.
     const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const generation = this.auth.sessionGeneration();
+    const request = this.mutationContexts.begin(target.workspaceId);
+    const isCurrent = () => generation === this.auth.sessionGeneration()
+      && this.mutationContexts.isCurrent(request, this.workspaces.currentId()) && target.isCurrent();
     const { workspaceId } = target;
     if (workspaceId === null) return;
     const confirmed = await this.actions.confirm({
@@ -326,24 +341,29 @@ export class TeamComponent {
       confirmLabel: "Abandonar workspace",
       destructive: true,
     });
-    if (!confirmed || this.saving() || !target.isCurrent()) return;
+    if (!confirmed || this.saving() || !isCurrent()) return;
     this.saving.set(true);
     try {
       await this.api.post(`/api/v1/workspaces/${workspaceId}/leave`);
-      await this.auth.refreshWorkspaces();
-      this.router.navigate(["/app/dashboard"]);
+      if (isCurrent()) void this.router.navigate(["/app/dashboard"]);
+      if (generation === this.auth.sessionGeneration()) await this.auth.refreshWorkspaces();
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.saving.set(false);
+      if (!this.destroyRef.destroyed) this.saving.set(false);
     }
   }
 
   async deleteWorkspace(): Promise<void> {
+    if (this.saving()) return;
     const workspace = this.detail()?.workspace;
     const target = targetWorkspace(this.workspaces, workspace?.id ?? null);
-    if (!workspace || !target.isCurrent() || this.deleteConfirmation() !== workspace.name
+    const generation = this.auth.sessionGeneration();
+    const request = this.mutationContexts.begin(target.workspaceId);
+    const isCurrent = () => generation === this.auth.sessionGeneration()
+      && this.mutationContexts.isCurrent(request, this.workspaces.currentId()) && target.isCurrent();
+    if (!workspace || !isCurrent() || this.deleteConfirmation() !== workspace.name
       || !this.deletePassword()
       || (this.user()?.mfaEnabled && !this.deleteFactorCode().trim())) return;
     const confirmed = await this.actions.confirm({
@@ -353,7 +373,7 @@ export class TeamComponent {
       destructive: true,
     });
     if (!confirmed || this.saving()) return;
-    if (!target.isCurrent()) {
+    if (!isCurrent()) {
       // The panel below belongs to a workspace this decision no longer names.
       this.cancelWorkspaceDeletion();
       return;
@@ -365,21 +385,25 @@ export class TeamComponent {
         password: this.deletePassword(),
         ...(this.deleteFactorCode().trim() ? { factorCode: this.deleteFactorCode().trim() } : {}),
       });
-      this.deleteOpen.set(false);
-      this.deleteConfirmation.set("");
-      this.deletePassword.set("");
-      this.deleteFactorCode.set("");
-      void this.router.navigate(["/app/dashboard"]);
+      if (isCurrent()) {
+        this.deleteOpen.set(false);
+        this.deleteConfirmation.set("");
+        this.deletePassword.set("");
+        this.deleteFactorCode.set("");
+        void this.router.navigate(["/app/dashboard"]);
+      }
       try {
-        await this.auth.refreshWorkspaces();
+        if (generation === this.auth.sessionGeneration()) await this.auth.refreshWorkspaces();
       } catch {
-        this.snackbar.open("Workspace eliminado. Recarga el panel para actualizar la navegación.", "Cerrar", { duration: 4000 });
+        if (isCurrent()) {
+          this.snackbar.open("Workspace eliminado. Recarga el panel para actualizar la navegación.", "Cerrar", { duration: 4000 });
+        }
       }
     } catch (err) {
-      if (!target.isCurrent()) return;
+      if (!isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.saving.set(false);
+      if (!this.destroyRef.destroyed) this.saving.set(false);
     }
   }
 
@@ -488,8 +512,13 @@ export class TeamComponent {
   }
 
   async transferOwnership(): Promise<void> {
+    if (this.saving()) return;
     const detail = this.detail();
     const scope = targetWorkspace(this.workspaces, detail?.workspace.id ?? null);
+    const generation = this.auth.sessionGeneration();
+    const request = this.mutationContexts.begin(scope.workspaceId);
+    const isCurrent = () => generation === this.auth.sessionGeneration()
+      && this.mutationContexts.isCurrent(request, this.workspaces.currentId()) && scope.isCurrent();
     const recipient = this.transferTarget();
     if (!detail || !recipient || recipient.role === "owner" || !this.transferPassword()
       || (this.user()?.mfaEnabled && !this.transferFactorCode()) || this.saving()) return;
@@ -501,7 +530,7 @@ export class TeamComponent {
       destructive: true,
     });
     if (!confirmed) return;
-    if (!scope.isCurrent()) {
+    if (!isCurrent()) {
       // A different workspace is selected now; this recipient and password
       // belong to the previous one, so drop the panel instead of transferring
       // blindly.
@@ -516,22 +545,26 @@ export class TeamComponent {
         password: this.transferPassword(),
         ...(this.transferFactorCode().trim() ? { factorCode: this.transferFactorCode().trim() } : {}),
       });
-      this.transferOpen.set(false);
-      this.transferPassword.set("");
-      this.transferFactorCode.set("");
-      this.resetTransferPicker();
-      this.snackbar.open("Propiedad transferida", "Cerrar", { duration: 3000 });
+      if (isCurrent()) {
+        this.transferOpen.set(false);
+        this.transferPassword.set("");
+        this.transferFactorCode.set("");
+        this.resetTransferPicker();
+        this.snackbar.open("Propiedad transferida", "Cerrar", { duration: 3000 });
+      }
       try {
+        if (generation !== this.auth.sessionGeneration()) return;
         await Promise.all([this.auth.refreshWorkspaces(), this.auth.refreshUser()]);
-        await this.load();
+        if (isCurrent()) await this.load();
       } catch {
+        if (!isCurrent()) return;
         this.snackbar.open("Propiedad transferida. Recarga el panel para actualizar permisos.", "Cerrar", { duration: 4000 });
       }
     } catch (err) {
-      if (!scope.isCurrent()) return;
+      if (!isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo transferir la propiedad", "Cerrar", { duration: 4000 });
     } finally {
-      this.saving.set(false);
+      if (!this.destroyRef.destroyed) this.saving.set(false);
     }
   }
 

@@ -43,6 +43,32 @@ final class PendingHandoffTest extends TestCase
         $this->withCookie('uvh_csrf', self::CSRF)->withHeader('X-CSRF-Token', self::CSRF);
     }
 
+    public function test_membership_capacity_preserves_the_invitation_until_space_is_available(): void
+    {
+        [$target, $token] = $this->invitationFixture();
+        config(['entitlements.limits.members' => 1]);
+        $this->signIn($target);
+        $this->postJson('/api/v1/workspaces/invitations/accept', ['token' => $token])->assertStatus(409);
+        $this->assertDatabaseHas('invitations', ['token' => Ids::sha256Hex($token), 'status' => 'pending']);
+        $this->assertDatabaseMissing('memberships', ['user_id' => $target->id]);
+        config(['entitlements.limits.members' => 2]);
+        $this->postJson('/api/v1/workspaces/invitations/accept', ['token' => $token])->assertOk();
+        $this->assertDatabaseHas('memberships', ['user_id' => $target->id]);
+    }
+
+    public function test_full_workspace_does_not_admit_an_invitation_email(): void
+    {
+        [, $token] = $this->invitationFixture();
+        $invitation = Invitation::where('token', Ids::sha256Hex($token))->firstOrFail();
+        $this->signIn(User::findOrFail($invitation->invited_by));
+        config(['entitlements.limits.members' => 1]);
+        $before = DB::table('mail_outbox')->count();
+        $this->postJson('/api/v1/workspaces/'.$invitation->workspace_id.'/invitations',
+            ['email' => 'new-member@example.test', 'role' => 'viewer'])->assertStatus(409);
+        $this->assertSame($before, DB::table('mail_outbox')->count());
+        $this->assertDatabaseMissing('invitations', ['email' => 'new-member@example.test']);
+    }
+
     public function test_parking_keeps_the_bearer_out_of_script_reach(): void
     {
         $token = Ids::randomToken(32);
@@ -288,6 +314,41 @@ final class PendingHandoffTest extends TestCase
         $cleared = $this->cookieOf($response, PendingHandoff::cookieName(PendingHandoff::INTENT));
         $this->assertNotNull($cleared);
         $this->assertSame('', $cleared->getValue());
+    }
+
+    public function test_explicit_invalid_invitation_input_never_spends_the_parked_invitation(): void
+    {
+        [$target, $token] = $this->invitationFixture();
+        $this->park(PendingHandoff::INVITATION, $token);
+        $this->signIn($target);
+
+        foreach (['accept', 'reject'] as $action) {
+            foreach (['', null, []] as $invalid) {
+                $this->postJson('/api/v1/workspaces/invitations/'.$action, ['token' => $invalid])->assertStatus(422);
+                $this->assertDatabaseHas('invitations', ['token' => Ids::sha256Hex($token), 'status' => 'pending']);
+            }
+        }
+        $this->assertDatabaseMissing('memberships', ['user_id' => $target->id]);
+        $this->getJson('/api/v1/pending')->assertJsonPath('invitation.pending', true);
+    }
+
+    public function test_explicit_invalid_intent_never_claims_or_completes_the_parked_one(): void
+    {
+        $issued = $this->postJson('/api/v1/link-intents', ['destination' => 'https://example.test/intended']);
+        $issued->assertCreated();
+        $intent = (string) $issued->json('intent');
+        $this->park(PendingHandoff::INTENT, $intent);
+        $this->signIn(User::factory()->create());
+
+        foreach (['', null, [], 'preview-only'] as $invalid) {
+            $this->postJson('/api/v1/link-intents/claim', ['intent' => $invalid])->assertNotFound();
+        }
+        $this->postJson('/api/v1/link-intents/claim', [])->assertOk();
+        foreach (['', null, [], 'preview-only'] as $invalid) {
+            $this->postJson('/api/v1/link-intents/complete', ['intent' => $invalid])->assertNotFound();
+        }
+        $this->getJson('/api/v1/pending')->assertJsonPath('linkIntent.pending', true);
+        $this->postJson('/api/v1/link-intents/claim', [])->assertOk()->assertJsonPath('destination', 'https://example.test/intended');
     }
 
     public function test_parking_is_rate_limited(): void

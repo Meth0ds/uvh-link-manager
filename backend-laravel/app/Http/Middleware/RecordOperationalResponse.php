@@ -2,10 +2,12 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\HttpLatency;
 use App\Support\OperationalMetrics;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class RecordOperationalResponse
 {
@@ -16,6 +18,7 @@ final class RecordOperationalResponse
             $response = $next($request);
         } catch (\Throwable $error) {
             OperationalMetrics::increment('http.server_error');
+            HttpLatency::observe('prepare', hrtime(true) - $startedAt);
             throw $error;
         }
 
@@ -29,6 +32,23 @@ final class RecordOperationalResponse
         }
         if ((hrtime(true) - $startedAt) >= 2_000_000_000) {
             OperationalMetrics::increment('http.slow_request');
+        }
+
+        HttpLatency::observe('prepare', hrtime(true) - $startedAt);
+        if ($response instanceof StreamedResponse && $response->getCallback() !== null) {
+            $callback = $response->getCallback();
+            $response->setCallback(static function () use ($callback): void {
+                $started = hrtime(true);
+                try {
+                    $callback();
+                    OperationalMetrics::increment('http.stream_completed');
+                } catch (\Throwable $error) {
+                    OperationalMetrics::increment('http.stream_failed');
+                    throw $error;
+                } finally {
+                    HttpLatency::observe('stream', hrtime(true) - $started);
+                }
+            });
         }
 
         return $response;
