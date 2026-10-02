@@ -555,6 +555,106 @@ describe("AuthComponent registration flow", () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
+  it("keeps the MFA method while its confirmation is in flight", async () => {
+    const response = deferred<void>();
+    auth.verifyMfa.and.returnValue(response.promise);
+    component.step.set("mfa");
+    component.mfaChallenge.set("challenge-a");
+    component.mfaRecoveryAvailable.set(true);
+    component.mfaForm.controls.code.setValue("123456");
+    fixture.detectChanges();
+    const confirmation = component.onMfa();
+    fixture.detectChanges();
+    const alternative = fixture.nativeElement.querySelector(".method-link") as HTMLButtonElement;
+    expect(alternative.disabled).toBeTrue();
+    component.goRecovery();
+    expect(component.step()).toBe("mfa");
+    response.resolve();
+    await confirmation;
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app");
+  });
+
+  it("keeps the recovery method while its confirmation is in flight", async () => {
+    const response = deferred<void>();
+    auth.recoverMfa.and.returnValue(response.promise);
+    component.step.set("recovery");
+    component.mfaChallenge.set("challenge-a");
+    component.recoveryForm.controls.code.setValue("ABCD-EFGH-JKLM-NPQR");
+    fixture.detectChanges();
+    const confirmation = component.onRecovery();
+    fixture.detectChanges();
+    const alternative = fixture.nativeElement.querySelector("button.method-link") as HTMLButtonElement;
+    expect(alternative.disabled).toBeTrue();
+    expect(fixture.nativeElement.querySelector("a.method-link").getAttribute("href")).toBeNull();
+    component.backToMfa();
+    expect(component.step()).toBe("recovery");
+    response.resolve();
+    await confirmation;
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app");
+  });
+
+  it("keeps keyboard focus inside the pending MFA dialog when its controls are disabled", async () => {
+    const response = deferred<void>();
+    auth.verifyMfa.and.returnValue(response.promise);
+    component.step.set("mfa");
+    component.mfaChallenge.set("challenge-a");
+    component.mfaForm.controls.code.setValue("123456");
+    fixture.detectChanges();
+    const confirmation = component.onMfa();
+    fixture.detectChanges();
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]') as HTMLElement;
+    expect(document.activeElement).toBe(dialog);
+    const tab = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    dialog.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBeTrue();
+    expect(document.activeElement).toBe(dialog);
+    response.resolve();
+    await confirmation;
+  });
+
+  it("clears a rejected MFA code and restores focus to the first box for a new attempt", async () => {
+    auth.verifyMfa.and.rejectWith(new ApiRequestError("Código incorrecto", 401));
+    component.step.set("mfa");
+    component.mfaChallenge.set("challenge-a");
+    fixture.detectChanges();
+    component.mfaForm.controls.code.setValue("123456");
+    await component.onMfa();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.mfaForm.invalid).toBeTrue();
+    expect(component.mfaForm.controls.code.value).toBe("");
+    const boxes = fixture.nativeElement.querySelectorAll("app-otp-code-input input") as NodeListOf<HTMLInputElement>;
+    expect(Array.from(boxes).map(input => input.value)).toEqual(["", "", "", "", "", ""]);
+    expect(document.activeElement).toBe(boxes[0]);
+    expect(component.error()).toBe("Código incorrecto");
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it("focuses the recovery field when changing methods", async () => {
+    component.step.set("mfa");
+    component.mfaChallenge.set("challenge-a");
+    component.mfaRecoveryAvailable.set(true);
+    fixture.detectChanges();
+    component.goRecovery();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('[formControlName="code"]'));
+  });
+
+  it("focuses the login email after an expired MFA challenge", async () => {
+    auth.verifyMfa.and.rejectWith(new ApiRequestError("Sesión MFA caducada", 401));
+    component.step.set("mfa");
+    component.mfaChallenge.set("challenge-a");
+    component.mfaForm.controls.code.setValue("123456");
+    fixture.detectChanges();
+    await component.onMfa();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component.step()).toBe("login");
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('#login-panel input[type="email"]'));
+  });
+
   it("does not restore a registration screen after its request was locally closed", async () => {
     const response = deferred<void>();
     auth.register.and.returnValue(response.promise);
