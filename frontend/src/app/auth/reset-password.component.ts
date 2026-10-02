@@ -1,5 +1,5 @@
-import { Component, computed, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
-import { Location } from "@angular/common";
+import { afterNextRender, Component, computed, DestroyRef, ElementRef, inject, Injector, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
+import { DOCUMENT, Location } from "@angular/common";
 
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -13,6 +13,8 @@ import { PendingLinkIntentService } from "../core/services/pending-link-intent.s
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { authBearer } from "./auth-bearer";
 import { LatestRequest } from "../core/services/latest-request";
+import { AuthService } from "../core/services/auth.service";
+import { decodeCredentialChange } from "../core/services/public-action-response-decoders";
 
 @Component({
   selector: "app-reset-password",
@@ -31,11 +33,11 @@ import { LatestRequest } from "../core/services/latest-request";
         }
 
         @if (!hasResetLink) {
-          <div class="alert error" role="alert">Este enlace no contiene una autorización válida. Abre el correo de recuperación o solicita uno nuevo.</div>
-          <a mat-flat-button routerLink="/auth/forgot-password">Solicitar otro enlace</a>
+          <div class="alert error" role="alert">Este enlace no es válido o ha caducado. Abre el correo de recuperación o solicita uno nuevo.</div>
+          <a #nextLink mat-flat-button routerLink="/auth/forgot-password">Solicitar otro enlace</a>
         } @else if (!done()) {
-        <form class="form" [formGroup]="form" (ngSubmit)="submit()" [attr.aria-busy]="busy()">
-          <mat-form-field appearance="outline">
+        <form #actionForm class="form" [formGroup]="form" (ngSubmit)="submit()" [attr.aria-busy]="busy()">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Nueva contraseña</mat-label>
             <input matInput [type]="hide() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="72" />
             <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
@@ -44,7 +46,7 @@ import { LatestRequest } from "../core/services/latest-request";
             <mat-hint>Al menos 10 caracteres. Evita datos personales y frases habituales.</mat-hint>
             @if (form.controls.password.invalid) { <mat-error>Utiliza entre 10 y 72 caracteres.</mat-error> }
           </mat-form-field>
-          <mat-form-field appearance="outline">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Confirmar contraseña</mat-label>
             <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
           </mat-form-field>
@@ -56,7 +58,7 @@ import { LatestRequest } from "../core/services/latest-request";
             <div class="alert error" role="alert">Las contraseñas no coinciden. Revisa el segundo campo.</div>
           }
 
-          <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="form.invalid || busy() || done()">
+          <button #submitButton mat-flat-button color="primary" type="submit" class="submit" [disabled]="form.invalid || busy() || done()">
             {{ busy() ? 'Guardando…' : 'Guardar contraseña' }}
           </button>
         </form>
@@ -64,7 +66,7 @@ import { LatestRequest } from "../core/services/latest-request";
 
         @if (done()) {
           <div class="alert ok" role="status">Contraseña actualizada. Ya puedes iniciar sesión.</div>
-          <a class="back" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">Ir a iniciar sesión</a>
+          <a #nextLink class="back" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">Ir a iniciar sesión</a>
         } @else {
           <a class="back" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">← Volver al acceso</a>
         }
@@ -82,13 +84,20 @@ export class ResetPasswordComponent {
   private invitations = inject(PendingInvitationService);
   private location = inject(Location);
   private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly auth = inject(AuthService);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+  private readonly actionForm = viewChild<unknown, ElementRef<HTMLFormElement>>("actionForm", { read: ElementRef });
+  private readonly submitButton = viewChild<unknown, ElementRef<HTMLButtonElement>>("submitButton", { read: ElementRef });
+  private readonly nextLink = viewChild<unknown, ElementRef<HTMLAnchorElement>>("nextLink", { read: ElementRef });
   private readonly token: string;
 
   /** Expose only availability to the view, never interpolate the bearer. */
-  get hasResetLink(): boolean { return this.token.length > 0; }
+  get hasResetLink(): boolean { return this.token.length > 0 && !this.linkRejected(); }
 
   readonly busy = signal(false);
   readonly done = signal(false);
+  readonly linkRejected = signal(false);
   readonly error = signal<string | null>(null);
   readonly hide = signal(true);
   readonly pendingLink = this.intents.pending;
@@ -112,19 +121,33 @@ export class ResetPasswordComponent {
 
   async submit(): Promise<void> {
     if (this.form.invalid || this.busy() || this.done() || !this.hasResetLink) return;
+    const ownedFocus = this.actionForm()?.nativeElement.contains(this.document.activeElement) ?? false;
+    const generation = this.auth.sessionGeneration();
     const request = this.requests.begin(this.token);
     this.busy.set(true);
     this.error.set(null);
     try {
-      await this.api.post("/api/v1/auth/reset-password", { token: this.token, password: this.form.value.password });
+      const result = await this.api.post("/api/v1/auth/reset-password", { token: this.token, password: this.form.value.password }, decodeCredentialChange);
+      if (result.current) this.auth.accountSignedOut(generation);
       if (!this.requests.isCurrent(request, this.token)) return;
       this.done.set(true);
+      this.form.reset();
     } catch (err) {
       if (this.requests.isCurrent(request, this.token)) {
         this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo restablecer la contraseña");
+        if (err instanceof ApiRequestError && err.status === 400) this.linkRejected.set(true);
       }
     } finally {
-      if (this.requests.isCurrent(request, this.token)) this.busy.set(false);
+      if (this.requests.isCurrent(request, this.token)) {
+        this.busy.set(false);
+        if (ownedFocus) {
+          afterNextRender(() => {
+            if (!this.requests.isCurrent(request, this.token) || this.document.activeElement !== this.document.body) return;
+            const next = this.done() || this.linkRejected() ? this.nextLink() : this.submitButton();
+            next?.nativeElement.focus({ preventScroll: true });
+          }, { injector: this.injector });
+        }
+      }
     }
   }
 }

@@ -210,10 +210,10 @@
       </button>
     </div>
   }
-  <!-- An incomplete registry is not an empty one, and it is not the whole set
-       either: revoked rows are retained and can push an idle session out. -->
+  <!-- The bounded registry keeps the current session first, followed by recent
+       activity. Revoking retained rows does not reveal the omitted history. -->
   @if (!sessionsLoading() && !sessionsError() && sessionsTruncated()) {
-    <p class="muted">Se muestran las sesiones con actividad más reciente. Hay más registros: revoca las que no reconozcas y vuelve a abrir esta sección para ver el resto.</p>
+    <p class="muted">Se muestran tu sesión actual y las sesiones más recientes, hasta un máximo de 100 registros. Hay más registros fuera de esta lista.</p>
   }
   @if (!sessionsLoading() && !sessionsError() && !sessions().length) {
     <p class="muted">No hay sesiones activas.</p>

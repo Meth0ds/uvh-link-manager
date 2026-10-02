@@ -27,7 +27,7 @@ class MfaStepUp
     public const ATTEMPT_PURPOSE = 'stepup';
 
     /**
-     * @return array{status: string, factor?: string, recovery_codes?: array<int, string>, verified_at?: Carbon}
+     * @return array{status: string, factor?: string, recovery_codes?: array<int, mixed>, verified_at?: Carbon}
      */
     public static function verify(
         User $user,
@@ -118,8 +118,8 @@ class MfaStepUp
     }
 
     /**
-     * @param  array<int, string>|null  $remaining
-     * @return array{status: string, factor: string, recovery_codes?: array<int, string>, verified_at: Carbon}
+     * @param  array<int, mixed>|null  $remaining
+     * @return array{status: string, factor: string, recovery_codes?: array<int, mixed>, verified_at: Carbon}
      */
     private static function success(User $user, UvhSession $session, string $attemptPurpose, string $factor, ?array $remaining = null): array
     {

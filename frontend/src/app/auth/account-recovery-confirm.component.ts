@@ -1,5 +1,5 @@
-import { Location } from "@angular/common";
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
+import { DOCUMENT, Location } from "@angular/common";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, inject, signal, viewChild } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -24,14 +24,14 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
         </mat-icon>
         <h2 id="account-recovery-confirm-title">{{ ok() ? 'Expediente abierto' : (!token ? 'Enlace no disponible' : (done() ? 'No se pudo confirmar' : 'Confirmar recuperación')) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
-        @if (!done()) {
+        @if (!done() || retryable()) {
           <div class="alert info">Este paso sólo acredita el acceso al email. No inicia sesión, no cambia la contraseña y no desactiva MFA.</div>
-          <button mat-flat-button color="primary" class="submit" type="button" (click)="confirm()" [disabled]="busy() || !token">
-            {{ busy() ? 'Confirmando…' : 'Confirmar y abrir expediente' }}
+          <button #confirmButton mat-flat-button color="primary" class="submit" type="button" (click)="confirm()" [disabled]="busy() || !token">
+            {{ busy() ? 'Confirmando…' : (retryable() ? 'Reintentar confirmación' : 'Confirmar y abrir expediente') }}
           </button>
           <a class="back" routerLink="/auth">No continuar</a>
         } @else {
-          <a mat-flat-button color="primary" routerLink="/auth">Volver al acceso</a>
+          <a #accessLink mat-flat-button color="primary" routerLink="/auth">Volver al acceso</a>
         }
       </section>
     </app-auth-shell>
@@ -43,12 +43,17 @@ export class AccountRecoveryConfirmComponent {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly location = inject(Location);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+  private readonly confirmButton = viewChild<unknown, ElementRef<HTMLButtonElement>>("confirmButton", { read: ElementRef });
+  private readonly accessLink = viewChild<unknown, ElementRef<HTMLAnchorElement>>("accessLink", { read: ElementRef });
   private readonly requests = new LatestRequest(inject(DestroyRef));
 
   readonly token = authBearer(this.route);
   readonly busy = signal(false);
   readonly done = signal(false);
   readonly ok = signal(false);
+  readonly retryable = signal(false);
   readonly message = signal("Confirma que tú solicitaste recuperar una cuenta sin sus factores de acceso.");
 
   constructor() {
@@ -60,9 +65,12 @@ export class AccountRecoveryConfirmComponent {
   }
 
   async confirm(): Promise<void> {
-    if (!this.token || this.busy() || this.done()) return;
+    if (!this.token || this.busy() || (this.done() && !this.retryable())) return;
+    const ownedFocus = this.document.activeElement === this.confirmButton()?.nativeElement;
     const request = this.requests.begin(this.token);
     this.busy.set(true);
+    this.done.set(false);
+    this.retryable.set(false);
     try {
       const result = await this.api.post<{ ok: true; message: string }>(
         "/api/v1/auth/account-recovery/confirm",
@@ -74,12 +82,23 @@ export class AccountRecoveryConfirmComponent {
       this.message.set(result.message);
     } catch (error) {
       if (this.requests.isCurrent(request, this.token)) {
-        this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar la solicitud");
+        this.ok.set(false);
+        this.retryable.set(!(error instanceof ApiRequestError) || error.status === 0 || error.status === 429 || error.status >= 500);
+        this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo conectar con el servidor. Inténtalo de nuevo.");
       }
     } finally {
       if (this.requests.isCurrent(request, this.token)) {
         this.busy.set(false);
         this.done.set(true);
+        if (ownedFocus) {
+          afterNextRender(() => {
+            // Disabling/removing the action may send focus to the body. Restore
+            // its logical successor without overriding a later user choice.
+            if (!this.requests.isCurrent(request, this.token) || this.document.activeElement !== this.document.body) return;
+            const next = this.retryable() ? this.confirmButton() : this.accessLink();
+            next?.nativeElement.focus({ preventScroll: true });
+          }, { injector: this.injector });
+        }
       }
     }
   }

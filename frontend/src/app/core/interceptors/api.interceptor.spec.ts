@@ -68,6 +68,15 @@ describe("apiInterceptor context isolation", () => {
     });
   }
 
+  it("opens MFA reauthentication for a parked authenticator replacement without expiring the session", async () => {
+    const forwarded = await intercept("/api/v1/auth/mfa/setup", new HttpErrorResponse({
+      status: 403, error: { details: { reason: "mfa_reauthentication_required" } },
+    }), "POST");
+    expect(auth.requireAdminMfaReauthentication).toHaveBeenCalledOnceWith(7);
+    expect(auth.sessionExpired).not.toHaveBeenCalled();
+    expect(forwarded.headers.has("X-Workspace-Id")).toBeFalse();
+  });
+
   it("treats account notifications as session requests without a workspace", async () => {
     expect((await intercept("/api/v1/notifications")).headers.has("X-Workspace-Id")).toBeFalse();
     await intercept("/api/v1/notifications/unread", new HttpErrorResponse({ status: 401 }));

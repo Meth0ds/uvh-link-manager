@@ -58,4 +58,46 @@ describe("MFA reauthentication session checks", () => {
     expect(auth.reauthenticateMfa).not.toHaveBeenCalled();
   });
 
+  it("lets a verified non-admin refresh MFA for account settings and return after success", async () => {
+    loaded.set(true); authenticated.set(true);
+    Object.assign(auth, { user: () => ({ isAdmin: false }) });
+    TestBed.overrideProvider(ActivatedRoute, { useValue: { snapshot: { queryParamMap: convertToParamMap({ returnTo: "/app/settings" }) } } });
+    auth.reauthenticateMfa.and.resolveTo({ verifiedAt: "2026-10-01T12:00:00Z", expiresAt: "2026-10-01T12:15:00Z" });
+    const component = TestBed.createComponent(MfaReauthenticateComponent).componentInstance;
+    await settle();
+    expect(component.ready()).toBeTrue();
+    expect(router.navigate).not.toHaveBeenCalled();
+    component.form.setValue({ password: "fixture-password", factorCode: "123456" });
+    await component.submit();
+    expect(auth.reauthenticateMfa).toHaveBeenCalledOnceWith("fixture-password", "123456");
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app/settings");
+    expect(component.form.controls.password.value).toBe("");
+    expect(component.form.controls.factorCode.value).toBe("");
+  });
+
+  it("still refuses a non-admin who asks to return to the administrative console", async () => {
+    loaded.set(true); authenticated.set(true);
+    Object.assign(auth, { user: () => ({ isAdmin: false }) });
+    TestBed.overrideProvider(ActivatedRoute, { useValue: { snapshot: { queryParamMap: convertToParamMap({ returnTo: "/app/admin/users" }) } } });
+    const component = TestBed.createComponent(MfaReauthenticateComponent).componentInstance;
+    await settle();
+    expect(component.ready()).toBeFalse();
+    expect(router.navigate).toHaveBeenCalledOnceWith(["/forbidden"]);
+    expect(auth.mfaSessionStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not offer credential submission for a non-admin without an active factor", async () => {
+    loaded.set(true); authenticated.set(true);
+    Object.assign(auth, { user: () => ({ isAdmin: false }) });
+    TestBed.overrideProvider(ActivatedRoute, { useValue: { snapshot: { queryParamMap: convertToParamMap({ returnTo: "/app/settings" }) } } });
+    auth.mfaSessionStatus.and.resolveTo({ enabled: false, fresh: false, verifiedAt: null, expiresAt: null });
+    const component = TestBed.createComponent(MfaReauthenticateComponent).componentInstance;
+    await settle();
+    expect(component.ready()).toBeFalse();
+    expect(router.navigate).toHaveBeenCalledOnceWith(["/forbidden"]);
+    component.form.setValue({ password: "fixture-password", factorCode: "123456" });
+    await component.submit();
+    expect(auth.reauthenticateMfa).not.toHaveBeenCalled();
+  });
+
 });

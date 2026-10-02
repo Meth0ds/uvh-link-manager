@@ -100,7 +100,9 @@ class SessionManager
         // reading it once keeps the guards below and the returned array
         // referring to the same, non-null instance.
         $user = $session->user;
-        if (! $user || $session->expires_at->isPast()) {
+        // Eager owner loading is a separate query: the account may have been
+        // blocked after the session SELECT's whereHas guard passed.
+        if (! $user || $user->deleted_at || $session->expires_at->lte(now())) {
             return null;
         }
 

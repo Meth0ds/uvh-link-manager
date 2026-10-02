@@ -27,7 +27,7 @@ export class AppComponent {
 
       if (invalidated && this.hadAuthenticatedSession && this.router.url.startsWith("/app")) {
         void this.router.navigate(["/auth"], { queryParams: { reason: "session-expired" } });
-      } else if (needsAdminMfa && this.router.url.startsWith("/app/admin")) {
+      } else if (needsAdminMfa && authenticated && (this.router.url === "/app" || this.router.url.startsWith("/app/"))) {
         void this.router.navigate(["/auth/reauthenticate"], {
           queryParams: { returnTo: safeReturnTo(this.router.url) },
         });

@@ -76,6 +76,7 @@ class EnvTemplateContractTest extends TestCase
         // a template entry would be a way to reopen the enumeration oracle by
         // accident.
         'RESEND_VERIFICATION_MIN_DURATION_MS' => 'anti-enumeration timing floor with a working default, deliberately not tunable',
+        'PASSWORD_RESET_MIN_DURATION_MS' => 'same anti-enumeration floor for public password requests; keep the working default out of the operator template',
         // The operational ceiling of the automated export document. Generous by
         // default and clamped by the code; a template entry would invite
         // raising it without measuring the private volume first.

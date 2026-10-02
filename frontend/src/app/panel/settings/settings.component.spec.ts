@@ -7,7 +7,7 @@ import { MatDialog } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { Subject } from "rxjs";
 import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, SessionList } from "../../core/models";
-import { ApiService } from "../../core/services/api.service";
+import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { NotificationService } from "../../core/services/notification.service";
 import { ThemeService } from "../../core/services/theme.service";
@@ -369,6 +369,33 @@ describe("SettingsComponent async safety", () => {
     expect(messages).toContain("La sesión quedó revocada. Abre la pantalla de acceso para continuar.");
     expect(messages).not.toContain("No se pudo revocar la sesión");
   });
+
+  for (const action of ["cancel", "disable"] as const) {
+    it(`preserves the MFA state when ${action} receives no valid server acknowledgement`, async () => {
+      auth.user.update((user) => ({ ...user!, mfaEnabled: true }));
+      component.mfaSecret.set("FIXTURESECRET");
+      component.mfaUri.set("otpauth://totp/Fixture?secret=FIXTURESECRET");
+      component.mfaQr.set("data:image/png;base64,fixture");
+      const error = new ApiRequestError("El servidor devolvió una respuesta no válida", 502);
+      if (action === "disable") {
+        const actions = TestBed.inject(ActionDialogService) as jasmine.SpyObj<ActionDialogService>;
+        actions.confirm.and.resolveTo(true);
+        component.mfaDisableForm.setValue({ password: "fixture-password", factorCode: "123456" });
+        auth.mfaDisable.and.rejectWith(error);
+        await component.disableMfa();
+      } else {
+        auth.mfaCancelSetup.and.rejectWith(error);
+        await component.cancelMfaSetup();
+      }
+      expect(component.mfaSecret()).toBe("FIXTURESECRET");
+      expect(component.mfaQr()).toBe("data:image/png;base64,fixture");
+      expect(component.mfaBusy()).toBeFalse();
+      expect(auth.user()?.mfaEnabled).toBeTrue();
+      expect(auth.refreshUser).not.toHaveBeenCalled();
+      expect(snackbar.open).toHaveBeenCalledWith(error.message, "Cerrar", jasmine.objectContaining({ duration: 4000 }));
+      expect(snackbar.open.calls.allArgs().map((args) => args[0])).not.toContain("MFA desactivado");
+    });
+  }
 
   for (const action of ["disable", "regenerate"] as const) {
     it(`does not ${action} MFA after the account changes while confirmation is open`, async () => {

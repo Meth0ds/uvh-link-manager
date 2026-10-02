@@ -19,19 +19,13 @@ import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widg
 import { intentBearer } from "./auth-bearer";
 import { OtpCodeInputComponent } from "./otp-code-input.component";
 
+import { assessPassword, passwordBands, passwordStrengthLabel } from "./password-policy";
+
 type Step = "login" | "register" | "mfa" | "recovery" | "verify-pending";
 type RegisterStep = 1 | 2;
 
 export const TERMS_VERSION = "2026-08-30";
 export const PRIVACY_VERSION = "2026-08-30";
-
-interface PasswordAssessment {
-  score: number;
-  common: boolean;
-  personal: boolean;
-  patterned: boolean;
-  feedback: string;
-}
 
 interface PublicAuthConfig {
   hcaptcha?: {
@@ -39,45 +33,6 @@ interface PublicAuthConfig {
     siteKey?: string | null;
     developmentFallback?: boolean;
   };
-}
-
-function normalized(value: string): string {
-  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-}
-
-function assessPassword(password: string, name: string, email: string): PasswordAssessment {
-  if (!password) return { score: 0, common: false, personal: false, patterned: false, feedback: "Empieza con una frase larga que no uses en ningún otro sitio." };
-
-  const lower = normalized(password);
-  const commonTerms = ["password", "contrasena", "qwerty", "admin", "welcome", "bienvenido", "letmein", "iloveyou", "123456", "uvh"];
-  const common = commonTerms.some((term) => lower.includes(term));
-  const patterned = /(.)\1{2,}/u.test(password)
-    || ["0123", "1234", "2345", "3456", "4567", "5678", "6789", "9876", "abcd", "bcde", "cdef", "qwer", "asdf"].some((sequence) => lower.includes(sequence));
-  const personalTerms = [
-    ...normalized(name).split(/[^a-z0-9]+/),
-    normalized(email.split("@")[0] ?? ""),
-  ].filter((term) => term.length >= 3);
-  const personal = personalTerms.some((term) => lower.includes(term));
-  const classes = [/[a-z]/.test(password), /[A-Z]/.test(password), /\d/.test(password), /[^A-Za-z0-9]/.test(password)].filter(Boolean).length;
-  const uniqueRatio = new Set([...password]).size / Math.max(1, [...password].length);
-
-  let score = Math.min(42, password.length * 3) + classes * 9 + Math.round(uniqueRatio * 12);
-  if (password.length >= 14) score += 8;
-  if (password.length >= 18) score += 8;
-  if (common) score -= 38;
-  if (patterned) score -= 24;
-  if (personal) score -= 28;
-  if (password.length < 10) score = Math.min(score, 24);
-  score = Math.max(0, Math.min(100, score));
-
-  let feedback = "Buena base. Una frase única y larga es más fácil de recordar y más difícil de adivinar.";
-  if (common) feedback = "Evita palabras y contraseñas habituales: son las primeras que prueba un atacante.";
-  else if (personal) feedback = "No incluyas tu nombre ni la parte visible de tu email.";
-  else if (patterned) feedback = "Sustituye secuencias y repeticiones previsibles por palabras no relacionadas.";
-  else if (password.length < 10) feedback = "Añade más caracteres: el mínimo es 10 y recomendamos una frase más larga.";
-  else if (classes < 3 && password.length < 16) feedback = "Hazla más larga o combina tipos de caracteres para reducir patrones previsibles.";
-
-  return { score, common, personal, patterned, feedback };
 }
 
 @Component({
@@ -229,16 +184,10 @@ export class AuthComponent {
   });
   readonly passwordAssessment = computed(() => assessPassword(this.passwordValue(), this.nameValue(), this.emailValue()));
   readonly passwordScore = computed(() => this.passwordAssessment().score);
-  readonly passwordStrength = computed(() => {
-    const score = this.passwordScore();
-    if (score >= 82) return "Fuerte";
-    if (score >= 58) return "Buena";
-    if (score >= 30) return "Mejorable";
-    return "Débil";
-  });
+  readonly passwordStrength = computed(() => passwordStrengthLabel(this.passwordScore()));
   readonly passwordClass = computed(() => {
     const score = this.passwordScore();
-    return score >= 82 ? "strong" : score >= 58 ? "good" : score >= 30 ? "fair" : "weak";
+    return score >= passwordBands.strong ? "strong" : score >= passwordBands.good ? "good" : score >= passwordBands.fair ? "fair" : "weak";
   });
   readonly passwordsMatch = computed(() => !this.confirmationValue() || this.passwordValue() === this.confirmationValue());
   readonly passwordRequirements = computed(() => {

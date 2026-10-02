@@ -338,6 +338,12 @@ describe("AuthComponent registration flow", () => {
     expect(component.passwordRequirements().filter((item) => item.met).length).toBe(4);
   });
 
+  it("does not label a password containing a forbidden word strong", () => {
+    component.registerForm.patchValue({ name: "Ana", email: "ana@example.test", password: "Orbit-Login-Copper-73!" });
+    expect(component.passwordStrength()).toBe("Débil");
+    expect(component.passwordRequirements().find(item => item.label === "Sin datos personales ni patrones")?.met).toBeFalse();
+  });
+
   it("updates password matching as confirmation changes", () => {
     component.registerForm.controls.password.setValue("Órbita-Mango-Cobre-47!");
     component.registerForm.controls.confirmPassword.setValue("otra-clave");

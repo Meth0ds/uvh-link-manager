@@ -192,7 +192,7 @@
                 }
                 <div class="password-strength" [class]="passwordClass()" aria-live="polite">
                   <div class="strength-head"><span>Fortaleza estimada</span><b>{{ passwordStrength() }}</b></div>
-                  <div class="strength-track" role="meter" aria-label="Fortaleza estimada de la contraseña" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="passwordScore()"><span [style.width.%]="passwordScore()"></span></div>
+                  <div class="strength-track" role="meter" aria-label="Fortaleza estimada de la contraseña" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="passwordScore()" [attr.aria-valuetext]="passwordStrength()"><span [style.width.%]="passwordScore()"></span></div>
                   <div class="password-requirements">
                     @for (requirement of passwordRequirements(); track requirement.label) {
                       <span [class.met]="requirement.met"><mat-icon aria-hidden="true">{{ requirement.met ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>{{ requirement.label }}</span>

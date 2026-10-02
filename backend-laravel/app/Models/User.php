@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  *
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $mfa_pending_expires_at
+ * @property array<int, mixed>|string|null $recovery_codes
  * @property Carbon|null $deleted_at
  */
 class User extends Authenticatable

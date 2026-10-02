@@ -1,11 +1,12 @@
 import { ApplicationConfig, inject, provideAppInitializer } from "@angular/core";
-import { provideRouter, withComponentInputBinding, withInMemoryScrolling, type RouterFeatures, type Routes } from "@angular/router";
+import { provideRouter, RouteReuseStrategy, withComponentInputBinding, withInMemoryScrolling, type RouterFeatures, type Routes } from "@angular/router";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
 import { MatPaginatorIntl } from "@angular/material/paginator";
 import { apiInterceptor } from "./core/interceptors/api.interceptor";
 import { SpanishPaginatorIntl } from "./core/paginator-intl";
 import { PendingHandoffService } from "./core/services/pending-handoff.service";
+import { AuthRouteReuseStrategy } from "./core/auth-route-reuse";
 
 export const routes: Routes = [
   {
@@ -35,6 +36,7 @@ export const routes: Routes = [
     // Canonical invitation URL used by email links. Keep the legacy root alias
     // so invitations already delivered before the cutover remain valid.
     path: "invitations/accept",
+    data: { renewAuthContext: true },
     loadComponent: () => import("./auth/invitation-accept.component").then((m) => m.InvitationAcceptComponent),
   },
   {
@@ -83,6 +85,7 @@ export const routerFeatures: RouterFeatures[] = [
 export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes, ...routerFeatures),
+    { provide: RouteReuseStrategy, useClass: AuthRouteReuseStrategy },
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),
     provideAnimationsAsync(),
     // Material ships the paginator in English; the panel is in Spanish, so its

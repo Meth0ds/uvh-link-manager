@@ -5,6 +5,18 @@ export interface PublicActionMessage {
   message: string;
 }
 
+export function decodePublicActionAcknowledgement(value: unknown): { ok: true } {
+  const source = record(value, "public action acknowledgement");
+  if (!boolean(source["ok"], "public action acknowledgement")) throw new Error("Invalid public action acknowledgement response");
+  return { ok: true };
+}
+
+/** Credential bearers can affect a different account than the browser session. */
+export function decodeCredentialChange(value: unknown): { ok: true; current: boolean } {
+  const source = record(value, "credential change");
+  return { ...decodePublicActionAcknowledgement(value), current: boolean(source["current"], "credential change") };
+}
+
 /** Decode only public confirmation text; never retain unrelated response keys. */
 export function decodePublicActionMessage(value: unknown): PublicActionMessage {
   const source = record(value, "public action");
@@ -12,6 +24,14 @@ export function decodePublicActionMessage(value: unknown): PublicActionMessage {
   return {
     ok: true,
     message: text(source["message"], "public action", 500),
+  };
+}
+
+export function decodeSecurityIncident(value: unknown): PublicActionMessage & { current: boolean } {
+  const source = record(value, "security incident");
+  return {
+    ...decodePublicActionMessage(value),
+    current: boolean(source["current"], "security incident"),
   };
 }
 

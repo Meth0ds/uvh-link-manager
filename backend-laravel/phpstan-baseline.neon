@@ -175,18 +175,6 @@ parameters:
 			path: app/Http/Controllers/AnalyticsController.php
 
 		-
-			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
-			identifier: function.impossibleType
-			count: 4
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Comparison operation "\>" between \*NEVER\* and 0 results in an error\.$#'
-			identifier: greater.invalid
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\AuthController\:\:cancelEmailChange\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -373,12 +361,6 @@ parameters:
 			path: app/Http/Controllers/AuthController.php
 
 		-
-			message: '#^Negated boolean expression is always true\.$#'
-			identifier: booleanNot.alwaysTrue
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
 			message: '#^Offset ''artifacts'' on array\{user_id\: int, artifacts\: array\<int, array\{id\: int, path\: mixed\}\>, blocked\: bool\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -387,54 +369,6 @@ parameters:
 		-
 			message: '#^Offset ''security_version'' on array\{user_id\: int, security_version\: int\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
-			count: 2
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Parameter \#1 \$array of function array_splice expects array, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Result of && is always false\.$#'
-			identifier: booleanAnd.alwaysFalse
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Result of \|\| is always true\.$#'
-			identifier: booleanOr.alwaysTrue
-			count: 2
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Right side of && is always false\.$#'
-			identifier: booleanAnd.rightAlwaysFalse
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between ''invalid'' and ''ok'' will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
-			identifier: notIdentical.alwaysFalse
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Strict comparison using \=\=\= between ''invalid'' and ''challenge'' will always evaluate to false\.$#'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
 			count: 2
 			path: app/Http/Controllers/AuthController.php
 
@@ -1081,24 +1015,6 @@ parameters:
 			path: app/Support/MailTransportPolicy.php
 
 		-
-			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
-			identifier: function.impossibleType
-			count: 1
-			path: app/Support/MfaStepUp.php
-
-		-
-			message: '#^Result of \|\| is always true\.$#'
-			identifier: booleanOr.alwaysTrue
-			count: 1
-			path: app/Support/MfaStepUp.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 1
-			path: app/Support/MfaStepUp.php
-
-		-
 			message: '#^Method App\\Support\\PasswordStrength\:\:containsAny\(\) has parameter \$needles with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -1127,12 +1043,6 @@ parameters:
 			identifier: identical.alwaysFalse
 			count: 1
 			path: app/Support/RedirectService.php
-
-		-
-			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
-			identifier: function.impossibleType
-			count: 1
-			path: app/Support/UvhRequest.php
 
 		-
 			message: '#^Method App\\Support\\UvhRequest\:\:apiToken\(\) return type has no value type specified in iterable type array\.$#'

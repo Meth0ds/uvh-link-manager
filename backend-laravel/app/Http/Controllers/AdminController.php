@@ -586,7 +586,7 @@ class AdminController
                 'r.id', 'r.user_id', 'r.status', 'r.email_confirmed_at', 'r.approved_at',
                 'r.rejected_at', 'r.completed_at', 'r.expires_at', 'r.created_at', 'r.updated_at',
                 'u.email', 'u.name', 'u.is_admin', 'u.mfa_enabled',
-                DB::raw('COUNT(a.id) FILTER (WHERE au.is_admin = TRUE AND au.mfa_enabled = TRUE AND au.email_verified_at IS NOT NULL AND au.deleted_at IS NULL) AS approval_count'),
+                DB::raw('COUNT(a.id) FILTER (WHERE a.admin_user_id <> r.user_id AND au.is_admin = TRUE AND au.mfa_enabled = TRUE AND au.email_verified_at IS NOT NULL AND au.deleted_at IS NULL) AS approval_count'),
             ]);
 
         return response()->json([
@@ -633,7 +633,7 @@ class AdminController
         }
         $targetUserId = (int) $snapshot->user_id;
         try {
-            $result = DB::transaction(function () use ($actor, $sessionId, $id, $targetUserId, $decision, $reasonCode): array {
+            $result = DB::transaction(function () use ($actor, $sessionId, $id, $targetUserId, $decision, $reasonCode, $request): array {
                 // Every recovery decision locks the same user set in primary-key
                 // order. Without deterministic ordering, two administrators
                 // approving one another's cases can deadlock PostgreSQL.
@@ -654,9 +654,21 @@ class AdminController
                 if (! $this->eligibleLockedAdminSession($lockedActor, $sessionId)) {
                     return ['status' => 'actor_changed'];
                 }
-                if (! $target || ! $target->email_verified_at || ! $target->mfa_enabled
+                // Admission belongs to the same transaction as the case change.
+                // History materialization may retry later, but the exact event
+                // must be durable before the decision can be committed.
+                $admit = static function (array $result) use ($lockedActor, $row, $decision, $request): array {
+                    Audit::write($lockedActor->id, 'admin.account_recovery_decision', 'account_recovery', $row->id, [
+                        'decision' => $decision,
+                        'result' => $result['status'],
+                        'approval_count' => $result['approvals'] ?? 0,
+                    ], UvhRequest::ip($request));
+
+                    return $result;
+                };
+                if (! $target || $target->deleted_at || ! $target->email_verified_at || ! $target->mfa_enabled
                     || (int) $target->security_version !== (int) $row->security_version
-                    || $row->expires_at->isPast()) {
+                    || $row->expires_at->lte(now())) {
                     $row->update([
                         'status' => 'expired',
                         'confirmation_token_hash' => null,
@@ -664,7 +676,7 @@ class AdminController
                         'updated_at' => now(),
                     ]);
 
-                    return ['status' => 'stale'];
+                    return $admit(['status' => 'stale']);
                 }
                 if ((int) $target->id === (int) $lockedActor->id) {
                     return ['status' => 'self'];
@@ -694,7 +706,7 @@ class AdminController
                         throw new MailAdmissionException('Account recovery rejection outbox admission failed');
                     }
 
-                    return ['status' => 'rejected', 'user_id' => (int) $target->id];
+                    return $admit(['status' => 'rejected', 'user_id' => (int) $target->id]);
                 }
 
                 DB::table('account_recovery_approvals')->insertOrIgnore([
@@ -706,6 +718,7 @@ class AdminController
                 $approvalCount = DB::table('account_recovery_approvals as a')
                     ->join('users as u', 'u.id', '=', 'a.admin_user_id')
                     ->where('a.request_id', $row->id)
+                    ->where('a.admin_user_id', '<>', $target->id)
                     ->where('u.is_admin', true)
                     ->where('u.mfa_enabled', true)
                     ->whereNotNull('u.email_verified_at')
@@ -715,7 +728,7 @@ class AdminController
                 if ($approvalCount < 2) {
                     $row->update(['status' => 'in_review', 'updated_at' => now()]);
 
-                    return ['status' => 'in_review', 'user_id' => (int) $target->id, 'approvals' => $approvalCount];
+                    return $admit(['status' => 'in_review', 'user_id' => (int) $target->id, 'approvals' => $approvalCount]);
                 }
 
                 $token = Ids::randomToken(32);
@@ -732,7 +745,7 @@ class AdminController
                     throw new MailAdmissionException('Account recovery completion outbox admission failed');
                 }
 
-                return ['status' => 'approved', 'user_id' => (int) $target->id, 'approvals' => $approvalCount];
+                return $admit(['status' => 'approved', 'user_id' => (int) $target->id, 'approvals' => $approvalCount]);
             });
         } catch (MailAdmissionException) {
             return response()->json(['error' => 'No se pudo admitir el correo de recuperación. No se ha aplicado la decisión final'], 503);
@@ -753,12 +766,6 @@ class AdminController
         if ($result['status'] === 'state') {
             return response()->json(['error' => 'El expediente no está pendiente de decisión'], 409);
         }
-
-        Audit::write($actor->id, 'admin.account_recovery_decision', 'account_recovery', $id, [
-            'decision' => $decision,
-            'result' => $result['status'],
-            'approval_count' => $result['approvals'] ?? 0,
-        ], UvhRequest::ip($request));
 
         return response()->json([
             'ok' => true,
@@ -1289,7 +1296,7 @@ class AdminController
         $session = DB::table('sessions')->where('id', $sessionId)->where('user_id', $actor->id)
             ->whereNull('revoked_at')->lockForUpdate()->first();
         if (! $session || (int) $session->security_version !== (int) $actor->security_version
-            || Carbon::parse($session->expires_at)->isPast() || $session->mfa_verified_at === null) {
+            || Carbon::parse($session->expires_at)->lte(now()) || $session->mfa_verified_at === null) {
             return false;
         }
 

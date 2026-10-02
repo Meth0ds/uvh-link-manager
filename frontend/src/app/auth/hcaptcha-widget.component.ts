@@ -1,5 +1,8 @@
 import {
   AfterViewInit,
+  afterNextRender,
+  DestroyRef,
+  Injector,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -13,6 +16,7 @@ import {
   inject,
   signal,
 } from "@angular/core";
+import { DOCUMENT } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
 import { ThemeService } from "../core/services/theme.service";
 
@@ -102,8 +106,13 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
   @HostBinding("class.challenge-open") get hostChallengeOpen(): boolean { return this.challengeOpen(); }
 
   private readonly theme = inject(ThemeService);
-  private readonly channel = this.createChannel();
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  private returnFocus: HTMLElement | null = null;
+  private channel = this.createChannel();
   private frameLoaded = false;
+  private frameAttemptUsed = false;
   private activeTheme: "light" | "dark" | null = null;
   private loadTimer: ReturnType<typeof setTimeout> | null = null;
   private executionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -137,7 +146,11 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
   }
 
   onFrameLoad(): void {
+    this.channel = this.createChannel();
+    this.tokenChange.emit("");
+    if (this.pendingExecution) this.pendingExecution.dispatched = false;
     this.frameLoaded = true;
+    this.frameAttemptUsed = false;
     this.state.set("loading");
     this.challengeOpen.set(false);
     this.sendInit();
@@ -146,11 +159,10 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
 
   reset(): void {
     this.rejectPending("La comprobación antiabuso se reinició.");
-    this.tokenChange.emit("");
-    this.state.set("loading");
-    this.challengeOpen.set(false);
-    this.post({ type: "reset" });
-    this.armLoadTimeout();
+    // Resetting the SDK alone cannot distinguish a callback already queued by
+    // its previous challenge. A new document and channel retire that attempt.
+    this.reloadFrame();
+    this.restoreTriggerFocus();
   }
 
   retry(): void {
@@ -167,6 +179,9 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
       return Promise.reject(new HCaptchaExecutionError("Completa la protección antiabuso para continuar."));
     }
     if (this.pendingExecution) return this.pendingExecution.promise;
+    const active = this.document.activeElement;
+    this.returnFocus = active instanceof HTMLElement && active !== this.document.body
+      && active !== this.frame.nativeElement ? active : null;
 
     let resolve!: (token: string) => void;
     let reject!: (error: HCaptchaExecutionError) => void;
@@ -178,14 +193,14 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
     this.tokenChange.emit("");
     this.armExecutionTimeout();
 
-    if (this.state() === "error") this.reloadFrame();
+    if (this.frameAttemptUsed || !["ready", "loading"].includes(this.state())) this.reloadFrame();
     else this.dispatchExecution();
 
     return promise;
   }
 
   private readonly onMessage = (event: MessageEvent<HCaptchaFrameMessage>): void => {
-    if (event.source !== this.frame.nativeElement.contentWindow || !event.data || event.data.source !== "uvh-hcaptcha-frame") return;
+    if (!this.frameLoaded || event.source !== this.frame.nativeElement.contentWindow || !event.data || event.data.source !== "uvh-hcaptcha-frame") return;
     if (event.data.type === "frame-ready") {
       this.sendInit();
       return;
@@ -194,13 +209,15 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
 
     switch (event.data.type) {
       case "ready":
+        if (this.frameAttemptUsed || this.pendingExecution?.dispatched || this.state() === "verified") return;
         this.state.set("ready");
         this.clearLoadTimeout();
         this.dispatchExecution();
         break;
       case "verified": {
+        if (this.invisible && (!this.pendingExecution?.dispatched || this.state() !== "verifying")) return;
         const token = typeof event.data.token === "string" ? event.data.token : "";
-        if (!token || token.length > 8192) {
+        if (!token || token.length > 8192 || /[\u0000-\u001f\u007f]/.test(token)) {
           this.fail();
           return;
         }
@@ -218,11 +235,17 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
         this.rejectPending("La comprobación ha caducado. Inténtalo de nuevo.");
         break;
       case "challenge-open":
+        if (this.invisible && (!this.pendingExecution?.dispatched || this.state() !== "verifying")) return;
         this.challengeOpen.set(true);
         break;
       case "challenge-close":
         this.challengeOpen.set(false);
-        this.rejectPending("Completa la protección antiabuso para continuar.");
+        if (this.pendingExecution) {
+          this.state.set("expired");
+          this.tokenChange.emit("");
+          this.rejectPending("Completa la protección antiabuso para continuar.");
+          this.restoreTriggerFocus();
+        }
         break;
       case "error":
         this.fail();
@@ -255,6 +278,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
     const pending = this.pendingExecution;
     if (!pending || pending.dispatched || !this.frameLoaded || this.state() === "loading") return;
     pending.dispatched = true;
+    this.frameAttemptUsed = true;
     this.state.set("verifying");
     this.clearLoadTimeout();
     this.post({ type: "execute" });
@@ -269,6 +293,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
   }
 
   private reloadFrame(): void {
+    this.channel = this.createChannel();
     this.tokenChange.emit("");
     this.state.set("loading");
     this.challengeOpen.set(false);
@@ -277,7 +302,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
     // invisible execution is pending. Let the replacement frame dispatch the
     // same logical attempt once it reports ready instead of hanging forever.
     if (this.pendingExecution) this.pendingExecution.dispatched = false;
-    this.frame.nativeElement.src = `/hcaptcha-frame.html?reload=${Date.now()}`;
+    this.frame.nativeElement.src = `/hcaptcha-frame.html?reload=${this.channel}`;
     this.armLoadTimeout();
   }
 
@@ -287,6 +312,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
     this.tokenChange.emit("");
     this.clearLoadTimeout();
     this.rejectPending("No se pudo completar la protección antiabuso. Inténtalo de nuevo.");
+    this.restoreTriggerFocus();
   }
 
   private resolvePending(token: string): void {
@@ -311,7 +337,21 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
       this.challengeOpen.set(false);
       this.state.set("expired");
       this.rejectPending("La comprobación ha caducado. Inténtalo de nuevo.");
+      this.restoreTriggerFocus();
     }, 120_000);
+  }
+
+  private restoreTriggerFocus(): void {
+    const target = this.returnFocus;
+    if (!target || this.destroyRef.destroyed) return;
+    afterNextRender(() => {
+      // The caller may still be handling the rejection and enabling its CTA.
+      // Respect another focus choice, a newer execution, or a destroyed view.
+      if (this.destroyRef.destroyed || this.pendingExecution || this.challengeOpen()
+        || !target.isConnected || target.matches(":disabled")) return;
+      const active = this.document.activeElement;
+      if (active === this.document.body || active === this.frame.nativeElement) target.focus({ preventScroll: true });
+    }, { injector: this.injector });
   }
 
   private clearExecutionTimeout(): void {

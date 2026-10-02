@@ -81,17 +81,25 @@ final class MailDeliveryEligibility
         }
 
         if ($tokenKind === 'verify') {
-            // Un bearer de verificación nombra un REGISTRO PENDIENTE, nunca un
-            // usuario: la cuenta no existe hasta que el bearer se gasta. El
-            // join ES la comprobación de vigencia —la activación borra la fila
-            // pendiente y sus bearers en cascada—, de modo que una fila viva es
-            // exactamente un registro sin activar esperando a su buzón.
+            // Current registrations name a pending row; the supported legacy
+            // resend names an existing unverified account. Both need live
+            // ownership in addition to a valid, unconsumed bearer.
             return DB::table('email_tokens as t')
-                ->join('pending_registrations as p', 'p.id', '=', 't.pending_registration_id')
                 ->where('t.id', $id)
                 ->where('t.kind', 'verify')
                 ->whereNull('t.used_at')
                 ->where('t.expires_at', '>', now())
+                ->where(function ($owner) {
+                    $owner->whereExists(function ($pending) {
+                        $pending->selectRaw('1')->from('pending_registrations as p')
+                            ->whereColumn('p.id', 't.pending_registration_id');
+                    })->orWhereExists(function ($user) {
+                        $user->selectRaw('1')->from('users as u')
+                            ->whereColumn('u.id', 't.user_id')
+                            ->whereNull('u.deleted_at')
+                            ->whereNull('u.email_verified_at');
+                    });
+                })
                 ->exists();
         }
 
@@ -217,6 +225,7 @@ final class MailDeliveryEligibility
             ->where('r.'.$state[1], $generation)->where('r.'.$state[2], '>', now())
             ->where('r.expires_at', '>', now())
             ->whereColumn('r.security_version', 'u.security_version')
+            ->where('u.mfa_enabled', true)
             ->whereNull('u.deleted_at')->whereNotNull('u.email_verified_at')->exists();
     }
 

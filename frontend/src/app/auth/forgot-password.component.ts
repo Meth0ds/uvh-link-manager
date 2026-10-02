@@ -15,6 +15,8 @@ import { HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 import { LatestRequest } from "../core/services/latest-request";
 import { decodePublicConfig } from "../core/services/public-response-decoders";
 
+import { decodePublicActionAcknowledgement } from "../core/services/public-action-response-decoders";
+
 interface PublicAuthConfig {
   hcaptcha?: { enabled?: boolean; siteKey?: string | null };
 }
@@ -65,6 +67,7 @@ export class ForgotPasswordComponent {
   }
 
   async submit(): Promise<void> {
+    if (this.sent()) return;
     if (this.form.invalid || this.busy() || !this.captchaToken()) {
       this.form.markAllAsTouched();
       if (!this.captchaToken()) this.error.set("Completa hCaptcha para continuar.");
@@ -78,7 +81,7 @@ export class ForgotPasswordComponent {
       await this.api.post("/api/v1/auth/forgot-password", {
         email,
         captchaToken: this.captchaToken(),
-      });
+      }, decodePublicActionAcknowledgement);
       if (!this.submitRequests.isCurrent(request, email)) return;
       this.sent.set(true);
     } catch (err) {

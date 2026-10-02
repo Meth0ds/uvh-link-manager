@@ -66,6 +66,7 @@ class EmitPasswordPolicy extends Command
             'feedback' => PasswordStrength::FEEDBACK,
             'minLength' => PasswordStrength::MIN_LENGTH,
             'maxLength' => PasswordStrength::MAX_LENGTH,
+            'maxBytes' => PasswordStrength::MAX_BYTES,
             'acceptMinScore' => PasswordStrength::ACCEPT_MIN_SCORE,
             'bands' => PasswordStrength::BANDS,
         ];
@@ -159,7 +160,8 @@ class EmitPasswordPolicy extends Command
           function isAcceptable(password, name, email) {
             var value = String(password == null ? "" : password);
             var length = Array.from(value).length;
-            if (length < policy.minLength || length > policy.maxLength) return false;
+            if (length < policy.minLength || length > policy.maxLength
+                || new TextEncoder().encode(value).length > policy.maxBytes) return false;
 
             var result = assess(value, name, email);
             if (result.common || result.patterned || result.personal) return false;

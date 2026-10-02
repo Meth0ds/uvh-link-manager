@@ -20,6 +20,8 @@ final class PasswordStrength
 
     public const MAX_LENGTH = 72;
 
+    public const MAX_BYTES = 72;
+
     /** UI label thresholds: Fuerte / Buena / Mejorable / Débil. */
     public const BANDS = ['strong' => 82, 'good' => 58, 'fair' => 30];
 
@@ -145,7 +147,7 @@ final class PasswordStrength
      */
     public static function isAcceptable(string $password, string $name = '', string $email = ''): bool
     {
-        if (mb_strlen($password) < 10 || mb_strlen($password) > 72) {
+        if (mb_strlen($password) < 10 || mb_strlen($password) > self::MAX_LENGTH || strlen($password) > self::MAX_BYTES) {
             return false;
         }
 

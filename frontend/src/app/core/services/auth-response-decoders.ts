@@ -3,6 +3,13 @@ import type { LoginOutcome, LoginResponse, MfaSessionStatus } from "./auth.servi
 
 type JsonRecord = Record<string, unknown>;
 
+/** Registration acknowledges a pending application, never an authenticated user. */
+export function decodeRegistrationResponse(value: unknown): { user: null } {
+  const source = record(value, "registration");
+  if (source["user"] !== null) invalid("registration");
+  return { user: null };
+}
+
 const WORKSPACE_ROLES = new Set<WorkspaceRole>(["owner", "admin", "editor", "viewer"]);
 const EXPORT_STATUSES = new Set<DataExportStatus["status"]>(["processing", "ready", "downloaded", "failed", "cancelled", "expired"]);
 const EXPORT_FAILURES = new Set<DataExportFailureReason>(["automated_size_limit", "generation_error", "stalled"]);
@@ -249,6 +256,12 @@ export function decodeSessionsBulkRevocation(value: unknown): { ok: true; revoke
   const source = record(value, "sessions bulk revocation");
   if (source["ok"] !== true) invalid("sessions bulk revocation");
   return { ok: true, revoked: integer(source["revoked"], "sessions bulk revocation") };
+}
+
+export function decodeMfaAcknowledgement(value: unknown): { ok: true } {
+  const source = record(value, "MFA mutation");
+  if (source["ok"] !== true) invalid("MFA mutation");
+  return { ok: true };
 }
 
 export function decodeMfaSetup(value: unknown): { secret: string; uri: string } {

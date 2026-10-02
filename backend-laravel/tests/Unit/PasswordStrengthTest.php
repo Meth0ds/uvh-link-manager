@@ -18,6 +18,14 @@ class PasswordStrengthTest extends TestCase
         $this->assertFalse(PasswordStrength::isAcceptable(str_repeat('Ab1!', 19)));
     }
 
+    public function test_rejects_unicode_phrase_above_bcrypt_byte_limit(): void
+    {
+        $password = 'Órbita-Mango-Cobre-47!🌙🌟🌍🌈🔥🌊🍀🍁🌻🌞🌧🌨🌩🌪🌫🌬🌭🌮';
+        $this->assertLessThan(72, mb_strlen($password));
+        $this->assertGreaterThan(72, strlen($password));
+        $this->assertFalse(PasswordStrength::isAcceptable($password));
+    }
+
     public function test_rejects_empty_password(): void
     {
         $this->assertFalse(PasswordStrength::isAcceptable(''));

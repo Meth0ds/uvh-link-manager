@@ -2,11 +2,11 @@
 
 Este documento es un gate de lanzamiento, no una declaración de que el entorno ya está listo. Cada requisito debe enlazar a evidencia fechada del entorno real. Una casilla sin evidencia se considera pendiente.
 
-## Estado actual de las correcciones — 01/10/2026
+## Estado actual de las correcciones — 02/10/2026
 
 La revisión de código B01–B19 tiene correcciones; los hallazgos adicionales y sus límites se mantienen en [el informe actual](project-completion-audit-2026-09-30.md). Cuotas/entitlements de modalidad standard, purga verificable, snapshot/cache de analítica, outbox de auditoría crítico, avisos operativos y correlación/métricas están implementados. Las nuevas migraciones se han aplicado al entorno local mediante `migrate --force`, conservando sus datos.
 
-Validación más reciente del código: frontend629 pruebas y backend951/7220aserciones; tipos/lint/build y Pint401/Larastan correctos. La migración2026_10_01 de cancelación protectora está aplicada localmente; se exige en readiness. Navegador móvil de cancelación y confirmación de email con respuestas simuladas verificado. Navegador31/31, smoke2/2, async128/128, boot56/56 y backups34/34 son ejecuciones anteriores: no validan automáticamente los cambios posteriores. Sus logs conservan fecha y alcance.
+Validación más reciente del código:1222backend/8810aserciones y743frontend, lote S01 email/navegación/optimización. Pint418/PHPStan0; lint/tipos/build exit0 (s01-email-actions-full-backend-final.log, s01-email-actions-quality-final.log, s01-email-actions-full-frontend-layout-final.log). Browser12 contextos/32POST simulados, foco/segunda navegación/caducidad y geometría de ayudas comprobados; capturas definitivas inspeccionadas (s01-email-actions-browser-layout-final.log). No migración ni E2E/release/proveedor real nuevo. Las puertas históricas navegador31/31, smoke2/2, async128/128, boot56/56 y backups34/34 no acreditan cambios posteriores. S01 continúa parcial y S02–S13 conservan alcance con optimización añadida.
 
 Evidencia local actual y comandos: [runbook de correcciones](remediation-operations-2026-09-30.md). La evidencia histórica de abajo se conserva con su fecha y no se convierte en prueba del despliegue actual. Siguen pendientes proveedores definitivos, alertas recibidas por un canal real, capacidad/migraciones con datos representativos, provenance/promoción, revisión manual de accesibilidad y responsables legales/operativos. El estado actual del bloqueo de CI remoto no se ha vuelto a comprobar.
 
@@ -246,3 +246,41 @@ Esta evidencia pertenece a un snapshot anterior. No valida los cambios manuales 
 - Pendiente de evidencia actual: volver a ejecutar toda la matriz sobre el árbol vigente, TLS/proxy real, secretos reales, correo y hCaptcha reales, migración y backup gestionados, E2E completo, revisión autenticada de la consola admin y datos legales definitivos.
 - Los flujos de cambio de email, exportación, transferencia, step-up de tokens, borrado de workspace, revocación de intenciones y eliminación de cuenta añadidos el 1 de septiembre son implementación manual no validada por tests en esta pasada.
 - Deuda no bloqueante del artefacto actual: migrar el runner Karma y las dependencias Webpack deprecadas a `@angular/build` antes de que Angular retire ese soporte.
+
+
+## S01 — decisiones y contrato de recuperación
+
+B79–B83 corregidos: decisión/exact-event en TX, target bloqueado rechazado, control independiente sin propietario en aprobación/finalización/listado, validación de respuesta pública Angular y elegibilidad de mail con MFA actual.32 regresiones backend y7 frontend nuevas. Baselines documentados en el informe.83/83 pruebas específicas,650 aserciones;658 frontend, lint/tipos/build correctos. Suite completa: 1160/1160 backend, 8412 aserciones, 210,00 s, exclusivamente uvh_test (s01-recovery-decision-full-backend.log). Calidad: Pint 415 archivos y PHPStan sin errores, exit0 (s01-recovery-decision-static.log). Sin entrega real ni cambio de layout; S01/S11/S10 siguen parciales y el objetivo global permanece activo.
+
+
+## S01 — configuración MFA y reautenticación general
+
+B84–B91 y G12 corregidos: presupuesto por cuenta en preparación/activación, email actual verificado en los seis mutadores, pendiente con caducidad exclusiva, ack validado, ventana fresca antes de credenciales y remedio de reautenticación usable desde ajustes para no-admin con MFA. Rol administrativo conservado. Análisis JSON corregido y15 entradas obsoletas retiradas del baseline, sin ampliar supresiones.29 pruebas backend y26 frontend nuevas; específico148/1428. Full1189/8604 en179s; Pint416/PHPStan0. Frontend final684/684, lint/typecheck/build exit0 (s01-mfa-configuration-frontend-final-verified.log). Browser4 contextos390/1440, claro/oscuro,8 POST simulados sin API real, retorno a la misma sección, sin desbordamiento ni errores de página; capturas móvil oscuro/escritorio claro inspeccionadas tras corregir el CTA (s01-mfa-reauth-browser-final.log). S01 y objetivo global activos; seguir incidente y completar gates por función antes de S02–S13.
+
+
+## S01 — incidente y protección de otra cuenta (02/10)
+
+B92–B94 corregidos: cookie/identidad ajena preservada, bearer con caducidad exclusiva y reintento manual tras fallo temporal con foco accesible. Contrato de respuesta validado (incluye current booleano); doble envío/estado destruido cubiertos. Copy aplicable a los avisos de contraseña y cierre de sesiones, con «exportaciones» en español.15 regresiones backend y15 frontend nuevas. Full1204/1204 backend,8712 aserciones,183,75s, sólo uvh_test (s01-incident-full-backend.log); Pint417/PHPStan sin errores, exit0 (s01-incident-static.log). Auditoría posterior no restaura accesos si falla; historial caído se recupera una sola vez. Browser4 contextos390/1440 claro/oscuro,8 POST todos simulados, foco y URL comprobados; no backend real ni proveedor. S01 sigue parcial y S02–S13 conservan alcance; siguiente bloque: verificación/reset/cambio de email y helpers pendientes.
+
+
+## S01 — email y optimización del contexto (02/10)
+
+B95–B101 corregidos: caducidad exclusiva en activación pending/legacy, reset y confirmación; cookie/identidad únicamente de la cuenta afectada; ack/current validados en UI; enlaces rechazados retiran formulario; nueva navegación renueva autoridad y destruye la pantalla anterior; ayudas Material dinámicas sin solapamiento.18 casos backend y44 frontend nuevos, baselines previos conservados en el informe. O01 centraliza respuesta de cierre y decoders; O02 centraliza ciclo de navegación para11 rutas y alias de invitación conservando reuse normal en otros formularios. Optimización añadida como requisito de S01–S13; no se afirma ganancia de rendimiento sin medición.
+
+Frontend final743/743, lint/tipos/build exit0 (s01-email-actions-full-frontend-layout-final.log). Browser12 contextos390/1440 claro/oscuro,32POST íntegramente simulados; reintento503→200,400terminal en activación/reset, foco, segundo enlace misma pestaña, URL sin bearer y geometría sin hints solapados; capturas definitivas inspeccionadas (s01-email-actions-browser-layout-final.log). Sin datos reales, proveedores, workers/scheduler, migración, commit/push/deploy ni E2E/release nuevo. S01 y objetivo global continúan parciales.
+
+
+S01 — B102–B105/O03: caducidad exclusiva perfil/reauth; confirmaciones forgot/resend estrictas; reset sólo activo/verificado y suelo temporal250ms; siete SELECT de sesión duplicados retirados y una recarga de perfil. Controles específicos73/429+solicitudes ampliadas6/52, frontend757/lint/typecheck/build correctos, Pint420/PHPStan0. Suite backend completa pendiente de cierre en s01-public-session-full-backend.log. No cierre S01/S02–S13 ni E2E/producción acreditados; referencia detallada en project-completion-audit-2026-09-30.md.
+
+Resultado final B102–B105/O03: full backend1242correctas/1fallo exclusivamente de declaración config; corregido sólo EnvTemplateContractTest y reejecutado4/395correctas, Pint fixtures finales correcto. No código productivo posterior al full ni suma de filtros como total. Frontend757/lint/tipos/build, Pint420/PHPStan0 y diff correcto. Cierre del lote de cambios, sin cierre de sistema ni objetivo.
+
+
+S01 B106–B111/O04: aislamiento de documentos/ejecución CAPTCHA, estados duplicate-ready/close, token control, borrado de credencial visible al navegar, rol admin posterior a await y foco lógico sin quitar elección posterior.31controlesfrontend nuevos; full788 y lint/tipos/build exit0, backend CAPTCHA20/63, browser4contextos/16POSTsimulados/foco/overflow/capturas finales. No bypass API demostrado ni entrega/proveedor real. Carga extra del iframe al reset es tradeoff, sin ganancia de velocidad afirmada. S01 parcial y objetivo global activo; referencia detallada en informe de completion.
+
+Ampliación B106 verificada: ready/challenge-open tardíos no reviven documento/ejecución;33pruebasfrontend nuevas, full790/lint/tipos/build correcto; browser4/16POSTsimulados/foco y otro foco conservado (s01-captcha-browser-definitive-keyboard.log). Backend sin cambio adicional,20/63controles. No se acreditan otros sistemas ni cierre global.
+
+
+S01 B112–B115/O05 (2026-10-02): seis confirmaciones de mutaciones ahora decodificadas en ejecución, evitando éxito falso en registro/corrección, logout, cambio de contraseña y cancelación/acuse de exportación. Cinco reutilizan ok:true y registro requiere user:null; no cambia admisión/autorización backend ni política de reintento.44regresiones (baseline34fallos/10correctas; green44), frontend834/lint/tipos/build correctos; backend66/915 en uvh_test y browser4contextos/16POST simulados correctos. Inventario440archivos/2141funciones con nombre/1128callbacks/3firmas con líneas y hashes, propietarios propuestos y conciliación pendiente; no es cobertura de revisión. Véase informe completion e inventario2026-10-02. S01 parcial, S02–S13/producción pendientes. Sin nuevo full backend ni entrega/proveedor real.
+
+
+Cierre definitivo de este lote (sin cierre de sistema): ajustado el aviso de logout del panel para no afirmar sesión vigente ante confirmación fallida. Después de ese último cambio:834/834frontend y lint/typecheck/build exit0 (s01-account-mutations-full-frontend-definitive.log). Inventario regenerado y440hashes contrastados con el árbol actual; Node --check y php -l correctos. Browser definitivo4contextos/16POST, foco y geometría, capturas390oscuro/1440claro inspeccionadas; backend66/915 específico, sin cambio productivo PHP. diff --check correcto. S01 parcial; objetivo activo, siguiente paso conciliación de funciones/helpers y UI MFA/cambios autenticados pendientes.

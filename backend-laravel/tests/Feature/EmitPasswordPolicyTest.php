@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Facades\Artisan;
+use Tests\Support\RepositoryRoot;
 use Tests\TestCase;
 
 /**
@@ -21,14 +22,8 @@ class EmitPasswordPolicyTest extends TestCase
         $generated = file_get_contents(storage_path('app/password-policy/uvh-password-policy.v1.js'));
         $this->assertNotFalse($generated, 'The artisan command must emit the bundle');
 
-        $committed = base_path('../frontend/public/uvh-password-policy.v1.js');
-        if (! is_file($committed)) {
-            // Frontend checkout not present in this environment; the bundle
-            // itself is still verified above.
-            $this->addToAssertionCount(1);
-
-            return;
-        }
+        $committed = RepositoryRoot::path().'/frontend/public/uvh-password-policy.v1.js';
+        $this->assertFileExists($committed);
 
         $this->assertSame(
             $generated,
@@ -42,7 +37,7 @@ class EmitPasswordPolicyTest extends TestCase
         Artisan::call('uvh:emit-password-policy', ['--force' => true]);
         $generated = file_get_contents(storage_path('app/password-policy/uvh-password-policy.v1.js'));
 
-        foreach (['"common"', '"patterns"', '"rejectWords"', '"feedback"', '"minLength"', '"maxLength"', '"acceptMinScore"', '"bands"'] as $key) {
+        foreach (['"common"', '"patterns"', '"rejectWords"', '"feedback"', '"minLength"', '"maxLength"', '"maxBytes"', '"acceptMinScore"', '"bands"'] as $key) {
             $this->assertStringContainsString($key, (string) $generated);
         }
     }

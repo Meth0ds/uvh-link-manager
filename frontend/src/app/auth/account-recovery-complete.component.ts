@@ -8,6 +8,7 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
+import { assessPassword, passwordMeterSteps, passwordStrengthLabel } from "./password-policy";
 import { authBearer } from "./auth-bearer";
 import { AuthShellComponent } from "./auth-shell.component";
 import { LatestRequest } from "../core/services/latest-request";
@@ -33,10 +34,11 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
                 <mat-icon>{{ hide() ? 'visibility_off' : 'visibility' }}</mat-icon>
               </button>
             </mat-form-field>
-            <div class="strength" role="meter" aria-label="Fortaleza estimada" aria-valuemin="0" aria-valuemax="4" [attr.aria-valuenow]="passwordScore()">
-              @for (part of [1, 2, 3, 4]; track part) { <span [class.met]="passwordScore() >= part"></span> }
+            <div class="strength" role="meter" aria-label="Fortaleza estimada" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="passwordScore()" [attr.aria-valuetext]="passwordLabel()">
+              @for (part of meterSteps; track part) { <span [class.met]="passwordScore() >= part"></span> }
               <small>{{ passwordLabel() }}</small>
             </div>
+            <p class="sub" role="status">{{ passwordAssessment().feedback }} La estimación no comprueba tus datos personales.</p>
             <mat-form-field appearance="outline">
               <mat-label>Repite la contraseña</mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
@@ -85,11 +87,10 @@ export class AccountRecoveryCompleteComponent {
     confirmation: ["", [Validators.required, Validators.pattern(/^RECUPERAR MI CUENTA$/)]],
   }, { validators: (group) => group.get("password")?.value === group.get("confirm")?.value ? null : { mismatch: true } });
   private readonly password = toSignal(this.form.controls.password.valueChanges, { initialValue: "" });
-  readonly passwordScore = computed(() => {
-    const value = this.password();
-    return [value.length >= 10, value.length >= 14, /[a-z]/.test(value) && /[A-Z]/.test(value), /\d/.test(value) || /[^A-Za-z0-9]/.test(value)].filter(Boolean).length;
-  });
-  readonly passwordLabel = computed(() => ["Introduce una contraseña", "Débil", "Mejorable", "Buena", "Fuerte"][this.passwordScore()]);
+  readonly meterSteps = passwordMeterSteps;
+  readonly passwordAssessment = computed(() => assessPassword(this.password()));
+  readonly passwordScore = computed(() => this.passwordAssessment().score);
+  readonly passwordLabel = computed(() => this.password() ? passwordStrengthLabel(this.passwordScore()) : "Introduce una contraseña");
 
   constructor() {
     this.location.replaceState("/auth/account-recovery/complete");

@@ -1,5 +1,5 @@
-import { Component, computed, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
-import { Location } from "@angular/common";
+import { afterNextRender, Component, computed, DestroyRef, ElementRef, inject, Injector, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
+import { DOCUMENT, Location } from "@angular/common";
 
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -16,6 +16,7 @@ import { PendingLinkIntentService } from "../core/services/pending-link-intent.s
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { authBearer } from "./auth-bearer";
 import { LatestRequest } from "../core/services/latest-request";
+import { decodePublicActionAcknowledgement } from "../core/services/public-action-response-decoders";
 
 /**
  * Activation of a pending registration: the email bearer plus the identity,
@@ -41,20 +42,20 @@ import { LatestRequest } from "../core/services/latest-request";
         @if (busy()) {
           <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
-        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="!token && done()">
-          {{ ok() ? 'verified_user' : (!token ? 'error_outline' : 'mark_email_read') }}
+        <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="failed() || ((!token || linkRejected()) && done())">
+          {{ ok() ? 'verified_user' : (failed() || !token || linkRejected() ? 'error_outline' : 'mark_email_read') }}
         </mat-icon>
-        <h2 id="verify-email-title">{{ ok() ? 'Email verificado' : (!token ? 'Enlace no disponible' : 'Confirmar email') }}</h2>
-        <p class="sub" role="status">{{ message() }}</p>
-        @if (token && !ok()) {
-          <form class="form" [formGroup]="form" (ngSubmit)="verify()" [attr.aria-busy]="busy()">
-            <mat-form-field appearance="outline">
+        <h2 id="verify-email-title">{{ ok() ? 'Email verificado' : (!token || linkRejected() ? 'Enlace no disponible' : 'Confirmar email') }}</h2>
+        <p class="sub" [attr.role]="failed() ? 'alert' : 'status'">{{ message() }}</p>
+        @if (token && !ok() && !linkRejected()) {
+          <form #actionForm class="form" [formGroup]="form" (ngSubmit)="verify()" [attr.aria-busy]="busy()">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>Nombre completo</mat-label>
               <input matInput formControlName="name" autocomplete="name" maxlength="80" />
-              <mat-hint>El nombre definitivo de la cuenta. No se conserva el que haya escrito quien registró la dirección.</mat-hint>
+              <mat-hint>El nombre que quieres mostrar en UVH.</mat-hint>
               @if (form.controls.name.invalid && form.controls.name.touched) { <mat-error>Utiliza entre 2 y 80 caracteres.</mat-error> }
             </mat-form-field>
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>Contraseña</mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="72" />
               <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
@@ -63,7 +64,7 @@ import { LatestRequest } from "../core/services/latest-request";
               <mat-hint>Es la contraseña definitiva de tu cuenta. Si ya elegiste una al registrarte, puedes repetirla.</mat-hint>
               @if (form.controls.password.invalid && form.controls.password.touched) { <mat-error>Utiliza entre 10 y 72 caracteres.</mat-error> }
             </mat-form-field>
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>Repite la contraseña</mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
             </mat-form-field>
@@ -76,15 +77,17 @@ import { LatestRequest } from "../core/services/latest-request";
             @if (form.controls.acceptTerms.hasError('required') && form.controls.acceptTerms.touched) {
               <div class="alert error" role="alert">Debes aceptar los términos vigentes para activar la cuenta.</div>
             }
-            <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()">
+            <button #submitButton mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()">
               {{ busy() ? 'Confirmando…' : (attempted() ? 'Volver a intentarlo' : 'Confirmar mi email') }}
             </button>
           </form>
         }
-        @if (done() && (ok() || !token)) {
-          <a mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">
+        @if (done() && ok()) {
+          <a #nextLink mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">
             {{ pendingLink() ? 'Iniciar sesión y crear mi enlace' : (pendingInvitation() ? 'Iniciar sesión y revisar invitación' : 'Iniciar sesión') }}
           </a>
+        } @else if (!token || linkRejected()) {
+          <a #nextLink mat-flat-button color="primary" routerLink="/auth" [queryParams]="{ mode: 'register' }">Solicitar otro enlace</a>
         }
       </div>
     </app-auth-shell>
@@ -100,11 +103,18 @@ export class VerifyEmailComponent {
   private invitations = inject(PendingInvitationService);
   private location = inject(Location);
   private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+  private readonly actionForm = viewChild<unknown, ElementRef<HTMLFormElement>>("actionForm", { read: ElementRef });
+  private readonly submitButton = viewChild<unknown, ElementRef<HTMLButtonElement>>("submitButton", { read: ElementRef });
+  private readonly nextLink = viewChild<unknown, ElementRef<HTMLAnchorElement>>("nextLink", { read: ElementRef });
 
   readonly busy = signal(false);
   readonly done = signal(false);
   readonly ok = signal(false);
   readonly attempted = signal(false);
+  readonly failed = signal(false);
+  readonly linkRejected = signal(false);
   readonly hide = signal(true);
   readonly message = signal("Confirma que tú creaste esta cuenta y elige su identidad y contraseña. Si no reconoces este registro, no continúes.");
   readonly pendingLink = this.intents.pending;
@@ -134,10 +144,12 @@ export class VerifyEmailComponent {
   }
 
   async verify(): Promise<void> {
-    if (!this.token || this.busy() || this.ok() || this.form.invalid) return;
+    if (!this.token || this.busy() || this.ok() || this.linkRejected() || this.form.invalid) return;
+    const ownedFocus = this.actionForm()?.nativeElement.contains(this.document.activeElement) ?? false;
     const request = this.requests.begin(this.token);
     this.busy.set(true);
     this.attempted.set(true);
+    this.failed.set(false);
     try {
       // Identity, legal acceptance and password all cross here: the backend
       // installs them at activation and re-stamps the acceptance with this
@@ -150,10 +162,11 @@ export class VerifyEmailComponent {
         acceptTerms: true,
         termsVersion: TERMS_VERSION,
         privacyVersion: PRIVACY_VERSION,
-      });
+      }, decodePublicActionAcknowledgement);
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.done.set(true);
+      this.form.reset();
       this.message.set(
         this.pendingLink()
           ? "Tu email quedó confirmado. Inicia sesión para crear el enlace que has guardado."
@@ -164,9 +177,20 @@ export class VerifyEmailComponent {
     } catch (err) {
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(false);
+      this.failed.set(true);
+      if (err instanceof ApiRequestError && err.status === 400) this.linkRejected.set(true);
       this.message.set(err instanceof ApiRequestError ? err.message : "El enlace de verificación no es válido o ha caducado.");
     } finally {
-      if (this.requests.isCurrent(request, this.token)) this.busy.set(false);
+      if (this.requests.isCurrent(request, this.token)) {
+        this.busy.set(false);
+        if (ownedFocus) {
+          afterNextRender(() => {
+            if (!this.requests.isCurrent(request, this.token) || this.document.activeElement !== this.document.body) return;
+            const next = this.ok() || this.linkRejected() ? this.nextLink() : this.submitButton();
+            next?.nativeElement.focus({ preventScroll: true });
+          }, { injector: this.injector });
+        }
+      }
     }
   }
 }

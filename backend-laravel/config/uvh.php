@@ -57,6 +57,8 @@ return [
     // las ramas se amortiguan hasta el mismo suelo, y el valor no es superficie
     // de operador: bajarlo reabriría el oráculo que existe para cerrar.
     'resend_verification_min_duration_ms' => (int) env('RESEND_VERIFICATION_MIN_DURATION_MS', 250),
+    // Apply the same latency floor to all generic password-reset requests.
+    'password_reset_min_duration_ms' => (int) env('PASSWORD_RESET_MIN_DURATION_MS', 250),
     // Techo operativo del documento de una exportación automática, en bytes de
     // texto plano. No es un límite de producto —la generación por bloques no
     // tiene el tope de filas ni el de 12 MiB de antes—: protege el volumen

@@ -23,7 +23,7 @@ export const adminGuard: CanActivateFn = async (_route, state) => {
   if (auth.user()?.isAdmin !== true) return router.createUrlTree(["/forbidden"]);
   try {
     const status = await auth.mfaSessionStatus();
-    if (!status.enabled) return router.createUrlTree(["/forbidden"]);
+    if (auth.user()?.isAdmin !== true || !status.enabled) return router.createUrlTree(["/forbidden"]);
     if (status.fresh) return true;
     return router.createUrlTree(["/auth/reauthenticate"], {
       queryParams: { returnTo: safeReturnTo(state.url) },

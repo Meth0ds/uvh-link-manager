@@ -28,13 +28,13 @@ import { LatestRequest } from "../core/services/latest-request";
   template: `
     <app-auth-shell>
       <section class="card" aria-labelledby="reauth-title">
-        <span class="step-kicker">ADMINISTRACIÓN / VERIFICACIÓN</span>
+        <span class="step-kicker">{{ administrativeAccess ? 'ADMINISTRACIÓN / VERIFICACIÓN' : 'SEGURIDAD / VERIFICACIÓN' }}</span>
         @if (initializing() || busy()) {
           <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
-        <mat-icon class="icon" aria-hidden="true">admin_panel_settings</mat-icon>
+        <mat-icon class="icon" aria-hidden="true">{{ administrativeAccess ? 'admin_panel_settings' : 'verified_user' }}</mat-icon>
         <h2 id="reauth-title">Confirma que eres tú</h2>
-        <p class="sub">Vas a entrar en administración. Confirma tu contraseña y un segundo factor para realizar acciones sensibles con una verificación reciente.</p>
+        <p class="sub">{{ administrativeAccess ? 'Vas a entrar en administración.' : 'Vas a realizar una acción sensible en tu cuenta.' }} Confirma tu contraseña y un segundo factor para continuar con una verificación reciente.</p>
         @if (initializing()) { <p class="auth-note" role="status">Comprobando la sesión y los requisitos de acceso. Todavía no necesitas introducir ningún código.</p> }
 
         @if (!initializing() && ready()) {
@@ -60,7 +60,7 @@ import { LatestRequest } from "../core/services/latest-request";
               <div class="alert error" role="alert">{{ error() }}</div>
             }
             <button mat-flat-button color="primary" class="submit" type="submit" [disabled]="form.invalid || busy()" [attr.aria-busy]="busy()">
-              {{ busy() ? 'Verificando…' : 'Continuar a administración' }}
+              {{ busy() ? 'Verificando…' : administrativeAccess ? 'Continuar a administración' : 'Confirmar y continuar' }}
             </button>
           </form>
         }
@@ -70,7 +70,7 @@ import { LatestRequest } from "../core/services/latest-request";
           <button mat-flat-button type="button" (click)="retryInitialization()">Reintentar comprobación</button>
         }
         <a class="back" routerLink="/app/dashboard"><mat-icon aria-hidden="true">arrow_back</mat-icon>Volver al panel</a>
-        <p class="auth-note">Esta comprobación no cierra tu sesión general. Solo confirma el acceso reciente a la consola administrativa.</p>
+        <p class="auth-note">Esta comprobación no cierra tu sesión. Confirma tu identidad antes de continuar con acciones sensibles.</p>
       </section>
     </app-auth-shell>
   `,
@@ -96,7 +96,8 @@ export class MfaReauthenticateComponent {
     password: ["", [Validators.required, Validators.maxLength(72)]],
     factorCode: ["", [Validators.required, Validators.maxLength(24)]],
   });
-  private readonly returnTo = safeReturnTo(this.route.snapshot.queryParamMap.get("returnTo") ?? "/app/admin");
+  private readonly returnTo = safeReturnTo(this.route.snapshot.queryParamMap.get("returnTo") ?? "/app/dashboard");
+  readonly administrativeAccess = /^\/app\/admin(?:\/|[?#]|$)/.test(this.returnTo);
 
   constructor() {
     void this.initialize();
@@ -160,7 +161,7 @@ export class MfaReauthenticateComponent {
         );
         return;
       }
-      if (this.auth.user()?.isAdmin !== true) {
+      if (this.administrativeAccess && this.auth.user()?.isAdmin !== true) {
         await this.navigateOnce(() => this.router.navigate(["/forbidden"]), current);
         return;
       }

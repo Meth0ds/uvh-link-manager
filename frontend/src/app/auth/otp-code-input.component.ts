@@ -4,8 +4,9 @@ import { FormControl, ReactiveFormsModule } from "@angular/forms";
 
 /**
  * Six individual boxes for a one-time code. The control stays the single owner
- * of the value (the boxes are a projection of it), so parent validators and
- * parent resets never desynchronize from what is on screen.
+ * of the submitted value. Local slots preserve holes during editing; the
+ * control receives their digits and stays invalid until all six are filled.
+ * Parent writes/resets replace the slots, so neither can retain a stale code.
  *
  * Input contract: digits only, exactly 6; the first box answers to the label
  * "Código de autenticación" so the whole code can also be typed or pasted into
@@ -67,26 +68,26 @@ export class OtpCodeInputComponent implements OnInit {
 
   // Inputs are not set until after construction, so the mirror starts empty
   // and attaches to the control in ngOnInit, when it exists.
-  private readonly mirror = signal<string | null>(null);
+  private readonly mirror = signal<readonly string[]>(["", "", "", "", "", ""]);
   private readonly destroyRef = inject(DestroyRef);
+  private writingControl = false;
   // Completion is keyed by the code itself: retyping over a full code (the
   // retry-after-error case) must fire again, but the same code twice must not.
   private lastEmittedCode: string | null = null;
 
-  protected readonly boxes = computed<readonly string[]>(() => {
-    const digits = (this.mirror() ?? "").replace(/\D/g, "").slice(0, 6).split("");
-    return [0, 1, 2, 3, 4, 5].map((index) => digits[index] ?? "");
-  });
+  protected readonly boxes = computed(() => this.mirror());
 
   constructor() {
     afterNextRender(() => this.focusBox(0));
   }
 
   ngOnInit(): void {
-    this.mirror.set(this.control.value);
+    this.projectControl(this.control.value);
     this.control.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((value) => this.mirror.set(value));
+      .subscribe((value) => {
+        if (!this.writingControl) this.projectControl(value);
+      });
   }
 
   onInput(event: Event, index: number): void {
@@ -131,21 +132,35 @@ export class OtpCodeInputComponent implements OnInit {
 
   /** Writes `text` starting at `start`, replacing from there; moves focus to `focusIndex`. */
   private writeDigits(start: number, text: string, focusIndex: number): void {
-    const current = (this.control.value ?? "").replace(/\D/g, "").split("");
-    const next = [0, 1, 2, 3, 4, 5].map((index) => current[index] ?? "");
-    for (let offset = 0; offset < text.length; offset += 1) {
+    const next = [...this.mirror()];
+    if (text === "") next[start] = "";
+    for (let offset = 0; offset < Math.min(text.length, 6 - start); offset += 1) {
       next[start + offset] = text[offset] ?? "";
     }
     const code = next.join("");
     const nowComplete = next.every((digit) => digit !== "");
+    this.mirror.set(next);
     if (this.control.value !== code) {
-      this.control.setValue(code);
+      // Our own synchronous valueChanges emission must not compact the holes.
+      this.writingControl = true;
+      try {
+        this.control.setValue(code);
+      } finally {
+        this.writingControl = false;
+      }
     }
+    if (!nowComplete) this.lastEmittedCode = null;
     if (nowComplete && this.lastEmittedCode !== code) {
       this.lastEmittedCode = code;
       this.completed.emit();
     }
     this.focusBox(focusIndex);
+  }
+
+  private projectControl(value: string | null): void {
+    const digits = (value ?? "").replace(/\D/g, "").slice(0, 6);
+    this.mirror.set([0, 1, 2, 3, 4, 5].map(index => digits[index] ?? ""));
+    this.lastEmittedCode = null;
   }
 
   private focusBox(index: number): void {

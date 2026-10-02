@@ -24,12 +24,14 @@ import { Router } from "@angular/router";
 interface Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
 }
 
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((onResolve) => { resolve = onResolve; });
-  return { promise, resolve };
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((onResolve, onReject) => { resolve = onResolve; reject = onReject; });
+  return { promise, resolve, reject };
 }
 
 const TOKEN = "t".repeat(43);
@@ -80,7 +82,7 @@ describe("public auth views async safety", () => {
 
   it("does not repeat a completed password reset", async () => {
     const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
-    api.post.and.resolveTo({});
+    api.post.and.resolveTo({ ok: true, current: false });
     TestBed.configureTestingModule({ imports: [ResetPasswordComponent], providers: sharedProviders(api, `token=${TOKEN}`) });
     const fixture = TestBed.createComponent(ResetPasswordComponent);
     fixture.componentInstance.form.setValue({ password: "Example-only-password", confirm: "Example-only-password" });
@@ -229,6 +231,66 @@ describe("public auth views async safety", () => {
     expect(component.done()).toBeFalse();
   });
 
+  for (const failure of [new ApiRequestError("Sin conexión", 0), new ApiRequestError("Espera antes de volver a intentar", 429), new ApiRequestError("Servidor no disponible", 500), new ApiRequestError("Admisión no disponible", 503), new Error("Connection interrupted")]) {
+    it(`allows manual recovery confirmation retry after ${failure instanceof ApiRequestError ? failure.status : "network failure"}`, async () => {
+      const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+      api.post.and.returnValues(Promise.reject(failure), Promise.resolve({ ok: true, message: "Expediente abierto" }));
+      TestBed.configureTestingModule({ imports: [AccountRecoveryConfirmComponent], providers: sharedProviders(api, `token=${TOKEN}`) });
+      const fixture = TestBed.createComponent(AccountRecoveryConfirmComponent);
+      const component = fixture.componentInstance;
+
+      await component.confirm();
+      fixture.detectChanges();
+      expect(component.ok()).toBeFalse();
+      const retry = fixture.nativeElement.querySelector("button.submit") as HTMLButtonElement | null;
+      expect(retry?.textContent).toContain("Reintentar confirmación");
+      expect(retry?.disabled).toBeFalse();
+      await component.confirm();
+      fixture.detectChanges();
+      expect(api.post).toHaveBeenCalledTimes(2);
+      expect(component.ok()).toBeTrue();
+      expect(fixture.nativeElement.querySelector("button.submit")).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain("Expediente abierto");
+    });
+  }
+
+  for (const outcome of ["retry", "success", "another control"] as const) {
+    it(`keeps keyboard focus useful after recovery confirmation: ${outcome}`, async () => {
+      const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+      const response = deferred<{ ok: true; message: string }>();
+      api.post.and.returnValue(response.promise);
+      TestBed.configureTestingModule({ imports: [AccountRecoveryConfirmComponent], providers: sharedProviders(api, `token=${TOKEN}`) });
+      const fixture = TestBed.createComponent(AccountRecoveryConfirmComponent);
+      fixture.detectChanges();
+      const button = fixture.nativeElement.querySelector("button.submit") as HTMLButtonElement;
+      button.focus();
+      const confirmation = fixture.componentInstance.confirm();
+      fixture.detectChanges();
+      const other = fixture.nativeElement.querySelector('[role="switch"]') as HTMLButtonElement;
+      if (outcome === "another control") other.focus();
+      if (outcome === "success") response.resolve({ ok: true, message: "Expediente abierto" });
+      else response.reject(new ApiRequestError("Inténtalo de nuevo", 503));
+      await confirmation;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const expected = outcome === "another control" ? other : fixture.nativeElement.querySelector(outcome === "retry" ? "button.submit" : 'a[mat-flat-button]');
+      expect(document.activeElement).toBe(expected);
+    });
+  }
+
+  it("keeps an invalid recovery confirmation final without repeating the bearer", async () => {
+    const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+    api.post.and.rejectWith(new ApiRequestError("El enlace ha caducado", 400));
+    TestBed.configureTestingModule({ imports: [AccountRecoveryConfirmComponent], providers: sharedProviders(api, `token=${TOKEN}`) });
+    const fixture = TestBed.createComponent(AccountRecoveryConfirmComponent);
+    await fixture.componentInstance.confirm();
+    await fixture.componentInstance.confirm();
+    fixture.detectChanges();
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.querySelector("button.submit")).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain("El enlace ha caducado");
+  });
+
   it("does not clear recovery credentials after a destroyed completion", async () => {
     const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
     const response = deferred<{ ok: true; message: string }>();
@@ -290,7 +352,7 @@ describe("public auth views async safety", () => {
 
     const confirmation = component.confirm();
     fixture.destroy();
-    response.resolve({});
+    response.resolve({ ok: true, current: true });
     await confirmation;
 
     expect(auth.accountSignedOut).toHaveBeenCalledOnceWith(7);
@@ -342,7 +404,7 @@ describe("public auth views async safety", () => {
 
   it("reconciles incident signout without updating a destroyed view", async () => {
     const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
-    const response = deferred<{ ok: true; message: string }>();
+    const response = deferred<{ ok: true; message: string; current: boolean }>();
     api.post.and.returnValue(response.promise);
     const auth = jasmine.createSpyObj<AuthService>("AuthService", ["sessionGeneration", "accountSignedOut"]);
     auth.sessionGeneration.and.returnValue(9);
@@ -355,7 +417,7 @@ describe("public auth views async safety", () => {
 
     const revocation = component.revoke();
     fixture.destroy();
-    response.resolve({ ok: true, message: "revoked" });
+    response.resolve({ ok: true, message: "revoked", current: true });
     await revocation;
 
     expect(auth.accountSignedOut).toHaveBeenCalledOnceWith(9);
@@ -441,11 +503,21 @@ describe("public auth views async safety", () => {
       api.post.and.rejectWith(new ApiRequestError("No disponible", status));
       await component.confirm();
       expect(auth.accountSignedOut).not.toHaveBeenCalled();
-      api.post.and.resolveTo({ ok: true } as never);
+      api.post.and.resolveTo({ ok: true, current: true } as never);
       await component.confirm();
       expect(api.post).toHaveBeenCalledTimes(status === 400 ? 1 : 2);
       expect(component.ok()).toBe(status !== 400);
       if (status !== 400) expect(auth.accountSignedOut).toHaveBeenCalledOnceWith(1);
+    });
+  }
+
+  for (const password of ["Password-Copper-Magnolia-73!", "Orbit-Login-Copper-73!", "Orbit-aaaa-Copper-73!"]) {
+    it(`does not label a forbidden recovery password strong: ${password}`, () => {
+      const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
+      TestBed.configureTestingModule({ imports: [AccountRecoveryCompleteComponent], providers: sharedProviders(api, `token=${TOKEN}`) });
+      const component = TestBed.createComponent(AccountRecoveryCompleteComponent).componentInstance;
+      component.form.controls.password.setValue(password);
+      expect(component.passwordLabel()).toBe("Débil");
     });
   }
 

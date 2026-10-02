@@ -203,7 +203,7 @@ export class PanelComponent {
       await this.auth.logout();
       await this.router.navigate(["/"]);
     } catch {
-      this.snackbar.open("No se pudo confirmar el cierre de sesión. Tu acceso sigue abierto; vuelve a intentarlo.", "Cerrar", { duration: 6000 });
+      this.snackbar.open("No se pudo confirmar el cierre de sesión. Vuelve a intentarlo.", "Cerrar", { duration: 6000 });
     } finally {
       this.logoutBusy.set(false);
     }

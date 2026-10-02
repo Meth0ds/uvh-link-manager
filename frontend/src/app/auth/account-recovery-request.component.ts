@@ -10,6 +10,7 @@ import { AuthShellComponent } from "./auth-shell.component";
 import { HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 import { LatestRequest } from "../core/services/latest-request";
 import { decodePublicConfig } from "../core/services/public-response-decoders";
+import { decodePublicActionMessage } from "../core/services/public-action-response-decoders";
 
 interface PublicAuthConfig {
   hcaptcha?: { enabled?: boolean; siteKey?: string | null };
@@ -104,7 +105,7 @@ export class AccountRecoveryRequestComponent {
       await this.api.post("/api/v1/auth/account-recovery/request", {
         email,
         captchaToken: this.captchaToken(),
-      });
+      }, decodePublicActionMessage);
       if (!this.submitRequests.isCurrent(request, email)) return;
       this.sent.set(true);
     } catch (error) {

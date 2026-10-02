@@ -42,8 +42,9 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 | POST | `/verify-email` | — | `{ token, password, name, acceptTerms, termsVersion, privacyVersion }` → decide la identidad definitiva (nombre), registra la aceptación de las versiones legales vigentes con la fecha de ESTA activación, decide la contraseña definitiva de la cuenta y crea la cuenta desde cero: usuario verificado, workspace autogenerado con el nombre definitivo, cuota y membresía. Consume el bearer token y deja morir la inscripción entera —fila pendiente y todos sus bearers— en la misma transacción. Nada de lo que el registro anónimo propuso —nombre, workspace, evidencia contractual ni contraseña— llega a la cuenta: lo decide quien abre el buzón tras la prueba de posesión (anti pre-hijack). El acceso posterior exige un login nuevo. |
 | POST | `/resend-verification` | — / sesión | Reenvía el correo de verificación con `{ email }` cuando no hay sesión: es la entrada diseñada para recuperar un registro pendiente, visible siempre en el panel de acceso (no depende de ninguna señal del servidor). La respuesta pública es genérica (anti-enumeración) y aplica cooldown de 60 s. |
 | POST | `/forgot-password` | — | `{ email }` → envía enlace (respuesta idéntica siempre, anti-enumeración). |
-| POST | `/reset-password` | — | `{ token, password }` → restablece y revoca sesiones; el token se consume atómicamente y solo puede funcionar una vez. |
+| POST | `/reset-password` | — | `{ token, password }` → `{ ok: true, current: boolean }`. Restablece y revoca sesiones del dueño; el token debe vencer después de `now`, se consume atómicamente y sólo funciona una vez. Sólo borra cookie/reconcilia identidad del navegador si `current` es true. |
 | POST | `/account-recovery/complete` | — | `{ token, password, confirmation: "RECUPERAR MI CUENTA" }`; finaliza un expediente con dos aprobadores vigentes, rota credenciales, retira MFA y rol admin, y admite el aviso de incidente en el mismo commit. |
+| POST | `/security-incident/revoke` | bearer de emergencia | `{ token }` → `{ ok: true, message, current: boolean }`. Requiere bearer `security_revoke` sin consumir y con `expires_at > now`. Revoca accesos y operaciones pendientes del dueño; sólo borra la cookie y reconcilia la identidad del navegador si `current` es true. No autentica, cambia el email, desactiva MFA ni levanta un bloqueo administrativo. |
 | GET | `/me` | sesión | `{ user }`. |
 | GET | `/mfa/session` | sesión | `{ enabled, fresh, verifiedAt, expiresAt }`; sólo expone la frescura del factor de la sesión actual. |
 | POST | `/mfa/reauthenticate` | sesión verificada | `{ password, factorCode }`; renueva la ventana administrativa con TOTP o recovery actual sin rotar la cookie. |
@@ -51,16 +52,16 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 | POST | `/change-password` | sesión | `{ current, newPassword, factorCode? }`; step-up si MFA está activo (ver «Verificación reforzada»), revoca las demás sesiones y avisa por email. |
 | POST | `/change-email` | sesión verificada | `{ newEmail, password, factorCode? }`; step-up si MFA está activo, reserva el buzón una hora y envía confirmación sin cambiar todavía el acceso. |
 | POST | `/change-email/cancel` | sesión verificada | `{ password, factorCode? }`; step-up si MFA está activo, cancela la reserva pendiente. |
-| POST | `/confirm-email-change` | — | `{ token }`; confirma el nuevo buzón, cambia la identidad y cierra todas las sesiones. La SPA exige clic explícito. |
+| POST | `/confirm-email-change` | — | `{ token }` → `{ ok: true, current: boolean }`; confirma el nuevo buzón, cambia la identidad y cierra las sesiones del dueño. Requiere caducidad exclusiva. La SPA exige clic explícito y sólo reconcilia la sesión afectada; otra cuenta abierta conserva su cookie. |
 | GET | `/sessions` | sesión | `{ sessions[], truncated }`, hasta 100, incluyendo `current` para identificar el navegador actual. |
 | POST | `/sessions/:id/revoke` | sesión | Revoca una sesión; si es la actual devuelve `current: true`, borra la cookie y el panel cierra sesión inmediatamente (también sincroniza otras pestañas). |
 | POST | `/sessions/revoke-others` | sesión | Cierre masivo conservando la actual; `{ ok, revoked }` con el recuento real de filas cerradas (cero si no había otras) e idempotente. Si cierra sesiones, admite en la misma transacción el aviso de seguridad por email (enlace de incidente 24 h); sin aviso entregable no se cierra nada (`503`). |
 | POST | `/sessions/revoke-all` | sesión | Cierre total incluida la actual; `{ ok, revoked }`, borra la cookie y la cuenta queda fuera en todos los dispositivos. Mismo aviso de seguridad atómico que `revoke-others`. |
-| POST | `/mfa/setup` | sesión | `{ password, code? }` → `{ secret, uri }`; `code` es obligatorio al reconfigurar MFA activo y la configuración pendiente caduca a los diez minutos. |
-| POST | `/mfa/enable` | sesión | `{ code }` → `{ recoveryCodes[] }`; los códigos sólo se entregan en esta respuesta y después se almacenan mediante hash. |
-| POST | `/mfa/cancel-setup` | sesión | Invalida un secreto MFA pendiente que todavía no se ha activado. |
-| POST | `/mfa/recovery-codes/regenerate` | sesión + MFA | `{ password, factorCode }`; invalida el juego anterior, entrega `recoveryCodes[]` nuevos una sola vez y revoca otras sesiones. |
-| POST | `/mfa/disable` | sesión | `{ password, code }`; exige contraseña y TOTP o recovery actual (step-up con ventana fresca). |
+| POST | `/mfa/setup` | sesión vigente + email verificado bajo lock | `{ password, code? }` → `{ secret, uri }`; con MFA activo exige factor actual y ventana fresca. Preparación con límite por cuenta; pendiente válido durante diez minutos, hasta su fecha de caducidad exclusiva. |
+| POST | `/mfa/enable` | sesión vigente + email verificado bajo lock | `{ code }` → `{ recoveryCodes[] }`; exige pendiente no caducado, TOTP no consumido y presupuesto por cuenta disponible. Códigos nuevos sólo en esta respuesta; se almacenan como hash. |
+| POST | `/mfa/cancel-setup` | sesión vigente + email verificado bajo lock | Invalida sólo el secreto pendiente; devuelve `{ ok: true }`. |
+| POST | `/mfa/recovery-codes/regenerate` | sesión vigente + email verificado + MFA | `{ password, factorCode }`; invalida el juego anterior, entrega `recoveryCodes[]` nuevos una sola vez y revoca otras sesiones. |
+| POST | `/mfa/disable` | sesión vigente + email verificado bajo lock | `{ password, code }`; contraseña y TOTP o recovery actual con ventana fresca; devuelve `{ ok: true }`. Rol de administrador de plataforma debe retirarse antes. |
 | GET | `/data-export` | sesión verificada | Estado de la solicitud de exportación más reciente, con `stage` (`collecting\|analytics\|encoding\|encrypting\|finalizing`) mientras se genera y `failureReason` (`automated_size_limit`, `generation_error`, `stalled`) cuando falló. |
 | GET | `/data-export/history` | sesión verificada | `{ exports[] }`, las últimas diez exportaciones con la misma forma que `/data-export` (`stage` sólo en las vivas). Sólo estado y fechas: sin rutas de artefacto ni generaciones de correo. |
 | POST | `/data-export` | sesión + step-up | `{ password, factorCode? }`; tras el step-up encola el job directamente y devuelve `processing`. El email posterior sólo anuncia que el archivo está listo, no autoriza nada. |
@@ -108,6 +109,13 @@ persistidos; el reintento exige que sigan vigentes. Un TOTP consumido en caché
 mantiene su marca antirreplay incluso si SQL revierte: usar el siguiente código.
 Un `200` no acredita recepción del email; el proveedor se invoca posteriormente.
 
+El control de emergencia se ejecuta tras una acción explícita. Una respuesta
+inválida nunca acredita éxito. El navegador permite reintentos manuales tras
+fallos de conexión, `429` o errores `5xx`; un bearer consumido o caducado devuelve
+`400` y ofrece recuperación. La revocación ya confirmada permanece aunque falle
+la auditoría posterior: el fallo de admisión se registra sin restaurar accesos;
+si sólo falla el historial, el evento queda en el outbox para su recuperación.
+
 La misma admisión obligatoria se aplica a alta/sustitución/desactivación MFA,
 regeneración de recovery codes y solicitud/confirmación de cambio de email.
 Si falla guardar un aviso, se devuelve `503` y no se confirma la mutación ni se
@@ -126,10 +134,10 @@ confirmación autoritativa; no se reactivará la eliminación para reintentar un
 ### Verificación reforzada (step-up)
 
 Toda operación que pide contraseña y un factor (`factorCode`, o `code` en
-`/mfa/disable`) —tokens API, purga, transferencia/eliminación de workspace,
+`/mfa/disable` y la reconfiguración `/mfa/setup`) —tokens API, purga, transferencia/eliminación de workspace,
 cambio y cancelación de email, cambio de contraseña, desactivación de MFA,
 exportación y eliminación de cuenta, regeneración de recovery codes y
-reautenticación— aplica el mismo contrato:
+reautenticación y preparación de un factor— aplica el mismo contrato:
 
 - **Presupuesto por cuenta y operación**: 10 fallos de verificación cada 15
   minutos, contados por cuenta —no por sesión— e incluyendo fallos de
@@ -137,8 +145,9 @@ reautenticación— aplica el mismo contrato:
   eliminación de workspace y regeneración de recovery codes comparten un mismo
   presupuesto; cambio de email (incluida su cancelación), cambio de contraseña,
   desactivación de MFA, exportación, eliminación de cuenta y reautenticación
-  tienen el suyo propio, y el login MFA el suyo, de modo que los fallos de una
-  operación nunca bloquean el acceso a la cuenta. Agotado → `429` con `Retry-After` y
+  tienen el suyo propio, como preparación y activación de MFA y login MFA.
+  Además, todos cargan un límite global de 20 fallos por cuenta cada 15 minutos;
+  alcanzarlo bloquea temporalmente también otras superficies, incluido login MFA. Agotado → `429` con `Retry-After` y
   `{ "error": "Demasiados intentos. Espera unos minutos.",
   "retryAfterSeconds": n }`. Un éxito restaura el presupuesto completo.
 - **Ventana fresca**: exige que `mfa_verified_at` sea reciente
@@ -148,6 +157,13 @@ reautenticación— aplica el mismo contrato:
   Un step-up exitoso renueva la ventana.
 - El factor se verifica con antirreplay por contador (TOTP) y los recovery
   codes son de un solo uso salvo que la operación reemplace el juego completo.
+
+La primera configuración sin MFA activo sólo exige contraseña válida. Activar
+un factor pendiente tiene su presupuesto propio (`mfa-enable`): 10 fallos/15 min
+y el mismo límite global de 20. Rechaza la igualdad exacta de caducidad, conserva
+el factor vigente hasta éxito y no publica códigos nuevos si falla el commit.
+Una caída del contador o del control de replay falla de forma cerrada.
+
 
 ## Derechos sobre datos — `/api/v1/auth/privacy-requests`
 
@@ -525,3 +541,22 @@ de reautenticación y vuelve a la ruta interna original tras confirmar.
 > devuelve una **página HTML** con status 404 (no `{ error }`); solo `/api/v1/*` usa el sobre JSON.
 > Ver `backend-laravel/tests/Feature/ApiParityTest.php`.
 | POST | `/r/:alias/unlock` | `{ password }` para enlaces protegidos. Con `Accept: application/json`: `{ ok: true }` 200 y la cookie de desbloqueo, o el sobre `{ error }` con 403/404/422/429 sin cambios. Con `Accept: text/html` el formulario se sirve y contesta como página en todos sus estados —contraseña incorrecta (403), contraseña fuera de rango (422), enlace inexistente (404) y límite de intentos agotado (429)—, y el acierto responde **200** con una pantalla que continúa al enlace: un `302` no sirve ahí porque `form-action 'self'` se comprueba en cada salto de la cadena de un envío de formulario y el destino está en otro origen, así que el navegador rechazaba el salto final y dejaba al visitante en la puerta. El presupuesto de intentos es **por enlace**: la clave normaliza el alias (`/r/ADV-X/unlock` y `/r/adv-x/unlock` comparten límite). El documento vive en `app/Support/VisitorPage.php`. |
+
+
+Las pantallas de activación/reset/cambio de email validan el acuse `ok: true`;
+reset y cambio exigen además `current` booleano. Un cuerpo incompleto o HTML no
+acredita éxito. Tras `400` por bearer inválido/caducado, activación y reset
+retiran el formulario y ofrecen otro enlace. Errores de validación conservan
+el formulario y los temporales permiten reintento explícito. El foco de teclado
+sigue la acción de reintento o el enlace siguiente. Las rutas con autoridad
+capturada al entrar renuevan el componente y destruyen tareas del anterior al
+navegar a otro enlace: no conservan el bearer ni credenciales del primero.
+
+
+Solicitudes públicas de correo: forgot-password y resend-verification devuelven {ok:true} sin revelar existencia. El frontend exige ese contrato en ejecución. Forgot sólo admite reset de cuentas activas verificadas; reset-password rechaza bearers de cuenta sin verificar. Todas las respuestas genéricas de forgot comparten uvh.password_reset_min_duration_ms (PASSWORD_RESET_MIN_DURATION_MS,250ms por defecto); validación422/CAPTCHA no están dentro de esa respuesta genérica. El suelo mitiga diferencias temporales sin garantizar latencia idéntica bajo carga. Perfil y reautenticación exigen sesión con expires_at estrictamente posterior al momento de revalidación bajo lock.
+
+
+CAPTCHA: el widget no concede autoridad por un mensaje de iframe. Sólo recibe source/canal del documento vigente; comprobación invisible exige ejecución actual despachada. Backend mantiene verificación de token con sitekey/hostname/replay del proveedor y fallback local limitado. Retirar/resetear un reto crea documento y canal nuevos; un resultado antiguo no completa una solicitud posterior. El guard de navegación administrativa revalida el rol local tras esperar MFA; la autorización efectiva sigue en backend.
+
+
+Confirmaciones de cliente: register exige {user:null} (resultado pendiente, sin sesión; forma uniforme también para destinos ocupados). change-registration-email, logout, change-password, data-export/cancel y data-export/download/acknowledge exigen {ok:true}, con booleano true. Un 2xx con cuerpo inválido genera ApiRequestError502 sin conservar el cuerpo ni afirmar éxito o rollback. Sólo la confirmación válida de logout limpia la identidad/workspace local y anuncia invalidación entre pestañas; resultados tardíos de operaciones autenticadas respetan la generación de sesión.

@@ -106,7 +106,7 @@ class PasswordPolicyTest extends TestCase
 
         $this->postJson('/api/v1/auth/reset-password', ['token' => $plain, 'password' => 'tiovivo-cobrizo-astilla-42'])
             ->assertStatus(200)
-            ->assertExactJson(['ok' => true]);
+            ->assertExactJson(['ok' => true, 'current' => false]);
     }
 
     public function test_change_password_rejects_weak_password(): void

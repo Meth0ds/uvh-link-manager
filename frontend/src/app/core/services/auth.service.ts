@@ -9,10 +9,12 @@ import {
   decodeDataExportStatusResponse,
   decodeLoginOutcome,
   decodeLoginResponse,
+  decodeMfaAcknowledgement,
   decodeMfaReauthentication,
   decodeMfaSessionStatus,
   decodeMfaSetup,
   decodeRecoveryCodes,
+  decodeRegistrationResponse,
   decodeRequiredDataExportResponse,
   decodeSessionRevocation,
   decodeSessionsBulkRevocation,
@@ -20,6 +22,8 @@ import {
   decodeWorkspacesResponse,
 } from "./auth-response-decoders";
 import type { AccountDeletionImpact, AuthUser, DataExportStatus, SessionList, Workspace } from "../models";
+
+import { decodePublicActionAcknowledgement } from "./public-action-response-decoders";
 
 const AUTH_INVALIDATION_KEY = "uvh.auth.invalidated";
 
@@ -241,11 +245,11 @@ export class AuthService {
       email,
       password,
       ...antiBot,
-    });
+    }, decodeRegistrationResponse);
   }
 
   async resendVerification(email: string | undefined, captchaToken: string): Promise<void> {
-    await this.api.post<{ ok: true }>("/api/v1/auth/resend-verification", { email, captchaToken });
+    await this.api.post("/api/v1/auth/resend-verification", { email, captchaToken }, decodePublicActionAcknowledgement);
   }
 
   /**
@@ -266,14 +270,14 @@ export class AuthService {
       currentEmail,
       newEmail,
       ...antiBot,
-    });
+    }, decodePublicActionAcknowledgement);
   }
 
   /** Confirm server-side revocation before representing the session as closed. */
   async logout(): Promise<void> {
     const generation = this.nextGeneration();
     this.sessionInvalidated.set(false);
-    await this.api.post("/api/v1/auth/logout");
+    await this.api.post("/api/v1/auth/logout", undefined, decodePublicActionAcknowledgement);
     this.assertCurrent(generation);
     this.clearLocalAuth();
     this.loaded.set(true);
@@ -371,7 +375,7 @@ export class AuthService {
       current,
       newPassword,
       ...(factorCode ? { factorCode } : {}),
-    });
+    }, decodePublicActionAcknowledgement);
     this.assertCurrent(generation);
   }
 
@@ -441,13 +445,13 @@ export class AuthService {
   /** Consume la exportación: marca `downloaded` y purga el artefacto. */
   async acknowledgeDataExportDownload(): Promise<void> {
     const generation = this.generation;
-    await this.api.post("/api/v1/auth/data-export/download/acknowledge");
+    await this.api.post("/api/v1/auth/data-export/download/acknowledge", undefined, decodePublicActionAcknowledgement);
     this.assertCurrent(generation);
   }
 
   async cancelDataExport(): Promise<void> {
     const generation = this.generation;
-    await this.api.post("/api/v1/auth/data-export/cancel");
+    await this.api.post("/api/v1/auth/data-export/cancel", undefined, decodePublicActionAcknowledgement);
     this.assertCurrent(generation);
   }
 
@@ -537,7 +541,7 @@ export class AuthService {
 
   async mfaCancelSetup(): Promise<void> {
     const generation = this.generation;
-    await this.api.post("/api/v1/auth/mfa/cancel-setup");
+    await this.api.post("/api/v1/auth/mfa/cancel-setup", undefined, decodeMfaAcknowledgement);
     this.assertCurrent(generation);
   }
 
@@ -553,7 +557,7 @@ export class AuthService {
 
   async mfaDisable(password: string, code: string): Promise<void> {
     const generation = this.generation;
-    await this.api.post("/api/v1/auth/mfa/disable", { password, code });
+    await this.api.post("/api/v1/auth/mfa/disable", { password, code }, decodeMfaAcknowledgement);
     this.assertCurrent(generation);
   }
 }
