@@ -93,9 +93,9 @@ export class NotificationService {
       "/api/v1/notifications/read-all", {}, decodeNotificationUnread));
   }
 
-  async preferences(): Promise<NotificationPreference[]> {
+  async preferences(options?: ApiReadOptions): Promise<NotificationPreference[]> {
     const { preferences } = await this.api.get<{ preferences: NotificationPreference[] }>(
-      "/api/v1/notifications/preferences", undefined, decodeNotificationPreferences);
+      "/api/v1/notifications/preferences", undefined, decodeNotificationPreferences, options);
     return preferences;
   }
 

@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Support\Auth\AccountReadContext;
 use App\Support\IsoDate;
 use App\Support\NotificationInbox;
 use App\Support\NotificationKinds;
 use App\Support\NotificationPreferences;
+use App\Support\SecurityContext;
+use App\Support\StaleSecurityContext;
 use App\Support\UvhRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,7 +31,10 @@ final class NotificationController extends Controller
     /** Bandeja, de más reciente a más antigua, con paginación por cursor. */
     public function index(Request $request): JsonResponse
     {
-        $user = UvhRequest::user($request);
+        $user = $this->liveReadUser($request);
+        if ($user === null) {
+            return response()->json(['error' => 'No autenticado'], 401);
+        }
         $limit = self::boundedLimit($request->query('limit'));
         $before = $request->query('before');
         $cursor = is_string($before) && preg_match('/^[1-9][0-9]*$/D', $before) === 1 ? (int) $before : null;
@@ -60,7 +67,10 @@ final class NotificationController extends Controller
     /** Sólo el contador, para la campana del panel. */
     public function unread(Request $request): JsonResponse
     {
-        $user = UvhRequest::user($request);
+        $user = $this->liveReadUser($request);
+        if ($user === null) {
+            return response()->json(['error' => 'No autenticado'], 401);
+        }
 
         return response()->json(['unread' => NotificationInbox::unreadCount((int) $user->id)]);
     }
@@ -68,34 +78,43 @@ final class NotificationController extends Controller
     /** Marca una notificación propia como leída; una ajena no existe. */
     public function read(Request $request, string $id): JsonResponse
     {
-        $user = UvhRequest::user($request);
-        $updated = DB::table('notifications')
-            ->where('user_id', (int) $user->id)
-            ->where('id', (int) $id)
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
-
-        if ($updated === 0) {
-            $exists = DB::table('notifications')
+        $unread = DB::transaction(function () use ($request, $id): ?int {
+            $user = $this->lockedUser($request);
+            $updated = DB::table('notifications')
                 ->where('user_id', (int) $user->id)
                 ->where('id', (int) $id)
-                ->exists();
-            if (! $exists) {
-                return response()->json(['error' => 'Notificación no encontrada'], 404);
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+
+            if ($updated === 0) {
+                $exists = DB::table('notifications')
+                    ->where('user_id', (int) $user->id)
+                    ->where('id', (int) $id)
+                    ->exists();
+                if (! $exists) {
+                    return null;
+                }
             }
+
+            return NotificationInbox::unreadCount((int) $user->id);
+        });
+        if ($unread === null) {
+            return response()->json(['error' => 'Notificación no encontrada'], 404);
         }
 
-        return response()->json(['unread' => NotificationInbox::unreadCount((int) $user->id)]);
+        return response()->json(['unread' => $unread]);
     }
 
     /** Marca toda la bandeja como leída. */
     public function readAll(Request $request): JsonResponse
     {
-        $user = UvhRequest::user($request);
-        DB::table('notifications')
-            ->where('user_id', (int) $user->id)
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+        DB::transaction(function () use ($request): void {
+            $user = $this->lockedUser($request);
+            DB::table('notifications')
+                ->where('user_id', (int) $user->id)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+        });
 
         return response()->json(['unread' => 0]);
     }
@@ -103,7 +122,10 @@ final class NotificationController extends Controller
     /** El catálogo entero con la entrega efectiva de cada kind. */
     public function preferences(Request $request): JsonResponse
     {
-        $user = UvhRequest::user($request);
+        $user = $this->liveReadUser($request);
+        if ($user === null) {
+            return response()->json(['error' => 'No autenticado'], 401);
+        }
 
         return response()->json(['preferences' => $this->preferenceView((int) $user->id)]);
     }
@@ -115,7 +137,6 @@ final class NotificationController extends Controller
      */
     public function updatePreferences(Request $request): JsonResponse
     {
-        $user = UvhRequest::user($request);
         $input = $request->input('preferences');
         if (! is_array($input) || $input === []) {
             return response()->json(['error' => 'Datos inválidos'], 422);
@@ -129,11 +150,19 @@ final class NotificationController extends Controller
                 || ! is_string($entry['delivery'])) {
                 return response()->json(['error' => 'Datos inválidos'], 422);
             }
+            if (array_key_exists($entry['kind'], $changes)) {
+                return response()->json(['error' => 'Datos inválidos'], 422);
+            }
             $changes[$entry['kind']] = $entry['delivery'];
         }
 
         try {
-            NotificationPreferences::update((int) $user->id, $changes, $request->ip());
+            $preferences = DB::transaction(function () use ($request, $changes): array {
+                $user = $this->lockedUser($request);
+                NotificationPreferences::update((int) $user->id, $changes, $request->ip());
+
+                return $this->preferenceView((int) $user->id);
+            });
         } catch (\InvalidArgumentException) {
             // El mensaje distingue lo que el usuario puede arreglar (entrega
             // inválida) de lo que nunca se acepta (silenciar un aviso crítico).
@@ -148,17 +177,35 @@ final class NotificationController extends Controller
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
 
-        return response()->json(['preferences' => $this->preferenceView((int) $user->id)]);
+        return response()->json(['preferences' => $preferences]);
+    }
+
+    private function liveReadUser(Request $request): ?User
+    {
+        return AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request))?->user;
+    }
+
+    /** Only inside the transaction that will commit the notification command. */
+    private function lockedUser(Request $request): User
+    {
+        $context = SecurityContext::lock(UvhRequest::user($request), UvhRequest::sessionId($request), true);
+        if ($context === null) {
+            throw new StaleSecurityContext;
+        }
+
+        return $context->user;
     }
 
     /** @return list<array{kind: string, category: string, delivery: string}> */
     private function preferenceView(int $userId): array
     {
+        $deliveries = NotificationPreferences::deliveriesFor($userId);
+
         return array_map(
             static fn (string $kind, array $shape): array => [
                 'kind' => $kind,
                 'category' => $shape['category'],
-                'delivery' => NotificationPreferences::deliveryFor($userId, $kind),
+                'delivery' => $deliveries[$kind],
             ],
             array_keys(NotificationKinds::all()),
             array_values(NotificationKinds::all()),

@@ -8,6 +8,7 @@ use App\Jobs\ProvisionDomainTlsJob;
 use App\Jobs\VerifyDomainDnsJob;
 use App\Models\EmailChangeRequest;
 use App\Models\PendingRegistration;
+use App\Models\RegistrationAttempt;
 use App\Models\User;
 use App\Models\Webhook;
 use App\Support\HCaptcha;
@@ -94,7 +95,7 @@ class ApiParityTest extends TestCase
             'password' => self::PASSWORD,
             'captchaToken' => 'test-login-passcode',
         ])->assertStatus(403)->assertExactJson([
-            'error' => 'Confirma tu email para continuar',
+            'error' => 'Revisa la solicitud de verificación de tu email',
             'reason' => 'pending_registration',
         ]);
 
@@ -107,7 +108,7 @@ class ApiParityTest extends TestCase
             'password' => 'wrong-'.self::PASSWORD,
             'captchaToken' => 'test-login-passcode',
         ])->assertStatus(403)->assertExactJson([
-            'error' => 'Confirma tu email para continuar',
+            'error' => 'Revisa la solicitud de verificación de tu email',
             'reason' => 'pending_registration',
         ]);
 
@@ -438,8 +439,8 @@ class ApiParityTest extends TestCase
         $free->assertStatus(200)->assertExactJson(['ok' => true]);
         $this->assertNull($this->cookieFrom($taken, 'uvh_session'));
 
-        // Same cost as well: each outcome admits exactly one outbox row, so the
-        // old oracle cannot reappear as a timing channel.
+        // Each outcome admits exactly one outbox row. This pins admission
+        // shape; it does not establish constant timing across all SQL work.
         $admitted = DB::table('mail_outbox')->where('id', '>', $lastOutboxId)->orderBy('id')->get();
         $this->assertCount(2, $admitted);
 
@@ -668,20 +669,21 @@ class ApiParityTest extends TestCase
         // una propuesta—: ya no hay propuesta y el campo se ignora.
         $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, ['password' => 'qx-'.self::PASSWORD], $this->captchaPayload()))
             ->assertStatus(403);
-        // With the attacker's own valid secret: the signature names an account,
-        // and it is not this one.
+        // The attacker's valid context may correct its OWN request, with the
+        // same public ACK. It cannot move the victim's pending row or bearer.
         $this->withCookie('uvh_registration_edit', $attackerSecret);
         $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, $this->captchaPayload()))
-            ->assertStatus(403);
+            ->assertStatus(200)->assertExactJson(['ok' => true]);
         // With a tampered copy of the victim's: the signature rejects it.
         $this->withCookie('uvh_registration_edit', 'x'.$victimSecret);
         $this->postJson('/api/v1/auth/change-registration-email', array_merge($move, $this->captchaPayload()))
             ->assertStatus(403);
 
-        // Nothing moved: same registration, same address, same bearer, same
-        // generation.
+        // The victim did not move: same registration/address/bearer/generation.
+        // The attacker created a separate pending request at their own mailbox.
         $this->assertSame(1, PendingRegistration::whereRaw('lower(email) = ?', [$victimEmail])->count());
-        $this->assertSame(0, PendingRegistration::whereRaw('lower(email) = ?', [$attackerEmail])->count());
+        $this->assertSame(1, PendingRegistration::whereRaw('lower(email) = ?', [$attackerEmail])->count());
+        $this->assertNotSame($victim->id, PendingRegistration::where('email', $attackerEmail)->sole()->id);
         $this->assertSame($victimBearer, (string) DB::table('email_tokens')->where('pending_registration_id', $victim->id)
             ->where('kind', 'verify')->whereNull('used_at')->value('id'));
         $this->assertSame(1, (int) $victim->fresh()->security_version);
@@ -1726,10 +1728,18 @@ class ApiParityTest extends TestCase
             'created_at' => now()->subHour(),
             'updated_at' => now()->subHour(),
         ]);
+        $stalePending = PendingRegistration::create(['email' => 'stale-pending@example.test', 'security_version' => 1]);
+        DB::table('pending_registrations')->where('id', $stalePending->id)->update(['updated_at' => now()->subDays(31)]);
+        $activeContext = RegistrationAttempt::create(['email' => $stalePending->email, 'expires_at' => now()->addHour(), 'pending_registration_id' => $stalePending->id, 'pending_security_version' => 1, 'legacy_pending_id' => $stalePending->id, 'legacy_security_version' => 1]);
+        $expiredContext = RegistrationAttempt::create(['email' => 'expired-context@example.test', 'expires_at' => now()->subHour()]);
         Cache::forget('uvh:housekeeping:last_heavy');
 
         $this->artisan('uvh:housekeeping')->assertExitCode(0);
 
+        $this->assertDatabaseMissing('pending_registrations', ['id' => $stalePending->id]);
+        $this->assertNull($activeContext->refresh()->pending_registration_id);
+        $this->assertSame($stalePending->id, $activeContext->legacy_pending_id);
+        $this->assertDatabaseMissing('registration_attempts', ['id' => $expiredContext->id]);
         $this->assertDatabaseMissing('webhook_deliveries', ['event_id' => 'old-failed']);
         $this->assertDatabaseMissing('webhook_deliveries', ['event_id' => 'old-success']);
         $this->assertDatabaseMissing('failed_jobs', ['uuid' => '00000000-0000-4000-8000-000000000001']);

@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\AuditEvent;
 use App\Models\User;
+use App\Support\Totp;
+use App\Support\UvhCrypto;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -41,6 +43,16 @@ class PromoteAdmin extends Command
                 }
                 if (! $user->mfa_enabled || blank($user->mfa_secret)) {
                     throw new \DomainException('La cuenta debe activar MFA antes de ser administradora.');
+                }
+                // Presence alone does not establish an enrolled, usable factor.
+                // decryptAtRest retains the deployment's supported legacy/keyring reads.
+                try {
+                    $secret = UvhCrypto::decryptAtRest((string) $user->mfa_secret);
+                } catch (\Throwable) {
+                    $secret = null;
+                }
+                if ($secret === null || ! Totp::isUsableSecret($secret)) {
+                    throw new \DomainException('La cuenta no tiene un factor MFA utilizable. Revisa su configuración antes de promoverla.');
                 }
                 if ($user->is_admin) {
                     return [$user, false];

@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
+import { Component, computed, effect, inject, signal, untracked, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
 import { Location } from "@angular/common";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
@@ -96,6 +96,7 @@ export class SettingsComponent implements AfterViewInit {
   private exportDialog?: MatDialogRef<DataExportDialogComponent, DataExportDialogResult>;
   private mfaRequests = new LatestRequest(this.destroyRef);
   private profileRequests = new LatestRequest(this.destroyRef);
+  private profileRefreshRequests = new LatestRequest(this.destroyRef);
   private workspaceNavigationRequests = new LatestRequest(this.destroyRef);
   private sessionRevocationRequests = new LatestRequest(this.destroyRef);
   private sessionsRequest = new LatestRequest(this.destroyRef);
@@ -104,6 +105,8 @@ export class SettingsComponent implements AfterViewInit {
   private deletionRequest = new LatestRequest(this.destroyRef);
   private privacyRequest = new LatestRequest(this.destroyRef);
   readonly user = this.auth.user;
+  readonly userRefreshRequired = this.auth.userRefreshRequired;
+  readonly profileRefreshBusy = signal(false);
   /** Ruta canónica de cada sección: la URL nombra la sección que se está leyendo. */
   private static readonly SECTION_PATHS: Record<string, string> = {
     account: "/app/settings/profile",
@@ -251,6 +254,7 @@ export class SettingsComponent implements AfterViewInit {
   ];
 
   // ---------------- Notification preferences ----------------
+  private readonly notificationPrefsRequests = new LatestRequest(this.destroyRef);
   readonly notificationPreferences = signal<NotificationPreference[]>([]);
   readonly notificationPrefsLoading = signal(true);
   readonly notificationPrefsBusy = signal(false);
@@ -273,29 +277,53 @@ export class SettingsComponent implements AfterViewInit {
     return NOTIFICATION_DELIVERY_LABELS[delivery];
   }
 
+  private resetNotificationPreferences(): void {
+    this.notificationPrefsRequests.invalidate();
+    this.notificationPreferences.set([]);
+    this.notificationPrefsError.set(null);
+    this.notificationPrefsLoading.set(false);
+    this.notificationPrefsBusy.set(false);
+  }
+
   async loadNotificationPreferences(): Promise<void> {
+    if (this.notificationPrefsBusy()) return;
+    if (!this.user()) {
+      this.resetNotificationPreferences();
+      return;
+    }
+    const request = this.notificationPrefsRequests.begin(this.accountContext());
+    const current = (): boolean => this.notificationPrefsRequests.isCurrent(request, this.accountContext());
     this.notificationPrefsLoading.set(true);
     this.notificationPrefsError.set(null);
     try {
-      this.notificationPreferences.set(await this.notifications.preferences());
+      const preferences = await this.notifications.preferences({ signal: request.signal });
+      if (current()) this.notificationPreferences.set(preferences);
     } catch {
-      this.notificationPrefsError.set("No se pudieron cargar tus preferencias de aviso. Inténtalo de nuevo.");
+      if (current()) this.notificationPrefsError.set("No se pudieron cargar tus preferencias de aviso. Inténtalo de nuevo.");
     } finally {
-      this.notificationPrefsLoading.set(false);
+      if (current()) this.notificationPrefsLoading.set(false);
     }
   }
 
   async setNotificationDelivery(pref: NotificationPreference, delivery: NotificationDelivery): Promise<void> {
     // El servidor rechaza cambiar un obligatorio; no se le manda ni se intenta.
-    if (pref.category === "mandatory" || pref.delivery === delivery || this.notificationPrefsBusy()) return;
+    if (!this.user() || pref.category === "mandatory" || pref.delivery === delivery || this.notificationPrefsBusy()) return;
+    // The write supersedes earlier reads; its response owns the visible snapshot.
+    // Never abort the server mutation when this view or identity goes away.
+    const request = this.notificationPrefsRequests.begin(this.accountContext());
+    const current = (): boolean => this.notificationPrefsRequests.isCurrent(request, this.accountContext());
+    this.notificationPrefsLoading.set(false);
+    this.notificationPrefsError.set(null);
     this.notificationPrefsBusy.set(true);
     try {
-      this.notificationPreferences.set(await this.notifications.updatePreferences([{ kind: pref.kind, delivery }]));
+      const preferences = await this.notifications.updatePreferences([{ kind: pref.kind, delivery }]);
+      if (!current()) return;
+      this.notificationPreferences.set(preferences);
       this.snackbar.open("Preferencia de avisos guardada", "Cerrar", { duration: 3000 });
     } catch (err) {
-      this.toast(err, "No se pudo guardar la preferencia. Inténtalo de nuevo.");
+      if (current()) this.toast(err, "No se pudo guardar la preferencia. Inténtalo de nuevo.");
     } finally {
-      this.notificationPrefsBusy.set(false);
+      if (current()) this.notificationPrefsBusy.set(false);
     }
   }
 
@@ -306,12 +334,16 @@ export class SettingsComponent implements AfterViewInit {
       if (identity !== nextIdentity) {
         identity = nextIdentity;
         this.clearSensitiveMfaUi();
+        this.resetNotificationPreferences();
+        if (this.user()) untracked(() => { void this.loadNotificationPreferences(); });
         this.profileBusy.set(false);
+        this.profileRefreshBusy.set(false);
         this.profileForm.reset({ name: this.user()?.name ?? "" });
       }
     });
     this.destroyRef.onDestroy(() => {
       this.clearSensitiveMfaUi();
+      this.resetNotificationPreferences();
       this.deletionDialog?.close();
       this.emailDialog?.close();
       this.passwordDialog?.close();
@@ -363,6 +395,20 @@ export class SettingsComponent implements AfterViewInit {
       this.toast(err, "");
     } finally {
       if (current()) this.profileBusy.set(false);
+    }
+  }
+
+  async refreshAccountView(): Promise<void> {
+    if (this.profileRefreshBusy()) return;
+    const request = this.profileRefreshRequests.begin(this.accountContext());
+    const current = () => this.profileRefreshRequests.isCurrent(request, this.accountContext());
+    this.profileRefreshBusy.set(true);
+    try {
+      await this.auth.refreshUser();
+    } catch (error) {
+      if (current()) this.toast(error, "Los cambios siguen confirmados, pero no se pudo actualizar la vista.");
+    } finally {
+      if (current()) this.profileRefreshBusy.set(false);
     }
   }
 

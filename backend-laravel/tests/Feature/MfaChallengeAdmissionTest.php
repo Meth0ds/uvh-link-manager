@@ -122,6 +122,53 @@ final class MfaChallengeAdmissionTest extends TestCase
         return ['before write' => [false], 'after write' => [true]];
     }
 
+    public function test_a_challenge_expires_at_exactly_five_minutes(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $response = $this->login($this->account())->assertOk()->assertJsonPath('mfaRequired', true);
+        $key = 'uvh:mfa:challenge:'.Ids::sha256Hex($response->json('challenge'));
+        $this->travel(299)->seconds();
+        $this->assertNotNull(Cache::get($key));
+        $this->travel(1)->seconds();
+        $this->assertNull(Cache::get($key));
+        $this->postJson('/api/v1/auth/mfa/verify', ['challenge' => $response->json('challenge'), 'code' => '123456'])
+            ->assertUnauthorized()->assertJsonPath('error', 'Sesión MFA caducada');
+        $this->assertDatabaseCount('sessions', 0);
+    }
+
+    public function test_a_cache_write_returning_false_cannot_publish_a_challenge(): void
+    {
+        $user = $this->account();
+        Cache::partialMock()->shouldReceive('put')->once()->andReturn(false);
+        Cache::shouldReceive('forget')->once()->andReturn(true);
+        $this->login($user)->assertStatus(503)->assertJsonMissingPath('challenge');
+        $this->assertDatabaseCount('audit_outbox', 0);
+        $this->assertDatabaseCount('audit_events', 0);
+        $this->assertDatabaseCount('sessions', 0);
+    }
+
+    public function test_failed_orphan_cleanup_preserves_the_original_error_and_bounds_the_secret_by_its_ttl(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $user = $this->account();
+        $store = Cache::store();
+        $writtenKey = null;
+        Cache::partialMock()->shouldReceive('put')->once()->andReturnUsing(static function ($key, $value, $ttl) use ($store, &$writtenKey): void {
+            $store->put($key, $value, $ttl);
+            $writtenKey = $key;
+            throw new \RuntimeException('Fixture: cache rejected after write');
+        });
+        Cache::shouldReceive('forget')->once()->andThrow(new \RuntimeException('Fixture: cleanup unavailable'));
+        $this->login($user)->assertStatus(503)->assertJsonMissingPath('challenge');
+        $this->assertNotNull($writtenKey);
+        $this->assertNotNull($store->get($writtenKey));
+        $this->assertDatabaseCount('audit_outbox', 0);
+        $this->assertDatabaseCount('audit_events', 0);
+        $this->assertDatabaseCount('sessions', 0);
+        $this->travel(300)->seconds();
+        $this->assertNull($store->get($writtenKey));
+    }
+
     #[DataProvider('cacheFailures')]
     public function test_cache_admission_failure_does_not_publish_a_challenge_or_its_event(bool $afterWrite): void
     {

@@ -166,7 +166,11 @@ final class OperationalMetrics
             return;
         }
         if (DB::transactionLevel() > 0) {
-            DB::afterCommit(static fn () => self::incrementBatch($counts));
+            try {
+                DB::afterCommit(static fn () => self::incrementBatch($counts));
+            } catch (\Throwable $error) {
+                self::logFailure($error);
+            }
 
             return;
         }
@@ -192,6 +196,8 @@ final class OperationalMetrics
         self::$reportingFailure = true;
         try {
             Log::warning('[metrics] counter write unavailable', ['exception' => $error::class]);
+        } catch (\Throwable) {
+            // A broken diagnostics transport must remain auxiliary too.
         } finally {
             self::$reportingFailure = false;
         }

@@ -1,6 +1,10 @@
-import { Injectable, computed, inject, signal } from "@angular/core";
+import { DestroyRef, Injectable, computed, inject, signal } from "@angular/core";
 import { ApiRequestError, ApiService, type ApiReadOptions } from "./api.service";
 import { WorkspaceService } from "./workspace.service";
+import { SessionContextService } from "./session-context.service";
+import { LatestRequest, type ViewRequest } from "./latest-request";
+import { AccountProfileService } from "./account-profile.service";
+import { AuthUserMutations } from "./auth-user-mutations";
 import {
   decodeAccountDeletionImpact,
   decodeAccountDeletionRequest,
@@ -56,9 +60,11 @@ export class AuthOperationSupersededError extends Error {
 @Injectable({ providedIn: "root" })
 export class AuthService {
   private api = inject(ApiService);
+  private readonly accountProfile = inject(AccountProfileService);
   private workspaces = inject(WorkspaceService);
 
-  readonly user = signal<AuthUser | null>(null);
+  private readonly sessionContext = inject(SessionContextService);
+  readonly user = this.sessionContext.user;
   readonly loaded = signal(false);
   /**
    * True once the startup probe has answered, whether it confirmed a session,
@@ -70,9 +76,20 @@ export class AuthService {
   /** True when the server rejected the session and the panel must close. */
   readonly sessionInvalidated = signal(false);
   readonly adminMfaReauthenticationRequired = signal(false);
+  /** A command was confirmed, but its authoritative projection still needs a read. */
+  readonly userRefreshRequired = signal(false);
   private initPromise?: Promise<void>;
-  private generation = 0;
+  private get generation(): number {
+    return this.sessionContext.generation();
+  }
   private workspaceRequest = 0;
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly identityRequests = new LatestRequest(this.destroyRef);
+  private readonly userMutations = new AuthUserMutations(
+    (generation, account) => this.assertUserContext(generation, account),
+    (user) => this.publishUser(user),
+    (generation, account) => this.reconcileUserMutations(generation, account),
+  );
 
   /**
    * A revoke/logout in one browser tab must close the other tabs too. The event
@@ -87,12 +104,14 @@ export class AuthService {
   constructor() {
     if (typeof window !== "undefined") {
       window.addEventListener("storage", this.onStorage);
+      this.destroyRef.onDestroy(() => window.removeEventListener("storage", this.onStorage));
     }
   }
 
   /** Clear the local identity before waiting on the network. */
   private clearLocalAuth(): void {
     this.user.set(null);
+    this.userRefreshRequired.set(false);
     this.adminMfaReauthenticationRequired.set(false);
     this.workspaces.setList([]);
     this.workspaces.select(null);
@@ -108,8 +127,8 @@ export class AuthService {
   }
 
   private nextGeneration(): number {
-    this.generation += 1;
-    return this.generation;
+    this.identityRequests.invalidate();
+    return this.sessionContext.advance();
   }
 
   private isCurrent(generation: number): boolean {
@@ -120,17 +139,89 @@ export class AuthService {
     if (!this.isCurrent(generation)) throw new AuthOperationSupersededError();
   }
 
+  /** Confirmed DTO writes take precedence over identity reads begun earlier. */
+  private publishUser(user: AuthUser): void {
+    this.identityRequests.invalidate();
+    this.user.set(user);
+    this.userRefreshRequired.set(false);
+  }
+
+  private assertUserContext(generation: number, account: number | null): void {
+    this.assertCurrent(generation);
+    if (this.destroyRef.destroyed || (this.user()?.id ?? null) !== account) throw new AuthOperationSupersededError();
+  }
+
+  private async reconcileUserMutations(generation: number, account: number | null): Promise<void> {
+    this.assertUserContext(generation, account);
+    this.userRefreshRequired.set(true);
+    try {
+      await this.me();
+    } catch {
+      // The command remains confirmed. Preserve the last known projection and
+      // the explicit refresh notice; a later owned identity read can clear it.
+    }
+  }
+
+  private applyUserMutation(command: () => Promise<AuthUser>): Promise<AuthUser> {
+    // Capture intent before the transport/CSRF boundary can yield.
+    return this.userMutations.run(this.generation, this.user()?.id ?? null, command);
+  }
+
+  /** A new observed account invalidates all guards captured for the old one. */
+  private adoptObservedUser(user: AuthUser): { generation: number; changed: boolean } {
+    const previous = this.user();
+    const changed = previous?.id !== user.id;
+    if (changed) {
+      this.nextGeneration();
+      // Preserve the stored workspace preference during the initial probe.
+      // An actual account replacement must discard the previous owner's list.
+      if (previous !== null) this.clearLocalAuth();
+    }
+    this.userMutations.observedIdentity();
+    this.publishUser(user);
+    this.sessionInvalidated.set(false);
+    this.loaded.set(true);
+    this.probeSettled.set(true);
+    return { generation: this.generation, changed };
+  }
+
+  private assertIdentityCurrent(request: ViewRequest): void {
+    if (!this.identityRequests.isCurrent(request, this.generation)) throw new AuthOperationSupersededError();
+  }
+
+  private async readIdentity(request: ViewRequest): Promise<AuthUser> {
+    try {
+      const { user } = await this.api.get<{ user: AuthUser }>(
+        "/api/v1/auth/me", undefined, decodeAuthUserResponse, { signal: request.signal },
+      );
+      this.assertIdentityCurrent(request);
+      return user;
+    } catch (error) {
+      // Cancellation alone is insufficient when a response is already queued.
+      if (!this.identityRequests.isCurrent(request, this.generation)) throw new AuthOperationSupersededError();
+      // A replacement /me also owns startup settlement if it cancelled init.
+      // A definitive anonymous answer is loaded; transient failures can retry.
+      this.probeSettled.set(true);
+      if (!this.loaded() && error instanceof ApiRequestError && error.status === 401) {
+        this.clearLocalAuth();
+        this.loaded.set(true);
+      }
+      throw error;
+    }
+  }
+
   /** Load /auth/me + workspaces once at startup, coalescing concurrent guards. */
   init(): Promise<void> {
     if (this.loaded()) return Promise.resolve();
     if (this.initPromise) return this.initPromise;
 
-    const generation = this.generation;
+    let generation = this.generation;
+    const request = this.identityRequests.begin(generation);
     const operation = (async () => {
       try {
-        const { user } = await this.api.get<{ user: AuthUser }>("/api/v1/auth/me", undefined, decodeAuthUserResponse);
-        this.assertCurrent(generation);
-        this.user.set(user);
+        const user = await this.readIdentity(request);
+        this.assertIdentityCurrent(request);
+        generation = this.adoptObservedUser(user).generation;
         // The identity is resolved here. Guards and the /auth redirect must not
         // wait for the workspace list: the panel refreshes it on its own, and
         // keeping it inside the "loaded" gate added a whole extra round-trip to
@@ -140,7 +231,7 @@ export class AuthService {
         await this.refreshWorkspaces(generation);
         this.assertCurrent(generation);
       } catch (error) {
-        if (!this.isCurrent(generation)) return;
+        if (!this.isCurrent(generation) || error instanceof AuthOperationSupersededError) return;
         this.user.set(null);
         // A definitive 401 means initialization completed anonymously. A
         // transport/5xx failure remains retryable and preserves the stored
@@ -191,7 +282,7 @@ export class AuthService {
       this.assertCurrent(generation);
       this.loaded.set(true);
       if (res.mfaRequired) return res;
-      this.user.set(res.user);
+      this.publishUser(res.user);
       this.adminMfaReauthenticationRequired.set(false);
       await this.refreshWorkspaces(generation);
       this.assertCurrent(generation);
@@ -206,7 +297,7 @@ export class AuthService {
     const generation = this.nextGeneration();
     const res = await this.api.post<LoginResponse>("/api/v1/auth/mfa/verify", { challenge, code }, decodeLoginResponse);
     this.assertCurrent(generation);
-    this.user.set(res.user);
+    this.publishUser(res.user);
     this.loaded.set(true);
     this.adminMfaReauthenticationRequired.set(false);
     await this.refreshWorkspaces(generation);
@@ -217,7 +308,7 @@ export class AuthService {
     const generation = this.nextGeneration();
     const res = await this.api.post<LoginResponse>("/api/v1/auth/mfa/recovery", { challenge, code }, decodeLoginResponse);
     this.assertCurrent(generation);
-    this.user.set(res.user);
+    this.publishUser(res.user);
     this.loaded.set(true);
     this.adminMfaReauthenticationRequired.set(false);
     await this.refreshWorkspaces(generation);
@@ -281,6 +372,7 @@ export class AuthService {
     this.assertCurrent(generation);
     this.clearLocalAuth();
     this.loaded.set(true);
+    this.probeSettled.set(true);
     this.announceInvalidation();
   }
 
@@ -290,6 +382,12 @@ export class AuthService {
     this.invalidateLocalSession(true);
   }
 
+  /** The cookie belongs to another account; close only this tab's projection. */
+  sessionContextChanged(expectedGeneration: number): void {
+    if (!this.isCurrent(expectedGeneration)) return;
+    this.invalidateLocalSession(false);
+  }
+
   /** Reconcile a confirmed cookie/session revocation without erasing a newer login. */
   accountSignedOut(expectedGeneration = this.generation): boolean {
     if (!this.isCurrent(expectedGeneration)) return false;
@@ -297,6 +395,7 @@ export class AuthService {
     this.sessionInvalidated.set(false);
     this.clearLocalAuth();
     this.loaded.set(true);
+    this.probeSettled.set(true);
     this.announceInvalidation();
     return true;
   }
@@ -306,6 +405,7 @@ export class AuthService {
     this.sessionInvalidated.set(true);
     this.clearLocalAuth();
     this.loaded.set(true);
+    this.probeSettled.set(true);
     if (announce) this.announceInvalidation();
   }
 
@@ -319,11 +419,11 @@ export class AuthService {
   }
 
   async me(): Promise<AuthUser> {
-    const generation = this.generation;
-    const { user } = await this.api.get<{ user: AuthUser }>("/api/v1/auth/me", undefined, decodeAuthUserResponse);
-    this.assertCurrent(generation);
-    this.sessionInvalidated.set(false);
-    this.user.set(user);
+    const request = this.identityRequests.begin(this.generation);
+    const user = await this.readIdentity(request);
+    this.assertIdentityCurrent(request);
+    const { generation, changed } = this.adoptObservedUser(user);
+    if (changed) void this.refreshWorkspaces(generation);
     return user;
   }
 
@@ -362,11 +462,7 @@ export class AuthService {
   }
 
   async updateProfile(name: string): Promise<AuthUser> {
-    const generation = this.generation;
-    const { user } = await this.api.patch<{ user: AuthUser }>("/api/v1/auth/profile", { name }, decodeAuthUserResponse);
-    this.assertCurrent(generation);
-    this.user.set(user);
-    return user;
+    return this.applyUserMutation(() => this.accountProfile.updateName(name));
   }
 
   async changePassword(current: string, newPassword: string, factorCode?: string): Promise<void> {
@@ -380,26 +476,11 @@ export class AuthService {
   }
 
   async requestEmailChange(newEmail: string, password: string, factorCode?: string): Promise<AuthUser> {
-    const generation = this.generation;
-    const { user } = await this.api.post<{ user: AuthUser }>("/api/v1/auth/change-email", {
-      newEmail,
-      password,
-      ...(factorCode ? { factorCode } : {}),
-    }, decodeAuthUserResponse);
-    this.assertCurrent(generation);
-    this.user.set(user);
-    return user;
+    return this.applyUserMutation(() => this.accountProfile.requestEmail(newEmail, password, factorCode));
   }
 
   async cancelEmailChange(password: string, factorCode?: string): Promise<AuthUser> {
-    const generation = this.generation;
-    const { user } = await this.api.post<{ user: AuthUser }>("/api/v1/auth/change-email/cancel", {
-      password,
-      ...(factorCode ? { factorCode } : {}),
-    }, decodeAuthUserResponse);
-    this.assertCurrent(generation);
-    this.user.set(user);
-    return user;
+    return this.applyUserMutation(() => this.accountProfile.cancelEmail(password, factorCode));
   }
 
   async dataExportStatus(options?: ApiReadOptions): Promise<DataExportStatus | null> {

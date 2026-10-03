@@ -6,7 +6,6 @@ use App\Exceptions\LinkException;
 use App\Models\Invitation;
 use App\Models\Membership;
 use App\Models\User;
-use App\Models\UvhSession;
 use App\Models\Workspace;
 use App\Support\Audit;
 use App\Support\FrontendUrl;
@@ -25,6 +24,8 @@ use App\Support\NotificationPreferences;
 use App\Support\OperationalMetrics;
 use App\Support\PendingHandoff;
 use App\Support\SearchTerm;
+use App\Support\SecurityContext;
+use App\Support\StaleSecurityContext;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
@@ -67,16 +68,12 @@ class WorkspaceController
             return response()->json(['error' => 'Nombre inválido'], 422);
         }
 
-        $result = DB::transaction(function () use ($name, $user): array {
+        $result = DB::transaction(function () use ($name, $user, $request): array {
             // Lock the owner row so parallel browser tabs cannot both pass the
             // workspace quota check under PostgreSQL read-committed isolation.
             // The version comparison also rejects a request that authenticated
             // before a password, email, MFA or account-lifecycle rotation.
-            $owner = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-            if (! $owner || ! $owner->email_verified_at
-                || (int) $owner->security_version !== (int) $user->security_version) {
-                return ['status' => 'stale'];
-            }
+            $this->lockSecurityContext($request);
             if (Workspace::where('owner_user_id', $user->id)->count() >= self::MAX_OWNED_WORKSPACES) {
                 return ['status' => 'limit'];
             }
@@ -89,19 +86,15 @@ class WorkspaceController
             ]);
             $w->memberships()->create(['user_id' => $user->id, 'role' => 'owner']);
             $w->quota()->create(['links_limit' => 1000]);
+            Audit::write($user->id, 'workspace.create', 'workspace', $w->id, null, UvhRequest::ip($request));
 
             return ['status' => 'created', 'workspace' => $w];
         });
-        if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
-        }
         if ($result['status'] !== 'created') {
             return response()->json(['error' => 'Límite de workspaces alcanzado'], 429);
         }
         /** @var Workspace $workspace */
         $workspace = $result['workspace'];
-
-        Audit::write($user->id, 'workspace.create', 'workspace', $workspace->id, null, UvhRequest::ip($request));
 
         return response()->json(['workspace' => [
             'id' => $workspace->id,
@@ -163,23 +156,19 @@ class WorkspaceController
             return response()->json(['error' => 'Nombre inválido'], 422);
         }
 
-        $renamed = DB::transaction(function () use ($user, $id, $name): bool {
-            if (! WorkspaceAccess::getMembershipLocked(
-                $user->id,
-                $id,
-                'admin',
-                expectedSecurityVersion: (int) $user->security_version,
-            )) {
+        $renamed = DB::transaction(function () use ($user, $id, $name, $request): bool {
+            $context = $this->lockSecurityContext($request);
+            if (! WorkspaceAccess::getMembershipForContext($context, $id, 'admin')) {
                 return false;
             }
             Workspace::where('id', $id)->update(['name' => $name, 'updated_at' => now()]);
+            Audit::write($user->id, 'workspace.rename', 'workspace', $id, null, UvhRequest::ip($request));
 
             return true;
         });
         if (! $renamed) {
             return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
         }
-        Audit::write($user->id, 'workspace.rename', 'workspace', $id, null, UvhRequest::ip($request));
 
         return response()->json(['ok' => true]);
     }
@@ -205,27 +194,16 @@ class WorkspaceController
             return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
         }
 
-        $result = DB::transaction(function () use ($user, $id, $userId, $role): string {
+        $result = DB::transaction(function () use ($user, $id, $userId, $role, $request): string {
             // Target accounts are part of the authorization decision. Lock all
             // involved users first and in primary-key order so deletion cannot
             // race a promotion into a role that revives if the account returns.
-            $users = User::whereIn('id', [(int) $user->id, $userId])
-                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-            $lockedActor = $users->get((int) $user->id);
-            $lockedTarget = $users->get($userId);
-            if (! $lockedActor || $lockedActor->deleted_at || ! $lockedActor->email_verified_at
-                || (int) $lockedActor->security_version !== (int) $user->security_version) {
-                return 'forbidden';
-            }
+            $context = $this->lockSecurityContext($request, $userId > 0 ? [$userId] : []);
+            $lockedTarget = $context->relatedUser($userId);
             if (! $lockedTarget || $lockedTarget->deleted_at || ! $lockedTarget->email_verified_at) {
                 return 'target_inactive';
             }
-            $actor = WorkspaceAccess::getMembershipLocked(
-                $user->id,
-                $id,
-                'admin',
-                expectedSecurityVersion: (int) $user->security_version,
-            );
+            $actor = WorkspaceAccess::getMembershipForContext($context, $id, 'admin');
             if (! $actor) {
                 return 'forbidden';
             }
@@ -252,6 +230,7 @@ class WorkspaceController
                     ->update(['status' => 'cancelled']);
             }
             $target->update(['role' => $role]);
+            Audit::write($user->id, 'workspace.role_change', 'workspace', $id, ['userId' => $userId, 'role' => $role], UvhRequest::ip($request));
 
             return 'updated';
         });
@@ -273,7 +252,6 @@ class WorkspaceController
         if ($result === 'busy') {
             return response()->json(['error' => 'Hay una entrega de webhook en curso para este miembro. Espera unos segundos y vuelve a intentarlo.'], 409);
         }
-        Audit::write($user->id, 'workspace.role_change', 'workspace', $id, ['userId' => $userId, 'role' => $role], UvhRequest::ip($request));
 
         return response()->json(['ok' => true]);
     }
@@ -297,20 +275,16 @@ class WorkspaceController
             return response()->json(['error' => 'Solo el propietario actual puede transferir el workspace'], 403);
         }
 
-        $sessionId = UvhRequest::sessionId($request);
         try {
-            $result = DB::transaction(function () use ($actor, $id, $targetInput, $password, $factorCode, $sessionId): array {
+            $result = DB::transaction(function () use ($actor, $id, $targetInput, $password, $factorCode, $request): array {
                 // Account deletion starts with the user row and later removes
                 // memberships. Lock every involved user first, in deterministic
                 // order, before touching the workspace or membership rows.
-                $users = User::whereIn('id', [(int) $actor->id, $targetInput])->whereNull('deleted_at')
-                    ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-                $lockedActor = $users->get((int) $actor->id);
-                $target = $users->get($targetInput);
-                $session = UvhSession::where('id', $sessionId)->where('user_id', $actor->id)
-                    ->whereNull('revoked_at')->lockForUpdate()->first();
-                if (! $lockedActor || ! $target || ! $target->email_verified_at || ! $session
-                    || (int) $session->security_version !== (int) $lockedActor->security_version) {
+                $context = $this->lockSecurityContext($request, [$targetInput]);
+                $lockedActor = $context->user;
+                $target = $context->relatedUser($targetInput);
+                $session = $context->session;
+                if (! $target || $target->deleted_at || ! $target->email_verified_at) {
                     return ['status' => 'stale'];
                 }
                 $workspace = Workspace::where('id', $id)->lockForUpdate()->first();
@@ -375,6 +349,10 @@ class WorkspaceController
                         throw new MailAdmissionException('Ownership transfer notices outbox admission failed');
                     }
                 }
+                Audit::write($actor->id, 'workspace.ownership_transfer', 'workspace', $id, [
+                    'targetUserId' => (int) $target->id,
+                    'factor' => $stepUp['factor'],
+                ], UvhRequest::ip($request));
 
                 return [
                     'status' => 'ok',
@@ -412,26 +390,17 @@ class WorkspaceController
             return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
         }
 
-        Audit::write($actor->id, 'workspace.ownership_transfer', 'workspace', $id, [
-            'targetUserId' => $result['target_user_id'],
-            'factor' => $result['factor'],
-        ], UvhRequest::ip($request));
-
         return response()->json(['ok' => true]);
     }
 
     public function removeMember(Request $request, int $id, int $userId)
     {
         $user = UvhRequest::user($request);
-        $removed = DB::transaction(function () use ($id, $userId, $user): string {
+        $removed = DB::transaction(function () use ($id, $userId, $user, $request): string {
+            $context = $this->lockSecurityContext($request);
             // The workspace lock serializes this removal with webhook creation,
             // whose controller rechecks membership while holding the same row.
-            $actor = WorkspaceAccess::getMembershipLocked(
-                $user->id,
-                $id,
-                'admin',
-                expectedSecurityVersion: (int) $user->security_version,
-            );
+            $actor = WorkspaceAccess::getMembershipForContext($context, $id, 'admin');
             if (! $actor) {
                 return 'forbidden';
             }
@@ -458,6 +427,7 @@ class WorkspaceController
                 ->where('invited_by', $userId)
                 ->where('status', 'pending')
                 ->update(['status' => 'cancelled']);
+            Audit::write($user->id, 'workspace.member_remove', 'workspace', $id, ['userId' => $userId], UvhRequest::ip($request));
 
             return 'removed';
         });
@@ -476,7 +446,6 @@ class WorkspaceController
         if ($removed === 'busy') {
             return response()->json(['error' => 'Hay una entrega de webhook en curso para este miembro. Espera unos segundos y vuelve a intentarlo.'], 409);
         }
-        Audit::write($user->id, 'workspace.member_remove', 'workspace', $id, ['userId' => $userId], UvhRequest::ip($request));
 
         return response()->json(['ok' => true]);
     }
@@ -484,12 +453,9 @@ class WorkspaceController
     public function leave(Request $request, int $id)
     {
         $user = UvhRequest::user($request);
-        $left = DB::transaction(function () use ($id, $user): string {
-            $membership = WorkspaceAccess::getMembershipLocked(
-                $user->id,
-                $id,
-                expectedSecurityVersion: (int) $user->security_version,
-            );
+        $left = DB::transaction(function () use ($id, $user, $request): string {
+            $context = $this->lockSecurityContext($request);
+            $membership = WorkspaceAccess::getMembershipForContext($context, $id);
             if (! $membership) {
                 return 'not_member';
             }
@@ -509,6 +475,7 @@ class WorkspaceController
                 ->where('invited_by', $user->id)
                 ->where('status', 'pending')
                 ->update(['status' => 'cancelled']);
+            Audit::write($user->id, 'workspace.leave', 'workspace', $id, null, UvhRequest::ip($request));
 
             return 'left';
         });
@@ -521,7 +488,6 @@ class WorkspaceController
         if ($left === 'busy') {
             return response()->json(['error' => 'Hay una entrega de webhook en curso. Espera unos segundos y vuelve a intentarlo.'], 409);
         }
-        Audit::write($user->id, 'workspace.leave', 'workspace', $id, null, UvhRequest::ip($request));
 
         return response()->json(['ok' => true]);
     }
@@ -536,26 +502,16 @@ class WorkspaceController
             || $confirmation === '' || mb_strlen($confirmation) > 120) {
             return response()->json(['error' => 'Confirma el nombre del workspace y tus credenciales'], 422);
         }
-        $sessionId = UvhRequest::sessionId($request);
         try {
-            $deleted = DB::transaction(function () use ($id, $user, $password, $factorCode, $confirmation, $sessionId): array {
+            $deleted = DB::transaction(function () use ($id, $user, $password, $factorCode, $confirmation, $request): array {
                 // Match account deletion's user -> session -> workspace lock order.
-                $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
-                    ->whereNull('revoked_at')->lockForUpdate()->first();
-                if (! $lockedUser || ! $lockedUser->email_verified_at || ! $session
-                    || (int) $session->security_version !== (int) $lockedUser->security_version) {
-                    return ['status' => 'stale'];
-                }
+                $context = $this->lockSecurityContext($request);
+                $lockedUser = $context->user;
+                $session = $context->session;
                 // Serialize deletion with webhook configuration and delivery. A
                 // workspace cannot disappear while an old endpoint is still sent
                 // a payload from it.
-                $membership = WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $id,
-                    'owner',
-                    expectedSecurityVersion: (int) $user->security_version,
-                );
+                $membership = WorkspaceAccess::getMembershipForContext($context, $id, 'owner');
                 if (! $membership || $membership->role !== 'owner') {
                     return ['status' => 'forbidden'];
                 }
@@ -594,6 +550,7 @@ class WorkspaceController
                     && ! UvhMail::workspaceDeleted($lockedUser->email, $workspace->name)) {
                     throw new MailAdmissionException('Workspace deletion notice outbox admission failed');
                 }
+                Audit::write($user->id, 'workspace.delete', 'workspace', $id, ['factor' => $stepUp['factor']], UvhRequest::ip($request));
 
                 return ['status' => 'deleted', 'factor' => $stepUp['factor']];
             });
@@ -626,8 +583,6 @@ class WorkspaceController
         if ($deleted['status'] === 'busy') {
             return response()->json(['error' => 'Hay una entrega de webhook en curso. Espera unos segundos y vuelve a intentarlo.'], 409);
         }
-
-        Audit::write($user->id, 'workspace.delete', 'workspace', $id, ['factor' => $deleted['factor']], UvhRequest::ip($request));
 
         return response()->json(['ok' => true]);
     }
@@ -663,14 +618,10 @@ class WorkspaceController
         $tokenHash = Ids::sha256Hex($token);
         try {
             $result = DB::transaction(function () use ($id, $email, $role, $user, $token, $tokenHash, $request): array {
+                $context = $this->lockSecurityContext($request);
                 // One parent-row lock serializes invitations for this workspace,
                 // including the check below and the partial unique index.
-                $actor = WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $id,
-                    'admin',
-                    expectedSecurityVersion: (int) $user->security_version,
-                );
+                $actor = WorkspaceAccess::getMembershipForContext($context, $id, 'admin');
                 if (! $actor || ($role === 'admin' && $actor->role !== 'owner')) {
                     return ['status' => 'forbidden'];
                 }
@@ -735,6 +686,7 @@ class WorkspaceController
                 )) {
                     throw new MailAdmissionException('Invitation outbox admission failed');
                 }
+                Audit::write($user->id, 'workspace.invite', 'workspace', $id, ['role' => $role], UvhRequest::ip($request));
 
                 return ['status' => 'created'];
             });
@@ -765,7 +717,6 @@ class WorkspaceController
 
             return response()->json(['error' => 'Este usuario ya es miembro o ya tiene una invitación pendiente'], 409);
         }
-        Audit::write($user->id, 'workspace.invite', 'workspace', $id, ['role' => $role], UvhRequest::ip($request));
 
         return response()->json(['ok' => true], 201);
     }
@@ -790,19 +741,14 @@ class WorkspaceController
         $snapshot = Invitation::where('token', $tokenHash)->first(['workspace_id', 'invited_by']);
         $workspaceId = $snapshot ? (int) $snapshot->workspace_id : null;
         try {
-            $inv = $snapshot ? DB::transaction(function () use ($tokenHash, $workspaceId, $snapshot, $user): ?Invitation {
+            $inv = $snapshot ? DB::transaction(function () use ($tokenHash, $workspaceId, $snapshot, $user, $request): ?Invitation {
                 // Global mutation order is users -> workspace -> child resources.
                 // Transfer of ownership follows this order too; locking the issuer
                 // only after the workspace created a deterministic deadlock cycle.
-                $userIds = array_values(array_unique([(int) $user->id, (int) $snapshot->invited_by]));
-                sort($userIds, SORT_NUMERIC);
-                $lockedUsers = User::whereIn('id', $userIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-                $target = $lockedUsers->get((int) $user->id);
-                $issuer = $lockedUsers->get((int) $snapshot->invited_by);
-                if (! $target || $target->deleted_at || ! $target->email_verified_at
-                    || (int) $target->security_version !== (int) $user->security_version) {
-                    return null;
-                }
+                $issuerId = (int) $snapshot->invited_by;
+                $context = $this->lockSecurityContext($request, $issuerId > 0 ? [$issuerId] : []);
+                $target = $context->user;
+                $issuer = $context->relatedUser($issuerId);
                 if (! Workspace::where('id', $workspaceId)->lockForUpdate()->first()) {
                     return null;
                 }
@@ -834,6 +780,7 @@ class WorkspaceController
                 }
                 $locked->update(['status' => 'accepted']);
                 Membership::create(['workspace_id' => $locked->workspace_id, 'user_id' => $target->id, 'role' => $locked->role]);
+                Audit::write($user->id, 'workspace.invitation_accepted', 'workspace', $locked->workspace_id, null, UvhRequest::ip($request));
 
                 return $locked->fresh();
             }) : null;
@@ -848,8 +795,6 @@ class WorkspaceController
             // dead end in front of the user on every visit.
             return $fromParked ? PendingHandoff::clearOn($rejected, PendingHandoff::INVITATION) : $rejected;
         }
-
-        Audit::write($user->id, 'workspace.invitation_accepted', 'workspace', $inv->workspace_id, null, UvhRequest::ip($request));
 
         $accepted = response()->json(['ok' => true, 'workspaceId' => $inv->workspace_id]);
 
@@ -872,15 +817,11 @@ class WorkspaceController
 
         $tokenHash = Ids::sha256Hex($token);
         $workspaceId = Invitation::where('token', $tokenHash)->value('workspace_id');
-        $inv = $workspaceId ? DB::transaction(function () use ($tokenHash, $workspaceId, $user): ?Invitation {
+        $inv = $workspaceId ? DB::transaction(function () use ($tokenHash, $workspaceId, $user, $request): ?Invitation {
             // Bearer rejection is still an authenticated account mutation.
             // Revalidate identity before the workspace to match the global lock
             // order and prevent a stale pre-rotation request using an old email.
-            $lockedUser = User::where('id', $user->id)->lockForUpdate()->first();
-            if (! $lockedUser || $lockedUser->deleted_at || ! $lockedUser->email_verified_at
-                || (int) $lockedUser->security_version !== (int) $user->security_version) {
-                return null;
-            }
+            $lockedUser = $this->lockSecurityContext($request)->user;
             if (! Workspace::where('id', $workspaceId)->lockForUpdate()->first()) {
                 return null;
             }
@@ -890,6 +831,7 @@ class WorkspaceController
                 return null;
             }
             $locked->update(['status' => 'rejected']);
+            Audit::write($user->id, 'workspace.invitation_rejected', 'workspace', $locked->workspace_id, null, UvhRequest::ip($request));
 
             return $locked;
         }) : null;
@@ -899,8 +841,6 @@ class WorkspaceController
             return $fromParked ? PendingHandoff::clearOn($rejected, PendingHandoff::INVITATION) : $rejected;
         }
 
-        Audit::write($user->id, 'workspace.invitation_rejected', 'workspace', $inv->workspace_id, null, UvhRequest::ip($request));
-
         $ok = response()->json(['ok' => true]);
 
         return $fromParked ? PendingHandoff::clearOn($ok, PendingHandoff::INVITATION) : $ok;
@@ -909,13 +849,9 @@ class WorkspaceController
     public function cancelInvitation(Request $request, int $id, int $invitationId)
     {
         $user = UvhRequest::user($request);
-        $changed = DB::transaction(function () use ($id, $invitationId, $user): string {
-            $actor = WorkspaceAccess::getMembershipLocked(
-                $user->id,
-                $id,
-                'admin',
-                expectedSecurityVersion: (int) $user->security_version,
-            );
+        $changed = DB::transaction(function () use ($id, $invitationId, $user, $request): string {
+            $context = $this->lockSecurityContext($request);
+            $actor = WorkspaceAccess::getMembershipForContext($context, $id, 'admin');
             if (! $actor) {
                 return 'access_changed';
             }
@@ -930,6 +866,7 @@ class WorkspaceController
                 return 'forbidden';
             }
             $invitation->update(['status' => 'cancelled']);
+            Audit::write($user->id, 'workspace.invitation_cancelled', 'workspace', $id, null, UvhRequest::ip($request));
 
             return 'ok';
         });
@@ -945,7 +882,6 @@ class WorkspaceController
         if ($changed === 'forbidden') {
             return response()->json(['error' => 'Solo el propietario puede gestionar invitaciones de administrador'], 403);
         }
-        Audit::write($user->id, 'workspace.invitation_cancelled', 'workspace', $id, null, UvhRequest::ip($request));
 
         return response()->json(['ok' => true]);
     }
@@ -957,12 +893,8 @@ class WorkspaceController
         $newTokenHash = Ids::sha256Hex($newToken);
         try {
             $result = DB::transaction(function () use ($id, $invitationId, $user, $newToken, $newTokenHash, $request): array {
-                $actor = WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $id,
-                    'admin',
-                    expectedSecurityVersion: (int) $user->security_version,
-                );
+                $context = $this->lockSecurityContext($request);
+                $actor = WorkspaceAccess::getMembershipForContext($context, $id, 'admin');
                 if (! $actor) {
                     return ['status' => 'forbidden'];
                 }
@@ -1012,6 +944,7 @@ class WorkspaceController
                 )) {
                     throw new MailAdmissionException('Invitation resend outbox admission failed');
                 }
+                Audit::write($user->id, 'workspace.invitation_resent', 'workspace', $id, null, UvhRequest::ip($request));
 
                 return ['status' => 'updated'];
             });
@@ -1042,9 +975,23 @@ class WorkspaceController
 
             return response()->json(['error' => 'Invitación no encontrada, no renovable o sin permisos'], 404);
         }
-        Audit::write($user->id, 'workspace.invitation_resent', 'workspace', $id, null, UvhRequest::ip($request));
 
         return response()->json(['ok' => true]);
+    }
+
+    /** @param list<int> $relatedUserIds */
+    private function lockSecurityContext(Request $request, array $relatedUserIds = []): SecurityContext
+    {
+        $snapshot = UvhRequest::user($request);
+        $sessionId = UvhRequest::sessionId($request);
+        $context = $snapshot === null ? null : ($relatedUserIds === []
+            ? SecurityContext::lock($snapshot, $sessionId, true)
+            : SecurityContext::lockWithUsers($snapshot, $sessionId, $relatedUserIds, true));
+        if ($context === null) {
+            throw new StaleSecurityContext;
+        }
+
+        return $context;
     }
 
     /**

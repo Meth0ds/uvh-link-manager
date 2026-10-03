@@ -13,6 +13,7 @@ use App\Http\Middleware\UvhSession;
 use App\Http\Middleware\UvhThrottleRequests;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\OperationalMetrics;
+use App\Support\StaleSecurityContext;
 use App\Support\WebhookAdmissionUnavailable;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -83,6 +84,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (StaleSecurityContext $exception, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            }
+
+            return null;
+        });
         $exceptions->render(function (WebhookAdmissionUnavailable $exception, Request $request) {
             OperationalMetrics::increment('webhook.admission_failed');
             if ($request->is('api/*') || $request->expectsJson()) {

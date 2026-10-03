@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\PendingRegistration;
+use App\Models\RegistrationAttempt;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Ids;
@@ -81,8 +82,13 @@ final class RegistrationAdmissionTest extends TestCase
                 if ($pending) {
                     $this->assertSame($before, $pending->refresh()->getAttributes());
                     $this->assertDatabaseHas('email_tokens', ['id' => Ids::sha256Hex('original-bearer')]);
+                    $attempt = RegistrationAttempt::sole();
+                    $this->assertSame(1, $attempt->security_version);
+                    $this->assertSame('original@example.test', $attempt->email);
+                    $this->assertNull($attempt->legacy_consumed_at);
                 } else {
                     $this->assertDatabaseCount('pending_registrations', 0);
+                    $this->assertDatabaseCount('registration_attempts', 0);
                 }
                 $this->assertDatabaseCount('mail_outbox', 0);
                 $this->assertDatabaseCount('audit_outbox', 0);

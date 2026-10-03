@@ -3,6 +3,9 @@ import { HttpClient, HttpErrorResponse, HttpParams } from "@angular/common/http"
 import { catchError, firstValueFrom, map, Observable, throwError, timeout, TimeoutError } from "rxjs";
 import type { ApiError } from "../models";
 import { retryAfterSeconds } from "./retry-after";
+import { SessionContextService } from "./session-context.service";
+import { WorkspaceService } from "./workspace.service";
+import { isWorkspaceScopedPath } from "../api-request-scope";
 
 const CSRF_COOKIES = ["__Host-uvh_csrf", "uvh_csrf"] as const;
 
@@ -60,6 +63,8 @@ function readCookie(name: string): string | null {
 export class ApiService {
   private http = inject(HttpClient);
   private csrfRequest?: Promise<void>;
+  private readonly sessionContext = inject(SessionContextService);
+  private readonly workspaces = inject(WorkspaceService);
 
   private csrfToken(): string | null {
     for (const name of CSRF_COOKIES) {
@@ -107,12 +112,13 @@ export class ApiService {
    * why the decision reads the `reason` the middleware sends instead of the
    * status alone.
    */
-  private async retryOnRejectedCsrf<T>(attempt: () => Promise<T>): Promise<T> {
+  private async retryOnRejectedCsrf<T>(attempt: () => Promise<T>, assertContext: () => void): Promise<T> {
     try {
       return await attempt();
     } catch (err) {
       if (!(err instanceof ApiRequestError) || err.reason !== CSRF_REJECTED) throw err;
       try {
+        assertContext();
         await this.fetchCsrf();
         return await attempt();
       } catch (retryErr) {
@@ -125,10 +131,31 @@ export class ApiService {
     }
   }
 
+  /** Capture intent before CSRF can yield to another auth/tenant transition. */
+  private mutationGuard(path: string): () => void {
+    const generation = this.sessionContext.generation();
+    const account = this.sessionContext.user()?.id ?? null;
+    const scoped = isWorkspaceScopedPath(path);
+    const workspace = scoped ? this.workspaces.currentId() : null;
+    const selection = scoped ? this.workspaces.selectionGeneration() : null;
+    return () => {
+      if (generation !== this.sessionContext.generation()
+        || account !== (this.sessionContext.user()?.id ?? null)
+        || (scoped && (workspace !== this.workspaces.currentId() || selection !== this.workspaces.selectionGeneration()))) {
+        throw new ApiRequestError("La sesión o el workspace cambió. Revisa el estado actual antes de continuar.",
+          409, { reason: "request_context_changed" }, undefined, "request_context_changed");
+      }
+    };
+  }
+
   /** One CSRF-protected mutation, re-issued once if its token is rejected. */
-  private async mutate<T>(build: () => Observable<T>, decoder?: ApiDecoder<T>): Promise<T> {
+  private async mutate<T>(path: string, build: () => Observable<T>, decoder?: ApiDecoder<T>): Promise<T> {
+    const assertContext = this.mutationGuard(path);
     await this.ensureCsrf();
-    return this.retryOnRejectedCsrf(() => this.request(build(), decoder, "mutation"));
+    return this.retryOnRejectedCsrf(() => {
+      assertContext();
+      return this.request(build(), decoder, "mutation");
+    }, assertContext);
   }
 
   private assertApiPath(path: string): void {
@@ -231,7 +258,7 @@ export class ApiService {
   /** POST (mutation — requires CSRF). `extraHeaders` carries e.g. an Idempotency-Key. */
   async post<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>, extraHeaders?: Record<string, string>): Promise<T> {
     this.assertApiPath(path);
-    return this.mutate(() => this.http.post<T>(path, body ?? {}, {
+    return this.mutate(path, () => this.http.post<T>(path, body ?? {}, {
       headers: { ...this.headers(true), ...extraHeaders },
     }), decoder);
   }
@@ -239,11 +266,15 @@ export class ApiService {
   /** POST returning a private binary artifact while preserving JSON errors. */
   async postBlob(path: string, body?: unknown): Promise<Blob> {
     this.assertApiPath(path);
+    const assertContext = this.mutationGuard(path);
     await this.ensureCsrf();
-    return this.retryOnRejectedCsrf(() => this.artifactRequest(this.http.post(path, body ?? {}, {
-      headers: this.headers(true),
-      responseType: "blob",
-    })));
+    return this.retryOnRejectedCsrf(() => {
+      assertContext();
+      return this.artifactRequest(this.http.post(path, body ?? {}, {
+        headers: this.headers(true),
+        responseType: "blob",
+      }));
+    }, assertContext);
   }
 
   /** GET returning a private binary artifact (exports) while preserving JSON errors. */
@@ -287,13 +318,13 @@ export class ApiService {
   /** PATCH (mutation — requires CSRF). */
   async patch<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
-    return this.mutate(() => this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
+    return this.mutate(path, () => this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
   }
 
   /** DELETE (mutation — requires CSRF). */
   async delete<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
     this.assertApiPath(path);
-    return this.mutate(() => this.http.delete<T>(path, { headers: this.headers(true), body }), decoder);
+    return this.mutate(path, () => this.http.delete<T>(path, { headers: this.headers(true), body }), decoder);
   }
 
   /** Raw observable for callers that need streaming/loading states. */

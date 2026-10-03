@@ -47,3 +47,8 @@ export function decodeAccountDeletionConfirmation(value: unknown): { ok: true; e
     executeAfter,
   };
 }
+
+/** Recovery completion both confirms text and reconciles the affected identity. */
+export function decodeAccountRecoveryCompletion(value: unknown): PublicActionMessage & { current: boolean } {
+  return { ...decodePublicActionMessage(value), ...decodeCredentialChange(value) };
+}

@@ -172,7 +172,7 @@ class AccountController
         }
 
         if (is_array($result['expired_artifact'] ?? null)) {
-            PrivateArtifactCleanup::attempt(
+            PrivateArtifactCleanup::afterCommit(
                 $result['expired_artifact']['id'],
                 $result['expired_artifact']['path'],
             );
@@ -226,7 +226,7 @@ class AccountController
             return response()->json(['error' => 'No hay una exportación activa'], 409);
         }
         if (is_string($result['path']) && $result['path'] !== '') {
-            PrivateArtifactCleanup::attempt($result['id'], $result['path']);
+            PrivateArtifactCleanup::afterCommit($result['id'], $result['path']);
         }
 
         return response()->json(['ok' => true]);
@@ -311,7 +311,7 @@ class AccountController
         if ($result['status'] !== 'ok'
             && isset($result['request_id'])
             && is_string($result['path'] ?? null)) {
-            PrivateArtifactCleanup::attempt((int) $result['request_id'], $result['path']);
+            PrivateArtifactCleanup::afterCommit((int) $result['request_id'], $result['path']);
         }
         if ($result['status'] === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
@@ -509,7 +509,7 @@ class AccountController
         }
 
         if (isset($result['request_id']) && is_string($result['path'] ?? null)) {
-            PrivateArtifactCleanup::attempt((int) $result['request_id'], $result['path']);
+            PrivateArtifactCleanup::afterCommit((int) $result['request_id'], $result['path']);
         }
         if ($result['status'] === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
@@ -844,7 +844,7 @@ class AccountController
             return response()->json(['error' => 'La confirmación no es válida o la cuenta ya no puede eliminarse'], 400);
         }
         foreach ($result['artifacts'] as $artifact) {
-            PrivateArtifactCleanup::attempt($artifact['id'], $artifact['path']);
+            PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
         }
         try {
             $intentRevocation = LinkIntentRegistry::revokeForUser($result['user_id']);

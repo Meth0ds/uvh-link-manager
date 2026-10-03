@@ -36,6 +36,13 @@
       </header>
 
 <div class="card-block profile-card">
+  @if (userRefreshRequired()) {
+    <app-async-operation-status tone="expired" icon="sync" role="status">
+      <b>Los cambios están confirmados</b>
+      <p>Los datos de esta vista necesitan actualizarse. Comprueba el estado actual antes de repetir una operación.</p>
+      <button mat-stroked-button type="button" (click)="refreshAccountView()" [disabled]="profileRefreshBusy()" [attr.aria-busy]="profileRefreshBusy()">{{ profileRefreshBusy() ? 'Actualizando…' : 'Actualizar datos' }}</button>
+    </app-async-operation-status>
+  }
   <div class="card-heading"><span class="card-icon"><mat-icon>person</mat-icon></span><div><h3>Cómo te ven los demás</h3><p>Usa un nombre reconocible para las personas con las que compartes workspace.</p></div></div>
   <form class="stack profile-form" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
     <mat-form-field appearance="outline" subscriptSizing="dynamic">

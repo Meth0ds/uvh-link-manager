@@ -32,7 +32,9 @@ class DatabaseSchemaTest extends TestCase
             'webhook_deliveries',
             'abuse_reports',
             'audit_events',
+            'security_incident_audits',
             'pending_registrations',
+            'registration_attempts',
             'email_tokens',
             'email_change_requests',
             'data_export_requests',
@@ -94,10 +96,12 @@ class DatabaseSchemaTest extends TestCase
             'webhook_deliveries' => ['webhook_id', 'config_version', 'event', 'event_id', 'payload', 'status', 'attempts', 'locked_at', 'next_attempt_at'],
             'abuse_reports' => ['link_id', 'reason', 'status', 'source', 'reporter_hash', 'report_day'],
             'audit_events' => ['user_id', 'workspace_id', 'action', 'resource_type', 'resource_id', 'metadata'],
+            'security_incident_audits' => ['id', 'user_id', 'affected_user_id', 'administratively_blocked', 'incident_correlation_id', 'incident_at'],
             // Un registro sin verificar es una fila propia, no un usuario sin
             // activar: ni nombre, ni workspace, ni aceptaciones que heredar, ni
             // contraseña —la propuesta no se guarda—.
             'pending_registrations' => ['id', 'email', 'security_version'],
+            'registration_attempts' => ['id', 'email', 'security_version', 'expires_at', 'pending_registration_id', 'pending_security_version', 'legacy_pending_id', 'legacy_security_version', 'legacy_claim_hash', 'legacy_consumed_at'],
             // Un bearer `verify` nombra un registro pendiente; los demás kinds
             // nombran un usuario (CHECK email_tokens_owner_check).
             'email_tokens' => ['id', 'user_id', 'pending_registration_id', 'kind', 'expires_at', 'used_at'],

@@ -6,7 +6,7 @@ import { FormBuilder } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { Subject } from "rxjs";
-import type { AccountDeletionImpact, AuthUser, DataExportStatus, Session, SessionList } from "../../core/models";
+import type { AccountDeletionImpact, AuthUser, DataExportStatus, NotificationPreference, Session, SessionList } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { NotificationService } from "../../core/services/notification.service";
@@ -55,7 +55,7 @@ describe("SettingsComponent async safety", () => {
   type AuthMethods = Pick<AuthService,
     "sessionGeneration" | "listSessions" | "dataExportStatus" | "dataExportHistory" | "accountDeletionImpact"
     | "updateProfile" | "changePassword" | "refreshUser" | "revokeSession" | "mfaSetup" | "mfaEnable" | "mfaDisable" | "mfaCancelSetup" | "mfaRegenerateRecoveryCodes">;
-  let auth: jasmine.SpyObj<AuthMethods> & { user: WritableSignal<AuthUser | null> };
+  let auth: jasmine.SpyObj<AuthMethods> & { user: WritableSignal<AuthUser | null>; userRefreshRequired: WritableSignal<boolean> };
   let api: jasmine.SpyObj<ApiService>;
   let snackbar: jasmine.SpyObj<MatSnackBar>;
   let router: jasmine.SpyObj<Router>;
@@ -71,7 +71,7 @@ describe("SettingsComponent async safety", () => {
       "sessionGeneration", "listSessions", "dataExportStatus", "dataExportHistory", "accountDeletionImpact",
       "updateProfile", "changePassword", "refreshUser", "revokeSession", "mfaSetup", "mfaEnable", "mfaDisable", "mfaCancelSetup", "mfaRegenerateRecoveryCodes",
     ]);
-    auth = Object.assign(authSpy, { user: signal<AuthUser | null>({
+    auth = Object.assign(authSpy, { userRefreshRequired: signal(false), user: signal<AuthUser | null>({
       id: 1, email: "user@example.test", name: "User", isAdmin: false,
       emailVerified: true, mfaEnabled: false,
     }) });
@@ -145,6 +145,125 @@ describe("SettingsComponent async safety", () => {
     expect(component.operationalPreferences()[0].delivery).toBe("daily_digest");
     expect(snackbar.open).toHaveBeenCalled();
   });
+
+  const preference = (delivery: NotificationPreference["delivery"] = "immediate"): NotificationPreference =>
+    ({ kind: "api_token_created", category: "operational", delivery });
+
+  it("keeps the newest notification preference load when responses finish out of order", async () => {
+    const old = deferred<NotificationPreference[]>();
+    notifications.preferences.and.returnValues(old.promise, Promise.resolve([preference("disabled")]));
+    const pending = component.loadNotificationPreferences();
+    await component.loadNotificationPreferences();
+    old.resolve([preference()]);
+    await pending;
+    expect(component.notificationPreferences()).toEqual([preference("disabled")]);
+  });
+
+  for (const failed of [false, true]) {
+    it(`does not let an old preference read ${failed ? "error" : "finally"} settle a newer read`, async () => {
+      const old = deferred<NotificationPreference[]>();
+      const fresh = deferred<NotificationPreference[]>();
+      notifications.preferences.and.returnValues(failed
+        ? old.promise.then(() => { throw new Error("old read failure"); }) : old.promise, fresh.promise);
+      const pending = component.loadNotificationPreferences();
+      const current = component.loadNotificationPreferences();
+      old.resolve([preference("disabled")]);
+      await pending;
+      expect(component.notificationPrefsLoading()).toBeTrue();
+      expect(component.notificationPrefsError()).toBeNull();
+      expect(component.notificationPreferences()).toEqual([]);
+      fresh.resolve([preference("daily_digest")]);
+      await current;
+      expect(component.notificationPrefsLoading()).toBeFalse();
+      expect(component.notificationPreferences()).toEqual([preference("daily_digest")]);
+    });
+  }
+
+  it("does not overwrite a confirmed preference with a read started before the write", async () => {
+    const old = deferred<NotificationPreference[]>();
+    notifications.preferences.and.returnValue(old.promise);
+    const pending = component.loadNotificationPreferences();
+    notifications.updatePreferences.and.resolveTo([preference("disabled")]);
+    await component.setNotificationDelivery(preference(), "disabled");
+    old.resolve([preference()]);
+    await pending;
+    expect(component.notificationPreferences()).toEqual([preference("disabled")]);
+    expect(component.notificationPrefsLoading()).toBeFalse();
+  });
+
+  it("does not start a competing preference read while a write owns the view", async () => {
+    const write = deferred<NotificationPreference[]>();
+    notifications.updatePreferences.and.returnValue(write.promise);
+    const pending = component.setNotificationDelivery(preference(), "disabled");
+    notifications.preferences.calls.reset();
+    await component.loadNotificationPreferences();
+    expect(notifications.preferences).not.toHaveBeenCalled();
+    write.resolve([preference("disabled")]);
+    await pending;
+  });
+
+  it("clears preferences and ignores a pending response after logout", async () => {
+    TestBed.tick();
+    component.notificationPreferences.set([preference()]);
+    const old = deferred<NotificationPreference[]>();
+    notifications.preferences.and.returnValue(old.promise);
+    const pending = component.loadNotificationPreferences();
+    auth.sessionGeneration.and.returnValue(2);
+    auth.user.set(null);
+    TestBed.tick();
+    expect(component.notificationPreferences()).toEqual([]);
+    expect(component.notificationPrefsLoading()).toBeFalse();
+    old.resolve([preference("disabled")]);
+    await pending;
+    expect(component.notificationPreferences()).toEqual([]);
+    expect(component.notificationPrefsError()).toBeNull();
+  });
+
+  for (const failed of [false, true]) {
+    it(`ignores a late preference ${failed ? "failure" : "success"} and finally across A to B to A`, async () => {
+      TestBed.tick();
+      const old = deferred<NotificationPreference[]>();
+      const fresh = deferred<NotificationPreference[]>();
+      notifications.updatePreferences.and.returnValues(failed
+        ? old.promise.then(() => { throw new Error("old failure"); }) : old.promise, fresh.promise);
+      const pending = component.setNotificationDelivery(preference(), "disabled");
+      const userA = auth.user()!;
+      auth.sessionGeneration.and.returnValue(2);
+      auth.user.set({ ...userA, id: 2 });
+      TestBed.tick();
+      auth.sessionGeneration.and.returnValue(3);
+      auth.user.set({ ...userA });
+      TestBed.tick();
+      await Promise.resolve();
+      expect(component.notificationPrefsBusy()).toBeFalse();
+      const current = component.setNotificationDelivery(preference(), "daily_digest");
+      old.resolve([preference("disabled")]);
+      await pending;
+      expect(snackbar.open).not.toHaveBeenCalled();
+      expect(component.notificationPrefsBusy()).toBeTrue();
+      expect(component.notificationPreferences()).not.toEqual([preference("disabled")]);
+      fresh.resolve([preference("daily_digest")]);
+      await current;
+      expect(component.notificationPreferences()).toEqual([preference("daily_digest")]);
+      expect(component.notificationPrefsBusy()).toBeFalse();
+      expect(snackbar.open).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  for (const action of ["load", "write"] as const) {
+    it(`ignores preference ${action} completion after the view is destroyed`, async () => {
+      const response = deferred<NotificationPreference[]>();
+      notifications.preferences.and.returnValue(response.promise);
+      notifications.updatePreferences.and.returnValue(response.promise);
+      const pending = action === "load" ? component.loadNotificationPreferences()
+        : component.setNotificationDelivery(preference(), "disabled");
+      TestBed.resetTestingModule();
+      response.resolve([preference("disabled")]);
+      await pending;
+      expect(component.notificationPreferences()).toEqual([]);
+      expect(snackbar.open).not.toHaveBeenCalled();
+    });
+  }
 
   it("keeps the newest sessions response when an older request finishes last", async () => {
     const older = deferred<SessionList>();
@@ -467,6 +586,40 @@ describe("SettingsComponent async safety", () => {
     auth.sessionGeneration.and.returnValue(2);
     response.resolve(auth.user()!);
     await operation;
+    expect(snackbar.open).not.toHaveBeenCalled();
+  });
+
+  it("refreshes confirmed account changes without sending the commands again", async () => {
+    auth.userRefreshRequired.set(true);
+    await component.refreshAccountView();
+    expect(auth.refreshUser).toHaveBeenCalledTimes(1);
+    expect(auth.updateProfile).not.toHaveBeenCalled();
+    expect(auth.changePassword).not.toHaveBeenCalled();
+    expect(component.profileRefreshBusy()).toBeFalse();
+  });
+
+  it("keeps confirmed changes separate from a failed view refresh", async () => {
+    auth.userRefreshRequired.set(true);
+    auth.refreshUser.and.rejectWith(new Error("Offline"));
+    await component.refreshAccountView();
+    expect(snackbar.open).toHaveBeenCalledWith("Los cambios siguen confirmados, pero no se pudo actualizar la vista.", "Cerrar", { duration: 4000 });
+    expect(component.userRefreshRequired()).toBeTrue();
+    expect(component.profileRefreshBusy()).toBeFalse();
+    expect(auth.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("does not repeat a pending manual refresh or show its failure in another account", async () => {
+    const response = deferred<void>();
+    auth.refreshUser.and.returnValue(response.promise.then(() => { throw new Error("Old offline"); }));
+    const operation = component.refreshAccountView();
+    await component.refreshAccountView();
+    expect(auth.refreshUser).toHaveBeenCalledTimes(1);
+    auth.sessionGeneration.and.returnValue(2);
+    auth.user.set(null);
+    TestBed.tick();
+    response.resolve();
+    await operation;
+    expect(component.profileRefreshBusy()).toBeFalse();
     expect(snackbar.open).not.toHaveBeenCalled();
   });
 

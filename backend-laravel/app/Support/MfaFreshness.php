@@ -26,10 +26,10 @@ final class MfaFreshness
         return max(1, min(60, (int) config('uvh.admin_mfa_fresh_minutes', self::DEFAULT_MINUTES)));
     }
 
-    /** null (never verified) and expired windows are equally not fresh. */
+    /** null and the exact expiresAt deadline are already outside the window. */
     public static function isFresh(?DateTimeInterface $verifiedAt): bool
     {
-        return $verifiedAt !== null && $verifiedAt >= now()->subMinutes(self::windowMinutes());
+        return $verifiedAt !== null && $verifiedAt > now()->subMinutes(self::windowMinutes());
     }
 
     /** Uniform 403 for step-up surfaces whose session window lapsed. */

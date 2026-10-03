@@ -317,7 +317,7 @@ class AdminController
         }
 
         foreach ($result['artifacts'] as $artifact) {
-            PrivateArtifactCleanup::attempt($artifact['id'], $artifact['path']);
+            PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
         }
         if ($result['revoke_intents']) {
             try {

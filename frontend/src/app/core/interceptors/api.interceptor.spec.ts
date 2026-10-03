@@ -12,11 +12,14 @@ describe("apiInterceptor context isolation", () => {
   beforeEach(() => {
     auth = jasmine.createSpyObj<AuthService>("AuthService", [
       "sessionGeneration",
+      "user",
+      "sessionContextChanged",
       "authenticated",
       "sessionExpired",
       "requireAdminMfaReauthentication",
     ]);
     auth.sessionGeneration.and.returnValue(7);
+    auth.user.and.returnValue({ id: 1, name: "User", email: "user@example.test", isAdmin: false, emailVerified: true, mfaEnabled: false });
     auth.authenticated.and.returnValue(true);
     workspaces = { currentId: () => 42 };
     TestBed.configureTestingModule({

@@ -1,5 +1,5 @@
 import { DatePipe } from "@angular/common";
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
@@ -66,14 +66,39 @@ export class NotificationsComponent {
   }
 
   constructor() {
+    let identity = this.accountContext();
+    effect(() => {
+      const nextIdentity = this.accountContext();
+      if (identity === nextIdentity) return;
+      identity = nextIdentity;
+      this.resetInbox();
+      if (this.auth.user()) untracked(() => { void this.load(); });
+    });
     void this.load();
+  }
+
+  private accountContext(): string {
+    return `${this.auth.user()?.id}:${this.auth.sessionGeneration()}`;
+  }
+
+  private resetInbox(): void {
+    this.requests.invalidate();
+    this.items.set([]);
+    this.cursor.set(null);
+    this.error.set(null);
+    this.loading.set(false);
+    this.busy.set(false);
   }
 
   async load(): Promise<void> {
     if (this.busy()) return;
+    if (!this.auth.user()) {
+      this.resetInbox();
+      return;
+    }
     this.loading.set(true);
-    const request = this.requests.begin(this.auth.sessionGeneration());
-    const current = (): boolean => this.requests.isCurrent(request, this.auth.sessionGeneration());
+    const request = this.requests.begin(this.accountContext());
+    const current = (): boolean => this.requests.isCurrent(request, this.accountContext());
     this.error.set(null);
     try {
       const page = await this.notifications.list(undefined, { signal: request.signal });
@@ -92,8 +117,8 @@ export class NotificationsComponent {
     const before = this.cursor();
     if (before === null || this.busy() || this.loading()) return;
     this.busy.set(true);
-    const request = this.requests.begin(this.auth.sessionGeneration());
-    const current = (): boolean => this.requests.isCurrent(request, this.auth.sessionGeneration());
+    const request = this.requests.begin(this.accountContext());
+    const current = (): boolean => this.requests.isCurrent(request, this.accountContext());
     this.error.set(null);
     try {
       const page = await this.notifications.list(before, { signal: request.signal });
@@ -111,8 +136,8 @@ export class NotificationsComponent {
   async markRead(item: NotificationItem): Promise<void> {
     if (item.readAt !== null || this.busy() || this.loading()) return;
     this.busy.set(true);
-    const request = this.requests.begin(this.auth.sessionGeneration());
-    const current = (): boolean => this.requests.isCurrent(request, this.auth.sessionGeneration());
+    const request = this.requests.begin(this.accountContext());
+    const current = (): boolean => this.requests.isCurrent(request, this.accountContext());
     this.error.set(null);
     try {
       await this.notifications.markRead(item.id);
@@ -130,8 +155,8 @@ export class NotificationsComponent {
   async markAllRead(): Promise<void> {
     if (this.busy() || this.loading()) return;
     this.busy.set(true);
-    const request = this.requests.begin(this.auth.sessionGeneration());
-    const current = (): boolean => this.requests.isCurrent(request, this.auth.sessionGeneration());
+    const request = this.requests.begin(this.accountContext());
+    const current = (): boolean => this.requests.isCurrent(request, this.accountContext());
     this.error.set(null);
     try {
       await this.notifications.markAllRead();

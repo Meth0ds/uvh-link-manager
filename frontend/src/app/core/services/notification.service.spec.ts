@@ -77,4 +77,12 @@ describe("NotificationService response ownership", () => {
     await old;
     expect(service.unread()).toBe(0);
   });
+  it("forwards cancellation options only to the preference read", async () => {
+    const controller = new AbortController();
+    api.get.and.resolveTo({ preferences: [] });
+    await service.preferences({ signal: controller.signal });
+    expect(api.get).toHaveBeenCalledWith("/api/v1/notifications/preferences", undefined,
+      jasmine.any(Function), { signal: controller.signal });
+  });
+
 });

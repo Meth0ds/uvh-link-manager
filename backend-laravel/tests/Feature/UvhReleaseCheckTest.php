@@ -48,7 +48,7 @@ final class UvhReleaseCheckTest extends TestCase
 
     public static function missingSchema(): array
     {
-        return [['ledger'], ['table'], ['column'], ['audit_column'], ['usage_index'], ['audit_outbox'], ['notice_ledger']];
+        return [['ledger'], ['table'], ['column'], ['audit_column'], ['usage_index'], ['audit_outbox'], ['notice_ledger'], ['incident_receipts'], ['incident_column']];
     }
 
     #[DataProvider('missingSchema')]
@@ -70,6 +70,12 @@ final class UvhReleaseCheckTest extends TestCase
                 Schema::rename('audit_outbox', 'release_hidden_audit_outbox');
             } elseif ($part === 'notice_ledger') {
                 Schema::rename('operational_notice_events', 'release_hidden_notice_ledger');
+            } elseif ($part === 'incident_receipts') {
+                Schema::rename('security_incident_audits', 'release_hidden_incident_receipts');
+            } elseif ($part === 'incident_column') {
+                Schema::table('security_incident_audits', function (Blueprint $table): void {
+                    $table->renameColumn('incident_at', 'release_hidden_incident_at');
+                });
             } elseif ($part === 'usage_index') {
                 DB::statement('DROP INDEX workspace_usage_tokens_idx');
             } else {
@@ -82,6 +88,7 @@ final class UvhReleaseCheckTest extends TestCase
                 'audit_column' => 'Falta la atribución de actividad por workspace (000033).',
                 'audit_outbox', 'notice_ledger' => 'Falta el esquema de auditoría durable o avisos operativos (2026_09_30).',
                 'usage_index' => 'Faltan índices acotados de uso por workspace (000034).',
+                'incident_receipts', 'incident_column' => 'Falta el esquema de recuperación de auditoría de incidentes (2026_10_03).',
                 default => 'Falta el esquema de presupuestos de invitación (000032).',
             };
             $this->assertContains($expected, ReleaseReadiness::errors());

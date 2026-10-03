@@ -31,6 +31,14 @@ groups:
           severity: critical
         annotations:
           summary: Hay auditoría durable pendiente de materializar
+      - alert: UvhSecurityIncidentAuditPending
+        expr: uvh_security_incident_audits_pending > 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: Hay revocaciones protectoras pendientes de auditoría
+          description: Revisar la admisión de auditoría y la etapa protective_incident_audits de housekeeping.
       - alert: UvhPreparationLatency
         expr: histogram_quantile(0.95, sum by (le) (uvh_http_duration_seconds_60m_bucket{phase="prepare"})) > 1
         for: 10m

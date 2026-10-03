@@ -31,7 +31,12 @@ final class AccountDeletionAudit
 
             return true;
         } catch (Throwable $error) {
-            Log::warning('Protective cancellation audit remains pending', ['request_id' => $request->id, 'exception_class' => $error::class]);
+            try {
+                Log::warning('Protective cancellation audit remains pending', ['request_id' => $request->id, 'exception_class' => $error::class]);
+            } catch (Throwable) {
+                // The receipt already survives; a broken logging transport
+                // must not roll back the protective cancellation either.
+            }
 
             return false;
         }

@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -109,6 +110,60 @@ final class MfaStepUpBudgetTest extends TestCase
             Carbon::parse($verifiedAt)->gt(now()->subMinute()),
             'A successful step-up must refresh the privileged window',
         );
+    }
+
+    #[DataProvider('freshnessBoundaryProvider')]
+    public function test_status_and_step_up_agree_on_the_exact_expiry(int $offsetSeconds, bool $expectedFresh): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-02T12:00:00Z'));
+        try {
+            config(['uvh.admin_mfa_fresh_minutes' => 15]);
+            $code = 'ABCDEFGH2345678J';
+            $user = $this->mfaUser([$code]);
+            $sessionId = $this->useSession($user);
+            $verifiedAt = now()->subMinutes(15)->addSeconds($offsetSeconds);
+            DB::table('sessions')->where('id', $sessionId)->update(['mfa_verified_at' => $verifiedAt]);
+
+            $status = $this->getJson('/api/v1/auth/mfa/session')->assertOk()->assertJsonPath('fresh', $expectedFresh);
+            self::assertSame($expectedFresh, Carbon::parse($status->json('expiresAt'))->gt(now()));
+
+            $response = $this->regenerate($code);
+            if ($expectedFresh) {
+                $response->assertOk()->assertJsonStructure(['recoveryCodes']);
+            } else {
+                $response->assertForbidden()->assertJsonPath('details.reason', 'mfa_reauthentication_required');
+                self::assertSame([Ids::sha256Hex($code)], $user->fresh()->recovery_codes);
+                self::assertEquals($verifiedAt, Carbon::parse(DB::table('sessions')->where('id', $sessionId)->value('mfa_verified_at')));
+            }
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_exact_expiry_rejects_step_up_without_consuming_the_factor(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-02T12:00:00Z'));
+        try {
+            config(['uvh.admin_mfa_fresh_minutes' => 15]);
+            $code = 'ABCDEFGH2345678J';
+            $user = $this->mfaUser([$code]);
+            $sessionId = $this->useSession($user);
+            DB::table('sessions')->where('id', $sessionId)->update(['mfa_verified_at' => now()->subMinutes(15)]);
+
+            $this->regenerate($code)->assertForbidden()->assertJsonPath('details.reason', 'mfa_reauthentication_required');
+            self::assertSame([Ids::sha256Hex($code)], $user->fresh()->recovery_codes);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public static function freshnessBoundaryProvider(): array
+    {
+        return [
+            'one second before expiry' => [1, true],
+            'at expiry' => [0, false],
+            'one second after expiry' => [-1, false],
+        ];
     }
 
     /**

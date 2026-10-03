@@ -46,6 +46,9 @@ final class ReleaseReadiness
             if (! Schema::hasColumn('account_deletion_requests', 'cancellation_audit_pending')) {
                 $errors[] = 'Falta el esquema de recuperación de auditoría de cancelación (2026_10_01).';
             }
+            if (! Schema::hasColumns('security_incident_audits', ['id', 'user_id', 'affected_user_id', 'administratively_blocked', 'incident_correlation_id', 'incident_at'])) {
+                $errors[] = 'Falta el esquema de recuperación de auditoría de incidentes (2026_10_03).';
+            }
             if (! Schema::hasColumn('audit_events', 'workspace_id')) {
                 $errors[] = 'Falta la atribución de actividad por workspace (000033).';
             }

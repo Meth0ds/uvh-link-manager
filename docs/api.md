@@ -12,6 +12,30 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 - `requireVerified` = email verificado.
 - Errores: `{ "error": string, "details?": unknown }`.
 
+### Cuenta esperada en peticiones del navegador
+
+La SPA adjunta `X-Uvh-Account-Id` a las rutas de sesión cuando ya muestra una
+cuenta. Laravel compara ese ID decimal positivo con el usuario autenticado por
+la cookie **antes de entrar en el controller**. Si difieren, devuelve
+`409 { error, reason: "session_context_changed" }`, sin incluir IDs ni revocar o
+reemplazar la cookie; un valor mal formado devuelve `400` con
+`reason: "invalid_account_context"`. El header jamás autentica ni elige al actor,
+y no sustituye CSRF, roles, verificación de email ni revalidación bajo lock.
+Su ausencia conserva la compatibilidad con clientes existentes.
+
+Ante ese conflicto exacto la SPA descarta únicamente su proyección local,
+workspaces y operaciones obsoletas y vuelve al acceso; no repite la mutación,
+no envía un logout y no anuncia una revocación a otras pestañas. También aplica
+a errores JSON recibidos como Blob en una descarga privada. Otros `409`
+conservan su tratamiento propio. Login, registro y acciones públicas con
+bearers de email/recuperación, así como la API de integración con Authorization,
+conservan su autoridad específica y no dependen de esta expectativa.
+
+Logout admite el cliente anónimo y sigue siendo idempotente. Con una sesión
+vigente comprueba la expectativa antes de revocar; sin header conserva el
+contrato anterior. Esta precondición evita una intención enviada con la cookie
+de otra cuenta; no puede retirar una mutación o un Set-Cookie ya despachados.
+
 ### Convenciones de errores y listados
 
 - `409 Conflict` indica estado concurrente o ya cambiado: challenge procesándose,
@@ -33,17 +57,17 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 
 | Método | Ruta | Auth | Descripción |
 | ------ | ---- | ---- | ----------- |
-| POST | `/register` | — | Registro multistep. Requiere `name`, `email`, `password`, `captchaToken`, `acceptTerms: true`, `termsVersion` y `privacyVersion`; el honeypot `website` debe estar vacío. Crea un **registro pendiente** (solo la dirección) y envía email de verificación sin crear sesión: hasta que el buzón se demuestra no hay cuenta —ni nombre, ni workspace, ni aceptación legal, ni contraseña que heredar—, y la activación (`/verify-email`) crea todo desde cero. Audita por separado la aceptación contractual y el aviso de privacidad mostrado. La contraseña se **valida** con el mismo contrato que la activación (feedback temprano en el formulario), pero no se guarda. Un registro anónimo sobre una dirección ya inscrita no la sustituye (ni su fila, ni su bearer); todos los desenlaces contestan igual y emiten la cookie `REGISTRATION_EDIT_COOKIE`. |
-| POST | `/login` | — | Login con `email`, `password` y `captchaToken`, sólo para cuentas con email verificado. Si MFA: `{ mfaRequired: true, challenge, recoveryAvailable }`; si no: `{ user }`. Una inscripción pendiente sin su cookie de edición recibe el mismo `401` de «Credenciales incorrectas» que una dirección desconocida. El navegador que conserva la cookie válida para esa dirección recibe `403` con `reason: pending_registration` para abrir la pantalla de verificación, sin sesión ni reto MFA. Una cuenta heredada sin verificar, con contraseña correcta, recibe `403` con `reason: email_verification_required`. El reenvío está en esa pantalla y el acceso genérico para recuperarlo se encuentra en la pestaña de registro. |
-| POST | `/change-registration-email` | cookie de edición | Corrige una dirección de registro no verificada con `{ currentEmail, newEmail, captchaToken }`. La autoridad es la cookie `REGISTRATION_EDIT_COOKIE` emitida por el `register` que creó esa inscripción (no la contraseña propuesta, que cualquier registro anónimo puede mintear); el secreto viaja sellado con cifrado autenticado —opaco: no revela la cuenta, la versión de seguridad ni el desenlace que lo emitió, así que un señuelo y un secreto real son indistinguibles— y queda ligado al registro pendiente y a su versión de seguridad, revalidados dentro del lock de la corrección y rotados con cada una, así que un secreto gastado no vuelve a servir. Invalida el bearer anterior, emite uno nuevo y no crea sesión. Sin el secreto, dirección desconocida y registro ya consumido contestan lo mismo: `403` genérico. |
+| POST | `/register` | — | Registro multistep con name/email/password/CAPTCHA/consentimientos. Nombre y contraseña se validan, pero no se guardan. Siempre crea un intento propio del navegador, con caducidad y generación, y responde `201 { user: null }` con cookie de edición opaca v4. Si la dirección está libre, crea además pending y bearer de verificación; si está ocupada o reservada, no modifica al ocupante y la admisión huérfana se suprime. Cuenta, credencial, workspace y aceptación legal sólo nacen tras probar el buzón. |
+| POST | `/login` | — | Requiere email/password/CAPTCHA. Una contraseña correcta conserva el acceso verificado con o sin MFA; una cuenta heredada sin verificar recibe `403 reason: email_verification_required`. Ante contraseña incorrecta o cuenta ausente, un contexto propio vigente para esa dirección recibe `403 reason: pending_registration` para revisar la solicitud, independientemente de la ocupación del email. Este reason histórico no afirma que exista una cuenta o pending. Sin contexto válido, `401` genérico. Nunca concede sesión/reto por una cookie de registro. |
+| POST | `/change-registration-email` | cookie de edición | `{ currentEmail, newEmail, captchaToken }` corrige la dirección elegida en el intento propio. Revalida cookie/generación/dirección/caducidad contra contexto bloqueado y responde `200 { ok: true }` con nueva cookie v4 en todos los destinos. Cada ACK gasta la generación anterior, incluso si el destino está ocupado. Sólo mueve el pending asociado a ese intento o crea uno nuevo si está libre; nunca altera User ni pending ajeno. En un conflicto conserva el bearer del pending propio y su dirección real, pero el contexto adopta la dirección solicitada para permitir otra corrección privada. Sin autoridad vigente o con currentEmail ajeno al contexto, `403` genérico. No crea sesión. |
 | POST | `/mfa/verify` | — | Completa login MFA con `{ challenge, code }` → `{ user }`. El challenge dura cinco minutos, está ligado a la versión de seguridad y se consume una sola vez. |
 | POST | `/mfa/recovery` | — | Completa el mismo challenge con `{ challenge, code }`; consume atómicamente el challenge y un recovery code de un solo uso. |
 | POST | `/logout` | sesión | Revoca la sesión actual. |
 | POST | `/verify-email` | — | `{ token, password, name, acceptTerms, termsVersion, privacyVersion }` → decide la identidad definitiva (nombre), registra la aceptación de las versiones legales vigentes con la fecha de ESTA activación, decide la contraseña definitiva de la cuenta y crea la cuenta desde cero: usuario verificado, workspace autogenerado con el nombre definitivo, cuota y membresía. Consume el bearer token y deja morir la inscripción entera —fila pendiente y todos sus bearers— en la misma transacción. Nada de lo que el registro anónimo propuso —nombre, workspace, evidencia contractual ni contraseña— llega a la cuenta: lo decide quien abre el buzón tras la prueba de posesión (anti pre-hijack). El acceso posterior exige un login nuevo. |
-| POST | `/resend-verification` | — / sesión | Reenvía el correo de verificación con `{ email }` cuando no hay sesión: es la entrada diseñada para recuperar un registro pendiente, visible siempre en el panel de acceso (no depende de ninguna señal del servidor). La respuesta pública es genérica (anti-enumeración) y aplica cooldown de 60 s. |
+| POST | `/resend-verification` | — / sesión | Reenvío público con email/CAPTCHA desde la pantalla de verificación o la pestaña de registro. Respuesta genérica `200 { ok: true }` para conocido, desconocido, consumido, cooldown o fallo de admisión de mail; cooldown60s y floor temporal común. Sólo el destinatario elegible recibe correo. Un caller autenticado ya verificado conserva400. No deriva autoridad del contexto de registro. |
 | POST | `/forgot-password` | — | `{ email }` → envía enlace (respuesta idéntica siempre, anti-enumeración). |
 | POST | `/reset-password` | — | `{ token, password }` → `{ ok: true, current: boolean }`. Restablece y revoca sesiones del dueño; el token debe vencer después de `now`, se consume atómicamente y sólo funciona una vez. Sólo borra cookie/reconcilia identidad del navegador si `current` es true. |
-| POST | `/account-recovery/complete` | — | `{ token, password, confirmation: "RECUPERAR MI CUENTA" }`; finaliza un expediente con dos aprobadores vigentes, rota credenciales, retira MFA y rol admin, y admite el aviso de incidente en el mismo commit. |
+| POST | `/account-recovery/complete` | — | `{ token, password, confirmation: "RECUPERAR MI CUENTA" }`; finaliza un expediente con dos aprobadores vigentes, rota credenciales, retira MFA y rol admin, y admite el aviso en el mismo commit. Responde `{ ok: true, message, current }`; sólo borra la cookie de la cuenta recuperada. |
 | POST | `/security-incident/revoke` | bearer de emergencia | `{ token }` → `{ ok: true, message, current: boolean }`. Requiere bearer `security_revoke` sin consumir y con `expires_at > now`. Revoca accesos y operaciones pendientes del dueño; sólo borra la cookie y reconcilia la identidad del navegador si `current` es true. No autentica, cambia el email, desactiva MFA ni levanta un bloqueo administrativo. |
 | GET | `/me` | sesión | `{ user }`. |
 | GET | `/mfa/session` | sesión | `{ enabled, fresh, verifiedAt, expiresAt }`; sólo expone la frescura del factor de la sesión actual. |
@@ -77,7 +101,16 @@ token en sí se compara carácter a carácter. Las rutas de workspace requieren
 | POST | `/notifications/:id/read` | sesión verificada | Marca una notificación propia como leída y devuelve `{ unread }`. Una notificación ajena no existe (`404`). |
 | POST | `/notifications/read-all` | sesión verificada | Marca la bandeja entera como leída → `{ unread: 0 }`. |
 | GET | `/notifications/preferences` | sesión verificada | `{ preferences[] }` con el catálogo completo: `kind`, `category` (`mandatory|operational`) y la entrega efectiva (`immediate|daily_digest|in_app_only|disabled`). |
-| PATCH | `/notifications/preferences` | sesión verificada | `{ preferences: [{ kind, delivery }] }`; valida el lote entero antes de escribir nada, registra el cambio en auditoría y rechaza (`422`) cualquier modificación de un kind obligatorio: los avisos críticos de credenciales, MFA, email, exportación o eliminación de cuenta llegan siempre. |
+| PATCH | `/notifications/preferences` | sesión verificada | `{ preferences: [{ kind, delivery }] }`; exige kinds únicos (`422` ante duplicados), valida el lote entero antes de escribir nada, registra el cambio en auditoría y rechaza (`422`) cualquier modificación de un kind obligatorio: los avisos críticos de credenciales, MFA, email, exportación o eliminación de cuenta llegan siempre. |
+
+Las seis rutas de notificaciones revalidan cuenta/sesión activa, ownership,
+generación, caducidad exclusiva y email verificado al iniciar el trabajo. Si el
+contexto cambia después del middleware, los GET responden `401` sin datos y
+los commands `409`, sin retirar la cookie ni aplicar cambios. Las escrituras
+adquieren locks dentro del mismo commit; preferencias, sellado del resumen y
+evento exacto de auditoría son atómicos. Si no se admite ese evento, falla la
+operación y se conserva el estado; una caída sólo del historial mantiene éxito
+y evidencia recuperable. No requieren step-up.
 
 La exportación es una **copia de acceso a la cuenta** de autogestión (art. 15
 RGPD): el propio documento lo declara en `rights.document:
@@ -102,6 +135,13 @@ garantizar el consumo único, responden `503` y no presentan el incidente como
 un código incorrecto. Los recovery codes aceptan el formato mostrado por la SPA
 o su forma normalizada de 16 caracteres; cada valor deja de ser válido al usarse.
 
+Si la cuenta cambia entre el preflight y la admisión bajo lock (generación,
+bloqueo, verificación o MFA), TOTP y recovery responden `401` con «Sesión MFA
+caducada». No conceden sesión ni gastan el presupuesto de factores fallidos.
+Un factor realmente incorrecto sí consume un intento del propósito y otro del
+presupuesto global; estos cambios de identidad no se registran como
+`auth.mfa_failed`.
+
 Cambio/reset de contraseña y finalización de recuperación guardan su aviso de
 incidente junto con las credenciales. Un fallo de admisión del outbox devuelve
 `503` y revierte la operación, incluido el consumo de bearers/recovery codes
@@ -112,9 +152,12 @@ Un `200` no acredita recepción del email; el proveedor se invoca posteriormente
 El control de emergencia se ejecuta tras una acción explícita. Una respuesta
 inválida nunca acredita éxito. El navegador permite reintentos manuales tras
 fallos de conexión, `429` o errores `5xx`; un bearer consumido o caducado devuelve
-`400` y ofrece recuperación. La revocación ya confirmada permanece aunque falle
-la auditoría posterior: el fallo de admisión se registra sin restaurar accesos;
-si sólo falla el historial, el evento queda en el outbox para su recuperación.
+`400` y ofrece recuperación. La revocación guarda en su propia transacción una constancia mínima de auditoría.
+Si falla admitir el evento en el outbox general, conserva esa constancia sin
+restaurar accesos; housekeeping reintenta hasta admitirlo. Si sólo falla el
+historial, el evento queda en el outbox. La constancia conserva hora e identidad
+originales, sin guardar el bearer, y se elimina junto con la admisión del evento.
+Una cuenta administrativamente bloqueada sigue bloqueada.
 
 La misma admisión obligatoria se aplica a alta/sustitución/desactivación MFA,
 regeneración de recovery codes y solicitud/confirmación de cambio de email.
@@ -310,6 +353,15 @@ Valores por defecto con los que empezar un enlace. El `payload` sólo contiene c
 | POST | `/invitations/reject` | Rechazar invitación. Mismas dos fuentes de bearer que `accept`. |
 | DELETE | `/:id/invitations/:invitationId` | Cancelar invitación. |
 | POST | `/:id/invitations/:invitationId/resend` | Reenviar invitación. |
+
+Las doce mutaciones revalidan bajo lock la cuenta verificada, su generación y
+la sesión concreta del navegador, antes de cambiar el workspace o gastar un
+factor. Si esa sesión se revoca, caduca o cambia entre middleware y operación,
+devuelven `409` con «La sesión cambió. Vuelve a iniciar sesión», sin borrar
+cookies. Aceptar/rechazar conserva entonces la invitación guardada para
+reintentar con una sesión nueva. Un bearer terminal sigue devolviendo `400` y
+se retira del aparcadero. Los permisos de miembro/rol se comprueban además del
+contexto de identidad.
 
 Cada cuenta puede poseer hasta 20 workspaces: tanto crear como recibir una
 transferencia devuelve `429` al alcanzar ese máximo. Pertenecer como miembro a
@@ -560,3 +612,28 @@ CAPTCHA: el widget no concede autoridad por un mensaje de iframe. Sólo recibe s
 
 
 Confirmaciones de cliente: register exige {user:null} (resultado pendiente, sin sesión; forma uniforme también para destinos ocupados). change-registration-email, logout, change-password, data-export/cancel y data-export/download/acknowledge exigen {ok:true}, con booleano true. Un 2xx con cuerpo inválido genera ApiRequestError502 sin conservar el cuerpo ni afirmar éxito o rollback. Sólo la confirmación válida de logout limpia la identidad/workspace local y anuncia invalidación entre pestañas; resultados tardíos de operaciones autenticadas respetan la generación de sesión.
+
+
+Cliente MFA: un código incompleto/tras borrar un slot no puede enviar el valor anterior. OTP conserva posiciones hasta completar seis dígitos y sólo entonces notifica completado; reset del formulario inicia otro ciclo de completado. MFA/recovery no cambian método durante una verificación pendiente; errores conservan su paso y caducidad exige login nuevo. Estos estados cliente no sustituyen validación de challenge/factor/replay/usuario/sesión en backend.
+
+
+Contrato MFA (B120): `fresh` requiere que `expiresAt` sea estrictamente posterior al instante actual. En la igualdad se exige `mfa_reauthentication_required`; un step-up caducado no consume su factor. El frontend distingue autenticación confirmada de navegación fallida (B119): el reintento sólo abre la ruta y no repite login/verificación.
+
+
+B121: un fallo de navegación después de reautenticar MFA se reintenta sin otro POST de factor ni otra sonda de sesión. Si la generación cambia, debe comprobarse de nuevo el contexto antes de seguir. B122: el comando `uvh:admin:promote` requiere secreto MFA que UvhCrypto pueda leer y Totp pueda usar; presencia de ciphertext no prueba elegibilidad. Se conserva compatibilidad keyring/legacy.
+
+
+### Consistencia de mutaciones de workspace (02/10)
+Crear/renombrar, roles, transferencia, expulsión/salida/borrado e invitaciones admiten su evento de éxito en el mismo commit del cambio. Un fallo de audit_outbox rechaza y revierte la operación; un fallo posterior del historial audit_events conserva el evento durable para recuperación. La respuesta de éxito no requiere entrega del proveedor ni materialización inmediata del historial. Transferencia y borrado vuelven a comprobar expires_at > now() al bloquear la sesión, antes de gastar credenciales; una sesión caducada durante la petición devuelve409. Un fallo transitorio de admisión no retira el bearer de invitación guardado. No volver a enviar un TOTP automáticamente: su reserva de replay en cache no comparte rollback SQL. Detalle del contrato y límites: SECURITY_MUTATION_CONTRACT.md; ledger parcial S03 del02/10.
+
+
+Registro/verificación (O12): contrato HTTP sin cambio. Register crea sólo pending y responde201 user:null con cookie opaca uniforme; verify-email fija identidad/contraseña/consentimientos y consume el bearer bajo TX, sin abrir sesión. AuthController delega en RegistrationAdmission; EmailAddressLock compartido conserva reclamos de dirección. La cookie de edición deja de autorizar al alcanzar exactamente su deadline (B127). Full1451/10213 y calidad434/PHPStan0 comprobados; no implica cierre del resto de Auth.
+
+
+O13 mantiene HTTP de corrección/reenvío durante extracción: RegistrationEmailCorrection::admit y VerificationResend::admit poseen TX completas. Reenvío común conserva owner/cooldown60s/expires/mail/rollback; cookie edición emite payloadv3(19ID/10sv), lee v2 y mantiene TTL/reloj/crypto. Full habitual1480/10386 y Pint437/PHPStan0 verificados. B129 abierto requiere cambiar privacidad del protocolo compuesto: receipt anónimo permite distinguir ocupación mediante los403/401 de login y200/403 de corrección; no se acredita contrato privado por JSON201 uniforme. Próximo cambio debe preservar orientación de cuentas sin verificar con contraseña correcta y edición de typo, sin modificar User/pending ajeno ni crear credenciales antes de probar buzón.
+
+
+O14/B129/B130 (03/10): intento de registro durable independiente de ocupación, cookie v4 y compatibilidad v2/v3, corrección coherente y single-use para todos los ACK. El aviso de login describe la solicitud; contraseña correcta conserva prioridad. Activación y retención comparten raíz estable/contexto antes de pending; purga conserva una renovación confirmada durante su espera. Probe original B129 ahora es regresión permanente; B130 reproducido rojo y corregido. Suite completa1527/1527 backend,11020aserciones,348,85s sólo uvh_test (s01-registration-attempt-full-backend.log), exit0;47 casos nuevos frente a1480.198/2255 contratos dedicados (98,94s, s01-registration-attempt-contracts-definitive.log). Pint442/PHPStan0 (s01-registration-attempt-quality-final.log), exit0, baseline sin ampliar. Frontend885/885 y lint/tipos/build correctos, sin nueva revisión visual manual/browser de API local. Inventario452/2176con nombre/1134callbacks/3firmas,452hashes y136anchors S01/28archivos más16S03/2archivos verificados; captura actual03/10, nombre histórico02/10. AuthController2488→2438líneas; no se atribuye ahorro de latencia global. Migración aplicada/verificada sólo uvh_test con guard explícito; NO aplicada uvh_local. Esquema y recambio coordinado de código/procesos pendientes antes de usarlo en otro entorno. S01–S13 y objetivo global siguen abiertos; próximo bloque admisión forgot/reset y helpers compartidos, más gates externos/CI billing sin cambio. Sin entrega real, worker/scheduler productivo, commit/push ni despliegue.
+
+
+Organización Auth O15 (03/10): forgot/reset conservan endpoints, códigos, payloads, CAPTCHA, suelo temporal y política de cookie. La TX completa se ejecuta en PasswordRecovery; SecurityIncidentNotice conserva los avisos comunes en el commit del caller. CredentialChangeResponse sólo borra cookie cuando el usuario del request coincide con el afectado.1544/11155 backend y151/1246 contratos antes/después; ninguna sesión concedida por reset. En frontend (B131) el ACK de registro no promete renovar la URL preparada: retomar antes de caducar y si sigue disponible. El TTL/API de intent y su cookie de aparcado no cambia.

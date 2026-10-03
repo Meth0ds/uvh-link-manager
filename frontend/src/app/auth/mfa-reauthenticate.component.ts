@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, ViewChild, afterNextRender, inject, signal } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -29,12 +29,12 @@ import { LatestRequest } from "../core/services/latest-request";
     <app-auth-shell>
       <section class="card" aria-labelledby="reauth-title">
         <span class="step-kicker">{{ administrativeAccess ? 'ADMINISTRACIÓN / VERIFICACIÓN' : 'SEGURIDAD / VERIFICACIÓN' }}</span>
-        @if (initializing() || busy()) {
+        @if (initializing() || busy() || navigationBusy()) {
           <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
-        <mat-icon class="icon" aria-hidden="true">{{ administrativeAccess ? 'admin_panel_settings' : 'verified_user' }}</mat-icon>
-        <h2 id="reauth-title">Confirma que eres tú</h2>
-        <p class="sub">{{ administrativeAccess ? 'Vas a entrar en administración.' : 'Vas a realizar una acción sensible en tu cuenta.' }} Confirma tu contraseña y un segundo factor para continuar con una verificación reciente.</p>
+        <mat-icon class="icon" aria-hidden="true">{{ navigationFailed() ? 'arrow_forward' : administrativeAccess ? 'admin_panel_settings' : 'verified_user' }}</mat-icon>
+        <h2 id="reauth-title">{{ navigationFailed() ? 'Continúa a tu destino' : 'Confirma que eres tú' }}</h2>
+        @if (!navigationFailed()) { <p class="sub">{{ administrativeAccess ? 'Vas a entrar en administración.' : 'Vas a realizar una acción sensible en tu cuenta.' }} Confirma tu contraseña y un segundo factor para continuar con una verificación reciente.</p> }
         @if (initializing()) { <p class="auth-note" role="status">Comprobando la sesión y los requisitos de acceso. Todavía no necesitas introducir ningún código.</p> }
 
         @if (!initializing() && ready()) {
@@ -65,12 +65,18 @@ import { LatestRequest } from "../core/services/latest-request";
           </form>
         }
 
-        @if (!initializing() && !ready() && error()) {
+        @if (navigationFailed()) {
+          <div #navigationStatus class="navigation-recovery" tabindex="-1" role="status" [attr.aria-busy]="navigationBusy()">
+            <p class="auth-note">No hemos podido abrir la página de destino. Puedes volver a intentarlo para continuar.</p>
+            <button mat-flat-button class="navigation-retry" type="button" (click)="retryNavigation()" [disabled]="navigationBusy()">{{ navigationBusy() ? 'Abriendo…' : 'Volver a intentarlo' }}</button>
+          </div>
+        }
+        @if (!initializing() && !ready() && error() && !navigationFailed()) {
           <div class="alert error" role="alert">{{ error() }}</div>
           <button mat-flat-button type="button" (click)="retryInitialization()">Reintentar comprobación</button>
         }
         <a class="back" routerLink="/app/dashboard"><mat-icon aria-hidden="true">arrow_back</mat-icon>Volver al panel</a>
-        <p class="auth-note">Esta comprobación no cierra tu sesión. Confirma tu identidad antes de continuar con acciones sensibles.</p>
+        @if (!navigationFailed()) { <p class="auth-note">Esta comprobación no cierra tu sesión. Confirma tu identidad antes de continuar con acciones sensibles.</p> }
       </section>
     </app-auth-shell>
   `,
@@ -82,14 +88,20 @@ export class MfaReauthenticateComponent {
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly initializeRequests = new LatestRequest(inject(DestroyRef));
-  private readonly submitRequests = new LatestRequest(inject(DestroyRef));
+  @ViewChild("navigationStatus") private navigationStatus?: ElementRef<HTMLElement>;
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+  private readonly initializeRequests = new LatestRequest(this.destroyRef);
+  private readonly submitRequests = new LatestRequest(this.destroyRef);
+  private pendingNavigation: { navigate: () => Promise<boolean>; current: () => boolean } | null = null;
   private terminalNavigation = false;
   private verifiedContext: string | null = null;
 
   readonly initializing = signal(true);
   readonly ready = signal(false);
   readonly busy = signal(false);
+  readonly navigationBusy = signal(false);
+  readonly navigationFailed = signal(false);
   readonly error = signal<string | null>(null);
   readonly hidePassword = signal(true);
   readonly form = this.fb.nonNullable.group({
@@ -104,7 +116,7 @@ export class MfaReauthenticateComponent {
   }
 
   async submit(): Promise<void> {
-    if (!this.ready() || this.initializing() || this.verifiedContext !== this.context() || this.form.invalid || this.busy()) {
+    if (!this.ready() || this.initializing() || this.verifiedContext !== this.context() || this.form.invalid || this.busy() || this.terminalNavigation) {
       this.form.markAllAsTouched();
       return;
     }
@@ -118,6 +130,7 @@ export class MfaReauthenticateComponent {
       );
       if (!this.submitRequests.isCurrent(request, this.context())) return;
       this.form.reset();
+      this.ready.set(false);
       await this.navigateOnce(
         () => this.router.navigateByUrl(this.returnTo),
         () => this.submitRequests.isCurrent(request, this.context()),
@@ -134,6 +147,31 @@ export class MfaReauthenticateComponent {
   retryInitialization(): void {
     if (this.initializing() || this.busy() || this.terminalNavigation) return;
     void this.initialize();
+  }
+
+  async retryNavigation(): Promise<void> {
+    const pending = this.pendingNavigation;
+    if (!pending || this.navigationBusy()) return;
+    if (!pending.current()) {
+      this.resetNavigationContext();
+      return;
+    }
+    this.navigationStatus?.nativeElement.focus({ preventScroll: true });
+    this.terminalNavigation = false;
+    await this.navigateOnce(pending.navigate, pending.current);
+  }
+
+  /** A destination approved for an old session must be checked again. */
+  private resetNavigationContext(): void {
+    this.pendingNavigation = null;
+    this.navigationFailed.set(false);
+    this.navigationBusy.set(false);
+    this.terminalNavigation = false;
+    this.verifiedContext = null;
+    this.ready.set(false);
+    this.busy.set(false);
+    this.initializing.set(false);
+    this.error.set("Tu sesión ha cambiado. Vuelve a comprobarla para continuar.");
   }
 
   private context(): string {
@@ -187,10 +225,33 @@ export class MfaReauthenticateComponent {
     }
   }
 
-  /** Only one authorization outcome may own navigation from this view. */
+  /** Navigation retries reuse only the route operation, never a factor POST. */
   private async navigateOnce(navigate: () => Promise<boolean>, current: () => boolean): Promise<void> {
     if (this.terminalNavigation || !current()) return;
     this.terminalNavigation = true;
-    await navigate();
+    this.navigationBusy.set(true);
+    let navigated = false;
+    try {
+      navigated = await navigate();
+    } catch {
+      // A failed route load and a cancelled route are both retryable here.
+    } finally {
+      if (!this.destroyRef.destroyed) this.navigationBusy.set(false);
+    }
+    if (this.destroyRef.destroyed) return;
+    if (!current()) {
+      this.resetNavigationContext();
+      return;
+    }
+    this.pendingNavigation = navigated ? null : { navigate, current };
+    this.navigationFailed.set(!navigated);
+    if (!navigated) {
+      this.error.set(null);
+      afterNextRender(() => {
+        if (current() && this.navigationFailed() && !this.navigationBusy()) {
+          this.navigationStatus?.nativeElement.focus({ preventScroll: true });
+        }
+      }, { injector: this.injector });
+    }
   }
 }

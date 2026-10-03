@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ViewChild, computed, effect, inject, isDevMode, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, ViewChild, afterNextRender, computed, effect, inject, isDevMode, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
@@ -15,6 +15,7 @@ import { decodePublicConfig } from "../core/services/public-response-decoders";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { LatestRequest } from "../core/services/latest-request";
+import { safeReturnTo } from "../core/guards/auth.guard";
 import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 import { intentBearer } from "./auth-bearer";
 import { OtpCodeInputComponent } from "./otp-code-input.component";
@@ -75,6 +76,10 @@ export class AuthComponent {
   @ViewChild("loginCaptcha") private loginCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("registerCaptcha") private registerCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("resendCaptcha") private resendCaptchaWidget?: HCaptchaWidgetComponent;
+  @ViewChild("mfaDialog") private mfaDialog?: ElementRef<HTMLElement>;
+  @ViewChild("loginEmail") private loginEmail?: ElementRef<HTMLInputElement>;
+  @ViewChild("recoveryCode") private recoveryCode?: ElementRef<HTMLInputElement>;
+  @ViewChild("navigationStatus") private navigationStatus?: ElementRef<HTMLElement>;
 
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
@@ -84,15 +89,19 @@ export class AuthComponent {
   private readonly intents = inject(PendingLinkIntentService);
   private readonly invitations = inject(PendingInvitationService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private redirectedAuthenticatedVisitor = false;
   private interactiveAuthStarted = false;
   private flowRevision = 0;
   private verificationRevision = 0;
+  private navigationRevision = 0;
   private readonly captchaConfigRequests = new LatestRequest(this.destroyRef);
 
   readonly step = signal<Step>("login");
   readonly registerStep = signal<RegisterStep>(1);
   readonly busy = signal(false);
+  readonly navigationBusy = signal(false);
+  private readonly failedNavigation = signal<{ destination: string; generation: number } | null>(null);
   readonly captchaConfigBusy = signal(true);
   readonly captchaConfigError = signal<string | null>(null);
   readonly hcaptchaSiteKey = signal("");
@@ -132,7 +141,7 @@ export class AuthComponent {
   /** Notices produced after registration/resend, excluding the static success copy. */
   readonly pendingNotice = computed(() => {
     const notice = this.info();
-    return notice && !notice.startsWith("¡Cuenta creada") ? notice : null;
+    return notice && !notice.startsWith("Solicitud registrada.") ? notice : null;
   });
 
   readonly loginForm = this.fb.nonNullable.group({
@@ -223,7 +232,7 @@ export class AuthComponent {
       this.step.set("register");
     }
     if (this.route.snapshot.queryParamMap.get("reason") === "session-expired") {
-      this.info.set("Tu sesión ya no está activa. Inicia sesión de nuevo para continuar.");
+      this.info.set("Vuelve a iniciar sesión para continuar de forma segura.");
     }
 
     effect(() => {
@@ -233,8 +242,7 @@ export class AuthComponent {
         || !this.auth.loaded()
         || !this.auth.authenticated()
       ) return;
-      this.redirectedAuthenticatedVisitor = true;
-      void this.router.navigateByUrl(this.returnTo());
+      void this.navigateAuthenticated(this.returnTo());
     });
 
     // La corrección de email comparte formulario con el registro pero solo
@@ -349,8 +357,7 @@ export class AuthComponent {
         this.step.set("mfa");
         this.info.set(null);
       } else {
-        this.redirectedAuthenticatedVisitor = true;
-        await this.router.navigateByUrl(destination);
+        await this.navigateAuthenticated(destination);
       }
     } catch (err) {
       if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
@@ -380,6 +387,48 @@ export class AuthComponent {
     }
   }
 
+  /** The failed destination belongs only to the session that tried to open it. */
+  navigationFailure(): string | null {
+    const failure = this.failedNavigation();
+    return failure && this.auth.authenticated() && failure.generation === this.auth.sessionGeneration()
+      ? failure.destination : null;
+  }
+
+  async retryNavigation(): Promise<void> {
+    const destination = this.navigationFailure();
+    if (!destination || this.navigationBusy()) return;
+    await this.navigateAuthenticated(destination);
+  }
+
+  /** Navigation failures must never be handled as credential/factor failures. */
+  private async navigateAuthenticated(destination: string): Promise<void> {
+    const revision = this.flowRevision;
+    const navigation = ++this.navigationRevision;
+    const generation = this.auth.sessionGeneration();
+    this.redirectedAuthenticatedVisitor = true;
+    this.navigationStatus?.nativeElement.focus({ preventScroll: true });
+    this.navigationBusy.set(true);
+    let navigated = false;
+    try {
+      navigated = await this.router.navigateByUrl(destination);
+    } catch {
+      // A cancelled route and a failed route load have the same retry contract.
+    }
+    if (this.destroyRef.destroyed || navigation !== this.navigationRevision) return;
+    this.navigationBusy.set(false);
+    if (!this.isFlowCurrent(revision) || !this.auth.authenticated() || generation !== this.auth.sessionGeneration()) return;
+    if (navigated) {
+      this.failedNavigation.set(null);
+      return;
+    }
+    this.failedNavigation.set({ destination, generation });
+    afterNextRender(() => {
+      if (this.isFlowCurrent(revision) && this.navigationFailure() === destination && !this.navigationBusy()) {
+        this.navigationStatus?.nativeElement.focus({ preventScroll: true });
+      }
+    }, { injector: this.injector });
+  }
+
   /** Auto-submit once the sixth digit lands; onMfa's busy() guard dedupes. */
   onOtpCompleted(): void {
     if (this.step() === "mfa" && !this.busy()) {
@@ -403,7 +452,13 @@ export class AuthComponent {
     );
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
-    if (!first || !last) return;
+    if (!first || !last) {
+      // Pending verification disables every control; retain a focusable dialog
+      // instead of letting Tab escape into the page behind aria-modal.
+      event.preventDefault();
+      this.mfaDialog?.nativeElement.focus();
+      return;
+    }
     const active = document.activeElement as HTMLElement | null;
     if (event.shiftKey && (active === first || !scrim.contains(active))) {
       event.preventDefault();
@@ -423,6 +478,7 @@ export class AuthComponent {
     const destination = this.returnTo();
     this.busy.set(true);
     this.error.set(null);
+    this.mfaDialog?.nativeElement.focus({ preventScroll: true });
     try {
       const challenge = this.mfaChallenge();
       if (!challenge) {
@@ -431,15 +487,20 @@ export class AuthComponent {
       }
       await this.auth.verifyMfa(challenge, this.mfaForm.controls.code.value);
       if (!this.isFlowCurrent(revision) || this.step() !== "mfa" || this.mfaChallenge() !== challenge) return;
-      this.redirectedAuthenticatedVisitor = true;
-      await this.router.navigateByUrl(destination);
+      await this.navigateAuthenticated(destination);
     } catch (err) {
       if (!this.isFlowCurrent(revision) || this.step() !== "mfa") return;
       const message = err instanceof ApiRequestError ? err.message : "Código incorrecto";
       if (message === "Sesión MFA caducada") this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
-      else this.error.set(message);
+      else {
+        this.mfaForm.reset();
+        this.error.set(message);
+      }
     } finally {
-      if (!this.destroyRef.destroyed) this.busy.set(false);
+      if (!this.destroyRef.destroyed) {
+        this.busy.set(false);
+        if (this.isFlowCurrent(revision) && this.step() === "mfa" && this.error()) this.focusAuthStep("mfa");
+      }
     }
   }
 
@@ -460,15 +521,17 @@ export class AuthComponent {
       }
       await this.auth.recoverMfa(challenge, this.recoveryForm.controls.code.value);
       if (!this.isFlowCurrent(revision) || this.step() !== "recovery" || this.mfaChallenge() !== challenge) return;
-      this.redirectedAuthenticatedVisitor = true;
-      await this.router.navigateByUrl(destination);
+      await this.navigateAuthenticated(destination);
     } catch (err) {
       if (!this.isFlowCurrent(revision) || this.step() !== "recovery") return;
       const message = err instanceof ApiRequestError ? err.message : "Código de recuperación incorrecto";
       if (message === "Sesión MFA caducada") this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
       else this.error.set(message);
     } finally {
-      if (!this.destroyRef.destroyed) this.busy.set(false);
+      if (!this.destroyRef.destroyed) {
+        this.busy.set(false);
+        if (this.isFlowCurrent(revision) && this.step() === "recovery" && this.error()) this.focusAuthStep("recovery");
+      }
     }
   }
 
@@ -535,9 +598,7 @@ export class AuthComponent {
       this.changeEmailMode.set(false);
       this.step.set("verify-pending");
       this.info.set(
-        this.pendingLink()
-          ? "¡Cuenta creada! Confirma tu email; tu URL seguirá preparada durante las próximas 24 horas."
-          : "¡Cuenta creada! Para continuar debes confirmar tu email. Revisa tu bandeja de entrada.",
+        "Solicitud registrada. Para continuar debes confirmar tu email. Si ya tienes una cuenta, inicia sesión o recupera tu contraseña.",
       );
       this.registerCaptchaToken.set("");
     } catch (err) {
@@ -630,7 +691,7 @@ export class AuthComponent {
     this.registerForm.controls.email.setValue(email);
     this.registerCaptchaToken.set("");
     this.error.set(null);
-    this.info.set("Indica la dirección correcta: te enviaremos una nueva verificación al buzón nuevo. La contraseña de tu cuenta la eliges al abrir ese correo.");
+    this.info.set("Indica la dirección correcta. Si puede completar el registro, recibirás una verificación para elegir tu contraseña.");
   }
 
   closeRegistration(): void {
@@ -665,14 +726,16 @@ export class AuthComponent {
   }
 
   goRecovery(): void {
-    if (!this.mfaChallenge() || !this.mfaRecoveryAvailable()) return;
+    if (this.busy() || !this.mfaChallenge() || !this.mfaRecoveryAvailable()) return;
     this.invalidateFlow();
     this.step.set("recovery");
     this.error.set(null);
     this.info.set(null);
+    this.focusAuthStep("recovery");
   }
 
   backToMfa(): void {
+    if (this.busy()) return;
     if (!this.mfaChallenge()) {
       this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
       return;
@@ -696,6 +759,24 @@ export class AuthComponent {
     this.info.set(message ?? null);
     this.loginCaptchaToken.set("");
     this.loginCaptchaWidget?.reset();
+    this.focusAuthStep("login");
+  }
+
+  /** A pending render must not focus a step that has since been abandoned. */
+  private focusAuthStep(step: "login" | "mfa" | "recovery"): void {
+    const revision = this.flowRevision;
+    afterNextRender(() => {
+      if (!this.isFlowCurrent(revision) || this.step() !== step || this.busy()) return;
+      const target = step === "login" ? this.loginEmail?.nativeElement
+        : step === "recovery" ? this.recoveryCode?.nativeElement
+        : this.mfaDialog?.nativeElement.querySelector<HTMLInputElement>("app-otp-code-input input");
+      if (!target) return;
+      const active = target.ownerDocument.activeElement;
+      const dialog = this.mfaDialog?.nativeElement;
+      // Preserve a deliberate choice made after the response arrived.
+      if (active !== target.ownerDocument.body && active !== dialog) return;
+      target.focus();
+    }, { injector: this.injector });
   }
 
   onLoginCaptchaToken(token: string): void {
@@ -791,18 +872,8 @@ export class AuthComponent {
   }
 
   private returnTo(): string {
-    const rt = this.route.snapshot.queryParamMap.get("returnTo") ?? "";
-    // Only internal single-slash paths: reject protocol-relative URLs,
-    // backslashes, control characters and unbounded query payloads.
-    if (
-      rt.startsWith("/") &&
-      !rt.startsWith("//") &&
-      !rt.includes("\\") &&
-      !/[\u0000-\u001f\u007f]/.test(rt) &&
-      rt.length <= 1024
-    ) {
-      return rt;
-    }
+    const destination = safeReturnTo(this.route.snapshot.queryParamMap.get("returnTo") ?? "", "");
+    if (destination) return destination;
     if (this.intents.hasPending()) return "/app/links";
     if (this.invitations.pending()) return "/invitations/accept";
     return "/app";

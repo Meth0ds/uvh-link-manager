@@ -228,6 +228,7 @@ class GenerateDataExportJob implements ShouldQueue
                     'download_expires_at' => $downloadExpiresAt,
                     'ready_at' => $now,
                 ]);
+                Audit::write($userId, 'account.data_export_ready', 'data_export', $requestId);
 
                 return true;
             });
@@ -237,7 +238,6 @@ class GenerateDataExportJob implements ShouldQueue
                 return;
             }
 
-            Audit::write($userId, 'account.data_export_ready', 'data_export', $requestId);
         } catch (\Throwable) {
             PrivateArtifactCleanup::attempt($requestId, $artifactPath);
             throw new \RuntimeException('No se pudo generar la exportación de datos');

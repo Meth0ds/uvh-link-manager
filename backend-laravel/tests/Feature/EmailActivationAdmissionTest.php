@@ -6,8 +6,10 @@ use App\Models\PendingRegistration;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Ids;
+use App\Support\PasswordStrength;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -109,5 +111,62 @@ final class EmailActivationAdmissionTest extends TestCase
         $this->assertSame($before, $user->refresh()->getAttributes());
         $this->assertNull(DB::table('email_tokens')->where('id', Ids::sha256Hex($payload['token']))->value('used_at'));
         $this->assertDatabaseCount('legal_acceptances', 0);
+    }
+
+    public static function accountKinds(): array
+    {
+        return ['pending' => [false], 'legacy' => [true]];
+    }
+
+    #[DataProvider('accountKinds')]
+    public function test_activation_establishes_one_identity_without_opening_a_session(bool $legacy): void
+    {
+        [$owner, $payload] = $this->fixture($legacy);
+        if ($legacy) {
+            $owner->update(['security_version' => 7]);
+        }
+        $otherToken = Ids::randomToken(32);
+        DB::table('email_tokens')->insert(['id' => Ids::sha256Hex($otherToken), $legacy ? 'user_id' : 'pending_registration_id' => $owner->id, 'kind' => 'verify', 'expires_at' => now()->addHour(), 'created_at' => now()]);
+
+        $response = $this->postJson('/api/v1/auth/verify-email', $payload)->assertOk()->assertExactJson(['ok' => true]);
+        $user = User::where('email', 'activation@example.test')->firstOrFail();
+        $this->assertSame('Mailbox Owner', $user->name);
+        $this->assertTrue(Hash::check($payload['password'], $user->password_hash));
+        $this->assertSame($legacy ? 8 : 1, (int) $user->security_version);
+        $this->assertNotNull($user->email_verified_at);
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('pending_registrations', 0);
+        $this->assertDatabaseCount('workspaces', $legacy ? 0 : 1);
+        $this->assertDatabaseCount('memberships', $legacy ? 0 : 1);
+        $this->assertDatabaseCount('quotas', $legacy ? 0 : 1);
+        $this->assertDatabaseCount('legal_acceptances', 2);
+        foreach (['terms', 'privacy_notice'] as $type) {
+            $this->assertDatabaseHas('legal_acceptances', ['user_id' => $user->id, 'document_type' => $type, 'version' => '2026-08-30', 'source' => 'registration']);
+        }
+        $this->assertDatabaseCount('sessions', 0);
+        $this->assertCount(0, collect($response->headers->getCookies())->filter(static fn ($cookie) => in_array($cookie->getName(), ['uvh_session', 'uvh_mfa_challenge'], true)));
+        $this->postJson('/api/v1/auth/verify-email', $payload)->assertStatus(400);
+        $this->postJson('/api/v1/auth/verify-email', [...$payload, 'token' => $otherToken])->assertStatus(400);
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('legal_acceptances', 2);
+    }
+
+    #[DataProvider('accountKinds')]
+    public function test_live_mailbox_password_rejection_keeps_the_bearer_for_a_retry(bool $legacy): void
+    {
+        [$owner, $payload] = $this->fixture($legacy);
+        $owner->update(['email' => 'coral-limonero@example.test']);
+        $before = $owner->refresh()->getAttributes();
+        $password = 'coral-limonero-zafiro-93';
+        $this->assertTrue(PasswordStrength::isAcceptable($password));
+
+        $this->postJson('/api/v1/auth/verify-email', [...$payload, 'password' => $password])
+            ->assertStatus(422)->assertExactJson(['error' => 'La contraseña es demasiado débil']);
+        $this->assertSame($before, $owner->refresh()->getAttributes());
+        $this->assertDatabaseHas('email_tokens', ['id' => Ids::sha256Hex($payload['token']), 'used_at' => null]);
+        $this->assertDatabaseCount('legal_acceptances', 0);
+        $this->assertDatabaseCount('workspaces', 0);
+        $this->assertDatabaseCount('audit_outbox', 0);
+        $this->postJson('/api/v1/auth/verify-email', $payload)->assertOk();
     }
 }

@@ -8,6 +8,7 @@ use App\Support\Ids;
 use App\Support\SessionManager;
 use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -143,5 +144,40 @@ final class AccountReadContextTest extends TestCase
         $this->assertCount(1, array_filter($body['sessions'], static fn ($row) => $row['current']));
         rsort($others);
         $this->assertSame(array_slice($others, 0, 99), array_slice(array_column($body['sessions'], 'id'), 1));
+    }
+
+    public static function readRoutes(): array
+    {
+        return [['me'], ['mfa/session'], ['sessions'], ['security-center']];
+    }
+
+    #[DataProvider('readRoutes')]
+    public function test_real_reads_refresh_context_without_mutation_locks(string $route): void
+    {
+        [$user, $token] = $this->account();
+        $before = $user->refresh()->getRawOriginal();
+        $locks = [];
+        $levels = [];
+        DB::listen(static function (QueryExecuted $query) use (&$locks, &$levels): void {
+            if (str_contains(strtolower($query->sql), 'for update')) {
+                $locks[] = $query->sql;
+            }
+            if (str_starts_with(strtolower($query->sql), 'select')
+                && preg_match('/from "(?:users|sessions|audit_events)"/', $query->sql)) {
+                $levels[] = $query->connection->transactionLevel();
+            }
+        });
+        $response = $this->withCookie('uvh_session', $token)
+            ->withCookie((string) config('uvh.csrf_cookie'), 'account-read-csrf')
+            ->getJson('/api/v1/auth/'.$route)->assertOk();
+        $this->assertSame([], $locks);
+        $this->assertNotEmpty($levels);
+        $this->assertSame([0], array_values(array_unique($levels)));
+        $this->assertCount(0, $response->headers->getCookies());
+        $this->assertSame($before, $user->refresh()->getRawOriginal());
+        $this->assertDatabaseCount('sessions', 1);
+        foreach (['JBSWY3DPEHPK3PXP', 'ABCD2345EFGH6789', $token, 'password_hash', 'mfa_secret', 'recovery_codes'] as $secret) {
+            $this->assertStringNotContainsString($secret, $response->getContent());
+        }
     }
 }

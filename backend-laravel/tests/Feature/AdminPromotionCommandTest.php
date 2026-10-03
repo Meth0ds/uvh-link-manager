@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Support\Ids;
+use App\Support\UvhCrypto;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -20,7 +22,7 @@ class AdminPromotionCommandTest extends TestCase
         $user = User::factory()->create([
             'email' => 'operator@example.test',
             'mfa_enabled' => true,
-            'mfa_secret' => 'encrypted-test-secret',
+            'mfa_secret' => UvhCrypto::encryptAtRest('JBSWY3DPEHPK3PXP'),
         ]);
 
         $this->artisan('uvh:admin:promote', ['email' => ' Operator@Example.Test '])
@@ -42,7 +44,7 @@ class AdminPromotionCommandTest extends TestCase
             'email' => 'admin@example.test',
             'is_admin' => true,
             'mfa_enabled' => true,
-            'mfa_secret' => 'encrypted-test-secret',
+            'mfa_secret' => UvhCrypto::encryptAtRest('JBSWY3DPEHPK3PXP'),
         ]);
 
         $this->artisan('uvh:admin:promote', ['email' => $user->email])
@@ -58,7 +60,7 @@ class AdminPromotionCommandTest extends TestCase
         $user = User::factory()->create(array_merge([
             'email' => 'candidate@example.test',
             'mfa_enabled' => true,
-            'mfa_secret' => 'encrypted-test-secret',
+            'mfa_secret' => UvhCrypto::encryptAtRest('JBSWY3DPEHPK3PXP'),
         ], $attributes));
 
         $this->artisan('uvh:admin:promote', ['email' => $user->email])
@@ -67,6 +69,55 @@ class AdminPromotionCommandTest extends TestCase
 
         $this->assertFalse($user->fresh()->is_admin);
         $this->assertDatabaseCount('audit_events', 0);
+    }
+
+    #[DataProvider('unusableFactorProvider')]
+    public function test_it_refuses_promotion_when_the_active_factor_cannot_be_used(string $kind): void
+    {
+        $secret = match ($kind) {
+            'malformed ciphertext' => 'enc:v1:bad',
+            'unreadable tag' => self::unreadableCiphertext(),
+            'invalid alphabet' => UvhCrypto::encryptAtRest('INVALID!SECRET'),
+            'too short' => UvhCrypto::encryptAtRest('ABCD'),
+            'empty plaintext' => UvhCrypto::encryptAtRest(''),
+        };
+        $user = User::factory()->create([
+            'email' => 'candidate@example.test',
+            'mfa_enabled' => true,
+            'mfa_secret' => $secret,
+        ]);
+
+        $this->artisan('uvh:admin:promote', ['email' => $user->email])
+            ->expectsOutputToContain('factor MFA utilizable')
+            ->assertFailed();
+        self::assertFalse($user->fresh()->is_admin);
+        $this->assertDatabaseCount('audit_events', 0);
+    }
+
+    public static function unusableFactorProvider(): array
+    {
+        return array_map(fn (string $kind): array => [$kind], ['malformed ciphertext', 'unreadable tag', 'invalid alphabet', 'too short', 'empty plaintext']);
+    }
+
+    private static function unreadableCiphertext(): string
+    {
+        $encrypted = UvhCrypto::encryptAtRest('JBSWY3DPEHPK3PXP');
+        $payload = Ids::base64urlDecode(substr($encrypted, strlen('enc:v1:')));
+        $payload[12] = chr(ord($payload[12]) ^ 1);
+
+        return 'enc:v1:'.Ids::base64urlEncode($payload);
+    }
+
+    public function test_it_preserves_the_supported_usable_legacy_factor(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'legacy@example.test',
+            'mfa_enabled' => true,
+            'mfa_secret' => 'JBSWY3DPEHPK3PXP',
+        ]);
+        $this->artisan('uvh:admin:promote', ['email' => $user->email])->assertSuccessful();
+        self::assertTrue($user->fresh()->is_admin);
+        $this->assertDatabaseCount('audit_events', 1);
     }
 
     public static function ineligibleAccounts(): array

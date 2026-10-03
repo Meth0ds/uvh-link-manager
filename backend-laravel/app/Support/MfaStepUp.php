@@ -4,8 +4,8 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Models\UvhSession;
+use App\Support\Auth\MfaFactorVerification;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -65,22 +65,8 @@ class MfaStepUp
             if (! is_string($user->mfa_secret) || $user->mfa_secret === '') {
                 return self::factorFailure($user->id, $attemptPurpose);
             }
-            try {
-                $secret = UvhCrypto::decryptAtRest($user->mfa_secret);
-            } catch (\Throwable) {
-                return self::factorFailure($user->id, $attemptPurpose);
-            }
-            $counter = Totp::matchingCounter($factorCode, $secret);
-            if ($counter === null) {
-                return self::factorFailure($user->id, $attemptPurpose);
-            }
-            $factor = substr(hash('sha256', $secret), 0, 24);
-            try {
-                $reserved = Cache::add('uvh:mfa:totp-used:'.$user->id.':'.$factor.':'.$counter, true, now()->addMinutes(3));
-            } catch (\Throwable $error) {
-                throw new MfaInfrastructureUnavailable('MFA replay store unavailable', 0, $error);
-            }
-            if (! $reserved) {
+            $secret = MfaFactorVerification::decryptSecret($user->mfa_secret);
+            if ($secret === null || ! MfaFactorVerification::consumeTotp($user->id, $factorCode, $secret)) {
                 return self::factorFailure($user->id, $attemptPurpose);
             }
 
@@ -91,13 +77,7 @@ class MfaStepUp
         if (! preg_match('/^[A-Z2-9]{16}$/D', $normalized) || ! is_array($user->recovery_codes)) {
             return self::factorFailure($user->id, $attemptPurpose);
         }
-        $target = Ids::sha256Hex($normalized);
-        $match = null;
-        foreach ($user->recovery_codes as $index => $hash) {
-            if (is_string($hash) && strlen($hash) === 64 && hash_equals($hash, $target)) {
-                $match = (int) $index;
-            }
-        }
+        $match = MfaFactorVerification::recoveryIndex($user->recovery_codes, $normalized);
         if ($match === null) {
             return self::factorFailure($user->id, $attemptPurpose);
         }

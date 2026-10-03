@@ -2,8 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\EmailToken;
 use App\Models\PendingRegistration;
+use App\Models\RegistrationAttempt;
+use App\Models\User;
+use App\Support\Ids;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
@@ -55,9 +60,18 @@ final class RegistrationEditConcurrencyTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_one_edit_secret_authorises_exactly_one_correction(): void
+    public static function outcomes(): array
+    {
+        return ['free destination' => [false], 'occupied destination' => [true]];
+    }
+
+    #[DataProvider('outcomes')]
+    public function test_one_edit_secret_authorises_exactly_one_correction(bool $occupied): void
     {
         $email = 'carrera-'.strtolower(bin2hex(random_bytes(4))).'@example.com';
+        if ($occupied) {
+            User::factory()->create(['email' => $email]);
+        }
         $registered = $this->postJson('/api/v1/auth/register', array_merge([
             'name' => 'Carrera User',
             'email' => $email,
@@ -65,8 +79,10 @@ final class RegistrationEditConcurrencyTest extends TestCase
         ], $this->captchaPayload()))->assertStatus(201);
         $secret = (string) $this->cookieFrom($registered, 'uvh_registration_edit');
         $this->assertNotSame('', $secret);
-        $pending = PendingRegistration::where('email', $email)->firstOrFail();
-        $this->assertSame(1, (int) $pending->security_version);
+        $attempt = RegistrationAttempt::where('email', $email)->sole();
+        $pending = PendingRegistration::where('email', $email)->first();
+        $this->assertSame(1, (int) $attempt->security_version);
+        $this->assertSame($occupied ? null : 1, $pending ? (int) $pending->security_version : null);
 
         $destinations = [
             'ganadora-'.strtolower(bin2hex(random_bytes(4))).'@example.com',
@@ -85,10 +101,97 @@ final class RegistrationEditConcurrencyTest extends TestCase
         // Exactly one move landed, and the generation advanced exactly once:
         // the loser's request found a row already rotated and refused instead
         // of rotating it again.
-        $pending->refresh();
-        $this->assertSame(2, (int) $pending->security_version);
-        $this->assertContains($pending->email, $destinations);
+        $attempt->refresh();
+        $this->assertSame(2, (int) $attempt->security_version);
+        $this->assertContains($attempt->email, $destinations);
+        $winner = PendingRegistration::findOrFail($attempt->pending_registration_id);
+        $this->assertSame($occupied ? 1 : 2, (int) $winner->security_version);
+        $this->assertSame($attempt->email, $winner->email);
         $this->assertSame(1, PendingRegistration::whereIn('email', $destinations)->count());
+    }
+
+    #[DataProvider('outcomes')]
+    public function test_activation_and_correction_share_context_before_parent_lock_order(bool $occupied): void
+    {
+        $email = 'activation-race@example.test';
+        if ($occupied) {
+            User::factory()->create(['email' => $email]);
+        }
+        $registered = $this->postJson('/api/v1/auth/register', array_merge(['email' => $email, 'name' => 'Context Author', 'password' => self::PASSWORD], $this->captchaPayload()))->assertCreated();
+        $secret = (string) $this->cookieFrom($registered, 'uvh_registration_edit');
+        if ($occupied) {
+            $this->withCookie('uvh_registration_edit', $secret);
+            $email = 'virtual-activation-race@example.test';
+            $corrected = $this->postJson('/api/v1/auth/change-registration-email', array_merge(['currentEmail' => 'activation-race@example.test', 'newEmail' => $email], $this->captchaPayload()))->assertOk();
+            $secret = (string) $this->cookieFrom($corrected, 'uvh_registration_edit');
+        }
+        $pending = PendingRegistration::sole();
+        $token = Ids::randomToken(32);
+        EmailToken::create(['id' => Ids::sha256Hex($token), 'pending_registration_id' => $pending->id, 'kind' => 'verify', 'expires_at' => now()->addDay()]);
+        $this->installSlowRotationTrigger();
+        $startAt = microtime(true) + 3;
+        $processes = [];
+        foreach ([$token, ''] as $index => $activation) {
+            $process = new Process([PHP_BINARY, base_path('tests/Support/registration-edit-probe.php'),
+                '--host='.(string) config('uvh.app_host'), '--email='.$email, '--new=corrected@example.test',
+                '--cookie='.$secret, '--activate='.$activation, '--at='.($startAt + $index * 0.4),
+            ], base_path(), $this->probeEnvironment());
+            $process->setTimeout(60);
+            $process->start();
+            $processes[] = $process;
+        }
+        $results = [];
+        foreach ($processes as $process) {
+            $process->wait();
+            $results[] = $this->decodeProbe($process);
+        }
+        $this->dropSlowRotationTrigger();
+        $this->assertNoProbeErrors($results);
+        $this->assertWorkersOverlapped($results);
+        $this->assertSame('ok', $results[1]['kind'], $this->describe($results));
+        $this->assertContains($results[0]['kind'], ['ok', 'invalid-bearer'], $this->describe($results));
+        $attempt = RegistrationAttempt::sole();
+        $this->assertSame($occupied ? 3 : 2, (int) $attempt->security_version);
+        $this->assertSame('corrected@example.test', $attempt->email);
+        $this->assertSame('corrected@example.test', PendingRegistration::findOrFail($attempt->pending_registration_id)->email);
+        $this->assertDatabaseMissing('email_tokens', ['id' => Ids::sha256Hex($token)]);
+        $this->assertDatabaseCount('sessions', 0);
+    }
+
+    public function test_retention_rechecks_expiry_after_waiting_for_a_context_renewal(): void
+    {
+        $attempt = RegistrationAttempt::create(['email' => 'renewed@example.test', 'expires_at' => now()->subHour()]);
+        $process = new Process([PHP_BINARY, base_path('tests/Support/registration-edit-probe.php'), '--purge=expired-attempts'], base_path(), $this->probeEnvironment());
+        $process->setTimeout(40);
+        DB::beginTransaction();
+        try {
+            RegistrationAttempt::whereKey($attempt->id)->lockForUpdate()->firstOrFail()->update(['expires_at' => now()->addHour(), 'security_version' => 2]);
+            $process->start();
+            $waiting = false;
+            $deadline = microtime(true) + 10;
+            do {
+                DB::select('SELECT pg_stat_clear_snapshot()');
+                $row = DB::selectOne("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = 'uvh-registration-purge-probe' AND wait_event_type = 'Lock') AS blocked");
+                $waiting = $row && (bool) $row->blocked;
+                if (! $waiting) {
+                    usleep(20_000);
+                }
+            } while (! $waiting && $process->isRunning() && microtime(true) < $deadline);
+            $this->assertTrue($waiting, 'The retention worker must actually wait on the renewing row, not run after commit.');
+            DB::commit();
+            $process->wait();
+            $result = $this->decodeProbe($process);
+            $this->assertSame('purged', $result['kind']);
+            $this->assertNotNull($attempt->fresh(), 'Retention deleted a context renewed while its snapshot was waiting.');
+            $this->assertSame(2, (int) $attempt->refresh()->security_version);
+        } finally {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+            if ($process->isRunning()) {
+                $process->stop();
+            }
+        }
     }
 
     // ---------------- harness ----------------
@@ -153,6 +256,7 @@ final class RegistrationEditConcurrencyTest extends TestCase
             'DB_USERNAME' => (string) $connection['username'],
             'DB_PASSWORD' => (string) $connection['password'],
             'QUEUE_CONNECTION' => 'sync',
+            'MAIL_MAILER' => 'array',
             'CACHE_STORE' => 'array',
             'SESSION_DRIVER' => 'array',
             'PUBLIC_HOST' => (string) config('uvh.public_host'),
@@ -243,16 +347,23 @@ final class RegistrationEditConcurrencyTest extends TestCase
 CREATE OR REPLACE FUNCTION uvh_test_slow_security_version() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
     PERFORM pg_sleep(1.5);
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
     RETURN NEW;
 END;
 $fn$
 SQL);
         DB::statement('CREATE TRIGGER uvh_test_slow_security_version BEFORE UPDATE OF security_version ON pending_registrations FOR EACH ROW EXECUTE FUNCTION uvh_test_slow_security_version()');
+        DB::statement('CREATE TRIGGER uvh_test_slow_pending_delete BEFORE DELETE ON pending_registrations FOR EACH ROW EXECUTE FUNCTION uvh_test_slow_security_version()');
+        DB::statement('CREATE TRIGGER uvh_test_slow_attempt_version BEFORE UPDATE OF security_version ON registration_attempts FOR EACH ROW EXECUTE FUNCTION uvh_test_slow_security_version()');
     }
 
     private function dropSlowRotationTrigger(): void
     {
         DB::statement('DROP TRIGGER IF EXISTS uvh_test_slow_security_version ON pending_registrations');
+        DB::statement('DROP TRIGGER IF EXISTS uvh_test_slow_pending_delete ON pending_registrations');
+        DB::statement('DROP TRIGGER IF EXISTS uvh_test_slow_attempt_version ON registration_attempts');
         DB::statement('DROP FUNCTION IF EXISTS uvh_test_slow_security_version()');
     }
 

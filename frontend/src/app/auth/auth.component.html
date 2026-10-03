@@ -15,8 +15,8 @@
       <aside class="intent-context" role="status">
         <span class="intent-context-icon"><mat-icon aria-hidden="true">bookmark_added</mat-icon></span>
         <span>
-          <b>Tu URL está guardada</b>
-          <small>La retomaremos cuando completes el acceso.</small>
+          <b>Continúa con tu URL</b>
+          <small>Completa el acceso para retomarla antes de que caduque.</small>
         </span>
       </aside>
     }
@@ -45,7 +45,7 @@
             <form class="form" [formGroup]="loginForm" (ngSubmit)="onLogin()" novalidate>
               <mat-form-field appearance="outline">
                 <mat-label>Email</mat-label>
-                <input matInput type="email" formControlName="email" autocomplete="email" />
+                <input #loginEmail matInput type="email" formControlName="email" autocomplete="email" />
                 <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
                 @if (loginForm.controls.email.hasError('required') && loginForm.controls.email.touched) {
                   <mat-error>Introduce tu email.</mat-error>
@@ -96,7 +96,7 @@
             <div class="register-heading">
               <div>
                 <h2 id="register-title">{{ changeEmailMode() ? 'Corrige tu email' : 'Crea tu cuenta en UVH' }}</h2>
-                <p>{{ changeEmailMode() ? 'Actualiza la dirección y te enviaremos una nueva verificación.' : (pendingLink() ? 'Crea tu cuenta y retoma el enlace al terminar.' : 'Una cuenta para los enlaces que compartes hoy y los cambios que vendrán después.') }}</p>
+                <p>{{ changeEmailMode() ? 'Actualiza la dirección para continuar con tu solicitud.' : (pendingLink() ? 'Crea tu cuenta y retoma el enlace al terminar.' : 'Una cuenta para los enlaces que compartes hoy y los cambios que vendrán después.') }}</p>
               </div>
               <span class="step-icon teal"><mat-icon aria-hidden="true">rocket_launch</mat-icon></span>
             </div>
@@ -141,7 +141,7 @@
                   }
                 </mat-form-field>                <div class="workspace-note">
                   <mat-icon aria-hidden="true">{{ changeEmailMode() ? 'edit_note' : 'workspaces' }}</mat-icon>
-                  <span><b>{{ changeEmailMode() ? 'Solo cambiaremos la dirección pendiente' : 'Tu workspace se crea automáticamente' }}</b><small>{{ changeEmailMode() ? 'Después enviaremos una nueva verificación.' : 'Podrás invitar a tu equipo cuando verifiques tu email.' }}</small></span>
+                  <span><b>{{ changeEmailMode() ? 'Actualiza la dirección de tu solicitud' : 'Tu workspace se crea automáticamente' }}</b><small>{{ changeEmailMode() ? 'Si está disponible, recibirás un enlace para confirmarla.' : 'Podrás invitar a tu equipo cuando verifiques tu email.' }}</small></span>
                 </div>
 
 
@@ -167,7 +167,7 @@
                        servidor ya no lee. -->
                   <div class="workspace-note" role="status">
                     <mat-icon aria-hidden="true">lock_open</mat-icon>
-                    <span><b>Sin contraseña ahora</b><small>Te enviaremos la verificación a la dirección nueva y allí elegirás la contraseña definitiva.</small></span>
+                    <span><b>Sin contraseña ahora</b><small>Si puedes completar el registro con esta dirección, recibirás el enlace para elegir tu contraseña.</small></span>
                   </div>
                 }
                 @if (!changeEmailMode()) {
@@ -241,7 +241,7 @@
 
     @if (step() === 'mfa') {
       <div class="otp-modal-scrim" role="presentation" (keydown)="onOtpModalKeydown($event)">
-        <section class="otp-modal" role="dialog" aria-modal="true" aria-labelledby="mfa-title" aria-describedby="mfa-lead">
+        <section #mfaDialog class="otp-modal" role="dialog" tabindex="-1" aria-modal="true" [attr.aria-busy]="busy()" aria-labelledby="mfa-title" aria-describedby="mfa-lead">
           <div class="mfa-stepper" aria-label="Paso 2 de 2">
             <span class="done"><mat-icon aria-hidden="true">check</mat-icon><b>Credenciales</b></span>
             <i aria-hidden="true"></i>
@@ -265,7 +265,7 @@
               <span>{{ busy() ? 'Verificando…' : 'Confirmar y entrar' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
             </button>
             @if (mfaRecoveryAvailable()) {
-              <button mat-button type="button" class="method-link" (click)="goRecovery()"><mat-icon aria-hidden="true">key</mat-icon>Usar un código de recuperación</button>
+              <button mat-button type="button" class="method-link" (click)="goRecovery()" [disabled]="busy()"><mat-icon aria-hidden="true">key</mat-icon>Usar un código de recuperación</button>
             }
             <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()">Volver al inicio de sesión</button>
           </form>
@@ -287,7 +287,7 @@
         <form class="form" [formGroup]="recoveryForm" (ngSubmit)="onRecovery()">
           <mat-form-field appearance="outline" class="recovery-field">
             <mat-label>Código de recuperación</mat-label>
-            <input matInput formControlName="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX" />
+            <input #recoveryCode matInput formControlName="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX" />
             <mat-icon matPrefix aria-hidden="true">key</mat-icon>
           </mat-form-field>
           @if (error()) {
@@ -299,8 +299,8 @@
           <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="recoveryForm.invalid || busy()">
             <span>{{ busy() ? 'Comprobando…' : 'Usar código y entrar' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
           </button>
-          <button mat-button type="button" class="method-link" (click)="backToMfa()"><mat-icon aria-hidden="true">phonelink_lock</mat-icon>Usar la aplicación autenticadora</button>
-          <a mat-button class="method-link" routerLink="/auth/account-recovery"><mat-icon aria-hidden="true">support_agent</mat-icon>No tengo acceso a ningún factor</a>
+          <button mat-button type="button" class="method-link" (click)="backToMfa()" [disabled]="busy()"><mat-icon aria-hidden="true">phonelink_lock</mat-icon>Usar la aplicación autenticadora</button>
+          <a mat-button class="method-link" [routerLink]="busy() ? null : '/auth/account-recovery'" [disabled]="busy()"><mat-icon aria-hidden="true">support_agent</mat-icon>No tengo acceso a ningún factor</a>
           <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()">Volver al inicio de sesión</button>
         </form>
       </section>
@@ -318,11 +318,11 @@
 
         <div class="pending-symbol" aria-hidden="true"><mat-icon>outgoing_mail</mat-icon><span></span></div>
         <h2 class="card-title" id="pending-title">{{ verificationRecovery() ? 'Recupera tu verificación.' : 'Tu siguiente paso está en el correo.' }}</h2>
-        <p class="pending-intro">{{ verificationRecovery() ? 'Si ya solicitaste la cuenta, pide otro enlace para confirmar tu dirección. Lo enviaremos solo si sigue pendiente.' : (verificationEditable() ? 'Abre el enlace que te enviamos para confirmar tu dirección. Después elegirás tu contraseña y podrás entrar en tu espacio.' : 'Abre el enlace que te enviamos para confirmar tu dirección y poder acceder a tu espacio.') }}</p>
+        <p class="pending-intro">{{ verificationRecovery() ? 'Si ya solicitaste la cuenta, pide otro enlace para confirmar tu dirección. Lo enviaremos solo si sigue pendiente.' : (verificationEditable() ? 'Si esta dirección puede completar el registro, recibirás un enlace para confirmarla y elegir tu contraseña. Si ya tienes una cuenta, vuelve al inicio de sesión o recupera tu contraseña.' : 'Abre el enlace que te enviamos para confirmar tu dirección y poder acceder a tu espacio.') }}</p>
 
         @if (verificationEmail(); as pendingEmail) {
           <div class="pending-email">
-            <span>{{ verificationRecovery() ? 'Dirección indicada' : 'Correo enviado a' }}</span>
+            <span>{{ verificationRecovery() || verificationEditable() ? 'Dirección indicada' : 'Correo enviado a' }}</span>
             <strong>{{ pendingEmail }}</strong>
             @if (verificationEditable()) {
               <button type="button" (click)="changeRegistrationEmail()" [disabled]="verificationBusy()">¿Te equivocaste de dirección? Cámbiala</button>
@@ -330,7 +330,7 @@
           </div>
         }
         @if (pendingLink()) {
-          <p class="pending-saved-link"><mat-icon aria-hidden="true">link</mat-icon> Tu enlace está guardado. Podrás crearlo cuando confirmes tu dirección.</p>
+          <p class="pending-saved-link"><mat-icon aria-hidden="true">link</mat-icon> Confirma tu dirección para retomar tu URL si sigue disponible.</p>
         }
         @if (error()) {
           <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
@@ -359,6 +359,20 @@
       </section>
     }
   </div>
+  } @else if (navigationFailure()) {
+    <section #navigationStatus class="card auth-card" tabindex="-1" aria-labelledby="navigation-title" [attr.aria-busy]="navigationBusy()">
+      @if (navigationBusy()) {
+        <mat-progress-bar mode="indeterminate" class="top-bar" aria-label="Abriendo tu espacio" />
+      }
+      <div class="welcome-row">
+        <div>
+          <h2 id="navigation-title">Tu sesión está iniciada.</h2>
+          <p>No hemos podido abrir la página de destino. Puedes volver a intentarlo para continuar.</p>
+        </div>
+        <span class="step-icon blue"><mat-icon aria-hidden="true">check</mat-icon></span>
+      </div>
+      <button mat-flat-button class="navigation-retry" type="button" (click)="retryNavigation()" [disabled]="navigationBusy()">{{ navigationBusy() ? 'Abriendo…' : 'Volver a intentarlo' }}</button>
+    </section>
   } @else {
     <div class="card auth-card" role="status" aria-live="polite">
       <div class="captcha-bootstrap"><span><b>Comprobando tu sesión…</b></span><mat-progress-bar mode="indeterminate" /></div>

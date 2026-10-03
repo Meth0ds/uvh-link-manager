@@ -50,7 +50,7 @@ final class SessionsRevocationNoticeTest extends TestCase
             if ($this->failExactAudit && str_starts_with(strtolower($event->sql), 'insert') && str_contains($event->sql, '"audit_outbox"')) {
                 foreach ($event->bindings as $binding) {
                     $row = is_string($binding) ? json_decode($binding, true) : null;
-                    if (is_array($row) && in_array($row['action'] ?? null, ['auth.sessions_revoked_others', 'auth.sessions_revoked_all'], true)) {
+                    if (is_array($row) && in_array($row['action'] ?? null, ['auth.session_revoke', 'auth.sessions_revoked_others', 'auth.sessions_revoked_all'], true)) {
                         throw new \RuntimeException('Fixture: exact session audit admission interrupted');
                     }
                 }
@@ -265,6 +265,178 @@ final class SessionsRevocationNoticeTest extends TestCase
             $this->assertSame(1, DB::table('audit_events')->where('action', 'auth.sessions_revoked_'.$surface)->count());
             $this->assertDatabaseCount('audit_outbox', 0);
         }
+    }
+
+    public static function outerClosures(): array
+    {
+        $cases = [];
+        foreach (['individual', 'current', 'others', 'all'] as $surface) {
+            foreach ([false, true] as $commit) {
+                $cases[$surface.' '.($commit ? 'commit' : 'rollback')] = [$surface, $commit];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('outerClosures')]
+    public function test_outer_commit_owns_revocation_notice_bearer_and_exact_event(string $surface, bool $commit): void
+    {
+        $this->freezeSecond();
+        [$user, $current, $other] = $this->account();
+        $foreign = User::factory()->create();
+        $foreignToken = SessionManager::create($foreign->id, Request::create('/'), 1, true);
+        $foreignId = Ids::sha256Hex($foreignToken);
+        $currentId = Ids::sha256Hex($current);
+        $otherId = Ids::sha256Hex($other);
+        $targetId = $surface === 'current' ? $currentId : $otherId;
+        $individual = in_array($surface, ['individual', 'current'], true);
+        $path = $individual ? '/api/v1/auth/sessions/'.$targetId.'/revoke' : '/api/v1/auth/sessions/revoke-'.$surface;
+        $action = $individual ? 'auth.session_revoke' : 'auth.sessions_revoked_'.$surface;
+        $clearsCookie = in_array($surface, ['current', 'all'], true);
+        $before = $user->refresh()->getRawOriginal();
+        $sessionsBefore = DB::table('sessions')->orderBy('id')->get()->toJson();
+        $call = fn () => $this->postJson($path);
+
+        DB::beginTransaction();
+        try {
+            $response = $call()->assertOk();
+            $response->assertExactJson($individual
+                ? ['ok' => true, 'current' => $surface === 'current']
+                : ['ok' => true, 'revoked' => $surface === 'all' ? 2 : 1]);
+            if ($clearsCookie) {
+                $response->assertCookieExpired('uvh_session');
+            } else {
+                $response->assertCookieMissing('uvh_session');
+            }
+            $this->assertSame($before, $user->refresh()->getRawOriginal());
+            $this->assertDatabaseCount('mail_outbox', 1);
+            $this->assertDatabaseCount('email_tokens', 1);
+            $this->assertDatabaseCount('notifications', 1);
+            $this->assertDatabaseCount('audit_outbox', 2);
+            $this->assertDatabaseCount('audit_events', 0);
+            $this->assertSame([2], $this->noticeTransactionLevels);
+            Queue::assertNothingPushed();
+            $notice = DB::table('mail_outbox')->sole();
+            $this->assertSame('pending', $notice->status);
+            $this->assertTrue(MailDeliveryEligibility::isCurrent($notice));
+            $this->assertSame($notice->resource_id, DB::table('email_tokens')->sole()->id);
+            $events = DB::table('audit_outbox')->get()->map(static fn ($row) => json_decode($row->event, true, flags: JSON_THROW_ON_ERROR));
+            $exact = $events->where('action', $action)->sole();
+            $this->assertSame($user->id, $exact['user_id']);
+            $this->assertSame($individual ? 'session' : 'user', $exact['resource_type']);
+            $this->assertSame($individual ? $targetId : (string) $user->id, $exact['resource_id']);
+            if (! $individual) {
+                $this->assertSame($surface === 'all' ? 2 : 1, json_decode($exact['metadata'], true, flags: JSON_THROW_ON_ERROR)['revoked']);
+            }
+            foreach ([self::PASSWORD, $current, $other, $foreignToken] as $secret) {
+                $this->assertStringNotContainsString($secret, json_encode($exact, JSON_THROW_ON_ERROR));
+            }
+            $this->assertNull(DB::table('sessions')->where('id', $foreignId)->value('revoked_at'));
+            $this->assertSame($surface === 'all' ? 2 : 1, DB::table('sessions')->where('user_id', $user->id)->whereNotNull('revoked_at')->count());
+            if ($commit) {
+                DB::commit();
+            } else {
+                DB::rollBack();
+            }
+        } finally {
+            while (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+        }
+        if (! $commit) {
+            $this->assertSame($sessionsBefore, DB::table('sessions')->orderBy('id')->get()->toJson());
+            foreach (['mail_outbox', 'email_tokens', 'notifications', 'audit_outbox', 'audit_events'] as $table) {
+                $this->assertDatabaseCount($table, 0);
+            }
+            Queue::assertNothingPushed();
+            $call()->assertOk();
+        }
+        $this->assertSame($before, $user->refresh()->getRawOriginal());
+        $this->assertNull(DB::table('sessions')->where('id', $foreignId)->value('revoked_at'));
+        $this->assertSame($surface === 'all' ? 2 : 1, DB::table('sessions')->where('user_id', $user->id)->whereNotNull('revoked_at')->count());
+        $this->assertDatabaseCount('mail_outbox', 1);
+        $this->assertDatabaseCount('email_tokens', 1);
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseCount('audit_outbox', 0);
+        $this->assertSame(1, DB::table('audit_events')->where('action', $action)->count());
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'auth.security_notice_admitted')->count());
+        Queue::assertPushed(DeliverMailOutboxJob::class, 1);
+    }
+
+    public static function individualAudits(): array
+    {
+        return [[false, false], [false, true], [true, false], [true, true]];
+    }
+
+    #[DataProvider('individualAudits')]
+    public function test_individual_revocation_preserves_exact_audit_admission_and_history_recovery(bool $currentTarget, bool $admissionFails): void
+    {
+        [$user, $current, $other] = $this->account();
+        $id = Ids::sha256Hex($currentTarget ? $current : $other);
+        $this->failExactAudit = $admissionFails;
+        if (! $admissionFails) {
+            Schema::rename('audit_events', 'audit_events_session_revocation');
+        }
+        try {
+            $response = $this->postJson('/api/v1/auth/sessions/'.$id.'/revoke');
+            if ($admissionFails) {
+                $response->assertServerError()->assertCookieMissing('uvh_session');
+                $this->assertSame(2, DB::table('sessions')->whereNull('revoked_at')->count());
+                foreach (['mail_outbox', 'email_tokens', 'notifications', 'audit_outbox'] as $table) {
+                    $this->assertDatabaseCount($table, 0);
+                }
+                Queue::assertNothingPushed();
+            } else {
+                $response->assertOk()->assertExactJson(['ok' => true, 'current' => $currentTarget]);
+                $events = DB::table('audit_outbox')->get()->map(static fn ($row) => json_decode($row->event, true, flags: JSON_THROW_ON_ERROR));
+                $exact = $events->where('action', 'auth.session_revoke')->sole();
+                $this->assertSame($user->id, $exact['user_id']);
+                $this->assertSame($id, $exact['resource_id']);
+                $this->assertSame('session', $exact['resource_type']);
+                $this->assertNotNull(DB::table('sessions')->where('id', $id)->value('revoked_at'));
+            }
+        } finally {
+            $this->failExactAudit = false;
+            if (! $admissionFails) {
+                Schema::rename('audit_events_session_revocation', 'audit_events');
+            }
+        }
+        if (! $admissionFails) {
+            $this->assertTrue(Audit::drain());
+            $this->assertTrue(Audit::drain());
+            $this->assertDatabaseCount('audit_outbox', 0);
+            $this->assertSame(1, DB::table('audit_events')->where('action', 'auth.session_revoke')->count());
+        }
+    }
+
+    public static function unverifiedClosures(): array
+    {
+        return [['individual'], ['others'], ['all']];
+    }
+
+    #[DataProvider('unverifiedClosures')]
+    public function test_pre_authorized_closure_preserves_its_live_email_and_step_up_policy(string $surface): void
+    {
+        [$user, $current, $other] = $this->account();
+        $request = Request::create('/');
+        $request->attributes->set(UvhRequest::USER, $user);
+        $request->attributes->set(UvhRequest::SESSION_ID, Ids::sha256Hex($current));
+        // A NEW request from an unverified account is rejected by hydrate.
+        // This already-authorized snapshot characterizes only the mutation's
+        // existing requireVerifiedEmail=false policy after an interleaving.
+        DB::table('users')->where('id', $user->id)->update(['email_verified_at' => null]);
+        $controller = app(AuthController::class);
+        $response = match ($surface) {
+            'individual' => $controller->revokeSession($request, Ids::sha256Hex($other)),
+            'others' => $controller->revokeOtherSessions($request),
+            'all' => $controller->revokeAllSessions($request),
+        };
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame($surface === 'all' ? 2 : 1, DB::table('sessions')->whereNotNull('revoked_at')->count());
+        $this->assertFalse($user->refresh()->mfa_enabled);
+        $this->assertSame(1, $user->security_version);
+        $this->assertNull($user->email_verified_at);
     }
 
     /** @return array{User, string, string} */

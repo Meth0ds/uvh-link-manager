@@ -8,11 +8,12 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
+import { AuthService } from "../core/services/auth.service";
 import { assessPassword, passwordMeterSteps, passwordStrengthLabel } from "./password-policy";
 import { authBearer } from "./auth-bearer";
 import { AuthShellComponent } from "./auth-shell.component";
 import { LatestRequest } from "../core/services/latest-request";
-import { decodePublicActionMessage } from "../core/services/public-action-response-decoders";
+import { decodeAccountRecoveryCompletion } from "../core/services/public-action-response-decoders";
 
 @Component({
   selector: "app-account-recovery-complete",
@@ -69,6 +70,7 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
 })
 export class AccountRecoveryCompleteComponent {
   private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly location = inject(Location);
@@ -105,15 +107,17 @@ export class AccountRecoveryCompleteComponent {
       this.form.markAllAsTouched();
       return;
     }
+    const generation = this.auth.sessionGeneration();
     const request = this.requests.begin(this.token);
     this.busy.set(true);
     this.error.set(null);
     try {
-      const result = await this.api.post<{ ok: true; message: string }>("/api/v1/auth/account-recovery/complete", {
+      const result = await this.api.post("/api/v1/auth/account-recovery/complete", {
         token: this.token,
         password: this.form.controls.password.value,
         confirmation: this.form.controls.confirmation.value,
-      }, decodePublicActionMessage);
+      }, decodeAccountRecoveryCompletion);
+      if (result.current) this.auth.accountSignedOut(generation);
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.message.set(result.message);

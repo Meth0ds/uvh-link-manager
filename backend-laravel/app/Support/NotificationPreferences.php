@@ -50,9 +50,31 @@ final class NotificationPreferences
             ->where('kind', $kind)
             ->value('delivery');
 
-        return is_string($stored) && in_array($stored, self::DELIVERIES, true)
-            ? $stored
-            : self::DELIVERY_IMMEDIATE;
+        return self::normalizeDelivery($stored);
+    }
+
+    /**
+     * Entregas del catálogo completo con una consulta limitada a la cuenta.
+     *
+     * @return array<string, string>
+     */
+    public static function deliveriesFor(int $userId): array
+    {
+        $stored = DB::table('notification_preferences')
+            ->where('user_id', $userId)->pluck('delivery', 'kind');
+        $deliveries = [];
+        foreach (array_keys(NotificationKinds::all()) as $kind) {
+            $deliveries[$kind] = NotificationKinds::isMandatory($kind)
+                ? self::DELIVERY_IMMEDIATE
+                : self::normalizeDelivery($stored->get($kind));
+        }
+
+        return $deliveries;
+    }
+
+    private static function normalizeDelivery(mixed $stored): string
+    {
+        return is_string($stored) && in_array($stored, self::DELIVERIES, true) ? $stored : self::DELIVERY_IMMEDIATE;
     }
 
     /**
@@ -99,7 +121,7 @@ final class NotificationPreferences
         // no sólo de validación: preferencias y sellado de lo pendiente
         // compilan juntos, y el claim del resumen diario los serializa contra
         // su propia transacción.
-        DB::transaction(function () use ($applied, $userId): void {
+        DB::transaction(function () use ($applied, $userId, $ip): void {
             foreach ($applied as $kind => $delivery) {
                 DB::table('notification_preferences')->updateOrInsert(
                     ['user_id' => $userId, 'kind' => $kind],
@@ -117,13 +139,12 @@ final class NotificationPreferences
                         ->update(['digested_at' => now()]);
                 }
             }
+            if ($applied !== []) {
+                Audit::write($userId, 'account.notification_preferences_updated', 'account', $userId, [
+                    'kinds' => array_keys($applied),
+                ], $ip);
+            }
         });
-
-        if ($applied !== []) {
-            Audit::write($userId, 'account.notification_preferences_updated', 'account', $userId, [
-                'kinds' => array_keys($applied),
-            ], $ip);
-        }
 
         return $applied;
     }

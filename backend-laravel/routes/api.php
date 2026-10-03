@@ -80,7 +80,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:uvh-login');
     Route::post('auth/mfa/verify', [AuthController::class, 'mfaVerify'])->middleware('throttle:uvh-mfa');
     Route::post('auth/mfa/recovery', [AuthController::class, 'mfaRecovery'])->middleware('throttle:uvh-mfa');
-    Route::post('auth/logout', [AuthController::class, 'logout']);
+    Route::post('auth/logout', [AuthController::class, 'logout'])->middleware('uvh.auth:optional');
     Route::post('auth/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:uvh-email-verify');
     Route::post('auth/confirm-email-change', [AuthController::class, 'confirmEmailChange'])->middleware('throttle:uvh-email-verify');
     Route::post('auth/account-deletion/confirm', [AccountController::class, 'confirmDeletion'])->middleware('throttle:uvh-email-verify');

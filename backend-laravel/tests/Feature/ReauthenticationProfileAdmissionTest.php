@@ -30,7 +30,7 @@ final class ReauthenticationProfileAdmissionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement('TRUNCATE users, audit_events, audit_outbox RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, mail_outbox, audit_events, audit_outbox RESTART IDENTITY CASCADE');
         $this->disableCookieEncryption();
         $this->withCredentials();
         $this->withCookie('uvh_csrf', 'profile-reauth')->withHeader('X-CSRF-Token', 'profile-reauth');
@@ -187,6 +187,91 @@ final class ReauthenticationProfileAdmissionTest extends TestCase
         } else {
             $this->assertSame($action === 'profile' ? 'Changed Profile' : $user->name, $user->refresh()->name);
             $this->assertSame($action === 'reauth' ? [] : [Ids::sha256Hex(self::RECOVERY)], $user->recovery_codes);
+        }
+    }
+
+    public static function outerCommits(): array
+    {
+        $cases = [];
+        foreach (['profile', 'recovery', 'totp'] as $action) {
+            foreach ([false, true] as $commit) {
+                $cases[$action.' '.($commit ? 'commit' : 'rollback')] = [$action, $commit];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('outerCommits')]
+    public function test_outer_commit_owns_profile_or_freshness_recovery_and_exact_event(string $action, bool $commit): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        [$user, $token, $id] = $this->account();
+        SessionManager::create($user->id, Request::create('/'), 1, true);
+        $before = $user->refresh()->getRawOriginal();
+        $sessionsBefore = DB::table('sessions')->orderBy('id')->get()->toJson();
+        $verifiedBefore = DB::table('sessions')->where('id', $id)->value('mfa_verified_at');
+        $event = $action === 'profile' ? 'auth.profile_update' : 'auth.mfa_reauthenticated';
+        $factor = $action === 'totp' ? (string) Totp::currentCode(self::SECRET) : self::RECOVERY;
+        $this->withCookie('uvh_session', $token)->withServerVariables(['REMOTE_ADDR' => '192.0.2.5']);
+        $call = fn () => $action === 'profile'
+            ? $this->patchJson('/api/v1/auth/profile', ['name' => 'Changed Profile'])
+            : $this->postJson('/api/v1/auth/mfa/reauthenticate', ['password' => self::PASSWORD, 'factorCode' => $factor]);
+        DB::beginTransaction();
+        try {
+            $call()->assertOk();
+            $this->assertDatabaseCount('audit_outbox', 1);
+            $this->assertDatabaseCount('audit_events', 0);
+            $this->assertSame(1, $user->refresh()->security_version);
+            $this->assertSame(2, DB::table('sessions')->whereNull('revoked_at')->count());
+            $this->assertDatabaseCount('mail_outbox', 0);
+            $pending = json_decode(DB::table('audit_outbox')->sole()->event, true, flags: JSON_THROW_ON_ERROR);
+            $this->assertSame($event, $pending['action']);
+            $this->assertSame($action === 'profile' ? null : UvhCrypto::hashIp('192.0.2.5'), $pending['ip_hash']);
+            if ($commit) {
+                DB::commit();
+            } else {
+                DB::rollBack();
+            }
+        } finally {
+            while (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+        }
+        if (! $commit) {
+            $this->assertSame($before, $user->refresh()->getRawOriginal());
+            $this->assertSame($sessionsBefore, DB::table('sessions')->orderBy('id')->get()->toJson());
+            $this->assertDatabaseCount('audit_outbox', 0);
+            $this->assertDatabaseCount('audit_events', 0);
+            if ($action === 'totp') {
+                $counter = Totp::matchingCounter($factor, self::SECRET);
+                $this->assertTrue(Cache::has('uvh:mfa:totp-used:'.$user->id.':'.substr(hash('sha256', self::SECRET), 0, 24).':'.$counter));
+                $call()->assertStatus(403);
+                $this->assertSame($verifiedBefore, DB::table('sessions')->where('id', $id)->value('mfa_verified_at'));
+                $this->assertSame(0, DB::table('audit_events')->where('action', $event)->count());
+
+                return;
+            }
+            $call()->assertOk();
+        }
+        $this->assertSame(1, $user->refresh()->security_version);
+        $this->assertSame(2, DB::table('sessions')->whereNull('revoked_at')->count());
+        $this->assertDatabaseCount('mail_outbox', 0);
+        $this->assertDatabaseCount('audit_outbox', 0);
+        $this->assertSame(1, DB::table('audit_events')->where('action', $event)->count());
+        $row = DB::table('audit_events')->where('action', $event)->sole();
+        $this->assertSame($action === 'profile' ? null : UvhCrypto::hashIp('192.0.2.5'), $row->ip_hash);
+        foreach ([self::PASSWORD, self::RECOVERY, $token, self::SECRET, '192.0.2.5'] as $secret) {
+            $this->assertStringNotContainsString($secret, json_encode($row, JSON_THROW_ON_ERROR));
+        }
+        if ($action === 'profile') {
+            $this->assertSame('Changed Profile', $user->name);
+            $this->assertSame($verifiedBefore, DB::table('sessions')->where('id', $id)->value('mfa_verified_at'));
+            $this->assertSame([Ids::sha256Hex(self::RECOVERY)], $user->recovery_codes);
+        } else {
+            $this->assertSame($action === 'recovery' ? [] : [Ids::sha256Hex(self::RECOVERY)], $user->recovery_codes);
+            $this->assertNotEquals($verifiedBefore, DB::table('sessions')->where('id', $id)->value('mfa_verified_at'));
+            $this->assertSame($action, json_decode($row->metadata, true, flags: JSON_THROW_ON_ERROR)['factor']);
         }
     }
 }

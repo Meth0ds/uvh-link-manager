@@ -15,5 +15,8 @@
 .decision-guide p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
 .invitation-actions { display: flex; flex-direction: column; gap: 12px; }
 .invitation-actions :is(button, a) { width: 100%; height: auto; min-height: 48px; white-space: normal; line-height: 1.6; padding-block: 10px; }
+.navigation-recovery { display: grid; gap: 18px; justify-items: start; }
+.navigation-recovery .auth-note { margin: 8px 0 0; }
+.navigation-recovery .navigation-retry { min-height: 48px; border-radius: 3px; padding-inline: 20px; }
 .invitation-neutral { color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

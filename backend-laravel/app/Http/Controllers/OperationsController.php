@@ -60,6 +60,7 @@ final class OperationsController
             $this->appendGauge($lines, 'uvh_mail_outbox_'.$status, DB::table('mail_outbox')->where('status', $status)->count());
         }
         $this->appendGauge($lines, 'uvh_audit_outbox_pending', DB::table('audit_outbox')->count());
+        $this->appendGauge($lines, 'uvh_security_incident_audits_pending', DB::table('security_incident_audits')->count());
         $oldestPendingMail = DB::table('mail_outbox')
             ->whereIn('status', ['pending', 'queued', 'processing', 'comp_pending', 'compensating'])
             ->min('created_at');

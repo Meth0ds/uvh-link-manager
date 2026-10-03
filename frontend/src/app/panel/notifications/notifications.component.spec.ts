@@ -1,6 +1,6 @@
 import { signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
-import type { NotificationItem, NotificationPreference } from "../../core/models";
+import type { AuthUser, NotificationItem, NotificationPreference } from "../../core/models";
 import { NotificationService } from "../../core/services/notification.service";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
@@ -24,8 +24,12 @@ describe("NotificationsComponent", () => {
   type NotificationMethods = Pick<NotificationService, "list" | "markRead" | "markAllRead" | "refreshUnread" | "preferences" | "updatePreferences">;
   let notifications: jasmine.SpyObj<NotificationMethods> & { unread: ReturnType<typeof signal<number>> };
   let component: NotificationsComponent;
+  let generation: number;
+  let user: ReturnType<typeof signal<AuthUser | null>>;
 
   beforeEach(async () => {
+    generation = 0;
+    user = signal<AuthUser | null>({ id: 1, name: "A", email: "a@example.test", isAdmin: false, emailVerified: true, mfaEnabled: false });
     const spy = jasmine.createSpyObj<NotificationMethods>(
       "NotificationService", ["list", "markRead", "markAllRead", "refreshUnread", "preferences", "updatePreferences"]);
     notifications = Object.assign(spy, { unread: signal(0) });
@@ -51,7 +55,7 @@ describe("NotificationsComponent", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: NotificationService, useValue: notifications },
-        { provide: AuthService, useValue: { sessionGeneration: () => 0 } },
+        { provide: AuthService, useValue: { sessionGeneration: () => generation, user } },
         { provide: WorkspaceService, useValue: { list: signal([{ id: 2 }]), select: jasmine.createSpy("select") } },
         { provide: Router, useValue: { navigateByUrl: jasmine.createSpy("navigateByUrl").and.resolveTo(true) } },
       ],
@@ -154,5 +158,52 @@ describe("NotificationsComponent", () => {
     await old;
     expect(component.items().map((row) => row.id)).toEqual([2]);
   });
+
+  it("removes the old inbox, cursor and error when the identity signs out", () => {
+    TestBed.tick();
+    component.cursor.set(2);
+    component.error.set("old error");
+    generation++;
+    user.set(null);
+    TestBed.tick();
+    expect(component.items()).toEqual([]);
+    expect(component.cursor()).toBeNull();
+    expect(component.error()).toBeNull();
+    expect(component.loading()).toBeFalse();
+    expect(component.busy()).toBeFalse();
+  });
+
+  for (const action of ["page", "mark", "all"] as const) {
+    it(`releases the old ${action} operation and preserves the new account's pending load`, async () => {
+      TestBed.tick();
+      let finish!: () => void;
+      const old = new Promise<void>((resolve) => { finish = resolve; });
+      component.cursor.set(2);
+      notifications.list.and.returnValue(old.then(() => ({ notifications: [item()], unread: 1, nextCursor: null })));
+      notifications.markRead.and.returnValue(old.then(() => 0));
+      notifications.markAllRead.and.returnValue(old.then(() => 0));
+      const pending = action === "page" ? component.loadMore()
+        : action === "mark" ? component.markRead(item()) : component.markAllRead();
+      let finishNew!: () => void;
+      const fresh = new Promise<void>((resolve) => { finishNew = resolve; });
+      notifications.list.and.returnValue(fresh.then(() => ({ notifications: [item({ id: 7 })], unread: 1, nextCursor: null })));
+      generation++;
+      user.set({ ...user()!, id: 2 });
+      TestBed.tick();
+      expect(component.busy()).toBeFalse();
+      expect(component.items()).toEqual([]);
+      expect(component.loading()).toBeTrue();
+      finish();
+      await pending;
+      expect(component.loading()).toBeTrue();
+      expect(component.items()).toEqual([]);
+      finishNew();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(component.items().map((row) => row.id)).toEqual([7]);
+      expect(component.loading()).toBeFalse();
+    });
+  }
 
 });

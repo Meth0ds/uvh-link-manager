@@ -1,10 +1,11 @@
 import { inject } from "@angular/core";
 import { HttpErrorResponse, HttpInterceptorFn } from "@angular/common/http";
-import { catchError, throwError } from "rxjs";
+import { catchError, from, throwError } from "rxjs";
 import { WorkspaceService } from "../services/workspace.service";
 import { AuthService } from "../services/auth.service";
+import { apiPathname, isWorkspaceScopedPath } from "../api-request-scope";
 
-const WORKSPACE_SCOPED = /^\/api\/v1\/(?:links|domains|tokens|webhooks|tags|collections|link-templates)(?:\/|$)|^\/api\/v1\/analytics\/(?:overview|export)(?:\/|$)/;
+
 const SESSIONLESS_AUTH_PATHS = new Set([
   "/api/v1/auth/register",
   "/api/v1/auth/change-registration-email",
@@ -24,20 +25,25 @@ const SESSIONLESS_AUTH_PATHS = new Set([
   "/api/v1/auth/account-recovery/complete",
 ]);
 
-function pathOf(url: string): string {
-  try {
-    return new URL(url, "https://uvh.invalid").pathname;
-  } catch {
-    return url.split(/[?#]/, 1)[0];
-  }
-}
 
 function usesSession(path: string): boolean {
   if (SESSIONLESS_AUTH_PATHS.has(path)) return false;
   if (path.startsWith("/api/v1/auth/")) return true;
-  if (WORKSPACE_SCOPED.test(path)) return true;
+  if (isWorkspaceScopedPath(path)) return true;
   if (/^\/api\/v1\/(?:workspaces|admin|notifications)(?:\/|$)/.test(path)) return true;
   return path === "/api/v1/link-intents/claim" || path === "/api/v1/link-intents/complete";
+}
+
+/** Read only the bounded machine discriminator for a private artifact error. */
+async function blobSessionConflict(blob: Blob): Promise<boolean> {
+  if (blob.size > 4_096) return false;
+  try {
+    const body: unknown = JSON.parse(await blob.text());
+    return typeof body === "object" && body !== null
+      && "reason" in body && body.reason === "session_context_changed";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -46,16 +52,23 @@ function usesSession(path: string): boolean {
  * workspace) are left without the workspace header.
  */
 export const apiInterceptor: HttpInterceptorFn = (req, next) => {
-  const path = pathOf(req.url);
+  const path = apiPathname(req.url);
   const workspace = inject(WorkspaceService).currentId();
   const auth = inject(AuthService);
   const generation = auth.sessionGeneration();
   const startedAuthenticated = auth.authenticated();
   const sessionRequest = usesSession(path);
-  const headers: Record<string, string> = WORKSPACE_SCOPED.test(path)
+  const account = auth.user()?.id;
+  const headers: Record<string, string> = isWorkspaceScopedPath(path)
     && Number.isSafeInteger(workspace) && (workspace as number) > 0
     ? { "X-Workspace-Id": String(workspace) }
     : {};
+  if (sessionRequest && Number.isSafeInteger(account) && (account as number) > 0) {
+    headers["X-Uvh-Account-Id"] = String(account);
+  }
+  const reconcileConflict = (): void => {
+    if (auth.user()?.id === account) auth.sessionContextChanged(generation);
+  };
 
   return next(req.clone({ withCredentials: true, setHeaders: headers })).pipe(
     catchError((error: unknown) => {
@@ -73,6 +86,17 @@ export const apiInterceptor: HttpInterceptorFn = (req, next) => {
         && error.error?.details?.reason === "mfa_reauthentication_required"
       ) {
         auth.requireAdminMfaReauthentication(generation);
+      }
+      if (error instanceof HttpErrorResponse && error.status === 409 && sessionRequest && startedAuthenticated) {
+        if (error.error instanceof Blob) {
+          // Blob.text() is asynchronous; retain the originating context while
+          // decoding so a late artifact error cannot clear a newer login.
+          return from(blobSessionConflict(error.error).then((conflict) => {
+            if (conflict) reconcileConflict();
+            throw error;
+          }));
+        }
+        if (error.error?.reason === "session_context_changed") reconcileConflict();
       }
       return throwError(() => error);
     }),

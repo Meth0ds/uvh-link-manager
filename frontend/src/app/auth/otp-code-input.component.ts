@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, EventEmitter, Input, OnInit, Output, QueryList, ViewChildren, afterNextRender, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, EventEmitter, Input, OnInit, Output, QueryList, ViewChildren, afterNextRender, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
 
@@ -68,14 +68,12 @@ export class OtpCodeInputComponent implements OnInit {
 
   // Inputs are not set until after construction, so the mirror starts empty
   // and attaches to the control in ngOnInit, when it exists.
-  private readonly mirror = signal<readonly string[]>(["", "", "", "", "", ""]);
+  protected readonly boxes = signal<readonly string[]>(["", "", "", "", "", ""]);
   private readonly destroyRef = inject(DestroyRef);
   private writingControl = false;
   // Completion is keyed by the code itself: retyping over a full code (the
   // retry-after-error case) must fire again, but the same code twice must not.
   private lastEmittedCode: string | null = null;
-
-  protected readonly boxes = computed(() => this.mirror());
 
   constructor() {
     afterNextRender(() => this.focusBox(0));
@@ -132,14 +130,14 @@ export class OtpCodeInputComponent implements OnInit {
 
   /** Writes `text` starting at `start`, replacing from there; moves focus to `focusIndex`. */
   private writeDigits(start: number, text: string, focusIndex: number): void {
-    const next = [...this.mirror()];
+    const next = [...this.boxes()];
     if (text === "") next[start] = "";
     for (let offset = 0; offset < Math.min(text.length, 6 - start); offset += 1) {
       next[start + offset] = text[offset] ?? "";
     }
     const code = next.join("");
     const nowComplete = next.every((digit) => digit !== "");
-    this.mirror.set(next);
+    this.boxes.set(next);
     if (this.control.value !== code) {
       // Our own synchronous valueChanges emission must not compact the holes.
       this.writingControl = true;
@@ -150,16 +148,18 @@ export class OtpCodeInputComponent implements OnInit {
       }
     }
     if (!nowComplete) this.lastEmittedCode = null;
+    // Completion can disable/destroy the boxes and move focus in the parent.
+    // Finish local editing before handing control to that transition.
+    this.focusBox(focusIndex);
     if (nowComplete && this.lastEmittedCode !== code) {
       this.lastEmittedCode = code;
       this.completed.emit();
     }
-    this.focusBox(focusIndex);
   }
 
   private projectControl(value: string | null): void {
     const digits = (value ?? "").replace(/\D/g, "").slice(0, 6);
-    this.mirror.set([0, 1, 2, 3, 4, 5].map(index => digits[index] ?? ""));
+    this.boxes.set([0, 1, 2, 3, 4, 5].map(index => digits[index] ?? ""));
     this.lastEmittedCode = null;
   }
 

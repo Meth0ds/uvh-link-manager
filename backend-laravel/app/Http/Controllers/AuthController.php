@@ -2,18 +2,33 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AccountDeletionRequest;
 use App\Models\AccountRecoveryRequest;
-use App\Models\AuditEvent;
-use App\Models\DataExportRequest;
 use App\Models\EmailChangeRequest;
 use App\Models\EmailToken;
 use App\Models\PendingRegistration;
 use App\Models\User;
-use App\Models\UvhSession;
 use App\Support\AccountRecoveryAdmissionException;
-use App\Support\AccountRecoveryLifecycle;
 use App\Support\Audit;
+use App\Support\Auth\AccountQueries;
+use App\Support\Auth\AccountReadContext;
+use App\Support\Auth\AccountRecoveryAdmission;
+use App\Support\Auth\AuthenticatedPasswordChange;
+use App\Support\Auth\CompromisedAccessRevocation;
+use App\Support\Auth\CredentialChangeResponse;
+use App\Support\Auth\EmailChangeAdmission;
+use App\Support\Auth\EmailChangeReservationConflict;
+use App\Support\Auth\LoginAdmission;
+use App\Support\Auth\MfaChallengeStore;
+use App\Support\Auth\MfaConfigurationAdmission;
+use App\Support\Auth\MfaLoginAdmission;
+use App\Support\Auth\PasswordRecovery;
+use App\Support\Auth\ProfileAdmission;
+use App\Support\Auth\ReauthenticationAdmission;
+use App\Support\Auth\RegistrationAdmission;
+use App\Support\Auth\RegistrationAttemptContext;
+use App\Support\Auth\RegistrationEmailCorrection;
+use App\Support\Auth\SessionRevocationAdmission;
+use App\Support\Auth\VerificationResend;
 use App\Support\FrontendUrl;
 use App\Support\HCaptcha;
 use App\Support\Ids;
@@ -24,43 +39,29 @@ use App\Support\MfaAttempts;
 use App\Support\MfaFreshness;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\MfaStepUp;
-use App\Support\NotificationInbox;
-use App\Support\NotificationKinds;
 use App\Support\PasswordStrength;
 use App\Support\PrivateArtifactCleanup;
 use App\Support\RegistrationEdit;
 use App\Support\SessionManager;
 use App\Support\Totp;
 use App\Support\UvhCrypto;
-use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController
 {
-    private const MFA_CHALLENGE_TTL = 300; // seconds
-
-    private const TERMS_VERSION = '2026-08-30';
-
-    private const PRIVACY_VERSION = '2026-08-30';
-
     // A valid cost-12 bcrypt hash for a value that is never accepted. Unknown
     // accounts still execute password verification, reducing timing-based
     // enumeration without constructing a fresh hash per request.
     private const DUMMY_PASSWORD_HASH = '$2y$12$P9Wl1lxLHGijwkSe6u4ive1jrgOvCs2K6cRjap1xfmi0GkoOLmqLO';
 
-    // MFA challenges and failed-attempt counters live in Laravel's shared
-    // cache/rate-limiter store, not PHP process memory. This keeps MFA secure
-    // when production runs multiple workers or containers.
-
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
         $email = trim(UvhRequest::inputString($request, 'email'));
         $name = trim(UvhRequest::inputString($request, 'name'));
@@ -72,8 +73,8 @@ class AuthController
         $acceptTerms = $request->boolean('acceptTerms');
 
         if (! $this->validName($name) || ! $this->validEmail($email) || ! $this->validPassword($password)
-            || ! $acceptTerms || ! hash_equals(self::TERMS_VERSION, $termsVersion)
-            || ! hash_equals(self::PRIVACY_VERSION, $privacyVersion)
+            || ! $acceptTerms || ! hash_equals(RegistrationAdmission::TERMS_VERSION, $termsVersion)
+            || ! hash_equals(RegistrationAdmission::PRIVACY_VERSION, $privacyVersion)
             || $honeypot !== '') {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
@@ -97,242 +98,67 @@ class AuthController
         // aceptación legal, ni contraseña —la activación decide todo eso con lo
         // que escribe el que abre el buzón—.
         //
-        // Sin propuesta guardada, una dirección por sí sola no demuestra el
-        // registro: login devuelve el mismo 401 que para una desconocida. Solo
-        // el navegador que conserva el secreto de edición del registro puede
-        // recibir la orientación específica a la pantalla de verificación.
-        $token = Ids::randomToken(32);
-        $tokenHash = Ids::sha256Hex($token);
+        // The browser's context is independent of address occupancy. It owns
+        // neither an account nor proof of the mailbox, but keeps later login
+        // guidance and correction responses uniform across all outcomes.
         try {
-            $outcome = DB::transaction(function () use ($email, $token, $tokenHash): array {
-                $this->lockEmailAddress($email);
-                $reserved = EmailChangeRequest::whereRaw('lower(new_email) = ?', [$email])
-                    ->where('expires_at', '>', now())->exists();
-                if ($reserved
-                    || PendingRegistration::whereRaw('lower(email) = ?', [$email])->exists()
-                    || User::whereRaw('lower(email) = ?', [$email])->exists()) {
-                    // Pendiente, verificada, borrada en blando o reservada: las
-                    // cuatro son la misma respuesta y a ninguna se sustituye. Un
-                    // registro sin verificar nunca posee una dirección —la
-                    // prueba del buzón manda—, de modo que a una inscripción
-                    // anónima posterior no le queda nada que ganar: no hay fila
-                    // de usuario que reescribir, y el bearer que ya está en el
-                    // buzón del propietario sigue completando el registro. Tampoco
-                    // hay callejón sin salida: `resend-verification` emite otro.
-                    //
-                    // El desenlace paga exactamente como una inscripción real:
-                    // una admisión huérfana cuyo token no tiene fila, de modo
-                    // que los jobs de entrega la suprimen y ningún buzón se
-                    // toca.
-                    $this->admitOrphanVerification($email);
-                    Audit::write(null, 'auth.register_duplicate', 'user', null);
-
-                    return ['status' => 'occupied', 'registration_id' => null, 'security_version' => null];
+            try {
+                $outcome = RegistrationAdmission::start($email);
+            } catch (QueryException $error) {
+                if (($error->errorInfo[0] ?? null) !== '23505') {
+                    throw $error;
                 }
-
-                $pending = PendingRegistration::create([
-                    'email' => $email,
-                    // Primera generación del secreto de edición, escrita
-                    // explícitamente para poder sellarla sin releer la fila.
-                    'security_version' => 1,
-                ]);
-
-                EmailToken::create([
-                    'id' => $tokenHash,
-                    'pending_registration_id' => (int) $pending->id,
-                    'kind' => 'verify',
-                    'expires_at' => now()->addDay(),
-                ]);
-                if (! UvhMail::verification(
-                    $email,
-                    $this->appUrl().'/auth/verify-email#token='.rawurlencode($token),
-                    $tokenHash,
-                )) {
-                    throw new MailAdmissionException('Registration verification outbox admission failed');
-                }
-
-                Audit::write(null, 'auth.register', 'pending_registration', (string) $pending->id);
-                Audit::write(null, 'auth.terms_accepted', 'consent', self::TERMS_VERSION);
-                Audit::write(null, 'auth.privacy_notice_acknowledged', 'privacy_notice', self::PRIVACY_VERSION);
-
-                return ['status' => 'created', 'registration_id' => (int) $pending->id, 'security_version' => 1];
-            });
+                // Recheck a destination claimed by a non-cooperating writer;
+                // still create a durable context rather than issuing a decoy.
+                $outcome = RegistrationAdmission::start($email);
+            }
         } catch (MailAdmissionException) {
             Audit::write(null, 'auth.email_delivery_failed', 'user', null, ['kind' => 'verify']);
 
             return response()->json(['error' => 'No se pudo completar el registro. Inténtalo de nuevo más tarde'], 503);
-        } catch (QueryException $e) {
-            if (($e->errorInfo[0] ?? null) === '23505') {
-                // A concurrent writer claimed the destination after the
-                // advisory-locked check; answer exactly like any other taken
-                // destination instead of advertising the race. The edit secret
-                // travels all the same, because "there is a cookie" must not be
-                // the thing that tells the caller which branch it took.
-                Audit::write(null, 'auth.register_duplicate', 'user', null);
-
-                return response()->json(['user' => null], 201)->withCookie(RegistrationEdit::decoy());
-            }
-            throw $e;
         }
 
-        // The registration edit secret, in every outcome and with the same
-        // shape: only the browser that created a pending row can correct its
-        // address later, and no branch of this endpoint announces itself by
-        // whether it handed one out.
-        $registrationEdit = is_int($outcome['security_version'])
-            ? RegistrationEdit::secret((int) $outcome['registration_id'], $outcome['security_version'])
-            : RegistrationEdit::decoy();
-
-        return response()->json(['user' => null], 201)->withCookie($registrationEdit);
+        return response()->json(['user' => null], 201)->withCookie(RegistrationEdit::forAttempt($outcome));
     }
 
-    /**
-     * Correct a mistyped address on an UNVERIFIED registration, without ever
-     * creating a session.
-     *
-     * The authority is the registration edit secret (`RegistrationEdit`), not
-     * any password: the pending row keeps no proposal at all any more. (When it
-     * did, accepting it here handed the destination to whoever minted the
-     * latest `register` —the same pre-hijack this change closed at activation,
-     * one step earlier—.) The secret only exists in the browser that created
-     * the row and cannot be fabricated from anything an attacker writes.
-     *
-     * The row is not replaced by later registrations any more, so this endpoint
-     * is not racing one either: it moves the pending row it was told to move, or
-     * it refuses. Every refusal —unknown address, confirmed account, absent or
-     * foreign secret— is the same 403, because the difference between them is
-     * exactly what an enumerating caller wants to learn.
-     */
-    public function changeRegistrationEmail(Request $request)
+    /** Correct the browser's requested address, without claiming any mailbox. */
+    public function changeRegistrationEmail(Request $request): JsonResponse
     {
-        $currentEmail = trim(UvhRequest::inputString($request, 'currentEmail'));
-        $newEmail = trim(UvhRequest::inputString($request, 'newEmail'));
+        $currentEmail = strtolower(trim(UvhRequest::inputString($request, 'currentEmail')));
+        $newEmail = strtolower(trim(UvhRequest::inputString($request, 'newEmail')));
         $captchaToken = UvhRequest::inputString($request, 'captchaToken');
         $honeypot = trim(UvhRequest::inputString($request, 'website'));
-
-        if (! $this->validEmail($currentEmail) || ! $this->validEmail($newEmail)
-            || strtolower($currentEmail) === strtolower($newEmail)
-            || $honeypot !== '') {
+        if (! $this->validEmail($currentEmail) || ! $this->validEmail($newEmail) || $currentEmail === $newEmail || $honeypot !== '') {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
         if ($captchaError = $this->captchaError($request, $captchaToken)) {
             return $captchaError;
         }
-
-        $currentEmail = strtolower($currentEmail);
-        $newEmail = strtolower($newEmail);
-        // Cheap early-out for garbage secrets; NOT the authority. The binding
-        // check runs inside the transaction, against the locked row — see
-        // below.
-        $pending = $this->findPendingRegistrationByEmail($currentEmail);
-        if (! $pending || ! RegistrationEdit::authorizes($request, $pending)) {
+        $attempt = RegistrationAttemptContext::snapshot($request, $currentEmail);
+        if (! $attempt) {
             return response()->json(['error' => 'No se puede cambiar este registro'], 403);
         }
-        $token = Ids::randomToken(32);
-        $tokenHash = Ids::sha256Hex($token);
-        $verificationUrl = $this->appUrl().'/auth/verify-email#token='.rawurlencode($token);
         try {
-            $changed = DB::transaction(function () use ($request, $pending, $newEmail, $tokenHash, $verificationUrl): array {
-                $locked = PendingRegistration::where('id', $pending->id)->lockForUpdate()->first();
-                // The secret is validated HERE, against the locked row, and
-                // this is the check that grants. A credential bound to a
-                // version plus a mutation of that version must live inside ONE
-                // critical section —lock, check, use— because validating before
-                // the lock leaves the classic TOCTOU window: two requests
-                // carrying the same generation-1 secret both pass the pre-check,
-                // the first rotates the row to generation 2, and the second
-                // then finds the row already at 2 and rotates it to 3 — one
-                // single-use secret spent twice.
-                if (! $locked || ! RegistrationEdit::authorizes($request, $locked)) {
-                    return ['status' => 'unavailable', 'security_version' => null];
+            try {
+                $changed = RegistrationEmailCorrection::admit($request, $attempt, $currentEmail, $newEmail);
+            } catch (QueryException $error) {
+                if (($error->errorInfo[0] ?? null) !== '23505') {
+                    throw $error;
                 }
-                $this->lockEmailAddress($newEmail);
-                // Whether the destination is taken must never reach the caller.
-                // `register` answers byte-for-byte the same for a duplicate
-                // address, and this correction does too: the conflict is then
-                // resolved by the flows that already own it — this
-                // registration's verification email, or `forgot-password` for
-                // the account that holds the destination.
-                $taken = User::whereRaw('lower(email) = ?', [$newEmail])->exists()
-                    || PendingRegistration::where('id', '!=', $locked->id)->whereRaw('lower(email) = ?', [$newEmail])->exists()
-                    || EmailChangeRequest::whereRaw('lower(new_email) = ?', [$newEmail])->where('expires_at', '>', now())->exists();
-
-                // The same statement on both outcomes: only a taken destination
-                // leaves the address untouched. A move rotates the security
-                // version, which is what spends the secret that authorised it —
-                // the same discipline as every other credential change in this
-                // controller.
-                $securityVersion = (int) $locked->security_version + ($taken ? 0 : 1);
-                $locked->update($taken
-                    ? ['updated_at' => now()]
-                    : ['email' => $newEmail, 'security_version' => $securityVersion, 'updated_at' => now()]);
-
-                if (! $taken) {
-                    // The old mailbox must lose every outstanding bearer. A
-                    // pending registration has no sessions and no reset links —
-                    // those need a verified account —, so its verify bearers are
-                    // the whole surface, and the row itself dies at activation.
-                    EmailToken::where('pending_registration_id', $locked->id)
-                        ->where('kind', 'verify')
-                        ->whereNull('used_at')
-                        ->delete();
-                    EmailToken::create([
-                        'id' => $tokenHash,
-                        'pending_registration_id' => (int) $locked->id,
-                        'kind' => 'verify',
-                        'expires_at' => now()->addDay(),
-                    ]);
-                    if (! UvhMail::verification($newEmail, $verificationUrl, $tokenHash)) {
-                        throw new MailAdmissionException('Registration email correction outbox admission failed');
-                    }
-
-                    Audit::write(null, 'auth.registration_email_change', 'pending_registration', (string) $locked->id);
-
-                    return ['status' => 'ok', 'security_version' => $securityVersion];
-                }
-
-                // A taken destination keeps the registration and its outstanding
-                // bearers exactly as they are, but still pays for one outbox
-                // admission of the same shape: its token has no backing row, so
-                // the delivery jobs suppress the message (`MailDeliveryEligibility`
-                // -> `obsolete`) and no mailbox is ever touched — least of all
-                // the caller's own. Same cost and same answer either way, so a
-                // timing observer learns nothing either.
-                if (! UvhMail::verification($newEmail, $verificationUrl, Ids::sha256Hex(Ids::randomToken(32)))) {
-                    throw new MailAdmissionException('Registration email correction outbox admission failed');
-                }
-
-                Audit::write(null, 'auth.registration_email_change_conflict', 'pending_registration', (string) $locked->id);
-
-                return ['status' => 'conflict', 'security_version' => (int) $locked->security_version];
-            });
+                // Re-run admission after a non-cooperating writer claimed the
+                // address. The rolled-back generation is still unspent.
+                $changed = RegistrationEmailCorrection::admit($request, $attempt, $currentEmail, $newEmail);
+            }
         } catch (MailAdmissionException) {
-            Audit::write(null, 'auth.email_delivery_failed', 'pending_registration', (string) $pending->id, ['kind' => 'verify']);
+            Audit::write(null, 'auth.email_delivery_failed', 'registration_attempt', (string) $attempt->id, ['kind' => 'verify']);
 
             return response()->json(['error' => 'No se pudo enviar la verificación. Inténtalo de nuevo más tarde'], 503);
-        } catch (QueryException $e) {
-            if (($e->errorInfo[0] ?? null) !== '23505') {
-                throw $e;
-            }
-            // A concurrent writer claimed the destination between the check and
-            // the update; the transaction rolled back untouched, so the row
-            // still holds the generation this request was authorised with.
-            // Answer exactly like the taken outcome instead of advertising the
-            // race.
-            $changed = ['status' => 'conflict', 'security_version' => (int) $pending->security_version];
-            Audit::write(null, 'auth.registration_email_change_conflict', 'pending_registration', (string) $pending->id);
         }
-        if ($changed['status'] === 'unavailable') {
+        if ($changed['attempt'] === null) {
             return response()->json(['error' => 'No se puede cambiar este registro'], 403);
         }
 
-        // The same answer and the same cookie shape either way: a move hands
-        // back a secret sealed with the generation it just installed, and a
-        // conflict re-seals the one the row still has, so the browser that
-        // mistyped can try another address instead of losing its witness.
-        return response()->json(['ok' => true])->withCookie(
-            RegistrationEdit::secret((int) $pending->id, (int) $changed['security_version']),
-        );
+        return response()->json(['ok' => true])->withCookie(RegistrationEdit::forAttempt($changed['attempt']));
     }
 
     public function login(Request $request)
@@ -354,17 +180,11 @@ class AuthController
         // its registration edit secret; a bare email must never reveal it.
         $ok = Hash::check($password, $user ? $user->password_hash : self::DUMMY_PASSWORD_HASH);
 
-        if ($user === null) {
-            $pending = $this->findPendingRegistrationByEmail($email);
-            if ($pending && RegistrationEdit::authorizes($request, $pending)) {
-                return response()->json([
-                    'error' => 'Confirma tu email para continuar',
-                    'reason' => 'pending_registration',
-                ], 403);
-            }
-        }
-
         if (! $ok || $user === null) {
+            if (RegistrationAttemptContext::owns($request, strtolower($email))) {
+                return response()->json(['error' => 'Revisa la solicitud de verificación de tu email', 'reason' => 'pending_registration'], 403);
+            }
+
             return response()->json(['error' => 'Credenciales incorrectas'], 401);
         }
 
@@ -380,44 +200,7 @@ class AuthController
 
         // Password verification is deliberately outside the lock. Revalidate
         // its exact generation before granting a session and reporting success.
-        $challenge = null;
-        try {
-            $login = DB::transaction(function () use ($user, $request, &$challenge): ?array {
-                $locked = User::where('id', $user->id)->lockForUpdate()->first();
-                if (! $locked || $locked->deleted_at || ! $locked->email_verified_at
-                    || (bool) $locked->mfa_enabled !== (bool) $user->mfa_enabled
-                    || (int) $locked->security_version !== (int) $user->security_version
-                    || ! hash_equals($locked->password_hash, $user->password_hash)
-                    || ! hash_equals(strtolower($locked->email), strtolower($user->email))) {
-                    return null;
-                }
-                if ($locked->mfa_enabled) {
-                    Audit::write($locked->id, 'auth.mfa_challenge_issued', 'user', $locked->id, null, UvhRequest::ip($request));
-                    $challenge = Ids::randomToken(24);
-                    $this->storeMfaChallenge($challenge, $locked->id, (int) $locked->security_version);
-
-                    return [
-                        'mfaRequired' => true,
-                        'challenge' => $challenge,
-                        'recoveryAvailable' => is_array($locked->recovery_codes) && count($locked->recovery_codes) > 0,
-                    ];
-                }
-                $token = SessionManager::create($locked->id, $request, (int) $locked->security_version);
-                Audit::write($locked->id, 'auth.login', 'user', $locked->id, ['mfa' => false], UvhRequest::ip($request));
-
-                return ['token' => $token, 'user' => $locked];
-            });
-        } catch (\Throwable $error) {
-            if ($challenge !== null) {
-                try {
-                    $this->forgetMfaChallenge($challenge);
-                } catch (\Throwable) {
-                    // A cache outage may prevent cleanup; the secret was never
-                    // published and its original TTL still bounds this orphan.
-                }
-            }
-            throw $error;
-        }
+        $login = LoginAdmission::admit($user, $request);
         if (! $login) {
             return response()->json(['error' => 'Credenciales incorrectas'], 401);
         }
@@ -430,7 +213,7 @@ class AuthController
             ->withCookie(SessionManager::cookie($login['token']));
     }
 
-    public function mfaVerify(Request $request)
+    public function mfaVerify(Request $request): JsonResponse
     {
         $challenge = UvhRequest::inputString($request, 'challenge');
         $code = UvhRequest::inputString($request, 'code');
@@ -439,7 +222,7 @@ class AuthController
             return response()->json(['error' => 'Código inválido'], 422);
         }
 
-        $ch = $this->getMfaChallenge($challenge);
+        $ch = MfaChallengeStore::get($challenge);
         if (! $ch) {
             return response()->json(['error' => 'Sesión MFA caducada'], 401);
         }
@@ -449,7 +232,7 @@ class AuthController
             return response()->json(['error' => 'MFA no configurado o email no verificado'], 401);
         }
         if ((int) ($ch['security_version'] ?? 0) !== (int) $user->security_version) {
-            $this->forgetMfaChallenge($challenge);
+            MfaChallengeStore::forget($challenge);
 
             return response()->json(['error' => 'Sesión MFA caducada'], 401);
         }
@@ -459,7 +242,7 @@ class AuthController
         }
 
         try {
-            $lock = Cache::lock($this->mfaChallengeLockKey($challenge), 15);
+            $lock = Cache::lock(MfaChallengeStore::lockKey($challenge), 15);
             if (! $lock->get()) {
                 return response()->json(['error' => 'Esta verificación ya se está procesando'], 409);
             }
@@ -472,36 +255,16 @@ class AuthController
         try {
             // Re-read both challenge and identity after taking the distributed
             // lock. TOTP and recovery then cannot race to consume one login.
-            $ch = $this->getMfaChallenge($challenge);
+            $ch = MfaChallengeStore::get($challenge);
             $user = $ch ? User::where('id', $ch['user_id'])->whereNull('deleted_at')->first() : null;
             if (! $ch || ! $user || ! $user->email_verified_at || ! $user->mfa_secret
                 || (int) $ch['security_version'] !== (int) $user->security_version) {
-                $this->forgetMfaChallenge($challenge);
+                MfaChallengeStore::forget($challenge);
 
                 return response()->json(['error' => 'Sesión MFA caducada'], 401);
             }
 
-            $verified = DB::transaction(function () use ($user, $ch, $challenge, $code, $request): array {
-                $locked = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                if (! $locked || ! $locked->email_verified_at || ! $locked->mfa_enabled || ! $locked->mfa_secret
-                    || (int) $locked->security_version !== (int) $ch['security_version']) {
-                    return ['status' => 'challenge'];
-                }
-                $secret = $this->decryptMfaSecret($locked->mfa_secret);
-                if ($secret === null) {
-                    return ['status' => 'unreadable'];
-                }
-                if (! $this->consumeTotpCode($locked->id, $code, $secret)) {
-                    return ['status' => 'factor'];
-                }
-                if (! $this->consumeMfaChallenge($challenge)) {
-                    return ['status' => 'challenge'];
-                }
-                $token = SessionManager::create($locked->id, $request, (int) $locked->security_version, true);
-                Audit::write($locked->id, 'auth.login', 'user', $locked->id, ['mfa' => true], UvhRequest::ip($request));
-
-                return ['status' => 'ok', 'token' => $token, 'user' => $locked];
-            });
+            $verified = MfaLoginAdmission::totp((int) $user->id, (int) $ch['security_version'], $challenge, $code, $request);
             if ($verified['status'] === 'unreadable') {
                 return response()->json(['error' => 'La aplicación autenticadora no está disponible. Usa un código de recuperación.'], 409);
             }
@@ -529,7 +292,7 @@ class AuthController
         }
     }
 
-    public function mfaRecovery(Request $request)
+    public function mfaRecovery(Request $request): JsonResponse
     {
         $challenge = UvhRequest::inputString($request, 'challenge');
         $code = $this->normalizeRecoveryCode(UvhRequest::inputString($request, 'code'));
@@ -538,7 +301,7 @@ class AuthController
             return response()->json(['error' => 'Código de recuperación inválido'], 422);
         }
 
-        $ch = $this->getMfaChallenge($challenge);
+        $ch = MfaChallengeStore::get($challenge);
         if (! $ch) {
             return response()->json(['error' => 'Sesión MFA caducada'], 401);
         }
@@ -549,7 +312,7 @@ class AuthController
             return response()->json(['error' => 'Código de recuperación incorrecto'], 401);
         }
         if ((int) ($ch['security_version'] ?? 0) !== (int) $user->security_version) {
-            $this->forgetMfaChallenge($challenge);
+            MfaChallengeStore::forget($challenge);
 
             return response()->json(['error' => 'Sesión MFA caducada'], 401);
         }
@@ -559,7 +322,7 @@ class AuthController
         }
 
         try {
-            $lock = Cache::lock($this->mfaChallengeLockKey($challenge), 15);
+            $lock = Cache::lock(MfaChallengeStore::lockKey($challenge), 15);
             if (! $lock->get()) {
                 return response()->json(['error' => 'Esta verificación ya se está procesando'], 409);
             }
@@ -570,7 +333,7 @@ class AuthController
         }
 
         try {
-            $ch = $this->getMfaChallenge($challenge);
+            $ch = MfaChallengeStore::get($challenge);
             if (! $ch || (int) $ch['user_id'] !== (int) $user->id) {
                 return response()->json(['error' => 'Sesión MFA caducada'], 401);
             }
@@ -578,41 +341,7 @@ class AuthController
             // Consume the one-time recovery code while locking the user row.
             // The distributed challenge lock also prevents a parallel TOTP
             // request from spending this login at the same time.
-            $consumed = DB::transaction(function () use ($user, $code, $ch, $challenge, $request): array {
-                $locked = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                if (! $locked || ! $locked->email_verified_at || ! $locked->mfa_enabled
-                    || ! is_array($locked->recovery_codes)
-                    || (int) $locked->security_version !== (int) $ch['security_version']) {
-                    return ['status' => 'invalid'];
-                }
-                $idx = $this->recoveryCodeIndex($locked->recovery_codes, $code);
-                if ($idx === null) {
-                    return ['status' => 'invalid'];
-                }
-                // Consume the cache challenge before committing the database
-                // mutation. An unavailable replay store throws and rolls this
-                // transaction back, so a recovery credential is never lost
-                // without producing an authenticated session.
-                if (! $this->consumeMfaChallenge($challenge)) {
-                    return ['status' => 'challenge'];
-                }
-                $codes = $locked->recovery_codes;
-                array_splice($codes, $idx, 1);
-                $locked->update(['recovery_codes' => $codes]);
-                $token = SessionManager::create($locked->id, $request, (int) $locked->security_version, true);
-
-                $remainingCodes = count($codes);
-                Audit::write($locked->id, 'auth.mfa_recovery', 'user', $locked->id);
-                if ($remainingCodes <= 2) {
-                    Audit::write($locked->id, $remainingCodes === 0 ? 'auth.mfa_recovery_exhausted' : 'auth.mfa_recovery_low', 'user', $locked->id, ['remaining' => $remainingCodes]);
-                }
-                Audit::write($locked->id, 'auth.login', 'user', $locked->id, [
-                    'mfa' => 'recovery',
-                    'recovery_codes_remaining' => $remainingCodes,
-                ], UvhRequest::ip($request));
-
-                return ['status' => 'ok', 'token' => $token, 'user' => $locked];
-            });
+            $consumed = MfaLoginAdmission::recovery((int) $user->id, (int) $ch['security_version'], $challenge, $code, $request);
             if ($consumed['status'] === 'challenge') {
                 return response()->json(['error' => 'Sesión MFA caducada'], 401);
             }
@@ -665,7 +394,7 @@ class AuthController
      * anonymous registration cannot replace the row or its bearer either: there
      * is nothing left for it to install.
      */
-    public function verifyEmail(Request $request)
+    public function verifyEmail(Request $request): JsonResponse
     {
         $token = UvhRequest::inputString($request, 'token');
         $password = UvhRequest::inputString($request, 'password');
@@ -687,8 +416,8 @@ class AuthController
         // same input contract as `register`. An acceptance without the exact
         // version shown is not evidence of anything.
         if (! $this->validName($name) || ! $acceptTerms
-            || ! hash_equals(self::TERMS_VERSION, $termsVersion)
-            || ! hash_equals(self::PRIVACY_VERSION, $privacyVersion)) {
+            || ! hash_equals(RegistrationAdmission::TERMS_VERSION, $termsVersion)
+            || ! hash_equals(RegistrationAdmission::PRIVACY_VERSION, $privacyVersion)) {
             return response()->json(['error' => 'Datos inválidos'], 422);
         }
         if (! PasswordStrength::isAcceptable($password)) {
@@ -696,119 +425,7 @@ class AuthController
             return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
         }
 
-        $passwordHash = Hash::make($password);
-        $tokenHash = Ids::sha256Hex($token);
-        $snapshot = EmailToken::where('id', $tokenHash)
-            ->where('kind', 'verify')->whereNull('used_at')->first(['id', 'pending_registration_id', 'user_id']);
-        // Pending registration first, bearer second is the global lifecycle
-        // lock order. The preflight row is untrusted and every property is
-        // checked again under lock, so replacement or consumption races fail
-        // closed.
-        $userId = null;
-        if ($snapshot && $snapshot->pending_registration_id) {
-            $userId = DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
-                $pending = PendingRegistration::where('id', $snapshot->pending_registration_id)->lockForUpdate()->first();
-                $row = EmailToken::where('id', $tokenHash)
-                    ->where('pending_registration_id', $snapshot->pending_registration_id)
-                    ->where('kind', 'verify')
-                    ->whereNull('used_at')
-                    ->lockForUpdate()
-                    ->first();
-                if (! $row || $row->expires_at->lte(now())) {
-                    return null;
-                }
-
-                if (! $pending) {
-                    // La activación ya lo consumió o una corrección lo retiró: el
-                    // bearer no vuelve a abrir nada, y el desenlace es el mismo
-                    // `Token inválido o caducado` de siempre.
-                    return null;
-                }
-                if (! PasswordStrength::isAcceptable($password, $name, (string) $pending->email)) {
-                    // Re-evaluate with the live identity while its row is locked. An
-                    // activation must not accept a password derived from the name or
-                    // mailbox merely because the preflight could not know that
-                    // context (same contract as reset-password). The name that
-                    // counts is the one typed HERE; the live mailbox is the row's.
-                    return -1;
-                }
-
-                $now = now();
-                $row->update(['used_at' => $now]);
-                // La dirección se reclama en `users` con el advisory de esa misma
-                // dirección —justo antes de escribirla, y con la fila pendiente ya
-                // bloqueada, de modo que su correo no se mueve mientras tanto—. Es
-                // lo que serializa esta creación con `register` y con cualquier
-                // corrección que apunte al mismo destino: usuarios y registros
-                // pendientes son dos tablas, y una dirección vive en una sola.
-                $this->lockEmailAddress(strtolower((string) $pending->email));
-                $user = User::create([
-                    'email' => (string) $pending->email,
-                    // Identity decided at activation, exactly like the password:
-                    // nothing an anonymous registration proposed is the account
-                    // owner's to keep — there is no proposal stored at all.
-                    'name' => $name,
-                    'password_hash' => $passwordHash,
-                    'email_verified_at' => $now,
-                    // The credential was just settled: this is generation 1 of the
-                    // account, and every later generation binds to a change of it.
-                    'security_version' => 1,
-                ]);
-                // Registration accepts a longer personal name than the workspace
-                // write contract. Keep the generated resource inside that contract
-                // instead of creating an unreadable workspace.
-                $workspace = $user->ownedWorkspaces()->create([
-                    'name' => $this->defaultWorkspaceName($name),
-                    'slug' => 'ws-'.strtolower(Ids::randomToken(6)),
-                ]);
-                $workspace->memberships()->create(['user_id' => $user->id, 'role' => 'owner']);
-                $workspace->quota()->create(['links_limit' => 1000]);
-                // The legal acceptance that counts is the one made HERE, by whoever
-                // proved the mailbox — not one an anonymous first registrant could
-                // stamp on the victim's behalf hours earlier. Nothing provisional
-                // was kept, so nothing provisional survives either: the pending row
-                // and every bearer it still had die with it, in one cascade.
-                $this->acceptRegistrationLegal((int) $user->id, $now);
-                $pending->delete();
-
-                return (int) $user->id;
-            });
-        } elseif ($snapshot && $snapshot->user_id) {
-            // Camino heredado: el bearer nombra una FILA DE USUARIO sin
-            // verificar (dato anterior al modelo de registro pendiente, o
-            // creado a mano). El buzón se demuestra exactamente igual, pero la
-            // cuenta ya existe: se le fija la credencial elegida aquí y queda
-            // verificada, sin crear andamio nuevo.
-            $userId = DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
-                $user = User::where('id', $snapshot->user_id)->whereNull('deleted_at')->lockForUpdate()->first();
-                $row = EmailToken::where('id', $tokenHash)
-                    ->where('user_id', $snapshot->user_id)
-                    ->where('kind', 'verify')
-                    ->whereNull('used_at')
-                    ->lockForUpdate()
-                    ->first();
-                if (! $user || $user->email_verified_at || ! $row || $row->expires_at->lte(now())) {
-                    return null;
-                }
-                if (! PasswordStrength::isAcceptable($password, $name, (string) $user->email)) {
-                    return -1;
-                }
-
-                $now = now();
-                $row->update(['used_at' => $now]);
-                $user->update([
-                    'name' => $name,
-                    'password_hash' => $passwordHash,
-                    'email_verified_at' => $now,
-                    // La credencial acaba de fijarse: nueva generación, como en
-                    // cualquier cambio de contraseña.
-                    'security_version' => (int) $user->security_version + 1,
-                ]);
-                $this->acceptRegistrationLegal((int) $user->id, $now);
-
-                return (int) $user->id;
-            });
-        }
+        $userId = RegistrationAdmission::activate($token, $password, $name);
         if ($userId === -1) {
             return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
         }
@@ -819,7 +436,7 @@ class AuthController
         return response()->json(['ok' => true]);
     }
 
-    public function resendVerification(Request $request)
+    public function resendVerification(Request $request): JsonResponse
     {
         // Public by design: login does not create an unverified session, so a
         // user must still be able to request the message after a failed login.
@@ -867,50 +484,12 @@ class AuthController
             return response()->json(['ok' => true]);
         }
 
-        $token = Ids::randomToken(32);
-        $tokenHash = Ids::sha256Hex($token);
         try {
-            DB::transaction(function () use ($pending, $unverifiedUser, $token, $tokenHash): void {
-                if ($unverifiedUser !== null) {
-                    $this->issueUserVerificationResend($unverifiedUser, $token, $tokenHash);
-
-                    return;
-                }
-                // The pending row lock makes cooldown, bearer replacement and
-                // outbox admission one commit; no crash can expose an
-                // undeliverable token.
-                $locked = PendingRegistration::where('id', $pending->id)->lockForUpdate()->first();
-                if (! $locked) {
-                    // Consumida por una activación mientras tanto: igual que una
-                    // dirección desconocida, `ok` sin más.
-                    return;
-                }
-                $last = EmailToken::where('pending_registration_id', $locked->id)
-                    ->where('kind', 'verify')->latest('created_at')->first();
-                if ($last && $last->created_at->gt(now()->subSeconds(60))) {
-                    return;
-                }
-
-                EmailToken::create([
-                    'id' => $tokenHash,
-                    'pending_registration_id' => (int) $locked->id,
-                    'kind' => 'verify',
-                    'expires_at' => now()->addDay(),
-                ]);
-                if (! UvhMail::verification(
-                    $locked->email,
-                    $this->appUrl().'/auth/verify-email#token='.rawurlencode($token),
-                    $tokenHash,
-                )) {
-                    throw new MailAdmissionException('Verification resend outbox admission failed');
-                }
-                EmailToken::where('pending_registration_id', $locked->id)->where('kind', 'verify')
-                    ->whereNull('used_at')->where('id', '!=', $tokenHash)->delete();
-            });
+            VerificationResend::admit($unverifiedUser ?? $pending);
         } catch (MailAdmissionException) {
             Audit::write(null, 'auth.email_delivery_failed',
                 $unverifiedUser !== null ? 'user' : 'pending_registration',
-                $unverifiedUser !== null ? (string) $unverifiedUser->id : (string) $pending?->id,
+                $unverifiedUser !== null ? (string) $unverifiedUser->id : (string) $pending->id,
                 ['kind' => 'verify'],
             );
 
@@ -945,44 +524,7 @@ class AuthController
         }
     }
 
-    /**
-     * Reenvío para una FILA DE USUARIO sin verificar (dato heredado o creado a
-     * mano): mismo candado, mismo cooldown de 60 s y misma sustitución de
-     * portadores que el registro pendiente. El contrato público no cambia —la
-     * rama que envía correo paga el mismo suelo anti-oráculo—.
-     */
-    private function issueUserVerificationResend(User $user, string $token, string $tokenHash): void
-    {
-        $locked = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-        if (! $locked || $locked->email_verified_at) {
-            // Verificada o consumida mientras tanto: igual que una dirección
-            // desconocida, `ok` sin más.
-            return;
-        }
-        $last = EmailToken::where('user_id', $locked->id)
-            ->where('kind', 'verify')->latest('created_at')->first();
-        if ($last && $last->created_at->gt(now()->subSeconds(60))) {
-            return;
-        }
-
-        EmailToken::create([
-            'id' => $tokenHash,
-            'user_id' => (int) $locked->id,
-            'kind' => 'verify',
-            'expires_at' => now()->addDay(),
-        ]);
-        if (! UvhMail::verification(
-            $locked->email,
-            $this->appUrl().'/auth/verify-email#token='.rawurlencode($token),
-            $tokenHash,
-        )) {
-            throw new MailAdmissionException('Verification resend outbox admission failed');
-        }
-        EmailToken::where('user_id', $locked->id)->where('kind', 'verify')
-            ->whereNull('used_at')->where('id', '!=', $tokenHash)->delete();
-    }
-
-    public function forgotPassword(Request $request)
+    public function forgotPassword(Request $request): JsonResponse
     {
         $startedAt = hrtime(true);
         $email = trim(UvhRequest::inputString($request, 'email'));
@@ -997,34 +539,7 @@ class AuthController
         $user = $this->findUserByEmail($email);
         if ($user && $user->email_verified_at) {
             try {
-                DB::transaction(function () use ($user, $email): void {
-                    $locked = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                    if (! $locked || ! $locked->email_verified_at || strtolower($locked->email) !== strtolower($email)) {
-                        return;
-                    }
-                    $last = EmailToken::where('user_id', $locked->id)
-                        ->where('kind', 'reset')->latest('created_at')->first();
-                    if ($last && $last->created_at->gt(now()->subSeconds(60))) {
-                        return;
-                    }
-                    $newToken = Ids::randomToken(32);
-                    $newTokenHash = Ids::sha256Hex($newToken);
-                    EmailToken::create([
-                        'id' => $newTokenHash,
-                        'user_id' => $locked->id,
-                        'kind' => 'reset',
-                        'expires_at' => now()->addHour(),
-                    ]);
-                    if (! UvhMail::resetPassword(
-                        $locked->email,
-                        $this->appUrl().'/auth/reset-password#token='.rawurlencode($newToken),
-                        $newTokenHash,
-                    )) {
-                        throw new MailAdmissionException('Password reset outbox admission failed');
-                    }
-                    EmailToken::where('user_id', $locked->id)->where('kind', 'reset')
-                        ->whereNull('used_at')->where('id', '!=', $newTokenHash)->delete();
-                });
+                PasswordRecovery::request($user, $email);
             } catch (MailAdmissionException) {
                 Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'reset']);
             }
@@ -1035,7 +550,7 @@ class AuthController
         return response()->json(['ok' => true]);
     }
 
-    public function resetPassword(Request $request)
+    public function resetPassword(Request $request): JsonResponse
     {
         $token = UvhRequest::inputString($request, 'token');
         $password = UvhRequest::inputString($request, 'password');
@@ -1052,45 +567,7 @@ class AuthController
         $snapshot = EmailToken::where('id', $tokenHash)
             ->where('kind', 'reset')->whereNull('used_at')->first(['id', 'user_id']);
         try {
-            $userId = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password): ?int {
-                $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-                $row = EmailToken::where('id', $tokenHash)
-                    ->where('user_id', $snapshot->user_id)
-                    ->where('kind', 'reset')
-                    ->whereNull('used_at')
-                    ->lockForUpdate()
-                    ->first();
-                if (! $row || $row->used_at || $row->expires_at->lte(now())) {
-                    return null;
-                }
-
-                if (! $user || $user->deleted_at || ! $user->email_verified_at) {
-                    return null;
-                }
-                if (! PasswordStrength::isAcceptable($password, $user->name, $user->email)) {
-                    // Re-evaluate with the live account identity while its row is
-                    // locked. A reset must not accept a password derived from the
-                    // user's name or mailbox merely because the anonymous
-                    // preflight could not know that context.
-                    return -1;
-                }
-
-                $now = now();
-                $row->update(['used_at' => $now]);
-                EmailToken::where('user_id', $user->id)->where('kind', 'reset')->whereNull('used_at')->delete();
-                $user->update([
-                    'password_hash' => $passwordHash,
-                    'security_version' => (int) $user->security_version + 1,
-                    'updated_at' => $now,
-                ]);
-                DB::table('sessions')->where('user_id', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                DB::table('api_tokens')->where('created_by', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                AccountRecoveryLifecycle::cancelActiveForUser((int) $user->id, $now);
-                $this->admitPasswordChangedNotice($user);
-                Audit::write($user->id, 'auth.password_reset', 'user', $user->id);
-
-                return (int) $user->id;
-            }) : null;
+            $userId = $snapshot ? PasswordRecovery::reset($snapshot, $tokenHash, $passwordHash, $password) : null;
         } catch (MailAdmissionException) {
             Audit::write((int) $snapshot->user_id, 'auth.email_delivery_failed', 'user', $snapshot->user_id, ['kind' => 'password_changed']);
 
@@ -1103,14 +580,14 @@ class AuthController
             return response()->json(['error' => 'Token inválido o caducado'], 400);
         }
 
-        return $this->credentialChangeResponse($request, $userId);
+        return CredentialChangeResponse::forUser($request, $userId);
     }
 
     /**
      * Consume the explicit one-use incident bearer. Email possession can stop
      * access, but cannot authenticate, change identity or disable MFA.
      */
-    public function revokeCompromisedAccess(Request $request)
+    public function revokeCompromisedAccess(Request $request): JsonResponse
     {
         $token = UvhRequest::inputString($request, 'token');
         if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1) {
@@ -1120,80 +597,13 @@ class AuthController
         $tokenHash = Ids::sha256Hex($token);
         $snapshot = EmailToken::where('id', $tokenHash)
             ->where('kind', 'security_revoke')->whereNull('used_at')->first(['id', 'user_id']);
-        $result = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): ?array {
-            // Include soft-blocked/grace-period accounts: this link is allowed
-            // to stop a hostile pending deletion, but never authenticates.
-            $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-            $row = EmailToken::where('id', $tokenHash)
-                ->where('user_id', $snapshot->user_id)
-                ->where('kind', 'security_revoke')
-                ->whereNull('used_at')
-                ->lockForUpdate()
-                ->first();
-            if (! $row || $row->used_at || $row->expires_at->lte(now())) {
-                return null;
-            }
-            if (! $user) {
-                return null;
-            }
-
-            $deletion = AccountDeletionRequest::where('user_id', $user->id)->lockForUpdate()->first();
-            if ($user->deleted_at && (! $deletion || $deletion->status !== 'scheduled')) {
-                // Never let an old email undo an administrative block.
-                EmailToken::where('user_id', $user->id)->where('kind', 'security_revoke')->whereNull('used_at')->update(['used_at' => now()]);
-
-                return ['user_id' => (int) $user->id, 'artifacts' => [], 'blocked' => true];
-            }
-
-            $artifacts = DataExportRequest::where('user_id', $user->id)
-                ->whereIn('status', ['processing', 'ready'])
-                ->whereNotNull('artifact_path')
-                ->get(['id', 'artifact_path'])
-                ->filter(fn ($export) => is_string($export->artifact_path) && $export->artifact_path !== '')
-                ->map(fn ($export) => ['id' => (int) $export->id, 'path' => $export->artifact_path])
-                ->values()
-                ->all();
-            DataExportRequest::where('user_id', $user->id)
-                ->whereIn('status', ['processing', 'ready'])
-                ->update([
-                    'status' => 'cancelled',
-                    'mail_generation_hash' => null,
-                    'updated_at' => now(),
-                ]);
-
-            $now = now();
-            $user->update([
-                'deleted_at' => null,
-                'mfa_pending_secret' => null,
-                'mfa_pending_expires_at' => null,
-                'security_version' => (int) $user->security_version + 1,
-                'updated_at' => $now,
-            ]);
-            DB::table('sessions')->where('user_id', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-            DB::table('api_tokens')->where('created_by', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-            EmailChangeRequest::where('user_id', $user->id)->delete();
-            EmailToken::where('user_id', $user->id)->where('kind', 'reset')->whereNull('used_at')->delete();
-            EmailToken::where('user_id', $user->id)->where('kind', 'security_revoke')->whereNull('used_at')->update(['used_at' => $now]);
-            AccountRecoveryLifecycle::cancelActiveForUser((int) $user->id, $now);
-
-            if ($deletion && in_array($deletion->status, ['requested', 'scheduled'], true)) {
-                $deletion->update([
-                    'status' => 'cancelled',
-                    'confirmation_token_hash' => null,
-                    'cancel_token_hash' => null,
-                    'cancelled_at' => $now,
-                    'updated_at' => $now,
-                ]);
-            }
-
-            return ['user_id' => (int) $user->id, 'artifacts' => $artifacts, 'blocked' => false];
-        }) : null;
+        $result = $snapshot ? CompromisedAccessRevocation::admit($snapshot, $tokenHash) : null;
 
         if (! $result) {
             return response()->json(['error' => 'El enlace no es válido o ya se ha utilizado'], 400);
         }
-        foreach ($result['artifacts'] ?? [] as $artifact) {
-            PrivateArtifactCleanup::attempt($artifact['id'], $artifact['path']);
+        foreach ($result['artifacts'] as $artifact) {
+            PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
         }
         try {
             LinkIntentRegistry::revokeForUser($result['user_id']);
@@ -1201,17 +611,14 @@ class AuthController
             // The index and cache TTL bound residual handoffs. Access is
             // already revoked even if this secondary minimisation step fails.
         }
-        Audit::write($result['user_id'], 'auth.emergency_access_revoked', 'user', $result['user_id'], [
-            'administratively_blocked' => $result['blocked'],
-        ]);
 
-        return $this->credentialChangeResponse($request, $result['user_id'], [
+        return CredentialChangeResponse::forUser($request, $result['user_id'], [
             'message' => 'Los accesos y cambios pendientes han quedado revocados. Restablece tu contraseña para recuperar la cuenta.',
         ]);
     }
 
     /** Start a support-reviewed MFA recovery without exposing account state. */
-    public function requestAccountRecovery(Request $request)
+    public function requestAccountRecovery(Request $request): JsonResponse
     {
         $email = trim(UvhRequest::inputString($request, 'email'));
         $captchaToken = UvhRequest::inputString($request, 'captchaToken');
@@ -1225,66 +632,7 @@ class AuthController
         $user = $this->findUserByEmail($email);
         if ($user && $user->email_verified_at && $user->mfa_enabled) {
             try {
-                DB::transaction(function () use ($user, $email): void {
-                    $locked = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                    if (! $locked || ! $locked->email_verified_at || ! $locked->mfa_enabled
-                        || ! hash_equals(strtolower($locked->email), strtolower($email))) {
-                        return;
-                    }
-                    $existing = AccountRecoveryRequest::where('user_id', $locked->id)
-                        ->whereIn('status', ['requested', 'email_confirmed', 'in_review', 'approved'])
-                        ->lockForUpdate()->first();
-                    if ($existing && ((int) $existing->security_version !== (int) $locked->security_version
-                        || $existing->expires_at->lte(now()))) {
-                        $existing->update([
-                            'status' => 'expired',
-                            'confirmation_token_hash' => null,
-                            'completion_token_hash' => null,
-                            'updated_at' => now(),
-                        ]);
-                        $existing = null;
-                    }
-                    if ($existing && ($existing->status !== 'requested'
-                        || $existing->updated_at->gt(now()->subMinute()))) {
-                        return;
-                    }
-
-                    $rawToken = Ids::randomToken(32);
-                    $generation = Ids::sha256Hex($rawToken);
-                    $confirmationExpiresAt = now()->addHour();
-                    $values = [
-                        'security_version' => (int) $locked->security_version,
-                        'status' => 'requested',
-                        'confirmation_token_hash' => $generation,
-                        'confirmation_expires_at' => $confirmationExpiresAt,
-                        'completion_token_hash' => null,
-                        'completion_expires_at' => null,
-                        'email_confirmed_at' => null,
-                        'approved_at' => null,
-                        'rejected_at' => null,
-                        'completed_at' => null,
-                        'expires_at' => now()->addDays(7),
-                    ];
-                    if ($existing) {
-                        DB::table('account_recovery_approvals')->where('request_id', $existing->id)->delete();
-                        $existing->update($values);
-                        $recovery = $existing;
-                    } else {
-                        $recovery = AccountRecoveryRequest::create(['user_id' => $locked->id, ...$values]);
-                    }
-                    $url = $this->appUrl().'/auth/account-recovery/confirm#token='.rawurlencode($rawToken);
-                    if (! UvhMail::accountRecoveryConfirmation($locked->email, $url, (int) $recovery->id, $generation)) {
-                        throw new MailAdmissionException('Account recovery confirmation outbox admission failed');
-                    }
-
-                    try {
-                        Audit::write($locked->id, 'auth.account_recovery_requested', 'account_recovery', $recovery->id);
-                    } catch (\Throwable $error) {
-                        // Roll back the case, bearer and mail together while
-                        // preserving the same public answer for every address.
-                        throw new AccountRecoveryAdmissionException('Recovery audit admission failed', 0, $error);
-                    }
-                });
+                AccountRecoveryAdmission::request($user, $email);
             } catch (MailAdmissionException|AccountRecoveryAdmissionException) {
                 // Keep the public response generic. The transactional row and
                 // bearer have rolled back, so no unusable case is exposed.
@@ -1298,7 +646,7 @@ class AuthController
     }
 
     /** Email confirmation opens the case but grants no account access. */
-    public function confirmAccountRecovery(Request $request)
+    public function confirmAccountRecovery(Request $request): JsonResponse
     {
         $token = UvhRequest::inputString($request, 'token');
         if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1) {
@@ -1307,37 +655,7 @@ class AuthController
         $tokenHash = Ids::sha256Hex($token);
         $snapshot = AccountRecoveryRequest::where('confirmation_token_hash', $tokenHash)
             ->where('status', 'requested')->first(['id', 'user_id']);
-        $result = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): ?array {
-            $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-            $row = AccountRecoveryRequest::where('id', $snapshot->id)
-                ->where('user_id', $snapshot->user_id)
-                ->where('confirmation_token_hash', $tokenHash)
-                ->where('status', 'requested')->lockForUpdate()->first();
-            if (! $row || ! $row->confirmation_expires_at || $row->confirmation_expires_at->lte(now())
-                || $row->expires_at->lte(now())) {
-                if ($row) {
-                    $row->update(['status' => 'expired', 'confirmation_token_hash' => null, 'updated_at' => now()]);
-                }
-
-                return null;
-            }
-            if (! $user || $user->deleted_at || ! $user->email_verified_at || ! $user->mfa_enabled
-                || (int) $user->security_version !== (int) $row->security_version) {
-                $row->update(['status' => 'expired', 'confirmation_token_hash' => null, 'updated_at' => now()]);
-
-                return null;
-            }
-            $row->update([
-                'status' => 'email_confirmed',
-                'confirmation_token_hash' => null,
-                'confirmation_expires_at' => null,
-                'email_confirmed_at' => now(),
-                'updated_at' => now(),
-            ]);
-            Audit::write($user->id, 'auth.account_recovery_email_confirmed', 'account_recovery', $row->id);
-
-            return ['user_id' => (int) $user->id, 'request_id' => (int) $row->id];
-        }) : null;
+        $result = $snapshot ? AccountRecoveryAdmission::confirm($snapshot, $tokenHash) : null;
         if (! $result) {
             return response()->json(['error' => 'La confirmación no es válida o ya se ha utilizado'], 400);
         }
@@ -1349,7 +667,7 @@ class AuthController
     }
 
     /** Complete a dual-approved recovery and rotate every account credential. */
-    public function completeAccountRecovery(Request $request)
+    public function completeAccountRecovery(Request $request): JsonResponse
     {
         $token = UvhRequest::inputString($request, 'token');
         $password = UvhRequest::inputString($request, 'password');
@@ -1380,151 +698,7 @@ class AuthController
             ->values()
             ->all();
         try {
-            $result = DB::transaction(function () use ($token, $password, $passwordHash, $snapshot, $expectedApproverIds): array {
-                // Match the global recovery lock order: all known user rows in
-                // primary-key order, followed by the case row. If the approval set
-                // changed since the preflight read we fail closed and require a new
-                // review instead of acquiring a late, out-of-order user lock.
-                $lockIds = array_values(array_unique([(int) $snapshot->user_id, ...$expectedApproverIds]));
-                sort($lockIds, SORT_NUMERIC);
-                $lockedUsers = User::whereIn('id', $lockIds)
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get()
-                    ->keyBy('id');
-                $row = AccountRecoveryRequest::where('id', $snapshot->id)
-                    ->where('user_id', $snapshot->user_id)
-                    ->where('completion_token_hash', Ids::sha256Hex($token))
-                    ->where('status', 'approved')
-                    ->lockForUpdate()
-                    ->first();
-                if (! $row || ! $row->completion_expires_at || $row->completion_expires_at->lte(now())
-                    || $row->expires_at->lte(now())) {
-                    if ($row) {
-                        $row->update(['status' => 'expired', 'completion_token_hash' => null, 'updated_at' => now()]);
-                    }
-
-                    return ['status' => 'invalid'];
-                }
-
-                $approverIds = DB::table('account_recovery_approvals')
-                    ->where('request_id', $row->id)
-                    ->orderBy('admin_user_id')
-                    ->pluck('admin_user_id')
-                    ->map(fn ($id) => (int) $id)
-                    ->unique()
-                    ->values()
-                    ->all();
-                if ($approverIds !== $expectedApproverIds) {
-                    $row->update([
-                        'status' => 'in_review',
-                        'completion_token_hash' => null,
-                        'completion_expires_at' => null,
-                        'approved_at' => null,
-                        'updated_at' => now(),
-                    ]);
-
-                    return ['status' => 'approval_changed'];
-                }
-                $user = $lockedUsers->get($row->user_id);
-                if (! $user || $user->deleted_at || ! $user->email_verified_at || ! $user->mfa_enabled
-                    || (int) $user->security_version !== (int) $row->security_version) {
-                    $row->update(['status' => 'expired', 'completion_token_hash' => null, 'updated_at' => now()]);
-
-                    return ['status' => 'invalid'];
-                }
-                $validApprovers = collect($approverIds)
-                    ->unique()
-                    ->filter(function (int $adminId) use ($lockedUsers, $user): bool {
-                        $admin = $lockedUsers->get($adminId);
-
-                        return (bool) ($admin
-                            && $adminId !== (int) $user->id
-                            && ! $admin->deleted_at
-                            && $admin->email_verified_at
-                            && $admin->is_admin
-                            && $admin->mfa_enabled);
-                    })
-                    ->count();
-                if ($validApprovers < 2) {
-                    $row->update([
-                        'status' => 'in_review',
-                        'completion_token_hash' => null,
-                        'completion_expires_at' => null,
-                        'approved_at' => null,
-                        'updated_at' => now(),
-                    ]);
-
-                    return ['status' => 'approval_changed'];
-                }
-
-                if (! PasswordStrength::isAcceptable($password, $user->name, $user->email)) {
-                    return ['status' => 'weak'];
-                }
-
-                $now = now();
-                $wasAdmin = (bool) $user->is_admin;
-                $artifacts = DataExportRequest::where('user_id', $user->id)
-                    ->whereIn('status', ['processing', 'ready'])
-                    ->whereNotNull('artifact_path')
-                    ->get(['id', 'artifact_path'])
-                    ->filter(fn ($export) => is_string($export->artifact_path) && $export->artifact_path !== '')
-                    ->map(fn ($export) => ['id' => (int) $export->id, 'path' => $export->artifact_path])
-                    ->values()
-                    ->all();
-                $user->update([
-                    'password_hash' => $passwordHash,
-                    'is_admin' => false,
-                    'mfa_enabled' => false,
-                    'mfa_secret' => null,
-                    'mfa_pending_secret' => null,
-                    'mfa_pending_expires_at' => null,
-                    'recovery_codes' => null,
-                    'security_version' => (int) $user->security_version + 1,
-                    'updated_at' => $now,
-                ]);
-                DB::table('sessions')->where('user_id', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                DB::table('api_tokens')->where('created_by', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                EmailToken::where('user_id', $user->id)->whereIn('kind', ['reset', 'security_revoke'])->delete();
-                EmailChangeRequest::where('user_id', $user->id)->delete();
-                DataExportRequest::where('user_id', $user->id)
-                    ->whereIn('status', ['processing', 'ready'])
-                    ->update([
-                        'status' => 'cancelled',
-                        'mail_generation_hash' => null,
-                        'updated_at' => $now,
-                    ]);
-                AccountDeletionRequest::where('user_id', $user->id)
-                    ->whereIn('status', ['requested', 'scheduled'])
-                    ->update([
-                        'status' => 'cancelled',
-                        'confirmation_token_hash' => null,
-                        'confirmation_expires_at' => null,
-                        'cancel_token_hash' => null,
-                        'updated_at' => $now,
-                    ]);
-                $row->update([
-                    'status' => 'completed',
-                    'completion_token_hash' => null,
-                    'completion_expires_at' => null,
-                    'completed_at' => $now,
-                    'updated_at' => $now,
-                ]);
-
-                $this->admitPasswordChangedNotice($user);
-                Audit::write($user->id, 'auth.account_recovery_completed', 'account_recovery', $row->id, [
-                    'mfa_disabled' => true,
-                    'platform_admin_removed' => $wasAdmin,
-                ]);
-
-                return [
-                    'status' => 'ok',
-                    'user_id' => (int) $user->id,
-                    'request_id' => (int) $row->id,
-                    'was_admin' => $wasAdmin,
-                    'artifacts' => $artifacts,
-                ];
-            });
+            $result = AccountRecoveryAdmission::complete($snapshot, $token, $password, $passwordHash, $expectedApproverIds);
         } catch (MailAdmissionException) {
             Audit::write((int) $snapshot->user_id, 'auth.email_delivery_failed', 'account_recovery', $snapshot->id, ['kind' => 'password_changed']);
 
@@ -1540,7 +714,7 @@ class AuthController
             return response()->json(['error' => 'La aprobación de seguridad ha cambiado. Soporte debe revisar de nuevo el expediente'], 409);
         }
         foreach ($result['artifacts'] as $artifact) {
-            PrivateArtifactCleanup::attempt($artifact['id'], $artifact['path']);
+            PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
         }
         try {
             LinkIntentRegistry::revokeForUser($result['user_id']);
@@ -1548,48 +722,34 @@ class AuthController
             // Session and API access are already revoked; TTL bounds cache residue.
         }
 
-        return response()->json([
-            'ok' => true,
+        return CredentialChangeResponse::forUser($request, $result['user_id'], [
             'message' => 'La cuenta se ha recuperado. Inicia sesión con la contraseña nueva y configura MFA de nuevo.',
-        ])->withCookie(SessionManager::clearCookie());
-    }
-
-    public function me(Request $request)
-    {
-        $context = $this->liveAccountReadContext($request);
-        if ($context === null) {
-            return response()->json(['error' => 'No autenticado'], 401);
-        }
-        $user = $context['user'];
-
-        return response()->json(['user' => UvhRequest::publicUser($user)]);
-    }
-
-    /** Report only session-local MFA freshness; no factor material is exposed. */
-    public function mfaSessionStatus(Request $request)
-    {
-        $context = $this->liveAccountReadContext($request);
-        if ($context === null) {
-            return response()->json(['error' => 'No autenticado'], 401);
-        }
-        $user = $context['user'];
-        $verifiedAt = $context['session']->mfa_verified_at;
-        $freshMinutes = MfaFreshness::windowMinutes();
-        $fresh = (bool) $user->mfa_enabled
-            && MfaFreshness::isFresh($verifiedAt);
-
-        return response()->json([
-            'enabled' => (bool) $user->mfa_enabled,
-            'fresh' => $fresh,
-            'verifiedAt' => $this->iso($verifiedAt),
-            'expiresAt' => $verifiedAt
-                ? $this->iso(CarbonImmutable::instance($verifiedAt)->addMinutes($freshMinutes))
-                : null,
         ]);
     }
 
+    public function me(Request $request): JsonResponse
+    {
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
+        if ($context === null) {
+            return response()->json(['error' => 'No autenticado'], 401);
+        }
+
+        return response()->json(AccountQueries::me($context));
+    }
+
+    /** Report only session-local MFA freshness; no factor material is exposed. */
+    public function mfaSessionStatus(Request $request): JsonResponse
+    {
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
+        if ($context === null) {
+            return response()->json(['error' => 'No autenticado'], 401);
+        }
+
+        return response()->json(AccountQueries::mfaSession($context));
+    }
+
     /** Refresh the privileged MFA window without creating or rotating a session. */
-    public function mfaReauthenticate(Request $request)
+    public function mfaReauthenticate(Request $request): JsonResponse
     {
         $password = UvhRequest::inputString($request, 'password');
         $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
@@ -1603,40 +763,7 @@ class AuthController
         }
 
         $sessionId = UvhRequest::sessionId($request);
-        $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode, $request): array {
-            $context = $this->lockActiveSecurityContext($user, $sessionId, true);
-            if ($context === null) {
-                return ['status' => 'stale'];
-            }
-            ['user' => $locked, 'session' => $session] = $context;
-            if (! $locked->mfa_enabled) {
-                return ['status' => 'not_configured'];
-            }
-
-            // Password plus a concrete current factor is sufficient to
-            // establish a fresh privileged window, even for a legacy session
-            // that predates the mfa_verified_at column.
-            // mfaReauthenticate IS the freshness refresh, so it cannot require
-            // a fresh window; it charges the account-wide 'reauthentication'
-            // budget through MfaStepUp (password + factor failures alike).
-            $stepUp = MfaStepUp::verify($locked, $session, $password, $factorCode, false, 'reauthentication');
-            if ($stepUp['status'] !== 'ok') {
-                return ['status' => $stepUp['status']];
-            }
-            if (isset($stepUp['recovery_codes'])) {
-                $locked->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => $stepUp['verified_at']]);
-            }
-
-            Audit::write($locked->id, 'auth.mfa_reauthenticated', 'session', $sessionId, [
-                'factor' => $stepUp['factor'],
-            ], UvhRequest::ip($request));
-
-            return [
-                'status' => 'ok',
-                'factor' => $stepUp['factor'],
-                'verified_at' => $stepUp['verified_at'],
-            ];
-        });
+        $result = ReauthenticationAdmission::admit($user, $sessionId, $password, $factorCode, UvhRequest::ip($request));
 
         if ($result['status'] === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
@@ -1664,7 +791,7 @@ class AuthController
         ]);
     }
 
-    public function profile(Request $request)
+    public function profile(Request $request): JsonResponse
     {
         $name = trim(UvhRequest::inputString($request, 'name'));
         if (! $this->validName($name)) {
@@ -1673,17 +800,7 @@ class AuthController
 
         $user = UvhRequest::user($request);
         $sessionId = UvhRequest::sessionId($request);
-        $updated = DB::transaction(function () use ($user, $sessionId, $name): ?User {
-            $context = $this->lockActiveSecurityContext($user, $sessionId, true);
-            if ($context === null) {
-                return null;
-            }
-            $locked = $context['user'];
-            $locked->update(['name' => $name, 'updated_at' => now()]);
-            Audit::write($locked->id, 'auth.profile_update', 'user', $locked->id);
-
-            return $locked;
-        });
+        $updated = ProfileAdmission::update($user, $sessionId, $name);
         if (! $updated) {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
         }
@@ -1691,7 +808,7 @@ class AuthController
         return response()->json(['user' => UvhRequest::publicUser($updated)]);
     }
 
-    public function requestEmailChange(Request $request)
+    public function requestEmailChange(Request $request): JsonResponse
     {
         $newEmail = strtolower(trim(UvhRequest::inputString($request, 'newEmail')));
         $password = UvhRequest::inputString($request, 'password');
@@ -1722,82 +839,9 @@ class AuthController
         $verificationUrl = $this->appUrl().'/auth/confirm-email#token='.rawurlencode($token);
         $sessionId = UvhRequest::sessionId($request);
         try {
-            $result = DB::transaction(function () use (
-                $user,
-                $sessionId,
-                $newEmail,
-                $password,
-                $factorCode,
-                $tokenHash,
-                $verificationUrl,
-            ): array {
-                $context = $this->lockActiveSecurityContext($user, $sessionId, true);
-                if ($context === null) {
-                    return ['status' => 'stale'];
-                }
-                ['user' => $locked, 'session' => $session] = $context;
-                // One shared step-up owns the attempt budget, the freshness
-                // window and replay protection. Business conflicts only become
-                // visible afterwards, so a caller without a valid factor cannot
-                // probe which addresses are taken.
-                $stepUp = MfaStepUp::verify($locked, $session, $password, $factorCode, true, 'email-change');
-                if ($stepUp['status'] !== 'ok') {
-                    return ['status' => $stepUp['status']];
-                }
-                $this->lockEmailAddress($newEmail);
-                if (strtolower($locked->email) === $newEmail) {
-                    return ['status' => 'same'];
-                }
-                if (User::where('id', '!=', $locked->id)->whereRaw('lower(email) = ?', [$newEmail])->exists()) {
-                    return ['status' => 'conflict'];
-                }
-
-                // Expired reservations must not occupy an email indefinitely.
-                EmailChangeRequest::where('expires_at', '<=', now())
-                    ->where(function ($query) use ($locked, $newEmail) {
-                        $query->where('user_id', $locked->id)->orWhereRaw('lower(new_email) = ?', [$newEmail]);
-                    })->delete();
-
-                EmailChangeRequest::where('user_id', $locked->id)->lockForUpdate()->first()?->delete();
-
-                // The recovery code is charged only on the created path: a
-                // same/conflict answer keeps the credential intact for a retry.
-                if (isset($stepUp['recovery_codes'])) {
-                    $locked->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => now()]);
-                }
-
-                $expiresAt = now()->addHour();
-                EmailChangeRequest::create([
-                    'id' => $tokenHash,
-                    'user_id' => $locked->id,
-                    'new_email' => $newEmail,
-                    'security_version' => (int) $locked->security_version,
-                    'expires_at' => $expiresAt,
-                    'created_at' => now(),
-                ]);
-                if (! UvhMail::emailChangeVerification($newEmail, $verificationUrl, $tokenHash)) {
-                    throw new MailAdmissionException('Email change verification outbox admission failed');
-                }
-                // The previous mailbox must receive a durable warning in the
-                // same commit as the new mailbox's bearer. If either admission
-                // fails, retain the previous reservation and recovery code.
-                NotificationInbox::record((int) $locked->id, NotificationKinds::EMAIL_CHANGE_REQUESTED);
-                if (! UvhMail::emailChangeRequested($locked->email)) {
-                    throw new MailAdmissionException('Email change warning outbox admission failed');
-                }
-
-                Audit::write($locked->id, 'auth.email_change_requested', 'user', $locked->id, [
-                    'factor' => $stepUp['factor'],
-                    'expires_in_minutes' => 60,
-                ]);
-
-                return [
-                    'status' => 'created',
-                    'user_id' => (int) $locked->id,
-                    'expires_at' => $expiresAt,
-                    'factor' => $stepUp['factor'],
-                ];
-            });
+            $result = EmailChangeAdmission::request($user, $sessionId, $newEmail, $password, $factorCode, $tokenHash, $verificationUrl);
+        } catch (EmailChangeReservationConflict) {
+            return response()->json(['error' => 'Ese email ya está en uso o pendiente de confirmación'], 409);
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['operation' => 'request_email_change']);
 
@@ -1842,7 +886,7 @@ class AuthController
         return response()->json(['user' => UvhRequest::publicUser($user->refresh())]);
     }
 
-    public function cancelEmailChange(Request $request)
+    public function cancelEmailChange(Request $request): JsonResponse
     {
         $password = UvhRequest::inputString($request, 'password');
         $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
@@ -1863,26 +907,7 @@ class AuthController
 
         $sessionId = UvhRequest::sessionId($request);
         try {
-            $result = DB::transaction(function () use ($user, $sessionId, $password, $factorCode): string {
-                $context = $this->lockActiveSecurityContext($user, $sessionId);
-                if ($context === null) {
-                    return 'stale';
-                }
-                ['user' => $locked, 'session' => $session] = $context;
-                // Same shared step-up as the request it cancels: account-wide
-                // budget, freshness window and replay protection in one place.
-                $stepUp = MfaStepUp::verify($locked, $session, $password, $factorCode, true, 'email-change');
-                if ($stepUp['status'] !== 'ok') {
-                    return $stepUp['status'];
-                }
-                if (isset($stepUp['recovery_codes'])) {
-                    $locked->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => now()]);
-                }
-                EmailChangeRequest::where('user_id', $locked->id)->delete();
-                Audit::write($locked->id, 'auth.email_change_cancelled', 'user', $locked->id);
-
-                return 'ok';
-            });
+            $result = EmailChangeAdmission::cancel($user, $sessionId, $password, $factorCode);
         } catch (MfaInfrastructureUnavailable $error) {
             report($error);
 
@@ -1908,7 +933,7 @@ class AuthController
         return response()->json(['user' => UvhRequest::publicUser($user->refresh())]);
     }
 
-    public function confirmEmailChange(Request $request)
+    public function confirmEmailChange(Request $request): JsonResponse
     {
         $token = UvhRequest::inputString($request, 'token');
         if (! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token)) {
@@ -1918,71 +943,7 @@ class AuthController
         $tokenHash = Ids::sha256Hex($token);
         $snapshot = EmailChangeRequest::where('id', $tokenHash)->first(['id', 'user_id']);
         try {
-            $result = $snapshot ? DB::transaction(function () use ($snapshot, $tokenHash): array {
-                $user = User::where('id', $snapshot->user_id)->lockForUpdate()->first();
-                $row = EmailChangeRequest::where('id', $tokenHash)
-                    ->where('user_id', $snapshot->user_id)->lockForUpdate()->first();
-                if (! $row) {
-                    return ['status' => 'invalid'];
-                }
-                if ($row->expires_at->lte(now())) {
-                    $row->delete();
-
-                    return ['status' => 'expired'];
-                }
-
-                if (! $user || $user->deleted_at || ! $user->email_verified_at
-                    || (int) $user->security_version !== (int) $row->security_version) {
-                    $row->delete();
-
-                    return ['status' => 'invalid'];
-                }
-                $this->lockEmailAddress(strtolower($row->new_email));
-                // Un registro pendiente posee su dirección tanto como una
-                // cuenta: dejar esta reclamación sobre ella dejaría dos
-                // titulares y una activación que crearía un segundo usuario con
-                // el mismo correo.
-                if (User::where('id', '!=', $user->id)->whereRaw('lower(email) = ?', [strtolower($row->new_email)])->exists()
-                    || PendingRegistration::whereRaw('lower(email) = ?', [strtolower($row->new_email)])->exists()) {
-                    $row->delete();
-
-                    return ['status' => 'conflict'];
-                }
-
-                $now = now();
-                $oldEmail = $user->email;
-                $newEmail = strtolower($row->new_email);
-                $nextVersion = (int) $user->security_version + 1;
-                $user->update([
-                    'email' => $newEmail,
-                    'email_verified_at' => $now,
-                    'security_version' => $nextVersion,
-                    'updated_at' => $now,
-                ]);
-                DB::table('sessions')->where('user_id', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                DB::table('api_tokens')->where('created_by', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                EmailToken::where('user_id', $user->id)->whereIn('kind', ['verify', 'reset'])->whereNull('used_at')->delete();
-                EmailChangeRequest::where('user_id', $user->id)->delete();
-                AccountRecoveryLifecycle::cancelActiveForUser((int) $user->id, $now);
-                // Both identity-change notices belong to this commit. Failure
-                // on the second mailbox also rolls back the first envelope;
-                // neither mailbox may be told about a change that was undone.
-                NotificationInbox::record((int) $user->id, NotificationKinds::EMAIL_CHANGED);
-                foreach (array_unique([$oldEmail, $newEmail]) as $recipient) {
-                    if (! UvhMail::emailChanged($recipient)) {
-                        throw new MailAdmissionException('Email changed notices outbox admission failed');
-                    }
-                }
-
-                Audit::write($user->id, 'auth.email_change_confirmed', 'user', $user->id, [
-                    'revoked_all_sessions' => true,
-                ]);
-
-                return [
-                    'status' => 'ok',
-                    'user_id' => (int) $user->id,
-                ];
-            }) : ['status' => 'invalid'];
+            $result = $snapshot ? EmailChangeAdmission::confirm($snapshot, $tokenHash) : ['status' => 'invalid'];
         } catch (MailAdmissionException) {
             Audit::write((int) $snapshot->user_id, 'auth.email_delivery_failed', 'user', $snapshot->user_id, ['operation' => 'confirm_email_change']);
 
@@ -2004,23 +965,10 @@ class AuthController
             return response()->json(['error' => 'La confirmación no es válida o ya se ha utilizado'], 400);
         }
 
-        return $this->credentialChangeResponse($request, $result['user_id']);
+        return CredentialChangeResponse::forUser($request, $result['user_id']);
     }
 
-    /**
-     * Only clear the browser identity if this bearer revoked its own account.
-     *
-     * @param  array{message?: string}  $extra
-     */
-    private function credentialChangeResponse(Request $request, int $userId, array $extra = []): JsonResponse
-    {
-        $current = UvhRequest::user($request)?->id === $userId;
-        $response = response()->json([...$extra, 'ok' => true, 'current' => $current]);
-
-        return $current ? $response->withCookie(SessionManager::clearCookie()) : $response;
-    }
-
-    public function changePassword(Request $request)
+    public function changePassword(Request $request): JsonResponse
     {
         $current = UvhRequest::inputString($request, 'current');
         $newPassword = UvhRequest::inputString($request, 'newPassword');
@@ -2056,56 +1004,7 @@ class AuthController
         // security operations for this account.
         $newPasswordHash = Hash::make($newPassword);
         try {
-            $changed = DB::transaction(function () use (
-                $user,
-                $sessionId,
-                $current,
-                $newPasswordHash,
-                $newPassword,
-                $factorCode,
-            ): string {
-                $context = $this->lockActiveSecurityContext($user, $sessionId);
-                if ($context === null) {
-                    return 'stale';
-                }
-                ['user' => $locked, 'session' => $session] = $context;
-                if (! PasswordStrength::isAcceptable($newPassword, $locked->name, $locked->email)) {
-                    return 'weak';
-                }
-                // One shared step-up owns the attempt budget, the freshness
-                // window and replay protection; the recovery-code consumption
-                // it reports joins the new password in the same atomic update.
-                $stepUp = MfaStepUp::verify($locked, $session, $current, $factorCode, true, 'password-change');
-                if ($stepUp['status'] !== 'ok') {
-                    return $stepUp['status'];
-                }
-
-                $now = now();
-                $nextVersion = (int) $locked->security_version + 1;
-                $updates = [
-                    'password_hash' => $newPasswordHash,
-                    'security_version' => $nextVersion,
-                    'updated_at' => $now,
-                ];
-                if (isset($stepUp['recovery_codes'])) {
-                    $updates['recovery_codes'] = $stepUp['recovery_codes'];
-                }
-                $locked->update($updates);
-                $session->update([
-                    'security_version' => $nextVersion,
-                    'mfa_verified_at' => $locked->mfa_enabled ? $now : $session->mfa_verified_at,
-                ]);
-                DB::table('sessions')->where('user_id', $locked->id)->where('id', '!=', $session->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                EmailToken::where('user_id', $locked->id)->where('kind', 'reset')->whereNull('used_at')->delete();
-                AccountRecoveryLifecycle::cancelActiveForUser((int) $locked->id, $now);
-                $this->admitPasswordChangedNotice($locked);
-                Audit::write($locked->id, 'auth.password_change', 'user', $locked->id, [
-                    'factor' => $stepUp['factor'],
-                    'revoked_other_sessions' => true,
-                ]);
-
-                return 'ok:'.$stepUp['factor'];
-            });
+            $changed = AuthenticatedPasswordChange::admit($user, $sessionId, $current, $newPasswordHash, $newPassword, $factorCode);
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'password_changed']);
 
@@ -2144,86 +1043,31 @@ class AuthController
         return response()->json(['ok' => true]);
     }
 
-    public function sessions(Request $request)
+    public function sessions(Request $request): JsonResponse
     {
-        $context = $this->liveAccountReadContext($request);
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if ($context === null) {
             return response()->json(['error' => 'No autenticado'], 401);
         }
-        $user = $context['user'];
-        $currentId = UvhRequest::sessionId($request);
-        // Keep this device visible even when the historical list is bounded.
-        // The extra row proves truncation without counting the whole history.
-        $available = $user->sessions()
-            ->orderByRaw('id = ? desc', [$currentId])
-            ->orderByDesc('last_used_at')->orderByDesc('id')
-            ->limit(101)->get();
-        $rows = $available->take(100)->map(fn ($s) => [
-            'id' => $s->id,
-            'user_agent' => $s->user_agent,
-            'created_at' => $this->iso($s->created_at),
-            'last_used_at' => $this->iso($s->last_used_at),
-            'expires_at' => $this->iso($s->expires_at),
-            'revoked_at' => $this->iso($s->revoked_at),
-            'mfa_verified_at' => $this->iso($s->mfa_verified_at),
-            'current' => $s->id === $currentId,
-        ]);
 
-        return response()->json(['sessions' => $rows, 'truncated' => $available->count() > 100]);
+        return response()->json(AccountQueries::sessions($context));
     }
 
     /**
      * Account-scoped security posture without credential or network details.
      * Activity uses an explicit action allowlist and omits metadata/IP hashes.
      */
-    public function securityCenter(Request $request)
+    public function securityCenter(Request $request): JsonResponse
     {
-        $context = $this->liveAccountReadContext($request);
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if ($context === null) {
             return response()->json(['error' => 'No autenticado'], 401);
         }
-        $user = $context['user'];
-        $activeSessions = $user->sessions()->whereNull('revoked_at')->where('expires_at', '>', now())->count();
-        $publicUser = UvhRequest::publicUser($user);
-        $passwordActions = ['auth.password_change', 'auth.password_reset', 'auth.account_recovery_completed'];
-        $lastPasswordEvent = AuditEvent::where('user_id', $user->id)->whereIn('action', $passwordActions)
-            ->orderByDesc('created_at')->orderByDesc('id')->first(['created_at']);
-        $visibleActions = [
-            'auth.login', 'auth.logout', 'auth.password_change', 'auth.password_reset',
-            'auth.session_revoke', 'auth.sessions_revoked_others', 'auth.sessions_revoked_all',
-            'auth.mfa_enable', 'auth.mfa_disable', 'auth.mfa_reconfigured',
-            'auth.mfa_recovery', 'auth.mfa_recovery_regenerate', 'auth.mfa_reauthenticated',
-            'auth.email_change_requested', 'auth.email_change_cancelled', 'auth.email_change_confirmed',
-            'auth.emergency_access_revoked', 'auth.account_recovery_completed',
-        ];
-        $activityRows = AuditEvent::where('user_id', $user->id)->whereIn('action', $visibleActions)
-            ->orderByDesc('created_at')->orderByDesc('id')->limit(21)->get(['id', 'action', 'created_at']);
-        // One row past the bound is what tells a full panel from a truncated
-        // one, so the last twenty events are never read as the whole personal
-        // audit trail. Same contract as the per-link activity panel.
-        $activityTruncated = $activityRows->count() > 20;
-        $activity = $activityRows->take(20)->map(fn (AuditEvent $event) => [
-            'id' => (int) $event->id,
-            'action' => $event->action,
-            'createdAt' => $this->iso($event->created_at),
-        ]);
 
-        return response()->json([
-            'summary' => [
-                'mfaEnabled' => (bool) $user->mfa_enabled,
-                'recoveryCodesRemaining' => is_array($user->recovery_codes) ? count($user->recovery_codes) : 0,
-                'activeSessions' => $activeSessions,
-                'currentSessionMfaVerifiedAt' => $this->iso($context['session']->mfa_verified_at),
-                'pendingEmail' => $publicUser['pendingEmail'],
-                'pendingEmailExpiresAt' => $publicUser['pendingEmailExpiresAt'],
-                'lastPasswordEventAt' => $this->iso($lastPasswordEvent?->created_at),
-            ],
-            'activity' => $activity,
-            'truncated' => $activityTruncated,
-        ]);
+        return response()->json(AccountQueries::securityCenter($context));
     }
 
-    public function revokeSession(Request $request, string $id)
+    public function revokeSession(Request $request, string $id): JsonResponse
     {
         if (! preg_match('/^[a-f0-9]{64}$/D', $id)) {
             return response()->json(['error' => 'Sesión no encontrada'], 404);
@@ -2232,24 +1076,7 @@ class AuthController
         $currentId = UvhRequest::sessionId($request);
         $current = $id === $currentId;
         try {
-            $found = DB::transaction(function () use ($user, $id, $currentId): bool {
-                $account = $this->lockActiveSecurityActor($user, $currentId);
-                if (! $account) {
-                    return false;
-                }
-                $row = $account->sessions()->where('id', $id)->lockForUpdate()->first();
-                if (! $row) {
-                    return false;
-                }
-                if (! $row->revoked_at) {
-                    $row->update(['revoked_at' => now()]);
-                    $this->admitSecurityIncidentNotice($account, NotificationKinds::SESSION_REVOKED,
-                        static fn (string $to, string $url, string $hash): bool => UvhMail::sessionRevoked($to, $url, $hash));
-                    Audit::write($account->id, 'auth.session_revoke', 'session', $id);
-                }
-
-                return true;
-            });
+            $found = SessionRevocationAdmission::revoke($user, $currentId, $id);
         } catch (MailAdmissionException) {
             return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se revocó la sesión. Inténtalo de nuevo.'], 503);
         }
@@ -2277,20 +1104,7 @@ class AuthController
             // cierre, como en el cambio de contraseña: sin aviso entregable no
             // se cierra nada, y una repetición sin filas que cerrar no manda
             // otro correo.
-            $revoked = DB::transaction(function () use ($user, $currentId): int {
-                $account = $this->lockActiveSecurityActor($user, $currentId);
-                if (! $account) {
-                    return -1;
-                }
-                $revoked = $account->sessions()->where('id', '!=', $currentId)
-                    ->whereNull('revoked_at')->update(['revoked_at' => now()]);
-                if ($revoked > 0) {
-                    $this->admitSessionsRevokedNotice($account, false);
-                }
-                Audit::write($account->id, 'auth.sessions_revoked_others', 'user', $account->id, ['revoked' => $revoked]);
-
-                return $revoked;
-            });
+            $revoked = SessionRevocationAdmission::others($user, $currentId);
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'sessions_revoked_others']);
 
@@ -2313,19 +1127,7 @@ class AuthController
         $user = UvhRequest::user($request);
         $currentId = UvhRequest::sessionId($request);
         try {
-            $revoked = DB::transaction(function () use ($user, $currentId): int {
-                $account = $this->lockActiveSecurityActor($user, $currentId);
-                if (! $account) {
-                    return -1;
-                }
-                $revoked = $account->sessions()->whereNull('revoked_at')->update(['revoked_at' => now()]);
-                if ($revoked > 0) {
-                    $this->admitSessionsRevokedNotice($account, true);
-                }
-                Audit::write($account->id, 'auth.sessions_revoked_all', 'user', $account->id, ['revoked' => $revoked]);
-
-                return $revoked;
-            });
+            $revoked = SessionRevocationAdmission::all($user, $currentId);
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'sessions_revoked_all']);
 
@@ -2338,7 +1140,7 @@ class AuthController
         return response()->json(['ok' => true, 'revoked' => $revoked])->withCookie(SessionManager::clearCookie());
     }
 
-    public function mfaSetup(Request $request)
+    public function mfaSetup(Request $request): JsonResponse
     {
         $password = UvhRequest::inputString($request, 'password');
         $codeInput = $request->input('code');
@@ -2352,32 +1154,7 @@ class AuthController
         $sessionId = UvhRequest::sessionId($request);
         $secret = Totp::generateSecret();
         $encryptedSecret = UvhCrypto::encryptAtRest($secret);
-        $setup = DB::transaction(function () use ($user, $sessionId, $password, $code, $encryptedSecret): string {
-            $context = $this->lockActiveSecurityContext($user, $sessionId, true);
-            if ($context === null) {
-                return 'stale';
-            }
-            ['user' => $locked, 'session' => $session] = $context;
-            // Replacements obey the shared freshness, account budget and
-            // replay checks before staging a new factor. Initial enrollment
-            // remains password-only while the account has no active MFA.
-            $stepUp = MfaStepUp::verify($locked, $session, $password, $code ?? '', true, 'mfa-setup');
-            if ($stepUp['status'] !== 'ok') {
-                return $stepUp['status'];
-            }
-            $updates = [
-                'mfa_pending_secret' => $encryptedSecret,
-                'mfa_pending_expires_at' => now()->addMinutes(10),
-            ];
-            if ($stepUp['factor'] === 'recovery') {
-                $updates['recovery_codes'] = $stepUp['recovery_codes'];
-            }
-            $locked->update($updates);
-
-            Audit::write($user->id, 'auth.mfa_setup', 'user', $user->id);
-
-            return 'ok';
-        });
+        $setup = MfaConfigurationAdmission::setup($user, $sessionId, $password, $code, $encryptedSecret);
         if ($setup === 'stale') {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión antes de configurar MFA'], 409);
         }
@@ -2398,7 +1175,7 @@ class AuthController
         return response()->json(['secret' => $secret, 'uri' => $uri]);
     }
 
-    public function mfaEnable(Request $request)
+    public function mfaEnable(Request $request): JsonResponse
     {
         $code = UvhRequest::inputString($request, 'code');
         if (! preg_match('/^\d{6}$/', $code)) {
@@ -2410,57 +1187,7 @@ class AuthController
         $recoveryCodes = $this->newRecoveryCodes();
 
         try {
-            $enabled = DB::transaction(function () use ($user, $sessionId, $code, $recoveryCodes): string {
-                $context = $this->lockActiveSecurityContext($user, $sessionId, true);
-                if ($context === null) {
-                    return 'stale';
-                }
-                ['user' => $locked, 'session' => $session] = $context;
-                if (MfaAttempts::tooMany($locked->id, 'mfa-enable')) {
-                    return 'locked';
-                }
-                if (! $locked->mfa_pending_secret || ! $locked->mfa_pending_expires_at || $locked->mfa_pending_expires_at->lte(now())) {
-                    MfaAttempts::recordFailure($locked->id, 'mfa-enable');
-
-                    return 'invalid';
-                }
-                $pendingSecret = $this->decryptMfaSecret($locked->mfa_pending_secret);
-                if ($pendingSecret === null || ! $this->consumeTotpCode($locked->id, $code, $pendingSecret)) {
-                    MfaAttempts::recordFailure($locked->id, 'mfa-enable');
-
-                    return 'invalid';
-                }
-
-                $now = now();
-                $reconfigured = (bool) $locked->mfa_enabled;
-                $nextVersion = (int) $locked->security_version + 1;
-                $locked->update([
-                    'mfa_secret' => $locked->mfa_pending_secret,
-                    'mfa_pending_secret' => null,
-                    'mfa_pending_expires_at' => null,
-                    'mfa_enabled' => true,
-                    'recovery_codes' => array_map(fn ($value) => Ids::sha256Hex($value), $recoveryCodes),
-                    'security_version' => $nextVersion,
-                    'updated_at' => $now,
-                ]);
-                $session->update(['security_version' => $nextVersion, 'mfa_verified_at' => $now]);
-                DB::table('sessions')->where('user_id', $locked->id)->where('id', '!=', $session->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                AccountRecoveryLifecycle::cancelActiveForUser((int) $locked->id, $now);
-                // Security notices without bearers are still mandatory: commit
-                // the factor, recovery hashes and encrypted notice together.
-                NotificationInbox::record((int) $locked->id, $reconfigured ? NotificationKinds::MFA_RECONFIGURED : NotificationKinds::MFA_ENABLED);
-                if (! UvhMail::mfaEnabled($locked->email, $reconfigured)) {
-                    throw new MailAdmissionException('MFA enable notice outbox admission failed');
-                }
-
-                Audit::write($locked->id, $reconfigured ? 'auth.mfa_reconfigured' : 'auth.mfa_enable', 'user', $locked->id, [
-                    'recovery_codes_issued' => count($recoveryCodes),
-                ]);
-
-                MfaAttempts::clear($locked->id, 'mfa-enable');
-
-                return $reconfigured ? 'reconfigured' : 'enabled';
-            });
+            $enabled = MfaConfigurationAdmission::enable($user, $sessionId, $code, $recoveryCodes);
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['operation' => 'mfa_enable']);
 
@@ -2484,26 +1211,12 @@ class AuthController
     }
 
     /** Discard a staged MFA factor without touching the currently active one. */
-    public function mfaCancelSetup(Request $request)
+    public function mfaCancelSetup(Request $request): JsonResponse
     {
         $user = UvhRequest::user($request);
         $sessionId = UvhRequest::sessionId($request);
 
-        $cancelled = DB::transaction(function () use ($user, $sessionId): bool {
-            $locked = $this->lockActiveSecurityActor($user, $sessionId, true);
-            if (! $locked) {
-                return false;
-            }
-
-            $locked->update([
-                'mfa_pending_secret' => null,
-                'mfa_pending_expires_at' => null,
-            ]);
-
-            Audit::write($user->id, 'auth.mfa_setup_cancel', 'user', $user->id);
-
-            return true;
-        });
+        $cancelled = MfaConfigurationAdmission::cancel($user, $sessionId);
         if (! $cancelled) {
             return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión antes de cancelar la configuración MFA.'], 409);
         }
@@ -2512,7 +1225,7 @@ class AuthController
     }
 
     /** Replace every recovery credential after a fresh password + factor check. */
-    public function mfaRegenerateRecoveryCodes(Request $request)
+    public function mfaRegenerateRecoveryCodes(Request $request): JsonResponse
     {
         $password = UvhRequest::inputString($request, 'password');
         $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
@@ -2529,48 +1242,7 @@ class AuthController
         $recoveryCodes = $this->newRecoveryCodes();
 
         try {
-            $result = DB::transaction(function () use (
-                $user,
-                $sessionId,
-                $password,
-                $factorCode,
-                $recoveryCodes,
-            ): array {
-                $context = $this->lockActiveSecurityContext($user, $sessionId, true);
-                if ($context === null || ! $context['user']->mfa_enabled) {
-                    return ['status' => 'stale'];
-                }
-                ['user' => $locked, 'session' => $session] = $context;
-
-                // One owner of password + factor + anti-replay + attempt budget
-                // + the privileged window. Regeneration replaces the complete
-                // set afterwards, so the recovery-code consumption MfaStepUp
-                // reports is deliberately discarded (no separate delete first).
-                $stepUp = MfaStepUp::verify($locked, $session, $password, $factorCode);
-                if ($stepUp['status'] !== 'ok') {
-                    return ['status' => $stepUp['status']];
-                }
-
-                $now = $stepUp['verified_at'];
-                $nextVersion = (int) $locked->security_version + 1;
-                $locked->update([
-                    'recovery_codes' => array_map(fn (string $value) => Ids::sha256Hex($value), $recoveryCodes),
-                    'security_version' => $nextVersion,
-                    'updated_at' => $now,
-                ]);
-                $session->update(['security_version' => $nextVersion]);
-                DB::table('sessions')->where('user_id', $locked->id)->where('id', '!=', $session->id)
-                    ->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                AccountRecoveryLifecycle::cancelActiveForUser((int) $locked->id, $now);
-                NotificationInbox::record((int) $locked->id, NotificationKinds::MFA_RECOVERY_CODES_REGENERATED);
-                if (! UvhMail::mfaRecoveryCodesRegenerated($locked->email)) {
-                    throw new MailAdmissionException('MFA recovery codes notice outbox admission failed');
-                }
-
-                Audit::write($user->id, 'auth.mfa_recovery_regenerate', 'user', $user->id, ['revoked_other_sessions' => true]);
-
-                return ['status' => 'ok', 'factor' => $stepUp['factor']];
-            });
+            $result = MfaConfigurationAdmission::regenerate($user, $sessionId, $password, $factorCode, $recoveryCodes);
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['operation' => 'mfa_recovery_regenerate']);
 
@@ -2601,7 +1273,7 @@ class AuthController
         ]);
     }
 
-    public function mfaDisable(Request $request)
+    public function mfaDisable(Request $request): JsonResponse
     {
         $password = UvhRequest::inputString($request, 'password');
         $code = trim(UvhRequest::inputString($request, 'code'));
@@ -2620,51 +1292,7 @@ class AuthController
 
         $sessionId = UvhRequest::sessionId($request);
         try {
-            $disabled = DB::transaction(function () use ($user, $sessionId, $password, $code): string {
-                $context = $this->lockActiveSecurityContext($user, $sessionId, true);
-                if ($context === null) {
-                    return 'stale';
-                }
-                ['user' => $locked, 'session' => $session] = $context;
-                // Disabling MFA always demands a concrete, current factor; the
-                // shared step-up's password-only shortcut never covers it.
-                $stepUp = MfaStepUp::verify($locked, $session, $password, $code, true, 'mfa-disable');
-                if ($stepUp['status'] !== 'ok') {
-                    return $stepUp['status'];
-                }
-                if ($stepUp['factor'] === 'password_only') {
-                    return 'invalid';
-                }
-                // Platform administration is MFA-gated. Keeping an administrator
-                // flag on an account without MFA creates an unusable operator and
-                // can lock the platform out when it is the last administrator.
-                if ($locked->is_admin) {
-                    return 'admin_required';
-                }
-
-                $now = $stepUp['verified_at'];
-                $nextVersion = (int) $locked->security_version + 1;
-                $locked->update([
-                    'mfa_enabled' => false,
-                    'mfa_secret' => null,
-                    'mfa_pending_secret' => null,
-                    'mfa_pending_expires_at' => null,
-                    'recovery_codes' => null,
-                    'security_version' => $nextVersion,
-                    'updated_at' => $now,
-                ]);
-                $session->update(['security_version' => $nextVersion, 'mfa_verified_at' => null]);
-                DB::table('sessions')->where('user_id', $locked->id)->where('id', '!=', $session->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
-                AccountRecoveryLifecycle::cancelActiveForUser((int) $locked->id, $now);
-                NotificationInbox::record((int) $locked->id, NotificationKinds::MFA_DISABLED);
-                if (! UvhMail::mfaDisabled($locked->email)) {
-                    throw new MailAdmissionException('MFA disable notice outbox admission failed');
-                }
-
-                Audit::write($user->id, 'auth.mfa_disable', 'user', $user->id);
-
-                return 'ok';
-            });
+            $disabled = MfaConfigurationAdmission::disable($user, $sessionId, $password, $code);
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['operation' => 'mfa_disable']);
 
@@ -2695,135 +1323,8 @@ class AuthController
         return response()->json(['ok' => true]);
     }
 
-    /**
-     * Refresh a read's account/session context without serializing ordinary GETs.
-     * Mutations retain their own row locks. No cookie is cleared here: a late
-     * rejected read must not erase a newer login's browser cookie.
-     *
-     * @return array{user: User, session: UvhSession}|null
-     */
-    private function liveAccountReadContext(Request $request): ?array
-    {
-        $snapshot = UvhRequest::user($request);
-        $sessionId = UvhRequest::sessionId($request);
-        if ($snapshot === null || $sessionId === null) {
-            return null;
-        }
-        $session = UvhSession::with('user')->where('id', $sessionId)
-            ->where('user_id', $snapshot->id)
-            ->where('security_version', (int) $snapshot->security_version)
-            ->whereNull('revoked_at')->where('expires_at', '>', now())->first();
-        $user = $session?->user;
-        if (! $session || ! $user || $user->deleted_at || ! $user->email_verified_at
-            || (int) $user->security_version !== (int) $snapshot->security_version) {
-            return null;
-        }
-
-        return ['user' => $user, 'session' => $session];
-    }
-
     /** Serialize account security mutations and revalidate the middleware snapshot. */
-    private function lockActiveSecurityActor(User $snapshot, ?string $sessionId, bool $requireVerifiedEmail = false): ?User
-    {
-        return $this->lockActiveSecurityContext($snapshot, $sessionId, $requireVerifiedEmail)['user'] ?? null;
-    }
-
-    /**
-     * Acquire the account before its session, then reuse both locked models.
-     * Callers must keep their mutation inside the same transaction.
-     *
-     * @return array{user: User, session: UvhSession}|null
-     */
-    private function lockActiveSecurityContext(User $snapshot, ?string $sessionId, bool $requireVerifiedEmail = false): ?array
-    {
-        $account = User::where('id', $snapshot->id)->whereNull('deleted_at')->lockForUpdate()->first();
-        if (! $account || ($requireVerifiedEmail && ! $account->email_verified_at)
-            || (int) $account->security_version !== (int) $snapshot->security_version || $sessionId === null) {
-            return null;
-        }
-        $session = UvhSession::where('id', $sessionId)->where('user_id', $account->id)
-            ->whereNull('revoked_at')->where('expires_at', '>', now())->lockForUpdate()->first();
-        if (! $session || (int) $session->security_version !== (int) $account->security_version) {
-            return null;
-        }
-
-        return ['user' => $account, 'session' => $session];
-    }
-
     // ---------------- helpers ----------------
-
-    private function admitPasswordChangedNotice(User $lockedUser): void
-    {
-        $this->admitSecurityIncidentNotice(
-            $lockedUser,
-            NotificationKinds::PASSWORD_CHANGED,
-            static fn (string $to, string $incidentUrl, string $tokenHash): bool => UvhMail::passwordChanged($to, $incidentUrl, $tokenHash),
-        );
-    }
-
-    /**
-     * Cierre masivo de sesiones: el mismo portador de incidente que el cambio
-     * de contraseña, con el aviso admitido en la transacción que cierra. Si el
-     * cierre no cerró filas —ya estaban cerradas o no hay más sesiones— no hay
-     * evento que anunciar y no se admite correo alguno.
-     */
-    private function admitSessionsRevokedNotice(User $lockedUser, bool $closedAll): void
-    {
-        $this->admitSecurityIncidentNotice(
-            $lockedUser,
-            $closedAll ? NotificationKinds::SESSIONS_REVOKED_ALL : NotificationKinds::SESSIONS_REVOKED_OTHERS,
-            static fn (string $to, string $incidentUrl, string $tokenHash): bool => UvhMail::sessionsRevoked($to, $incidentUrl, $tokenHash, $closedAll),
-        );
-    }
-
-    /**
-     * Admit the incident bearer and encrypted notice in the mutation's commit.
-     *
-     * Callers must already hold the row locks that serialize the mutation. Do
-     * not open a separate transaction or swallow admission failures here: a
-     * crash must not commit the security change without a recoverable notice.
-     * Provider delivery remains after-commit and is not a prerequisite for
-     * changing credentials.
-     *
-     * @param  \Closure(string, string, string): bool  $deliver
-     */
-    private function admitSecurityIncidentNotice(User $lockedUser, string $notificationKind, \Closure $deliver): void
-    {
-        if (DB::transactionLevel() < 1) {
-            throw new \LogicException('Security notice requires the mutation transaction');
-        }
-
-        $token = Ids::randomToken(32);
-        $tokenHash = Ids::sha256Hex($token);
-        EmailToken::create([
-            'id' => $tokenHash,
-            'user_id' => $lockedUser->id,
-            'kind' => 'security_revoke',
-            'expires_at' => now()->addDay(),
-        ]);
-        $url = $this->appUrl().'/auth/security-incident#token='.rawurlencode($token);
-        NotificationInbox::record((int) $lockedUser->id, $notificationKind);
-        Audit::write((int) $lockedUser->id, 'auth.security_notice_admitted', 'user', $lockedUser->id, ['kind' => $notificationKind]);
-        if (! $deliver($lockedUser->email, $url, $tokenHash)) {
-            throw new MailAdmissionException('Security notice outbox admission failed');
-        }
-
-        // Retain this new bearer plus four previous notices. Excluding the new
-        // ID avoids pruning it when timestamps tie and random hashes determine
-        // the order; a just-admitted notice must not be obsolete at commit.
-        $staleIds = EmailToken::where('user_id', $lockedUser->id)
-            ->where('kind', 'security_revoke')
-            ->whereNull('used_at')
-            ->where('id', '!=', $tokenHash)
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->offset(4)
-            ->limit(100)
-            ->pluck('id');
-        if ($staleIds->isNotEmpty()) {
-            EmailToken::whereIn('id', $staleIds)->delete();
-        }
-    }
 
     private function captchaError(Request $request, string $token): ?JsonResponse
     {
@@ -2842,49 +1343,6 @@ class AuthController
         return response()->json([
             'error' => 'Completa de nuevo la verificación antiabuso.',
         ], 422);
-    }
-
-    /**
-     * Pay for one outbox admission exactly like a real registration without
-     * ever mailing the occupant: the token hash has no backing row, so the
-     * delivery jobs suppress the envelope (`MailDeliveryEligibility` ->
-     * `obsolete`) and no mailbox is touched — least of all the caller's own.
-     */
-    private function admitOrphanVerification(string $email): void
-    {
-        if (! UvhMail::verification(
-            $email,
-            $this->appUrl().'/auth/verify-email#token='.rawurlencode(Ids::randomToken(32)),
-            Ids::sha256Hex(Ids::randomToken(32)),
-        )) {
-            throw new MailAdmissionException('Registration verification outbox admission failed');
-        }
-    }
-
-    /**
-     * Legal acceptance: business evidence of THIS request. The table allows one
-     * row per user/document/version (`legal_acceptance_user_document_unique`),
-     * so each new acceptance refreshes the current version's row instead of
-     * colliding with the superseded one. Only the activation (`verifyEmail`)
-     * calls it: the acceptance that counts is the one made by whoever proves
-     * the mailbox, never one an anonymous first registrant could stamp.
-     */
-    private function acceptRegistrationLegal(int $userId, Carbon $acceptedAt): void
-    {
-        foreach ([
-            ['document_type' => 'terms', 'version' => self::TERMS_VERSION],
-            ['document_type' => 'privacy_notice', 'version' => self::PRIVACY_VERSION],
-        ] as $document) {
-            DB::table('legal_acceptances')->updateOrInsert(
-                ['user_id' => $userId, ...$document],
-                ['source' => 'registration', 'accepted_at' => $acceptedAt],
-            );
-        }
-        // Activation and its exact events share admission: failure rolls back
-        // the credential, bearer consumption and legal evidence together.
-        Audit::write($userId, 'auth.email_verified', 'user', $userId);
-        Audit::write($userId, 'auth.terms_accepted', 'consent', self::TERMS_VERSION);
-        Audit::write($userId, 'auth.privacy_notice_acknowledged', 'privacy_notice', self::PRIVACY_VERSION);
     }
 
     private function findUserByEmail(string $email): ?User
@@ -2917,158 +1375,14 @@ class AuthController
         return $len >= 2 && $len <= 80 && ! preg_match('/[\x00-\x1f\x7f]/', $name);
     }
 
-    private function defaultWorkspaceName(string $userName): string
-    {
-        $prefix = 'Workspace de ';
-        $maximumWorkspaceCharacters = 80;
-        $availableCharacters = $maximumWorkspaceCharacters - mb_strlen($prefix, 'UTF-8');
-
-        // mb_substr counts Unicode code points, matching the backend's name
-        // validation and the frontend decoder's explicit code-point count.
-        return $prefix.mb_substr($userName, 0, $availableCharacters, 'UTF-8');
-    }
-
     private function appUrl(): string
     {
         return FrontendUrl::base();
     }
 
-    /**
-     * Serialize claims across users, pending registrations and pending
-     * email-change reservations.
-     *
-     * Disciplina anti-deadlock: cada flujo bloquea primero sus propias filas
-     * (el registro pendiente o el usuario, y sus tokens) y toma este advisory
-     * justo antes de escribir la dirección que reclama. Quien sostiene un
-     * advisory no vuelve a esperar a nada —sus escrituras de dirección solo
-     * chocan con las de otro poseedor del mismo advisory, que no existe—, de
-     * modo que ningún ciclo de espera puede cerrarse.
-     */
-    private function lockEmailAddress(string $email): void
-    {
-        // A collision only causes harmless extra serialization. Using a
-        // transaction-scoped PostgreSQL advisory lock closes the race between
-        // registration and confirmation across two different tables.
-        $key = (int) sprintf('%u', crc32('uvh:email:'.strtolower($email)));
-        DB::select('SELECT pg_advisory_xact_lock(?)', [$key]);
-    }
-
     private function iso(mixed $value): ?string
     {
         return IsoDate::format($value);
-    }
-
-    private function mfaChallengeKey(string $challenge): string
-    {
-        return 'uvh:mfa:challenge:'.Ids::sha256Hex($challenge);
-    }
-
-    private function storeMfaChallenge(string $challenge, int $userId, int $securityVersion): void
-    {
-        try {
-            $stored = Cache::put(
-                $this->mfaChallengeKey($challenge),
-                ['user_id' => $userId, 'security_version' => $securityVersion],
-                now()->addSeconds(self::MFA_CHALLENGE_TTL),
-            );
-            if ($stored === false) {
-                throw new \RuntimeException('MFA challenge store rejected write');
-            }
-        } catch (\Throwable $error) {
-            throw new MfaInfrastructureUnavailable('MFA challenge store unavailable', 0, $error);
-        }
-    }
-
-    /** @return array{user_id: int, security_version: int}|null */
-    private function getMfaChallenge(string $challenge): ?array
-    {
-        if ($challenge === '' || strlen($challenge) > 128) {
-            return null;
-        }
-        try {
-            $value = Cache::get($this->mfaChallengeKey($challenge));
-        } catch (\Throwable $error) {
-            throw new MfaInfrastructureUnavailable('MFA challenge store unavailable', 0, $error);
-        }
-
-        return is_array($value) && isset($value['user_id'], $value['security_version'])
-            ? ['user_id' => (int) $value['user_id'], 'security_version' => (int) $value['security_version']]
-            : null;
-    }
-
-    private function forgetMfaChallenge(string $challenge): void
-    {
-        try {
-            Cache::forget($this->mfaChallengeKey($challenge));
-        } catch (\Throwable $error) {
-            throw new MfaInfrastructureUnavailable('MFA challenge store unavailable', 0, $error);
-        }
-    }
-
-    private function consumeMfaChallenge(string $challenge): bool
-    {
-        $key = $this->mfaChallengeKey($challenge);
-        if ($this->getMfaChallenge($challenge) === null) {
-            return false;
-        }
-        try {
-            $reserved = Cache::add($key.':consumed', true, now()->addSeconds(self::MFA_CHALLENGE_TTL));
-        } catch (\Throwable $error) {
-            throw new MfaInfrastructureUnavailable('MFA challenge store unavailable', 0, $error);
-        }
-        if (! $reserved) {
-            return false;
-        }
-
-        try {
-            Cache::forget($key);
-        } catch (\Throwable $error) {
-            // The consumed marker was already persisted. Report an explicit
-            // infrastructure outage rather than a generic 500; the caller
-            // must start a new challenge and cannot replay this one.
-            throw new MfaInfrastructureUnavailable('MFA challenge store unavailable', 0, $error);
-        }
-
-        return true;
-    }
-
-    private function mfaChallengeLockKey(string $challenge): string
-    {
-        return $this->mfaChallengeKey($challenge).':lock';
-    }
-
-    private function decryptMfaSecret(?string $encrypted): ?string
-    {
-        if (! is_string($encrypted) || $encrypted === '') {
-            return null;
-        }
-
-        try {
-            return UvhCrypto::decryptAtRest($encrypted);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    /** Consume one TOTP counter once per concrete factor across all workers. */
-    private function consumeTotpCode(int $userId, string $code, string $secret): bool
-    {
-        $counter = Totp::matchingCounter($code, $secret);
-        if ($counter === null) {
-            return false;
-        }
-
-        $factor = substr(hash('sha256', $secret), 0, 24);
-
-        try {
-            return Cache::add(
-                'uvh:mfa:totp-used:'.$userId.':'.$factor.':'.$counter,
-                true,
-                now()->addMinutes(3),
-            );
-        } catch (\Throwable $error) {
-            throw new MfaInfrastructureUnavailable('MFA replay store unavailable', 0, $error);
-        }
     }
 
     /** @return array<int, string> */
@@ -3090,19 +1404,5 @@ class AuthController
     private function formatRecoveryCode(string $code): string
     {
         return implode('-', str_split($code, 4));
-    }
-
-    /** Constant-time comparison across the small fixed recovery set. */
-    private function recoveryCodeIndex(array $hashes, string $code): ?int
-    {
-        $target = Ids::sha256Hex($code);
-        $match = null;
-        foreach ($hashes as $index => $hash) {
-            if (is_string($hash) && strlen($hash) === 64 && hash_equals($hash, $target)) {
-                $match = (int) $index;
-            }
-        }
-
-        return $match;
     }
 }

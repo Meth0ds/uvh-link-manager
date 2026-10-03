@@ -40,6 +40,7 @@ describe("AuthComponent registration flow", () => {
   let authenticated: WritableSignal<boolean>;
   let probeSettled: WritableSignal<boolean>;
   let loaded: WritableSignal<boolean>;
+  let routeParameters: Record<string, string>;
 
   function captchaWidget(selector: string): FakeHCaptchaWidgetComponent {
     return fixture.debugElement.query(By.css(selector)).componentInstance as FakeHCaptchaWidgetComponent;
@@ -53,6 +54,7 @@ describe("AuthComponent registration flow", () => {
   }
 
   beforeEach(async () => {
+    routeParameters = {};
     api = jasmine.createSpyObj<ApiService>("ApiService", ["get", "post", "delete"]);
     api.get.and.resolveTo({
       hcaptcha: { enabled: true, siteKey: "10000000-ffff-ffff-ffff-000000000001" },
@@ -69,11 +71,13 @@ describe("AuthComponent registration flow", () => {
       "login",
       "verifyMfa",
       "recoverMfa",
+      "sessionGeneration",
     ]);
     auth.register.and.resolveTo();
     auth.changeRegistrationEmail.and.resolveTo();
     auth.resendVerification.and.resolveTo();
     auth.logout.and.resolveTo();
+    auth.sessionGeneration.and.returnValue(0);
     auth.login.and.resolveTo({ mfaRequired: true, challenge: "mfa-challenge", recoveryAvailable: true });
     authenticated = signal(false);
     probeSettled = signal(true);
@@ -96,7 +100,7 @@ describe("AuthComponent registration flow", () => {
         { provide: AuthService, useValue: auth },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { queryParamMap: { get: () => null } } },
+          useValue: { snapshot: { queryParamMap: { get: (key: string) => routeParameters[key] ?? null } } },
         },
         {
           provide: Router,
@@ -285,6 +289,50 @@ describe("AuthComponent registration flow", () => {
     expect(component.info()).toContain("confirmar tu email");
   });
 
+  it("does not promise a fresh day for an intent with one minute remaining", async () => {
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    api.post.and.resolveTo({ pending: true, expiresAt } as never);
+    const intents = TestBed.inject(PendingLinkIntentService);
+    expect(intents.capture("A".repeat(43), expiresAt)).toBeTrue();
+    expect(await intents.confirmed()).toBeTrue();
+    showRegistrationStep();
+    component.registerForm.patchValue({
+      name: "Ana García", email: "ana@example.com", password: "Strong-password-123!",
+      confirmPassword: "Strong-password-123!", acceptTerms: true, company: "",
+    });
+
+    await component.onRegister();
+    fixture.detectChanges();
+
+    expect(component.step()).toBe("verify-pending");
+    expect(component.pendingLink()?.expiresAt).toBe(expiresAt);
+    expect(component.info()).not.toContain("24 horas");
+    expect(fixture.nativeElement.querySelector(".intent-context small").textContent).toContain("antes de que caduque");
+    expect(fixture.nativeElement.querySelector(".pending-saved-link").textContent).toContain("si sigue disponible");
+  });
+
+  it("does not promise retention while the intent park is still unconfirmed", async () => {
+    const park = deferred<{ pending: true; expiresAt: string }>();
+    api.post.and.returnValue(park.promise as never);
+    const intents = TestBed.inject(PendingLinkIntentService);
+    expect(intents.capture("B".repeat(43))).toBeTrue();
+    showRegistrationStep();
+    component.registerForm.patchValue({
+      name: "Ana García", email: "ana@example.com", password: "Strong-password-123!",
+      confirmPassword: "Strong-password-123!", acceptTerms: true, company: "",
+    });
+
+    await component.onRegister();
+    fixture.detectChanges();
+
+    expect(component.step()).toBe("verify-pending");
+    expect(component.pendingLink()?.expiresAt).toBeNull();
+    expect(component.info()).not.toContain("24 horas");
+    expect(fixture.nativeElement.querySelector(".pending-saved-link").textContent).toContain("si sigue disponible");
+    park.resolve({ pending: true, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    expect(await intents.confirmed()).toBeTrue();
+  });
+
   it("offers a safe email correction and clears the sessionless registration state", () => {
     component.registeredEmail.set("wrong@example.com");
     component.verificationEmail.set("wrong@example.com");
@@ -412,7 +460,7 @@ describe("AuthComponent registration flow", () => {
     expect(resendButton()).toBeUndefined();
   });
 
-  it("opens verification when login identifies the browser's pending registration", async () => {
+  it("opens the browser registration context without promising account creation or delivery", async () => {
     component.loginForm.setValue({ email: "ana@example.com", password: "unused-password" });
     auth.login.and.rejectWith(new ApiRequestError("Confirma tu email para continuar", 403, undefined, undefined, "pending_registration"));
 
@@ -424,6 +472,9 @@ describe("AuthComponent registration flow", () => {
     expect(component.verificationEditable()).toBeTrue();
     expect(component.error()).toBeNull();
     expect(fixture.nativeElement.textContent).toContain("Reenviar enlace");
+    expect(fixture.nativeElement.textContent).toContain("Dirección indicada");
+    expect(fixture.nativeElement.textContent).toContain("Si ya tienes una cuenta");
+    expect(fixture.nativeElement.textContent).not.toContain("Correo enviado a");
   });
 
   it("opens verification for a legacy unverified account without offering registration edits", async () => {
@@ -523,6 +574,208 @@ describe("AuthComponent registration flow", () => {
     expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app");
   });
 
+  for (const method of ["login", "mfa", "recovery"] as const) {
+    for (const failure of ["cancelled", "rejected"] as const) {
+      it(`offers navigation retry after ${method} succeeds but navigation is ${failure}`, async () => {
+        component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
+        if (method !== "login") {
+          await component.onLogin();
+          if (method === "recovery") component.goRecovery();
+          fixture.detectChanges();
+        }
+        if (failure === "cancelled") router.navigateByUrl.and.resolveTo(false);
+        else router.navigateByUrl.and.rejectWith(new Error("route could not load"));
+        if (method === "login") {
+          auth.login.and.callFake(async () => {
+            authenticated.set(true);
+            return { mfaRequired: false, user: {
+              id: 1, email: "ana@example.com", name: "Ana", isAdmin: false,
+              emailVerified: true, mfaEnabled: false,
+            } };
+          });
+          await component.onLogin();
+        } else if (method === "mfa") {
+          auth.verifyMfa.and.callFake(async () => { authenticated.set(true); });
+          component.mfaForm.controls.code.setValue("123456");
+          await component.onMfa();
+        } else {
+          auth.recoverMfa.and.callFake(async () => { authenticated.set(true); });
+          component.recoveryForm.controls.code.setValue("ABCD-EFGH-JKLM-NPQR");
+          await component.onRecovery();
+        }
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(authenticated()).toBeTrue();
+        expect(component.error()).toBeNull();
+        expect(fixture.nativeElement.textContent).toContain("Tu sesión está iniciada");
+        expect(fixture.nativeElement.querySelector(".navigation-retry")).not.toBeNull();
+        expect(fixture.nativeElement.textContent).not.toContain("Comprobando tu sesión");
+        expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app");
+      });
+    }
+  }
+
+  for (const failure of ["cancelled", "rejected"] as const) {
+    it(`offers retry to an existing session when its initial navigation is ${failure}`, async () => {
+      if (failure === "cancelled") router.navigateByUrl.and.resolveTo(false);
+      else router.navigateByUrl.and.rejectWith(new Error("route could not load"));
+      authenticated.set(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector(".navigation-retry")).not.toBeNull();
+      expect(component.error()).toBeNull();
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app");
+    });
+  }
+
+  async function failAuthenticatedNavigation(): Promise<void> {
+    router.navigateByUrl.and.resolveTo(false);
+    authenticated.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  it("retries only navigation and keeps focus and the retry control while it is pending", async () => {
+    await failAuthenticatedNavigation();
+    const response = deferred<boolean>();
+    router.navigateByUrl.and.returnValue(response.promise);
+    const button = fixture.nativeElement.querySelector(".navigation-retry") as HTMLButtonElement;
+    button.focus();
+    button.click();
+    fixture.detectChanges();
+    expect(button.disabled).toBeTrue();
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('[aria-labelledby="navigation-title"]'));
+    expect(fixture.nativeElement.textContent).toContain("Abriendo…");
+    await component.retryNavigation();
+    expect(router.navigateByUrl).toHaveBeenCalledTimes(2);
+    expect(auth.login).not.toHaveBeenCalled();
+    expect(auth.verifyMfa).not.toHaveBeenCalled();
+    expect(auth.recoverMfa).not.toHaveBeenCalled();
+    response.resolve(true);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.navigationBusy()).toBeFalse();
+    expect(component.navigationFailure()).toBeNull();
+  });
+
+  it("keeps another navigation failure retryable without an automatic retry loop", async () => {
+    await failAuthenticatedNavigation();
+    await component.retryNavigation();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component.navigationFailure()).toBe("/app");
+    expect(router.navigateByUrl).toHaveBeenCalledTimes(2);
+    expect((fixture.nativeElement.querySelector(".navigation-retry") as HTMLButtonElement).disabled).toBeFalse();
+  });
+
+  it("does not retry a destination after the session has been invalidated", async () => {
+    await failAuthenticatedNavigation();
+    authenticated.set(false);
+    await component.retryNavigation();
+    fixture.detectChanges();
+    expect(component.navigationFailure()).toBeNull();
+    expect(fixture.nativeElement.querySelector(".navigation-retry")).toBeNull();
+    expect(fixture.nativeElement.querySelector("#login-panel")).not.toBeNull();
+    expect(router.navigateByUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reuse a failed destination for a newer session generation", async () => {
+    await failAuthenticatedNavigation();
+    auth.sessionGeneration.and.returnValue(1);
+    await component.retryNavigation();
+    fixture.detectChanges();
+    expect(component.navigationFailure()).toBeNull();
+    expect(fixture.nativeElement.querySelector(".navigation-retry")).toBeNull();
+    expect(router.navigateByUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores navigation failure after the view is destroyed", async () => {
+    await failAuthenticatedNavigation();
+    const response = deferred<boolean>();
+    router.navigateByUrl.and.returnValue(response.promise);
+    const retry = component.retryNavigation();
+    fixture.destroy();
+    response.resolve(true);
+    await retry;
+    expect(component.navigationFailure()).toBe("/app");
+    expect(router.navigateByUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not show a late navigation failure after a session is invalidated", async () => {
+    await failAuthenticatedNavigation();
+    const response = deferred<boolean>();
+    router.navigateByUrl.and.returnValue(response.promise);
+    const retry = component.retryNavigation();
+    authenticated.set(false);
+    auth.sessionGeneration.and.returnValue(1);
+    response.resolve(false);
+    await retry;
+    fixture.detectChanges();
+    expect(component.navigationBusy()).toBeFalse();
+    expect(component.navigationFailure()).toBeNull();
+    expect(fixture.nativeElement.querySelector("#login-panel")).not.toBeNull();
+  });
+
+  it("does not let an old navigation clear the busy state of a newer login", async () => {
+    await failAuthenticatedNavigation();
+    const older = deferred<boolean>();
+    const newer = deferred<boolean>();
+    const entered = deferred<void>();
+    router.navigateByUrl.and.callFake(() => {
+      if (router.navigateByUrl.calls.count() === 2) return older.promise;
+      entered.resolve();
+      return newer.promise;
+    });
+    const retry = component.retryNavigation();
+    authenticated.set(false);
+    auth.sessionGeneration.and.returnValue(1);
+    component.onTabChange(0);
+    component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
+    auth.login.and.callFake(async () => {
+      authenticated.set(true);
+      return { mfaRequired: false, user: {
+        id: 1, email: "ana@example.com", name: "Ana", isAdmin: false,
+        emailVerified: true, mfaEnabled: false,
+      } };
+    });
+    fixture.detectChanges();
+    const login = component.onLogin();
+    await entered.promise;
+    expect(router.navigateByUrl).toHaveBeenCalledTimes(3);
+    older.resolve(false);
+    await retry;
+    expect(component.navigationBusy()).toBeTrue();
+    expect(component.navigationFailure()).toBeNull();
+    newer.resolve(true);
+    await login;
+    expect(component.navigationBusy()).toBeFalse();
+    expect(component.error()).toBeNull();
+  });
+
+  for (const [input, destination] of [
+    ["/app/settings?tab=security#sessions", "/app/settings?tab=security#sessions"],
+    ["/auth/confirm-email#token=fixture", "/auth/confirm-email#token=fixture"],
+    ["https://attacker.example", "/app"], ["//attacker.example", "/app"],
+    ["/\\attacker.example", "/app"], ["/app\u0000", "/app"],
+    [`/app/${"x".repeat(1025)}`, "/app"],
+  ]) {
+    it(`applies the shared destination rule to interactive login: ${JSON.stringify(input).slice(0, 70)}`, async () => {
+      routeParameters["returnTo"] = input;
+      auth.login.and.callFake(async () => {
+        authenticated.set(true);
+        return { mfaRequired: false, user: {
+          id: 1, email: "ana@example.com", name: "Ana", isAdmin: false,
+          emailVerified: true, mfaEnabled: false,
+        } };
+      });
+      component.loginForm.setValue({ email: "ana@example.com", password: "correct-password" });
+      await component.onLogin();
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith(destination);
+    });
+  }
+
   it("does not navigate when an MFA result belongs to a locally abandoned challenge", async () => {
     const response = deferred<void>();
     auth.verifyMfa.and.returnValue(response.promise);
@@ -539,7 +792,7 @@ describe("AuthComponent registration flow", () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
-  it("does not navigate when a recovery result belongs to a replaced step", async () => {
+  it("does not navigate when a recovery result belongs to a locally abandoned challenge", async () => {
     const response = deferred<void>();
     auth.recoverMfa.and.returnValue(response.promise);
     component.step.set("recovery");
@@ -547,11 +800,11 @@ describe("AuthComponent registration flow", () => {
     component.recoveryForm.controls.code.setValue("ABCD-EFGH-JKLM-NPQR");
 
     const recovery = component.onRecovery();
-    component.backToMfa();
+    component.restartMfaLogin("Vuelve a iniciar sesión");
     response.resolve();
     await recovery;
 
-    expect(component.step()).toBe("mfa");
+    expect(component.step()).toBe("login");
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
@@ -610,6 +863,23 @@ describe("AuthComponent registration flow", () => {
     expect(document.activeElement).toBe(dialog);
     response.resolve();
     await confirmation;
+  });
+
+  it("retains dialog focus when OTP completion automatically starts verification", async () => {
+    const response = deferred<void>();
+    auth.verifyMfa.and.returnValue(response.promise);
+    component.step.set("mfa");
+    component.mfaChallenge.set("challenge-a");
+    fixture.detectChanges();
+    const first = fixture.nativeElement.querySelector("app-otp-code-input input") as HTMLInputElement;
+    first.value = "123456";
+    first.dispatchEvent(new Event("input", { bubbles: true }));
+    fixture.detectChanges();
+    expect(component.busy()).toBeTrue();
+    expect(auth.verifyMfa).toHaveBeenCalledOnceWith("challenge-a", "123456");
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('[role="dialog"]'));
+    response.resolve();
+    await fixture.whenStable();
   });
 
   it("clears a rejected MFA code and restores focus to the first box for a new attempt", async () => {
@@ -697,7 +967,7 @@ describe("AuthComponent registration flow", () => {
     fixture.detectChanges();
 
 
-    expect(fixture.nativeElement.textContent).toContain("Tu URL está guardada");
+    expect(fixture.nativeElement.textContent).toContain("Continúa con tu URL");
     expect(fixture.nativeElement.textContent).toContain("Accede para retomar el enlace");
   });
 

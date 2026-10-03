@@ -1,0 +1,30 @@
+# Session Revocation Admission — siguiente bloque
+
+**Objetivo:** separar gradualmente las tres transacciones de revocación individual/otras/todas, conservando las políticas actuales, antes de continuar los demás sistemas.
+
+**Estado:** O22/O23 full1724/12910 finalizado0, sin handle pendiente. Fuente de los tres callers, wrappers SecurityContext, SecurityContext completo, SessionsRevocationNoticeTest y SessionHydrationBoundaryTest leída. Sin nueva caracterización, extracción ni suite específica atribuida todavía. El full O22/O23 debe terminar antes de editar PHP/tests.
+
+**Restricciones:** ejecución secuencial, sin subagentes/worktree/commit/push/deploy. Sólo DB uvh_test con guard real antes de truncar. Una suite DB a la vez; no editar PHP/tests mientras corre. No frontend, migración, cuenta/DB local, proveedor/worker/scheduler real.
+
+- [x] Releer SecurityIncidentNotice y dependencias exactas de estos callers; guardar snapshot completo del controlador y verificar política de cookie/errores.
+- [x] Añadir caracterizaciones outer commit/rollback individual/otras/todas: revocación, cuenta/generación, avisos/bearer/inbox, exact audit, jobs sólo tras commit y retry. Conservar los controles previos de idempotencia, contexto obsoleto, admisión fallida e historial recuperable.
+- [x] Ejecutar filtro antes del traslado, incluido SessionHydrationBoundaryTest como control de la política distinta de logout. Ningún supuesto de bug por separación.
+- [x] Crear SessionRevocationAdmission con tres métodos que posean cada TX completa. Usar SecurityContext::lock con requireVerifiedEmail=false como los callers actuales; no añadir step-up/rotación. Mantener bool/-1/count y todos los SQL, avisos y audit. Controller conserva validación id64hex,404/409/503, current/cookie y audits de rechazo.
+- [x] Tipar sólo el retorno JsonResponse ausente de revokeSession y retirar su ignore resuelto; wrappers privados sólo se retirarán si no quedan callers. Comparar los tres cuerpos normalizados después de format, repetir filtro y calidad.
+- [x] Full backend sobre uvh_test con fuente estable, inventario sin bootstrap y verificación de hashes/anchors tras full; documentar evidencia y actualizar Next Step sin cerrar S01–S13.
+
+**Política que no debe homogeneizarse:** logout conserva la revocación protectora aunque falle la admisión de audit; SessionHydrationBoundaryTest lo caracteriza. Su cierre no debe transformarse en una transacción que deshaga la revocación por caída de auditoría. La revocación explícita individual/otras/todas sí conserva el aviso entregable y evento exacto dentro de su commit actual.
+
+**Límites:** interleavings deterministas no prueban concurrencia universal, volumen, toda la infraestructura ni QA visual. No prometer ahorro de latencia/SQL por reorganizar código.
+
+
+O24 en curso: quince caracterizaciones previas (ocho outer commit/rollback para individual/propia/otras/todas, cuatro admisión exacta/historial individual, tres cuenta sin verificar/sin step-up). Contexto de DB guardado y cola falsa; sólo uvh_test. Fuente SecurityIncidentNotice completa, Audit completo, UvhMail send/sessionRevoked/sessionsRevoked, dispatcher completo, NotificationInbox completo y preferences deliveryFor leídos; no acreditar toda cadena de plantillas/proveedor. Snapshot .uvh-runtime/session-revocation-controller-before.php guardado. Turno anterior O22/O23 clasificado progreso verificado, objetivo global activo. Error inicial de lectura Notice fuera de Auth corregido por inventario; no edición de producto.
+
+
+O24 traslado verificado por filtro:66/604 antes20,06s y después18,79s, exit0;15 casos nuevos. Pint470/PHPStan0,exit0. Tres TX completas comparadas tras format, adaptando sólo wrapper a SecurityContext::lock?->user. AuthController1469→1408líneas; dos wrappers privados/imports sin callers retirados, baseline162/151→161/150 por un retorno JsonResponse resuelto. Sin policy/SQL/HTTP nuevo; logout intacto. Full final compartido O24/O25 pendiente, no acreditar O22/O23 como full del nuevo árbol.
+
+
+O24/O25 progreso:15caracterizaciones de revocación y54regresiones S10 (B140 audit,B141 contexto obsoleto,B142duplicates),69controles nuevos.66/604 antes20,06s/después18,79s O24;134/1007 definitivo37,75s y calidadPint471/PHPStan0. Baseline161/150, controlador1408líneas. Batch delivery13→1queries por GET/PATCH medido, no latencia atribuida. Inventario467/2211/1141/3;225S01/53files,16S03/2files y29S10/5files rebasados. Full69090 en curso exclusivamenteuvh_test; no PHP/tests editados durante suite. Objetivo/S01–S13 activos; CI/gates reales y revisión de otros productores/retenciones/UI siguen abiertos.
+
+
+O24/O25 verificados (03/10): full1793/1793 backend,13590aserciones,369,85s exclusivamente uvh_test (`s10-notification-session-full-backend.log`),exit0;69controles nuevos respecto a1724 (15revocación+54notificaciones).134/1007 dedicado final37,75s y Pint471/PHPStan0,exit0. B140(P2) exact audit preferencias en su TX, también bare callers; B141(P2) seis rutas revalidan cuenta/sesión y verified,401GET/409command sin datos/cookies/cambios ante42invalidaciones tras hydrate; B142(P3) duplicate kind422sin cambio. Rojo API46fallos/3controles,120aserciones,17,28s; bare2fallos/1control,9aserciones,1,58s; consultas2fallos/3controles,23aserciones,2,02s. Vista reduce13SELECT delivery→1scoped por cuenta en GET/PATCH, sin atribuir latencia ni una sola query total HTTP. O24tres TX completas comparadas tras format;66/604antes20,06s/después18,79s, policy/logout intactos. AuthController1469→1408líneas; baseline162/151→161findings/150entradas, sólo1retorno resuelto retirado sin nuevos ignores. Inventario467archivos/2211funciones con nombre/1141callbacks/3firmas;467hashes y225anchorsS01/53files+16S03/2files+29S10/5files comprobados después de full. Node--check/diff correctos. No PHP/tests edits durante suites ni frontend/nueva suite/browser/E2E/migración/uvh_local/proveedor/worker/scheduler productivo/commit/push/deploy. S01–S13/objetivo global abiertos; siguiente UI de notificaciones ligada a identidad, todavía candidato sin ID, más productores/retención/gates reales y CI billing histórico pendiente sin nueva consulta.

@@ -12,8 +12,10 @@ use App\Support\SessionManager;
 use App\Support\UvhRequest;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -186,6 +188,46 @@ final class AccountDeletionSecurityTest extends TestCase
         AccountDeletionAudit::reconcile();
         AccountDeletionAudit::reconcile();
         Audit::drain();
+        $this->assertFalse($row->refresh()->cancellation_audit_pending);
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'account.deletion_cancelled')->count());
+    }
+
+    #[DataProvider('protectiveFailures')]
+    public function test_broken_fallback_logging_does_not_undo_protective_cancellation(string $failure): void
+    {
+        $user = $this->account();
+        $user->update(['deleted_at' => now(), 'security_version' => 2]);
+        $token = Ids::randomToken(32);
+        $row = AccountDeletionRequest::create([
+            'user_id' => $user->id, 'security_version' => 2, 'status' => 'scheduled',
+            'cancel_token_hash' => Ids::sha256Hex($token), 'execute_after' => now()->addDay(),
+        ]);
+        $warningAttempted = false;
+        Log::listen(static function (MessageLogged $event) use (&$warningAttempted): void {
+            if ($event->message === 'Protective cancellation audit remains pending') {
+                $warningAttempted = true;
+                throw new \RuntimeException('Fixture: cancellation fallback logging unavailable');
+            }
+        });
+        $this->failAudit = $failure === 'php';
+        if ($failure === 'sql') {
+            Schema::rename('audit_outbox', 'audit_outbox_unavailable');
+        }
+        try {
+            $response = $this->postJson('/api/v1/auth/account-deletion/cancel', ['token' => $token]);
+            $this->assertTrue($warningAttempted);
+            $response->assertOk();
+            $this->assertNull($user->refresh()->deleted_at);
+            $this->assertSame('cancelled', $row->refresh()->status);
+            $this->assertTrue($row->cancellation_audit_pending);
+        } finally {
+            $this->failAudit = false;
+            if ($failure === 'sql') {
+                Schema::rename('audit_outbox_unavailable', 'audit_outbox');
+            }
+        }
+        AccountDeletionAudit::reconcile();
+        AccountDeletionAudit::reconcile();
         $this->assertFalse($row->refresh()->cancellation_audit_pending);
         $this->assertSame(1, DB::table('audit_events')->where('action', 'account.deletion_cancelled')->count());
     }

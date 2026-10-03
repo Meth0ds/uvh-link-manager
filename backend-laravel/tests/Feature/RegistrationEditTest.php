@@ -8,6 +8,7 @@ use App\Support\RegistrationEdit;
 use App\Support\SealedToken;
 use App\Support\SignedToken;
 use Illuminate\Http\Request;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -119,6 +120,37 @@ final class RegistrationEditTest extends TestCase
 
         foreach ([[1, 1], [127, 1], [999_999_999, 1], [127, 2]] as [$id, $generation]) {
             $this->assertFalse(RegistrationEdit::authorizes($decoy, $this->pending($id, $generation)));
+        }
+    }
+
+    public static function databaseRanges(): array
+    {
+        return ['generation 999' => [127, 999], 'generation 1000' => [127, 1000], 'integer maximum' => [127, 2_147_483_647], 'id beyond ten digits' => [10_000_000_000, 1], 'bigint maximum' => [PHP_INT_MAX, 1]];
+    }
+
+    #[DataProvider('databaseRanges')]
+    public function test_secrets_cover_the_database_id_and_generation_ranges_at_one_fixed_length(int $id, int $generation): void
+    {
+        $length = strlen((string) RegistrationEdit::decoy()->getValue());
+        $value = (string) RegistrationEdit::secret($id, $generation)->getValue();
+        $this->assertSame($length, strlen($value));
+        $this->assertTrue(RegistrationEdit::authorizes($this->requestCarryingValue($value), $this->pending($id, $generation)));
+        $this->assertFalse(RegistrationEdit::authorizes($this->requestCarryingValue($value), $this->pending($id, $generation - 1)));
+    }
+
+    public function test_a_previously_issued_v2_claim_still_binds_its_exact_generation(): void
+    {
+        $value = SealedToken::seal(sprintf('{"e":%013d,"v":2,"pid":"%010d","sv":"%03d"}', (int) (microtime(true) * 1000) + 60_000, 127, 999));
+        $request = $this->requestCarryingValue($value);
+        $this->assertTrue(RegistrationEdit::authorizes($request, $this->pending(127, 999)));
+        $this->assertFalse(RegistrationEdit::authorizes($request, $this->pending(127, 1000)));
+    }
+
+    public function test_authentic_claims_outside_the_database_ranges_never_alias_a_valid_row(): void
+    {
+        foreach ([[str_repeat('9', 19), '0000000001', PHP_INT_MAX, 1], ['0000000000000000127', '2147483648', 127, 2_147_483_647]] as [$pid, $sv, $id, $generation]) {
+            $value = SealedToken::seal(sprintf('{"e":%013d,"v":3,"pid":"%s","sv":"%s"}', (int) (microtime(true) * 1000) + 60_000, $pid, $sv));
+            $this->assertFalse(RegistrationEdit::authorizes($this->requestCarryingValue($value), $this->pending($id, $generation)));
         }
     }
 

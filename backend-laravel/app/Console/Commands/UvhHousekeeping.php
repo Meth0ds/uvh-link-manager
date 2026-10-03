@@ -7,9 +7,12 @@ use App\Jobs\ProbeDomainTlsJob;
 use App\Jobs\VerifyDomainDnsJob;
 use App\Models\CustomDomain;
 use App\Models\Link;
+use App\Models\PendingRegistration;
 use App\Models\User;
 use App\Support\AccountDeletionAudit;
 use App\Support\Audit;
+use App\Support\Auth\RegistrationAttemptContext;
+use App\Support\Auth\SecurityIncidentAudit;
 use App\Support\DestinationReputationService;
 use App\Support\DomainClaims;
 use App\Support\DomainEvents;
@@ -49,6 +52,7 @@ class UvhHousekeeping extends Command
         };
 
         $run('protective_deletion_audits', fn () => AccountDeletionAudit::reconcile());
+        $run('protective_incident_audits', fn () => SecurityIncidentAudit::reconcile());
 
         $run('audit_outbox', function (): void {
             if (! Audit::drain()) {
@@ -281,12 +285,27 @@ class UvhHousekeeping extends Command
             // camino de vuelta. Plazo fijo, no surface de operador; sus bearers
             // caen en cascada y los avisos que quedaran en el outbox pasan a
             // obsoletos por la misma regla de siempre.
-            $this->purgeInBatches(
-                'pending_registrations', 'id',
-                'updated_at < ?',
-                [$cutoff(30)],
-                $batch,
-            );
+            RegistrationAttemptContext::purgeExpired($nowIso, $batch);
+            // Parent deletion must lock its context first: the FK SET NULL
+            // would otherwise invert correction's context -> pending order.
+            $lastPendingId = 0;
+            for ($pass = 0; $pass < 10; $pass++) {
+                $ids = PendingRegistration::where('updated_at', '<', $cutoff(30))
+                    ->where('id', '>', $lastPendingId)->orderBy('id')->limit($batch)->pluck('id');
+                foreach ($ids as $id) {
+                    DB::transaction(function () use ($id): void {
+                        RegistrationAttemptContext::lockForPending((int) $id);
+                        $pending = PendingRegistration::whereKey($id)->lockForUpdate()->first();
+                        if ($pending && $pending->updated_at->lt(now()->subDays(30))) {
+                            $pending->delete();
+                        }
+                    });
+                    $lastPendingId = (int) $id;
+                }
+                if ($ids->count() < $batch) {
+                    break;
+                }
+            }
 
             // API credentials remain visible for a short audit window after they
             // can no longer authenticate, then their hashes and metadata are removed.

@@ -7,6 +7,7 @@ use App\Models\Membership;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class WorkspaceAccess
 {
@@ -51,12 +52,8 @@ class WorkspaceAccess
             return null;
         }
 
-        if (! Workspace::where('id', $workspaceId)->lockForUpdate()->first()) {
-            return null;
-        }
-
-        $membership = self::getMembership($userId, $workspaceId);
-        if (! $membership || ! self::roleAtLeast($membership->role, $min)) {
+        $membership = self::lockMembership($userId, $workspaceId, $min);
+        if (! $membership) {
             return null;
         }
 
@@ -82,6 +79,26 @@ class WorkspaceAccess
         }
 
         return $membership;
+    }
+
+    /** Browser authority already holds account/session locks in this transaction. */
+    public static function getMembershipForContext(SecurityContext $context, int $workspaceId, string $min = 'viewer'): ?Membership
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Workspace authority requires the security context transaction');
+        }
+
+        return self::lockMembership((int) $context->user->id, $workspaceId, $min);
+    }
+
+    private static function lockMembership(int $userId, int $workspaceId, string $min): ?Membership
+    {
+        if (! Workspace::where('id', $workspaceId)->lockForUpdate()->first()) {
+            return null;
+        }
+        $membership = self::getMembership($userId, $workspaceId);
+
+        return $membership && self::roleAtLeast($membership->role, $min) ? $membership : null;
     }
 
     public static function getDefaultWorkspace(int $userId): ?int
