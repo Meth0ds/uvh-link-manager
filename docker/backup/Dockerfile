@@ -16,6 +16,6 @@
 # puerta en rojo sobre la base y habría exigido una excepción para un hallazgo
 # que sí tiene arreglo. `openssl` no viene en la imagen de Alpine y el cifrado de
 # `backup.sh` lo necesita; `sha256sum` y `base64` los pone busybox.
-FROM postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+FROM postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
 
 RUN apk add --no-cache curl ca-certificates openssl
