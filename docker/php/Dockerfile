@@ -8,7 +8,7 @@
 # comprueba en CI que el digest sigue resolviendo.
 FROM composer:2@sha256:aaeab4b6b031e0a88efb907f0f26b563532a644fc2f4ea0d000ecf8658f7a2b8 AS composer
 
-FROM php:8.4-cli@sha256:a9c8c681304716e000318f590480b6f47f3f3e018794b5f9d65d827f75d3bd00
+FROM php:8.5-cli@sha256:19642e172d3a542225225e202ddc2c11f67bdcbddf147b676c49338609b9290f
 
 # phpredis is not bundled with PHP: compile it and drop the build toolchain in
 # the same layer, so local development uses the same client as production.
