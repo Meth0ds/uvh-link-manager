@@ -13,7 +13,9 @@ use App\Models\LinkTemplate;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Webhook;
+use App\Support\Ids;
 use App\Support\LinkService;
+use App\Support\SessionManager;
 use App\Support\UvhRequest;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
@@ -166,6 +168,8 @@ final class WorkspaceMutationTest extends TestCase
         $request = Request::create('/', 'POST', $input);
         $request->attributes->set(UvhRequest::USER, $user);
         $request->attributes->set(UvhRequest::WORKSPACE_ID, $workspaceId);
+        $token = SessionManager::create($user->id, $request, (int) $user->security_version);
+        $request->attributes->set(UvhRequest::SESSION_ID, Ids::sha256Hex($token));
 
         return $request;
     }

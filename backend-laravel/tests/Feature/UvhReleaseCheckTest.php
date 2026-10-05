@@ -48,7 +48,22 @@ final class UvhReleaseCheckTest extends TestCase
 
     public static function missingSchema(): array
     {
-        return [['ledger'], ['table'], ['column'], ['audit_column'], ['usage_index'], ['audit_outbox'], ['notice_ledger'], ['incident_receipts'], ['incident_column']];
+        return [['ledger'], ['table'], ['column'], ['audit_column'], ['usage_index'], ['audit_outbox'], ['notice_ledger'], ['incident_receipts'], ['incident_column'], ['deletion_receipts'], ['deletion_column']];
+    }
+
+    public function test_lifecycle_receipts_table_does_not_hide_a_missing_migration_ledger_entry(): void
+    {
+        DB::beginTransaction();
+        try {
+            $this->assertTrue(Schema::hasTable('account_deletion_lifecycle_audits'));
+            $this->assertSame(1, DB::table('migrations')->where('migration', '2026_10_04_000001_preserve_account_deletion_lifecycle_audits')->delete());
+            $this->assertContains('Hay 1 migraciones pendientes para esta imagen.', ReleaseReadiness::errors());
+            $this->assertRuntimeUnready();
+            $this->assertFalse(DB::table('migrations')->where('migration', '2026_10_04_000001_preserve_account_deletion_lifecycle_audits')->exists());
+            $this->assertTrue(Schema::hasTable('account_deletion_lifecycle_audits'));
+        } finally {
+            DB::rollBack();
+        }
     }
 
     #[DataProvider('missingSchema')]
@@ -76,6 +91,12 @@ final class UvhReleaseCheckTest extends TestCase
                 Schema::table('security_incident_audits', function (Blueprint $table): void {
                     $table->renameColumn('incident_at', 'release_hidden_incident_at');
                 });
+            } elseif ($part === 'deletion_receipts') {
+                Schema::rename('account_deletion_lifecycle_audits', 'release_hidden_deletion_receipts');
+            } elseif ($part === 'deletion_column') {
+                Schema::table('account_deletion_lifecycle_audits', function (Blueprint $table): void {
+                    $table->renameColumn('lifecycle_at', 'release_hidden_lifecycle_at');
+                });
             } elseif ($part === 'usage_index') {
                 DB::statement('DROP INDEX workspace_usage_tokens_idx');
             } else {
@@ -89,6 +110,7 @@ final class UvhReleaseCheckTest extends TestCase
                 'audit_outbox', 'notice_ledger' => 'Falta el esquema de auditoría durable o avisos operativos (2026_09_30).',
                 'usage_index' => 'Faltan índices acotados de uso por workspace (000034).',
                 'incident_receipts', 'incident_column' => 'Falta el esquema de recuperación de auditoría de incidentes (2026_10_03).',
+                'deletion_receipts', 'deletion_column' => 'Falta el esquema de recuperación de auditoría del ciclo de eliminación (2026_10_04).',
                 default => 'Falta el esquema de presupuestos de invitación (000032).',
             };
             $this->assertContains($expected, ReleaseReadiness::errors());

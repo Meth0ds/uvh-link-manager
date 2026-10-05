@@ -12,6 +12,8 @@ use App\Models\UvhSession;
 use App\Support\AccountDeletionAudit;
 use App\Support\AccountRecoveryLifecycle;
 use App\Support\Audit;
+use App\Support\Auth\AccountReadContext;
+use App\Support\Auth\CredentialChangeResponse;
 use App\Support\FrontendUrl;
 use App\Support\Ids;
 use App\Support\LinkIntentRegistry;
@@ -24,7 +26,6 @@ use App\Support\NotificationKinds;
 use App\Support\OperationalMetrics;
 use App\Support\PrivateArtifact;
 use App\Support\PrivateArtifactCleanup;
-use App\Support\SessionManager;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Illuminate\Database\QueryException;
@@ -36,9 +37,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AccountController
 {
-    public function exportStatus(Request $request)
+    public function exportStatus(Request $request): JsonResponse
     {
-        $user = UvhRequest::user($request);
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
+        if ($context === null) {
+            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 401);
+        }
+        $user = $context->user;
         $row = DataExportRequest::where('user_id', $user->id)->latest('id')->first();
 
         return response()->json(['export' => $this->publicExport($row, (int) $user->security_version)]);
@@ -55,7 +60,11 @@ class AccountController
      */
     public function exportHistory(Request $request): JsonResponse
     {
-        $user = UvhRequest::user($request);
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
+        if ($context === null) {
+            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 401);
+        }
+        $user = $context->user;
         $rows = DataExportRequest::where('user_id', $user->id)
             ->latest('id')->limit(10)->get();
 
@@ -178,15 +187,19 @@ class AccountController
             );
         }
 
-        // Queue publication can fail even though the request is durable. The
-        // processing row is its own recovery marker and housekeeping re-admits
-        // the idempotent job, so the request is reported as started either way.
-        try {
-            GenerateDataExportJob::dispatch((int) $result['export']->id);
-        } catch (\Throwable) {
-            OperationalMetrics::increment('export.queue_unavailable');
-            Audit::write($user->id, 'account.data_export_queue_deferred', 'data_export', (int) $result['export']->id);
-        }
+        // Publish only after the outer commit: an external queue cannot roll
+        // back a job, and a worker must be able to see the durable request.
+        // The processing row remains a recovery marker if publication fails.
+        $exportId = (int) $result['export']->id;
+        $userId = (int) $user->id;
+        DB::afterCommit(static function () use ($exportId, $userId): void {
+            try {
+                GenerateDataExportJob::dispatch($exportId);
+            } catch (\Throwable) {
+                OperationalMetrics::increment('export.queue_unavailable');
+                Audit::write($userId, 'account.data_export_queue_deferred', 'data_export', $exportId);
+            }
+        });
 
         return response()->json(['export' => $this->publicExport($result['export'])], 202);
     }
@@ -269,7 +282,7 @@ class AccountController
                     return ['status' => 'missing'];
                 }
                 $path = is_string($row->artifact_path) ? $row->artifact_path : null;
-                if (! $row->download_expires_at || $row->download_expires_at->isPast()) {
+                if ($row->download_expires_at?->isFuture() !== true) {
                     $row->update(['status' => 'expired', 'mail_generation_hash' => null]);
 
                     return ['status' => 'expired', 'path' => $path, 'request_id' => (int) $row->id];
@@ -342,6 +355,7 @@ class AccountController
             return response()->json(['error' => 'La exportación cambió de estado antes de poder entregarse'], 409);
         }
 
+        $cipher = null;
         try {
             $cipher = Storage::disk('local')->readStream($result['path']);
             if (! is_resource($cipher)) {
@@ -356,6 +370,9 @@ class AccountController
             // transitorio exige.
             $manifest = PrivateArtifact::validate($cipher);
         } catch (\Throwable) {
+            if (is_resource($cipher)) {
+                fclose($cipher);
+            }
             // A transient volume failure or interrupted read does not consume
             // the export: it stays ready and the owner retries. Housekeeping
             // still owns eventual expiry/cleanup.
@@ -382,6 +399,7 @@ class AccountController
                     && $lockedUser !== null
                     && $session !== null
                     && ! $lockedUser->deleted_at
+                    && $lockedUser->email_verified_at !== null
                     && (int) $session->security_version === (int) $lockedUser->security_version
                     && (int) $lockedUser->security_version === (int) $row->security_version
                     && $row->download_expires_at?->isFuture() === true
@@ -422,10 +440,13 @@ class AccountController
         // El cuerpo se descifra por bloques al salir: la memoria viva de una
         // descarga es la de un bloque, sea el documento del tamaño que sea.
         return response()->streamDownload(function () use ($cipher): void {
-            foreach (PrivateArtifact::readChunks($cipher) as $chunk) {
-                echo $chunk;
+            try {
+                foreach (PrivateArtifact::readChunks($cipher) as $chunk) {
+                    echo $chunk;
+                }
+            } finally {
+                fclose($cipher);
             }
-            fclose($cipher);
         }, 'uvh-datos-'.now()->format('Y-m-d').'.json', [
             'Content-Type' => 'application/json; charset=utf-8',
             // Con el manifiesto del pie, el navegador comprueba la longitud
@@ -456,7 +477,7 @@ class AccountController
                 }
 
                 $path = is_string($row->artifact_path) ? $row->artifact_path : null;
-                if (! $row->download_expires_at || $row->download_expires_at->isPast()) {
+                if ($row->download_expires_at?->isFuture() !== true) {
                     $row->update(['status' => 'expired', 'mail_generation_hash' => null]);
 
                     return ['status' => 'expired', 'path' => $path, 'request_id' => (int) $row->id];
@@ -535,7 +556,11 @@ class AccountController
 
     public function deletionImpact(Request $request)
     {
-        $user = UvhRequest::user($request);
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
+        if ($context === null) {
+            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 401);
+        }
+        $user = $context->user;
         $owned = DB::table('workspaces')->where('owner_user_id', $user->id)
             ->orderBy('id')->limit(20)->get(['id', 'name', 'slug']);
         $pending = AccountDeletionRequest::where('user_id', $user->id)->first();
@@ -731,7 +756,7 @@ class AccountController
                 if (! $row) {
                     return ['status' => 'invalid'];
                 }
-                if (! $row->confirmation_expires_at || $row->confirmation_expires_at->isPast()) {
+                if ($row->confirmation_expires_at?->isFuture() !== true) {
                     $row->update(['status' => 'expired', 'confirmation_token_hash' => null]);
 
                     return ['status' => 'expired'];
@@ -846,21 +871,24 @@ class AccountController
         foreach ($result['artifacts'] as $artifact) {
             PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
         }
-        try {
-            $intentRevocation = LinkIntentRegistry::revokeForUser($result['user_id']);
-        } catch (\Throwable) {
-            $intentRevocation = ['revoked' => 0, 'busy' => -1];
-        }
-        Audit::write($result['user_id'], 'account.deletion_link_intents_reconciled', 'account_deletion', $result['request_id'], [
-            'execute_after' => $result['execute_after']->toIso8601String(),
-            'link_intents_revoked' => $intentRevocation['revoked'],
-            'link_intents_busy' => $intentRevocation['busy'],
-        ]);
+        $userId = $result['user_id'];
+        $requestId = $result['request_id'];
+        $executeAfter = $result['execute_after']->toIso8601String();
+        // Cached handoffs and their counters cannot roll back with PostgreSQL.
+        // Reconcile only a durable suspension, including an enclosing commit.
+        LinkIntentRegistry::afterCommit($userId, static function (array $intentRevocation) use ($userId, $requestId, $executeAfter): void {
+            // This is secondary cleanup telemetry. Admission failure must not
+            // become a business rollback or poison an enclosing transaction.
+            Audit::write($userId, 'account.deletion_link_intents_reconciled', 'account_deletion', $requestId, [
+                'execute_after' => $executeAfter,
+                'link_intents_revoked' => $intentRevocation['revoked'],
+                'link_intents_busy' => $intentRevocation['busy'],
+            ]);
+        });
 
-        return response()->json([
-            'ok' => true,
+        return CredentialChangeResponse::forUser($request, $result['user_id'], [
             'executeAfter' => $result['execute_after']->toIso8601String(),
-        ])->withCookie(SessionManager::clearCookie());
+        ]);
     }
 
     public function cancelDeletion(Request $request)
@@ -952,7 +980,7 @@ class AccountController
 
     private function isExpired(DataExportRequest $request): bool
     {
-        return $request->status === 'ready' && $request->download_expires_at?->isPast();
+        return $request->status === 'ready' && $request->download_expires_at?->isFuture() !== true;
     }
 
     /** @return array<string, mixed>|null */

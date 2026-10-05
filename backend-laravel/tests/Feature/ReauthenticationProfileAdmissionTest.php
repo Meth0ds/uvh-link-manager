@@ -2,7 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountProfileController;
+use App\Http\Controllers\MfaSessionController;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Ids;
@@ -76,7 +77,7 @@ final class ReauthenticationProfileAdmissionTest extends TestCase
         $request = Request::create('/', 'POST', $action === 'profile' ? ['name' => 'Changed Profile'] : ['password' => self::PASSWORD, 'factorCode' => self::RECOVERY]);
         $request->attributes->set(UvhRequest::USER, $snapshot);
         $request->attributes->set(UvhRequest::SESSION_ID, $id);
-        $controller = app(AuthController::class);
+        $controller = app($action === 'profile' ? AccountProfileController::class : MfaSessionController::class);
         $response = $action === 'profile' ? $controller->profile($request) : $controller->mfaReauthenticate($request);
         $this->assertSame(409, $response->getStatusCode());
         $this->assertSame($before, $user->refresh()->getAttributes());
@@ -176,7 +177,7 @@ final class ReauthenticationProfileAdmissionTest extends TestCase
         $request = Request::create('/', 'POST', $action === 'profile' ? ['name' => 'Changed Profile'] : ['password' => self::PASSWORD, 'factorCode' => self::RECOVERY]);
         $request->attributes->set(UvhRequest::USER, $snapshot);
         $request->attributes->set(UvhRequest::SESSION_ID, $id);
-        $controller = app(AuthController::class);
+        $controller = app($action === 'profile' ? AccountProfileController::class : MfaSessionController::class);
         $response = $action === 'profile' ? $controller->profile($request) : $controller->mfaReauthenticate($request);
         $this->assertSame($seconds > 0 ? 200 : 409, $response->getStatusCode());
         if ($seconds <= 0) {

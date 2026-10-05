@@ -55,7 +55,7 @@ describe("SettingsComponent async safety", () => {
   type AuthMethods = Pick<AuthService,
     "sessionGeneration" | "listSessions" | "dataExportStatus" | "dataExportHistory" | "accountDeletionImpact"
     | "updateProfile" | "changePassword" | "refreshUser" | "revokeSession" | "mfaSetup" | "mfaEnable" | "mfaDisable" | "mfaCancelSetup" | "mfaRegenerateRecoveryCodes">;
-  let auth: jasmine.SpyObj<AuthMethods> & { user: WritableSignal<AuthUser | null>; userRefreshRequired: WritableSignal<boolean> };
+  let auth: jasmine.SpyObj<AuthMethods> & { user: WritableSignal<AuthUser | null>; userRefreshRequired: WritableSignal<boolean>; userMutationUnconfirmed: WritableSignal<boolean>; mfaRecoveryIssueUnconfirmed: WritableSignal<boolean> };
   let api: jasmine.SpyObj<ApiService>;
   let snackbar: jasmine.SpyObj<MatSnackBar>;
   let router: jasmine.SpyObj<Router>;
@@ -71,7 +71,7 @@ describe("SettingsComponent async safety", () => {
       "sessionGeneration", "listSessions", "dataExportStatus", "dataExportHistory", "accountDeletionImpact",
       "updateProfile", "changePassword", "refreshUser", "revokeSession", "mfaSetup", "mfaEnable", "mfaDisable", "mfaCancelSetup", "mfaRegenerateRecoveryCodes",
     ]);
-    auth = Object.assign(authSpy, { userRefreshRequired: signal(false), user: signal<AuthUser | null>({
+    auth = Object.assign(authSpy, { mfaRecoveryIssueUnconfirmed: signal(false), userMutationUnconfirmed: signal(false), userRefreshRequired: signal(false), user: signal<AuthUser | null>({
       id: 1, email: "user@example.test", name: "User", isAdmin: false,
       emailVerified: true, mfaEnabled: false,
     }) });
@@ -597,6 +597,47 @@ describe("SettingsComponent async safety", () => {
     expect(auth.changePassword).not.toHaveBeenCalled();
     expect(component.profileRefreshBusy()).toBeFalse();
   });
+
+  it("keeps keyboard focus in the account section when successful refresh removes its button", fakeAsync(() => {
+    auth.userRefreshRequired.set(true);
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    const button = root.querySelector<HTMLButtonElement>('app-async-operation-status button')!;
+    button.focus();
+    auth.refreshUser.and.callFake(async () => { auth.userRefreshRequired.set(false); });
+    button.click();
+    flushMicrotasks();
+    fixture.detectChanges();
+    flushMicrotasks();
+    expect(document.activeElement).toBe(root.querySelector('#account'));
+    expect(auth.updateProfile).not.toHaveBeenCalled();
+  }));
+
+  it("does not steal focus if another control was chosen while the account read was pending", fakeAsync(() => {
+    auth.userRefreshRequired.set(true);
+    const response = deferred<void>();
+    auth.refreshUser.and.returnValue(response.promise.then(() => { auth.userRefreshRequired.set(false); }));
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    const button = root.querySelector<HTMLButtonElement>('app-async-operation-status button')!;
+    button.focus();
+    button.click();
+    fixture.detectChanges();
+    expect(button.disabled).toBeFalse();
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    expect(document.activeElement).toBe(button);
+    button.click();
+    expect(auth.refreshUser).toHaveBeenCalledTimes(1);
+    const input = root.querySelector<HTMLInputElement>('.profile-form input')!;
+    input.focus();
+    response.resolve();
+    flushMicrotasks();
+    fixture.detectChanges();
+    flushMicrotasks();
+    expect(document.activeElement).toBe(input);
+  }));
 
   it("keeps confirmed changes separate from a failed view refresh", async () => {
     auth.userRefreshRequired.set(true);

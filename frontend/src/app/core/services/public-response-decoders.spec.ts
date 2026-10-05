@@ -42,8 +42,8 @@ describe("public response decoders", () => {
 
   it("decodes public action results and scheduled deletion dates", () => {
     expect(decodePublicActionMessage({ ok: true, message: "Confirmed" })).toEqual({ ok: true, message: "Confirmed" });
-    expect(decodeAccountDeletionConfirmation({ ok: true, executeAfter: "2026-10-01T00:00:00Z" }).ok).toBeTrue();
+    expect(decodeAccountDeletionConfirmation({ ok: true, current: true, executeAfter: "2026-10-01T00:00:00Z" }).ok).toBeTrue();
     expect(() => decodePublicActionMessage({ ok: false, message: "No" })).toThrow();
-    expect(() => decodeAccountDeletionConfirmation({ ok: true, executeAfter: "not-a-date" })).toThrow();
+    expect(() => decodeAccountDeletionConfirmation({ ok: true, current: true, executeAfter: "not-a-date" })).toThrow();
   });
 });

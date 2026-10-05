@@ -13,7 +13,7 @@ use App\Support\Idempotency;
 use App\Support\LinkService;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
-use App\Support\WorkspaceAccess;
+use App\Support\WorkspaceWriteActor;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -117,17 +117,10 @@ class LinkBulkController
         }
 
         $lease = (string) ($begin['lease'] ?? '');
-        $apiTokenContext = UvhRequest::apiToken($request);
+        $writeActor = WorkspaceWriteActor::fromRequest($request);
         try {
-            $body = DB::transaction(function () use ($workspaceId, $user, $action, $ids, $tags, $collectionId, $domainId, $scope, $key, $hash, $lease, $apiTokenContext): array {
-                if (! WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $workspaceId,
-                    'editor',
-                    $apiTokenContext,
-                    'links:write',
-                    (int) $user->security_version,
-                )) {
+            $body = DB::transaction(function () use ($request, $workspaceId, $user, $action, $ids, $tags, $collectionId, $domainId, $scope, $key, $hash, $lease, $writeActor): array {
+                if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
                     throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
                 }
 
@@ -141,6 +134,11 @@ class LinkBulkController
                 $applied = $this->apply($workspaceId, $user, $action, $ids, $tags ?? [], $collectionId, is_int($domainId) ? $domainId : null);
 
                 $body = ['ok' => true, 'action' => $action, 'applied' => $applied];
+                Audit::write($user->id, 'link.bulk', 'link', null, [
+                    'action' => $action,
+                    'count' => $body['applied'],
+                    'linkIds' => $ids,
+                ], UvhRequest::ip($request), workspaceId: $workspaceId);
                 // La respuesta se sella en la misma transacción que el efecto:
                 // o quedan ambos o ninguno, y una repetición nunca ve «hecho»
                 // sobre un efecto que se revirtió.
@@ -158,13 +156,10 @@ class LinkBulkController
                 return response()->json(['error' => 'No se puede restaurar: el alias ya está en uso'], 409);
             }
             throw $e;
+        } catch (\Throwable $e) {
+            Idempotency::release((int) $user->id, $scope, $key, $lease);
+            throw $e;
         }
-
-        Audit::write($user->id, 'link.bulk', 'link', null, [
-            'action' => $action,
-            'count' => $body['applied'],
-            'linkIds' => $ids,
-        ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json($body);
     }

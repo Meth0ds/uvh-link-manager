@@ -164,6 +164,7 @@ class LinkService
         array $input,
         ?array $apiTokenContext = null,
         ?int $actorSecurityVersion = null,
+        ?WorkspaceWriteActor $writeActor = null,
     ): array {
         $domainId = $input['domain_id'] ?? null;
         $collectionId = $input['collection_id'] ?? null;
@@ -180,15 +181,18 @@ class LinkService
         $state = self::deriveState($input);
         $utm = $input['utm'] ?? [];
 
-        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $collectionId, $alias, $state, $utm, $input, $apiTokenContext, $actorSecurityVersion) {
-            if (! WorkspaceAccess::getMembershipLocked(
-                $userId,
-                $workspaceId,
-                'editor',
-                $apiTokenContext,
-                'links:write',
-                $actorSecurityVersion,
-            )) {
+        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $collectionId, $alias, $state, $utm, $input, $apiTokenContext, $actorSecurityVersion, $writeActor) {
+            $membership = $writeActor
+                ? $writeActor->lockMembership($userId, $workspaceId, $actorSecurityVersion)
+                : WorkspaceAccess::getMembershipLocked(
+                    $userId,
+                    $workspaceId,
+                    'editor',
+                    $apiTokenContext,
+                    'links:write',
+                    $actorSecurityVersion,
+                );
+            if (! $membership) {
                 throw new LinkException('Tu acceso al workspace cambió. Recarga antes de crear el enlace.', 403);
             }
             if ($domainId !== null && ! CustomDomain::where('id', $domainId)
@@ -248,6 +252,8 @@ class LinkService
                 'alias' => $alias,
             ]);
 
+            $writeActor?->auditLink('link.create', (int) $link->id);
+
             return ['id' => $link->id, 'alias' => $alias, 'state' => $state];
         });
 
@@ -272,16 +278,20 @@ class LinkService
         int $expectedVersion,
         ?array $apiTokenContext = null,
         ?int $actorSecurityVersion = null,
+        ?WorkspaceWriteActor $writeActor = null,
     ): array {
-        $updated = DB::transaction(function () use ($linkId, $workspaceId, $userId, $input, $expectedVersion, $apiTokenContext, $actorSecurityVersion): array {
-            if (! WorkspaceAccess::getMembershipLocked(
-                $userId,
-                $workspaceId,
-                'editor',
-                $apiTokenContext,
-                'links:write',
-                $actorSecurityVersion,
-            )) {
+        $updated = DB::transaction(function () use ($linkId, $workspaceId, $userId, $input, $expectedVersion, $apiTokenContext, $actorSecurityVersion, $writeActor): array {
+            $membership = $writeActor
+                ? $writeActor->lockMembership($userId, $workspaceId, $actorSecurityVersion)
+                : WorkspaceAccess::getMembershipLocked(
+                    $userId,
+                    $workspaceId,
+                    'editor',
+                    $apiTokenContext,
+                    'links:write',
+                    $actorSecurityVersion,
+                );
+            if (! $membership) {
                 throw new LinkException('Tu acceso al workspace cambió. Recarga antes de guardar.', 403);
             }
             $link = Link::where('id', $linkId)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->lockForUpdate()->first();
@@ -381,6 +391,8 @@ class LinkService
                 'linkId' => $linkId,
                 'alias' => $alias,
             ]);
+
+            $writeActor?->auditLink('link.update', $linkId);
 
             return ['id' => $linkId, 'alias' => $alias, 'state' => $nextState];
         });

@@ -66,15 +66,15 @@ export class ConfirmAccountDeletionComponent {
     this.error.set(false);
     this.retryable.set(false);
     try {
-      const result = await this.api.post<{ ok: true; executeAfter: string }>(
+      const result = await this.api.post<{ ok: true; executeAfter: string; current: boolean }>(
         "/api/v1/auth/account-deletion/confirm",
         { token: this.token },
         decodeAccountDeletionConfirmation,
       );
-      this.auth.accountSignedOut(generation);
+      if (result.current) this.auth.accountSignedOut(generation);
       if (!this.requests.isCurrent(request, this.token)) return;
       this.done.set(true);
-      this.message.set(`El acceso está cerrado. La anonimización se ejecutará a partir de ${new Date(result.executeAfter).toLocaleString()}. Revisa tu email para conservar el enlace de cancelación.`);
+      this.message.set(`El acceso de la cuenta asociada a este enlace está cerrado. La anonimización se ejecutará a partir de ${new Date(result.executeAfter).toLocaleString()}. Revisa tu email para conservar el enlace de cancelación.`);
     } catch (error) {
       if (!this.requests.isCurrent(request, this.token)) return;
       this.error.set(true);

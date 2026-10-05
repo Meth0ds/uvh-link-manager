@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountProfileController;
+use App\Http\Controllers\AccountSessionsController;
+use App\Http\Controllers\MfaSessionController;
 use App\Models\User;
 use App\Support\Ids;
 use App\Support\SessionManager;
@@ -69,7 +71,11 @@ final class AccountReadContextTest extends TestCase
             'actor-version' => $this->rotateBoth($user, $id),
             'foreign-session' => DB::table('sessions')->where('id', $id)->update(['user_id' => User::factory()->create()->id]),
         };
-        $response = app(AuthController::class)->{$action}($this->request($snapshot, $id));
+        $response = app(match ($action) {
+            'me' => AccountProfileController::class,
+            'sessions', 'securityCenter' => AccountSessionsController::class,
+            'mfaSessionStatus' => MfaSessionController::class,
+        })->{$action}($this->request($snapshot, $id));
         $this->assertSame(401, $response->getStatusCode());
         $this->assertSame(['error' => 'No autenticado'], json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR));
         // A delayed old GET must not erase a cookie installed by a newer login.
@@ -93,7 +99,11 @@ final class AccountReadContextTest extends TestCase
         [$user, $token, $id] = $this->account();
         $verified = now()->startOfSecond();
         DB::table('sessions')->where('id', $id)->update(['mfa_verified_at' => $verified]);
-        $response = app(AuthController::class)->{$action}($this->request(clone $user, $id));
+        $response = app(match ($action) {
+            'me' => AccountProfileController::class,
+            'sessions', 'securityCenter' => AccountSessionsController::class,
+            'mfaSessionStatus' => MfaSessionController::class,
+        })->{$action}($this->request(clone $user, $id));
         $this->assertSame(200, $response->getStatusCode());
         $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame($verified->format('Y-m-d\TH:i:s.v\Z'), $action === 'securityCenter' ? $body['summary']['currentSessionMfaVerifiedAt'] : $body['verifiedAt']);
@@ -107,7 +117,7 @@ final class AccountReadContextTest extends TestCase
         [$user, $token, $id] = $this->account();
         $snapshot = clone $user;
         DB::table('users')->where('id', $user->id)->update(['name' => 'Current Profile']);
-        $response = app(AuthController::class)->me($this->request($snapshot, $id));
+        $response = app(AccountProfileController::class)->me($this->request($snapshot, $id));
         $this->assertSame(200, $response->getStatusCode());
         $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame('Current Profile', $body['user']['name']);
@@ -135,7 +145,7 @@ final class AccountReadContextTest extends TestCase
         }
         $foreign = User::factory()->create();
         SessionManager::create($foreign->id, Request::create('/'), 1);
-        $response = app(AuthController::class)->sessions($this->request($user, $id));
+        $response = app(AccountSessionsController::class)->sessions($this->request($user, $id));
         $this->assertSame(200, $response->getStatusCode());
         $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         $this->assertCount(min(100, $otherCount + 1), $body['sessions']);

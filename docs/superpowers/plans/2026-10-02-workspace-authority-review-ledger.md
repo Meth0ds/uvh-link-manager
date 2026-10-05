@@ -73,3 +73,34 @@ Revisión final de migración: ID de miembro0/000 aceptado por la ruta no es un 
 
 
 Verificación definitiva del árbol final B125/O09–O10:1431/1431 backend,10041 aserciones,249,51s en uvh_test (s01-auth-extraction-full-backend-final.log), exit0. Pint428/PHPStan0 con baseline existente y sin ampliación (s01-auth-extraction-quality-final.log), exit0. Último cambio PHP ID0/000 incluido en esta suite. Inventario444/2158 con nombre/1130 callbacks/3 firmas;444 hashes y anchors de ambos ledgers actuales, Node --check y git diff --check correctos. Backend97 regresiones nuevas frente al full1334 anterior; frontend no modificado en este lote y no se acredita nueva ejecución de su suite. S01–S13 y objetivo global abiertos; siguiente extracción admisión final TOTP/recovery según plan. CI billing permanece externo pendiente. No DB local, migración, proveedor, worker/scheduler, commit/push ni despliegue.
+
+
+## O55 — B187/P1: autoridad compartida para recursos de enlaces
+
+La lectura completa del wrapper y los controladores confirma que las rutas de etiquetas/colecciones/plantillas/importación son consumidores S04; el helper propone S03 y su autoridad compartida se acredita aquí. No extender este arreglo a LinkController/LinkBulkController ni a todos los otros callers de getMembershipLocked. Cuarenta intercalaciones HTTP tras middleware (revocación, deadline exacto, generación de sesión, dueño distinto, fila ausente) y una revocación entre filas CSV producían200/201; ocho controles válidos.49/277verdes tras cerrar la frontera con SecurityContext antes del workspace en la misma TX. Dos fixtures directas anteriores reciben sesión real sin cambiar aserciones.264/1630dedicadas, Pint506/PHPStan0; full2266/19706exit0 y806hashes intactos tras terminal;objetivo global pendiente.
+
+## backend-laravel/app/Support/WorkspaceMutation.php
+
+| Función | Línea actual | Evidencia y pendientes |
+| --- | --- | --- |
+| `run` | 21 | B187: browser exige cuenta/sesión exacta activa y verificada; bearer conserva account/workspace/token/scopes. Callbacks y audit siguen en TX. Sólo ocho rutas probadas; todas las carreras/otros mutadores pendientes. |
+| `linkChanged` | 47 | Cuerpo completo leído/preservado: version/updated_at y dispatch de link.updated. Controles de representación ya existentes pasan; no certifica aquí toda entrega real de webhooks. |
+
+Estado de negocio completo de colecciones/tags/links/pivot/plantillas/import/outbox/historial/deliveries sin cambios al rechazar; otra sesión válida no autoriza la invalidada. Importación preserva primera fila confirmada, se detiene antes de la siguiente, libera reserva y puede retomarse sin duplicados con sesión válida. Hooks SQL deterministas en una conexión, no prueba de todas las carreras entre procesos. UI/gates externos/retención/capacidad/CI/operación y S01–S13 siguen abiertos.
+
+
+## O56 — autoridad compartida para escrituras de enlaces
+
+O55 completo es histórico: su wrapper se conserva por comparación de snapshot exacto; O56 extrae su lógica en WorkspaceWriteActor y la usa también en los servicios/controladores nativos. La captura no concede permiso, exige TX vigente y vuelve a validar cuenta/sesión o token y membership. IDs de usuario/workspace y generación del caller deben coincidir con la captura; el modelo se clona para conservar su versión. No incluye resolver token expirado en igualdad ni todos los otros writers por encontrar.
+
+## backend-laravel/app/Support/WorkspaceWriteActor.php
+
+| Función | Línea actual | Evidencia y pendientes |
+| --- | --- | --- |
+| `__construct` | 15 | Cuerpo completo leído; capture no es authority. B188: binding user/workspace/version, TX obligatoria, sesión concreta o token/scopes/rol. Native HTTP y protección de otros recursos regresan; todas las carreras/otros sistemas pendientes. |
+| `fromRequest` | 23 | Cuerpo completo leído; capture no es authority. B188: binding user/workspace/version, TX obligatoria, sesión concreta o token/scopes/rol. Native HTTP y protección de otros recursos regresan; todas las carreras/otros sistemas pendientes. |
+| `lockMembership` | 46 | Cuerpo completo leído; capture no es authority. B188: binding user/workspace/version, TX obligatoria, sesión concreta o token/scopes/rol. Native HTTP y protección de otros recursos regresan; todas las carreras/otros sistemas pendientes. |
+
+| `auditLink` | 38 | O57 B190: método completo leído; identidad/workspace/IP capturados, TX obligatoria y evento específico dentro del commit de enlace. No concede permiso ni agrega locks: lockMembership sigue siendo autoridad.101casos nuevos/520dedicadas,calidad509/PHPStan0;full2501/21544 exit0 y809hashes post-terminal intactos. |
+
+O57: callback de admisión concreta del wrapper ocurre después de negocio yantes del evento genérico, dentro de la misma TX. Siete recursos relacionados usan resultados/metadatos del callback original; ninguna regla de autoridad cambia. Un fallo específico revierte también genérico yefectos; Auditglobal/logout protector sin cambios.

@@ -217,7 +217,7 @@ class LinkCsvController
                     Idempotency::renew((int) $user->id, $scope, (string) $key, $hash, $lease);
                 });
             }
-            $body = WorkspaceMutation::run($request, function () use ($user, $scope, $key, $hash, $lease, $batchId): array {
+            $body = WorkspaceMutation::run($request, function () use ($request, $workspaceId, $user, $scope, $key, $hash, $lease, $batchId): array {
                 Idempotency::renew((int) $user->id, $scope, (string) $key, $hash, $lease);
                 DB::table('link_import_batches')->where('id', $batchId)->update(['expires_at' => now()->addHours(Idempotency::TTL_HOURS)]);
                 // The persisted ledger is authoritative, including rows
@@ -225,6 +225,15 @@ class LinkCsvController
                 $rows = DB::table('link_import_rows')->where('batch_id', $batchId)
                     ->orderBy('row_number')->get()->map(fn ($row) => (array) $row)->all();
                 $body = $this->summarizeRows($rows, false);
+                $created = $body['created'];
+                $errors = $body['errors'];
+                if ($created > 0 || $errors !== []) {
+                    Audit::write($user->id, 'link.import', 'link', null, [
+                        'created' => $created,
+                        'failed' => $body['failed'],
+                        'invalid' => count($errors),
+                    ], UvhRequest::ip($request), workspaceId: $workspaceId);
+                }
                 Idempotency::commit((int) $user->id, $scope, (string) $key, $hash, 200, $body, $lease);
 
                 return $body;
@@ -237,16 +246,6 @@ class LinkCsvController
                 return response()->json(['error' => $e->getMessage()], $e->status);
             }
             throw $e;
-        }
-        $created = $body['created'];
-        $errors = $body['errors'];
-
-        if ($created > 0 || $errors !== []) {
-            Audit::write($user->id, 'link.import', 'link', null, [
-                'created' => $created,
-                'failed' => $body['failed'],
-                'invalid' => count($errors),
-            ], UvhRequest::ip($request), workspaceId: $workspaceId);
         }
 
         return response()->json($body);

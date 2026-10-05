@@ -1,8 +1,8 @@
 # Inventario de funciones y superficies — 2026-10-02
 
-Captura del árbol: 2026-10-03T19:10:46.408Z. La fecha del nombre identifica la creación del inventario; esta captura registra su actualización.
+Captura del árbol: 2026-10-05T00:06:24.680Z. La fecha del nombre identifica la creación del inventario; esta captura registra su actualización.
 
-469 archivos; 2229 funciones/métodos con nombre; 1148 callbacks/closures anónimos; 3 firmas sin cuerpo. 0 archivos sin propuesta específica de propietario. Todas las propuestas requieren conciliación por consumidor; enumerar no acredita revisar. La [matriz de rutas](2026-10-01-system-review-coverage.md) conserva la evidencia previa; el [JSON](2026-10-02-source-function-inventory.json) contiene líneas, hashes, funciones y propietario propuesto.
+496 archivos; 2287 funciones/métodos con nombre; 1187 callbacks/closures anónimos; 3 firmas sin cuerpo. 0 archivos sin propuesta específica de propietario. Todas las propuestas requieren conciliación por consumidor; enumerar no acredita revisar. La [matriz de rutas](2026-10-01-system-review-coverage.md) conserva la evidencia previa; el [JSON](2026-10-02-source-function-inventory.json) contiene líneas, hashes, funciones y propietario propuesto.
 
 Cobertura: PHP app/bootstrap/config/routes y AST TypeScript/JavaScript de frontend src/public/scripts. HTML/Blade/SCSS y scripts Python/PHP auxiliares se inventarían como superficies; no se analizan expresiones de plantilla ni JS embebido. Migraciones, infraestructura YAML/Docker/CI y dependencias necesitan inventario específico S13. No se ejecuta código de la aplicación ni se conecta a la DB. Callbacks heredan función contenedora cuando es identificable; propietarios compartidos deben conciliarse por consumidor antes de cerrar un sistema.
 
@@ -15,19 +15,19 @@ node scripts/review-source-inventory.mjs
 
 | Sistema propuesto | Entradas de funciones/callbacks |
 | --- | --- |
-| S01 | 597 |
-| S02 | 254 |
-| S03 | 217 |
-| S04 | 366 |
+| S01 | 651 |
+| S02 | 281 |
+| S03 | 221 |
+| S04 | 376 |
 | S05 | 55 |
 | S06 | 237 |
 | S07 | 42 |
 | S08 | 144 |
 | S09 | 169 |
 | S10 | 181 |
-| S11 | 288 |
+| S11 | 289 |
 | S12 | 191 |
-| S13 | 639 |
+| S13 | 640 |
 
 | Archivo | Sistema propuesto | Con nombre | Anónimas | Estado de conciliación |
 | --- | --- | --- | --- | --- |
@@ -39,16 +39,23 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Console/Commands/RotateAppSecret.php` | S13 | 3 | 4 | Conciliar evidencia por función |
 | `backend-laravel/app/Console/Commands/UvhE2eResetLimits.php` | S13 | 7 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Console/Commands/UvhHealthcheck.php` | S13 | 1 | 0 | Conciliar evidencia por función |
-| `backend-laravel/app/Console/Commands/UvhHousekeeping.php` | S13 | 14 | 58 | Conciliar evidencia por función |
+| `backend-laravel/app/Console/Commands/UvhHousekeeping.php` | S13 | 14 | 59 | Conciliar evidencia por función |
 | `backend-laravel/app/Console/Commands/UvhNotificationsDigest.php` | S10 | 5 | 4 | Conciliar evidencia por función |
 | `backend-laravel/app/Console/Commands/UvhReleaseCheck.php` | S13 | 1 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Exceptions/IdempotencyLeaseLost.php` | S13 | 1 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Exceptions/LinkException.php` | S04 | 1 | 0 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/AccountController.php` | S02 | 13 | 13 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/AdminController.php` | S11 | 33 | 32 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/AccountController.php` | S02 | 13 | 15 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/AccountCredentialsController.php` | S01 | 5 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/AccountProfileController.php` | S01 | 2 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/AccountRecoveryController.php` | S01 | 3 | 1 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/AccountSessionsController.php` | S01 | 5 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/AdminController.php` | S11 | 33 | 33 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/AnalyticsController.php` | S09 | 8 | 4 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/AuthController.php` | S01 | 44 | 3 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/CollectionController.php` | S04 | 6 | 6 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/AuthController.php` | S01 | 2 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/CollectionController.php` | S04 | 6 | 9 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/Concerns/EqualizesPublicMailDuration.php` | S01 | 1 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/Concerns/NormalizesRecoveryCodes.php` | S01 | 1 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/Concerns/ValidatesAuthInput.php` | S01 | 4 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/Controller.php` | S13 | 0 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/DomainController.php` | S06 | 23 | 8 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/EdgeController.php` | S06 | 1 | 1 | Conciliar evidencia por función |
@@ -56,14 +63,20 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Http/Controllers/LinkController.php` | S04 | 17 | 13 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/LinkCsvController.php` | S04, S13 | 7 | 6 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/LinkIntentController.php` | S04, S05 | 19 | 5 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/LinkTemplateController.php` | S04 | 3 | 3 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/LinkTemplateController.php` | S04 | 3 | 5 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/MfaChallengeController.php` | S01 | 2 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/MfaConfigurationController.php` | S01 | 7 | 2 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/MfaSessionController.php` | S01 | 3 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/NotificationController.php` | S10 | 10 | 6 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/OperationsController.php` | S13 | 3 | 8 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/PasswordRecoveryController.php` | S01 | 2 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/PendingHandoffController.php` | S03, S05 | 4 | 0 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/PrivacyRightsController.php` | S02 | 13 | 9 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/PrivacyRightsController.php` | S02 | 12 | 8 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/PublicController.php` | S12 | 15 | 6 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/RedirectController.php` | S05 | 8 | 0 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/TagController.php` | S04 | 5 | 7 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/RegistrationController.php` | S01 | 5 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/SecurityIncidentController.php` | S01 | 1 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/TagController.php` | S04 | 5 | 9 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/TokenController.php` | S07 | 5 | 4 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/WebhookController.php` | S08 | 12 | 12 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/WorkspaceActivityController.php` | S09 | 1 | 8 | Conciliar evidencia por función |
@@ -122,6 +135,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Models/Workspace.php` | S03 | 5 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Providers/AppServiceProvider.php` | S13 | 7 | 67 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/AccountDeletionAudit.php` | S02 | 2 | 2 | Conciliar evidencia por función |
+| `backend-laravel/app/Support/AccountDeletionLifecycleAudit.php` | S02 | 4 | 2 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/AccountExportDocument.php` | S02 | 17 | 14 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/AccountRecoveryAdmissionException.php` | S01 | 0 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/AccountRecoveryLifecycle.php` | S01 | 1 | 0 | Conciliar evidencia por función |
@@ -131,6 +145,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Support/Auth/AccountQueries.php` | S01 | 4 | 2 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/Auth/AccountReadContext.php` | S01 | 2 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/Auth/AccountRecoveryAdmission.php` | S01 | 3 | 7 | Conciliar evidencia por función |
+| `backend-laravel/app/Support/Auth/AuthAccountLookup.php` | S01 | 1 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/Auth/AuthenticatedPasswordChange.php` | S01 | 1 | 1 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/Auth/CompromisedAccessRevocation.php` | S01 | 1 | 3 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/Auth/CredentialChangeResponse.php` | S01 | 1 | 0 | Conciliar evidencia por función |
@@ -177,7 +192,8 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Support/InvitationMailBudget.php` | S03 | 4 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/IsoDate.php` | S13 | 4 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/LinkBlockReason.php` | S11 | 5 | 1 | Conciliar evidencia por función |
-| `backend-laravel/app/Support/LinkIntentRegistry.php` | S04 | 5 | 1 | Conciliar evidencia por función |
+| `backend-laravel/app/Support/LinkIntentLifetime.php` | S04 | 1 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Support/LinkIntentRegistry.php` | S04 | 6 | 2 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/LinkService.php` | S04 | 15 | 2 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/MailAdmissionException.php` | S10 | 0 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/MailDeliveryEligibility.php` | S10 | 10 | 7 | Conciliar evidencia por función |
@@ -237,6 +253,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Support/WorkspaceActivityCursor.php` | S09 | 2 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/WorkspaceLimits.php` | S03 | 3 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/WorkspaceMutation.php` | S03 | 2 | 1 | Conciliar evidencia por función |
+| `backend-laravel/app/Support/WorkspaceWriteActor.php` | S03 | 4 | 0 | Conciliar evidencia por función |
 | `backend-laravel/bootstrap/app.php` | S13 | 0 | 6 | Conciliar evidencia por función |
 | `backend-laravel/bootstrap/providers.php` | S13 | 0 | 0 | Conciliar evidencia por función |
 | `backend-laravel/config/app.php` | S13 | 0 | 0 | Conciliar evidencia por función |
@@ -269,11 +286,12 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/auth/account-recovery-request.component.ts` | S01 | 4 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/auth/auth-bearer.ts` | S01 | 6 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/auth/auth-card.scss` | S01 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/auth/auth-flow-state.ts` | S01 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/auth/auth-shell.component.scss` | S12 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/auth/auth-shell.component.ts` | S12 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/auth/auth.component.html` | S01 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/auth/auth.component.scss` | S01 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/auth/auth.component.ts` | S01 | 36 | 15 | Conciliar evidencia por función |
+| `frontend/src/app/auth/auth.component.ts` | S01 | 36 | 24 | Conciliar evidencia por función |
 | `frontend/src/app/auth/auth.routes.ts` | S01 | 13 | 13 | Conciliar evidencia por función |
 | `frontend/src/app/auth/cancel-account-deletion.component.ts` | S02 | 3 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/auth/confirm-account-deletion.component.ts` | S02 | 3 | 0 | Conciliar evidencia por función |
@@ -318,10 +336,18 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/core/report-status-label.ts` | S11 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/resource-type-label.ts` | S13 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/retry-countdown.ts` | S13 | 4 | 3 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/account-data-export.service.ts` | S02 | 6 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/account-deletion.service.ts` | S02 | 2 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/account-mfa.service.ts` | S01 | 5 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/account-profile.service.ts` | S01 | 3 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/account-sessions.service.ts` | S01 | 4 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/admin-response-decoders.ts` | S11 | 18 | 9 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/api.service.ts` | S13 | 24 | 16 | Conciliar evidencia por función |
-| `frontend/src/app/core/services/auth-response-decoders.ts` | S01, S02 | 30 | 3 | Conciliar evidencia por función |
-| `frontend/src/app/core/services/auth.service.ts` | S01, S02 | 54 | 4 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/auth-entry.service.ts` | S01 | 6 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/auth-response-decoders.ts` | S01, S02 | 30 | 6 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/auth-session-contracts.ts` | S01 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/auth-user-mutations.ts` | S01 | 3 | 1 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/auth.service.ts` | S01, S02 | 59 | 15 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/browser-download.ts` | S02 | 1 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/credential-response-decoders.ts` | S07, S08, S13 | 16 | 4 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/domain-response-decoders.ts` | S06 | 9 | 5 | Conciliar evidencia por función |
@@ -339,6 +365,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/core/services/public-action-response-decoders.ts` | S01, S02 | 6 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/public-response-decoders.ts` | S12 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/public-status-response.ts` | S12 | 2 | 5 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/registration.service.ts` | S01 | 3 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/response-decoder-helpers.ts` | S13 | 15 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/retry-after.ts` | S13 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/scale-response-decoders.ts` | S09 | 15 | 7 | Conciliar evidencia por función |
@@ -461,7 +488,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/panel/settings/password-change-dialog.component.ts` | S01 | 8 | 2 | Conciliar evidencia por función |
 | `frontend/src/app/panel/settings/settings.component.html` | S02 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/settings/settings.component.scss` | S02 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/settings/settings.component.ts` | S01, S02 | 73 | 20 | Conciliar evidencia por función |
+| `frontend/src/app/panel/settings/settings.component.ts` | S01, S02 | 85 | 22 | Conciliar evidencia por función |
 | `frontend/src/app/panel/team/invitation-retry.service.ts` | S03 | 4 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/team/team.component.html` | S03 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/team/team.component.scss` | S03 | 0 | 0 | Conciliar evidencia por función |

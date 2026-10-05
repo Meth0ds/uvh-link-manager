@@ -9,8 +9,6 @@ use Illuminate\Support\Facades\DB;
 /** Metadata-only inverse index used to revoke claimed link intentions by user. */
 class LinkIntentRegistry
 {
-    private const TTL_HOURS = 24;
-
     private const MAX_ACTIVE_PER_USER = 100;
 
     public static function remember(int $userId, string $intentHash, string $expiresAt): void
@@ -55,6 +53,29 @@ class LinkIntentRegistry
     public static function forget(string $intentHash): void
     {
         DB::table('link_intent_claims')->where('intent_hash', $intentHash)->delete();
+    }
+
+    /**
+     * Cached destinations and counters cannot participate in a SQL rollback.
+     * The optional observer reports secondary reconciliation after durability;
+     * required business audit admission remains in the caller's transaction.
+     *
+     * @param  null|callable(array{revoked: int, busy: int}): void  $reconciled
+     */
+    public static function afterCommit(int $userId, ?callable $reconciled = null): void
+    {
+        DB::afterCommit(static function () use ($userId, $reconciled): void {
+            try {
+                $result = self::revokeForUser($userId);
+            } catch (\Throwable) {
+                // The inverse index and TTL bound residual handoffs. Cleanup
+                // failure cannot undo an already committed security change.
+                $result = ['revoked' => 0, 'busy' => -1];
+            }
+            if ($reconciled !== null) {
+                $reconciled($result);
+            }
+        });
     }
 
     /** @return array{revoked: int, busy: int} */
@@ -145,8 +166,11 @@ class LinkIntentRegistry
         }
 
         try {
-            Cache::put($counterKey, max(0, (int) Cache::get($counterKey, 0) - 1), now()->addHours(self::TTL_HOURS));
-            Cache::put($globalKey, max(0, (int) Cache::get($globalKey, 0) - 1), now()->addHours(self::TTL_HOURS));
+            // A bucket is shared with other live bearers. Revoking one must not
+            // shorten its retention below the configured handoff lifetime.
+            $counterExpiresAt = now()->addHours(LinkIntentLifetime::hours());
+            Cache::put($counterKey, max(0, (int) Cache::get($counterKey, 0) - 1), $counterExpiresAt);
+            Cache::put($globalKey, max(0, (int) Cache::get($globalKey, 0) - 1), $counterExpiresAt);
         } finally {
             $counterLock->release();
             $globalLock->release();

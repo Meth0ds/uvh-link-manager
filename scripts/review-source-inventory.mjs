@@ -19,6 +19,10 @@ for (const row of coverage.split('\n')) {
 
 function proposedSystem(path, name = '') {
   const file = basename(path);
+  if (['auth-entry.service.ts', 'registration.service.ts', 'auth-session-contracts.ts'].includes(file)) return { system: 'S01', basis: 'entry/registration transport and wire types; facade state and callers require review' };
+  if (['account-profile.service.ts', 'account-mfa.service.ts', 'account-sessions.service.ts', 'auth-user-mutations.ts'].includes(file)) return { system: 'S01', basis: 'account transport/reconciliation; callers require review' };
+  if (file === 'account-deletion.service.ts') return { system: 'S02', basis: 'account deletion transport; facade and callers require review' };
+  if (file === 'account-data-export.service.ts') return { system: 'S02', basis: 'account export transport; facade and callers require review' };
   if (file === 'session-context.service.ts') return { system: 'S01', basis: 'shared local auth projection/clock; callers require review' };
   if (file === 'api-request-scope.ts') return { system: 'S13', basis: 'shared HTTP scope; reconcile S01/S03 callers' };
   const routed = routeOwners.get(`${file.replace(/\.php$/, '')}@${name}`);
@@ -40,7 +44,7 @@ function proposedSystem(path, name = '') {
     ['S02', /AccountController|PrivacyRights|AccountDeletion|DataExport|AccountExport|PrivateArtifact|ExportTooLarge|privacy|account-deletion|data-export|browser-download/],
     ['S03', /invitation-accept/],
     ['S12', /auth-shell/],
-    ['S01', /AuthController|AccountRecovery|EmailChangeRequest|EmailToken|PendingRegistration|RegistrationAttempt|RegistrationEdit|SessionManager|UvhSession|UvhAuth|RequireMfa|Mfa|Totp|PasswordStrength|HCaptcha|HostOnlyCookie|EmitPasswordPolicy|DevTotp|PromoteAdmin|\/Models\/User\.php|LegalAcceptance|\/auth\/|auth-route|auth\.guard|hcaptcha-frame|uvh-password-policy|public-action-response|password-change-dialog|email-access-dialog|account-recovery-state|\/security\/|security-center-response/],
+    ['S01', /MfaChallengeController|MfaSessionController|MfaConfigurationController|AuthController|AccountProfileController|AccountCredentialsController|AccountSessionsController|NormalizesRecoveryCodes|RegistrationController|PasswordRecoveryController|SecurityIncidentController|ValidatesAuthInput|EqualizesPublicMailDuration|AccountRecovery|EmailChangeRequest|EmailToken|PendingRegistration|RegistrationAttempt|RegistrationEdit|SessionManager|UvhSession|UvhAuth|RequireMfa|Mfa|Totp|PasswordStrength|HCaptcha|HostOnlyCookie|EmitPasswordPolicy|DevTotp|PromoteAdmin|\/Models\/User\.php|LegalAcceptance|\/auth\/|auth-route|auth\.guard|hcaptcha-frame|uvh-password-policy|public-action-response|password-change-dialog|email-access-dialog|account-recovery-state|\/security\/|security-center-response/],
     ['S09', /WorkspaceActivity/],
     ['S03', /Workspace|Membership|Invitation|RequireWorkspace|\/team\/|workspace|invitation|PendingController|PendingHandoff|pending-handoff|pending-invitation|handoff-response/],
     ['S04', /LinkController|LinkBulkController|LinkException|TagController|CollectionController|LinkTemplate|LinkService|LinkIntent|\/Models\/(Link|Tag|Collection)\.php|\/links\/|\/collections\/|\/templates\/|\/tags\/|link-intent|link-response|link-state|pending-link-intent/],

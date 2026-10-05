@@ -87,6 +87,26 @@ describe("Same-account User DTO mutation reconciliation", () => {
     expect(profile.error).toBeUndefined();
   }));
 
+  it("does not cancel a post-MFA refresh in favour of an older profile commit awaiting delivery", fakeAsync(() => {
+    const profile = observe(auth.updateProfile("After"));
+    flushMicrotasks();
+    const command = http.expectOne("/api/v1/auth/profile");
+    // Profile has committed and captured its DTO. MFA then commits, and its
+    // caller begins /me before the delayed profile acknowledgement arrives.
+    const mfaRefresh = observe(auth.refreshUser());
+    const afterMfa = http.expectOne("/api/v1/auth/me");
+    command.flush({ user: account({ name: "After" }) });
+    flushMicrotasks();
+    const final = account({ name: "After", mfaEnabled: true, recoveryCodesRemaining: 8 });
+    if (!afterMfa.cancelled) afterMfa.flush({ user: final });
+    flushMicrotasks();
+    reconcileIfRequested(final);
+    expect(auth.user()).toEqual(final);
+    expect(profile.error).toBeUndefined();
+    // An obsolete read may be superseded; the confirmed MFA never replays.
+    expect(mfaRefresh.error === undefined || mfaRefresh.error instanceof AuthOperationSupersededError).toBeTrue();
+  }));
+
   it("keeps a confirmed email request when the overlapping profile fails", fakeAsync(() => {
     const email = observe(auth.requestEmailChange("next@example.test", "fixture"));
     const profile = observe(auth.updateProfile("Invalid"));

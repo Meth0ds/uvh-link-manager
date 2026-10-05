@@ -1,28 +1,19 @@
 import { DestroyRef, Injectable, computed, inject, signal } from "@angular/core";
 import { ApiRequestError, ApiService, type ApiReadOptions } from "./api.service";
+import { AuthEntryService } from "./auth-entry.service";
+import { RegistrationService } from "./registration.service";
+import type { LoginOutcome, MfaSessionStatus } from "./auth-session-contracts";
 import { WorkspaceService } from "./workspace.service";
 import { SessionContextService } from "./session-context.service";
 import { LatestRequest, type ViewRequest } from "./latest-request";
 import { AccountProfileService } from "./account-profile.service";
+import { AccountMfaService } from "./account-mfa.service";
+import { AccountSessionsService } from "./account-sessions.service";
+import { AccountDataExportService } from "./account-data-export.service";
+import { AccountDeletionService } from "./account-deletion.service";
 import { AuthUserMutations } from "./auth-user-mutations";
 import {
-  decodeAccountDeletionImpact,
-  decodeAccountDeletionRequest,
   decodeAuthUserResponse,
-  decodeDataExportHistoryResponse,
-  decodeDataExportStatusResponse,
-  decodeLoginOutcome,
-  decodeLoginResponse,
-  decodeMfaAcknowledgement,
-  decodeMfaReauthentication,
-  decodeMfaSessionStatus,
-  decodeMfaSetup,
-  decodeRecoveryCodes,
-  decodeRegistrationResponse,
-  decodeRequiredDataExportResponse,
-  decodeSessionRevocation,
-  decodeSessionsBulkRevocation,
-  decodeSessionsResponse,
   decodeWorkspacesResponse,
 } from "./auth-response-decoders";
 import type { AccountDeletionImpact, AuthUser, DataExportStatus, SessionList, Workspace } from "../models";
@@ -31,23 +22,8 @@ import { decodePublicActionAcknowledgement } from "./public-action-response-deco
 
 const AUTH_INVALIDATION_KEY = "uvh.auth.invalidated";
 
-export interface LoginResponse {
-  mfaRequired?: false;
-  user: AuthUser;
-}
-export interface MfaRequiredResponse {
-  mfaRequired: true;
-  challenge: string;
-  recoveryAvailable: boolean;
-}
-export type LoginOutcome = LoginResponse | MfaRequiredResponse;
-
-export interface MfaSessionStatus {
-  enabled: boolean;
-  fresh: boolean;
-  verifiedAt: string | null;
-  expiresAt: string | null;
-}
+export type { LoginResponse, MfaRequiredResponse, LoginOutcome, MfaSessionStatus } from "./auth-session-contracts";
+type MfaConfigurationOperation = "setup" | "replace-setup" | "enable" | "cancel" | "regenerate" | "disable";
 
 /** Internal control-flow error: a newer auth transition owns the UI state. */
 export class AuthOperationSupersededError extends Error {
@@ -60,7 +36,13 @@ export class AuthOperationSupersededError extends Error {
 @Injectable({ providedIn: "root" })
 export class AuthService {
   private api = inject(ApiService);
+  private readonly entry = inject(AuthEntryService);
+  private readonly registration = inject(RegistrationService);
   private readonly accountProfile = inject(AccountProfileService);
+  private readonly accountMfa = inject(AccountMfaService);
+  private readonly accountSessions = inject(AccountSessionsService);
+  private readonly accountDataExport = inject(AccountDataExportService);
+  private readonly accountDeletion = inject(AccountDeletionService);
   private workspaces = inject(WorkspaceService);
 
   private readonly sessionContext = inject(SessionContextService);
@@ -78,6 +60,10 @@ export class AuthService {
   readonly adminMfaReauthenticationRequired = signal(false);
   /** A command was confirmed, but its authoritative projection still needs a read. */
   readonly userRefreshRequired = signal(false);
+  /** An ambiguous security response requires inspection, without claiming a commit. */
+  readonly userMutationUnconfirmed = signal(false);
+  /** Delivery of write-only recovery credentials cannot be resolved by /me. */
+  readonly mfaRecoveryIssueUnconfirmed = signal(false);
   private initPromise?: Promise<void>;
   private get generation(): number {
     return this.sessionContext.generation();
@@ -112,6 +98,8 @@ export class AuthService {
   private clearLocalAuth(): void {
     this.user.set(null);
     this.userRefreshRequired.set(false);
+    this.userMutationUnconfirmed.set(false);
+    this.mfaRecoveryIssueUnconfirmed.set(false);
     this.adminMfaReauthenticationRequired.set(false);
     this.workspaces.setList([]);
     this.workspaces.select(null);
@@ -144,6 +132,8 @@ export class AuthService {
     this.identityRequests.invalidate();
     this.user.set(user);
     this.userRefreshRequired.set(false);
+    this.userMutationUnconfirmed.set(false);
+    if (!user.mfaEnabled) this.mfaRecoveryIssueUnconfirmed.set(false);
   }
 
   private assertUserContext(generation: number, account: number | null): void {
@@ -164,7 +154,40 @@ export class AuthService {
 
   private applyUserMutation(command: () => Promise<AuthUser>): Promise<AuthUser> {
     // Capture intent before the transport/CSRF boundary can yield.
-    return this.userMutations.run(this.generation, this.user()?.id ?? null, command);
+    return this.userMutations.run(this.generation, this.user()?.id ?? null, command, this.userRefreshRequired());
+  }
+
+  private markUserProjectionStale(unconfirmed = false): void {
+    // A confirmed security ACK can change fields even without a User DTO.
+    // It supersedes earlier probes and any overlapping profile/email snapshot.
+    this.identityRequests.invalidate();
+    this.userMutations.identityRead();
+    this.userRefreshRequired.set(true);
+    this.userMutationUnconfirmed.set(unconfirmed);
+  }
+
+  private async confirmedMfaMutation<T>(operation: MfaConfigurationOperation, command: () => Promise<T>): Promise<T> {
+    const generation = this.generation;
+    const account = this.user()?.id ?? null;
+    const affectsUser = operation !== "setup" && operation !== "cancel";
+    const issuesCodes = operation === "enable" || operation === "regenerate";
+    let result: T;
+    try {
+      result = await command();
+    } catch (error) {
+      if (affectsUser && account !== null && error instanceof ApiRequestError && (error.status === 502 || error.status === 0)) {
+        this.assertUserContext(generation, account);
+        // The response cannot prove whether a write committed. Freeze the
+        // projection for an explicit read instead of replaying the command.
+        this.markUserProjectionStale(true);
+        if (issuesCodes) this.mfaRecoveryIssueUnconfirmed.set(true);
+      }
+      throw error;
+    }
+    this.assertUserContext(generation, account);
+    if (affectsUser && account !== null) this.markUserProjectionStale();
+    if (issuesCodes || operation === "disable") this.mfaRecoveryIssueUnconfirmed.set(false);
+    return result;
   }
 
   /** A new observed account invalidates all guards captured for the old one. */
@@ -177,7 +200,7 @@ export class AuthService {
       // An actual account replacement must discard the previous owner's list.
       if (previous !== null) this.clearLocalAuth();
     }
-    this.userMutations.observedIdentity();
+    this.userMutations.identityRead();
     this.publishUser(user);
     this.sessionInvalidated.set(false);
     this.loaded.set(true);
@@ -216,6 +239,7 @@ export class AuthService {
     if (this.initPromise) return this.initPromise;
 
     let generation = this.generation;
+    this.userMutations.identityRead();
     const request = this.identityRequests.begin(generation);
     const operation = (async () => {
       try {
@@ -278,7 +302,7 @@ export class AuthService {
     this.sessionInvalidated.set(false);
     this.clearLocalAuth();
     try {
-      const res = await this.api.post<LoginOutcome>("/api/v1/auth/login", { email, password, captchaToken }, decodeLoginOutcome);
+      const res = await this.entry.login(email, password, captchaToken);
       this.assertCurrent(generation);
       this.loaded.set(true);
       if (res.mfaRequired) return res;
@@ -295,7 +319,7 @@ export class AuthService {
 
   async verifyMfa(challenge: string, code: string): Promise<void> {
     const generation = this.nextGeneration();
-    const res = await this.api.post<LoginResponse>("/api/v1/auth/mfa/verify", { challenge, code }, decodeLoginResponse);
+    const res = await this.entry.verifyMfa(challenge, code);
     this.assertCurrent(generation);
     this.publishUser(res.user);
     this.loaded.set(true);
@@ -306,7 +330,7 @@ export class AuthService {
 
   async recoverMfa(challenge: string, code: string): Promise<void> {
     const generation = this.nextGeneration();
-    const res = await this.api.post<LoginResponse>("/api/v1/auth/mfa/recovery", { challenge, code }, decodeLoginResponse);
+    const res = await this.entry.recoverMfa(challenge, code);
     this.assertCurrent(generation);
     this.publishUser(res.user);
     this.loaded.set(true);
@@ -331,16 +355,11 @@ export class AuthService {
       privacyVersion: string;
     },
   ): Promise<void> {
-    await this.api.post<{ user: null }>("/api/v1/auth/register", {
-      name,
-      email,
-      password,
-      ...antiBot,
-    }, decodeRegistrationResponse);
+    await this.registration.register(name, email, password, antiBot);
   }
 
   async resendVerification(email: string | undefined, captchaToken: string): Promise<void> {
-    await this.api.post("/api/v1/auth/resend-verification", { email, captchaToken }, decodePublicActionAcknowledgement);
+    await this.registration.resendVerification(email, captchaToken);
   }
 
   /**
@@ -357,18 +376,14 @@ export class AuthService {
     newEmail: string,
     antiBot: { captchaToken: string; website?: string },
   ): Promise<void> {
-    await this.api.post<{ ok: true }>("/api/v1/auth/change-registration-email", {
-      currentEmail,
-      newEmail,
-      ...antiBot,
-    }, decodePublicActionAcknowledgement);
+    await this.registration.changeRegistrationEmail(currentEmail, newEmail, antiBot);
   }
 
   /** Confirm server-side revocation before representing the session as closed. */
   async logout(): Promise<void> {
     const generation = this.nextGeneration();
     this.sessionInvalidated.set(false);
-    await this.api.post("/api/v1/auth/logout", undefined, decodePublicActionAcknowledgement);
+    await this.entry.logout();
     this.assertCurrent(generation);
     this.clearLocalAuth();
     this.loaded.set(true);
@@ -419,6 +434,7 @@ export class AuthService {
   }
 
   async me(): Promise<AuthUser> {
+    this.userMutations.identityRead();
     const request = this.identityRequests.begin(this.generation);
     const user = await this.readIdentity(request);
     this.assertIdentityCurrent(request);
@@ -429,12 +445,13 @@ export class AuthService {
 
   /** Refresh the local identity after security-sensitive account changes. */
   async refreshUser(): Promise<void> {
+    if (this.user()) this.userRefreshRequired.set(true);
     await this.me();
   }
 
   async mfaSessionStatus(): Promise<MfaSessionStatus> {
     const generation = this.generation;
-    const status = await this.api.get<MfaSessionStatus>("/api/v1/auth/mfa/session", undefined, decodeMfaSessionStatus);
+    const status = await this.entry.mfaSessionStatus();
     this.assertCurrent(generation);
     if (status.fresh) this.adminMfaReauthenticationRequired.set(false);
     return status;
@@ -442,11 +459,7 @@ export class AuthService {
 
   async reauthenticateMfa(password: string, factorCode: string): Promise<{ verifiedAt: string; expiresAt: string }> {
     const generation = this.generation;
-    const result = await this.api.post<{ ok: true; verifiedAt: string; expiresAt: string }>(
-      "/api/v1/auth/mfa/reauthenticate",
-      { password, factorCode },
-      decodeMfaReauthentication,
-    );
+    const result = await this.entry.reauthenticateMfa(password, factorCode);
     this.assertCurrent(generation);
     this.adminMfaReauthenticationRequired.set(false);
     return { verifiedAt: result.verifiedAt, expiresAt: result.expiresAt };
@@ -485,7 +498,7 @@ export class AuthService {
 
   async dataExportStatus(options?: ApiReadOptions): Promise<DataExportStatus | null> {
     const generation = this.generation;
-    const { export: status } = await this.api.get<{ export: DataExportStatus | null }>("/api/v1/auth/data-export", undefined, decodeDataExportStatusResponse, options);
+    const { export: status } = await this.accountDataExport.status(options);
     this.assertCurrent(generation);
     return status;
   }
@@ -493,17 +506,14 @@ export class AuthService {
   /** Historial acotado: las últimas diez exportaciones, sin rutas de artefacto. */
   async dataExportHistory(options?: ApiReadOptions): Promise<DataExportStatus[]> {
     const generation = this.generation;
-    const { exports } = await this.api.get<{ exports: DataExportStatus[] }>("/api/v1/auth/data-export/history", undefined, decodeDataExportHistoryResponse, options);
+    const { exports } = await this.accountDataExport.history(options);
     this.assertCurrent(generation);
     return exports;
   }
 
   async requestDataExport(password: string, factorCode?: string): Promise<DataExportStatus> {
     const generation = this.generation;
-    const { export: status } = await this.api.post<{ export: DataExportStatus }>("/api/v1/auth/data-export", {
-      password,
-      ...(factorCode ? { factorCode } : {}),
-    }, decodeRequiredDataExportResponse);
+    const { export: status } = await this.accountDataExport.request(password, factorCode);
     this.assertCurrent(generation);
     return status;
   }
@@ -515,10 +525,7 @@ export class AuthService {
    */
   async downloadDataExport(password: string, factorCode?: string): Promise<Blob> {
     const generation = this.generation;
-    const blob = await this.api.postBlob("/api/v1/auth/data-export/download", {
-      password,
-      ...(factorCode ? { factorCode } : {}),
-    });
+    const blob = await this.accountDataExport.download(password, factorCode);
     this.assertCurrent(generation);
     return blob;
   }
@@ -526,30 +533,26 @@ export class AuthService {
   /** Consume la exportación: marca `downloaded` y purga el artefacto. */
   async acknowledgeDataExportDownload(): Promise<void> {
     const generation = this.generation;
-    await this.api.post("/api/v1/auth/data-export/download/acknowledge", undefined, decodePublicActionAcknowledgement);
+    await this.accountDataExport.acknowledge();
     this.assertCurrent(generation);
   }
 
   async cancelDataExport(): Promise<void> {
     const generation = this.generation;
-    await this.api.post("/api/v1/auth/data-export/cancel", undefined, decodePublicActionAcknowledgement);
+    await this.accountDataExport.cancel();
     this.assertCurrent(generation);
   }
 
   async accountDeletionImpact(options?: ApiReadOptions): Promise<AccountDeletionImpact> {
     const generation = this.generation;
-    const impact = await this.api.get<AccountDeletionImpact>("/api/v1/auth/account-deletion", undefined, decodeAccountDeletionImpact, options);
+    const impact = await this.accountDeletion.impact(options);
     this.assertCurrent(generation);
     return impact;
   }
 
   async requestAccountDeletion(password: string, confirmation: string, factorCode?: string): Promise<{ status: "requested"; confirmationExpiresAt: string }> {
     const generation = this.generation;
-    const result = await this.api.post<{ status: "requested"; confirmationExpiresAt: string }>("/api/v1/auth/account-deletion", {
-      password,
-      confirmation,
-      ...(factorCode ? { factorCode } : {}),
-    }, decodeAccountDeletionRequest);
+    const result = await this.accountDeletion.request(password, confirmation, factorCode);
     this.assertCurrent(generation);
     return result;
   }
@@ -561,18 +564,14 @@ export class AuthService {
    */
   async listSessions(options?: ApiReadOptions): Promise<SessionList> {
     const generation = this.generation;
-    const decoded = await this.api.get<SessionList>("/api/v1/auth/sessions", undefined, decodeSessionsResponse, options);
+    const decoded = await this.accountSessions.list(options);
     this.assertCurrent(generation);
     return decoded;
   }
 
   async revokeSession(id: string, current = false): Promise<boolean> {
     const generation = this.generation;
-    const result = await this.api.post<{ ok: true; current?: boolean }>(
-      `/api/v1/auth/sessions/${encodeURIComponent(id)}/revoke`,
-      undefined,
-      decodeSessionRevocation,
-    );
+    const result = await this.accountSessions.revoke(id);
     this.assertCurrent(generation);
     if (current || result.current) this.sessionExpired();
     return result.current === true || current;
@@ -584,11 +583,7 @@ export class AuthService {
    */
   async revokeOtherSessions(): Promise<number> {
     const generation = this.generation;
-    const result = await this.api.post<{ ok: true; revoked: number }>(
-      "/api/v1/auth/sessions/revoke-others",
-      undefined,
-      decodeSessionsBulkRevocation,
-    );
+    const result = await this.accountSessions.revokeOthers();
     this.assertCurrent(generation);
     return result.revoked;
   }
@@ -596,49 +591,29 @@ export class AuthService {
   /** Cierre total, incluida la actual: la cuenta queda fuera y esta sesión local expira. */
   async revokeAllSessions(): Promise<number> {
     const generation = this.generation;
-    const result = await this.api.post<{ ok: true; revoked: number }>(
-      "/api/v1/auth/sessions/revoke-all",
-      undefined,
-      decodeSessionsBulkRevocation,
-    );
+    const result = await this.accountSessions.revokeAll();
     this.assertCurrent(generation);
     this.sessionExpired();
     return result.revoked;
   }
 
   async mfaSetup(password: string, code?: string): Promise<{ secret: string; uri: string }> {
-    const generation = this.generation;
-    const result = await this.api.post<{ secret: string; uri: string }>("/api/v1/auth/mfa/setup", { password, code }, decodeMfaSetup);
-    this.assertCurrent(generation);
-    return result;
+    return this.confirmedMfaMutation(code ? "replace-setup" : "setup", () => this.accountMfa.setup(password, code));
   }
 
   async mfaEnable(code: string): Promise<{ recoveryCodes: string[] }> {
-    const generation = this.generation;
-    const result = await this.api.post<{ recoveryCodes: string[] }>("/api/v1/auth/mfa/enable", { code }, decodeRecoveryCodes);
-    this.assertCurrent(generation);
-    return result;
+    return this.confirmedMfaMutation("enable", () => this.accountMfa.enable(code));
   }
 
   async mfaCancelSetup(): Promise<void> {
-    const generation = this.generation;
-    await this.api.post("/api/v1/auth/mfa/cancel-setup", undefined, decodeMfaAcknowledgement);
-    this.assertCurrent(generation);
+    await this.confirmedMfaMutation("cancel", () => this.accountMfa.cancelSetup());
   }
 
   async mfaRegenerateRecoveryCodes(password: string, factorCode: string): Promise<{ recoveryCodes: string[] }> {
-    const generation = this.generation;
-    const result = await this.api.post<{ recoveryCodes: string[] }>("/api/v1/auth/mfa/recovery-codes/regenerate", {
-      password,
-      factorCode,
-    }, decodeRecoveryCodes);
-    this.assertCurrent(generation);
-    return result;
+    return this.confirmedMfaMutation("regenerate", () => this.accountMfa.regenerate(password, factorCode));
   }
 
   async mfaDisable(password: string, code: string): Promise<void> {
-    const generation = this.generation;
-    await this.api.post("/api/v1/auth/mfa/disable", { password, code }, decodeMfaAcknowledgement);
-    this.assertCurrent(generation);
+    await this.confirmedMfaMutation("disable", () => this.accountMfa.disable(password, code));
   }
 }

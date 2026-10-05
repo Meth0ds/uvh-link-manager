@@ -58,6 +58,8 @@ class CollectionController
                 }
 
                 return Collection::create(['workspace_id' => $workspaceId, 'name' => $name]);
+            }, function (Collection $collection) use ($request, $user, $workspaceId, $name): void {
+                Audit::write($user->id, 'collection.create', 'collection', (int) $collection->id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
@@ -70,8 +72,6 @@ class CollectionController
             }
             throw $e;
         }
-
-        Audit::write($user->id, 'collection.create', 'collection', (int) $collection->id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['collection' => ['id' => (int) $collection->id, 'name' => $collection->name, 'links' => 0]], 201);
     }
@@ -102,6 +102,8 @@ class CollectionController
                     throw new LinkException('Colección no encontrada', 404);
                 }
                 $collection->update(['name' => $name]);
+            }, function () use ($request, $user, $workspaceId, $id, $name): void {
+                Audit::write($user->id, 'collection.rename', 'collection', $id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
@@ -111,8 +113,6 @@ class CollectionController
             }
             throw $e;
         }
-
-        Audit::write($user->id, 'collection.rename', 'collection', $id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true, 'id' => $id, 'name' => $name]);
     }
@@ -158,12 +158,13 @@ class CollectionController
                 $collection->delete();
 
                 return [$moved, $cleared];
+            }, function (array $result) use ($request, $user, $workspaceId, $id): void {
+                [$moved, $cleared] = $result;
+                Audit::write($user->id, 'collection.delete', 'collection', $id, ['moved' => $moved, 'cleared_templates' => $cleared], UvhRequest::ip($request), workspaceId: $workspaceId);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
-
-        Audit::write($user->id, 'collection.delete', 'collection', $id, ['moved' => $moved, 'cleared_templates' => $cleared], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true, 'moved' => $moved]);
     }

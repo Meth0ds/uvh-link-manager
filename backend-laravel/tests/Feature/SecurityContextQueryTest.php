@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountCredentialsController;
+use App\Http\Controllers\AccountProfileController;
+use App\Http\Controllers\MfaConfigurationController;
+use App\Http\Controllers\MfaSessionController;
 use App\Models\User;
 use App\Support\Ids;
 use App\Support\SessionManager;
@@ -54,7 +57,12 @@ final class SecurityContextQueryTest extends TestCase
                 }
             }
         });
-        $response = app(AuthController::class)->{$method}($request);
+        $response = app(match ($method) {
+            'profile' => AccountProfileController::class,
+            'requestEmailChange', 'cancelEmailChange', 'changePassword' => AccountCredentialsController::class,
+            'mfaReauthenticate' => MfaSessionController::class,
+            'mfaSetup', 'mfaEnable', 'mfaRegenerateRecoveryCodes', 'mfaDisable' => MfaConfigurationController::class,
+        })->{$method}($request);
         $this->assertSame(200, $response->getStatusCode());
         // Email-change responses refresh the public DTO after the commit.
         $ownerReads = in_array($method, ['requestEmailChange', 'cancelEmailChange'], true) ? 2 : 1;

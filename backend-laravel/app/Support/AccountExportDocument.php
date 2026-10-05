@@ -353,9 +353,11 @@ final class AccountExportDocument
      */
     private static function copyRows($fragment, callable $put): void
     {
-        rewind($fragment);
+        if (! rewind($fragment)) {
+            throw new \RuntimeException('Export fragment rewind failed');
+        }
         $pending = null;
-        while (($line = fgets($fragment)) !== false) {
+        while (($line = Streams::readLine($fragment)) !== false) {
             $line = rtrim($line, "\n");
             if (trim($line) === '') {
                 continue;
@@ -420,8 +422,10 @@ final class AccountExportDocument
     /** @param resource $fragment */
     private static function firstLine($fragment): string
     {
-        rewind($fragment);
-        while (($line = fgets($fragment)) !== false) {
+        if (! rewind($fragment)) {
+            throw new \RuntimeException('Export fragment rewind failed');
+        }
+        while (($line = Streams::readLine($fragment)) !== false) {
             $line = rtrim($line, "\n");
             if (trim($line) !== '') {
                 return $line;
@@ -434,12 +438,21 @@ final class AccountExportDocument
     /** @return array<string, resource> */
     private static function openFragments(): array
     {
-        $fragments = ['account' => fopen('php://temp/maxmemory:2097152', 'r+b')];
-        foreach (self::SECTIONS as $section) {
-            $fragments[$section] = fopen('php://temp/maxmemory:2097152', 'r+b');
-        }
+        $fragments = [];
+        try {
+            foreach (['account', ...self::SECTIONS] as $section) {
+                $fragment = fopen('php://temp/maxmemory:2097152', 'r+b');
+                if (! is_resource($fragment)) {
+                    throw new \RuntimeException('Export fragment storage rejected opening');
+                }
+                $fragments[$section] = $fragment;
+            }
 
-        return $fragments;
+            return $fragments;
+        } catch (\Throwable $error) {
+            self::closeFragments($fragments);
+            throw $error;
+        }
     }
 
     /** @param array<string, resource> $fragments */

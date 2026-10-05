@@ -1,0 +1,38 @@
+# Gradual Auth separation: MFA challenges, freshness and configuration
+
+Run sequentially after the O49 dedicated/quality/full/JUnit gates and all frozen source/test hashes are verified with terminal handles. Preserve the user's tree; no agents/worktree/commit/push/deploy, uvh_local/users/mail/provider changes or productive workers/scheduler/migrations. One guarded uvh_test suite at a time; do not edit PHP/tests during a suite. This finishes the remaining controller ownership work, not the whole Auth service, S01 or project audit.
+
+## Intended owners and source evidence
+
+AuthController currently has521lines/14methods. O49 read the complete challenge, freshness and configuration functions and all their helper bodies; revalidate current hashes and complete callers before moving them.
+
+- MfaChallengeController: mfaVerify/mfaRecovery. Keep distributed challenge lock acquisition/release, rereads, attempt budget, recovery consumption, cache outage responses and cookie issuance exact. Compose NormalizesRecoveryCodes, shared with credentials and factor configuration. MfaLoginAdmission owns the existing complete SQL commit.
+- MfaSessionController: mfaSessionStatus/mfaReauthenticate and private iso. Retain live AccountReadContext/AccountQueries projection, existing reauthentication admission, exact error reasons, audit/IP, deadline/freshness and lack of session rotation.
+- MfaConfigurationController: mfaSetup/mfaEnable/mfaCancelSetup/mfaRegenerateRecoveryCodes/mfaDisable and private newRecoveryCodes/formatRecoveryCode. Compose the existing NormalizesRecoveryCodes. Preserve random generation/encryption before locks, exactly ten recovery codes, pending/active distinction, attempt and freshness policies, admin boundary, mail/audit transaction and replay behavior.
+- AuthController becomes the coherent login/logout owner with existing shared ValidatesAuthInput and DUMMY_PASSWORD_HASH. Remove only imports/concerns unused after extraction; no superclass or forwarding facade and no opportunistic business-policy changes.
+
+## Work and gates
+
+- [x] Confirm O49 full/JUnit terminal and frozen hashes; snapshot complete Auth521/14methods, concerns/api and fresh185runtime route contracts; freeze credential/session/login/MFA/mail/audit/security/CAPTCHA/baseline dependencies and affected whole tests.
+- [x] Read all direct/dynamic caller functions and affected tests. Existing references include mixed SecurityContextQuery, AccountReadContext, ReauthenticationProfileAdmission, SecurityNoticeAtomicity and MfaConfigurationBoundary (its protective closures now correctly use AccountSessionsController and must remain there). Search all other class/string dispatches; do not infer MFA-only ownership from filenames.
+- [x] Run relevant meaningful current regression baseline: LoginAdmission, MfaChallenge, MfaLoginAdmission/Result, MfaConfigurationAdmission/Boundary, MfaStepUp/Budget/Freshness, AccountReadContext, ReauthenticationProfileAdmission, SecurityContextQuery, CredentialStepUpContract, SecurityNoticeAtomicity and public recovery/security notice contracts. New tests only for material source-identified gaps.
+- [x] Move nine HTTP actions and three helpers literally into independent owners, share the existing normalization concern, and change exactly nine route action classes/imports. Adapt direct calls with exhaustive actual-owner mappings; preserve all fixtures/assertions/interleavings. No wrappers for obsolete Auth methods.
+- [x] Compare every original method/doc and whole remaining Auth after declared import/concern removal; compare whole new owners and185runtime contracts with only nine class changes. Preserve the O45–O49 historical proofs through hash-verified snapshots plus the current extraction comparer. Require unchanged business dependency and baseline hashes unless a proven obsolete suppression is removed explicitly.
+- [x] Run dedicated after, Pint/PHPStan and full backend/JUnit on guarded uvh_test, with frozen source/test hashes and no live-suite edits. Reconcile ledger/matrix/report/canonical planning with actual results; do not treat green tests or a smaller file as complete project proof.
+
+## Remaining broader objective
+
+The frontend Auth facade and Auth services, all S01–S13 functions/roles, retention/capacity/CI and production gates still require their own evidence. The registry TTL/configurable lifetime remains an unproven source candidate without BugID. A possible logout audit/commit boundary must be investigated and reproduced separately before claiming a defect; do not silently alter it during ownership extraction. Do not apply the deletion lifecycle migration outside the guarded test DB as part of this block.
+
+
+## O49 preparation evidence (no O50 snapshot or implementation yet)
+
+During the guarded O49 full suite, read the complete current Auth challenge/recovery/freshness/configuration/helpers and the whole ReauthenticationAdmission, MfaLoginAdmission, MfaConfigurationAdmission and MfaChallengeStore. These services remain unchanged; this reading is not a new runtime/provider/capacity gate. Current PHP reference search has65sites saved in `.uvh-runtime/s01-auth-mfa-refs.txt`. Five tests retain actual MFA references: AccountReadContext (two status maps), ReauthenticationProfileAdmission (two profile/reauth maps), SecurityContextQuery (one mixed map), SecurityNoticeAtomicity (one factor-configuration controller), MfaConfigurationBoundary (two factor calls). The latter's separate three protective closures correctly use AccountSessionsController. These whole tests were read during O49; revalidate hashes before editing. Route count and body proof must be captured afresh after O49 full is terminal. Do not check O50 work boxes from this preparation.
+
+Remaining Auth contains an orphaned historical helper-section preamble (`Serialize account security mutations...` plus the helpers divider). Once all three private helpers are relocated, remove only that obsolete preamble explicitly in the whole-class proof; preserve the method docblocks at their new owner. It must not misleadingly remain attached to login/logout or be counted as a policy change.
+
+
+O50 declared source adaptation after the first quality run: PHPStan reported the two original redundant null coalesces at their new owner and the unmatched old suppression. The final MfaChallengeStore::get method validates isset and returns both fields cast to int, so both existing preflights now read security_version directly. Exactly two occurrences change; all other method content/docblocks remains literal. Remove exactly the old nullCoalesce.offset suppression(count2), reducing baseline151/140→149/139; no new ignore. The current comparer checks the entire new owner after those two substitutions and the entire baseline after that one block removal, with34business/input dependency hashes unchanged. O47/O48/O49 baseline evidence is preserved via hash-verified pre-O50 endpoint and the explicit current comparison. Dedicated/quality/full must rerun after this cleanup; do not use the earlier literal378green result as final evidence for changed source.
+
+
+Local O50 final:378/3444before71.73s/after-final62.67s;Pint503/PHPStan0;full2205/18889,JUniterrors0/failures0/skips0,380.362116s;06:22.794, Memory: 137.00 MB.686frozen source/test/config hashes intact after terminal. Auth86/twoHTTPmethods;490inventorysources;358S01/82files,16S03/2,63S10/9,198S02/31 anchors checked. Complete controller ownership separation locally verified; global objective/S01–S13 remains active. Next lifecycle follow-up plan prepared. Baseline149/139,exactobsolete suppression removal,rename unrelated preserved;no newBugID/tests.

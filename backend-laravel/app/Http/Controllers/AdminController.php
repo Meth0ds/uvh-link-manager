@@ -320,12 +320,9 @@ class AdminController
             PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
         }
         if ($result['revoke_intents']) {
-            try {
-                $intentRevocation = LinkIntentRegistry::revokeForUser($id);
-            } catch (\Throwable) {
-                $intentRevocation = ['revoked' => 0, 'busy' => -1];
-            }
-            Audit::write($actorId, 'admin.user_intents_revoked', 'user', $id, $intentRevocation, $ip);
+            LinkIntentRegistry::afterCommit($id, static function (array $intentRevocation) use ($actorId, $id, $ip): void {
+                Audit::write($actorId, 'admin.user_intents_revoked', 'user', $id, $intentRevocation, $ip);
+            });
         }
 
         return response()->json(['ok' => true]);

@@ -1,5 +1,5 @@
 import type { AccountDeletionImpact, AuthUser, DataExportFailureReason, DataExportStage, DataExportStatus, Session, SessionList, Workspace, WorkspaceRole } from "../models";
-import type { LoginOutcome, LoginResponse, MfaSessionStatus } from "./auth.service";
+import type { LoginOutcome, LoginResponse, MfaSessionStatus } from "./auth-session-contracts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -143,7 +143,7 @@ export function decodeMfaReauthentication(value: unknown): { ok: true; verifiedA
 
 function dataExport(value: unknown): DataExportStatus {
   const source = record(value, "data export");
-  return {
+  const decoded: DataExportStatus = {
     id: integer(source["id"], "data export", 1),
     status: literal(source["status"], EXPORT_STATUSES, "data export"),
     failureReason: source["failureReason"] === null ? null : literal(source["failureReason"], EXPORT_FAILURES, "data export failure"),
@@ -155,6 +155,9 @@ function dataExport(value: unknown): DataExportStatus {
     readyAt: nullableText(source["readyAt"], "data export"),
     downloadedAt: nullableText(source["downloadedAt"], "data export"),
   };
+  if ((decoded.status !== "processing" && decoded.stage !== null)
+    || (decoded.status !== "failed" && decoded.failureReason !== null)) invalid("data export");
+  return decoded;
 }
 
 export function decodeDataExportStatusResponse(value: unknown): { export: DataExportStatus | null } {
@@ -266,13 +269,40 @@ export function decodeMfaAcknowledgement(value: unknown): { ok: true } {
 
 export function decodeMfaSetup(value: unknown): { secret: string; uri: string } {
   const source = record(value, "MFA setup");
+  const secret = text(source["secret"], "MFA setup");
   const uri = text(source["uri"], "MFA setup");
-  if (!uri.startsWith("otpauth://totp/")) invalid("MFA setup");
-  return { secret: text(source["secret"], "MFA setup"), uri };
+  // These are newly generated instructions: validate the emitter's contract,
+  // not the broader format accepted for legacy stored TOTP credentials.
+  if (!/^[A-Z2-7]{32}$/.test(secret) || /[\u0000-\u0020\u007f]/.test(uri)
+    || !uri.startsWith("otpauth://totp/") || uri.includes("#")) invalid("MFA setup");
+  const rawPath = uri.slice("otpauth://totp/".length).split("?")[0];
+  if (!rawPath || rawPath.includes("/")) invalid("MFA setup");
+  let parsed: URL;
+  try { parsed = new URL(uri); } catch { invalid("MFA setup"); }
+  if (parsed.protocol !== "otpauth:" || parsed.hostname !== "totp" || parsed.port !== ""
+    || parsed.username !== "" || parsed.password !== "") invalid("MFA setup");
+  const expected: Record<string, string> = { secret, issuer: "UVH", algorithm: "SHA1", digits: "6", period: "30" };
+  const keys: string[] = [];
+  parsed.searchParams.forEach((_value, key) => keys.push(key));
+  if (keys.length !== 5 || keys.some((key) => !Object.hasOwn(expected, key))) invalid("MFA setup");
+  for (const key of Object.keys(expected)) {
+    if (parsed.searchParams.getAll(key).length !== 1 || parsed.searchParams.get(key) !== expected[key]) invalid("MFA setup");
+  }
+  let label: string;
+  try { label = decodeURIComponent(rawPath); } catch { invalid("MFA setup"); }
+  if (!label.startsWith("UVH:") || label.slice(4).trim() === ""
+    || /[\u0000-\u001f\u007f]/.test(label)) invalid("MFA setup");
+  return { secret, uri };
 }
 
 export function decodeRecoveryCodes(value: unknown): { recoveryCodes: string[] } {
   const source = record(value, "MFA recovery codes");
-  if (!Array.isArray(source["recoveryCodes"])) invalid("MFA recovery codes");
-  return { recoveryCodes: source["recoveryCodes"].map((code) => text(code, "MFA recovery codes")) };
+  const values = source["recoveryCodes"];
+  // The v1 issuance contract is ten distinct 16-character credentials, grouped
+  // as four blocks. An empty/partial set must never be represented as success.
+  if (!Array.isArray(values) || values.length !== 10) invalid("MFA recovery codes");
+  const codes = values.map((code) => text(code, "MFA recovery codes"));
+  if (codes.some((code) => !/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){3}$/.test(code))
+    || new Set(codes).size !== codes.length) invalid("MFA recovery codes");
+  return { recoveryCodes: codes };
 }

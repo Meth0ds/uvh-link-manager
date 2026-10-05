@@ -285,20 +285,22 @@ final class LinkCsvTransferTest extends TestCase
         [$owner, $workspace] = $this->workspace();
         $this->signIn($owner, $workspace);
         $payload = ['dryRun' => false, 'csv' => "alias,destination\none,https://example.org/1\ntwo,https://example.org/2\nthree,https://example.org/3\n"];
+        $sessionId = DB::table('sessions')->where('user_id', $owner->id)->value('id');
         $takeover = true;
         $replacement = null;
-        DB::listen(function (QueryExecuted $event) use (&$takeover, &$replacement, $owner, $workspace, $payload): void {
+        DB::listen(function (QueryExecuted $event) use (&$takeover, &$replacement, $owner, $workspace, $payload, $sessionId): void {
             if (! $takeover || ! str_starts_with(strtolower($event->sql), 'insert into "link_import_rows"')) {
                 return;
             }
             $takeover = false;
-            DB::afterCommit(function () use (&$replacement, $owner, $workspace, $payload): void {
+            DB::afterCommit(function () use (&$replacement, $owner, $workspace, $payload, $sessionId): void {
                 // A was suspended between committed rows beyond the lease.
                 DB::table('idempotency_keys')->where('key', 'import-takeover')->update(['lease_until' => now()->subMinute()]);
                 $retry = Request::create('/api/v1/links/import', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($payload));
                 $retry->headers->set('Idempotency-Key', 'import-takeover');
                 $retry->attributes->set(UvhRequest::USER, $owner);
                 $retry->attributes->set(UvhRequest::WORKSPACE_ID, (int) $workspace->id);
+                $retry->attributes->set(UvhRequest::SESSION_ID, $sessionId);
                 $replacement = (new LinkCsvController)->import($retry);
             });
         });

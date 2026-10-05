@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountCredentialsController;
 use App\Jobs\DeliverMailOutboxJob;
 use App\Models\AccountRecoveryRequest;
 use App\Models\User;
@@ -215,7 +215,7 @@ final class PasswordNoticeAtomicityTest extends TestCase
             $request = Request::create('/', 'POST', ['current' => self::CURRENT_PASSWORD, 'newPassword' => self::NEW_PASSWORD, 'factorCode' => self::RECOVERY_CODE]);
             $request->attributes->set(UvhRequest::USER, $snapshot);
             $request->attributes->set(UvhRequest::SESSION_ID, Ids::sha256Hex($session));
-            $response = app(AuthController::class)->changePassword($request);
+            $response = app(AccountCredentialsController::class)->changePassword($request);
             $this->assertSame(422, $response->getStatusCode());
             $this->assertSame($before, $user->refresh()->getRawOriginal());
         } else {

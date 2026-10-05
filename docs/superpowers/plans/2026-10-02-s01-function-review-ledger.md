@@ -29,22 +29,51 @@ Evidencia: Auth59+OTP8 (67 dedicadas), frontend864; browser anterior4/32POST y a
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `onOtpCompleted` | 433 | Código y regresión local verificados |
-| `onOtpModalKeydown` | 439 | Código y regresión local verificados |
-| `onMfa` | 472 | Edición/flujo/foco y fallo de navegación verificados |
-| `onRecovery` | 507 | Edición/flujo/foco y fallo de navegación verificados |
-| `goRecovery` | 728 | Código y regresión local verificados |
-| `backToMfa` | 737 | Código y regresión local verificados |
-| `restartMfaLogin` | 750 | Código y regresión local verificados |
-| `focusAuthStep` | 766 | Código y regresión local verificados |
-| `constructor` | 213 | Navegación inicial local verificada; otros efectos con sus gates |
-| `onLogin` | 324 | Credenciales/navegación local comprobadas; destino compartido O08 |
-| `navigationFailure` | 391 | Código y estado ligados a sesión comprobados |
-| `retryNavigation` | 397 | Sin credenciales repetidas; deduplicación/invalidez comprobadas |
-| `navigateAuthenticated` | 404 | Cancelación/rejection/vida/generaciones y foco comprobados |
-| `returnTo` | 874 | Regla compartida y destinos locales probados; autorretorno /auth no bloquea |
-| `onRegister` | 538 | Lectura completa; guards/revisión/ack y copy neutral. B131 elimina promesa de renovación24h;68 Auth/887 frontend. No acredita layout manual ni lifecycle S04 completo. |
-| `changeRegistrationEmail` | 683 | Inicio de edición conserva contexto elegido; copy condicionado a disponibilidad; contrato frontend existente y nuevo texto leídos. |
+| `onOtpCompleted` | 454 | Código y regresión local verificados |
+| `onOtpModalKeydown` | 460 | Código y regresión local verificados |
+| `onMfa` | 493 | Edición/flujo/foco y fallo de navegación verificados |
+| `onRecovery` | 528 | Edición/flujo/foco y fallo de navegación verificados |
+| `goRecovery` | 733 | Código y regresión local verificados |
+| `backToMfa` | 743 | Código y regresión local verificados |
+| `restartMfaLogin` | 757 | Código y regresión local verificados |
+| `focusAuthStep` | 771 | Código y regresión local verificados |
+| `constructor` | 240 | Navegación inicial local verificada; otros efectos con sus gates |
+| `onLogin` | 351 | Credenciales/navegación local comprobadas; destino compartido O08 |
+| `navigationFailure` | 412 | Código y estado ligados a sesión comprobados |
+| `retryNavigation` | 418 | Sin credenciales repetidas; deduplicación/invalidez comprobadas |
+| `navigateAuthenticated` | 425 | Cancelación/rejection/vida/generaciones y foco comprobados |
+| `returnTo` | 879 | Regla compartida y destinos locales probados; autorretorno /auth no bloquea |
+| `onRegister` | 559 | Lectura completa; guards/revisión/ack y copy neutral. B131 elimina promesa de renovación24h;68 Auth/887 frontend. No acredita layout manual ni lifecycle S04 completo. |
+| `changeRegistrationEmail` | 695 | Inicio de edición conserva contexto elegido; copy condicionado a disponibilidad; contrato frontend existente y nuevo texto leídos. |
+
+O53: archivo completo, plantilla completa y988líneas originales de pruebas leídos; extracción del estado MFA y cinco contratos de consumidor comprobados antes/después. Métodos adicionales abajo acreditan lectura y conservación literal del cuerpo, salvo la sustitución de step por flow en las transiciones declaradas. No acreditan por sí solos proveedor real, cookies nativas ni toda variante de autoridad de registro/verificación.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `applyCredentialRules` | 290 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `onTabChange` | 304 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `onAuthTabKeydown` | 312 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `nextRegisterStep` | 329 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `previousRegisterStep` | 343 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `resendVerification` | 636 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `openVerificationRecovery` | 684 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `closeRegistration` | 708 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `goForgot` | 728 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `onLoginCaptchaToken` | 787 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `onRegisterCaptchaToken` | 792 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `onResendCaptchaToken` | 797 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `retryCaptchaConfiguration` | 802 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `executeCaptcha` | 806 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `loadCaptchaConfiguration` | 829 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `invalidateFlow` | 860 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `isFlowCurrent` | 866 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+| `isVerificationCurrent` | 870 | O53: código completo leído; cuerpo preservado en comparación del archivo; consumidor local en412pruebas de auth. Contratos de registro/verificación y CAPTCHA mantienen su evidencia y límites propios. |
+
+O54/B186: comparador grupal conservado como regla compartida; se suspende en corrección y se restaura al salir. Reproducción real de consumidor1fallo/73positivos y75verde antes de extraer estados.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `PASSWORD_MATCH_RULE` | 74 | Código completo conservado respecto al comparador anterior; ahora sujeto al mismo modo que las reglas de credenciales. La corrección no pide contraseña; el registro vuelve a exigir igualdad y consentimiento. |
 
 ## backend-laravel/app/Support/MfaAttempts.php
 
@@ -94,14 +123,14 @@ Evidencia: TotpTest19/23, fuentes RFC4226 AppendixD y RFC6238 AppendixB; full127
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `generateSecret` | 17 | Código leído; verificación independiente pendiente |
+| `generateSecret` | 17 | O34: cuerpo completo releído; generador20bytes→32Base32,100/100 formatos comprobados sin bootstrap/DB. Sin nueva afirmación de entropía o seguridad del RNG. |
 | `verify` | 39 | Código leído; verificación independiente pendiente |
 | `matchingCounter` | 45 | Código leído; verificación independiente pendiente |
 | `currentCode` | 71 | Código leído; verificación independiente pendiente |
 | `secondsRemaining` | 81 | Código leído; verificación independiente pendiente |
 | `isUsableSecret` | 87 | Código leído; verificación independiente pendiente |
 | `counter` | 92 | Código leído; verificación independiente pendiente |
-| `provisioningUri` | 97 | Código leído; verificación independiente pendiente |
+| `provisioningUri` | 97 | O34: cuerpo completo releído; tres payloads reales comparados exactamente con positivos frontend, incluyendo plus/slash/hash/UTF8 codificados. No prueba del validador email ni proveedores. |
 | `hotp` | 113 | Vectores publicados verificados; parte alta64bits pendiente |
 | `base32Decode` | 126 | Key RFC exacta, upper/lower, verificadas |
 
@@ -154,57 +183,12 @@ Evidencia: MFA/step-up77;controllers distintos S11/S13 pendientes.
 
 ## backend-laravel/app/Http/Controllers/AuthController.php
 
-Actor activo/session-version/TTL bajo locks; id64hex/owner en individual; idempotencia; aviso entregable y exact-audit en TX; current cookie sólo cierre propio. Contador incluye expiradas no revocadas, como documentado. UI SecurityCenter/panel pendiente de gate específico.
-
-Evidencia: SessionsRevocationNotice dentro77/541;9interleavings revoked/expired/version y4audit cases.
+O50: propietario de login/logout; registro/recuperación/perfil/credenciales/sesiones/MFA ya tienen propietarios HTTP independientes. Clase restante521→86comparada completa tras12métodos trasladados,20imports yconcern no usados retirados yprólogo obsoleto dehelpers eliminado explícitamente. No cambia política/servicios. 378/3444antes-después,Pint503/PHPStan0,full2205/18889 yJUnit0errors/failures/skips;686hashes conservados. No cierre S01 ni objetivo global.
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `revokeSession` | 1070 | O24: caller HTTP leído; TX completa en SessionRevocationAdmission, SQL/policy/cookies/404/409/503 conservados.15 controles nuevos,66/604 antes/después y134/1007 final conjunto; UI mantiene gate. |
-| `revokeOtherSessions` | 1098 | O24: caller HTTP leído; TX completa en SessionRevocationAdmission, SQL/policy/cookies/404/409/503 conservados.15 controles nuevos,66/604 antes/después y134/1007 final conjunto; UI mantiene gate. |
-| `revokeAllSessions` | 1125 | O24: caller HTTP leído; TX completa en SessionRevocationAdmission, SQL/policy/cookies/404/409/503 conservados.15 controles nuevos,66/604 antes/después y134/1007 final conjunto; UI mantiene gate. |
-| `mfaSessionStatus` | 741 | O23: caller completo y AccountQueries::mfaSession; estado/fechas exactas B120 y SQL/401 conservados. Contexto vivo por petición; GET sin locks/TX de negocio. UI mantiene gate. |
-| `login` | 164 | Extracción conservadora LoginAdmission; contratos de credenciales, audit/cache y payload existentes; CAPTCHA/proveedores/tiempo remoto siguen pendientes |
-| `mfaVerify` | 216 | Caller MfaLoginAdmission::totp, resultado union y JsonResponse tipados; consumo/fallback/rollback locales comprobados; lock/presupuesto/HTTP aún aquí |
-| `mfaRecovery` | 295 | Caller MfaLoginAdmission::recovery, resultado union/JsonResponse tipados; B126 distingue cuenta obsoleta de código incorrecto; marker conservado al fallar cleanup |
-| `mfaEnable` | 1178 | O21: caller HTTP completo; código/generación aleatoria/formato/catches conservados. TX completa delegada; first/reconfigure, autoridad viva y outer rollback/TOTP replay comprobados; UI/reloj/provider real pendientes. |
-| `register` | 64 | O12: validación/CAPTCHA/respuestas/cookies conservadas; SQL/mail/audit delegado completo a RegistrationAdmission. Proveedor/tiempo/concurrencia intersistemas con gates separados. |
-| `verifyEmail` | 397 | O12: contrato legal/token/password y HTTP conservados; activación pending/legacy transaccional delegada, sin sesión; UI/proveedores pendientes propios. |
-| `changeRegistrationEmail` | 125 | O13: validaciones/CAPTCHA/preflight/cookie y errores conservados; TX delegada. O14 revalida intento propio y emite v4; composición comprobada con ocupación/secuencias/replay y full1527/11020. |
-| `resendVerification` | 439 | O13: selección/HTTP/floor público; servicio común revalida elegibilidad/cooldown bajo lock, pruebas de carreras/rollback/retry locales. |
-| `forgotPassword` | 527 | O15: caller tipado; validación/CAPTCHA/floor y fallo público conservados; solicitud transaccional delegada. Cooldown y lookup/lock locales comprobados. |
-| `resetPassword` | 553 | O15: caller tipado; hash fuera del lock; reset transaccional completo delegado. Replay/kind/owner/expiry/live identity y cookie propia/ajena comprobados; no sesión emitida. |
-| `revokeCompromisedAccess` | 590 | O16: caller HTTP leído; delega TX completa a CompromisedAccessRevocation, conserva cleanup/index/cookie tras resultado confirmado. B132 admite evidencia recuperable sin revertir protección por audit general. O18/B135-B137: dos casos físicos commit/rollback y dos fallbacks disco/logs/métricas pasan; cleanup HTTP espera commit exterior. |
-| `requestAccountRecovery` | 621 | O17: validación/CAPTCHA/lookup202 y catch genérico conservados; TX completa delegada. Cooldown59/60/61 y cuatro cambios después del lookup comprobados. Tiempo/carga/proveedor real pendientes. |
-| `confirmAccountRecovery` | 649 | O17: sintaxis/preflight y400/200 conservados; TX completa delegada, hash/owner/status y generación/estado vivos comprobados. No concede sesión. |
-| `completeAccountRecovery` | 670 | O17: hash y approvals preflight fuera de locks; TX completa delegada, respuesta/cleanup posteriores. B134 conserva cookie ajena y current booleano; O18/B135-B137: dos casos físicos commit/rollback y dos fallbacks disco/logs/métricas pasan; callback terminal revalida path/status bajo lock. |
-| `changePassword` | 971 | O19: caller HTTP completo, validación/hash fuera de locks y catches/status sin cambios. TX completa delegada;18 nuevas caracterizaciones y93/873 antes/después. Hash a TXlevel0 y own-session/current policy conservados; dependencias/UI/gates reales abiertos. |
-| `requestEmailChange` | 811 | O20: caller HTTP completo; validación/preflight/token/url conservados y TX delegada. B139 rechaza reserva ajena vigente con rollback y mismo409. Factor inválido no revela ocupación; native PostgreSQL sin ciclo. UI/gates reales pendientes. |
-| `cancelEmailChange` | 889 | O20: caller HTTP conservado; TX completa delegada. Cancelación con/sin pendiente mantiene consumption de recovery y exact audit; outer rollback/retry comprobados. UI/gates reales pendientes. |
-| `confirmEmailChange` | 936 | O20: lookup/sintaxis/HTTP/current conservados; TX completa delegada. Siete cambios tras lookup, ocupación User/Pending, expiry/replay y outer rollback/mail doble/audit comprobados. UI/gates reales pendientes. |
-| `equalizePublicMailDuration` | 518 | Lectura completa; suelo configurable hrtime/usleep, sin garantía de tiempo constante bajo toda carga. Controles existentes de ramas públicas conservados. |
-| `findUserByEmail` | 1348 | Helper leído: trim en caller, lower(email) y deleted excluido; lookup no concede autoridad y servicio revalida bajo lock. Otros callers mantienen gate propio. |
-| `validEmail` | 1358 | Helper leído: no vacío, máximo254bytes y filtro PHP; contratos HTTP existentes conservados. No implica entregabilidad del buzón. |
-| `validPassword` | 1363 | Helper leído:10..72bytes; fuerza evaluada aparte y con identidad viva en mutación. Contratos locales; coste/rate limit reales pendientes. |
-| `appUrl` | 1378 | Wrapper leído hacia FrontendUrl::base; notices/password usan mismo propietario compartido tras traslado. Configuración del despliegue mantiene su gate. |
-| `mfaSetup` | 1143 | O21: caller completo; generación/cifrado fuera de locks, input/HTTP preservados. Setup recovery/estado pendiente y outer rollback/retry comprobados; no reemplaza activo. |
-| `mfaCancelSetup` | 1214 | O21: caller completo; cancela sólo pendiente sin step-up, con cuenta/sesión vigente. Outer rollback/retry conserva factor activo y códigos. |
-| `mfaRegenerateRecoveryCodes` | 1228 | O21: caller completo; input/codes aleatorios/formato/HTTP conservados. Reemplazo/generación/sesiones/casos/notice/exact audit en TX; autoridad y outer rollback/retry verificados. |
-| `mfaDisable` | 1276 | O21: caller completo; preflight/HTTP/catches conservados. Factor concreto, prohibición admin y commit de rotación/revocación/cancel/notice/audit permanecen; autoridad y outer rollback/retry verificados. |
-| `newRecoveryCodes` | 1389 | Helper completo leído;10 cadenas aleatorias usando Ids antes de locks. Respuesta/hash de10 códigos comprobados; entropy/infra real conserva gate. |
-| `normalizeRecoveryCode` | 1399 | Helper completo leído; trim, mayúsculas y retirada de espacios/guiones conservados; factor sigue comprobándose bajo lock. |
-| `formatRecoveryCode` | 1404 | Helper completo leído; grupos de4 y guiones; char42 comprueba respuesta normalizada contra hashes persistidos. |
-
-
-
-
-| Función | Línea actual | Estado |
-| --- | --- | --- |
-| `mfaReauthenticate` | 752 | O22: caller HTTP y rechazos conservados; delega TX completa a ReauthenticationAdmission. Factor concreto, audit/IP hasheada y outer commit/rollback/replay comprobados; no rotación de sesión. |
-| `profile` | 794 | O22: validación y DTO conservados; delega TX completa a ProfileAdmission. Nombre y exact audit bajo autoridad viva, outer commit/rollback/retry comprobados; no step-up nuevo. |
-| `me` | 730 | O23: resolve por petición y payload AccountQueries; SQL/401 conservados. GET real sin FOR UPDATE/TX de negocio, secretos ni cookie nueva con CSRF existente; UI mantiene gate. |
-| `sessions` | 1046 | O23: caller y proyección completa separados; current validado, orden estable y límite101→100/truncated conservados. GET sin locks de mutación; volumen/UI pendientes. |
-| `securityCenter` | 1060 | O23: caller y proyección completa separados; scopes, allowlist, limit21→20/truncated sin metadata/IP conservados. GET sin locks de mutación; UI pendiente. |
+| `login` | 24 | Extracción conservadora LoginAdmission; contratos de credenciales, audit/cache y payload existentes; CAPTCHA/proveedores/tiempo remoto siguen pendientes |
+| `logout` | 76 | Lectura completa; cuerpo preservado literalmente por comparadorO50. Revocación/cookie/audit originales. SessionHydrationBoundary exige logout protector aun si admisiónaudit falla yrecuperación cuando sólo falla historial; archivos/funciones leídos, no nueva brecha ni promesa de admisión obligatoria. Full2205/18889incluye contratos de logout sin cambio; no acredita otras fronteras ni proveedores. |
 
 
 ## frontend/src/app/auth/mfa-reauthenticate.component.ts
@@ -522,7 +506,7 @@ Dependencia S13 leída completa: enumera migraciones sin ejecutarlas, verifica l
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `errors` | 12 | Lectura completa y contratos locales incluidos en99/1105; esquema nuevo sólo uvh_test. |
+| `errors` | 12 | Lectura completa y contratos locales incluidos en99/1105; esquema nuevo sólo uvh_test. O47: tres nuevos contratos de table/lifecycle_at/ledger del receipt2026_10_04, errores seguros yhealth sinwrites;171/2919dedicado,full2205/18889, ledger/table verificadas sólo uvh_test. |
 
 
 O16/B132/B133 verificados (03/10): full1568/1568 backend,11349aserciones,337,83s exclusivamente uvh_test (s01-incident-full-backend.log), exit0;24 controles nuevos frente a1544.99/1105 dedicados,22,28s (s01-incident-contracts-definitive.log), exit0. Pint452/PHPStan0 (s01-incident-quality-final-fixed.log), exit0; baseline182→180 findings/169entradas, dos supresiones resueltas retiradas y ninguna añadida. B132 conserva evidencia recuperable sin revertir revocación por audit general; B133 impide rollback de cancelación por logger de fallback. TX incidente completa comparada tras extracción, AuthController2289→2220líneas; sin latencia/consultas ahorradas medidas. Inventario457archivos/2183con nombre/1137callbacks/3firmas,457hashes y158anchorsS01/35archivos más16S03/2archivos comprobados tras full. YAML7reglas completas únicas validado, Node--check/diff correctos; no promtool/monitorización real atribuida. Migración2026_10_03_000002 aplicada sólo uvh_test con guard; uvh_local intacta, sin backfill histórico. Frontend sin cambio/nueva ejecución/browser atribuidos. S01–S13/objetivo global activos: siguiente separación request/confirm/complete recovery con caracterización previa y resto de funciones/roles/gates externos pendientes. CI billing conocido permanece externo. Sin proveedor real, worker/scheduler productivo, commit/push/deploy.
@@ -563,9 +547,9 @@ Dependencia S11 parcial de recovery: listado, decisión y helper de sesión leí
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `accountRecoveries` | 554 | Lectura completa; filtro/escape/paginación/proyección y aprobación independiente leídos, contratos previos incluidos; gran volumen real pendiente. |
-| `decideAccountRecovery` | 617 | Lectura completa; approvals/mail/audit/rechazos/target independiente; pruebas existentes dentro139/991. No nueva extracción ni actor-race adicional atribuida. |
-| `eligibleLockedAdminSession` | 1290 | Lectura completa; usuario esperado ya bloqueado, sesión concreta/versión/expiry exclusivo/MFA fresh; otros callersS11 conservan gate. |
+| `accountRecoveries` | 551 | Lectura completa; filtro/escape/paginación/proyección y aprobación independiente leídos, contratos previos incluidos; gran volumen real pendiente. |
+| `decideAccountRecovery` | 614 | Lectura completa; approvals/mail/audit/rechazos/target independiente; pruebas existentes dentro139/991. No nueva extracción ni actor-race adicional atribuida. |
+| `eligibleLockedAdminSession` | 1287 | Lectura completa; usuario esperado ya bloqueado, sesión concreta/versión/expiry exclusivo/MFA fresh; otros callersS11 conservan gate. |
 
 ## frontend/src/app/auth/account-recovery-complete.component.ts
 
@@ -582,7 +566,7 @@ Archivo leído completo; entrada nueva de recovery compone validadores de texto/
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `decodeAccountRecoveryCompletion` | 52 | Lectura completa; ok false/current faltante-string-número/ack válido y estados de UI comprobados en8 nuevos. |
+| `decodeAccountRecoveryCompletion` | 53 | Lectura completa; ok false/current faltante-string-número/ack válido y estados de UI comprobados en8 nuevos. |
 
 ## backend-laravel/app/Support/PrivateArtifactCleanup.php
 
@@ -596,8 +580,8 @@ Fronteras: volumen/retención, filesystem real/permisos/symlinks, APP_SECRET rot
 | `attempt` | 34 | Lectura completa; worker processing recibe false real ante DELETE rechazado, mantiene path y puede reintentar. |
 | `clean` | 40 | Lectura completa; status/ruta bajo lock, storage failure y SQL de puntero fallido; no borra callback obsoleto. |
 | `retryTerminal` | 91 | Lectura completa; cambio después de selección, retry idempotente y dos ciclos heavy reales de housekeeping en uvh_test. |
-| `reportFailure` | 111 | Nuevo; four combinaciones incidente/recovery con métricas ausentes/presentes y log fallido; puntero durable. |
-| `isManagedPath` | 126 | Regex completa;4 vectores traversal/sufijo/newline rechazan sin borrar archivo válido incluso con logger fallido. |
+| `reportFailure` | 119 | Nuevo; four combinaciones incidente/recovery con métricas ausentes/presentes y log fallido; puntero durable. |
+| `isManagedPath` | 134 | Regex completa;4 vectores traversal/sufijo/newline rechazan sin borrar archivo válido incluso con logger fallido. |
 
 
 O17/B134 verificados (03/10): full1600/1600 backend,11589aserciones,338,08s exclusivamente uvh_test (s01-account-recovery-full-backend.log), exit0;32 casos nuevos frente a1568.103/765 antes/después del traslado,139/991 dedicado final,36,63s; Pint454/PHPStan0 (s01-account-recovery-quality-final.log), exit0. Baseline180→177 findings/166entradas, sólo3 retornos resueltos eliminados. AccountRecoveryAdmission conserva tres TX completas comparadas; AuthController2220→1985líneas. B134 cookie sólo propia/current booleano y SPA con generación/validación/destruction/nueva identidad: redAPI2fallos/1control, redfrontend5fallos/3controles;50dedicados pasan. Fullfrontend895/895 definitivo (s01-account-recovery-full-frontend-definitive.log), lint/tipos/build definitivos exit0. Lint inicial señaló ternario de assert; sustituido por if/else sin relajar regla ni tocar PHP. Inventario458archivos/2187con nombre/1137callbacks/3firmas;458hashes y176anchorsS01/42archivos más16S03/2archivos verificados tras full. Node--check/gitdiff--check correctos. Sin ganancia de latencia/SQL medida ni nueva concurrencia multiproceso/QA visual/E2E/proveedor atribuida. No nueva migración/uvh_local/worker/scheduler/commit/push/deploy. Objetivo yS01–S13 abiertos; siguiente frontera cleanup físico/fallback en callers Auth y resto de mutaciones/lecturas/frontends/roles por función. CI billing conocido y gates reales externos mantienen estado.
@@ -627,9 +611,9 @@ failed/failTooLarge conservan eventos fuera de TX; requieren reproducción y pol
 | `handle` | 57 | Lectura completa; B138 ready audit+mail+notice/TX/retry comprobados; tests previos de stages/chunking/rotation incluidos. |
 | `failed` | 247 | Lectura completa; sólo processing y owner/request lock; audit externo pendiente de repro/política. |
 | `failTooLarge` | 288 | Lectura completa; marca terminal antes de codec.write; audit externo y otros modos de tamaño/memoria pendientes. |
-| `writeStage` | 325 | Lectura completa; conexión lateral y progreso no autoritativo; secuencia existente incluida en dedicado. |
-| `stageConnection` | 346 | Lectura completa; reutiliza connection y connectUsing force; fallos/reconexión real mantienen gate. |
-| `hasMemoryHeadroom` | 365 | Lectura completa; unlimited/sufijos/margen; no nueva matriz de límites CLI/arquitecturas atribuida. |
+| `writeStage` | 324 | Lectura completa; conexión lateral y progreso no autoritativo; secuencia existente incluida en dedicado. |
+| `stageConnection` | 345 | Lectura completa; reutiliza connection y connectUsing force; fallos/reconexión real mantienen gate. |
+| `hasMemoryHeadroom` | 364 | Lectura completa; unlimited/sufijos/margen; no nueva matriz de límites CLI/arquitecturas atribuida. |
 
 
 ## backend-laravel/app/Http/Controllers/AccountController.php
@@ -638,7 +622,7 @@ Dependencia S02 parcial: cancelExport leído completo, cambia sólo cleanup post
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `cancelExport` | 194 | Lectura completa; dos nuevos casos de outer commit/rollback con archivo físico; gates de ruta/helpers/UI/mutaciones vecinas conservados. |
+| `cancelExport` | 207 | Lectura completa; dos nuevos casos de outer commit/rollback con archivo físico; gates de ruta/helpers/UI/mutaciones vecinas conservados. |
 
 
 O18/B135–B138 verificación final (03/10): full1631/1631 backend,11741 aserciones,357,71s exclusivamente uvh_test (`s01-artifact-full-backend.log`), exit0;31 controles nuevos.123/869 dedicado final y Pint456/PHPStan0 definitivos, exit0. Baseline177 findings/166 entradas conservado sin nuevos ignores. Inventario458 archivos/2190 funciones con nombre/1138 callbacks/3 firmas;458 hashes y192 anchors S01/45 archivos más16 S03/2 archivos comprobados tras full. Node--check y gitdiff--check correctos. No edición de PHP/tests durante suite ni cambio frontend/migración/uvh_local/proveedor real/worker o scheduler productivo/commit/push/deploy. La revisión global y gates reales siguen abiertos; siguiente caracterización/separación de contraseña autenticada, email y MFA con TX completas, más fronteras export pendientes.
@@ -801,34 +785,55 @@ O27: lectura completa de las funciones enumeradas y sus callbacks/dependencias r
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `generation` | 77 | O27: Getter al signal compartido, antes primitive; todos los reads de generación adquieren reactividad. |
-| `onStorage` | 89 | O27: Marker local revoca proyección/generación, sin secreto; cleanup de listeners/múltiples raíces no acreditado. |
-| `clearLocalAuth` | 102 | O27: Mismo user null/flag/workspace reset; signal compartido conserva fachada writable. |
-| `sessionGeneration` | 114 | O27: API pública intacta, read ahora reactivo. |
-| `nextGeneration` | 118 | O28: invalida también identity reads antes de avanzar; protege cancelación y respuesta ya decodificada. |
-| `isCurrent` | 123 | O27: Misma comparación de número, no ampliado a userid para responses ya enviados. |
-| `assertCurrent` | 127 | O27: Mismo control-flow SupersededError, no abort de transporte. |
-| `init` | 180 | O28/B149/B150: probe coalesced con LatestRequest/abort/epoch; comprueba otra vez antes de publicar, adopta generación propia y no borra /me más nuevo; retry/transient/401 preservados. |
-| `refreshWorkspaces` | 226 | O27: Revision/generation propios existentes; sin gate nuevo para cada rol. |
-| `login` | 240 | O27: Generación antes de enviar/clear; DTO/Auth facade/workspaces intactos. Real HTTP login propio pasa guard de dispatch. |
-| `verifyMfa` | 262 | O27: Transición pública con su generación, decoded user yworkspaces comprobados. |
-| `recoverMfa` | 273 | O27: Mismo lifecycle probado a través de HTTP real simulado. |
-| `register` | 288 | O27: Registro anónimo/generic user:null sigue permitido ydecoded; no creación de sesión. |
-| `logout` | 334 | O27: Mismo cierre sólo confirmado, gen avanza antes deawait; B148 effect ya observa avance si falla yuser permanece.; O28/B152: probe settled para reemplazo fallido o cierre definitivo, transient retry conserva loadedfalse |
-| `sessionExpired` | 346 | O27: Esperada generación filtra401viejos, mismo invalidate. |
-| `accountSignedOut` | 358 | O27: Esperada generación protege confirmación tardía; fixture real usa para invalidar intento pendiente.; O28/B152: probe settled para reemplazo fallido o cierre definitivo, transient retry conserva loadedfalse |
-| `invalidateLocalSession` | 369 | O27: Incrementa reloj/borrauser/workspaces yflag; no nueva política.; O28/B152: probe settled para reemplazo fallido o cierre definitivo, transient retry conserva loadedfalse |
-| `announceInvalidation` | 378 | O27: Marker sin credenciales yfallo storage silencioso, igual. |
-| `me` | 387 | O28/B149/B150: única lectura vigente, abort + guard antes de publicar; cuenta distinta avanza epoch y recarga workspaces sin heredar rol; misma cuenta conserva commands. |
-| `publishUser` | 132 | O28/B149: DTO confirmado cancela probes anteriores antes de publicar; tres writers perfil/email tienen regresiones reales HTTP y decoder. |
-| `adoptObservedUser` | 138 | O28/B150: centraliza identidad observada, loaded/probe y epoch; sólo una cuenta previa distinta descarta selección almacenada; workspaces se cargan con epoch nuevo. |
-| `assertIdentityCurrent` | 154 | O28/B149: guard sin await justo antes de publicar; dos nuevas regresiones de invalidación entre helper y writer. |
-| `readIdentity` | 158 | O28/B149: transporte GET cancelable y decoder real; reevalúa propiedad en éxito/error, traduce cancelación obsoleta a Superseded sin borrar estado actual.; O28/B152: probe settled para reemplazo fallido o cierre definitivo, transient retry conserva loadedfalse |
-| `sessionContextChanged` | 352 | O28/B151: sólo la generación originaria limpia la proyección; sin logout, cookie write ni marker cross-tab; probe queda resuelto. |
-| `updateProfile` | 430 | O28/B149/B150: DTO confirmado invalida probe viejo; epoch observado rechaza respuesta enviada por cuenta anterior. |
-| `requestEmailChange` | 448 | O28/B149/B150: misma política de DTO/epoch; bearer/factor/backend mantienen su admisión. |
-| `cancelEmailChange` | 460 | O28/B149/B150: misma política de DTO/epoch, sin inventar éxito al recibir DTO obsoleto. |
-| `changePassword` | 438 | O28/B150: ACK tardío después de observar B queda Superseded; misma cuenta conserva comando válido, sin modificar seguridad backend. |
+| `generation` | 68 | O27: Getter al signal compartido, antes primitive; todos los reads de generación adquieren reactividad. |
+| `onStorage` | 85 | O27: Marker local revoca proyección/generación, sin secreto; cleanup de listeners/múltiples raíces no acreditado. |
+| `clearLocalAuth` | 98 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `sessionGeneration` | 113 | O27: API pública intacta, read ahora reactivo. |
+| `nextGeneration` | 117 | O28: invalida también identity reads antes de avanzar; protege cancelación y respuesta ya decodificada. |
+| `isCurrent` | 122 | O27: Misma comparación de número, no ampliado a userid para responses ya enviados. |
+| `assertCurrent` | 126 | O27: Mismo control-flow SupersededError, no abort de transporte. |
+| `init` | 237 | O28/B149/B150: probe coalesced con LatestRequest/abort/epoch; comprueba otra vez antes de publicar, adopta generación propia y no borra /me más nuevo; retry/transient/401 preservados. |
+| `refreshWorkspaces` | 284 | O27: Revision/generation propios existentes; sin gate nuevo para cada rol. |
+| `login` | 298 | O27: Generación antes de enviar/clear; DTO/Auth facade/workspaces intactos. Real HTTP login propio pasa guard de dispatch.  O52: sólo expresiónHTTP sustituida por owner; resto de método/clase comparado.24nuevos contratos HTTP/API/interceptor y407antes/después,types/lint/build7.242s verdes. Full1397/1397,804hashesintactos; no nueva garantía nativa/proveedor/DOM. |
+| `verifyMfa` | 320 | O27: Transición pública con su generación, decoded user yworkspaces comprobados.  O52: sólo expresiónHTTP sustituida por owner; resto de método/clase comparado.24nuevos contratos HTTP/API/interceptor y407antes/después,types/lint/build7.242s verdes. Full1397/1397,804hashesintactos; no nueva garantía nativa/proveedor/DOM. |
+| `recoverMfa` | 331 | O27: Mismo lifecycle probado a través de HTTP real simulado.  O52: sólo expresiónHTTP sustituida por owner; resto de método/clase comparado.24nuevos contratos HTTP/API/interceptor y407antes/después,types/lint/build7.242s verdes. Full1397/1397,804hashesintactos; no nueva garantía nativa/proveedor/DOM. |
+| `register` | 346 | O27: Registro anónimo/generic user:null sigue permitido ydecoded; no creación de sesión.  O52: sólo expresiónHTTP sustituida por owner; resto de método/clase comparado.24nuevos contratos HTTP/API/interceptor y407antes/después,types/lint/build7.242s verdes. Full1397/1397,804hashesintactos; no nueva garantía nativa/proveedor/DOM. |
+| `logout` | 383 | O27: Mismo cierre sólo confirmado, gen avanza antes deawait; B148 effect ya observa avance si falla yuser permanece.; O28/B152: probe settled para reemplazo fallido o cierre definitivo, transient retry conserva loadedfalse  O52: sólo expresiónHTTP sustituida por owner; resto de método/clase comparado.24nuevos contratos HTTP/API/interceptor y407antes/después,types/lint/build7.242s verdes. Full1397/1397,804hashesintactos; no nueva garantía nativa/proveedor/DOM. |
+| `sessionExpired` | 395 | O27: Esperada generación filtra401viejos, mismo invalidate. |
+| `accountSignedOut` | 407 | O27: Esperada generación protege confirmación tardía; fixture real usa para invalidar intento pendiente.; O28/B152: probe settled para reemplazo fallido o cierre definitivo, transient retry conserva loadedfalse |
+| `invalidateLocalSession` | 418 | O27: Incrementa reloj/borrauser/workspaces yflag; no nueva política.; O28/B152: probe settled para reemplazo fallido o cierre definitivo, transient retry conserva loadedfalse |
+| `announceInvalidation` | 427 | O27: Marker sin credenciales yfallo storage silencioso, igual. |
+| `me` | 436 | O28/B149/B150: única lectura vigente, abort + guard antes de publicar; cuenta distinta avanza epoch y recarga workspaces sin heredar rol; misma cuenta conserva commands. |
+| `publishUser` | 131 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `adoptObservedUser` | 194 | O28/B150: centraliza identidad observada, loaded/probe y epoch; sólo una cuenta previa distinta descarta selección almacenada; workspaces se cargan con epoch nuevo. |
+| `assertIdentityCurrent` | 211 | O28/B149: guard sin await justo antes de publicar; dos nuevas regresiones de invalidación entre helper y writer. |
+| `readIdentity` | 215 | O28/B149: transporte GET cancelable y decoder real; reevalúa propiedad en éxito/error, traduce cancelación obsoleta a Superseded sin borrar estado actual.; O28/B152: probe settled para reemplazo fallido o cierre definitivo, transient retry conserva loadedfalse |
+| `sessionContextChanged` | 401 | O28/B151: sólo la generación originaria limpia la proyección; sin logout, cookie write ni marker cross-tab; probe queda resuelto. |
+| `updateProfile` | 477 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `requestEmailChange` | 491 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `cancelEmailChange` | 495 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `changePassword` | 481 | O28/B150: ACK tardío después de observar B queda Superseded; misma cuenta conserva comando válido, sin modificar seguridad backend. |
+| `assertUserContext` | 139 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `reconcileUserMutations` | 144 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `applyUserMutation` | 155 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+
+O29/B153 sustituye publicación incondicional de snapshots simultáneos por reconciliación posterior. Una lectura iniciada o publicada durante command obliga reconciliación (también post-MFA). Failure conserva notice explícito y ACK; supresión sólo de fallos del read, no command. API/contexto capturados antes de awaits; no cambia generación de misma cuenta.
+| `markUserProjectionStale` | 160 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `confirmedMfaMutation` | 169 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `refreshUser` | 447 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `mfaSetup` | 600 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `mfaEnable` | 604 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `mfaCancelSetup` | 608 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `mfaRegenerateRecoveryCodes` | 612 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `mfaDisable` | 616 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+
+| `listSessions` | 565 | O33: GET con options/signal/timeout, generation antes/después de transporte conservada; entrada validada y supersession comprobadas por HTTP real simulado. |
+
+| `revokeSession` | 572 | O33: Current protector/client+server/ACK inválido/interceptor401/identity reemplazada preservados; no abort/replay de write enviado. Caller Settings real prueba propia navegación y supresión tras replacement/destroy. |
+
+| `revokeOtherSessions` | 584 | O33: Count0 ypositivo validados, ACK inválido/httpfail no cambia identidad ni se reenvía; guards duranteCSRF/retry ysettlement conservados. |
+
+| `revokeAllSessions` | 592 | O33: Logout propio sólo tras ACK validado/generation vigente;0válido; late success/401 no borraB; política Auth intacta por comparación mecánica. |
 
 ## frontend/src/app/core/services/api.service.ts
 
@@ -872,3 +877,314 @@ O28: función y dependencias leídas; controles acotados a propiedad de lecturas
 | `isCurrent` | 40 | O28/B149: destrucción/revisión/contexto requeridos; guard al decodificar y justo antes de publicar tras nested await. |
 
 O28: AuthService completo y los dos constructores leídos; DestroyRef retira listener storage con su injector y LatestRequest cancela GET al destruir. Test real de disposal verifica ausencia de efecto posterior; no bug ID de raíces múltiples atribuido. Revisión/contratos de writers simultáneos de DTO de la misma cuenta y restantes callers/roles/gates S01–S13 continúan pendientes. Header server es precondición, no autorización ni solución universal a Set-Cookie ya enviado.
+
+## frontend/src/app/core/services/account-profile.service.ts
+
+O29 separa sólo transporte perfil/email; fachada mantiene publicación/generación. No espera previa nueva ni cola de password; API captura intención/CSRF como antes.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `updateName` | 11 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `requestEmail` | 16 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `cancelEmail` | 23 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+
+## frontend/src/app/core/services/auth-user-mutations.ts
+
+O29/B153: grupo de commands ya despachados del mismo epoch/ID, no orden por inicio/llegada. Tras settle, único /me si colisión o read concurrente; resultado command confirmado separado de refresh. No passwords retenidas en el grupo, reintento ni abort de writes.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `constructor` | 21 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `identityRead` | 29 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `run` | 33 | O29/B153 + O30: grupo hereda necesidad de reconciliación previa; ACK de seguridad cancela probes y marca grupos abiertos. Test profile previo y nuevo tras ACK impide downgrade de MFA. Sin serializar/reintentar commands. |
+
+
+## frontend/src/app/panel/settings/settings.component.ts
+
+O29: Settings conserva formularios montados y admite profile/email simultáneos. Aviso compartido muestra confirmación distinta de actualización; read manual deduplicado no reenvía command. Foco vuelve a #account sólo si control seguía elegido; aria-disabled conserva foco durante espera. Constructor/effects de identidad y caller HTML leídos; funciones ajenas no acreditadas.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `saveProfile` | 440 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `settleAfterConfirmedMutation` | 432 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `refreshAccountView` | 457 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `openEmailDialog` | 485 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `loadSessions` | 521 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `startMfaSetup` | 983 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `startMfaReconfiguration` | 988 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `stageMfaSetup` | 996 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `beginMfaReconfiguration` | 1026 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `enableMfa` | 1032 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `disableMfa` | 1055 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `cancelMfaSetup` | 1092 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `cancelMfaReconfiguration` | 1109 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `accountContext` | 1115 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `clearSensitiveMfaUi` | 1119 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `clearMfaSetupUi` | 1131 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `settleUncertainMfaUi` | 1141 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `finishRecoveryCodes` | 1150 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `beginRecoveryRegeneration` | 1157 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `cancelRecoveryRegeneration` | 1163 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `regenerateRecoveryCodes` | 1169 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+
+## frontend/src/app/panel/settings/email-access-dialog.component.ts
+
+O29: archivo completo leído; etapas/step-up/success/secret cleanup/close existentes. submit sigue esperando confirmación; reconciliación fallida deja aviso en Settings y no false rollback. QA con formularios/DOM reales, fixture propia sin correo ni DB.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `submit` | 87 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+
+## frontend/src/app/core/services/account-mfa.service.ts
+
+O30: contrato/caller completo leído. Cobertura limitada, sistema y roles restantes abiertos.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `setup` | 10 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `enable` | 14 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `cancelSetup` | 18 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `regenerate` | 22 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `disable` | 26 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+
+
+## frontend/src/app/core/services/auth-response-decoders.ts
+
+O34/B163: decodeMfaSetup y sus dos callbacks locales completos revisados con emisor/caller; validación del DTO antes de publicar instrucciones.
+
+O30: contrato/caller completo leído. Cobertura limitada, sistema y roles restantes abiertos.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `decodeRecoveryCodes` | 298 | O30/B156: v1 exige diez credenciales distintas, cuatro bloques de4 y alfabeto real Ids. Ocho casos enable/regenerate rechazan empty/partial/duplicate/invalid; no publica éxito parcial. Decoder inválido conserva resultado incierto; GET no recupera códigos write-only. |
+
+
+| `session` | 220 | O33: Lectura completa de shape/strings/booleans, con current y nullablefields; datos válidos ytruncated comprobados por HTTP. Formatos semánticos de fecha se mantienen como strings por contrato vigente, no gate nuevo. |
+
+| `nullableString` | 222 | O33: Callback local de session: null ostring, otros tipos rechazados. Código leído, nestedcallbackconciliado por caller; no nueva policy. |
+
+| `decodeSessionsResponse` | 239 | O33: Lista acotada flagboolean, omissionlegacy→false;[]/truncatedtrue/errorstringflag probados. Sin transformar lectura en éxito vacío. |
+
+| `decodeSessionRevocation` | 251 | O33: oktrue obligatorio/currentboolean si presente; malformed no false logout, currentomitido permiteprotectorlocal porfacade. |
+
+| `decodeSessionsBulkRevocation` | 258 | O33: oktrue/countintegernonnegative,0válido;errshape/false/negativo/string rechazados sin cambios locales. |
+
+| `decodeMfaSetup` | 270 | O34/B163: Base32 nuevo32, manual=QR, cinco parámetros únicos conocidos y coherentes, labelUVH/cuenta, path sin normalización engañosa, tipos/control/fragment/authority inválidos rechazados. Callback forEach cuenta keys y some descarta desconocidas; no cambios en credenciales legacy.47 pruebas de contrato/HTTP más7 callerSettings; full1179, con límites sin cookie/proveedor nativo. |
+
+## backend-laravel/app/Support/Ids.php
+
+O30: contrato/caller completo leído. Cobertura limitada, sistema y roles restantes abiertos.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `randomRecoveryCode` | 33 | Dependencia S13 leída completa para contrato O30/B156: alfabeto y default16 comprobados con newRecoveryCodes/formatRecoveryCode. Sin cambio PHP ni nueva prueba de entropy, random infra o todos los callers. |
+
+
+O30: constructor Settings y efectos de identidad/incertidumbre leídos junto con HTML MFA. Nunca guardar plaintext codes/secret en Auth; sólo flag de entrega incierta del mismo epoch/ID. Ese flag sobrevive remount SPA y lecturas activas; se limpia al emitir codes válidos, observar factor desactivado o sustituir identidad. No persistencia tras reload ni gate de clipboard/descarga tardía acreditado. El foco de refresh vuelve a la sección originaria (#account/#security) sólo si el usuario conservó el control. Restantes proyecciones de Settings ante cambio de identidad y configuración setup URI/secret siguen como candidatos por revisar, sin bug ID antes de reproducción.
+
+## frontend/src/app/core/services/account-sessions.service.ts
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+
+| `list` | 11 | O33: Transporte puro GET, decoder yoptions intactos; mismo round trip/context headers; AbortSignal cancela sólo read. Sin almacenamiento/proyección de identidad. |
+
+| `revoke` | 15 | O33: Transporte puro POST a ID encodeURIComponent, body vacío yACK runtime; CSRF/preconditions centrales preservados. No política de invalidación propia. |
+
+| `revokeOthers` | 21 | O33: Transporte puro POST+bulkdecoder; integercount0válido ymalformed/negativo rechazados; no nuevo retry/queue. |
+
+| `revokeAll` | 25 | O33: Transporte puro POST+bulkdecoder; efectos de identity sólo en facade después de guard, ningún callback/publicación aquí. |
+
+O33: cuatro transportes extraídos después de46caracterizaciones vigentes, sin bugID nuevo. Comparación de cuatro métodos completos conserva guard/effects después de adaptar expression API. Backend/DOM/CSS sin cambio; source/controller/tests previosO32 son evidencia anterior. Cinco controles nuevos del caller Settings fortalecen la composición. Gates finales:174dedicado/1125full/lint/tipos/build10,512s, exit0;473hashes y352S01anchors comprobados. No cierreS01.
+
+
+## backend-laravel/app/Http/Controllers/SecurityIncidentController.php
+
+O46: propietario actual tras separación gradual; evidencia histórica conservada en cada fila. No cierre de S01/S02 ni dobleconteo de dependencia compartida.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `revokeCompromisedAccess` | 22 | O16: caller HTTP leído; delega TX completa a CompromisedAccessRevocation, conserva cleanup/index/cookie tras resultado confirmado. B132 admite evidencia recuperable sin revertir protección por audit general. O18/B135-B137: dos casos físicos commit/rollback y dos fallbacks disco/logs/métricas pasan; cleanup HTTP espera commit exterior.  O46: dueño trasladado; cuerpo completo preservado tras sólo adaptar lookup,191contratos/1923aserciones antes-después,185runtime-routes y44métodos comparados;Pint489/PHPStan0,full2149/17449/395,866s yJUnit0errors/failures/skips. |
+
+
+## backend-laravel/app/Http/Controllers/AccountRecoveryController.php
+
+O46: propietario actual tras separación gradual; evidencia histórica conservada en cada fila. No cierre de S01/S02 ni dobleconteo de dependencia compartida.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `requestAccountRecovery` | 29 | O17: validación/CAPTCHA/lookup202 y catch genérico conservados; TX completa delegada. Cooldown59/60/61 y cuatro cambios después del lookup comprobados. Tiempo/carga/proveedor real pendientes.  O46: dueño trasladado; cuerpo completo preservado tras sólo adaptar lookup,191contratos/1923aserciones antes-después,185runtime-routes y44métodos comparados;Pint489/PHPStan0,full2149/17449/395,866s yJUnit0errors/failures/skips. |
+| `confirmAccountRecovery` | 57 | O17: sintaxis/preflight y400/200 conservados; TX completa delegada, hash/owner/status y generación/estado vivos comprobados. No concede sesión.  O46: dueño trasladado; cuerpo completo preservado tras sólo adaptar lookup,191contratos/1923aserciones antes-después,185runtime-routes y44métodos comparados;Pint489/PHPStan0,full2149/17449/395,866s yJUnit0errors/failures/skips. |
+| `completeAccountRecovery` | 78 | O17: hash y approvals preflight fuera de locks; TX completa delegada, respuesta/cleanup posteriores. B134 conserva cookie ajena y current booleano; O18/B135-B137: dos casos físicos commit/rollback y dos fallbacks disco/logs/métricas pasan; callback terminal revalida path/status bajo lock.  O46: dueño trasladado; cuerpo completo preservado tras sólo adaptar lookup,191contratos/1923aserciones antes-después,185runtime-routes y44métodos comparados;Pint489/PHPStan0,full2149/17449/395,866s yJUnit0errors/failures/skips. |
+
+
+## backend-laravel/app/Support/Auth/AuthAccountLookup.php
+
+O46: propietario actual tras separación gradual; evidencia histórica conservada en cada fila. No cierre de S01/S02 ni dobleconteo de dependencia compartida.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `activeByEmail` | 10 | Helper leído: trim en caller, lower(email) y deleted excluido; lookup no concede autoridad y servicio revalida bajo lock. Otros callers mantienen gate propio.  O46: dueño trasladado; cuerpo completo preservado tras sólo adaptar lookup,191contratos/1923aserciones antes-después,185runtime-routes y44métodos comparados;Pint489/PHPStan0,full2149/17449/395,866s yJUnit0errors/failures/skips. |
+
+
+## backend-laravel/app/Http/Controllers/Concerns/ValidatesAuthInput.php
+
+O46: propietario actual tras separación gradual; evidencia histórica conservada en cada fila. No cierre de S01/S02 ni dobleconteo de dependencia compartida.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `validEmail` | 31 | Helper leído: no vacío, máximo254bytes y filtro PHP; contratos HTTP existentes conservados. No implica entregabilidad del buzón.  O46: dueño trasladado; cuerpo completo preservado tras sólo adaptar lookup,191contratos/1923aserciones antes-después,185runtime-routes y44métodos comparados;Pint489/PHPStan0,full2149/17449/395,866s yJUnit0errors/failures/skips. |
+| `validPassword` | 36 | Helper leído:10..72bytes; fuerza evaluada aparte y con identidad viva en mutación. Contratos locales; coste/rate limit reales pendientes.  O46: dueño trasladado; cuerpo completo preservado tras sólo adaptar lookup,191contratos/1923aserciones antes-después,185runtime-routes y44métodos comparados;Pint489/PHPStan0,full2149/17449/395,866s yJUnit0errors/failures/skips. |
+
+| `captchaError` | 12 | O46: helper completo preservado ytrait compartido Auth/Recovery. Rechazo/proveedor503/hostajeno/ConnectionException porHTTPfake, un intento; publicmessage422/503exacto ysin admisión privada.36nuevos/191dedicados1923aserciones antes-después;full2149/17449/395,866s yJUnit0errors/failures/skips. No proveedor real ni timing productivo. |
+
+
+O46 final verificado (04/10): **2149/2149 backend,17449aserciones,395,866s/139MB,exit0**, exclusivamente uvh_test (`.uvh-runtime/s01-auth-recovery-controllers-full-backend.log`). JUnit2149/17449/errors0/failures0/skipped0,36PublicRecoveryHttpContractTest/431aserciones,393,309949sJUnit en `backend-laravel/storage/logs/s01-auth-recovery-controllers-junit.xml`; summary `.uvh-runtime/s01-auth-recovery-controllers-junit-summary.json`.191/1923dedicado antes32,27s/después32,68s;Pint489/PHPStan0 exit0.15hashes de fuente/test/baseline conservados y479sourcehashes/354S01/16S03/63S10/194S02anchors comprobados después. FullAuth restante/44methodbodies/185runtime-routes/8dependencies y2deletion+6export+4sessions+3TX anteriores preservados tras las adaptaciones declaradas.
+
+AccountRecoveryController3actions ySecurityIncidentController1action son los propietarios reales; shared3validators yactive-email preflight evitan duplicación. AuthController1227líneas/AuthService648,baseline152/141 sin nuevoignore. Sin nuevoBugID/TS/DOM/QA/provider/SMTP/Redis/nativecookie/latency/capacity claim;frontend1373O43 previo. Suites DB secuenciales ysin PHP/tests editados durante full. Handles propios terminales;sharedpostgres/mailpit operativos, sin worker/scheduler/appserver. No uvh_local/users/mail/providers/productioncommands/migraciones externas/commit/push/deploy.
+
+PlanO46 cerrado sólo como extracción local. **Objetivo global/S01–S13 activos; Auth no está totalmente separado.** NextStep vigente: `docs/superpowers/plans/2026-10-04-account-deletion-lifecycle-audit.md`, reproducir admisión primaria deanonimización ycompensaciones protectoras por comando nativo guardado;sourcecandidates sin ID hasta rojo. Después continuar extracción coherente registro/activación ypasswordrecovery. RestoAuth/MFA/profile/sessions,registryTTL/configurable,funciones/roles/retención/capacidad/CI/operación real permanecen pendientes. No redefinir cierre como suites verdes/extracción parcial.
+
+
+| `validName` | 41 | O48: original helper completo deAuth movido al trait; UTF8válido,2..80caracteres ysin controlesASCII, consumido por registro/activación/perfil. Cuerpo literal preservado y301/2852regresiones antes-después;Pint496/PHPStan0,full2205/18889/398,526s yJUnit0errors/failures/skips. |
+
+## backend-laravel/app/Http/Controllers/RegistrationController.php
+
+O48: propietario de acciones/helpers tras extracción literal. Evidencia histórica conservada;301/2852antes-después93,37s/95,46s, comparación de36cuerpos/comentarios y185routes. Pint496/PHPStan0;full2205/18889/398,526s yJUnit0errors/failures/skips; sin cierre de S01.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `register` | 28 | O12: validación/CAPTCHA/respuestas/cookies conservadas; SQL/mail/audit delegado completo a RegistrationAdmission. Proveedor/tiempo/concurrencia intersistemas con gates separados. O48: cuerpo ydoc completos trasladados sin reescritura. |
+| `changeRegistrationEmail` | 89 | O13: validaciones/CAPTCHA/preflight/cookie y errores conservados; TX delegada. O14 revalida intento propio y emite v4; composición comprobada con ocupación/secuencias/replay y full1527/11020. O48: cuerpo ydoc completos trasladados sin reescritura. |
+| `verifyEmail` | 145 | O12: contrato legal/token/password y HTTP conservados; activación pending/legacy transaccional delegada, sin sesión; UI/proveedores pendientes propios. O48: cuerpo ydoc completos trasladados sin reescritura. |
+| `resendVerification` | 187 | O13: selección/HTTP/floor público; servicio común revalida elegibilidad/cooldown bajo lock, pruebas de carreras/rollback/retry locales. O48: cuerpo ydoc completos trasladados sin reescritura. |
+| `findPendingRegistrationByEmail` | 256 | O48: helper completo leído; lookup lower(email)/first idéntico, sólo preflight del reenvío; servicio revalida autoridad bajo lock. Cuerpo íntegro comparado, sin nueva garantía de delivery o coste. |
+
+
+## backend-laravel/app/Http/Controllers/PasswordRecoveryController.php
+
+O48: propietario de acciones/helpers tras extracción literal. Evidencia histórica conservada;301/2852antes-después93,37s/95,46s, comparación de36cuerpos/comentarios y185routes. Pint496/PHPStan0;full2205/18889/398,526s yJUnit0errors/failures/skips; sin cierre de S01.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `forgotPassword` | 26 | O15: caller tipado; validación/CAPTCHA/floor y fallo público conservados; solicitud transaccional delegada. Cooldown y lookup/lock locales comprobados. O48: cuerpo ydoc completos trasladados sin reescritura. |
+| `resetPassword` | 52 | O15: caller tipado; hash fuera del lock; reset transaccional completo delegado. Replay/kind/owner/expiry/live identity y cookie propia/ajena comprobados; no sesión emitida. O48: cuerpo ydoc completos trasladados sin reescritura. |
+
+
+## backend-laravel/app/Http/Controllers/Concerns/EqualizesPublicMailDuration.php
+
+O48: propietario de acciones/helpers tras extracción literal. Evidencia histórica conservada;301/2852antes-después93,37s/95,46s, comparación de36cuerpos/comentarios y185routes. Pint496/PHPStan0;full2205/18889/398,526s yJUnit0errors/failures/skips; sin cierre de S01.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `equalizePublicMailDuration` | 18 | Lectura completa; suelo configurable hrtime/usleep, sin garantía de tiempo constante bajo toda carga. Controles existentes de ramas públicas conservados. O48: cuerpo ydoc completos trasladados sin reescritura. |
+
+
+## backend-laravel/app/Http/Controllers/AccountProfileController.php
+
+O49: cuerpos/comentarios completos movidos literalmente; propietario real sin herencia ni forwarding a Auth. 185contratos runtime idénticos salvo11owners;23dependencias hash-preservadas. Regresión300/2669antes-después46,63s/47,25s;Pint500/PHPStan0,full2205/18889 yJUnit0errors/failures/skips;683hashes conservados. Evidencia histórica conservada, sin cierre S01 ni gate UI/proveedores.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `me` | 17 | O23: resolve por petición y payload AccountQueries; SQL/401 conservados. GET real sin FOR UPDATE/TX de negocio, secretos ni cookie nueva con CSRF existente; UI mantiene gate. O49: traslado literal del método ycomentarios. |
+| `profile` | 27 | O22: validación y DTO conservados; delega TX completa a ProfileAdmission. Nombre y exact audit bajo autoridad viva, outer commit/rollback/retry comprobados; no step-up nuevo. O49: traslado literal del método ycomentarios. |
+
+
+## backend-laravel/app/Http/Controllers/AccountCredentialsController.php
+
+O49: cuerpos/comentarios completos movidos literalmente; propietario real sin herencia ni forwarding a Auth. 185contratos runtime idénticos salvo11owners;23dependencias hash-preservadas. Regresión300/2669antes-después46,63s/47,25s;Pint500/PHPStan0,full2205/18889 yJUnit0errors/failures/skips;683hashes conservados. Evidencia histórica conservada, sin cierre S01 ni gate UI/proveedores.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `requestEmailChange` | 31 | O20: caller HTTP completo; validación/preflight/token/url conservados y TX delegada. B139 rechaza reserva ajena vigente con rollback y mismo409. Factor inválido no revela ocupación; native PostgreSQL sin ciclo. UI/gates reales pendientes. O49: traslado literal del método ycomentarios. |
+| `cancelEmailChange` | 109 | O20: caller HTTP conservado; TX completa delegada. Cancelación con/sin pendiente mantiene consumption de recovery y exact audit; outer rollback/retry comprobados. UI/gates reales pendientes. O49: traslado literal del método ycomentarios. |
+| `confirmEmailChange` | 156 | O20: lookup/sintaxis/HTTP/current conservados; TX completa delegada. Siete cambios tras lookup, ocupación User/Pending, expiry/replay y outer rollback/mail doble/audit comprobados. UI/gates reales pendientes. O49: traslado literal del método ycomentarios. |
+| `changePassword` | 191 | O19: caller HTTP completo, validación/hash fuera de locks y catches/status sin cambios. TX completa delegada;18 nuevas caracterizaciones y93/873 antes/después. Hash a TXlevel0 y own-session/current policy conservados; dependencias/UI/gates reales abiertos. O49: traslado literal del método ycomentarios. |
+| `appUrl` | 266 | Wrapper leído hacia FrontendUrl::base; notices/password usan mismo propietario compartido tras traslado. Configuración del despliegue mantiene su gate. O49: traslado literal del método ycomentarios. |
+
+
+## backend-laravel/app/Http/Controllers/AccountSessionsController.php
+
+O49: cuerpos/comentarios completos movidos literalmente; propietario real sin herencia ni forwarding a Auth. 185contratos runtime idénticos salvo11owners;23dependencias hash-preservadas. Regresión300/2669antes-después46,63s/47,25s;Pint500/PHPStan0,full2205/18889 yJUnit0errors/failures/skips;683hashes conservados. Evidencia histórica conservada, sin cierre S01 ni gate UI/proveedores.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `sessions` | 17 | O23: caller y proyección completa separados; current validado, orden estable y límite101→100/truncated conservados. GET sin locks de mutación; volumen/UI pendientes. O49: traslado literal del método ycomentarios. |
+| `securityCenter` | 31 | O23: caller y proyección completa separados; scopes, allowlist, limit21→20/truncated sin metadata/IP conservados. GET sin locks de mutación; UI pendiente. O49: traslado literal del método ycomentarios. |
+| `revokeSession` | 41 | O24: caller HTTP leído; TX completa en SessionRevocationAdmission, SQL/policy/cookies/404/409/503 conservados.15 controles nuevos,66/604 antes/después y134/1007 final conjunto; UI mantiene gate. O49: traslado literal del método ycomentarios. |
+| `revokeOtherSessions` | 69 | O24: caller HTTP leído; TX completa en SessionRevocationAdmission, SQL/policy/cookies/404/409/503 conservados.15 controles nuevos,66/604 antes/después y134/1007 final conjunto; UI mantiene gate. O49: traslado literal del método ycomentarios. |
+| `revokeAllSessions` | 96 | O24: caller HTTP leído; TX completa en SessionRevocationAdmission, SQL/policy/cookies/404/409/503 conservados.15 controles nuevos,66/604 antes/después y134/1007 final conjunto; UI mantiene gate. O49: traslado literal del método ycomentarios. |
+
+
+## backend-laravel/app/Http/Controllers/Concerns/NormalizesRecoveryCodes.php
+
+O49: cuerpos/comentarios completos movidos literalmente; propietario real sin herencia ni forwarding a Auth. 185contratos runtime idénticos salvo11owners;23dependencias hash-preservadas. Regresión300/2669antes-después46,63s/47,25s;Pint500/PHPStan0,full2205/18889 yJUnit0errors/failures/skips;683hashes conservados. Evidencia histórica conservada, sin cierre S01 ni gate UI/proveedores.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `normalizeRecoveryCode` | 8 | Helper completo leído; trim, mayúsculas y retirada de espacios/guiones conservados; factor sigue comprobándose bajo lock. O49: traslado literal del método ycomentarios. |
+
+
+## backend-laravel/app/Http/Controllers/MfaChallengeController.php
+
+O50: propietario real sin herencia/forwarding. Todos14cuerpos/docs yclase restante comparados;12literales/dos sólo quitan coalesce redundante garantizado porgetfinal;9acciones+3helpers movidos;185runtime-routes idénticas salvo9classes;34dependencias ynormalización compartida intactas;baseline149/139retira sólo la supresión previa(count2). Regresión378/3444antes71,73s/después final62,67s;Pint503/PHPStan0,full2205/18889 yJUnit0errors/failures/skips;686hashes conservados. No gate frontend/provider/capacity ni cierre global.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `mfaVerify` | 21 | Caller MfaLoginAdmission::totp, resultado union y JsonResponse tipados; consumo/fallback/rollback locales comprobados; lock/presupuesto/HTTP aún aquí O50: traslado literal completo. |
+| `mfaRecovery` | 100 | Caller MfaLoginAdmission::recovery, resultado union/JsonResponse tipados; B126 distingue cuenta obsoleta de código incorrecto; marker conservado al fallar cleanup O50: traslado literal completo. |
+
+
+## backend-laravel/app/Http/Controllers/MfaSessionController.php
+
+O50: propietario real sin herencia/forwarding. Todos14cuerpos/docs yclase restante comparados;12literales/dos sólo quitan coalesce redundante garantizado porgetfinal;9acciones+3helpers movidos;185runtime-routes idénticas salvo9classes;34dependencias ynormalización compartida intactas;baseline149/139retira sólo la supresión previa(count2). Regresión378/3444antes71,73s/después final62,67s;Pint503/PHPStan0,full2205/18889 yJUnit0errors/failures/skips;686hashes conservados. No gate frontend/provider/capacity ni cierre global.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `mfaSessionStatus` | 20 | O23: caller completo y AccountQueries::mfaSession; estado/fechas exactas B120 y SQL/401 conservados. Contexto vivo por petición; GET sin locks/TX de negocio. UI mantiene gate. O50: traslado literal completo. |
+| `mfaReauthenticate` | 31 | O22: caller HTTP y rechazos conservados; delega TX completa a ReauthenticationAdmission. Factor concreto, audit/IP hasheada y outer commit/rollback/replay comprobados; no rotación de sesión. O50: traslado literal completo. |
+| `iso` | 73 | Helper completo leído haciaIsoDate::format; original cuerpo/documentación preservados. Configuración/relojes distribuidos conservan gate. O50: traslado literal completo. |
+
+
+## backend-laravel/app/Http/Controllers/MfaConfigurationController.php
+
+O50: propietario real sin herencia/forwarding. Todos14cuerpos/docs yclase restante comparados;12literales/dos sólo quitan coalesce redundante garantizado porgetfinal;9acciones+3helpers movidos;185runtime-routes idénticas salvo9classes;34dependencias ynormalización compartida intactas;baseline149/139retira sólo la supresión previa(count2). Regresión378/3444antes71,73s/después final62,67s;Pint503/PHPStan0,full2205/18889 yJUnit0errors/failures/skips;686hashes conservados. No gate frontend/provider/capacity ni cierre global.
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `mfaSetup` | 24 | O21: caller completo; generación/cifrado fuera de locks, input/HTTP preservados. Setup recovery/estado pendiente y outer rollback/retry comprobados; no reemplaza activo. O50: traslado literal completo. |
+| `mfaEnable` | 59 | O21: caller HTTP completo; código/generación aleatoria/formato/catches conservados. TX completa delegada; first/reconfigure, autoridad viva y outer rollback/TOTP replay comprobados; UI/reloj/provider real pendientes. O50: traslado literal completo. |
+| `mfaCancelSetup` | 95 | O21: caller completo; cancela sólo pendiente sin step-up, con cuenta/sesión vigente. Outer rollback/retry conserva factor activo y códigos. O50: traslado literal completo. |
+| `mfaRegenerateRecoveryCodes` | 109 | O21: caller completo; input/codes aleatorios/formato/HTTP conservados. Reemplazo/generación/sesiones/casos/notice/exact audit en TX; autoridad y outer rollback/retry verificados. O50: traslado literal completo. |
+| `mfaDisable` | 157 | O21: caller completo; preflight/HTTP/catches conservados. Factor concreto, prohibición admin y commit de rotación/revocación/cancel/notice/audit permanecen; autoridad y outer rollback/retry verificados. O50: traslado literal completo. |
+| `newRecoveryCodes` | 208 | Helper completo leído;10 cadenas aleatorias usando Ids antes de locks. Respuesta/hash de10 códigos comprobados; entropy/infra real conserva gate. O50: traslado literal completo. |
+| `formatRecoveryCode` | 218 | Helper completo leído; grupos de4 y guiones; char42 comprueba respuesta normalizada contra hashes persistidos. O50: traslado literal completo. |
+
+## frontend/src/app/core/services/auth-entry.service.ts
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `login` | 17 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+| `verifyMfa` | 21 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+| `recoverMfa` | 25 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+| `logout` | 29 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+| `mfaSessionStatus` | 33 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+| `reauthenticateMfa` | 37 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+
+## frontend/src/app/core/services/registration.service.ts
+
+| Función | Línea actual | Estado |
+| --- | --- | --- |
+| `register` | 11 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+| `resendVerification` | 31 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+| `changeRegistrationEmail` | 35 | O52: transporte puro; clase entera comparada con expresiones/cuerposHTTP originales. Generación/publicación/CSRF/anti-enumeración permanecen en fachada/cliente/servidor.24contratos HTTP nuevos,407caracterización antes/después,types/lint/build verdes; full1397/1397,804hashesintactos, sin nuevoBugID ni medición de latencia. |
+
+## frontend/src/app/core/services/auth-session-contracts.ts
+
+O52: cuatro declaraciones públicas de tipos originales trasladadas literalmente; AuthService conserva re-export público ydecoder sólo cambia importtype. Archivo sin funciones; no sumar anchors de funciones ni atribuir nuevo gate de DTO/backend.
+
+## frontend/src/app/auth/auth-flow-state.ts
+
+O53: unión discriminada de tipos, sin funciones. Login/registro/verificación no admiten desafío; MFA y recuperación comparten challenge y recoveryAvailable. Las tres proyecciones del componente son readonly; las transiciones escriben el estado completo. No añadir función ficticia ni atribuir nueva garantía de backend a este módulo.
+
+O54: el módulo auth-flow-state ahora declara también etapa/modo de registro, originalEmail para corrección y source/email para las tres procedencias de verificación. Tipos completos leídos/comparados; rama MFA literalmente preservada. No contiene funciones ni reemplaza autorización firmada del servidor. B186 y el nuevo bloque de estado tienen417auth/1407full/types/lint/build yQA3POSTs con límites documentados.

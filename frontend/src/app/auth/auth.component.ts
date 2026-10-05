@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, ViewChild, afterNextRender, computed, effect, inject, isDevMode, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
-import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
+import { FormBuilder, ReactiveFormsModule, Validators, type ValidatorFn } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCheckboxModule } from "@angular/material/checkbox";
@@ -19,11 +19,9 @@ import { safeReturnTo } from "../core/guards/auth.guard";
 import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 import { intentBearer } from "./auth-bearer";
 import { OtpCodeInputComponent } from "./otp-code-input.component";
+import type { AuthFlowState, RegisterStep } from "./auth-flow-state";
 
 import { assessPassword, passwordBands, passwordStrengthLabel } from "./password-policy";
-
-type Step = "login" | "register" | "mfa" | "recovery" | "verify-pending";
-type RegisterStep = 1 | 2;
 
 export const TERMS_VERSION = "2026-08-30";
 export const PRIVACY_VERSION = "2026-08-30";
@@ -62,8 +60,8 @@ export class AuthComponent {
    *
    * La corrección de email reutiliza este formulario sin elegir credencial ni
    * aceptar contratos —la contraseña que deja el registro es una propuesta y la
-   * aceptación es evidencia de quien se registró—, así que esas tres reglas se
-   * suspenden mientras el modo corrección está activo y se reponen al salir. Con
+   * aceptación es evidencia de quien se registró—, así que esas reglas, incluida
+   * la igualdad de contraseñas, se suspenden al corregir y se reponen al salir. Con
    * las listas declaradas una vez, suspender y reponer no puede divergir de lo
    * que el registro exige.
    */
@@ -72,6 +70,12 @@ export class AuthComponent {
   private static readonly CONFIRMATION_RULES = [Validators.required, Validators.maxLength(72)];
 
   private static readonly TERMS_RULES = [Validators.requiredTrue];
+
+  private static readonly PASSWORD_MATCH_RULE: ValidatorFn = (group) => {
+    const password = group.get("password")?.value;
+    const confirmation = group.get("confirmPassword")?.value;
+    return password === confirmation ? null : { mismatch: true };
+  };
 
   @ViewChild("loginCaptcha") private loginCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("registerCaptcha") private registerCaptchaWidget?: HCaptchaWidgetComponent;
@@ -97,8 +101,12 @@ export class AuthComponent {
   private navigationRevision = 0;
   private readonly captchaConfigRequests = new LatestRequest(this.destroyRef);
 
-  readonly step = signal<Step>("login");
-  readonly registerStep = signal<RegisterStep>(1);
+  private readonly flow = signal<AuthFlowState>({ kind: "login" });
+  readonly step = computed(() => this.flow().kind);
+  readonly registerStep = computed<RegisterStep>(() => {
+    const flow = this.flow();
+    return flow.kind === "register" ? flow.stage : 1;
+  });
   readonly busy = signal(false);
   readonly navigationBusy = signal(false);
   private readonly failedNavigation = signal<{ destination: string; generation: number } | null>(null);
@@ -114,14 +122,37 @@ export class AuthComponent {
 
   readonly error = signal<string | null>(null);
   readonly info = signal<string | null>(null);
-  readonly verificationEmail = signal<string | null>(null);
-  readonly verificationEditable = signal(false);
-  readonly verificationRecovery = signal(false);
-  readonly registeredEmail = signal<string | null>(null);
-  readonly changeEmailMode = signal(false);
+  readonly verificationEmail = computed(() => {
+    const flow = this.flow();
+    return flow.kind === "verify-pending" ? flow.email
+      : flow.kind === "register" && flow.mode === "correct-email" ? flow.originalEmail : null;
+  });
+  readonly verificationEditable = computed(() => {
+    const flow = this.flow();
+    return flow.kind === "verify-pending" && flow.source === "browser-registration";
+  });
+  readonly verificationRecovery = computed(() => {
+    const flow = this.flow();
+    return flow.kind === "verify-pending" && flow.source === "recovery";
+  });
+  readonly registeredEmail = computed(() => {
+    const flow = this.flow();
+    return flow.kind === "register" && flow.mode === "correct-email" ? flow.originalEmail
+      : flow.kind === "verify-pending" && flow.source === "browser-registration" ? flow.email : null;
+  });
+  readonly changeEmailMode = computed(() => {
+    const flow = this.flow();
+    return flow.kind === "register" && flow.mode === "correct-email";
+  });
   readonly verificationBusy = signal(false);
-  readonly mfaChallenge = signal<string | null>(null);
-  readonly mfaRecoveryAvailable = signal(false);
+  readonly mfaChallenge = computed(() => {
+    const flow = this.flow();
+    return flow.kind === "mfa" || flow.kind === "recovery" ? flow.challenge : null;
+  });
+  readonly mfaRecoveryAvailable = computed(() => {
+    const flow = this.flow();
+    return (flow.kind === "mfa" || flow.kind === "recovery") && flow.recoveryAvailable;
+  });
   readonly hidePassword = signal(true);
   readonly tabIndex = signal(0);
   readonly pendingLink = this.intents.pending;
@@ -161,11 +192,7 @@ export class AuthComponent {
       company: ["", [Validators.maxLength(120)]],
     },
     {
-      validators: (group) => {
-        const password = group.get("password")?.value;
-        const confirmation = group.get("confirmPassword")?.value;
-        return password === confirmation ? null : { mismatch: true };
-      },
+      validators: AuthComponent.PASSWORD_MATCH_RULE,
     },
   );
 
@@ -229,7 +256,7 @@ export class AuthComponent {
     }
     if (capturedIntent || registerMode) {
       this.tabIndex.set(1);
-      this.step.set("register");
+      this.flow.set({ kind: "register", mode: "new", stage: 1 });
     }
     if (this.route.snapshot.queryParamMap.get("reason") === "session-expired") {
       this.info.set("Vuelve a iniciar sesión para continuar de forma segura.");
@@ -270,17 +297,14 @@ export class AuthComponent {
     password.updateValueAndValidity();
     confirmPassword.updateValueAndValidity();
     acceptTerms.updateValueAndValidity();
+    this.registerForm.setValidators(required ? AuthComponent.PASSWORD_MATCH_RULE : null);
+    this.registerForm.updateValueAndValidity();
   }
 
   onTabChange(index: number): void {
     this.invalidateFlow();
     this.tabIndex.set(index);
-    this.step.set(index === 0 ? "login" : "register");
-    this.registerStep.set(1);
-    this.changeEmailMode.set(false);
-    this.verificationEmail.set(null);
-    this.verificationEditable.set(false);
-    this.verificationRecovery.set(false);
+    this.flow.set(index === 0 ? { kind: "login" } : { kind: "register", mode: "new", stage: 1 });
     this.error.set(null);
     this.info.set(null);
   }
@@ -309,16 +333,19 @@ export class AuthComponent {
     fields.forEach((control) => control.markAsTouched());
     if (fields.some((control) => control.invalid)) return;
 
+    const flow = this.flow();
+    if (flow.kind !== "register") return;
     this.error.set(null);
     this.info.set(null);
-    this.registerStep.set(2);
+    this.flow.set({ ...flow, stage: 2 });
   }
 
   previousRegisterStep(): void {
     this.invalidateFlow();
     this.error.set(null);
     this.info.set(null);
-    this.registerStep.set(1);
+    const flow = this.flow();
+    if (flow.kind === "register") this.flow.set({ ...flow, stage: 1 });
   }
 
   async onLogin(): Promise<void> {
@@ -335,7 +362,6 @@ export class AuthComponent {
     this.interactiveAuthStarted = true;
     this.busy.set(true);
     this.error.set(null);
-    this.verificationEmail.set(null);
     try {
       // Invisible hCaptcha is executed at submit time. Keeping this token local
       // to the attempt prevents an expired or previously redeemed value from
@@ -350,11 +376,9 @@ export class AuthComponent {
       );
       if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
       if (outcome.mfaRequired) {
-        this.mfaChallenge.set(outcome.challenge);
-        this.mfaRecoveryAvailable.set(outcome.recoveryAvailable);
         this.mfaForm.reset();
         this.recoveryForm.reset();
-        this.step.set("mfa");
+        this.flow.set({ kind: "mfa", challenge: outcome.challenge, recoveryAvailable: outcome.recoveryAvailable });
         this.info.set(null);
       } else {
         await this.navigateAuthenticated(destination);
@@ -365,11 +389,8 @@ export class AuthComponent {
       if (err instanceof ApiRequestError && err.status === 403
         && (err.reason === "pending_registration" || err.reason === "email_verification_required")) {
         const email = this.loginForm.controls.email.value.trim().toLowerCase();
-        this.verificationEmail.set(email);
-        this.registeredEmail.set(err.reason === "pending_registration" ? email : null);
-        this.verificationEditable.set(err.reason === "pending_registration");
-        this.verificationRecovery.set(false);
-        this.step.set("verify-pending");
+        this.flow.set({ kind: "verify-pending", email,
+          source: err.reason === "pending_registration" ? "browser-registration" : "unverified-account" });
         this.info.set(null);
         this.loginCaptchaToken.set("");
         this.loginCaptchaWidget?.reset();
@@ -591,12 +612,7 @@ export class AuthComponent {
         );
       }
       if (!stillCurrent()) return;
-      this.registeredEmail.set(email);
-      this.verificationEmail.set(email);
-      this.verificationEditable.set(true);
-      this.verificationRecovery.set(false);
-      this.changeEmailMode.set(false);
-      this.step.set("verify-pending");
+      this.flow.set({ kind: "verify-pending", email, source: "browser-registration" });
       this.info.set(
         "Solicitud registrada. Para continuar debes confirmar tu email. Si ya tienes una cuenta, inicia sesión o recupera tu contraseña.",
       );
@@ -671,23 +687,18 @@ export class AuthComponent {
     if (emailControl.invalid) return;
 
     this.invalidateFlow();
-    this.verificationEmail.set(emailControl.value.trim().toLowerCase());
-    this.registeredEmail.set(null);
-    this.verificationEditable.set(false);
-    this.verificationRecovery.set(true);
-    this.step.set("verify-pending");
+    this.flow.set({ kind: "verify-pending", email: emailControl.value.trim().toLowerCase(), source: "recovery" });
     this.error.set(null);
     this.info.set(null);
   }
 
   changeRegistrationEmail(): void {
-    const email = this.registeredEmail() ?? this.verificationEmail();
-    if (!email) return;
+    const flow = this.flow();
+    if (flow.kind !== "verify-pending" || flow.source !== "browser-registration" || !flow.email) return;
+    const email = flow.email;
     this.invalidateFlow();
     this.tabIndex.set(1);
-    this.step.set("register");
-    this.registerStep.set(1);
-    this.changeEmailMode.set(true);
+    this.flow.set({ kind: "register", mode: "correct-email", stage: 1, originalEmail: email });
     this.registerForm.controls.email.setValue(email);
     this.registerCaptchaToken.set("");
     this.error.set(null);
@@ -698,14 +709,8 @@ export class AuthComponent {
     // Registration is intentionally sessionless; no server session exists to
     // revoke here.
     this.invalidateFlow();
-    this.changeEmailMode.set(false);
-    this.registeredEmail.set(null);
-    this.verificationEmail.set(null);
-    this.verificationEditable.set(false);
-    this.verificationRecovery.set(false);
     this.loginCaptchaToken.set("");
     this.registerCaptchaToken.set("");
-    this.registerStep.set(1);
     this.registerForm.reset({
       name: "",
       email: "",
@@ -715,7 +720,7 @@ export class AuthComponent {
       company: "",
     });
     this.tabIndex.set(0);
-    this.step.set("login");
+    this.flow.set({ kind: "login" });
     this.error.set(null);
     this.info.set("Has cerrado el registro pendiente. Puedes volver cuando quieras.");
   }
@@ -726,9 +731,10 @@ export class AuthComponent {
   }
 
   goRecovery(): void {
-    if (this.busy() || !this.mfaChallenge() || !this.mfaRecoveryAvailable()) return;
+    const flow = this.flow();
+    if (this.busy() || (flow.kind !== "mfa" && flow.kind !== "recovery") || !flow.challenge || !flow.recoveryAvailable) return;
     this.invalidateFlow();
-    this.step.set("recovery");
+    this.flow.set({ ...flow, kind: "recovery" });
     this.error.set(null);
     this.info.set(null);
     this.focusAuthStep("recovery");
@@ -736,12 +742,13 @@ export class AuthComponent {
 
   backToMfa(): void {
     if (this.busy()) return;
-    if (!this.mfaChallenge()) {
+    const flow = this.flow();
+    if ((flow.kind !== "mfa" && flow.kind !== "recovery") || !flow.challenge) {
       this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
       return;
     }
     this.invalidateFlow();
-    this.step.set("mfa");
+    this.flow.set({ ...flow, kind: "mfa" });
     this.recoveryForm.reset();
     this.error.set(null);
     this.info.set(null);
@@ -749,12 +756,10 @@ export class AuthComponent {
 
   restartMfaLogin(message?: string): void {
     this.invalidateFlow();
-    this.mfaChallenge.set(null);
-    this.mfaRecoveryAvailable.set(false);
     this.mfaForm.reset();
     this.recoveryForm.reset();
     this.tabIndex.set(0);
-    this.step.set("login");
+    this.flow.set({ kind: "login" });
     this.error.set(null);
     this.info.set(message ?? null);
     this.loginCaptchaToken.set("");

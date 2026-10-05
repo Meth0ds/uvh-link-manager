@@ -2,7 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountCredentialsController;
+use App\Http\Controllers\MfaConfigurationController;
 use App\Jobs\DeliverMailOutboxJob;
 use App\Models\AccountRecoveryRequest;
 use App\Models\EmailChangeRequest;
@@ -242,7 +243,7 @@ final class SecurityNoticeAtomicityTest extends TestCase
         });
         $request->attributes->set(UvhRequest::USER, $snapshot);
         $request->attributes->set(UvhRequest::SESSION_ID, $currentId);
-        $controller = app(AuthController::class);
+        $controller = app(MfaConfigurationController::class);
         $response = match ($action) {
             'setup' => $controller->mfaSetup($request),
             'cancel' => $controller->mfaCancelSetup($request),
@@ -351,7 +352,7 @@ final class SecurityNoticeAtomicityTest extends TestCase
         ]);
         $request->attributes->set(UvhRequest::USER, $snapshot);
         $request->attributes->set(UvhRequest::SESSION_ID, $sessionId);
-        $controller = app(AuthController::class);
+        $controller = app(AccountCredentialsController::class);
         $response = match ($action) {
             'password' => $controller->changePassword($request),
             'request' => $controller->requestEmailChange($request),

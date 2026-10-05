@@ -5,6 +5,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { Component, EventEmitter, Input, Output, signal, type WritableSignal } from "@angular/core";
 import { By } from "@angular/platform-browser";
 import { AuthComponent } from "./auth.component";
+import type { AuthFlowState } from "./auth-flow-state";
 import { AuthService } from "../core/services/auth.service";
 import { ApiRequestError, ApiService } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
@@ -46,10 +47,13 @@ describe("AuthComponent registration flow", () => {
     return fixture.debugElement.query(By.css(selector)).componentInstance as FakeHCaptchaWidgetComponent;
   }
 
+  function setFlow(flow: AuthFlowState): void {
+    (component as unknown as { flow: WritableSignal<AuthFlowState> }).flow.set(flow);
+  }
+
   function showRegistrationStep(): void {
     component.tabIndex.set(1);
-    component.step.set("register");
-    component.registerStep.set(2);
+    setFlow({ kind: "register", mode: "new", stage: 2 });
     fixture.detectChanges();
   }
 
@@ -231,6 +235,7 @@ describe("AuthComponent registration flow", () => {
   });
 
   it("loads only the public hCaptcha sitekey for both access modes", async () => {
+    component.onTabChange(1);
     component.registerForm.controls.name.setValue("Ana García");
     component.registerForm.controls.email.setValue("ana@example.com");
     await component.nextRegisterStep();
@@ -334,9 +339,7 @@ describe("AuthComponent registration flow", () => {
   });
 
   it("offers a safe email correction and clears the sessionless registration state", () => {
-    component.registeredEmail.set("wrong@example.com");
-    component.verificationEmail.set("wrong@example.com");
-    component.step.set("verify-pending");
+    setFlow({ kind: "verify-pending", email: "wrong@example.com", source: "browser-registration" });
 
     component.changeRegistrationEmail();
     expect(component.changeEmailMode()).toBeTrue();
@@ -351,6 +354,138 @@ describe("AuthComponent registration flow", () => {
     expect(component.verificationEmail()).toBeNull();
     expect(component.registeredEmail()).toBeNull();
     expect(component.registerForm.controls.email.value).toBe("");
+  });
+
+  it("corrects a browser-owned pending email despite an abandoned password mismatch", async () => {
+    component.onTabChange(1);
+    component.registerForm.patchValue({ name: "Ana García", email: "ana@example.com" });
+    await component.nextRegisterStep();
+    component.registerForm.patchValue({ password: "Strong-password-123!", confirmPassword: "different-password" });
+    expect(component.registerForm.hasError("mismatch")).toBeTrue();
+    component.onTabChange(0);
+    fixture.detectChanges();
+    component.loginForm.setValue({ email: "ana@example.com", password: "unused-password" });
+    auth.login.and.rejectWith(new ApiRequestError("Revisa la solicitud", 403, undefined, undefined, "pending_registration"));
+    await component.onLogin();
+    fixture.detectChanges();
+
+    component.changeRegistrationEmail();
+    fixture.detectChanges();
+    component.registerForm.controls.email.setValue("correct@example.com");
+    await component.nextRegisterStep();
+    fixture.detectChanges();
+    const submit = fixture.nativeElement.querySelector('#register-panel button[type="submit"]') as HTMLButtonElement;
+    expect(fixture.nativeElement.querySelector('[formControlName="password"]')).toBeNull();
+    expect(submit.disabled).toBeFalse();
+    await component.onRegister();
+
+    expect(auth.changeRegistrationEmail).toHaveBeenCalledOnceWith("ana@example.com", "correct@example.com", {
+      captchaToken: "fresh-passcode", website: "",
+    });
+    expect(auth.register).not.toHaveBeenCalled();
+    expect(component.step()).toBe("verify-pending");
+    expect(component.verificationEmail()).toBe("correct@example.com");
+  });
+
+  it("restores password matching and consent when returning from correction to new registration", async () => {
+    component.loginForm.setValue({ email: "ana@example.com", password: "unused-password" });
+    auth.login.and.rejectWith(new ApiRequestError("Revisa la solicitud", 403, undefined, undefined, "pending_registration"));
+    await component.onLogin();
+    component.changeRegistrationEmail();
+    fixture.detectChanges();
+    component.registerForm.controls.email.setValue("correct@example.com");
+    await component.nextRegisterStep();
+    fixture.detectChanges();
+    expect(component.registerForm.valid).toBeTrue();
+
+    component.onTabChange(1);
+    fixture.detectChanges();
+    component.registerForm.patchValue({ name: "Ana García", password: "short", confirmPassword: "different-password" });
+    await component.nextRegisterStep();
+    fixture.detectChanges();
+    const submit = fixture.nativeElement.querySelector('#register-panel button[type="submit"]') as HTMLButtonElement;
+    expect(fixture.nativeElement.querySelector('[formControlName="password"]')).not.toBeNull();
+    expect(component.registerForm.controls.password.hasError("minlength")).toBeTrue();
+    expect(component.registerForm.controls.acceptTerms.hasError("required")).toBeTrue();
+    expect(component.registerForm.hasError("mismatch")).toBeTrue();
+    expect(submit.disabled).toBeTrue();
+    await component.onRegister();
+    expect(auth.register).not.toHaveBeenCalled();
+    expect(auth.changeRegistrationEmail).not.toHaveBeenCalled();
+  });
+
+  it("keeps the correct original email through back/next and successive corrections", async () => {
+    component.onTabChange(1);
+    component.registerForm.patchValue({ name: "Ana García", email: "first@example.com" });
+    await component.nextRegisterStep();
+    fixture.detectChanges();
+    component.registerForm.patchValue({ password: "Strong-password-123!", confirmPassword: "Strong-password-123!", acceptTerms: true });
+    await component.onRegister();
+    fixture.detectChanges();
+
+    component.changeRegistrationEmail();
+    fixture.detectChanges();
+    component.registerForm.controls.email.setValue("second@example.com");
+    await component.nextRegisterStep();
+    component.previousRegisterStep();
+    expect(component.registerForm.controls.email.value).toBe("second@example.com");
+    await component.nextRegisterStep();
+    fixture.detectChanges();
+    await component.onRegister();
+    fixture.detectChanges();
+    component.changeRegistrationEmail();
+    fixture.detectChanges();
+    component.registerForm.controls.email.setValue("third@example.com");
+    await component.nextRegisterStep();
+    fixture.detectChanges();
+    await component.onRegister();
+    fixture.detectChanges();
+
+    expect(auth.changeRegistrationEmail.calls.allArgs()).toEqual([
+      ["first@example.com", "second@example.com", { captchaToken: "fresh-passcode", website: "" }],
+      ["second@example.com", "third@example.com", { captchaToken: "fresh-passcode", website: "" }],
+    ]);
+    expect(auth.register).toHaveBeenCalledTimes(1);
+    expect(component.verificationEmail()).toBe("third@example.com");
+    expect(component.verificationEditable()).toBeTrue();
+  });
+
+  it("shows generic verification recovery without retaining the previous browser edit context", async () => {
+    component.loginForm.setValue({ email: "owned@example.com", password: "unused-password" });
+    auth.login.and.rejectWith(new ApiRequestError("Revisa la solicitud", 403, undefined, undefined, "pending_registration"));
+    await component.onLogin();
+    component.changeRegistrationEmail();
+    component.onTabChange(1);
+    component.registerForm.controls.email.setValue("generic@example.com");
+    component.openVerificationRecovery();
+    fixture.detectChanges();
+
+    expect(component.verificationRecovery()).toBeTrue();
+    expect(component.verificationEditable()).toBeFalse();
+    expect(component.registeredEmail()).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain("¿Te equivocaste de dirección?");
+    await component.resendVerification();
+    expect(auth.resendVerification).toHaveBeenCalledOnceWith("generic@example.com", "fresh-passcode");
+    expect(auth.changeRegistrationEmail).not.toHaveBeenCalled();
+  });
+
+  it("uses the legacy account address for resend after closing another pending registration", async () => {
+    component.loginForm.setValue({ email: "owned@example.com", password: "unused-password" });
+    auth.login.and.rejectWith(new ApiRequestError("Revisa la solicitud", 403, undefined, undefined, "pending_registration"));
+    await component.onLogin();
+    component.closeRegistration();
+    fixture.detectChanges();
+    component.loginForm.setValue({ email: "legacy@example.com", password: "correct-password" });
+    auth.login.and.rejectWith(new ApiRequestError("Confirma tu email", 403, undefined, undefined, "email_verification_required"));
+    await component.onLogin();
+    fixture.detectChanges();
+
+    expect(component.verificationEditable()).toBeFalse();
+    expect(component.registeredEmail()).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain("¿Te equivocaste de dirección?");
+    await component.resendVerification();
+    expect(auth.resendVerification).toHaveBeenCalledOnceWith("legacy@example.com", "fresh-passcode");
+    expect(auth.changeRegistrationEmail).not.toHaveBeenCalled();
   });
 
   it("does not submit when the honeypot contains a value", async () => {
@@ -403,8 +538,7 @@ describe("AuthComponent registration flow", () => {
 
   it("renders a visible alert for a diverging confirmation instead of only disabling the button", () => {
     component.tabIndex.set(1);
-    component.step.set("register");
-    component.registerStep.set(2);
+    setFlow({ kind: "register", mode: "new", stage: 2 });
     component.registerForm.controls.password.setValue("Órbita-Mango-Cobre-47!");
     component.registerForm.controls.confirmPassword.setValue("otra-clave-distinta");
     component.registerForm.controls.confirmPassword.markAsTouched();
@@ -776,11 +910,95 @@ describe("AuthComponent registration flow", () => {
     });
   }
 
+  for (const recoveryAvailable of [false, true]) {
+    it(`offers recovery only when the login response allows it (${recoveryAvailable})`, async () => {
+      auth.login.and.resolveTo({ mfaRequired: true, challenge: "login-challenge", recoveryAvailable });
+      component.loginForm.setValue({ email: "ana@example.com", password: "Strong-password-123!" });
+
+      await component.onLogin();
+      fixture.detectChanges();
+
+      const recoveryButton = fixture.nativeElement.querySelector("button.method-link") as HTMLButtonElement | null;
+      expect(recoveryButton !== null).toBe(recoveryAvailable);
+      component.goRecovery();
+      expect(component.step()).toBe(recoveryAvailable ? "recovery" : "mfa");
+      expect(auth.login).toHaveBeenCalledTimes(1);
+      expect(auth.verifyMfa).not.toHaveBeenCalled();
+      expect(auth.recoverMfa).not.toHaveBeenCalled();
+    });
+  }
+
+  it("uses the original login challenge after changing MFA methods in both directions", async () => {
+    component.loginForm.setValue({ email: "ana@example.com", password: "Strong-password-123!" });
+    await component.onLogin();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector("button.method-link") as HTMLButtonElement).click();
+    fixture.detectChanges();
+    component.recoveryForm.controls.code.setValue("ABCD-EFGH-JKLM-NPQR");
+
+    (fixture.nativeElement.querySelector("button.method-link") as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(component.step()).toBe("mfa");
+    expect(component.recoveryForm.controls.code.value).toBe("");
+    component.mfaForm.controls.code.setValue("123456");
+    await component.onMfa();
+
+    expect(auth.login).toHaveBeenCalledTimes(1);
+    expect(auth.verifyMfa).toHaveBeenCalledOnceWith("mfa-challenge", "123456");
+    expect(auth.recoverMfa).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app");
+  });
+
+  it("uses only the new challenge and recovery policy after an expired recovery attempt", async () => {
+    component.loginForm.setValue({ email: "ana@example.com", password: "Strong-password-123!" });
+    await component.onLogin();
+    component.goRecovery();
+    component.recoveryForm.controls.code.setValue("ABCD-EFGH-JKLM-NPQR");
+    auth.recoverMfa.and.rejectWith(new ApiRequestError("Sesión MFA caducada", 401));
+    await component.onRecovery();
+    fixture.detectChanges();
+    expect(component.step()).toBe("login");
+
+    auth.login.and.resolveTo({ mfaRequired: true, challenge: "replacement-challenge", recoveryAvailable: false });
+    await component.onLogin();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector("button.method-link")).toBeNull();
+    component.goRecovery();
+    expect(component.step()).toBe("mfa");
+    component.mfaForm.controls.code.setValue("654321");
+    await component.onMfa();
+
+    expect(auth.login).toHaveBeenCalledTimes(2);
+    expect(auth.recoverMfa).toHaveBeenCalledOnceWith("mfa-challenge", "ABCD-EFGH-JKLM-NPQR");
+    expect(auth.verifyMfa).toHaveBeenCalledOnceWith("replacement-challenge", "654321");
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app");
+  });
+
+  it("submits a completed OTP only once while confirmation is pending", async () => {
+    const response = deferred<void>();
+    auth.verifyMfa.and.returnValue(response.promise);
+    component.loginForm.setValue({ email: "ana@example.com", password: "Strong-password-123!" });
+    await component.onLogin();
+    fixture.detectChanges();
+    const first = fixture.nativeElement.querySelector("app-otp-code-input input") as HTMLInputElement;
+    first.value = "123456";
+    first.dispatchEvent(new Event("input", { bubbles: true }));
+    fixture.detectChanges();
+    component.onOtpCompleted();
+    await component.onMfa();
+
+    expect(first.disabled).toBeTrue();
+    expect(auth.verifyMfa).toHaveBeenCalledOnceWith("mfa-challenge", "123456");
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    response.resolve();
+    await fixture.whenStable();
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith("/app");
+  });
+
   it("does not navigate when an MFA result belongs to a locally abandoned challenge", async () => {
     const response = deferred<void>();
     auth.verifyMfa.and.returnValue(response.promise);
-    component.step.set("mfa");
-    component.mfaChallenge.set("challenge-a");
+    setFlow({ kind: "mfa", challenge: "challenge-a", recoveryAvailable: false });
     component.mfaForm.controls.code.setValue("123456");
 
     const verification = component.onMfa();
@@ -795,8 +1013,7 @@ describe("AuthComponent registration flow", () => {
   it("does not navigate when a recovery result belongs to a locally abandoned challenge", async () => {
     const response = deferred<void>();
     auth.recoverMfa.and.returnValue(response.promise);
-    component.step.set("recovery");
-    component.mfaChallenge.set("challenge-a");
+    setFlow({ kind: "recovery", challenge: "challenge-a", recoveryAvailable: false });
     component.recoveryForm.controls.code.setValue("ABCD-EFGH-JKLM-NPQR");
 
     const recovery = component.onRecovery();
@@ -811,9 +1028,7 @@ describe("AuthComponent registration flow", () => {
   it("keeps the MFA method while its confirmation is in flight", async () => {
     const response = deferred<void>();
     auth.verifyMfa.and.returnValue(response.promise);
-    component.step.set("mfa");
-    component.mfaChallenge.set("challenge-a");
-    component.mfaRecoveryAvailable.set(true);
+    setFlow({ kind: "mfa", challenge: "challenge-a", recoveryAvailable: true });
     component.mfaForm.controls.code.setValue("123456");
     fixture.detectChanges();
     const confirmation = component.onMfa();
@@ -830,8 +1045,7 @@ describe("AuthComponent registration flow", () => {
   it("keeps the recovery method while its confirmation is in flight", async () => {
     const response = deferred<void>();
     auth.recoverMfa.and.returnValue(response.promise);
-    component.step.set("recovery");
-    component.mfaChallenge.set("challenge-a");
+    setFlow({ kind: "recovery", challenge: "challenge-a", recoveryAvailable: false });
     component.recoveryForm.controls.code.setValue("ABCD-EFGH-JKLM-NPQR");
     fixture.detectChanges();
     const confirmation = component.onRecovery();
@@ -849,8 +1063,7 @@ describe("AuthComponent registration flow", () => {
   it("keeps keyboard focus inside the pending MFA dialog when its controls are disabled", async () => {
     const response = deferred<void>();
     auth.verifyMfa.and.returnValue(response.promise);
-    component.step.set("mfa");
-    component.mfaChallenge.set("challenge-a");
+    setFlow({ kind: "mfa", challenge: "challenge-a", recoveryAvailable: false });
     component.mfaForm.controls.code.setValue("123456");
     fixture.detectChanges();
     const confirmation = component.onMfa();
@@ -868,8 +1081,7 @@ describe("AuthComponent registration flow", () => {
   it("retains dialog focus when OTP completion automatically starts verification", async () => {
     const response = deferred<void>();
     auth.verifyMfa.and.returnValue(response.promise);
-    component.step.set("mfa");
-    component.mfaChallenge.set("challenge-a");
+    setFlow({ kind: "mfa", challenge: "challenge-a", recoveryAvailable: false });
     fixture.detectChanges();
     const first = fixture.nativeElement.querySelector("app-otp-code-input input") as HTMLInputElement;
     first.value = "123456";
@@ -884,8 +1096,7 @@ describe("AuthComponent registration flow", () => {
 
   it("clears a rejected MFA code and restores focus to the first box for a new attempt", async () => {
     auth.verifyMfa.and.rejectWith(new ApiRequestError("Código incorrecto", 401));
-    component.step.set("mfa");
-    component.mfaChallenge.set("challenge-a");
+    setFlow({ kind: "mfa", challenge: "challenge-a", recoveryAvailable: false });
     fixture.detectChanges();
     component.mfaForm.controls.code.setValue("123456");
     await component.onMfa();
@@ -902,9 +1113,7 @@ describe("AuthComponent registration flow", () => {
   });
 
   it("focuses the recovery field when changing methods", async () => {
-    component.step.set("mfa");
-    component.mfaChallenge.set("challenge-a");
-    component.mfaRecoveryAvailable.set(true);
+    setFlow({ kind: "mfa", challenge: "challenge-a", recoveryAvailable: true });
     fixture.detectChanges();
     component.goRecovery();
     fixture.detectChanges();
@@ -914,8 +1123,7 @@ describe("AuthComponent registration flow", () => {
 
   it("focuses the login email after an expired MFA challenge", async () => {
     auth.verifyMfa.and.rejectWith(new ApiRequestError("Sesión MFA caducada", 401));
-    component.step.set("mfa");
-    component.mfaChallenge.set("challenge-a");
+    setFlow({ kind: "mfa", challenge: "challenge-a", recoveryAvailable: false });
     component.mfaForm.controls.code.setValue("123456");
     fixture.detectChanges();
     await component.onMfa();
@@ -947,8 +1155,7 @@ describe("AuthComponent registration flow", () => {
   it("keeps a closed registration state when an older resend finishes later", async () => {
     const response = deferred<void>();
     auth.resendVerification.and.returnValue(response.promise);
-    component.step.set("verify-pending");
-    component.verificationEmail.set("ana@example.com");
+    setFlow({ kind: "verify-pending", email: "ana@example.com", source: "browser-registration" });
     fixture.detectChanges();
 
     const resend = component.resendVerification();

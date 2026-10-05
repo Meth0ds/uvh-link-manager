@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\Ids;
+use App\Support\LinkIntentLifetime;
 use App\Support\LinkIntentRegistry;
 use App\Support\OperationalMetrics;
 use App\Support\PendingHandoff;
@@ -253,7 +254,7 @@ class LinkIntentController
     /** Hours an intent lives, and the ceiling of the cookie that parks it. */
     private function ttlHours(): int
     {
-        return max(1, (int) config('uvh.intent_ttl_hours'));
+        return LinkIntentLifetime::hours();
     }
 
     /**
@@ -325,7 +326,7 @@ class LinkIntentController
         return $base.':'.$hour->copy()->utc()->format('YmdH');
     }
 
-    /** Count the current hour plus 24 prior buckets (conservative by < 1 h). */
+    /** Count the current hour plus the lifetime's prior buckets (conservative by < 1 h). */
     private function bucketTotal(string $base, Carbon $hour): int
     {
         $total = 0;

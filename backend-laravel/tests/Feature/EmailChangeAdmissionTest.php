@@ -25,7 +25,7 @@ final class EmailChangeAdmissionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        DB::statement('TRUNCATE users, mail_outbox, audit_events, audit_outbox, operational_metrics RESTART IDENTITY CASCADE');
+        DB::statement('TRUNCATE users, pending_registrations, mail_outbox, audit_events, audit_outbox, operational_metrics RESTART IDENTITY CASCADE');
         Queue::fake();
         $this->travelTo(now()->startOfSecond());
         $this->disableCookieEncryption();

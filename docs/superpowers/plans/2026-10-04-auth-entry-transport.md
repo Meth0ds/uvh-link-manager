@@ -1,0 +1,30 @@
+# Gradual auth frontend separation: entry and registration transport
+
+Continue after O51 dedicated/quality/full/JUnit are terminal and frozen hashes match. Preserve the shared tree and the complete S01–S13 objective. No agents, worktrees, commit/push/deploy, real accounts/mail/providers, uvh_local or productive workers/scheduler. One guarded SQL suite at a time. Do not edit PHP/tests or frozen sources while the current backend full suite runs.
+
+The user's pasted architecture proposal explicitly favors gradual extraction without splitting transactions/invariants, and later frontend state separation. Controller ownership is complete locally; frontend auth orchestration and all other systems still need their own evidence. AuthService currently has648lines. It contains identity observation, generation guards, workspace coordination, mutation settlement and HTTP payloads. Keep one coherent owner for identity publication/invalidations; do not move state into transport services merely to lower a line count.
+
+## Evidence already read during O51
+
+Complete current AuthService648lines and AccountProfileService/AccountMfaService read. Existing entry generation and mutation/identity tests were only partly read; do not credit complete review or fresh frontend gates. AuthComponent initial215lines still show independent step/challenge/verification signals; remaining complete transitions/template/focus/captcha/navigation and their tests must be read before a state refactor. The user's attachment was read in full. Its approximate sizes and example structures describe earlier code, not the current authoritative state.
+
+## Sequential implementation
+
+- [x] Snapshot current AuthService/types/decoders/HTTP/interceptor/session context and affected tests. Read complete relevant functions/callers/tests. Distinguish pure transport from identity and workflow invariants.
+- [x] Run suitable existing characterization tests before extraction. Add consumer HTTP contracts only for material uncovered scopes, payload/decoder/error/CSRF boundaries or asynchronous ownership; do not add tests that only mirror forwarding methods. Reproduce any product bug before assigning an ID.
+- [x] Extract registration/register-email-correction/resend transport into a cohesive owner, preserving all three AuthService public methods and await boundaries. Separately extract login/MFA challenge/recovery/logout/MFA status/reauthentication transport. Preserve method bodies outside explicit HTTP expression replacements; preserve generation capture before CSRF, stale-response errors, local identity publication, workspace refresh, cross-tab markers and recovery-code policy. Keep types acyclic through type-only contracts/re-exports if needed; do not change callers or API scopes to fit the extraction.
+- [x] Compare entire original AuthService and complete new owners against declared moves; hash all unrelated dependencies and tests. Run focused/full frontend tests, typecheck/lint/build and inventory/ledger gates on final sources. No measured speed claim from extraction. Do not infer DOM/browser/provider safety from unit tests.
+- [x] Update canonical reports and planning with actual evidence and limits.
+- [ ] Read and characterize the entire AuthComponent template/flow/tests before replacing independent step/challenge fields with a discriminated state. Preserve verification edit authority, navigation/generation guards, focus/accessibility, CAPTCHA isolation and deferred-response behavior. This is a later block, not completion by a transport-only milestone.
+
+Global completion still requires current requirement-by-requirement proof for S01–S13, roles, retention, capacity, CI and operational release. O51's array-cache and aggregate global-limit fixture do not prove Redis/distributed capacity or live configuration-change migration.
+
+
+Additional source preflight candidates (no IDs/reproductions): decodeLoginOutcome advertises rejection of mixed branches but reconstructs the MFA branch without checking a simultaneous user field, and reconstructs authenticated identity without checking simultaneous challenge fields. Existing tests allow extra envelope fields and use deliberately opaque sample challenges; read API compatibility requirements before claiming a defect or tightening bearer syntax. decodeMfaSessionStatus/reauthentication only type-check timestamps; evaluate malformed/inconsistent deadlines through actual facade/consumer behavior before changing validation. O51 frozen sources must remain unchanged until full ends.
+
+CorrelateRequest proposal requalified from actual current sources: whole middleware/RequestTrace and four RequestCorrelationTest cases read, plus Laravel Routing Pipeline handleException report/render. The downstream pipeline handles route and later-middleware errors before CorrelateRequest finally pops the trace. Existing route/middleware/stream/spoof tests are part of the running full suite; no new defect/ID/fix attributed to the attachment's call-order suggestion. No proof for arbitrary failure preceding this middleware or native server delivery is claimed.
+
+Separate lifecycle follow-up candidate: lowering a running deployment's intent TTL may make bucketTotal stop scanning older still-live bearers and may shorten shared buckets again. The O51 fixed-config24/48/168h tests do not cover live configuration changes. Read the deployment/configuration contract and reproduce actual HTTP admission before assigning a finding; do not silently expand O51's success claim.
+
+
+O52 local transport block verified:407before/after,24new HTTP contracts,types/lint/build7.242s exit0;Full frontend1397/1397, ChromeHeadless9.852s (cases9.112s),exit0;804frozen source/test/config hashes match after terminal suite, no source/test edits during full. AuthService619lines, two pure transport owners and unchanged shared wire types. Whole-file comparator and494inventory hashes current. Next auth-flow-state plan; global goal active. No new BugID or functional decoder change.

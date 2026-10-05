@@ -104,8 +104,11 @@ export class SettingsComponent implements AfterViewInit {
   private exportHistoryRequest = new LatestRequest(this.destroyRef);
   private deletionRequest = new LatestRequest(this.destroyRef);
   private privacyRequest = new LatestRequest(this.destroyRef);
+  private exportMutationRequest = new LatestRequest(this.destroyRef);
+  private privacyMutationRequest = new LatestRequest(this.destroyRef);
   readonly user = this.auth.user;
   readonly userRefreshRequired = this.auth.userRefreshRequired;
+  readonly userMutationUnconfirmed = this.auth.userMutationUnconfirmed;
   readonly profileRefreshBusy = signal(false);
   /** Ruta canónica de cada sección: la URL nombra la sección que se está leyendo. */
   private static readonly SECTION_PATHS: Record<string, string> = {
@@ -172,7 +175,10 @@ export class SettingsComponent implements AfterViewInit {
   // ---------------- Data export ----------------
   readonly exportStatus = signal<DataExportStatus | null>(null);
   readonly exportLoading = signal(true);
+  readonly exportError = signal<string | null>(null);
+  readonly exportRefreshing = signal(false);
   readonly exportBusy = signal(false);
+  private readonly exportHeading = viewChild<ElementRef<HTMLElement>>("exportHeading");
   /** Historial acotado: las últimas diez filas, como el servidor. */
   readonly exportHistory = signal<DataExportStatus[]>([]);
   /**
@@ -222,6 +228,8 @@ export class SettingsComponent implements AfterViewInit {
   readonly mfaQr = signal<string | null>(null);
   readonly recoveryCodes = signal<string[]>([]);
   readonly recoveryCodesAcknowledged = signal(false);
+  readonly recoveryIssueUnconfirmed = this.auth.mfaRecoveryIssueUnconfirmed;
+  private readonly uncertainMfaSetup = signal(false);
   /** A user with an active factor must deliberately enter this flow to replace it. */
   readonly mfaReconfiguring = signal(false);
   readonly recoveryRegenerating = signal(false);
@@ -333,22 +341,19 @@ export class SettingsComponent implements AfterViewInit {
       const nextIdentity = this.accountContext();
       if (identity !== nextIdentity) {
         identity = nextIdentity;
-        this.clearSensitiveMfaUi();
-        this.resetNotificationPreferences();
-        if (this.user()) untracked(() => { void this.loadNotificationPreferences(); });
-        this.profileBusy.set(false);
-        this.profileRefreshBusy.set(false);
-        this.profileForm.reset({ name: this.user()?.name ?? "" });
+        untracked(() => {
+          this.clearAccountView();
+          this.loadAccountView();
+        });
+      }
+    });
+    effect(() => {
+      if (this.uncertainMfaSetup() && !this.userRefreshRequired() && this.user()) {
+        untracked(() => this.settleUncertainMfaUi());
       }
     });
     this.destroyRef.onDestroy(() => {
-      this.clearSensitiveMfaUi();
-      this.resetNotificationPreferences();
-      this.deletionDialog?.close();
-      this.emailDialog?.close();
-      this.passwordDialog?.close();
-      this.exportDialog?.close();
-      this.stopExportExpiryCheck();
+      this.clearAccountView();
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", this.exportReadyRefreshHandler);
         window.removeEventListener("focus", this.exportReadyRefreshHandler);
@@ -358,11 +363,62 @@ export class SettingsComponent implements AfterViewInit {
       document.addEventListener("visibilitychange", this.exportReadyRefreshHandler);
       window.addEventListener("focus", this.exportReadyRefreshHandler);
     }
+    this.loadAccountView();
+  }
+
+  private loadAccountView(): void {
+    if (!this.user() || this.destroyRef.destroyed) return;
     void this.loadSessions();
-    void this.loadExportStatus();
+    void this.loadExportStatus(true, false, false);
+    void this.loadExportHistory();
     void this.loadDeletionImpact();
     void this.loadPrivacyRequests();
     void this.loadNotificationPreferences();
+  }
+
+  /** Clear the outgoing owner's data before any replacement reads can settle. */
+  private clearAccountView(): void {
+    this.clearSensitiveMfaUi();
+    this.resetNotificationPreferences();
+    for (const requests of [this.profileRequests, this.profileRefreshRequests, this.workspaceNavigationRequests,
+      this.sessionsRequest, this.exportRequest, this.exportHistoryRequest, this.deletionRequest, this.privacyRequest,
+      this.exportMutationRequest, this.privacyMutationRequest]) requests.invalidate();
+    // Session revocation retains its own guard for the intentional current-
+    // session logout transition; reads and other commands never own that exit.
+    this.profileBusy.set(false);
+    this.profileRefreshBusy.set(false);
+    this.profileForm.reset({ name: this.user()?.name ?? "" });
+    this.sessions.set([]);
+    this.sessionsTruncated.set(false);
+    this.sessionsLoading.set(false);
+    this.sessionsError.set(null);
+    this.exportPoller.stop();
+    this.exportPoller.reset();
+    this.stopExportExpiryCheck();
+    this.exportPollLastStatus = null;
+    this.exportStatus.set(null);
+    this.exportHistory.set([]);
+    this.exportLoading.set(false);
+    this.exportError.set(null);
+    this.exportRefreshing.set(false);
+    this.exportBusy.set(false);
+    this.deletionImpact.set(null);
+    this.deletionLoading.set(false);
+    this.privacyRequests.set([]);
+    this.privacyTotal.set(0);
+    this.privacyPage.set(0);
+    this.privacyLoading.set(false);
+    this.privacyBusy.set(false);
+    this.privacyError.set(null);
+    this.privacyResponseId.set(null);
+    this.privacyForm.reset({ type: "access", details: "" });
+    this.privacyResponseForm.reset();
+    const overlays = [this.deletionDialog, this.emailDialog, this.passwordDialog, this.exportDialog];
+    this.deletionDialog = undefined;
+    this.emailDialog = undefined;
+    this.passwordDialog = undefined;
+    this.exportDialog = undefined;
+    for (const overlay of overlays) overlay?.close(false);
   }
 
   private toast(err: unknown, fallback: string): void {
@@ -398,13 +454,27 @@ export class SettingsComponent implements AfterViewInit {
     }
   }
 
-  async refreshAccountView(): Promise<void> {
+  async refreshAccountView(event?: Event): Promise<void> {
     if (this.profileRefreshBusy()) return;
+    const control = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    const section = control?.closest<HTMLElement>(".settings-section");
+    const wasUnconfirmed = this.userMutationUnconfirmed();
     const request = this.profileRefreshRequests.begin(this.accountContext());
     const current = () => this.profileRefreshRequests.isCurrent(request, this.accountContext());
     this.profileRefreshBusy.set(true);
     try {
       await this.auth.refreshUser();
+      if (current() && !this.userRefreshRequired() && wasUnconfirmed) {
+        // /me cannot recover a lost write-only pending secret or credential
+        // issue. Drop the uncertain enrollment and keep explicit recovery help.
+        this.settleUncertainMfaUi();
+      }
+      if (current() && !this.userRefreshRequired() && control
+        && (document.activeElement === control || (!control.isConnected && document.activeElement === document.body))) {
+        // The successful read removes its retry button. Keep keyboard focus in
+        // the section unless the user already chose another control meanwhile.
+        section?.focus({ preventScroll: true });
+      }
     } catch (error) {
       if (current()) this.toast(error, "Los cambios siguen confirmados, pero no se pudo actualizar la vista.");
     } finally {
@@ -413,36 +483,43 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   openEmailDialog(mode: EmailAccessDialogData["mode"]): void {
-    if (this.emailDialog) return;
+    if (this.emailDialog || !this.user() || this.destroyRef.destroyed) return;
+    const context = this.accountContext();
     const data: EmailAccessDialogData = { mode, pendingEmail: this.user()?.pendingEmail };
-    this.emailDialog = this.dialogs.open(EmailAccessDialogComponent, {
+    const dialog = this.dialogs.open(EmailAccessDialogComponent, {
       data, width: "min(560px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: mode === "change" ? "#email-address-step input" : "first-heading", restoreFocus: true, injector: this.injector,
       ariaLabel: mode === "change" ? "Cambiar el email de acceso" : "Cancelar el cambio de email pendiente",
     });
-    this.emailDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
+    this.emailDialog = dialog;
+    dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
+      if (this.emailDialog !== dialog) return;
       this.emailDialog = undefined;
-      if (!completed) return;
+      if (!completed || context !== this.accountContext() || this.destroyRef.destroyed) return;
       this.snackbar.open(mode === "change" ? "Confirmación enviada al nuevo email" : "Cambio de email cancelado", "Cerrar", { duration: 3500 });
     });
   }
 
   openPasswordDialog(): void {
-    if (this.passwordDialog) return;
-    this.passwordDialog = this.dialogs.open(PasswordChangeDialogComponent, {
+    if (this.passwordDialog || !this.user() || this.destroyRef.destroyed) return;
+    const context = this.accountContext();
+    const dialog = this.dialogs.open(PasswordChangeDialogComponent, {
       width: "min(610px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: "#password-credentials-step input", restoreFocus: true, injector: this.injector,
       ariaLabel: "Cambiar la contraseña de acceso",
     });
-    this.passwordDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
+    this.passwordDialog = dialog;
+    dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
+      if (this.passwordDialog !== dialog) return;
       this.passwordDialog = undefined;
-      if (!completed) return;
+      if (!completed || context !== this.accountContext() || this.destroyRef.destroyed) return;
       this.snackbar.open("Contraseña actualizada", "Cerrar", { duration: 2500 });
       void this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     });
   }
 
   async loadSessions(): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed) return;
     const context = this.auth.sessionGeneration();
     const request = this.sessionsRequest.begin(context);
     this.sessionsLoading.set(true);
@@ -466,9 +543,10 @@ export class SettingsComponent implements AfterViewInit {
   /**
    * `silent` lo usan las sondas: no mueve el esqueleto, no avisa de nada y
    * conserva el último estado conocido si la red falla (la siguiente sonda
-   * reintenta). Las cargas visibles mantienen su comportamiento original.
+   * reintenta). Un fallo de lectura nunca confirma que no hay exportación.
    */
-  async loadExportStatus(notify = true, silent = false): Promise<void> {
+  async loadExportStatus(notify = true, silent = false, reloadHistory = true): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed) return;
     const context = this.auth.sessionGeneration();
     const request = this.exportRequest.begin(context);
     if (!silent) this.exportLoading.set(true);
@@ -479,18 +557,38 @@ export class SettingsComponent implements AfterViewInit {
       if (statusChanged) this.exportPoller.reset();
       this.exportPollLastStatus = status?.status ?? null;
       this.exportStatus.set(status);
+      this.exportError.set(null);
       this.armExportExpiryCheck(status);
       // El historial sólo cambia cuando cambia el estado visible; las sondas
       // silenciosas no lo tocan mientras la exportación siga igual.
-      if (statusChanged) void this.loadExportHistory();
+      if (statusChanged && reloadHistory) void this.loadExportHistory();
     } catch (err) {
       if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
-      if (silent) return;
-      this.exportStatus.set(null);
-      if (notify) this.toast(err, "No se pudo consultar el estado de la exportación");
+      this.exportError.set(err instanceof ApiRequestError ? err.message : "No se pudo consultar el estado de la exportación");
+      if (notify && !silent) this.toast(err, "No se pudo consultar el estado de la exportación");
     } finally {
       if (this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) {
         if (!silent) this.exportLoading.set(false);
+        this.exportPoller.schedule();
+      }
+    }
+  }
+
+  /** Recover the observation, keeping keyboard focus and never replaying a write. */
+  async retryExportStatus(): Promise<void> {
+    if (!this.exportError() || this.exportRefreshing() || this.exportLoading() || this.exportBusy()
+      || !this.user() || this.destroyRef.destroyed) return;
+    const context = this.accountContext();
+    const current = () => context === this.accountContext() && !this.destroyRef.destroyed;
+    this.exportRefreshing.set(true);
+    this.exportPoller.stop();
+    this.stopExportExpiryCheck();
+    try {
+      await this.loadExportStatus(false, true);
+      if (current() && !this.exportError()) this.exportHeading()?.nativeElement.focus({ preventScroll: true });
+    } finally {
+      if (current()) {
+        this.exportRefreshing.set(false);
         this.exportPoller.schedule();
       }
     }
@@ -501,6 +599,7 @@ export class SettingsComponent implements AfterViewInit {
    * tarjeta de estado: lo que manda es la exportación activa.
    */
   async loadExportHistory(): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed) return;
     const context = this.auth.sessionGeneration();
     const request = this.exportHistoryRequest.begin(context);
     try {
@@ -515,12 +614,12 @@ export class SettingsComponent implements AfterViewInit {
   private exportNeedsPoll(): boolean {
     // Sólo la generación avanza sola. `ready` es un estado final vivo: no se
     // sondea, se refresca al recuperar la pestaña y al caducar la descarga.
-    return (this.exportStatus()?.status ?? null) === "processing";
+    return !this.exportRefreshing() && (this.exportStatus()?.status ?? null) === "processing";
   }
 
   /** Una exportación lista no sondea: al volver a la pestaña se refresca una vez. */
   private readonly exportReadyRefreshHandler = (): void => {
-    if (typeof document !== "undefined" && document.hidden) return;
+    if (this.exportRefreshing() || (typeof document !== "undefined" && document.hidden)) return;
     if ((this.exportStatus()?.status ?? null) === "ready") void this.loadExportStatus(false, true);
   };
 
@@ -549,16 +648,20 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   openDataExportDialog(purpose: "request" | "download" = "request"): void {
-    if (this.exportDialog || this.exportBusy()) return;
-    this.exportDialog = this.dialogs.open(DataExportDialogComponent, {
+    if (this.exportDialog || this.exportBusy() || this.exportLoading() || this.exportError() || this.exportRefreshing()
+      || !this.user() || this.destroyRef.destroyed) return;
+    const context = this.accountContext();
+    const dialog = this.dialogs.open(DataExportDialogComponent, {
       data: { purpose },
       width: "min(560px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: "#export-password-step input", restoreFocus: true, injector: this.injector,
       ariaLabel: purpose === "download" ? "Descargar la exportación de datos" : "Solicitar una exportación de datos",
     });
-    this.exportDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
+    this.exportDialog = dialog;
+    dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
+      if (this.exportDialog !== dialog) return;
       this.exportDialog = undefined;
-      if (!result) return;
+      if (!result || context !== this.accountContext() || this.destroyRef.destroyed) return;
       if (result === "unconfirmed") {
         this.snackbar.open("Archivo descargado. No pudimos confirmar la recepción: puedes descargarlo de nuevo o dejar que caduque.", "Cerrar", { duration: 6000 });
       } else {
@@ -569,7 +672,10 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async cancelDataExport(): Promise<void> {
-    if (this.exportBusy()) return;
+    if (this.exportBusy() || this.exportLoading() || this.exportError() || this.exportRefreshing()
+      || !this.user() || this.destroyRef.destroyed) return;
+    const request = this.exportMutationRequest.begin(this.accountContext());
+    const current = () => this.exportMutationRequest.isCurrent(request, this.accountContext());
     const confirmed = await this.actions.confirm({
       title: "Cancelar exportación",
       message: "La descarga pendiente dejará de funcionar y se eliminará el archivo privado si ya estaba preparado.",
@@ -578,16 +684,17 @@ export class SettingsComponent implements AfterViewInit {
     });
     // The answer can arrive after another attempt started; the dialog is not a
     // lock on the operation it describes.
-    if (!confirmed || this.exportBusy()) return;
+    if (!confirmed || !current() || this.exportBusy() || this.exportLoading() || this.exportError() || this.exportRefreshing()) return;
     this.exportBusy.set(true);
     try {
       await this.auth.cancelDataExport();
+      if (!current()) return;
       this.snackbar.open("Exportación cancelada", "Cerrar", { duration: 2500 });
       await this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.loadExportHistory()]);
     } catch (err) {
-      this.toast(err, "");
+      if (current()) this.toast(err, "");
     } finally {
-      this.exportBusy.set(false);
+      if (current()) this.exportBusy.set(false);
     }
   }
 
@@ -597,6 +704,7 @@ export class SettingsComponent implements AfterViewInit {
 
   /** Los estados con acción propia no repiten la entrada «Solicitar mi archivo». */
   exportShowsRequestEntry(): boolean {
+    if (!this.user() || this.exportLoading() || this.exportError() || this.exportRefreshing()) return false;
     const status = this.exportStatus()?.status ?? null;
     return status === null || status === "downloaded" || status === "cancelled";
   }
@@ -654,6 +762,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async loadDeletionImpact(notify = true): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed) return;
     const context = this.auth.sessionGeneration();
     const request = this.deletionRequest.begin(context);
     this.deletionLoading.set(true);
@@ -671,14 +780,18 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   openAccountDeletion(): void {
-    if (this.deletionDialog || this.deletionLoading() || !this.deletionImpact()?.canDelete) return;
-    this.deletionDialog = this.dialogs.open(AccountDeletionDialogComponent, {
+    if (this.deletionDialog || this.deletionLoading() || !this.deletionImpact()?.canDelete || !this.user() || this.destroyRef.destroyed) return;
+    const context = this.accountContext();
+    const dialog = this.dialogs.open(AccountDeletionDialogComponent, {
       width: "min(580px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: "first-heading", restoreFocus: true, injector: this.injector,
       ariaLabel: "Solicitar el cierre de cuenta",
     });
-    this.deletionDialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+    this.deletionDialog = dialog;
+    dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      if (this.deletionDialog !== dialog) return;
       this.deletionDialog = undefined;
+      if (context !== this.accountContext() || this.destroyRef.destroyed) return;
       // Refresh even on Escape after a successful send; the returned value is
       // never used as proof of server state and contains no credentials.
       void this.loadDeletionImpact();
@@ -686,6 +799,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async loadPrivacyRequests(notify = false): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed) return;
     const page = this.privacyPage() + 1;
     const perPage = this.privacyPageSize();
     const context = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${perPage}`;
@@ -720,6 +834,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async submitPrivacyRequest(): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed) return;
     const type = this.privacyForm.controls.type.value;
     const detailControl = this.privacyForm.controls.details;
     const details = detailControl.value.trim();
@@ -735,63 +850,79 @@ export class SettingsComponent implements AfterViewInit {
       this.privacyForm.markAllAsTouched();
       return;
     }
+    const request = this.privacyMutationRequest.begin(this.accountContext());
+    const current = () => this.privacyMutationRequest.isCurrent(request, this.accountContext());
     this.privacyBusy.set(true);
     try {
       await this.api.post("/api/v1/auth/privacy-requests", { type, details });
+      if (!current()) return;
       this.privacyForm.reset({ type: "access", details: "" });
       this.privacyPage.set(0);
       await this.loadPrivacyRequests(false);
+      if (!current()) return;
       this.snackbar.open("Solicitud registrada y plazo iniciado", "Cerrar", { duration: 3500 });
     } catch (error) {
+      if (!current()) return;
       this.toast(error, "");
       await this.loadPrivacyRequests(false);
     } finally {
-      this.privacyBusy.set(false);
+      if (current()) this.privacyBusy.set(false);
     }
   }
 
   beginPrivacyResponse(id: number): void {
+    if (!this.user() || this.destroyRef.destroyed || this.privacyBusy()) return;
     this.privacyResponseId.set(id);
     this.privacyResponseForm.reset();
   }
 
   async respondPrivacy(request: PrivacyRightRequest): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed) return;
     if (this.privacyResponseForm.invalid || this.privacyBusy()) {
       this.privacyResponseForm.markAllAsTouched();
       return;
     }
+    const mutation = this.privacyMutationRequest.begin(this.accountContext());
+    const current = () => this.privacyMutationRequest.isCurrent(mutation, this.accountContext());
     this.privacyBusy.set(true);
     try {
       await this.api.post(`/api/v1/auth/privacy-requests/${request.id}/respond`, {
         message: this.privacyResponseForm.controls.message.value.trim(),
       });
+      if (!current()) return;
       this.privacyResponseId.set(null);
       await this.loadPrivacyRequests(false);
+      if (!current()) return;
       this.snackbar.open("Respuesta incorporada al expediente", "Cerrar", { duration: 3000 });
     } catch (error) {
-      this.toast(error, "");
+      if (current()) this.toast(error, "");
     } finally {
-      this.privacyBusy.set(false);
+      if (current()) this.privacyBusy.set(false);
     }
   }
 
   async cancelPrivacy(request: PrivacyRightRequest): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed || this.privacyBusy()) return;
+    const mutation = this.privacyMutationRequest.begin(this.accountContext());
+    const current = () => this.privacyMutationRequest.isCurrent(mutation, this.accountContext());
     const confirmed = await this.actions.confirm({
       title: "Cancelar solicitud",
       message: "El expediente quedará cerrado como cancelado. Podrás crear otra solicitud del mismo tipo más adelante.",
       confirmLabel: "Cancelar solicitud",
       destructive: true,
     });
-    if (!confirmed || this.privacyBusy()) return;
+    if (!confirmed || !current() || this.privacyBusy()) return;
     this.privacyBusy.set(true);
     try {
       await this.api.post(`/api/v1/auth/privacy-requests/${request.id}/cancel`, {});
+      if (!current()) return;
       await this.loadPrivacyRequests();
+      if (!current()) return;
       this.snackbar.open("Solicitud cancelada", "Cerrar", { duration: 2500 });
     } catch (error) {
-      this.toast(error, "");
+      if (current()) this.toast(error, "");
     } finally {
-      this.privacyBusy.set(false);
+      if (current()) this.privacyBusy.set(false);
     }
   }
 
@@ -850,12 +981,12 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async startMfaSetup(): Promise<void> {
-    if (this.mfaPasswordForm.invalid || this.mfaBusy()) return;
+    if (this.mfaPasswordForm.invalid || this.mfaBusy() || this.userRefreshRequired()) return;
     await this.stageMfaSetup(this.mfaPasswordForm.controls.password.value);
   }
 
   async startMfaReconfiguration(): Promise<void> {
-    if (this.mfaReconfigureForm.invalid || this.mfaBusy()) return;
+    if (this.mfaReconfigureForm.invalid || this.mfaBusy() || this.userRefreshRequired()) return;
     await this.stageMfaSetup(
       this.mfaReconfigureForm.controls.password.value,
       this.mfaReconfigureForm.controls.factorCode.value,
@@ -883,6 +1014,7 @@ export class SettingsComponent implements AfterViewInit {
         this.snackbar.open("La configuración está preparada, pero no se pudo generar el QR. Usa la clave manual mostrada.", "Cerrar", { duration: 5000 });
       }
       this.mfaCodeForm.reset();
+      if (code) await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
     } catch (err) {
       if (!current()) return;
       this.toast(err, "");
@@ -892,13 +1024,13 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   beginMfaReconfiguration(): void {
-    if (this.mfaBusy()) return;
+    if (this.mfaBusy() || this.userRefreshRequired()) return;
     this.mfaReconfiguring.set(true);
     this.mfaReconfigureForm.reset();
   }
 
   async enableMfa(): Promise<void> {
-    if (this.mfaCodeForm.invalid || this.mfaBusy()) return;
+    if (this.mfaCodeForm.invalid || this.mfaBusy() || this.userRefreshRequired()) return;
     const request = this.mfaRequests.begin(this.accountContext());
     const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     this.mfaBusy.set(true);
@@ -906,12 +1038,14 @@ export class SettingsComponent implements AfterViewInit {
       const { recoveryCodes } = await this.auth.mfaEnable(this.mfaCodeForm.controls.code.value);
       if (!current()) return;
       this.recoveryCodes.set(recoveryCodes);
+      this.uncertainMfaSetup.set(false);
       this.recoveryCodesAcknowledged.set(false);
       this.clearMfaSetupUi();
       this.snackbar.open("MFA activado", "Cerrar", { duration: 2500 });
-      await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
+      await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
       if (!current()) return;
+      if (this.userMutationUnconfirmed()) this.uncertainMfaSetup.set(true);
       this.toast(err, "");
     } finally {
       if (current()) this.mfaBusy.set(false);
@@ -919,7 +1053,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async disableMfa(): Promise<void> {
-    if (this.mfaDisableForm.invalid || this.mfaBusy()) return;
+    if (this.mfaDisableForm.invalid || this.mfaBusy() || this.userRefreshRequired()) return;
     const request = this.mfaRequests.begin(this.accountContext());
     const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     const confirmed = await this.actions.confirm({
@@ -928,7 +1062,7 @@ export class SettingsComponent implements AfterViewInit {
       confirmLabel: "Desactivar MFA",
       destructive: true,
     });
-    if (!confirmed || !current() || this.mfaBusy()) return;
+    if (!confirmed || !current() || this.mfaBusy() || this.userRefreshRequired()) return;
     this.mfaBusy.set(true);
     try {
       await this.auth.mfaDisable(
@@ -946,7 +1080,7 @@ export class SettingsComponent implements AfterViewInit {
       this.mfaCodeForm.reset();
       this.mfaDisableForm.reset();
       this.snackbar.open("MFA desactivado", "Cerrar", { duration: 2500 });
-      await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
+      await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
       if (!current()) return;
       this.toast(err, "");
@@ -986,6 +1120,7 @@ export class SettingsComponent implements AfterViewInit {
     this.mfaRequests.invalidate();
     this.clearMfaSetupUi();
     this.recoveryCodes.set([]);
+    this.uncertainMfaSetup.set(false);
     this.recoveryCodesAcknowledged.set(false);
     this.recoveryRegenerating.set(false);
     this.recoveryRegenerateForm.reset();
@@ -1003,6 +1138,15 @@ export class SettingsComponent implements AfterViewInit {
     this.mfaReconfiguring.set(false);
   }
 
+  private settleUncertainMfaUi(): void {
+    this.uncertainMfaSetup.set(false);
+    this.clearMfaSetupUi();
+    this.recoveryCodes.set([]);
+    this.recoveryCodesAcknowledged.set(false);
+    this.recoveryRegenerating.set(false);
+    this.recoveryRegenerateForm.reset();
+  }
+
   finishRecoveryCodes(): void {
     if (!this.recoveryCodesAcknowledged()) return;
     this.recoveryCodes.set([]);
@@ -1011,7 +1155,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   beginRecoveryRegeneration(): void {
-    if (this.mfaBusy()) return;
+    if (this.mfaBusy() || this.userRefreshRequired()) return;
     this.recoveryRegenerating.set(true);
     this.recoveryRegenerateForm.reset();
   }
@@ -1023,7 +1167,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async regenerateRecoveryCodes(): Promise<void> {
-    if (this.recoveryRegenerateForm.invalid || this.mfaBusy()) {
+    if (this.recoveryRegenerateForm.invalid || this.mfaBusy() || this.userRefreshRequired()) {
       this.recoveryRegenerateForm.markAllAsTouched();
       return;
     }
@@ -1035,7 +1179,7 @@ export class SettingsComponent implements AfterViewInit {
       confirmLabel: "Regenerar códigos",
       destructive: true,
     });
-    if (!confirmed || !current() || this.mfaBusy()) return;
+    if (!confirmed || !current() || this.mfaBusy() || this.userRefreshRequired()) return;
 
     this.mfaBusy.set(true);
     try {
@@ -1045,6 +1189,7 @@ export class SettingsComponent implements AfterViewInit {
       );
       if (!current()) return;
       this.recoveryCodes.set(recoveryCodes);
+      this.uncertainMfaSetup.set(false);
       this.recoveryCodesAcknowledged.set(false);
       this.recoveryRegenerating.set(false);
       this.recoveryRegenerateForm.reset();
@@ -1052,6 +1197,7 @@ export class SettingsComponent implements AfterViewInit {
       await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
       if (!current()) return;
+      if (this.userMutationUnconfirmed()) this.uncertainMfaSetup.set(true);
       this.toast(err, "");
     } finally {
       if (current()) this.mfaBusy.set(false);
@@ -1061,14 +1207,16 @@ export class SettingsComponent implements AfterViewInit {
   copyRecoveryCodes(): void {
     const codes = this.recoveryCodes();
     if (!codes.length) return;
+    const context = this.accountContext();
+    const current = () => !this.destroyRef.destroyed && context === this.accountContext() && codes === this.recoveryCodes();
     const copy = navigator.clipboard?.writeText(codes.join("\n"));
     if (!copy) {
       this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
       return;
     }
     void copy.then(
-      () => this.snackbar.open("Códigos copiados", "Cerrar", { duration: 2000 }),
-      () => this.snackbar.open("No se pudieron copiar los códigos", "Cerrar", { duration: 2500 }),
+      () => { if (current()) this.snackbar.open("Códigos copiados", "Cerrar", { duration: 2000 }); },
+      () => { if (current()) this.snackbar.open("No se pudieron copiar los códigos", "Cerrar", { duration: 2500 }); },
     );
   }
 

@@ -100,6 +100,14 @@ final class PrivateArtifactCleanup
 
         $cleaned = 0;
         foreach ($rows as $row) {
+            if (DB::transactionLevel() > 0) {
+                // A sweep may see a terminal transition in an enclosing
+                // transaction. Defer and revalidate that exact pointer, just
+                // like business callers; scheduled work is not yet cleaned.
+                self::afterCommit((int) $row->id, $row->artifact_path);
+
+                continue;
+            }
             if (self::clean((int) $row->id, $row->artifact_path, true)) {
                 $cleaned++;
             }

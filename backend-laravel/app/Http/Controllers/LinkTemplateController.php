@@ -102,6 +102,8 @@ class LinkTemplateController
                     'name' => $name,
                     'payload' => $payload,
                 ]);
+            }, function (LinkTemplate $template) use ($request, $user, $workspaceId, $name): void {
+                Audit::write($user->id, 'link_template.create', 'link_template', (int) $template->id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
@@ -114,8 +116,6 @@ class LinkTemplateController
             }
             throw $e;
         }
-
-        Audit::write($user->id, 'link_template.create', 'link_template', (int) $template->id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['template' => [
             'id' => (int) $template->id,
@@ -141,12 +141,12 @@ class LinkTemplateController
                     throw new LinkException('Plantilla no encontrada', 404);
                 }
                 $template->delete();
+            }, function () use ($request, $user, $workspaceId, $id): void {
+                Audit::write($user->id, 'link_template.delete', 'link_template', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
-
-        Audit::write($user->id, 'link_template.delete', 'link_template', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }

@@ -25,19 +25,20 @@ export class AuthUserMutations {
     private readonly refresh: (generation: number, account: number | null) => Promise<void>,
   ) {}
 
-  observedIdentity(): void {
+  /** A concurrent identity read may reflect a newer security commit. */
+  identityRead(): void {
     if (this.active) this.active.reconcile = true;
   }
 
-  async run(generation: number, account: number | null, command: () => Promise<AuthUser>): Promise<AuthUser> {
+  async run(generation: number, account: number | null, command: () => Promise<AuthUser>, needsReconciliation = false): Promise<AuthUser> {
     let group = this.active;
     if (!group || group.generation !== generation || group.account !== account) {
       let settle!: () => void;
       const settled = new Promise<void>((resolve) => { settle = resolve; });
-      group = { generation, account, pending: 0, reconcile: false, confirmed: false, settled, settle };
+      group = { generation, account, pending: 0, reconcile: needsReconciliation, confirmed: false, settled, settle };
       this.active = group;
     }
-    if (++group.pending > 1) group.reconcile = true;
+    if (++group.pending > 1 || needsReconciliation) group.reconcile = true;
     let user: AuthUser;
     try {
       user = await command();

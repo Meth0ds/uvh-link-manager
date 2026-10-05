@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\LinkException;
 use App\Models\Link;
-use App\Models\User;
-use App\Models\UvhSession;
 use App\Support\Audit;
 use App\Support\IsoDate;
 use App\Support\LinkBlockReason;
@@ -16,10 +14,12 @@ use App\Support\MfaInfrastructureUnavailable;
 use App\Support\MfaStepUp;
 use App\Support\OperationalMetrics;
 use App\Support\SearchTerm;
+use App\Support\SecurityContext;
 use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
 use App\Support\WorkspaceAccess;
+use App\Support\WorkspaceWriteActor;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -215,12 +215,11 @@ class LinkController
                 $input,
                 UvhRequest::apiToken($request),
                 (int) $user->security_version,
+                WorkspaceWriteActor::fromRequest($request),
             );
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
-
-        Audit::write($user->id, 'link.create', 'link', $created['id'], null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         $link = Link::with(['domain', 'tags'])
             ->where('id', $created['id'])->where('workspace_id', $workspaceId)->first();
@@ -344,7 +343,7 @@ class LinkController
         }
 
         try {
-            $updated = LinkService::update(
+            LinkService::update(
                 $id,
                 $workspaceId,
                 $user->id,
@@ -352,12 +351,11 @@ class LinkController
                 $expectedVersion,
                 UvhRequest::apiToken($request),
                 (int) $user->security_version,
+                WorkspaceWriteActor::fromRequest($request),
             );
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
-
-        Audit::write($user->id, 'link.update', 'link', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         $link = Link::with(['domain', 'tags'])
             ->where('id', $id)->where('workspace_id', $workspaceId)->first();
@@ -386,16 +384,9 @@ class LinkController
         }
 
         try {
-            $apiTokenContext = UvhRequest::apiToken($request);
-            $transition = DB::transaction(function () use ($workspaceId, $user, $id, $state, $apiTokenContext): array {
-                if (! WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $workspaceId,
-                    'editor',
-                    $apiTokenContext,
-                    'links:write',
-                    (int) $user->security_version,
-                )) {
+            $writeActor = WorkspaceWriteActor::fromRequest($request);
+            $transition = DB::transaction(function () use ($workspaceId, $user, $id, $state, $reason, $writeActor): array {
+                if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
                     throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
                 }
                 $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
@@ -422,17 +413,17 @@ class LinkController
                     ]);
                 }
 
+                $writeActor->auditLink('link.state_change', $id, [
+                    'from' => $from,
+                    'to' => $state,
+                    'reason' => is_string($reason) ? $reason : null,
+                ]);
+
                 return ['from' => $from, 'to' => $state];
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
-
-        Audit::write($user->id, 'link.state_change', 'link', $id, [
-            'from' => $transition['from'],
-            'to' => $transition['to'],
-            'reason' => is_string($reason) ? $reason : null,
-        ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true, 'state' => $transition['to']]);
     }
@@ -457,16 +448,9 @@ class LinkController
         }
 
         try {
-            $apiTokenContext = UvhRequest::apiToken($request);
-            $appealId = DB::transaction(function () use ($workspaceId, $user, $id, $message, $apiTokenContext): int {
-                if (! WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $workspaceId,
-                    'editor',
-                    $apiTokenContext,
-                    'links:write',
-                    (int) $user->security_version,
-                )) {
+            $writeActor = WorkspaceWriteActor::fromRequest($request);
+            $appealId = DB::transaction(function () use ($workspaceId, $user, $id, $message, $writeActor): int {
+                if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
                     throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
                 }
                 $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
@@ -490,14 +474,16 @@ class LinkController
                     throw new LinkException('Ya hay una apelación abierta para este enlace', 409);
                 }
 
-                return (int) DB::table('link_appeals')
+                $appealId = (int) DB::table('link_appeals')
                     ->where('link_id', $id)->where('status', 'open')->value('id');
+                $writeActor->auditLink('link.appeal', $id, ['appealId' => $appealId]);
+
+                return $appealId;
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
 
-        Audit::write($user->id, 'link.appeal', 'link', $id, ['appealId' => $appealId], UvhRequest::ip($request), workspaceId: $workspaceId);
         OperationalMetrics::increment('reputation.appeal_opened');
 
         return response()->json(['ok' => true, 'appealId' => $appealId], 201);
@@ -509,16 +495,9 @@ class LinkController
         $user = UvhRequest::user($request);
 
         try {
-            $apiTokenContext = UvhRequest::apiToken($request);
-            DB::transaction(function () use ($workspaceId, $user, $id, $apiTokenContext): void {
-                if (! WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $workspaceId,
-                    'editor',
-                    $apiTokenContext,
-                    'links:write',
-                    (int) $user->security_version,
-                )) {
+            $writeActor = WorkspaceWriteActor::fromRequest($request);
+            DB::transaction(function () use ($workspaceId, $user, $id, $writeActor): void {
+                if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
                     throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
                 }
                 $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
@@ -537,12 +516,11 @@ class LinkController
                     'updated_at' => now(),
                 ]);
                 WebhookService::dispatch($workspaceId, 'link.deleted', ['linkId' => $id]);
+                $writeActor->auditLink('link.delete', $id);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
-
-        Audit::write($user->id, 'link.delete', 'link', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }
@@ -553,16 +531,9 @@ class LinkController
         $user = UvhRequest::user($request);
 
         try {
-            $apiTokenContext = UvhRequest::apiToken($request);
-            DB::transaction(function () use ($id, $workspaceId, $user, $apiTokenContext): void {
-                if (! WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $workspaceId,
-                    'editor',
-                    $apiTokenContext,
-                    'links:write',
-                    (int) $user->security_version,
-                )) {
+            $writeActor = WorkspaceWriteActor::fromRequest($request);
+            DB::transaction(function () use ($id, $workspaceId, $user, $writeActor): void {
+                if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
                     throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
                 }
                 $link = Link::withTrashed()->where('id', $id)->where('workspace_id', $workspaceId)
@@ -600,6 +571,7 @@ class LinkController
                     'alias' => (string) $link->alias,
                     'state' => $next,
                 ]);
+                $writeActor->auditLink('link.restore', $id);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
@@ -609,8 +581,6 @@ class LinkController
             }
             throw $e;
         }
-
-        Audit::write($user->id, 'link.restore', 'link', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }
@@ -629,18 +599,15 @@ class LinkController
         }
 
         try {
-            $result = DB::transaction(function () use ($workspaceId, $actor, $sessionId, $password, $factorCode, $confirmation, $id): array {
+            $result = DB::transaction(function () use ($request, $workspaceId, $actor, $sessionId, $password, $factorCode, $confirmation, $id): array {
                 // Global order: account -> session -> workspace -> link.
-                $lockedUser = User::where('id', $actor->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                $session = UvhSession::where('id', $sessionId)->where('user_id', $actor->id)
-                    ->whereNull('revoked_at')->lockForUpdate()->first();
-                if (! $lockedUser || ! $session
-                    || (int) $session->security_version !== (int) $lockedUser->security_version) {
+                $context = SecurityContext::lock($actor, $sessionId, requireVerifiedEmail: true);
+                if (! $context) {
                     return ['status' => 'stale'];
                 }
-                if (! WorkspaceAccess::getMembershipLocked(
-                    $actor->id, $workspaceId, 'admin', expectedSecurityVersion: (int) $actor->security_version,
-                )) {
+                $lockedUser = $context->user;
+                $session = $context->session;
+                if (! WorkspaceAccess::getMembershipForContext($context, $workspaceId, 'admin')) {
                     return ['status' => 'forbidden'];
                 }
                 $link = Link::withTrashed()->where('id', $id)->where('workspace_id', $workspaceId)
@@ -660,6 +627,9 @@ class LinkController
                 }
                 $alias = (string) $link->alias;
                 $link->forceDelete();
+                Audit::write($actor->id, 'link.purge', 'link', $id, [
+                    'alias' => $alias, 'factor' => $stepUp['factor'],
+                ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
                 return ['status' => 'deleted', 'alias' => $alias, 'factor' => $stepUp['factor']];
             });
@@ -687,9 +657,6 @@ class LinkController
         if ($error !== null) {
             return response()->json(['error' => $error[0]], $error[1]);
         }
-        Audit::write($actor->id, 'link.purge', 'link', $id, [
-            'alias' => $result['alias'], 'factor' => $result['factor'],
-        ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }

@@ -2,7 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountSessionsController;
+use App\Http\Controllers\MfaConfigurationController;
 use App\Models\User;
 use App\Support\Ids;
 use App\Support\MfaAttempts;
@@ -85,7 +86,7 @@ final class MfaConfigurationBoundaryTest extends TestCase
             'setup' => 'mfaSetup', 'cancel' => 'mfaCancelSetup',
             'enable', 'reconfigure' => 'mfaEnable', 'regenerate' => 'mfaRegenerateRecoveryCodes', 'disable' => 'mfaDisable',
         };
-        $response = app(AuthController::class)->{$method}($request);
+        $response = app(MfaConfigurationController::class)->{$method}($request);
         $this->assertSame(409, $response->getStatusCode());
         $this->assertSame($before, $user->refresh()->getRawOriginal());
         $this->assertSame($sessions, DB::table('sessions')->orderBy('id')->get()->toJson());
@@ -267,7 +268,7 @@ final class MfaConfigurationBoundaryTest extends TestCase
         Cache::shouldReceive('store')->andThrow(new \RuntimeException('Fixture: attempt store unavailable'));
         $caught = null;
         try {
-            app(AuthController::class)->{$action === 'setup' ? 'mfaSetup' : 'mfaEnable'}($request);
+            app(MfaConfigurationController::class)->{$action === 'setup' ? 'mfaSetup' : 'mfaEnable'}($request);
         } catch (MfaInfrastructureUnavailable $error) {
             $caught = $error;
         }
@@ -294,7 +295,7 @@ final class MfaConfigurationBoundaryTest extends TestCase
         $request = Request::create('/', 'POST');
         $request->attributes->set(UvhRequest::USER, $snapshot);
         $request->attributes->set(UvhRequest::SESSION_ID, $current);
-        $controller = app(AuthController::class);
+        $controller = app(AccountSessionsController::class);
         $response = match ($action) {
             'single' => $controller->revokeSession($request, $other),
             'others' => $controller->revokeOtherSessions($request),

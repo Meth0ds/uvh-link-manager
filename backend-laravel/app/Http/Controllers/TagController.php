@@ -71,9 +71,8 @@ class TagController
             return response()->json(['error' => 'Ya existe una etiqueta con ese nombre'], 409);
         }
 
-        $from = $tag->name;
         try {
-            $from = WorkspaceMutation::run($request, function () use ($workspaceId, $id, $name): string {
+            WorkspaceMutation::run($request, function () use ($workspaceId, $id, $name): string {
                 $tag = Tag::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
                 if (! $tag) {
                     throw new LinkException('Etiqueta no encontrada', 404);
@@ -91,6 +90,8 @@ class TagController
                 }
 
                 return $from;
+            }, function (string $from) use ($request, $user, $workspaceId, $id, $name): void {
+                Audit::write($user->id, 'tag.rename', 'tag', $id, ['from' => $from, 'to' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
@@ -103,8 +104,6 @@ class TagController
             }
             throw $e;
         }
-
-        Audit::write($user->id, 'tag.rename', 'tag', $id, ['from' => $from, 'to' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true, 'id' => $id, 'name' => $name]);
     }
@@ -191,15 +190,16 @@ class TagController
                 }
 
                 return [$moved, $locked->get($targetId)->name];
+            }, function (array $result) use ($request, $user, $workspaceId, $targetId, $sources): void {
+                [$merged] = $result;
+                Audit::write($user->id, 'tag.merge', 'tag', $targetId, [
+                    'sourceIds' => array_keys($sources),
+                    'moved' => $merged,
+                ], UvhRequest::ip($request), workspaceId: $workspaceId);
             });
         } catch (LinkException $e) {
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
-
-        Audit::write($user->id, 'tag.merge', 'tag', $targetId, [
-            'sourceIds' => array_keys($sources),
-            'moved' => $merged,
-        ], UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true, 'id' => $targetId, 'name' => $targetName, 'moved' => $merged]);
     }

@@ -1,0 +1,13 @@
+# Autoridad ycaducidad de tokens API
+
+Continuación del objetivo S01–S13, después de terminal/hashes/registros O57. No editar fuente/tests mientras full38136esté vivo. Lectura completa actual RequireApiToken/WorkspaceAccess/TokenController/ApiToken/ApiTokenSchemeTest; rutas bearer nativas18 ytokens browser3 identificadas desde fuente actual. `o57-source-read-ahead/source-evidence.json`. Candidatos sinID hasta reproducciones reales. La garantía de sesión concreta en enlaces no cubre emisión/revocación de credenciales de integración.
+
+- [ ] Observar mismo38136hasta terminal, comprobar JUnit y809hashes ycerrar registros O57 sin cierre global. Snapshot propio desde fuente actual verificada antes de cambios.
+- [ ] Reproducir token deadline -1/0/+1 ysin caducidad en middleware HTTP nativo (lecturas ycinco escrituras links; rechazo temprano en demás rutas bearer sin llamadas externas). Credencial caducada no actualiza last_used_at ni revela datos/modifica negocio/audit/colas.
+- [ ] Reproducir deadline exacto después del middleware yantes del lock de token/negocio; conservar account→workspace→token/recursos yscopes/roles/tenant/generación, otras cookies ignoradas.
+- [ ] Reproducir sesión concreta caducada/revocada/otro dueño/generación/ausente después del middleware en emisión yrevocación browser; límites -1/0/+1 antes de consumir factor/recovery,misma sesión exacta requerida. Reutilizar SecurityContext+membership bajo su TX, sin duplicar account/session locks. Política de logout protector preservada.
+- [ ] Reproducir fecha de emisión exactamente ahora yque vence entre validación ycommit; no devolver credencial/consumir recovery/admitir aviso si la fecha ya no sirve. Controles que conservan tokens sin fecha yfecha futura/admisión durable/notice/roles. No atribuir bug por hipótesis sólo.
+- [ ] Si hayrojo, corregir comparación inclusiva/autoridad en fuente mínima yregresar consumidores sin debilitar tests ni baseline. Pint/PHPStan/fullbackend/hash/comparación íntegra;testing/uvh_test,suites SQL secuenciales,sin fuente/test edits durante full.
+- [ ] Actualizar ledgers/matriz/inventario/evidencia ycontinuar todas las demás funciones/roles/UI/diseño/retención/capacidad/CI/operación, incluido despacho auxiliar bajoTXexterior/CSV como otrogate. Sin agentes/worktrees/commit/push/deploy/uvh_local/cuentas/correo/proveedores/servicios productivos/migraciones externas.
+
+O57 previo terminal38136exit0/full2501/21544/JUnit0errores-fallos-omitidos y809hashes intactos;registrosfinales actualizados. No procesoSQL propio pendiente. Snapshot yrojo propios de este plan aún porhacer;fuentesahead vigentes.No bloqueo.

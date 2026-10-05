@@ -268,6 +268,7 @@ class GenerateDataExportJob implements ShouldQueue
                 'mail_generation_hash' => null,
                 'failure_reason' => 'generation_error',
             ]);
+            Audit::write((int) $request->user_id, 'account.data_export_failed', 'data_export', (int) $request->id);
 
             return ['path' => $path, 'user_id' => (int) $request->user_id, 'request_id' => (int) $request->id];
         });
@@ -275,9 +276,8 @@ class GenerateDataExportJob implements ShouldQueue
             return;
         }
         if (is_string($result['path']) && $result['path'] !== '') {
-            PrivateArtifactCleanup::attempt($result['request_id'], $result['path']);
+            PrivateArtifactCleanup::afterCommit($result['request_id'], $result['path']);
         }
-        Audit::write($result['user_id'], 'account.data_export_failed', 'data_export', $result['request_id']);
     }
 
     /**
@@ -299,19 +299,18 @@ class GenerateDataExportJob implements ShouldQueue
             $request->update([
                 'status' => 'failed',
                 'stage' => null,
-                'artifact_path' => null,
                 'mail_generation_hash' => null,
                 'failure_reason' => 'automated_size_limit',
                 'updated_at' => now(),
+            ]);
+            Audit::write($userId, 'account.data_export_failed', 'data_export', $requestId, [
+                'reason' => 'automated_size_limit',
             ]);
 
             return true;
         });
         if ($failed) {
-            PrivateArtifactCleanup::attempt($requestId, $artifactPath);
-            Audit::write($userId, 'account.data_export_failed', 'data_export', $requestId, [
-                'reason' => 'automated_size_limit',
-            ]);
+            PrivateArtifactCleanup::afterCommit($requestId, $artifactPath);
         }
     }
 

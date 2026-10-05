@@ -10,6 +10,7 @@ use App\Models\Link;
 use App\Models\PendingRegistration;
 use App\Models\User;
 use App\Support\AccountDeletionAudit;
+use App\Support\AccountDeletionLifecycleAudit;
 use App\Support\Audit;
 use App\Support\Auth\RegistrationAttemptContext;
 use App\Support\Auth\SecurityIncidentAudit;
@@ -52,6 +53,7 @@ class UvhHousekeeping extends Command
         };
 
         $run('protective_deletion_audits', fn () => AccountDeletionAudit::reconcile());
+        $run('deletion_lifecycle_audits', fn () => AccountDeletionLifecycleAudit::reconcile());
         $run('protective_incident_audits', fn () => SecurityIncidentAudit::reconcile());
 
         $run('audit_outbox', function (): void {
@@ -421,7 +423,7 @@ class UvhHousekeeping extends Command
                     ->where('status', 'processing')->where('updated_at', '<', now()->subMinutes(30))
                     ->update(['status' => 'failed', 'failure_reason' => 'stalled', 'updated_at' => now()]);
                 if ($updated === 1 && is_string($export->artifact_path) && $export->artifact_path !== '') {
-                    PrivateArtifactCleanup::attempt((int) $export->id, $export->artifact_path);
+                    PrivateArtifactCleanup::afterCommit((int) $export->id, $export->artifact_path);
                 }
             }
 
@@ -441,7 +443,7 @@ class UvhHousekeeping extends Command
                         'updated_at' => now(),
                     ]);
                 if ($updated === 1 && is_string($export->artifact_path) && $export->artifact_path !== '') {
-                    PrivateArtifactCleanup::attempt((int) $export->id, $export->artifact_path);
+                    PrivateArtifactCleanup::afterCommit((int) $export->id, $export->artifact_path);
                 }
             }
 
@@ -620,7 +622,7 @@ class UvhHousekeeping extends Command
                         'status' => 'blocked', 'cancel_token_hash' => null, 'updated_at' => now(),
                     ]);
 
-                    return null;
+                    return ['audit_only' => true, 'audit_pending' => ! AccountDeletionLifecycleAudit::record($user, $request, 'account.deletion_blocked')];
                 }
                 $mailConfirmed = is_string($request->cancel_token_hash)
                     && DB::table('mail_outbox')
@@ -644,7 +646,8 @@ class UvhHousekeeping extends Command
                         'updated_at' => $now,
                     ]);
 
-                    return ['blocked' => true, 'mail_unconfirmed' => true, 'user_id' => (int) $user->id, 'artifacts' => []];
+                    return ['blocked' => true, 'mail_unconfirmed' => true, 'user_id' => (int) $user->id, 'artifacts' => [],
+                        'audit_pending' => ! AccountDeletionLifecycleAudit::record($user, $request, 'account.deletion_cancelled_mail_unconfirmed')];
                 }
                 if (DB::table('workspaces')->where('owner_user_id', $user->id)->exists()) {
                     $now = now();
@@ -660,7 +663,8 @@ class UvhHousekeeping extends Command
                         'updated_at' => $now,
                     ]);
 
-                    return ['blocked' => true, 'mail_unconfirmed' => false, 'user_id' => (int) $user->id, 'artifacts' => []];
+                    return ['blocked' => true, 'mail_unconfirmed' => false, 'user_id' => (int) $user->id, 'artifacts' => [],
+                        'audit_pending' => ! AccountDeletionLifecycleAudit::record($user, $request, 'account.deletion_blocked')];
                 }
 
                 $artifacts = DB::table('data_export_requests')->where('user_id', $user->id)
@@ -721,6 +725,9 @@ class UvhHousekeeping extends Command
                     'executed_at' => $now,
                     'updated_at' => $now,
                 ]);
+                // Destructive execution requires durable evidence in the same
+                // business commit. History delivery still happens after commit.
+                Audit::write($user->id, 'account.deletion_executed', 'account_deletion', $id);
 
                 return ['blocked' => false, 'mail_unconfirmed' => false, 'user_id' => (int) $user->id, 'artifacts' => $artifacts];
             });
@@ -728,19 +735,17 @@ class UvhHousekeeping extends Command
             if (! $result) {
                 continue;
             }
-            foreach ($result['artifacts'] ?? [] as $artifact) {
-                PrivateArtifactCleanup::attempt($artifact['id'], $artifact['path']);
+            if (! ($result['audit_only'] ?? false)) {
+                foreach ($result['artifacts'] ?? [] as $artifact) {
+                    PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
+                }
+                LinkIntentRegistry::afterCommit($result['user_id']);
             }
-            try {
-                LinkIntentRegistry::revokeForUser($result['user_id']);
-            } catch (\Throwable) {
-                // The inverse index remains available for the next scheduled
-                // housekeeping pass; the deleted account cannot authenticate.
+            if ($result['audit_pending'] ?? false) {
+                // Protection has committed with a retryable receipt. Report
+                // this incomplete pass without undoing the protective change.
+                throw new \RuntimeException('Deletion lifecycle audit remains pending');
             }
-            $action = $result['mail_unconfirmed']
-                ? 'account.deletion_cancelled_mail_unconfirmed'
-                : ($result['blocked'] ? 'account.deletion_blocked' : 'account.deletion_executed');
-            Audit::write($result['user_id'], $action, 'account_deletion', $id);
         }
     }
 

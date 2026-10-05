@@ -6,10 +6,10 @@
   <div class="profile-access"><mat-icon aria-hidden="true">{{ user()?.emailVerified ? 'mark_email_read' : 'mail_outline' }}</mat-icon><span>{{ user()?.emailVerified ? 'Email verificado' : 'Email sin verificar' }}</span></div>
 </section>
 
-<section class="security-strip" [class.protected]="user()?.mfaEnabled" aria-label="Estado de seguridad de la cuenta">
-  <span class="security-icon" aria-hidden="true"><mat-icon>{{ user()?.mfaEnabled ? 'verified_user' : 'shield' }}</mat-icon></span>
-  <div><b>{{ user()?.mfaEnabled ? 'Verificación en dos pasos activa' : 'Añade un segundo factor de acceso' }}</b><p>{{ user()?.mfaEnabled ? 'Las operaciones sensibles requieren una comprobación adicional.' : 'Configura una aplicación autenticadora y guarda los códigos de recuperación.' }}</p></div>
-  <a class="security-state" href="#security" (click)="goToSection($event, securitySection)">{{ user()?.mfaEnabled ? 'Gestionar MFA' : 'Configurar MFA' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
+<section class="security-strip" [class.protected]="!userRefreshRequired() && user()?.mfaEnabled" aria-label="Estado de seguridad de la cuenta">
+  <span class="security-icon" aria-hidden="true"><mat-icon>{{ userRefreshRequired() ? 'sync' : user()?.mfaEnabled ? 'verified_user' : 'shield' }}</mat-icon></span>
+  <div><b>{{ userRefreshRequired() ? 'Estado de seguridad pendiente de actualizar' : user()?.mfaEnabled ? 'Verificación en dos pasos activa' : 'Añade un segundo factor de acceso' }}</b><p>{{ userRefreshRequired() ? 'Comprueba los datos actuales en Acceso y seguridad.' : user()?.mfaEnabled ? 'Las operaciones sensibles requieren una comprobación adicional.' : 'Configura una aplicación autenticadora y guarda los códigos de recuperación.' }}</p></div>
+  <a class="security-state" href="#security" (click)="goToSection($event, securitySection)">{{ userRefreshRequired() ? 'Comprobar estado' : user()?.mfaEnabled ? 'Gestionar MFA' : 'Configurar MFA' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
 </section>
 
 <!-- La navegación local mantiene una página extensa predecible sin duplicar rutas ni estado. -->
@@ -37,10 +37,10 @@
 
 <div class="card-block profile-card">
   @if (userRefreshRequired()) {
-    <app-async-operation-status tone="expired" icon="sync" role="status">
-      <b>Los cambios están confirmados</b>
+    <app-async-operation-status class="account-refresh-notice" tone="expired" icon="sync" role="status">
+      <b>{{ userMutationUnconfirmed() ? 'Comprueba el resultado del cambio' : 'Los cambios están confirmados' }}</b>
       <p>Los datos de esta vista necesitan actualizarse. Comprueba el estado actual antes de repetir una operación.</p>
-      <button mat-stroked-button type="button" (click)="refreshAccountView()" [disabled]="profileRefreshBusy()" [attr.aria-busy]="profileRefreshBusy()">{{ profileRefreshBusy() ? 'Actualizando…' : 'Actualizar datos' }}</button>
+      <button mat-stroked-button type="button" (click)="refreshAccountView($event)" [attr.aria-disabled]="profileRefreshBusy()" [attr.aria-busy]="profileRefreshBusy()">{{ profileRefreshBusy() ? 'Actualizando…' : 'Actualizar datos' }}</button>
     </app-async-operation-status>
   }
   <div class="card-heading"><span class="card-icon"><mat-icon>person</mat-icon></span><div><h3>Cómo te ven los demás</h3><p>Usa un nombre reconocible para las personas con las que compartes workspace.</p></div></div>
@@ -109,9 +109,17 @@
 
 <!-- MFA -->
 <div class="card-block mfa-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>verified_user</mat-icon></span><div><h3>Verificación en dos pasos</h3><p>Configura una aplicación autenticadora y tus métodos de recuperación.</p></div><span class="mini-state" [class.on]="user()?.mfaEnabled">{{ user()?.mfaEnabled ? 'Activo' : 'Inactivo' }}</span></div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>verified_user</mat-icon></span><div><h3>Verificación en dos pasos</h3><p>Configura una aplicación autenticadora y tus métodos de recuperación.</p></div><span class="mini-state" [class.on]="!userRefreshRequired() && user()?.mfaEnabled">{{ userRefreshRequired() ? 'Pendiente de actualizar' : user()?.mfaEnabled ? 'Activo' : 'Inactivo' }}</span></div>
 
-  @if (recoveryCodes().length || mfaSecret() || !user()?.mfaEnabled || mfaReconfiguring()) {
+  @if (userRefreshRequired()) {
+    <app-async-operation-status class="mfa-refresh-notice account-refresh-notice" tone="expired" icon="sync" role="status">
+      <b>Comprueba el estado actual de tu cuenta</b>
+      <p>{{ userMutationUnconfirmed() ? 'No se pudo confirmar el resultado del envío. Comprueba los datos antes de volver a modificar MFA.' : 'El cambio está confirmado. Actualiza los datos antes de volver a modificar MFA.' }}</p>
+      <button mat-stroked-button type="button" (click)="refreshAccountView($event)" [attr.aria-disabled]="profileRefreshBusy()" [attr.aria-busy]="profileRefreshBusy()">{{ profileRefreshBusy() ? 'Actualizando…' : 'Actualizar datos' }}</button>
+    </app-async-operation-status>
+  }
+
+  @if (recoveryCodes().length || (!userRefreshRequired() && (mfaSecret() || !user()?.mfaEnabled || mfaReconfiguring()))) {
     <ol class="mfa-progress" [attr.aria-label]="'Paso ' + mfaSetupStep() + ' de 3'">
       <li [class.active]="mfaSetupStep() === 1" [class.complete]="mfaSetupStep() > 1"><span>@if (mfaSetupStep() > 1) { <mat-icon>check</mat-icon> } @else { 1 }</span><b>Confirmar</b></li>
       <li [class.active]="mfaSetupStep() === 2" [class.complete]="mfaSetupStep() > 2"><span>@if (mfaSetupStep() > 2) { <mat-icon>check</mat-icon> } @else { 2 }</span><b>Vincular</b></li>
@@ -134,6 +142,8 @@
       <mat-checkbox color="primary" [checked]="recoveryCodesAcknowledged()" (change)="recoveryCodesAcknowledged.set($event.checked)">He guardado los códigos en un lugar accesible fuera de UVH.</mat-checkbox>
       <button mat-flat-button color="primary" type="button" class="finish-mfa" (click)="finishRecoveryCodes()" [disabled]="!recoveryCodesAcknowledged()">Finalizar configuración</button>
     </section>
+  } @else if (userRefreshRequired()) {
+    <p class="muted">Tu configuración estará disponible cuando se actualicen los datos.</p>
   } @else if (mfaSecret()) {
     <section class="mfa-enrol" aria-labelledby="mfa-link-title">
       <div class="enrol-copy"><span class="setup-kicker"><mat-icon>qr_code_2</mat-icon>Paso 2</span><h3 id="mfa-link-title">Vincula tu aplicación</h3><p>Escanea el QR con tu aplicación autenticadora. Si no puedes escanearlo, introduce la clave manual.</p></div>
@@ -167,6 +177,9 @@
       </form>
     </section>
   } @else {
+    @if (recoveryIssueUnconfirmed()) {
+      <div class="inline-note" role="status"><mat-icon aria-hidden="true">key</mat-icon><span>No se recibieron códigos de recuperación utilizables. Regenera un nuevo conjunto y guárdalo antes de depender de él.</span></div>
+    }
     <div class="mfa-summary">
       <div><span class="summary-icon"><mat-icon>phonelink_lock</mat-icon></span><span><b>Aplicación autenticadora</b><small>Vinculada y activa</small></span><mat-icon class="summary-check">check_circle</mat-icon></div>
       <div [class.attention]="(user()?.recoveryCodesRemaining ?? 0) <= 2"><span class="summary-icon"><mat-icon>key</mat-icon></span><span><b>Códigos de recuperación</b><small>{{ user()?.recoveryCodesRemaining ?? 0 }} disponibles</small></span><strong>{{ user()?.recoveryCodesRemaining ?? 0 }}</strong></div>
@@ -283,12 +296,21 @@
 
 <!-- Data portability -->
 <div class="card-block data-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>download_for_offline</mat-icon></span><div><h3>Descarga de datos</h3><p>Copia de cuenta de uso propio, preparada al momento. El derecho de acceso del RGPD, con expediente y plazos, se ejerce en «Derechos sobre tus datos».</p></div></div>
+  <div class="card-heading"><span class="card-icon"><mat-icon>download_for_offline</mat-icon></span><div><h3 #exportHeading id="export-heading" tabindex="-1">Descarga de datos</h3><p>Copia de cuenta de uso propio, preparada al momento. El derecho de acceso del RGPD, con expediente y plazos, se ejerce en «Derechos sobre tus datos».</p></div></div>
+  @if (exportError(); as message) {
+    <app-async-operation-status class="export-observation-error" tone="expired" icon="sync_problem" role="status" aria-live="polite" aria-atomic="true" [attr.aria-busy]="exportRefreshing()">
+      <b>No pudimos actualizar tu exportación</b>
+      <p>{{ message }}</p>
+      @if (exportStatus()) { <p>Se muestra el último estado conocido. Actualízalo antes de descargar, cancelar o solicitar otro archivo.</p> }
+      @else { <p>Comprueba el estado antes de solicitar un archivo nuevo.</p> }
+      <button mat-stroked-button type="button" class="export-retry" (click)="retryExportStatus()" [attr.aria-disabled]="exportRefreshing() ? 'true' : null" [attr.aria-busy]="exportRefreshing()">{{ exportRefreshing() ? 'Actualizando…' : 'Actualizar estado' }}</button>
+    </app-async-operation-status>
+  }
   @if (exportLoading()) {
     <app-panel-skeleton variant="form" label="Consultando exportaciones" />
   } @else {
     @if (exportStatus(); as currentExport) {
-      <app-async-operation-status [tone]="exportTone(currentExport.status)" [icon]="exportIcon(currentExport.status)" aria-live="polite">
+      <app-async-operation-status [tone]="exportError() ? 'done' : exportTone(currentExport.status)" [icon]="exportIcon(currentExport.status)" aria-live="polite">
           @switch (currentExport.status) {
             @case ('processing') {
               <b>Estamos preparando tus datos</b>
@@ -297,7 +319,7 @@
             @case ('ready') {
               <b>Tu exportación está lista</b>
               <p>Preparada {{ formatDate(currentExport.readyAt ?? '') }}. Disponible hasta {{ formatDate(currentExport.downloadExpiresAt ?? '') }}.</p>
-              <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog('download')" [disabled]="exportBusy()"><mat-icon aria-hidden="true">download</mat-icon>Descargar archivo</button>
+              <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog('download')" [disabled]="exportBusy() || exportLoading() || !!exportError() || exportRefreshing()"><mat-icon aria-hidden="true">download</mat-icon>Descargar archivo</button>
             }
             @case ('downloaded') {
               <b>Exportación descargada</b>
@@ -310,13 +332,13 @@
                 <button mat-flat-button class="export-primary" type="button" (click)="openPortabilityFlow()"><mat-icon aria-hidden="true">gavel</mat-icon>Solicitar portabilidad</button>
               } @else {
                 <p>Fue un fallo de generación y puedes repetirlo. El nuevo intento vuelve a preparar el archivo desde cero.</p>
-                <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog()" [disabled]="exportBusy()"><mat-icon aria-hidden="true">replay</mat-icon>Volver a intentarlo</button>
+                <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog()" [disabled]="exportBusy() || exportLoading() || !!exportError() || exportRefreshing()"><mat-icon aria-hidden="true">replay</mat-icon>Volver a intentarlo</button>
               }
             }
             @case ('expired') {
               <b>El archivo ha caducado</b>
               <p>Preparada {{ formatDate(currentExport.readyAt ?? '') }}, disponible hasta {{ formatDate(currentExport.downloadExpiresAt ?? '') }}. Por seguridad el archivo privado se elimina pasada la ventana de descarga.</p>
-              <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog()" [disabled]="exportBusy()"><mat-icon aria-hidden="true">restart_alt</mat-icon>Generar una nueva exportación</button>
+              <button mat-flat-button class="export-primary" type="button" (click)="openDataExportDialog()" [disabled]="exportBusy() || exportLoading() || !!exportError() || exportRefreshing()"><mat-icon aria-hidden="true">restart_alt</mat-icon>Generar una nueva exportación</button>
             }
             @default { <b>Solicitud cancelada</b><p>Puedes iniciar una nueva cuando lo necesites.</p> }
           }
@@ -324,7 +346,7 @@
     }
 
     @if (exportIsActive()) {
-      <div class="row-actions"><button mat-stroked-button class="danger" type="button" (click)="cancelDataExport()" [disabled]="exportBusy()">{{ exportBusy() ? 'Cancelando…' : 'Cancelar exportación' }}</button></div>
+      <div class="row-actions"><button mat-stroked-button class="danger" type="button" (click)="cancelDataExport()" [disabled]="exportBusy() || exportLoading() || !!exportError() || exportRefreshing()">{{ exportBusy() ? 'Cancelando…' : 'Cancelar exportación' }}</button></div>
     } @else if (exportShowsRequestEntry()) {
       <div class="security-entry export-entry">
         <span class="security-entry-mark" aria-hidden="true"><mat-icon>lock</mat-icon></span>

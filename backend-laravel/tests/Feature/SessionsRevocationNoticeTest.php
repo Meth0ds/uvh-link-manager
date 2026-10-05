@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountSessionsController;
 use App\Jobs\DeliverMailOutboxJob;
 use App\Models\User;
 use App\Support\Audit;
@@ -207,7 +207,7 @@ final class SessionsRevocationNoticeTest extends TestCase
             'version' => DB::table('users')->where('id', $user->id)->update(['security_version' => 2]),
         };
         // Simulate the interleaving AFTER middleware authorized its snapshot.
-        $controller = app(AuthController::class);
+        $controller = app(AccountSessionsController::class);
         $response = match ($surface) {
             'individual' => $controller->revokeSession($request, Ids::sha256Hex($other)),
             'others' => $controller->revokeOtherSessions($request),
@@ -426,7 +426,7 @@ final class SessionsRevocationNoticeTest extends TestCase
         // This already-authorized snapshot characterizes only the mutation's
         // existing requireVerifiedEmail=false policy after an interleaving.
         DB::table('users')->where('id', $user->id)->update(['email_verified_at' => null]);
-        $controller = app(AuthController::class);
+        $controller = app(AccountSessionsController::class);
         $response = match ($surface) {
             'individual' => $controller->revokeSession($request, Ids::sha256Hex($other)),
             'others' => $controller->revokeOtherSessions($request),

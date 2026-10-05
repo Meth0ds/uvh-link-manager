@@ -362,7 +362,7 @@ describe("public auth views async safety", () => {
 
   it("reconciles deletion signout without updating a destroyed view", async () => {
     const api = jasmine.createSpyObj<ApiService>("ApiService", ["post"]);
-    const response = deferred<{ ok: true; executeAfter: string }>();
+    const response = deferred<{ ok: true; executeAfter: string; current: boolean }>();
     api.post.and.returnValue(response.promise);
     const auth = jasmine.createSpyObj<AuthService>("AuthService", ["sessionGeneration", "accountSignedOut"]);
     auth.sessionGeneration.and.returnValue(8);
@@ -375,7 +375,7 @@ describe("public auth views async safety", () => {
 
     const confirmation = component.confirm();
     fixture.destroy();
-    response.resolve({ ok: true, executeAfter: "2026-09-12T00:00:00Z" });
+    response.resolve({ ok: true, executeAfter: "2026-09-12T00:00:00Z", current: true });
     await confirmation;
 
     expect(auth.accountSignedOut).toHaveBeenCalledOnceWith(8);
@@ -472,7 +472,7 @@ describe("public auth views async safety", () => {
         api.post.and.rejectWith(new ApiRequestError("Temporalmente no disponible", status));
         await perform();
         expect(component.busy()).toBeFalse();
-        api.post.and.resolveTo({ ok: true, executeAfter: new Date(Date.now() + 7 * 86400000).toISOString() } as never);
+        api.post.and.resolveTo(action === "confirm" ? { ok: true, current: true, executeAfter: new Date(Date.now() + 7 * 86400000).toISOString() } : { ok: true });
         await perform();
         expect(api.post).toHaveBeenCalledTimes(2);
         expect(component.done()).toBeTrue();

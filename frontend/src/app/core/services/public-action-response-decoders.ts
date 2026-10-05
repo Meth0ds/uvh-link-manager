@@ -35,7 +35,7 @@ export function decodeSecurityIncident(value: unknown): PublicActionMessage & { 
   };
 }
 
-export function decodeAccountDeletionConfirmation(value: unknown): { ok: true; executeAfter: string } {
+export function decodeAccountDeletionConfirmation(value: unknown): { ok: true; executeAfter: string; current: boolean } {
   const source = record(value, "account deletion confirmation");
   const executeAfter = text(source["executeAfter"], "account deletion confirmation", 64);
   if (!boolean(source["ok"], "account deletion confirmation")) {
@@ -45,6 +45,7 @@ export function decodeAccountDeletionConfirmation(value: unknown): { ok: true; e
   return {
     ok: true,
     executeAfter,
+    current: boolean(source["current"], "account deletion confirmation"),
   };
 }
 

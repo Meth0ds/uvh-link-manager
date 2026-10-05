@@ -1,0 +1,29 @@
+# Gradual Auth separation: authenticated account profile, credentials and sessions
+
+Execute sequentially after O48 full/JUnit and frozen source/test hashes are verified and terminal. No agents/worktree/commit/push/deploy, uvh_local/users/mail/provider changes or productive workers/scheduler/migrations. Use one guarded uvh_test suite at a time; never edit PHP/tests during a suite. This is another block toward complete Auth separation, not a new global objective or closure of S01–S13.
+
+## Source evidence and intended ownership
+
+Current Auth899 has27methods; the eleven action bodies below, appUrl and normalizeRecoveryCode have been read completely. Route methods, current read-context/credential/session service contracts and dynamic test references must be revalidated before extraction. Tests listed below have only their direct-call sites located during O48 preparation; do not credit complete test review from those snippets.
+
+- AccountProfileController owns me/profile, with existing ValidatesAuthInput for the shared name policy.
+- AccountCredentialsController owns requestEmailChange/cancelEmailChange/confirmEmailChange/changePassword, and the private appUrl helper. It retains current input validation, CAPTCHA-independent credential authorization, preflight/hash timing, all JSON/status/cookie responses and catches. Credential services keep live locks, factor consumption, mail/audit/TX and response authority.
+- AccountSessionsController owns sessions/securityCenter/revokeSession/revokeOtherSessions/revokeAllSessions. Session-scoped freshness readers and mutation authority remain in AccountReadContext/AccountQueries/SessionRevocationAdmission. Public DTO allowlists, own-cookie clearing and idempotent counts stay exact.
+- normalizeRecoveryCode moves intact to a narrow shared concern used by remaining Auth MFA methods and AccountCredentialsController. The same trim/space/hyphen/uppercase body remains singular. Auth still owns login/logout and MFA; no delegation to the giant controller is added.
+
+## Work and gates
+
+- [x] Snapshot complete Auth899/27method metadata, validation/normalization source, routes and fresh185runtime contracts; freeze credential/profile/read-context/session/CAPTCHA/baseline/dependency sources. Check all direct class references and dynamic method dispatches.
+- [x] Read whole affected tests/harnesses, not just snippets. Run meaningful current regressions before extraction: AccountReadContext, ReauthenticationProfileAdmission, SecurityContextQuery, SecurityCenter, SessionsRevocationNotice, PasswordNoticeAtomicity, SecurityNoticeAtomicity, AuthenticatedPasswordChangeAdmission, EmailChangeAdmission/Concurrency, CredentialStepUpContract and relevant middleware/security/recovery contracts. Add contracts only for material gaps identified in source review.
+- [x] Move all eleven HTTP bodies and appUrl exactly; share the original recovery normalization body. Preserve complete remaining Auth (constants/comments/policy), all original concern methods and service hashes. Remove only unused imports and update exactly eleven route owners/imports. Do not change business admissions during the extraction.
+- [x] Adapt direct test references to their actual new owners; do not preserve obsolete methods through controller wrappers/aliases or disable the direct stale-snapshot tests. PasswordNoticeAtomicity uses credentials; SessionsRevocationNotice uses sessions; mixed SecurityContextQuery/AccountReadContext/ReauthenticationProfileAdmission cases need an explicit method-owner mapping while keeping assertions and fixture interleavings. SecurityNoticeAtomicity MFA cases still use Auth, credential cases use the new owner. Read those whole functions before editing.
+- [x] Compare every original Auth method body/comments at its new owner and entire remaining Auth after declared ownership/import/trait adaptations; compare the complete normalization concern. Compare all185runtime route contracts with only the eleven class owners changed. Preserve previous O48/O47/O46/O45 proof via hash-verified endpoints and a fresh current comparer.
+- [x] Run dedicated before/after regressions, Pint/PHPStan, full backend/JUnit. Freeze all source/test hashes during full; remove only genuinely obsolete baseline suppressions if analysis proves them resolved, never add ignores to hide extraction errors.
+- [x] Rebase inventory/function ledgers and route matrix/report/canonical planning with actual owners, evidence and explicit remaining responsibilities. Existing frontend1373O43 is prior evidence; no UI/provider/Redis/native-cookie/capacity claim from PHP ownership changes.
+
+## Next and global scope
+
+After this block, finish MFA challenge/login verification, MFA reauthentication/status and factor configuration with their cohesive owners and private helpers. Auth may remain the small coherent login/logout controller; completion means its unrelated domains have real owners, no giant superclass or forwarding facade, preserved contracts and verified dependencies. The frontend Auth facade, all S01–S13 functions/roles/retention/capacity/CI/production gates and unreproduced registry TTL source candidate retain their own review. Never declare the entire project completed merely because Auth has fewer lines or suites are green.
+
+
+Local O49 verified:300/2669before46.63s/after47.25s;Pint500/PHPStan0;full2205/18889,JUniterrors0/failures0/skips0,387.717031s;06:30.082, Memory: 139.00 MB.683source/test/config hashes preserved after terminal full. Auth521/14methods,487source files;356S01/79files,16S03/2,63S10/9,198S02/31 anchors checked. Seven direct-test files have only owner adaptations; eighth adds isolated pending registration cleanup after before/after repetition exposed leftover fixture. No new product BugID/tests. Next MFA plan remains unchecked; global goal/S01–S13 open.

@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountCredentialsController;
+use App\Http\Controllers\AccountProfileController;
+use App\Http\Controllers\AccountRecoveryController;
+use App\Http\Controllers\AccountSessionsController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
@@ -11,10 +15,16 @@ use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkCsvController;
 use App\Http\Controllers\LinkIntentController;
 use App\Http\Controllers\LinkTemplateController;
+use App\Http\Controllers\MfaChallengeController;
+use App\Http\Controllers\MfaConfigurationController;
+use App\Http\Controllers\MfaSessionController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PendingHandoffController;
 use App\Http\Controllers\PrivacyRightsController;
 use App\Http\Controllers\PublicController;
+use App\Http\Controllers\RegistrationController;
+use App\Http\Controllers\SecurityIncidentController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\WebhookController;
@@ -75,33 +85,33 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::get('pending', [PendingHandoffController::class, 'show'])->middleware('throttle:uvh-pending-read');
 
     // Auth.
-    Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:uvh-register');
-    Route::post('auth/change-registration-email', [AuthController::class, 'changeRegistrationEmail'])->middleware('throttle:uvh-register');
+    Route::post('auth/register', [RegistrationController::class, 'register'])->middleware('throttle:uvh-register');
+    Route::post('auth/change-registration-email', [RegistrationController::class, 'changeRegistrationEmail'])->middleware('throttle:uvh-register');
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:uvh-login');
-    Route::post('auth/mfa/verify', [AuthController::class, 'mfaVerify'])->middleware('throttle:uvh-mfa');
-    Route::post('auth/mfa/recovery', [AuthController::class, 'mfaRecovery'])->middleware('throttle:uvh-mfa');
+    Route::post('auth/mfa/verify', [MfaChallengeController::class, 'mfaVerify'])->middleware('throttle:uvh-mfa');
+    Route::post('auth/mfa/recovery', [MfaChallengeController::class, 'mfaRecovery'])->middleware('throttle:uvh-mfa');
     Route::post('auth/logout', [AuthController::class, 'logout'])->middleware('uvh.auth:optional');
-    Route::post('auth/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:uvh-email-verify');
-    Route::post('auth/confirm-email-change', [AuthController::class, 'confirmEmailChange'])->middleware('throttle:uvh-email-verify');
+    Route::post('auth/verify-email', [RegistrationController::class, 'verifyEmail'])->middleware('throttle:uvh-email-verify');
+    Route::post('auth/confirm-email-change', [AccountCredentialsController::class, 'confirmEmailChange'])->middleware('throttle:uvh-email-verify');
     Route::post('auth/account-deletion/confirm', [AccountController::class, 'confirmDeletion'])->middleware('throttle:uvh-email-verify');
     Route::post('auth/account-deletion/cancel', [AccountController::class, 'cancelDeletion'])->middleware('throttle:uvh-email-verify');
     // Public: an unverified user has no session after registration/login, so
     // the resend path must remain reachable without authentication. The
     // controller keeps the response generic to avoid email enumeration.
-    Route::post('auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:uvh-email-verify');
-    Route::post('auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:uvh-password-reset');
-    Route::post('auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:uvh-password-reset');
-    Route::post('auth/security-incident/revoke', [AuthController::class, 'revokeCompromisedAccess'])->middleware('throttle:uvh-security-incident');
-    Route::post('auth/account-recovery/request', [AuthController::class, 'requestAccountRecovery'])->middleware('throttle:uvh-account-recovery');
-    Route::post('auth/account-recovery/confirm', [AuthController::class, 'confirmAccountRecovery'])->middleware('throttle:uvh-account-recovery');
-    Route::post('auth/account-recovery/complete', [AuthController::class, 'completeAccountRecovery'])->middleware('throttle:uvh-account-recovery');
-    Route::get('auth/me', [AuthController::class, 'me'])->middleware('uvh.auth');
-    Route::get('auth/mfa/session', [AuthController::class, 'mfaSessionStatus'])->middleware('uvh.auth');
-    Route::post('auth/mfa/reauthenticate', [AuthController::class, 'mfaReauthenticate'])
+    Route::post('auth/resend-verification', [RegistrationController::class, 'resendVerification'])->middleware('throttle:uvh-email-verify');
+    Route::post('auth/forgot-password', [PasswordRecoveryController::class, 'forgotPassword'])->middleware('throttle:uvh-password-reset');
+    Route::post('auth/reset-password', [PasswordRecoveryController::class, 'resetPassword'])->middleware('throttle:uvh-password-reset');
+    Route::post('auth/security-incident/revoke', [SecurityIncidentController::class, 'revokeCompromisedAccess'])->middleware('throttle:uvh-security-incident');
+    Route::post('auth/account-recovery/request', [AccountRecoveryController::class, 'requestAccountRecovery'])->middleware('throttle:uvh-account-recovery');
+    Route::post('auth/account-recovery/confirm', [AccountRecoveryController::class, 'confirmAccountRecovery'])->middleware('throttle:uvh-account-recovery');
+    Route::post('auth/account-recovery/complete', [AccountRecoveryController::class, 'completeAccountRecovery'])->middleware('throttle:uvh-account-recovery');
+    Route::get('auth/me', [AccountProfileController::class, 'me'])->middleware('uvh.auth');
+    Route::get('auth/mfa/session', [MfaSessionController::class, 'mfaSessionStatus'])->middleware('uvh.auth');
+    Route::post('auth/mfa/reauthenticate', [MfaSessionController::class, 'mfaReauthenticate'])
         ->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
-    Route::patch('auth/profile', [AuthController::class, 'profile'])->middleware('uvh.auth');
-    Route::post('auth/change-email', [AuthController::class, 'requestEmailChange'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
-    Route::post('auth/change-email/cancel', [AuthController::class, 'cancelEmailChange'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
+    Route::patch('auth/profile', [AccountProfileController::class, 'profile'])->middleware('uvh.auth');
+    Route::post('auth/change-email', [AccountCredentialsController::class, 'requestEmailChange'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
+    Route::post('auth/change-email/cancel', [AccountCredentialsController::class, 'cancelEmailChange'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
     Route::get('auth/data-export', [AccountController::class, 'exportStatus'])->middleware('uvh.auth:verified');
     Route::get('auth/data-export/history', [AccountController::class, 'exportHistory'])->middleware('uvh.auth:verified');
     Route::post('auth/data-export', [AccountController::class, 'requestExport'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
@@ -116,7 +126,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('auth/privacy-requests/{id}/cancel', [PrivacyRightsController::class, 'cancel'])->middleware(['uvh.auth:verified', 'throttle:uvh-privacy'])->where('id', '[0-9]+');
     Route::post('link-intents/claim', [LinkIntentController::class, 'claim'])->middleware('uvh.auth:verified');
     Route::post('link-intents/complete', [LinkIntentController::class, 'complete'])->middleware('uvh.auth:verified');
-    Route::post('auth/change-password', [AuthController::class, 'changePassword'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
+    Route::post('auth/change-password', [AccountCredentialsController::class, 'changePassword'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
 
     // Centro de notificaciones de la cuenta: bandeja, lectura y preferencias.
     // Las lecturas son idempotentes y baratas; la única escritura con alcance
@@ -130,17 +140,17 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::patch('preferences', [NotificationController::class, 'updatePreferences']);
         Route::post('{id}/read', [NotificationController::class, 'read'])->where('id', '[0-9]+');
     });
-    Route::get('auth/sessions', [AuthController::class, 'sessions'])->middleware('uvh.auth');
-    Route::get('auth/security-center', [AuthController::class, 'securityCenter'])->middleware('uvh.auth');
-    Route::post('auth/sessions/revoke-others', [AuthController::class, 'revokeOtherSessions'])->middleware('uvh.auth');
-    Route::post('auth/sessions/revoke-all', [AuthController::class, 'revokeAllSessions'])->middleware('uvh.auth');
-    Route::post('auth/sessions/{id}/revoke', [AuthController::class, 'revokeSession'])->middleware('uvh.auth');
-    Route::post('auth/mfa/setup', [AuthController::class, 'mfaSetup'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
-    Route::post('auth/mfa/enable', [AuthController::class, 'mfaEnable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
-    Route::post('auth/mfa/cancel-setup', [AuthController::class, 'mfaCancelSetup'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
-    Route::post('auth/mfa/recovery-codes/regenerate', [AuthController::class, 'mfaRegenerateRecoveryCodes'])
+    Route::get('auth/sessions', [AccountSessionsController::class, 'sessions'])->middleware('uvh.auth');
+    Route::get('auth/security-center', [AccountSessionsController::class, 'securityCenter'])->middleware('uvh.auth');
+    Route::post('auth/sessions/revoke-others', [AccountSessionsController::class, 'revokeOtherSessions'])->middleware('uvh.auth');
+    Route::post('auth/sessions/revoke-all', [AccountSessionsController::class, 'revokeAllSessions'])->middleware('uvh.auth');
+    Route::post('auth/sessions/{id}/revoke', [AccountSessionsController::class, 'revokeSession'])->middleware('uvh.auth');
+    Route::post('auth/mfa/setup', [MfaConfigurationController::class, 'mfaSetup'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
+    Route::post('auth/mfa/enable', [MfaConfigurationController::class, 'mfaEnable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
+    Route::post('auth/mfa/cancel-setup', [MfaConfigurationController::class, 'mfaCancelSetup'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
+    Route::post('auth/mfa/recovery-codes/regenerate', [MfaConfigurationController::class, 'mfaRegenerateRecoveryCodes'])
         ->middleware(['uvh.auth', 'uvh.mfa', 'throttle:uvh-credential']);
-    Route::post('auth/mfa/disable', [AuthController::class, 'mfaDisable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
+    Route::post('auth/mfa/disable', [MfaConfigurationController::class, 'mfaDisable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
 
     // Links.
     Route::prefix('links')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {

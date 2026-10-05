@@ -3,16 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Support\Audit;
+use App\Support\Auth\AccountReadContext;
 use App\Support\Ids;
 use App\Support\MailAdmissionException;
 use App\Support\MfaFreshness;
 use App\Support\NotificationInbox;
 use App\Support\NotificationKinds;
 use App\Support\OperationalMetrics;
+use App\Support\SecurityContext;
 use App\Support\UvhCrypto;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,10 +26,14 @@ final class PrivacyRightsController
 
     private const TYPES = ['access', 'rectification', 'erasure', 'objection', 'restriction', 'portability'];
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         [$page, $perPage] = $this->pagination($request);
-        $user = UvhRequest::user($request);
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
+        if (! $context) {
+            return response()->json(['error' => 'No autenticado'], 401);
+        }
+        $user = $context->user;
         $query = DB::table('privacy_rights_requests')->where('user_id', $user->id);
         $total = (clone $query)->count();
         $rows = $query->orderByDesc('created_at')->orderByDesc('id')
@@ -41,7 +48,7 @@ final class PrivacyRightsController
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $type = UvhRequest::inputString($request, 'type');
         $details = $this->validBody(UvhRequest::inputString($request, 'details'), false);
@@ -53,16 +60,15 @@ final class PrivacyRightsController
         }
 
         $user = UvhRequest::user($request);
+        $sessionId = UvhRequest::sessionId($request);
+        $ip = UvhRequest::ip($request);
         try {
-            $result = DB::transaction(function () use ($user, $type, $details): array {
-                $locked = DB::table('users')->where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                // A rights request is legally significant account state. Do not
-                // accept one from a browser request that predates credential or
-                // account-lifecycle rotation, even if middleware authenticated it.
-                if (! $locked || $locked->email_verified_at === null
-                    || (int) $locked->security_version !== (int) $user->security_version) {
+            $result = DB::transaction(function () use ($user, $sessionId, $ip, $type, $details): array {
+                $context = SecurityContext::lock($user, $sessionId, true);
+                if (! $context) {
                     return ['status' => 'stale'];
                 }
+                $locked = $context->user;
                 $active = DB::table('privacy_rights_requests')->where('user_id', $locked->id)
                     ->where('type', $type)->whereIn('status', self::ACTIVE)->lockForUpdate()->first();
                 if ($active) {
@@ -90,6 +96,8 @@ final class PrivacyRightsController
                     throw new MailAdmissionException('Privacy request acknowledgement outbox admission failed');
                 }
 
+                Audit::write($locked->id, 'privacy.request_submitted', 'privacy_right', $id, ['type' => $type], $ip);
+
                 return ['status' => 'created', 'id' => $id];
             });
         } catch (QueryException $error) {
@@ -109,22 +117,22 @@ final class PrivacyRightsController
         }
 
         $row = DB::table('privacy_rights_requests')->where('id', $result['id'])->first();
-        Audit::write($user->id, 'privacy.request_submitted', 'privacy_right', $result['id'], ['type' => $type], UvhRequest::ip($request));
 
         return response()->json(['request' => $this->publicRequest($row, true)], 201);
     }
 
-    public function respond(Request $request, int $id)
+    public function respond(Request $request, int $id): JsonResponse
     {
         $body = $this->validBody(UvhRequest::inputString($request, 'message'), true);
         if ($body === false) {
             return response()->json(['error' => 'El mensaje debe tener entre 10 y 2.000 caracteres'], 422);
         }
         $user = UvhRequest::user($request);
-        $result = DB::transaction(function () use ($user, $id, $body): string {
-            $lockedUser = DB::table('users')->where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-            if (! $lockedUser || $lockedUser->email_verified_at === null
-                || (int) $lockedUser->security_version !== (int) $user->security_version) {
+        $sessionId = UvhRequest::sessionId($request);
+        $ip = UvhRequest::ip($request);
+        $result = DB::transaction(function () use ($user, $sessionId, $ip, $id, $body): string {
+            $context = SecurityContext::lock($user, $sessionId, true);
+            if (! $context) {
                 return 'stale';
             }
             $row = DB::table('privacy_rights_requests')->where('id', $id)->where('user_id', $user->id)
@@ -145,6 +153,8 @@ final class PrivacyRightsController
                 'updated_at' => now(),
             ]);
 
+            Audit::write($context->user->id, 'privacy.user_responded', 'privacy_right', $id, null, $ip);
+
             return 'ok';
         });
 
@@ -161,21 +171,21 @@ final class PrivacyRightsController
             return response()->json(['error' => 'El expediente alcanzó su límite de mensajes. Contacta con soporte'], 409);
         }
 
-        Audit::write($user->id, 'privacy.user_responded', 'privacy_right', $id, null, UvhRequest::ip($request));
-
         return response()->json(['ok' => true]);
     }
 
-    public function cancel(Request $request, int $id)
+    public function cancel(Request $request, int $id): JsonResponse
     {
         $user = UvhRequest::user($request);
+        $sessionId = UvhRequest::sessionId($request);
+        $ip = UvhRequest::ip($request);
         try {
-            $result = DB::transaction(function () use ($user, $id): string {
-                $lockedUser = DB::table('users')->where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                if (! $lockedUser || $lockedUser->email_verified_at === null
-                    || (int) $lockedUser->security_version !== (int) $user->security_version) {
+            $result = DB::transaction(function () use ($user, $sessionId, $ip, $id): string {
+                $context = SecurityContext::lock($user, $sessionId, true);
+                if (! $context) {
                     return 'stale';
                 }
+                $lockedUser = $context->user;
                 $row = DB::table('privacy_rights_requests')->where('id', $id)->where('user_id', $user->id)
                     ->lockForUpdate()->first();
                 if (! $row) {
@@ -196,6 +206,8 @@ final class PrivacyRightsController
                     throw new MailAdmissionException('Privacy cancellation outbox admission failed');
                 }
 
+                Audit::write($lockedUser->id, 'privacy.request_cancelled', 'privacy_right', $id, null, $ip);
+
                 return 'ok';
             });
         } catch (MailAdmissionException) {
@@ -211,13 +223,24 @@ final class PrivacyRightsController
             return response()->json(['error' => 'La solicitud ya no se puede cancelar'], 409);
         }
 
-        Audit::write($user->id, 'privacy.request_cancelled', 'privacy_right', $id, null, UvhRequest::ip($request));
-
         return response()->json(['ok' => true]);
     }
 
-    public function adminIndex(Request $request)
+    public function adminIndex(Request $request): JsonResponse
     {
+        $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
+        if (! $context) {
+            return response()->json(['error' => 'No autenticado'], 401);
+        }
+        if (! $context->user->is_admin) {
+            return response()->json(['error' => 'Acceso restringido'], 403);
+        }
+        if (! $context->user->mfa_enabled || ! $context->session->mfa_verified_at) {
+            return response()->json(['error' => 'Esta operación requiere una sesión autenticada con MFA', 'details' => ['reason' => 'mfa_required']], 403);
+        }
+        if (! MfaFreshness::isFresh($context->session->mfa_verified_at)) {
+            return MfaFreshness::reauthenticationRequired();
+        }
         [$page, $perPage] = $this->pagination($request);
         $status = UvhRequest::queryString($request, 'status');
         $type = UvhRequest::queryString($request, 'type');
@@ -253,7 +276,7 @@ final class PrivacyRightsController
         ]);
     }
 
-    public function adminAction(Request $request, int $id)
+    public function adminAction(Request $request, int $id): JsonResponse
     {
         $action = UvhRequest::inputString($request, 'action');
         $reasonCode = UvhRequest::inputString($request, 'reasonCode');
@@ -267,6 +290,7 @@ final class PrivacyRightsController
         }
 
         $actor = UvhRequest::user($request);
+        $ip = UvhRequest::ip($request);
         $sessionId = UvhRequest::sessionId($request);
         $snapshot = DB::table('privacy_rights_requests')->where('id', $id)->first(['user_id']);
         if (! $snapshot) {
@@ -274,17 +298,15 @@ final class PrivacyRightsController
         }
         $targetUserId = $snapshot->user_id !== null ? (int) $snapshot->user_id : null;
         try {
-            $result = DB::transaction(function () use ($actor, $sessionId, $id, $targetUserId, $action, $reasonCode, $message): array {
-                $userIds = array_values(array_unique(array_filter([$actor->id, $targetUserId], fn ($value) => is_int($value))));
-                sort($userIds, SORT_NUMERIC);
-                $lockedUsers = DB::table('users')->whereIn('id', $userIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-                $lockedActor = $lockedUsers->get($actor->id);
-                // Keep the global lock hierarchy user -> session -> resource.
-                // Account lifecycle and step-up flows use the same order, so an
-                // administrator cannot deadlock them by editing a privacy case.
-                if (! $this->eligibleLockedAdminSession($lockedActor, $sessionId)) {
+            $result = DB::transaction(function () use ($actor, $sessionId, $ip, $id, $targetUserId, $action, $reasonCode, $message): array {
+                // Lock all users in ascending ID order, then the exact session,
+                // then the case, as in account lifecycle and step-up flows.
+                $context = SecurityContext::lockWithUsers($actor, $sessionId, $targetUserId !== null ? [$targetUserId] : [], true);
+                if (! $context || ! $context->user->is_admin || ! $context->user->mfa_enabled
+                    || ! MfaFreshness::isFresh($context->session->mfa_verified_at)) {
                     return ['status' => 'actor_changed'];
                 }
+                $lockedActor = $context->user;
                 $row = DB::table('privacy_rights_requests')->where('id', $id)->lockForUpdate()->first();
                 if (! $row) {
                     return ['status' => 'not_found'];
@@ -334,7 +356,7 @@ final class PrivacyRightsController
                     $this->insertMessage($id, 'admin', (int) $lockedActor->id, $message);
                 }
 
-                $target = $targetUserId !== null ? $lockedUsers->get($targetUserId) : null;
+                $target = $targetUserId !== null ? $context->relatedUser($targetUserId) : null;
                 if ($target && $target->deleted_at === null) {
                     NotificationInbox::record((int) $target->id, NotificationKinds::PRIVACY_REQUEST_UPDATED);
                 }
@@ -342,6 +364,8 @@ final class PrivacyRightsController
                     && ! UvhMail::privacyRequestUpdated((string) $target->email, $id, $action === 'extend' ? 'extended' : $nextStatus, $generation)) {
                     throw new MailAdmissionException('Privacy status outbox admission failed');
                 }
+
+                Audit::write($lockedActor->id, 'admin.privacy_action', 'privacy_right', $id, ['action' => $action], $ip);
 
                 return ['status' => 'ok', 'next' => $nextStatus];
             });
@@ -368,11 +392,13 @@ final class PrivacyRightsController
             return response()->json(['error' => 'La ampliación ya se usó o el plazo ordinario venció'], 409);
         }
 
-        Audit::write($actor->id, 'admin.privacy_action', 'privacy_right', $id, ['action' => $action], UvhRequest::ip($request));
-
         return response()->json(['ok' => true, 'status' => $result['next']]);
     }
 
+    /**
+     * @param  array<int, array<int, array{id:int,authorRole:string,body:?string,createdAt:mixed}>>|null  $messagesByRequest
+     * @return array<string, mixed>
+     */
     private function publicRequest(object $row, bool $includeMessages, bool $admin = false, ?array $messagesByRequest = null): array
     {
         $deadline = $row->extended_until ?? $row->due_at;
@@ -463,26 +489,6 @@ final class PrivacyRightsController
 
             return null;
         }
-    }
-
-    /** Revalidate platform authority and the exact fresh MFA session under locks. */
-    private function eligibleLockedAdminSession(?object $actor, ?string $sessionId): bool
-    {
-        if (! $actor || $sessionId === null || $actor->deleted_at !== null
-            || $actor->email_verified_at === null || ! (bool) $actor->is_admin || ! (bool) $actor->mfa_enabled) {
-            return false;
-        }
-        $session = DB::table('sessions')->where('id', $sessionId)->where('user_id', $actor->id)
-            ->whereNull('revoked_at')->lockForUpdate()->first();
-        if (! $session || (int) $session->security_version !== (int) $actor->security_version
-            || Carbon::parse($session->expires_at)->isPast() || $session->mfa_verified_at === null) {
-            return false;
-        }
-
-        // The freshness window lives in MfaFreshness alone: a second
-        // definition of its clamp is how two surfaces drift apart the day it
-        // changes.
-        return MfaFreshness::isFresh(Carbon::parse($session->mfa_verified_at));
     }
 
     private function validBody(string $body, bool $required): string|false

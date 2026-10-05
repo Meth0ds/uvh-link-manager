@@ -64,7 +64,7 @@ export class AccountDeletionDialogComponent {
       this.impact.set(impact);
       if (!this.allowed()) this.error.set("La cuenta tiene requisitos pendientes o una solicitud en curso. Cierra esta ventana y actualiza los ajustes antes de continuar.");
     } catch {
-      if (!this.destroyRef.destroyed) this.error.set("No se pudo comprobar si puedes cerrar la cuenta. No se ha enviado ninguna solicitud.");
+      if (!this.destroyRef.destroyed) this.error.set("No se pudieron comprobar los requisitos de tu cuenta. Vuelve a consultar su estado antes de continuar.");
     } finally {
       if (!this.destroyRef.destroyed) this.loading.set(false);
     }

@@ -53,7 +53,7 @@ describe("Notification UI identity through the real HTTP boundary", () => {
 
   function settings(): SettingsComponent {
     const component = TestBed.runInInjectionContext(() => new SettingsComponent());
-    http.expectOne((request) => request.url.includes("/privacy-requests")).flush({ requests: [], total: 0 });
+    http.expectOne((request) => request.url.includes("/privacy-requests")).flush({ requests: [], total: 0, page: 1, perPage: 5 });
     TestBed.tick();
     return component;
   }
@@ -92,6 +92,7 @@ describe("Notification UI identity through the real HTTP boundary", () => {
     flushMicrotasks();
     TestBed.tick();
     expect(auth.sessionGeneration()).toBeGreaterThan(originalGeneration);
+    http.expectOne((request) => request.url.includes("/privacy-requests")).flush({ requests: [], total: 0, page: 1, perPage: 5 });
     // The repaired component refreshes its new identity; the original has no read.
     for (const read of http.match("/api/v1/notifications/preferences")) read.flush({ preferences: [preference] });
     flushMicrotasks();

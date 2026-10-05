@@ -144,13 +144,12 @@ describe("authentication response decoders", () => {
   });
 
   it("validates MFA setup URIs and every recovery code", () => {
-    expect(decodeMfaSetup({ secret: "BASE32", uri: "otpauth://totp/UVH:test" })).toEqual({
-      secret: "BASE32", uri: "otpauth://totp/UVH:test",
-    });
-    expect(decodeRecoveryCodes({ recoveryCodes: ["ABCD-EFGH", "JKLM-NPQR"] })).toEqual({
-      recoveryCodes: ["ABCD-EFGH", "JKLM-NPQR"],
-    });
-    expect(() => decodeMfaSetup({ secret: "BASE32", uri: "https://example.test" })).toThrow();
+    const secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+    const setup = { secret, uri: `otpauth://totp/UVH%3Atest%40example.test?secret=${secret}&issuer=UVH&algorithm=SHA1&digits=6&period=30` };
+    expect(decodeMfaSetup(setup)).toEqual(setup);
+    const codes = [..."ABCDEFGHJK"].map((last) => `ABCD-EFGH-JKLM-NPQ${last}`);
+    expect(decodeRecoveryCodes({ recoveryCodes: codes })).toEqual({ recoveryCodes: codes });
+    expect(() => decodeMfaSetup({ secret, uri: "https://example.test" })).toThrow();
     expect(() => decodeRecoveryCodes({ recoveryCodes: ["valid", 42] })).toThrow();
   });
 });
