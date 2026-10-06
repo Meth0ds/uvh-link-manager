@@ -1,0 +1,40 @@
+{
+  "name": "uvh-panel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Panel local de UVH: mini-app Angular Material precompilada (no depende del servidor Angular de desarrollo).",
+  "scripts": {
+    "build": "ng build",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "lint": "eslint \"src/**/*.{ts,html}\" --max-warnings=0",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@angular/animations": "~22.2.1",
+    "@angular/cdk": "~22.2.1",
+    "@angular/common": "~22.2.1",
+    "@angular/compiler": "~22.2.1",
+    "@angular/core": "~22.2.1",
+    "@angular/forms": "~22.2.1",
+    "@angular/material": "~22.2.1",
+    "@angular/platform-browser": "~22.2.1",
+    "rxjs": "~7.8.1",
+    "tslib": "^2.6.3",
+    "zone.js": "~0.15.0",
+    "@fontsource/manrope": "5.3.0",
+    "material-icons": "1.13.14"
+  },
+  "devDependencies": {
+    "@angular/build": "~22.2.0",
+    "@angular/cli": "~22.2.0",
+    "@angular/compiler-cli": "~22.2.1",
+    "typescript": "~6.0.3",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "typescript-eslint": "^8.69.0",
+    "angular-eslint": "^22.2.0",
+    "@playwright/test": "1.63.0",
+    "@axe-core/playwright": "4.13.0",
+    "postject": "1.0.0-alpha.6"
+  }
+}

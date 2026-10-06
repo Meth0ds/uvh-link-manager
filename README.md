@@ -94,8 +94,9 @@ Copy-Item backend-laravel/.env.example backend-laravel/.env
 docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php composer install
 docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php php artisan key:generate
 
-# 4. Abre el panel local y pulsa "Iniciar todo".
-.\UVH Control.cmd
+# 4. Prepara Angular y abre el panel local compilado: "Iniciar entorno".
+Push-Location frontend; npm ci; Pop-Location
+.\dist\uvh-control-windows-x64.exe
 ```
 
 ### Cualquier plataforma
@@ -115,9 +116,17 @@ El perfil `laravel` levanta la API en `http://127.0.0.1:8000`, el worker
 (`queue:work` sobre las colas `mail,webhooks,domains,exports,analytics`) y el
 scheduler. Angular sirve el panel en `http://127.0.0.1:4200`.
 
-`UVH Control.cmd` orquesta lo mismo desde una interfaz de escritorio, incluidas
-la recuperación segura de Docker y el diagnóstico de puertos; la guía completa
-está en [docs/local-control.md](docs/local-control.md).
+Los ejecutables nativos `dist/uvh-control-windows-x64.exe`,
+`dist/uvh-control-macos-arm64` y `dist/uvh-control-linux-x64` (doble clic o
+terminal) abren un panel Angular Material independiente con identidad UVH,
+temas claro/oscuro, estado de servicios, registros y mantenimiento. El panel
+no requiere Node.js instalado; iniciar Angular de desarrollo sí requiere Node
+y `npm ci` previo en `frontend/`. La API local valida origen y sesión, las
+operaciones quedan identificadas y las acciones sensibles piden confirmación.
+La reparación IPC de Docker solo aplica a Windows y exige elevación explícita.
+La guía y las limitaciones están en [docs/local-control.md](docs/local-control.md).
+Sin binario, compila primero `panel/` y usa `node scripts/uvh-control.mjs serve`
+(o `status|start|stop|restart|migrate` sin panel).
 
 ## Verificación
 
@@ -236,7 +245,7 @@ el [modelo de amenazas](docs/threat-model.md).
 | [Sistema de diseño](docs/design-system.md) | Tokens, temas y convenciones visuales del panel. |
 | [Pruebas E2E](docs/e2e-testing.md) | Aislamiento, ejecución, cobertura y límites de Playwright. |
 | [Análisis estático](docs/static-analysis.md) | Configuración de Pint y Larastan, y su baseline. |
-| [Control local](docs/local-control.md) | Panel de escritorio, arranque y diagnóstico. |
+| [Control local](docs/local-control.md) | Panel web local, arranque y diagnóstico. |
 | [Backlog](docs/current-backlog.md) | Trabajo vigente por prioridades (histórico en [docs/archive/todos.md](docs/archive/todos.md)). |
 
 ### Evidencias de release
