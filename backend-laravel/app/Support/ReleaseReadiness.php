@@ -55,6 +55,26 @@ final class ReleaseReadiness
             if (! Schema::hasColumn('audit_events', 'workspace_id')) {
                 $errors[] = 'Falta la atribución de actividad por workspace (000033).';
             }
+            $preciseTokenExpiry = false;
+            foreach (Schema::getColumns('api_tokens') as $column) {
+                if ($column['name'] === 'expires_at') {
+                    $preciseTokenExpiry = $column['type'] === 'timestamp(6) with time zone';
+                    break;
+                }
+            }
+            if (! $preciseTokenExpiry) {
+                $errors[] = 'Falta la precisión de caducidad de tokens API (2026_10_06).';
+            }
+            $preciseLinkDates = [];
+            foreach (Schema::getColumns('links') as $column) {
+                if (in_array($column['name'], ['scheduled_at', 'expires_at'], true)
+                    && $column['type'] === 'timestamp(6) with time zone') {
+                    $preciseLinkDates[] = $column['name'];
+                }
+            }
+            if (count($preciseLinkDates) !== 2) {
+                $errors[] = 'Falta la precisión de fechas de enlaces (2026_10_06).';
+            }
             if (! Schema::hasIndex('custom_domains', 'workspace_usage_domains_idx')
                 || ! Schema::hasIndex('api_tokens', 'workspace_usage_tokens_idx')
                 || ! Schema::hasIndex('webhooks', 'workspace_usage_webhooks_idx')) {

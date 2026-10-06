@@ -210,17 +210,20 @@ class UvhHousekeeping extends Command
         for ($pass = 0; $pass < 10; $pass++) {
             $changed = DB::transaction(function () use ($batch): int {
                 $now = now();
+                // Query-builder DateTime bindings use second precision. Keep
+                // the same microsecond instant for SQL and the locked decision.
+                $nowSql = $now->format('Y-m-d H:i:s.uP');
                 $links = Link::query()
                     ->whereNull('deleted_at')
-                    ->where(function ($query) use ($now) {
-                        $query->where(function ($scheduled) use ($now) {
+                    ->where(function ($query) use ($nowSql) {
+                        $query->where(function ($scheduled) use ($nowSql) {
                             $scheduled->where('state', 'scheduled')
                                 ->whereNotNull('scheduled_at')
-                                ->where('scheduled_at', '<=', $now);
-                        })->orWhere(function ($expired) use ($now) {
+                                ->where('scheduled_at', '<=', $nowSql);
+                        })->orWhere(function ($expired) use ($nowSql) {
                             $expired->where('state', 'active')
                                 ->whereNotNull('expires_at')
-                                ->where('expires_at', '<', $now);
+                                ->where('expires_at', '<=', $nowSql);
                         });
                     })
                     ->orderBy('id')
@@ -229,7 +232,7 @@ class UvhHousekeeping extends Command
                     ->get();
 
                 foreach ($links as $link) {
-                    $next = $link->expires_at !== null && $link->expires_at->lt($now)
+                    $next = $link->expires_at !== null && $link->expires_at->lte($now)
                         ? 'expired'
                         : 'active';
                     $link->update([

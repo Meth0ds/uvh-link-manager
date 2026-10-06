@@ -42,7 +42,7 @@ class RequireApiToken
         $row = ApiToken::with('creator')->where('token_hash', Ids::sha256Hex($token))
             ->whereHas('creator', fn ($q) => $q->whereNull('deleted_at')->whereNotNull('email_verified_at'))
             ->first();
-        if (! $row || ! $row->creator || $row->revoked_at || ($row->expires_at && $row->expires_at->isPast())) {
+        if (! $row || ! $row->creator || $row->revoked_at || ($row->expires_at && $row->expires_at->lte(now()))) {
             return response()->json(['error' => 'Token inválido o revocado'], 401);
         }
         $membership = Membership::where('workspace_id', $row->workspace_id)->where('user_id', $row->created_by)->first();

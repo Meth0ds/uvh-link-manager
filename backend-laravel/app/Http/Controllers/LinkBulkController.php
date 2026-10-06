@@ -200,7 +200,7 @@ class LinkBulkController
                 if ($target === 'active' && $link->scheduled_at && $link->scheduled_at->isFuture()) {
                     throw new LinkException("El enlace {$link->alias} sigue programado. Modifica su fecha de activación antes de activarlo.", 409);
                 }
-                if ($target === 'active' && $link->expires_at && $link->expires_at->isPast()) {
+                if ($target === 'active' && $link->expires_at && $link->expires_at->lte(now())) {
                     throw new LinkException("El enlace {$link->alias} ya ha caducado. Amplía su fecha de caducidad antes de activarlo.", 409);
                 }
             }
@@ -256,7 +256,7 @@ class LinkBulkController
                 // Expiry wins over scheduling, exactly like the single restore.
                 $next = $link->state_before_delete === 'blocked'
                     ? 'blocked'
-                    : (($link->expires_at && $link->expires_at->isPast())
+                    : (($link->expires_at && $link->expires_at->lte(now()))
                         ? 'expired'
                         : (($link->scheduled_at && $link->scheduled_at->isFuture()) ? 'scheduled' : 'active'));
                 $link->update([

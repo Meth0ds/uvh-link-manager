@@ -37,10 +37,12 @@ class SecurityScanContractTest extends TestCase
 
     /**
      * Directories that make a whole-repository walk unusable: installed
-     * dependencies, the PHPStan cache under `storage/`, and the directory the
-     * local scanner runs write to.
+     * dependencies, the PHPStan cache under `storage/`, the directory the local
+     * scanner runs write to, and build output — `dist/` holds the native
+     * `uvh-control` executables, whose ~120 MB each exhaust the suite's memory
+     * limit when a walk reads them.
      */
-    private const UNWALKABLE = ['vendor', 'node_modules', '.git', '.angular', '.uvh-runtime', 'storage'];
+    private const UNWALKABLE = ['vendor', 'node_modules', '.git', '.angular', '.uvh-runtime', 'storage', 'dist'];
 
     /**
      * Source that must keep being scanned. An exception covering any of these

@@ -18,6 +18,8 @@ class ApiToken extends Model
 {
     const UPDATED_AT = null;
 
+    protected $dateFormat = 'Y-m-d H:i:s.uP';
+
     protected $fillable = [
         'workspace_id',
         'name',

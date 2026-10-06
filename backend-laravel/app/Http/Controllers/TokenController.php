@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\LinkException;
 use App\Models\ApiToken;
-use App\Models\User;
-use App\Models\UvhSession;
 use App\Support\Audit;
 use App\Support\Ids;
 use App\Support\IsoDate;
@@ -15,16 +14,20 @@ use App\Support\MfaStepUp;
 use App\Support\NotificationInbox;
 use App\Support\NotificationKinds;
 use App\Support\NotificationPreferences;
+use App\Support\SecurityContext;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceAccess;
 use App\Support\WorkspaceLimits;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class TokenController
 {
     private const SCOPES = ['links:read', 'links:write', 'analytics:read', 'domains:read', 'domains:write'];
+
+    private const EXPIRY_ERROR = 'La caducidad debe estar entre ahora y un año';
 
     public function index(Request $request)
     {
@@ -71,8 +74,8 @@ class TokenController
             if ($expiresAtValue === null) {
                 return response()->json(['error' => 'Datos inválidos'], 422);
             }
-            if ($expiresAtValue->isPast() || $expiresAtValue->gt(now()->addYear())) {
-                return response()->json(['error' => 'La caducidad debe estar entre ahora y un año'], 422);
+            if (! $this->validExpiry($expiresAtValue)) {
+                return response()->json(['error' => self::EXPIRY_ERROR], 422);
             }
         }
         try {
@@ -80,22 +83,19 @@ class TokenController
                 // Keep the global lock order user -> session -> workspace. Account
                 // deletion holds the user row before revoking workspace resources;
                 // reversing this order here could deadlock both operations.
-                $lockedUser = User::where('id', $user->id)->whereNull('deleted_at')->lockForUpdate()->first();
-                $session = UvhSession::where('id', $sessionId)->where('user_id', $user->id)
-                    ->whereNull('revoked_at')->lockForUpdate()->first();
-                if (! $lockedUser || ! $lockedUser->email_verified_at || ! $session
-                    || (int) $session->security_version !== (int) $lockedUser->security_version) {
+                $context = SecurityContext::lock($user, $sessionId, requireVerifiedEmail: true);
+                if (! $context) {
                     return ['status' => 'stale'];
                 }
+                $lockedUser = $context->user;
+                $session = $context->session;
                 // Serialise issuance per workspace so a burst cannot bypass the
                 // active-token cap.
-                if (! WorkspaceAccess::getMembershipLocked(
-                    $user->id,
-                    $workspaceId,
-                    'editor',
-                    expectedSecurityVersion: (int) $user->security_version,
-                )) {
+                if (! WorkspaceAccess::getMembershipForContext($context, $workspaceId, 'editor')) {
                     return ['status' => 'forbidden'];
+                }
+                if (! $this->validExpiry($expiresAtValue)) {
+                    throw new LinkException(self::EXPIRY_ERROR, 422);
                 }
                 $active = ApiToken::where('workspace_id', $workspaceId)->whereNull('revoked_at')
                     ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
@@ -106,6 +106,12 @@ class TokenController
                 $stepUp = MfaStepUp::verify($lockedUser, $session, $password, $factorCode);
                 if ($stepUp['status'] !== 'ok') {
                     return ['status' => $stepUp['status']];
+                }
+                // Password/factor checks can outlive a short chosen deadline.
+                // Throw so the step-up's SQL MFA proof also rolls back; the
+                // shared TOTP anti-replay policy remains conservative.
+                if (! $this->validExpiry($expiresAtValue)) {
+                    throw new LinkException(self::EXPIRY_ERROR, 422);
                 }
                 if (isset($stepUp['recovery_codes'])) {
                     $lockedUser->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => now()]);
@@ -141,6 +147,8 @@ class TokenController
 
                 return ['status' => 'created', 'factor' => $stepUp['factor'], 'token' => $token];
             });
+        } catch (LinkException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'workspace', $workspaceId, ['kind' => 'api_token_created']);
 
@@ -177,14 +185,11 @@ class TokenController
     {
         $workspaceId = UvhRequest::workspaceId($request);
         $user = UvhRequest::user($request);
+        $sessionId = UvhRequest::sessionId($request);
 
-        $result = DB::transaction(function () use ($workspaceId, $user, $id, $request): string {
-            if (! WorkspaceAccess::getMembershipLocked(
-                $user->id,
-                $workspaceId,
-                'editor',
-                expectedSecurityVersion: (int) $user->security_version,
-            )) {
+        $result = DB::transaction(function () use ($workspaceId, $user, $sessionId, $id, $request): string {
+            $context = SecurityContext::lock($user, $sessionId, requireVerifiedEmail: true);
+            if (! $context || ! WorkspaceAccess::getMembershipForContext($context, $workspaceId, 'editor')) {
                 return 'forbidden';
             }
             $token = ApiToken::where('id', $id)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
@@ -204,6 +209,18 @@ class TokenController
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Each call revalidates the clock after potentially slow operations.
+     *
+     * @phpstan-impure
+     */
+    private function validExpiry(?Carbon $expiresAt): bool
+    {
+        $instant = now();
+
+        return $expiresAt === null || ($expiresAt->gt($instant) && $expiresAt->lte($instant->copy()->addYear()));
     }
 
     private function dto(ApiToken $t): array

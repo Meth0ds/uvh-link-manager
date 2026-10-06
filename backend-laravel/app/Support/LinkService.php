@@ -178,10 +178,9 @@ class LinkService
             $alias = self::generateUniqueAlias($domainId);
         }
 
-        $state = self::deriveState($input);
         $utm = $input['utm'] ?? [];
 
-        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $collectionId, $alias, $state, $utm, $input, $apiTokenContext, $actorSecurityVersion, $writeActor) {
+        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $collectionId, $alias, $utm, $input, $apiTokenContext, $actorSecurityVersion, $writeActor) {
             $membership = $writeActor
                 ? $writeActor->lockMembership($userId, $workspaceId, $actorSecurityVersion)
                 : WorkspaceAccess::getMembershipLocked(
@@ -214,6 +213,10 @@ class LinkService
             if ($quota !== null && $used >= (int) $quota) {
                 throw new LinkException('Cuota de enlaces alcanzada', 429);
             }
+
+            // Account/workspace/quota locks can wait across a lifecycle
+            // boundary. Derive the state at admission, after those waits.
+            $state = self::deriveState($input);
 
             try {
                 $link = Link::create([
@@ -462,15 +465,16 @@ class LinkService
     {
         $scheduled = self::toDateTime($input['scheduled_at'] ?? null);
         $expires = self::toDateTime($input['expires_at'] ?? null);
+        $now = now();
         // Expiry wins over scheduling. `validate()` refuses a pair where
         // `scheduled_at >= expires_at`, so for any admitted input the two
         // cannot disagree — but a writer that reaches here without validation
         // must still not derive a live-looking `scheduled` state from a link
         // whose expiry is already in the past.
-        if ($expires && $expires->isPast()) {
+        if ($expires && $expires->lte($now)) {
             return 'expired';
         }
-        if ($scheduled && $scheduled->isFuture()) {
+        if ($scheduled && $scheduled->gt($now)) {
             return 'scheduled';
         }
 

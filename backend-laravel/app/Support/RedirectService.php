@@ -158,7 +158,7 @@ class RedirectService
         if ($state === 'scheduled' || ($link->scheduled_at && $link->scheduled_at->isFuture())) {
             return ['kind' => 'unavailable', 'reason' => 'scheduled'];
         }
-        if ($state === 'expired' || ($link->expires_at && $link->expires_at->isPast())) {
+        if ($state === 'expired' || ($link->expires_at && $link->expires_at->lte(now()))) {
             return ['kind' => 'unavailable', 'reason' => 'expired'];
         }
 
@@ -277,7 +277,7 @@ class RedirectService
 
                     return;
                 }
-                if ($freshState === 'expired' || ($fresh->expires_at && $fresh->expires_at->isPast())) {
+                if ($freshState === 'expired' || ($fresh->expires_at && $fresh->expires_at->lte(now()))) {
                     $outcome = ['kind' => 'unavailable', 'reason' => 'expired'];
 
                     return;

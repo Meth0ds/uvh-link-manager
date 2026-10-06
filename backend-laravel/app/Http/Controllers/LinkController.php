@@ -400,7 +400,7 @@ class LinkController
                 if ($state === 'active' && $link->scheduled_at && $link->scheduled_at->isFuture()) {
                     throw new LinkException('El enlace sigue programado. Modifica su fecha de activación antes de activarlo.', 409);
                 }
-                if ($state === 'active' && $link->expires_at && $link->expires_at->isPast()) {
+                if ($state === 'active' && $link->expires_at && $link->expires_at->lte(now())) {
                     throw new LinkException('El enlace ya ha caducado. Amplía su fecha de caducidad antes de activarlo.', 409);
                 }
                 $from = $link->state;
@@ -556,7 +556,7 @@ class LinkController
                 // alive because its activation date is still ahead.
                 $next = $link->state_before_delete === 'blocked'
                     ? 'blocked'
-                    : (($link->expires_at && $link->expires_at->isPast())
+                    : (($link->expires_at && $link->expires_at->lte(now()))
                         ? 'expired'
                         : (($link->scheduled_at && $link->scheduled_at->isFuture()) ? 'scheduled' : 'active'));
                 $link->update([
@@ -786,8 +786,8 @@ class LinkController
             'fallback_destination' => $request->has('fallbackDestination') ? $request->input('fallbackDestination') : ($current->fallback_destination ?? null),
             'max_clicks' => $request->has('maxClicks') ? $request->input('maxClicks') : ($current->max_clicks ?? null),
             'single_use' => $request->has('singleUse') ? (bool) $request->input('singleUse') : (bool) ($current->single_use ?? false),
-            'scheduled_at' => $request->has('scheduledAt') ? $request->input('scheduledAt') : $this->iso($current->scheduled_at ?? null),
-            'expires_at' => $request->has('expiresAt') ? $request->input('expiresAt') : $this->iso($current->expires_at ?? null),
+            'scheduled_at' => $request->has('scheduledAt') ? $request->input('scheduledAt') : ($current?->scheduled_at?->format('Y-m-d\TH:i:s.uP')),
+            'expires_at' => $request->has('expiresAt') ? $request->input('expiresAt') : ($current?->expires_at?->format('Y-m-d\TH:i:s.uP')),
             'notes' => $request->has('notes') ? $request->input('notes') : ($current->notes ?? null),
             'utm' => $request->has('utm')
                 ? $request->input('utm')

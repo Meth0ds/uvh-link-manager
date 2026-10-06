@@ -22,6 +22,8 @@ class Link extends Model
 {
     use SoftDeletes;
 
+    protected $dateFormat = 'Y-m-d H:i:s.uP';
+
     protected $fillable = [
         'workspace_id',
         'created_by',

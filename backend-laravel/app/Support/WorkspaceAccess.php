@@ -72,7 +72,7 @@ class WorkspaceAccess
                 ->where('created_by', $userId)
                 ->lockForUpdate()->first();
             $scopes = $token?->scopes;
-            if (! $token || $token->revoked_at || ($token->expires_at && $token->expires_at->isPast())
+            if (! $token || $token->revoked_at || ($token->expires_at && $token->expires_at->lte(now()))
                 || ! is_array($scopes) || ! in_array($requiredScope, $scopes, true)) {
                 return null;
             }
