@@ -60,7 +60,7 @@ WorkspaceAuditAtomicityTest contiene133 casos (56 anteriores +60 invalidaciones 
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `getMembershipLocked` | 40 | Contrato histórico de cuenta/token/roles preservado, nuevo helper compartido |
+| `getMembershipLocked` | 40 | Contrato de cuenta/token/roles preservado. O58 B192: rechazo inclusivo de expiry bajo lock en cinco escrituras bearer; -1/0/+1 con negocio/audit/colas intactos al rechazar. Otros callers y carreras completas mantienen gates propios. |
 | `getMembershipForContext` | 85 | TX requerida; sólo autoridad del contexto, policy workspace/role todavía local |
 | `lockMembership` | 94 | Parent workspace bloqueado antes de leer membership/role; no certifica todos sus otros callers |
 

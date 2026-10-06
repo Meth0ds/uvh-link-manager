@@ -123,15 +123,15 @@ Lectura completa de las funciones enumeradas y callbacks internos. Settings es r
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `notificationKindLabel` | 276 | O26: Catálogo compartido. |
-| `notificationKindIcon` | 280 | O26: Iconos catálogo. |
-| `notificationDeliveryLabel` | 284 | O26: Etiquetas de delivery. |
-| `resetNotificationPreferences` | 288 | O26: Vacía DTO/errors/flags e invalida read/revisión en identity/destroy. |
-| `loadNotificationPreferences` | 296 | O26: LatestRequest con accountContext/abort; old response/error/finally descartados, no GET durante PATCH. |
-| `setNotificationDelivery` | 316 | O26: Write supersedes GET previo; guard anterior a todos los efectos/errores/finally. Mandatory no enviado; PATCH no cancelado. |
-| `constructor` | 338 | O26: Callbacks completos de identity/destroy leídos; recarga prefs sólo si usuario. Callers ajenos no acreditados por leer constructor. |
-| `accountContext` | 1115 | O26: ID + generación protege A→B→A y misma cuenta/nueva sesión. |
-| `toast` | 424 | O26: Se usa sólo si la mutación de preferencias sigue siendo dueña; mensaje ApiRequestError/fallback preservado. |
+| `notificationKindLabel` | 293 | O26: Catálogo compartido. |
+| `notificationKindIcon` | 297 | O26: Iconos catálogo. |
+| `notificationDeliveryLabel` | 301 | O26: Etiquetas de delivery. |
+| `resetNotificationPreferences` | 305 | O26: Vacía DTO/errors/flags e invalida read/revisión en identity/destroy. |
+| `loadNotificationPreferences` | 313 | O26: LatestRequest con accountContext/abort; old response/error/finally descartados, no GET durante PATCH. |
+| `setNotificationDelivery` | 333 | O26: Write supersedes GET previo; guard anterior a todos los efectos/errores/finally. Mandatory no enviado; PATCH no cancelado. |
+| `constructor` | 355 | O26: Callbacks completos de identity/destroy leídos; recarga prefs sólo si usuario. Callers ajenos no acreditados por leer constructor. |
+| `accountContext` | 1135 | O26: ID + generación protege A→B→A y misma cuenta/nueva sesión. |
+| `toast` | 442 | O26: Se usa sólo si la mutación de preferencias sigue siendo dueña; mensaje ApiRequestError/fallback preservado. |
 
 
 ## frontend/src/app/core/services/notification-response-decoders.ts

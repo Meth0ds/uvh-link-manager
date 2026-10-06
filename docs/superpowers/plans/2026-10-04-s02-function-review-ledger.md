@@ -6,34 +6,34 @@ O31: registros por función, no cierre S02. Código/callbacks/dependencias direc
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `constructor` | 338 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `loadAccountView` | 369 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `clearAccountView` | 380 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `openEmailDialog` | 485 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `openPasswordDialog` | 503 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `loadSessions` | 521 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `loadExportStatus` | 548 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `loadExportHistory` | 601 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `exportNeedsPoll` | 614 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `exportReadyRefreshHandler` | 621 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `armExportExpiryCheck` | 630 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `stopExportExpiryCheck` | 643 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `openDataExportDialog` | 650 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `cancelDataExport` | 674 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `loadDeletionImpact` | 764 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `openAccountDeletion` | 782 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `loadPrivacyRequests` | 801 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `onPrivacyPage` | 830 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `submitPrivacyRequest` | 836 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `beginPrivacyResponse` | 873 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `respondPrivacy` | 879 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `cancelPrivacy` | 904 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `copyRecoveryCodes` | 1207 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
-| `downloadRecoveryCodes` | 1223 | O31: función y downloadBlob leídos; entrega síncrona, callback de URL sólo limpia recurso propio. Sin nuevo control de descarga/permiso real ni bug atribuido. |
+| `constructor` | 355 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `loadAccountView` | 386 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `clearAccountView` | 397 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `openEmailDialog` | 503 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `openPasswordDialog` | 521 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `loadSessions` | 539 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `loadExportStatus` | 566 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `loadExportHistory` | 619 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `exportNeedsPoll` | 632 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `exportReadyRefreshHandler` | 639 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `armExportExpiryCheck` | 648 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `stopExportExpiryCheck` | 661 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `openDataExportDialog` | 668 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `cancelDataExport` | 692 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `loadDeletionImpact` | 782 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `openAccountDeletion` | 802 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `loadPrivacyRequests` | 821 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `onPrivacyPage` | 850 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `submitPrivacyRequest` | 856 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `beginPrivacyResponse` | 893 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `respondPrivacy` | 899 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `cancelPrivacy` | 924 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `copyRecoveryCodes` | 1227 | O31/B157–B159: código completo leído; controles reales de identidad/read/confirmación/settlement/teardown. Scope acotado; no gate de todos roles/proveedores ni autoridad por estado cliente. |
+| `downloadRecoveryCodes` | 1243 | O31: función y downloadBlob leídos; entrega síncrona, callback de URL sólo limpia recurso propio. Sin nuevo control de descarga/permiso real ni bug atribuido. |
 
-| `retryExportStatus` | 578 | O35/B164: nueva función y callback current completos leídos. Consulta GET única, pause de poll/expiry, ownership y focus al título en success o conserva botón en failure;24 controles HTTP/UI y QA aislada, sin POST automático. |
-| `exportIsActive` | 701 | O35: selector de processing/ready leído; conserva último snapshot para UI/poll, nunca prueba de actualidad o autorización. |
-| `exportShowsRequestEntry` | 706 | O35/B164: presencia de owner, loading/error/manualrefresh excluyen ausencia aparente; null validado/terminal descargado o cancelado permite nueva solicitud. |
+| `retryExportStatus` | 596 | O35/B164: nueva función y callback current completos leídos. Consulta GET única, pause de poll/expiry, ownership y focus al título en success o conserva botón en failure;24 controles HTTP/UI y QA aislada, sin POST automático. |
+| `exportIsActive` | 719 | O35: selector de processing/ready leído; conserva último snapshot para UI/poll, nunca prueba de actualidad o autorización. |
+| `exportShowsRequestEntry` | 724 | O35/B164: presencia de owner, loading/error/manualrefresh excluyen ausencia aparente; null validado/terminal descargado o cancelado permite nueva solicitud. |
 
 ## frontend/src/app/core/services/auth.service.ts
 
@@ -346,7 +346,7 @@ O45/O47: dependencia compartida S01/S11/S13 leída sólo en los métodos enumera
 | --- | --- | --- |
 | `handle` | 45 | O45/B181–B182: cuerpo completo/callbacks leídos; autoridad, locks, admisión primaria y receipts preservados. 30 nuevos controles HTTP/native-command guardados en uvh_test, caché array y Storagefake;181dedicadas/1944aserciones yPint484/PHPStan0. Normal/outercommit/rollback/savepoint, archivo/counters/A-B/outage/audit; full2113/17018/350,697s exit0. No provider/SMTP/Redis/nativecookie/retención de producción ni cierre del sistema.; O47/B183–B184: requerido execution audit enTX y3protective outcomes conreceipt exacto;171/2919dedicado yfull2205/18889/378,548s,45lifecycle+8schema+3readiness nuevos. Parser/body comparers actuales, sin afirmar toda retención/roles/proveedores; record/reconcile/errorstage probados. |
 | `runStage` | 185 | O45/B181–B182: cuerpo completo/callbacks leídos; autoridad, locks, admisión primaria y receipts preservados. 30 nuevos controles HTTP/native-command guardados en uvh_test, caché array y Storagefake;181dedicadas/1944aserciones yPint484/PHPStan0. Normal/outercommit/rollback/savepoint, archivo/counters/A-B/outage/audit; full2113/17018/350,697s exit0. No provider/SMTP/Redis/nativecookie/retención de producción ni cierre del sistema.; O47/B183–B184: requerido execution audit enTX y3protective outcomes conreceipt exacto;171/2919dedicado yfull2205/18889/378,548s,45lifecycle+8schema+3readiness nuevos. Parser/body comparers actuales, sin afirmar toda retención/roles/proveedores; record/reconcile/errorstage probados. |
-| `executeAccountDeletions` | 599 | O45/B181–B182: cuerpo completo/callbacks leídos; autoridad, locks, admisión primaria y receipts preservados. 30 nuevos controles HTTP/native-command guardados en uvh_test, caché array y Storagefake;181dedicadas/1944aserciones yPint484/PHPStan0. Normal/outercommit/rollback/savepoint, archivo/counters/A-B/outage/audit; full2113/17018/350,697s exit0. No provider/SMTP/Redis/nativecookie/retención de producción ni cierre del sistema.; O47/B183–B184: requerido execution audit enTX y3protective outcomes conreceipt exacto;171/2919dedicado yfull2205/18889/378,548s,45lifecycle+8schema+3readiness nuevos. Parser/body comparers actuales, sin afirmar toda retención/roles/proveedores; record/reconcile/errorstage probados. |
+| `executeAccountDeletions` | 602 | O45/B181–B182: cuerpo completo/callbacks leídos; autoridad, locks, admisión primaria y receipts preservados. 30 nuevos controles HTTP/native-command guardados en uvh_test, caché array y Storagefake;181dedicadas/1944aserciones yPint484/PHPStan0. Normal/outercommit/rollback/savepoint, archivo/counters/A-B/outage/audit; full2113/17018/350,697s exit0. No provider/SMTP/Redis/nativecookie/retención de producción ni cierre del sistema.; O47/B183–B184: requerido execution audit enTX y3protective outcomes conreceipt exacto;171/2919dedicado yfull2205/18889/378,548s,45lifecycle+8schema+3readiness nuevos. Parser/body comparers actuales, sin afirmar toda retención/roles/proveedores; record/reconcile/errorstage probados. |
 
 
 ## backend-laravel/app/Support/Auth/CompromisedAccessRevocation.php
@@ -443,3 +443,17 @@ Dependencia S04 revisada para revocaciones S02/S01; no cierre independiente del 
 | --- | --- | --- |
 | `hours` | 8 | O51/B185: conserva literalmente normalización min1 de emisión. Creation/consumption/security revocation comparten duración.12casos nuevos HTTP con middleware,SQL ycachearray; suite relacionada147/3569 yfull2217/19429 verdes,688hashesintactos/0JUnitfailures. |
 
+
+
+## frontend/src/app/panel/settings/settings.component.ts
+
+O64: consumidor de presentación y recuperación acotado; no cierre del sistema ni nueva autoridad del backend.
+
+| Función | Línea actual | Evidencia |
+| --- | --- | --- |
+| `initialSection` | 125 | Fuente completa y caller leídos. B211/B212: dos rojos temporales y uno de recuperación; controles de vistas persistentes/foco/borradores/reintento. Fronteras funcionales ajenas no cerradas. |
+| `goToSection` | 140 | Fuente completa y caller leídos. B211/B212: dos rojos temporales y uno de recuperación; controles de vistas persistentes/foco/borradores/reintento. Fronteras funcionales ajenas no cerradas. |
+| `jumpTo` | 165 | Fuente completa y caller leídos. B211/B212: dos rojos temporales y uno de recuperación; controles de vistas persistentes/foco/borradores/reintento. Fronteras funcionales ajenas no cerradas. |
+| `ngAfterViewInit` | 154 | Fuente completa y caller leídos. B211/B212: dos rojos temporales y uno de recuperación; controles de vistas persistentes/foco/borradores/reintento. Fronteras funcionales ajenas no cerradas. |
+| `loadSessions` | 539 | Fuente completa y caller leídos. B211/B212: dos rojos temporales y uno de recuperación; controles de vistas persistentes/foco/borradores/reintento. Fronteras funcionales ajenas no cerradas. |
+| `loadDeletionImpact` | 782 | Fuente completa y caller leídos. B211/B212: dos rojos temporales y uno de recuperación; controles de vistas persistentes/foco/borradores/reintento. Fronteras funcionales ajenas no cerradas. |

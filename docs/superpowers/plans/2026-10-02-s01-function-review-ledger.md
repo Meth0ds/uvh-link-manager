@@ -506,7 +506,7 @@ Dependencia S13 leída completa: enumera migraciones sin ejecutarlas, verifica l
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `errors` | 12 | Lectura completa y contratos locales incluidos en99/1105; esquema nuevo sólo uvh_test. O47: tres nuevos contratos de table/lifecycle_at/ledger del receipt2026_10_04, errores seguros yhealth sinwrites;171/2919dedicado,full2205/18889, ledger/table verificadas sólo uvh_test. |
+| `errors` | 12 | Lectura completa y contratos locales incluidos en99/1105; esquema nuevo sólo uvh_test. O47: tres nuevos contratos de table/lifecycle_at/ledger del receipt2026_10_04, errores seguros yhealth sinwrites;171/2919dedicado,full2205/18889, ledger/table verificadas sólo uvh_test. O58: precisión timestamp(6) de API exigida incluso con ledger forjado; migración pendiente sigue rechazando con esquema preciso, sin reparación. Esquema aplicado sólo uvh_test. |
 
 
 O16/B132/B133 verificados (03/10): full1568/1568 backend,11349aserciones,337,83s exclusivamente uvh_test (s01-incident-full-backend.log), exit0;24 controles nuevos frente a1544.99/1105 dedicados,22,28s (s01-incident-contracts-definitive.log), exit0. Pint452/PHPStan0 (s01-incident-quality-final-fixed.log), exit0; baseline182→180 findings/169entradas, dos supresiones resueltas retiradas y ninguna añadida. B132 conserva evidencia recuperable sin revertir revocación por audit general; B133 impide rollback de cancelación por logger de fallback. TX incidente completa comparada tras extracción, AuthController2289→2220líneas; sin latencia/consultas ahorradas medidas. Inventario457archivos/2183con nombre/1137callbacks/3firmas,457hashes y158anchorsS01/35archivos más16S03/2archivos comprobados tras full. YAML7reglas completas únicas validado, Node--check/diff correctos; no promtool/monitorización real atribuida. Migración2026_10_03_000002 aplicada sólo uvh_test con guard; uvh_local intacta, sin backfill histórico. Frontend sin cambio/nueva ejecución/browser atribuidos. S01–S13/objetivo global activos: siguiente separación request/confirm/complete recovery con caracterización previa y resto de funciones/roles/gates externos pendientes. CI billing conocido permanece externo. Sin proveedor real, worker/scheduler productivo, commit/push/deploy.
@@ -905,27 +905,27 @@ O29: Settings conserva formularios montados y admite profile/email simultáneos.
 
 | Función | Línea actual | Estado |
 | --- | --- | --- |
-| `saveProfile` | 440 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
-| `settleAfterConfirmedMutation` | 432 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
-| `refreshAccountView` | 457 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `openEmailDialog` | 485 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
-| `loadSessions` | 521 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `startMfaSetup` | 983 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `startMfaReconfiguration` | 988 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `stageMfaSetup` | 996 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `beginMfaReconfiguration` | 1026 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `enableMfa` | 1032 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `disableMfa` | 1055 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `cancelMfaSetup` | 1092 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `cancelMfaReconfiguration` | 1109 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `accountContext` | 1115 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `clearSensitiveMfaUi` | 1119 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `clearMfaSetupUi` | 1131 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `settleUncertainMfaUi` | 1141 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `finishRecoveryCodes` | 1150 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `beginRecoveryRegeneration` | 1157 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `cancelRecoveryRegeneration` | 1163 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
-| `regenerateRecoveryCodes` | 1169 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `saveProfile` | 458 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `settleAfterConfirmedMutation` | 450 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `refreshAccountView` | 475 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `openEmailDialog` | 503 | O29/B153: lectura completa, contratos HTTP reales de solapamiento/decoder/contexto; no gate de DB/proveedor/roles nuevo. |
+| `loadSessions` | 539 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `startMfaSetup` | 1003 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `startMfaReconfiguration` | 1008 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `stageMfaSetup` | 1016 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `beginMfaReconfiguration` | 1046 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `enableMfa` | 1052 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `disableMfa` | 1075 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `cancelMfaSetup` | 1112 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `cancelMfaReconfiguration` | 1129 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `accountContext` | 1135 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `clearSensitiveMfaUi` | 1139 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `clearMfaSetupUi` | 1151 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `settleUncertainMfaUi` | 1161 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `finishRecoveryCodes` | 1170 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `beginRecoveryRegeneration` | 1177 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `cancelRecoveryRegeneration` | 1183 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
+| `regenerateRecoveryCodes` | 1189 | O30/B154–B156: función/callbacks y caller leídos; HTTP/API/decoder/Auth reales y controles acotados de Settings. No nuevo gate DB/proveedor/roles ni cierre S01. |
 
 ## frontend/src/app/panel/settings/email-access-dialog.component.ts
 
@@ -1188,3 +1188,23 @@ O52: cuatro declaraciones públicas de tipos originales trasladadas literalmente
 O53: unión discriminada de tipos, sin funciones. Login/registro/verificación no admiten desafío; MFA y recuperación comparten challenge y recoveryAvailable. Las tres proyecciones del componente son readonly; las transiciones escriben el estado completo. No añadir función ficticia ni atribuir nueva garantía de backend a este módulo.
 
 O54: el módulo auth-flow-state ahora declara también etapa/modo de registro, originalEmail para corrección y source/email para las tres procedencias de verificación. Tipos completos leídos/comparados; rama MFA literalmente preservada. No contiene funciones ni reemplaza autorización firmada del servidor. B186 y el nuevo bloque de estado tienen417auth/1407full/types/lint/build yQA3POSTs con límites documentados.
+
+O59: ReleaseReadiness.errors exige ambas fechas Link con precisión6 además deledger;3rojos de schema ycontrol ledgerpendiente. UvhHousekeeping.transitionDueLinks leído completo yejercido aisladamente por reflectionnative: expiry<=now, activación<=now, mismo instanteseis dígitos para SQL/Carbon. No se ejecuta scheduler productivo ni se certifican las demás etapas de retención/correo/provider.115/466dedicadas; full/calidad pendientes. Migración sólo *_test, releaseexterno pendiente.
+
+
+## frontend/src/app/core/session-agent-label.ts
+
+O64: consumidor de presentación y recuperación acotado; no cierre del sistema ni nueva autoridad del backend.
+
+| Función | Línea actual | Evidencia |
+| --- | --- | --- |
+| `sessionAgentLabel` | 2 | Función completa leída; cuatro casos de marcas/sistemas/fallback. Descriptivo, no identidad/autorización. |
+
+
+## frontend/src/app/panel/security/security-center.component.ts
+
+O64: consumidor de presentación y recuperación acotado; no cierre del sistema ni nueva autoridad del backend.
+
+| Función | Línea actual | Evidencia |
+| --- | --- | --- |
+| `agent` | 165 | Sólo presentación UA compartida. Fuente completa leída; no se acreditan revocación ni carreras ajenas. |
