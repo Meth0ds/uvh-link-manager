@@ -52,6 +52,10 @@ describe("Export observation with real account transport", () => {
   }
   function start(): TestRequest {
     auth.user.set(user()); auth.loaded.set(true);
+    // El panel muestra una sola tarea: el expediente de exportación vive en
+    // «Tus datos», así que la prueba entra por su ruta canónica como un usuario.
+    const route = TestBed.inject(ActivatedRoute) as unknown as { snapshot: { data: Record<string, unknown> } };
+    route.snapshot.data["section"] = "privacy";
     fixture = TestBed.createComponent(SettingsComponent); fixture.detectChanges();
     sideReads();
     return http.expectOne(endpoint);

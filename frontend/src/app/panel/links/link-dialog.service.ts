@@ -20,8 +20,10 @@ export class LinkDialogService {
   private open(data: LinkDialogData): Observable<LinkDto | null> {
     const ref = this.dialog.open<LinkDialogComponent, LinkDialogData, LinkDto>(LinkDialogComponent, {
       data,
-      width: "min(820px, 94vw)",
-      maxHeight: "92vh",
+      width: "1000px",
+      height: "min(860px, calc(100dvh - 24px))",
+      maxWidth: "calc(100vw - 24px)",
+      maxHeight: "calc(100dvh - 24px)",
       disableClose: true,
       autoFocus: false,
     });

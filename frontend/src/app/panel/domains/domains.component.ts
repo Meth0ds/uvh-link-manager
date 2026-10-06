@@ -212,8 +212,8 @@ export class DomainsComponent {
       // owns the slot: a selection change or a newer create in flight must not
       // move it into another tenant's list or another operation's result.
       if (!target.isCurrent() || !this.addMutation.isCurrent(action)) return;
-      this.newDomain.set("");
-      this.snackbar.open("Dominio añadido. Añade el registro TXT para verificar.", "Cerrar", { duration: 4000 });
+      if (this.newDomain().trim() === domain) this.newDomain.set("");
+      this.snackbar.open("Dominio añadido. Abre su configuración para preparar los registros DNS.", "Cerrar", { duration: 4000 });
       this.domains.update((d) => [created, ...d]);
     } catch (err) {
       if (!target.isCurrent() || !this.addMutation.isCurrent(action)) return;

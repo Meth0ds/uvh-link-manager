@@ -291,7 +291,8 @@
     .meta {
       overflow-wrap: anywhere;
       color: var(--uvh-muted);
-      font-size: 11.5px;
+      font-size: 13px;
+      line-height: 1.7;
     }
   }
 
@@ -371,3 +372,5 @@
     transition: none !important;
   }
 }
+
+.registry-timezone { margin: 24px 0 0; color: var(--uvh-muted); font-size: 12px; line-height: 1.6; }

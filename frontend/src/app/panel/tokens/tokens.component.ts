@@ -1,4 +1,4 @@
-import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy, HostListener } from "@angular/core";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -21,11 +21,15 @@ import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeApiTokensResponse, decodeCreatedApiTokenResponse } from "../../core/services/credential-response-decoders";
 import { localDateTimeIso } from "../../core/strict-wire";
 import {
+  apiTokenState,
+  tokenExpiryTick,
   tokenActionAriaLabel,
   tokenActionLabel,
   tokenStateIcon,
   tokenStateLabel,
 } from "../../core/api-token-label";
+
+import { dateTimeLabel } from "../../core/date-time-label";
 
 const SCOPES = [
   { value: "links:read", label: "Consultar enlaces" },
@@ -64,6 +68,9 @@ export class TokensComponent {
   private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly mutations = new LatestRequest(inject(DestroyRef));
 
+  private readonly clockRevision = signal(0);
+  readonly formatDate = dateTimeLabel;
+  readonly timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   readonly tokens = signal<ApiTokenDto[]>([]);
   /** The server held token rows back, so this list is not the whole registry. */
   readonly truncated = signal(false);
@@ -86,6 +93,17 @@ export class TokensComponent {
   private loadedWorkspaceId: number | null | undefined;
 
   constructor() {
+    // One wake-up at the nearest expiry, rather than polling every registry row.
+    // Effect cleanup clears obsolete timers on row/context changes and destruction.
+    effect((onCleanup) => {
+      this.clockRevision();
+      const now = Date.now();
+      const future = this.tokens().filter((token) => token.revokedAt === null)
+        .map((token) => tokenExpiryTick(token.expiresAt)).filter((value): value is number => value !== null && value > now);
+      if (!future.length) return;
+      const timer = setTimeout(() => this.refreshClock(), Math.min(2_147_483_647, Math.max(1, Math.min(...future) - now)));
+      onCleanup(() => clearTimeout(timer));
+    });
     effect(() => {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
@@ -234,10 +252,18 @@ export class TokensComponent {
     return t.id;
   }
 
-  // The registry row prints the same state twice — as a chip and as the label of
-  // the revoke control — so both readings, and the icon, come from one place.
-  readonly stateLabel = (t: ApiTokenDto) => tokenStateLabel(!!t.revokedAt);
-  readonly stateIcon = (t: ApiTokenDto) => tokenStateIcon(!!t.revokedAt);
+  @HostListener("document:visibilitychange")
+  refreshClock(): void {
+    this.clockRevision.update((revision) => revision + 1);
+  }
+
+  state(token: ApiTokenDto) {
+    this.clockRevision();
+    return apiTokenState(token, Date.now());
+  }
+
+  readonly stateLabel = (t: ApiTokenDto) => tokenStateLabel(this.state(t));
+  readonly stateIcon = (t: ApiTokenDto) => tokenStateIcon(this.state(t));
   readonly actionLabel = (t: ApiTokenDto) => tokenActionLabel(!!t.revokedAt);
   readonly actionAriaLabel = (t: ApiTokenDto) => tokenActionAriaLabel(!!t.revokedAt, t.name);
 }

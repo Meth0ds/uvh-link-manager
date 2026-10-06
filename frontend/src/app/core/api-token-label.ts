@@ -1,45 +1,51 @@
-/**
- * What the token registry says about one API token.
- *
- * A revoked token is kept in the list on purpose, so its state is part of what the
- * row has to say rather than a detail of it. The row prints that state twice — as
- * a chip and as the label of the revoke control, which reads "Revocar" while the
- * credential still works and "Revocado" once it does not — and both readings come
- * from here so they cannot drift apart.
- */
+import type { ApiTokenDto } from "./models";
 
-/** The state of the credential, as the row's chip prints it. */
+export type ApiTokenState = "active" | "expired" | "revoked" | "unknown";
+
+/** First browser clock tick at or after the wire expiry; do not round micros down. */
+export function tokenExpiryTick(raw: string | null): number | null {
+  if (raw === null) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.(\d{1,6}))?(?:Z|[+-]\d{2}:\d{2})$/.exec(raw);
+  if (!match) return null;
+  const [, year, month, day, fraction = ""] = match;
+  const calendar = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (calendar.getUTCFullYear() !== Number(year) || calendar.getUTCMonth() !== Number(month) - 1 || calendar.getUTCDate() !== Number(day)) return null;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed + (/[1-9]/.test(fraction.slice(3)) ? 1 : 0) : null;
+}
+
+/** Presentation only: API authentication and revocation remain server decisions. */
+export function apiTokenState(token: Pick<ApiTokenDto, "revokedAt" | "expiresAt">, now: number): ApiTokenState {
+  if (token.revokedAt !== null) return "revoked";
+  if (token.expiresAt === null) return "active";
+  const expiry = tokenExpiryTick(token.expiresAt);
+  return expiry === null ? "unknown" : expiry <= now ? "expired" : "active";
+}
+
 export const TOKEN_STATE_LABEL = {
   revoked: "Revocado",
   active: "Activo",
+  expired: "Caducado",
+  unknown: "Estado desconocido",
 } as const;
 
-/** What the revoke control reads: the action while it can still be taken. */
-export const TOKEN_ACTION_LABEL = {
-  revoked: "Revocado",
-  active: "Revocar",
-} as const;
+export const TOKEN_ACTION_LABEL = { revoked: "Revocado", active: "Revocar" } as const;
 
-export function tokenStateLabel(revoked: boolean): string {
-  return revoked ? TOKEN_STATE_LABEL.revoked : TOKEN_STATE_LABEL.active;
+/** Boolean callers keep the earlier active/revoked contract. */
+export function tokenStateLabel(state: ApiTokenState | boolean): string {
+  return TOKEN_STATE_LABEL[typeof state === "boolean" ? state ? "revoked" : "active" : state];
 }
 
 export function tokenActionLabel(revoked: boolean): string {
   return revoked ? TOKEN_ACTION_LABEL.revoked : TOKEN_ACTION_LABEL.active;
 }
 
-/** The icon the row draws for the state. */
-export function tokenStateIcon(revoked: boolean): string {
-  return revoked ? "key_off" : "key";
+export function tokenStateIcon(state: ApiTokenState | boolean): string {
+  const current = typeof state === "boolean" ? state ? "revoked" : "active" : state;
+  return { active: "key", expired: "schedule", revoked: "key_off", unknown: "help_outline" }[current];
 }
 
-/**
- * The accessible name of the revoke control, which has to say two things at once:
- * which token, and whether it is still there to revoke.
- *
- * It keeps the registry's own wording (the sentence a screen reader reads is the
- * same one the row shows) rather than the button's shorter visible label.
- */
+/** Expired credentials can still be revoked to retire them definitively. */
 export function tokenActionAriaLabel(revoked: boolean, name: string): string {
   return revoked ? `Token revocado: ${name}` : `Revocar token: ${name}`;
 }

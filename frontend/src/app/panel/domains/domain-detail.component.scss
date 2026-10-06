@@ -8,7 +8,7 @@
   gap: 5px;
   margin-bottom: 14px;
   color: var(--uvh-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   text-decoration: none;
   transition: color 160ms ease;
@@ -93,13 +93,13 @@
 .diagnostic-card p {
   margin: 4px 0 0;
   color: var(--uvh-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
 }
 
 .eyebrow {
   color: var(--uvh-muted);
-  font: 10px/1.4 "Courier New", monospace;
+  font: inherit; font-size: 13px; line-height: 1.6;
   letter-spacing: .1em;
   text-transform: uppercase;
 }
@@ -147,7 +147,7 @@
   border: 1px solid var(--uvh-border);
   border-radius: 3px;
   color: var(--uvh-muted);
-  font: 12px/1 "Courier New", monospace;
+  font: inherit; font-size: 13px; line-height: 1.6;
 }
 
 .observed {
@@ -165,7 +165,7 @@
 
   span {
     color: var(--uvh-muted);
-    font: 9.5px/1.4 "Courier New", monospace;
+    font: inherit; font-size: 13px; line-height: 1.6;
     letter-spacing: .1em;
     text-transform: uppercase;
   }
@@ -178,7 +178,7 @@
     color: var(--uvh-electric);
     background: var(--uvh-surface);
     font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-    font-size: 11px;
+    font-size: 13px;
   }
 }
 
@@ -212,7 +212,7 @@
 
   dt {
     color: var(--uvh-muted);
-    font: 9.5px/1.6 "Courier New", monospace;
+    font: inherit; font-size: 13px; line-height: 1.6;
     letter-spacing: .1em;
     text-transform: uppercase;
   }
@@ -220,7 +220,7 @@
   dd {
     margin: 5px 0 0;
     color: var(--uvh-ink);
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 700;
     line-height: 1.6;
   }
@@ -255,7 +255,7 @@
 .scheduler-note {
   margin: 14px 0 0;
   color: var(--uvh-muted);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.7;
 }
 
@@ -284,12 +284,12 @@
 
   b {
     color: var(--uvh-ink);
-    font-size: 12.5px;
+    font-size: 13px;
   }
 
   .activity-detail {
     color: var(--uvh-muted);
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .scheduler-note {
@@ -334,3 +334,8 @@
     transition: none !important;
   }
 }
+
+.back-link { min-height: 44px; }
+.surface-form mat-form-field { min-width: 0; max-width: 100%; }
+:is(a, button, summary, input):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
+@container (max-width: 620px) { .alert { flex-wrap: wrap; } .surface-form > mat-form-field, .surface-form > button { width: 100%; } }

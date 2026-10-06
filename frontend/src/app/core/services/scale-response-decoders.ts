@@ -26,7 +26,7 @@ import {
 } from "./response-decoder-helpers";
 
 const BULK_ACTIONS = new Set<BulkAction>([
-  "pause", "activate", "archive", "trash", "restore", "tag", "untag", "move",
+  "pause", "activate", "archive", "trash", "restore", "tag", "untag", "move", "set-domain",
 ]);
 
 /** The server reports at most 100 row errors and flags the rest as truncated. */

@@ -359,9 +359,13 @@ export class DomainDetailComponent {
         (value) => decodeDomainDetailResponse(value, current.id, this.canEdit()),
       );
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.surfaceDirty.set(false);
+      // A successful save confirms the submitted values, not a newer draft.
+      const unchanged = this.rootDestinationInput().trim() === root && this.notFoundModeInput() === mode;
       this.domain.set(response.domain);
-      this.syncSurface(response.domain);
+      if (unchanged) {
+        this.surfaceDirty.set(false);
+        this.syncSurface(response.domain);
+      }
       this.snackbar.open("Preferencias de visitante guardadas", "Cerrar", { duration: 2500 });
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;

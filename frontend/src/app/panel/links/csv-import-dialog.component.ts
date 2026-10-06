@@ -24,6 +24,7 @@ import type { ImportReport } from "../../core/models";
  */
 @Component({
   selector: "app-csv-import-dialog",
+  host: { class: "csv-dialog" },
   standalone: true,
   imports: [FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule],
   template: `
@@ -31,36 +32,28 @@ import type { ImportReport } from "../../core/models";
       <span class="title-mark" aria-hidden="true"><mat-icon>upload</mat-icon></span>
       <span><small>Biblioteca</small><b>Importar enlaces desde CSV</b></span>
     </h2>
-    <mat-dialog-content>
-      <p class="message">
-        Las columnas obligatorias son <b>alias</b> y <b>destination</b>; también se admiten
-        fallback_destination, notes, tags (nombres separados por <b>;</b>), scheduled_at, expires_at,
-        max_clicks y single_use. Cada fila se valida con las mismas reglas que un enlace manual.
-      </p>
-      <p class="message">
-        La columna <b>tags</b> separa los nombres por <b>;</b>: un nombre que contenga ese separador
-        se partiría en varias etiquetas. Para esos nombres usa <b>tags_json</b>, una lista JSON de
-        nombres —<b>["prensa;2026"]</b> es una sola etiqueta—, que es además la columna que emite el
-        export. Las dos columnas no se pueden usar a la vez en el mismo archivo.
-      </p>
-      <textarea
-        class="csv-input"
-        [(ngModel)]="csv"
-        (ngModelChange)="onCsvInput()"
-        aria-label="Contenido CSV"
-        placeholder="alias,destination,tags&#10;oferta-1,https://example.org/oferta,prensa;2026&#10;alias,destination,tags_json&#10;oferta-2,https://example.org/oferta,&quot;[&quot;&quot;prensa;2026&quot;&quot;]&quot;"
-      ></textarea>
-      <div class="inline-form">
-        <button mat-stroked-button type="button" (click)="pick.click()">
-          <mat-icon>attach_file</mat-icon> Cargar archivo
-        </button>
+    <mat-dialog-content class="csv-content">
+      <p class="message">Trae varios enlaces a tu biblioteca. Primero comprobaremos el contenido; después podrás confirmar la importación.</p>
+      <div class="csv-start">
+        <button mat-stroked-button type="button" (click)="pick.click()" [disabled]="busy() || done()"><mat-icon aria-hidden="true">attach_file</mat-icon> Elegir archivo CSV</button>
+        <span>También puedes pegar su contenido debajo.</span>
         <input #pick type="file" accept=".csv,text/csv" hidden (change)="onFile($event)" />
       </div>
-
+      <label class="csv-label" for="csv-content">Contenido del archivo</label>
+      <textarea id="csv-content" class="csv-input" [(ngModel)]="csv" (ngModelChange)="onCsvInput()" aria-label="Contenido CSV" aria-describedby="csv-content-hint" [readonly]="busy() || done()"
+        placeholder="alias,destination,tags_json&#10;oferta-1,https://example.org/oferta,&quot;[&quot;&quot;prensa;2026&quot;&quot;]&quot;&#10;oferta-2,https://example.org/novedades,&quot;[&quot;&quot;editorial&quot;&quot;]&quot;"
+      ></textarea>
+      <p class="note" id="csv-content-hint">Una cabecera y un enlace por fila. Alias y destino son obligatorios.</p>
+      <details class="csv-help"><summary>Formato, columnas y etiquetas</summary>
+        <p>Las columnas obligatorias son <code>alias</code> y <code>destination</code>. También se admiten <code>fallback_destination</code>, <code>notes</code>, <code>scheduled_at</code>, <code>expires_at</code>, <code>max_clicks</code> y <code>single_use</code>.</p>
+        <p><code>tags_json</code> contiene una lista JSON de nombres: <code>["prensa;2026"]</code> es una sola etiqueta. Es el formato del export y del ejemplo anterior.</p>
+        <p>La alternativa <code>tags</code> separa nombres por <b>;</b>: un nombre que lo contenga se partiría en varias etiquetas. Las dos columnas no se pueden usar a la vez en el mismo archivo. Cada fila se comprueba con las mismas reglas que un enlace manual.</p>
+      </details>
+      @if (busy()) { <p class="csv-status" role="status">Procesando el archivo…</p> }
       @if (report(); as current) {
-        <div class="report" [class.ok]="!current.errors.length">
+        <div class="report csv-report" role="status" [class.ok]="!current.errors.length">
           @if (current.dryRun) {
-            <b>Dry run: nada escrito todavía.</b>
+            <b>Comprobación terminada. Todavía no se ha importado ningún enlace.</b>
             <span>{{ current.valid }} filas importables con el estado actual del workspace. La comprobación no reserva alias ni cuota.</span>
           } @else {
             <b>Importación completada.</b>
@@ -97,12 +90,8 @@ import type { ImportReport } from "../../core/models";
     <mat-dialog-actions align="end">
       <button mat-button type="button" (click)="close()">{{ done() ? "Cerrar" : "Cancelar" }}</button>
       @if (!done()) {
-        <button mat-stroked-button type="button" (click)="validate()" [disabled]="busy() || !csv.trim()">
-          <mat-icon>fact_check</mat-icon> Validar
-        </button>
-        <button mat-flat-button color="primary" type="button" (click)="import()" [disabled]="busy() || !csv.trim()">
-          <mat-icon>upload</mat-icon> Importar
-        </button>
+        <button mat-stroked-button type="button" (click)="validate()" [disabled]="busy() || !csv.trim() || retryImport() !== null"><mat-icon aria-hidden="true">fact_check</mat-icon> Comprobar archivo</button>
+        <button mat-flat-button type="button" (click)="import()" [disabled]="busy() || !csv.trim() || !report()?.dryRun || !report()?.valid || retryImport() !== null"><mat-icon aria-hidden="true">upload</mat-icon> {{ report()?.dryRun && report()?.valid ? 'Importar ' + report()!.valid + (report()!.valid === 1 ? ' enlace' : ' enlaces') : 'Importar enlaces' }}</button>
       }
     </mat-dialog-actions>
   `,

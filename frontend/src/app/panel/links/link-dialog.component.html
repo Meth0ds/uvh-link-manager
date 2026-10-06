@@ -1,217 +1,221 @@
-<h2 mat-dialog-title class="dialog-title">
-  <span class="title-mark" aria-hidden="true"><mat-icon>{{ isEdit ? "edit" : "add_link" }}</mat-icon></span>
-  <span class="title-copy"><small>{{ isEdit ? "Configuración" : "Nuevo recurso" }}</small><b>{{ isEdit ? "Editar enlace" : "Crear enlace" }}</b></span>
-  @if (isEdit && data.link) {
-    <span class="alias-chip tnum">{{ data.link.shortUrl }}</span>
-  }
-</h2>
+<header class="editor-header">
+  <div class="editor-heading">
+    <span class="editor-mark" aria-hidden="true"><mat-icon>link</mat-icon></span>
+    <div>
+      <h2 mat-dialog-title>{{ isEdit ? 'Editar enlace' : 'Crear enlace' }}</h2>
+      <p>{{ isEdit ? 'Ajusta el destino y cómo funciona tu enlace.' : 'Empieza por el destino. El resto lo decides tú.' }}</p>
+    </div>
+  </div>
+  <button mat-icon-button mat-dialog-close type="button" aria-label="Cerrar editor de enlace" class="editor-close"><mat-icon>close</mat-icon></button>
+  <div class="mobile-address" aria-label="Vista previa de la URL corta">
+    <mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>
+    <span>{{ previewDomain }}/<b>{{ form.controls.alias.value.trim() || 'alias automático' }}</b></span>
+  </div>
+</header>
 
-<mat-dialog-content class="dlg-body">
+<mat-dialog-content class="editor-body" [attr.aria-busy]="loading()">
   @if (loading()) {
-    <mat-progress-bar mode="indeterminate" />
+    <div class="editor-loading" role="status">
+      <mat-progress-bar mode="indeterminate" />
+      <p>Cargando los datos del enlace…</p>
+    </div>
   }
-
   @if (!loading()) {
-    <form [formGroup]="form">
-      <div class="template-bar">
+    <div class="editor-layout">
+      <form [formGroup]="form" class="editor-form">
         @if (templates().length) {
-          <mat-form-field appearance="outline" class="grow">
-            <mat-label>Plantilla</mat-label>
-            <mat-select [value]="null" (selectionChange)="applyTemplate($event.value)" aria-label="Aplicar plantilla">
-              <mat-option [value]="null">Elegir una plantilla…</mat-option>
-              @for (template of templates(); track template.id) {
-                <mat-option [value]="template">{{ template.name }}</mat-option>
-              }
-            </mat-select>
-            <mat-hint>Rellena el formulario con los valores guardados.</mat-hint>
-          </mat-form-field>
-        }
-        <button mat-stroked-button type="button" (click)="saveAsTemplate()" [disabled]="busy()">
-          <mat-icon>bookmark_add</mat-icon> Guardar como plantilla
-        </button>
-      </div>
-      <mat-tab-group animationDuration="220ms">
-        <mat-tab label="Destino">
-          <div class="tab-pad">
-            <div class="tab-intro"><span><mat-icon>near_me</mat-icon></span><div><b>Destino y URL corta</b><p>Define adónde redirige y cómo se presenta el enlace.</p></div></div>
-            <mat-form-field appearance="outline" class="full">
-              <mat-label>URL de destino</mat-label>
-              <input matInput formControlName="destination" placeholder="https://ejemplo.com/pagina-muy-larga" />
-              <mat-icon matPrefix>launch</mat-icon>
-              <mat-hint>Solo URLs http/https válidas.</mat-hint>
-              @if (form.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
-            </mat-form-field>
-            <div class="row">
-              <mat-form-field appearance="outline" class="grow">
-                <mat-label>{{ isEdit ? "Alias" : "Alias (opcional)" }}</mat-label>
-                <input matInput formControlName="alias" placeholder="mi-enlace" />
-                <mat-icon matPrefix>edit</mat-icon>
-                @if (aliasStatus() === 'available') {
-                  <mat-hint class="ok-hint">✓ {{ aliasStatusText() }}</mat-hint>
-                }
-                @if (aliasStatus() === 'checking') {
-                  <mat-hint>Comprobando…</mat-hint>
-                }
-                @if (aliasStatus() === 'taken' || aliasStatus() === 'reserved' || aliasStatus() === 'invalid') {
-                  <mat-hint class="err-hint">{{ aliasStatusText() }}</mat-hint>
-                }
-                @if (form.controls.alias.hasError('pattern')) { <mat-error>Usa letras, números, guion o guion bajo.</mat-error> }
-                @if (form.controls.alias.hasError('required')) { <mat-error>El alias no se puede vaciar.</mat-error> }
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="domain">
-                <mat-label>Dominio</mat-label>
-                <mat-select formControlName="domainId">
-                  <mat-option [value]="null">uvh.es</mat-option>
-                  @if (currentDomainUnavailable(); as unavailable) {
-                    <mat-option [value]="unavailable.id" disabled>{{ unavailable.domain ?? 'Dominio' }} — No disponible</mat-option>
-                  }
-                  @for (d of domains(); track d) {
-                    <mat-option [value]="d.id">{{ d.domain }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            </div>              <mat-form-field appearance="outline" class="full">
-                <mat-label>Destino alternativo (fallback)</mat-label>
-                <input matInput formControlName="fallbackDestination" placeholder="Si ninguna regla coincide" />
-                @if (form.controls.fallbackDestination.hasError('url')) { <mat-error>Introduce una URL http/https válida.</mat-error> }
-              </mat-form-field>
-          </div>
-        </mat-tab>
-        <mat-tab label="Opciones">
-          <div class="tab-pad">
-            <div class="tab-intro"><span><mat-icon>tune</mat-icon></span><div><b>Controles de acceso y vigencia</b><p>Limita el uso, programa fechas y añade contexto interno.</p></div></div>
-            <div class="row">
-              <mat-form-field appearance="outline" class="grow">
-                <mat-label>{{ isEdit ? "Nueva contraseña (opcional)" : "Contraseña (protege el enlace)" }}</mat-label>
-                <input matInput formControlName="password" type="password" autocomplete="new-password" maxlength="72" />
-                <mat-icon matPrefix>lock_outline</mat-icon>
-                @if (isEdit && data.link?.passwordProtected) {
-                  <mat-hint>Déjala vacía para conservar la protección actual.</mat-hint>
-                }
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="clicks">
-                <mat-label>Máx. clics</mat-label>
-                <input matInput formControlName="maxClicks" type="number" min="1" />
-                <mat-icon matPrefix>touch_app</mat-icon>
-              </mat-form-field>
-            </div>
-            @if (isEdit && data.link?.passwordProtected) {
-              <mat-checkbox formControlName="clearPassword" color="warn">Quitar la contraseña actual</mat-checkbox>
-            }
-            <mat-checkbox formControlName="singleUse" color="primary">Uso único (se agota tras el primer clic)</mat-checkbox>
-            <div class="row">
-              <mat-form-field appearance="outline" class="grow">
-                <mat-label>Activación programada</mat-label>
-                <input matInput formControlName="scheduledAt" type="datetime-local" />
-                <mat-icon matPrefix>event</mat-icon>
-                @if (form.controls.scheduledAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="grow">
-                <mat-label>Expiración</mat-label>
-                <input matInput formControlName="expiresAt" type="datetime-local" />
-                <mat-icon matPrefix>event_busy</mat-icon>
-                @if (form.controls.expiresAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
-                @if (form.controls.expiresAt.hasError('pastDateTime')) { <mat-error>La expiración debe ser futura: el enlace nacería caducado.</mat-error> }
-              </mat-form-field>
-            </div>
-            @if (form.hasError('lifecycleOrder')) {
-              <div class="alert error">La expiración debe ser posterior a la activación.</div>
-            }
-            <mat-form-field appearance="outline" class="full">
-              <mat-label>Notas internas</mat-label>
-              <textarea matInput formControlName="notes" rows="2" placeholder="Contexto para tu equipo…"></textarea>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="full">
-              <mat-label>Colección</mat-label>
-              <mat-select formControlName="collectionId">
-                <mat-option [value]="null">Sin colección</mat-option>
-                @for (collection of collections(); track collection.id) {
-                  <mat-option [value]="collection.id">{{ collection.name }}</mat-option>
+          <div class="template-tools">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Plantilla</mat-label>
+              <mat-select [value]="null" (selectionChange)="applyTemplate($event.value)" aria-label="Aplicar plantilla">
+                <mat-option [value]="null">Sin plantilla</mat-option>
+                @for (template of templates(); track template.id) {
+                  <mat-option [value]="template">{{ template.name }}</mat-option>
                 }
               </mat-select>
-              <mat-hint>Agrupación plana dentro del workspace.</mat-hint>
             </mat-form-field>
-            <mat-form-field appearance="outline" class="full">
-              <mat-label>Etiquetas</mat-label>
-              <mat-chip-grid #tagGrid aria-label="Etiquetas">
-                @for (tag of tags(); track tag) {
-                  <mat-chip-row (removed)="removeTag(tag)">
-                    {{ tag }}
-                    <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + tag"><mat-icon>cancel</mat-icon></button>
-                  </mat-chip-row>
+            <button mat-icon-button type="button" (click)="saveAsTemplate()" [disabled]="busy()" aria-label="Guardar como plantilla" matTooltip="Guardar como plantilla"><mat-icon>bookmark_add</mat-icon></button>
+          </div>
+        }
+        <mat-tab-group animationDuration="0ms" class="editor-tabs">
+          <mat-tab label="Destino">
+            <div class="editor-section">
+              <div class="section-heading"><h3>¿Adónde lleva?</h3><p>La página que se abrirá al visitar tu enlace.</p></div>
+              <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
+                <mat-label>URL de destino</mat-label>
+                <input id="link-destination" matInput formControlName="destination" placeholder="https://ejemplo.com/tu-pagina" type="url" autocomplete="url" />
+                <mat-icon matPrefix aria-hidden="true">north_east</mat-icon>
+                <mat-hint>Una dirección http o https, sin usuario ni contraseña.</mat-hint>
+                @if (form.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
+                @if (form.controls.destination.hasError('required')) { <mat-error>Escribe la URL de destino.</mat-error> }
+              </mat-form-field>
+              <div class="section-heading secondary"><h3>Tu URL corta</h3><p>Elige una dirección fácil de reconocer y compartir.</p></div>
+              <div class="address-fields">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>Dominio</mat-label>
+                  <mat-select formControlName="domainId" [canSelectNullableOptions]="true">
+                    <mat-option [value]="null">{{ platformDomain }}</mat-option>
+                    @if (currentDomainUnavailable(); as unavailable) {
+                      <mat-option [value]="unavailable.id" disabled>{{ unavailable.domain ?? 'Dominio' }} — No disponible</mat-option>
+                    }
+                    @for (d of domains(); track d.id) { <mat-option [value]="d.id">{{ d.domain }}</mat-option> }
+                  </mat-select>
+                </mat-form-field>
+                <span class="address-divider" aria-hidden="true">/</span>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>{{ isEdit ? 'Alias' : 'Alias (opcional)' }}</mat-label>
+                  <input matInput formControlName="alias" placeholder="mi-enlace" autocomplete="off" />
+                  @if (!isEdit && !form.controls.alias.value) { <mat-hint>Si lo dejas vacío, asignaremos uno.</mat-hint> }
+                  @if (aliasStatus() === 'available') { <mat-hint class="success-hint">{{ aliasStatusText() }}</mat-hint> }
+                  @if (aliasStatus() === 'checking') { <mat-hint>Comprobando disponibilidad…</mat-hint> }
+                  @if (aliasStatus() === 'taken' || aliasStatus() === 'reserved' || aliasStatus() === 'invalid') { <mat-hint class="error-hint">{{ aliasStatusText() }}</mat-hint> }
+                  @if (form.controls.alias.hasError('pattern')) { <mat-error>Usa letras, números, guion o guion bajo.</mat-error> }
+                  @if (form.controls.alias.hasError('required')) { <mat-error>El alias no se puede vaciar.</mat-error> }
+                </mat-form-field>
+              </div>
+              <div class="section-heading secondary"><h3>Destino alternativo</h3><p>Opcional. Se utiliza si ninguna regla de redirección coincide.</p></div>
+              <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
+                <mat-label>URL alternativa (opcional)</mat-label>
+                <input matInput formControlName="fallbackDestination" type="url" placeholder="https://ejemplo.com" />
+                @if (form.controls.fallbackDestination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
+              </mat-form-field>
+            </div>
+          </mat-tab>
+          <mat-tab label="Acceso">
+            <div class="editor-section">
+              <div class="section-heading"><h3>Quién puede usarlo</h3><p>Añade protección o limita el número de visitas.</p></div>
+              <div class="field-pair">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>{{ isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña (opcional)' }}</mat-label>
+                  <input matInput formControlName="password" type="password" autocomplete="new-password" maxlength="72" />
+                  <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
+                  @if (isEdit && data.link?.passwordProtected) { <mat-hint>Déjala vacía para mantener la contraseña actual.</mat-hint> }
+                </mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>Máximo de clics (opcional)</mat-label>
+                  <input matInput formControlName="maxClicks" type="number" min="1" max="10000000" />
+                  @if (form.controls.maxClicks.hasError('min') || form.controls.maxClicks.hasError('max')) { <mat-error>Usa un valor entre 1 y 10.000.000.</mat-error> }
+                </mat-form-field>
+              </div>
+              <div class="access-choices">
+                @if (isEdit && data.link?.passwordProtected) { <mat-checkbox formControlName="clearPassword">Quitar la contraseña actual</mat-checkbox> }
+                <mat-checkbox formControlName="singleUse">Uso único</mat-checkbox>
+                <p>Después del primer clic, el enlace deja de estar disponible.</p>
+              </div>
+              <div class="section-heading secondary"><h3>Cuándo está disponible</h3><p>Fechas en la zona horaria de tu dispositivo. Déjalas vacías para no limitar la vigencia.</p></div>
+              <div class="field-pair">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>Activación programada</mat-label>
+                  <input matInput formControlName="scheduledAt" type="datetime-local" [attr.aria-describedby]="form.hasError('lifecycleOrder') ? 'link-window-error' : null" />
+                  @if (form.controls.scheduledAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
+                </mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-label>Expiración</mat-label>
+                  <input matInput formControlName="expiresAt" type="datetime-local" [attr.aria-describedby]="form.hasError('lifecycleOrder') ? 'link-window-error' : null" />
+                  @if (form.controls.expiresAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
+                  @if (form.controls.expiresAt.hasError('pastDateTime')) { <mat-error>Elige una fecha futura.</mat-error> }
+                </mat-form-field>
+              </div>
+              @if (form.hasError('lifecycleOrder')) { <div id="link-window-error" class="editor-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>La expiración debe ser posterior a la activación.</span></div> }
+            </div>
+          </mat-tab>
+          <mat-tab label="Organizar">
+            <div class="editor-section">
+              <div class="section-heading"><h3>Encuéntralo cuando lo necesites</h3><p>Agrupa el enlace y añade contexto para tu equipo.</p></div>
+              <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
+                <mat-label>Colección</mat-label>
+                <mat-select formControlName="collectionId" [canSelectNullableOptions]="true">
+                  <mat-option [value]="null">Sin colección</mat-option>
+                  @for (collection of collections(); track collection.id) { <mat-option [value]="collection.id">{{ collection.name }}</mat-option> }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
+                <mat-label>Etiquetas</mat-label>
+                <mat-chip-grid #tagGrid aria-label="Etiquetas">
+                  @for (tag of tags(); track tag) {
+                    <mat-chip-row (removed)="removeTag(tag)">{{ tag }}<button matChipRemove type="button" [attr.aria-label]="'Quitar ' + tag"><mat-icon>cancel</mat-icon></button></mat-chip-row>
+                  }
+                  <input [matChipInputFor]="tagGrid" (matChipInputTokenEnd)="addTag($event)" placeholder="Añadir etiqueta…" />
+                </mat-chip-grid>
+                <mat-hint>Pulsa Intro para añadir una etiqueta. Hasta 20.</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
+                <mat-label>Notas internas</mat-label>
+                <textarea matInput formControlName="notes" rows="4" placeholder="Qué debe saber tu equipo sobre este enlace"></textarea>
+                @if (form.controls.notes.hasError('maxlength')) { <mat-error>Acorta las notas a 1.000 caracteres.</mat-error> }
+                @if (form.controls.notes.hasError('controlCharacters')) { <mat-error>Escribe las notas en una sola línea.</mat-error> }
+                <mat-hint>Solo visibles dentro de tu workspace.</mat-hint>
+              </mat-form-field>
+            </div>
+          </mat-tab>
+          <mat-tab label="Campaña">
+            <div class="editor-section" formGroupName="utm">
+              <div class="section-heading"><h3>De dónde llegan las visitas</h3><p>Estos parámetros se añaden al destino al redirigir. Todos son opcionales.</p></div>
+              <div class="field-pair">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Fuente (utm_source)</mat-label><input matInput formControlName="source" placeholder="newsletter" />@if (form.controls.utm.controls.source.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }<mat-hint>El origen del tráfico.</mat-hint></mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Medio (utm_medium)</mat-label><input matInput formControlName="medium" placeholder="email" />@if (form.controls.utm.controls.medium.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }<mat-hint>El canal de la campaña.</mat-hint></mat-form-field>
+              </div>
+              <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label>Campaña (utm_campaign)</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" />@if (form.controls.utm.controls.campaign.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+              <div class="field-pair">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Término (utm_term)</mat-label><input matInput formControlName="term" placeholder="palabra clave" />@if (form.controls.utm.controls.term.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Contenido (utm_content)</mat-label><input matInput formControlName="content" placeholder="boton-principal" />@if (form.controls.utm.controls.content.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+              </div>
+            </div>
+          </mat-tab>
+          <mat-tab label="Reglas">
+            <div class="editor-section">
+              <div class="section-heading"><h3>Un destino para cada contexto</h3><p>La primera regla que coincida decide el destino. Una regla sin destino no se guarda.</p></div>
+              @if (!ruleForms.length) { <div class="rules-empty"><mat-icon aria-hidden="true">alt_route</mat-icon><p>Este enlace lleva siempre al destino principal.</p><span>Añade una regla para adaptar el destino al visitante.</span></div> }
+              <div class="rules">
+                @for (rule of ruleForms; track rule; let i = $index) {
+                  <section class="rule" [formGroup]="rule" [attr.aria-label]="'Regla ' + (i + 1)">
+                    <div class="rule-heading"><h4>Regla {{ i + 1 }}</h4><button mat-icon-button type="button" (click)="removeRule(i)" [attr.aria-label]="'Eliminar regla ' + (i + 1)" [disabled]="ruleForms.length === 1"><mat-icon>delete_outline</mat-icon></button></div>
+                    <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label>Destino de la regla</mat-label><input matInput formControlName="destination" type="url" placeholder="https://ejemplo.com/oferta" />@if (rule.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales o déjala vacía.</mat-error> }</mat-form-field>
+                    <div class="rule-fields">
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>País (ISO)</mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2" />@if (rule.controls.country.invalid) { <mat-error>Usa dos letras, como ES.</mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es o es-ES" maxlength="8" />@if (rule.controls.language.invalid) { <mat-error>Usa un idioma o una variante regional.</mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Dispositivo</mat-label><mat-select formControlName="device"><mat-option value="">Cualquiera</mat-option><mat-option value="desktop">Escritorio</mat-option><mat-option value="mobile">Móvil</mat-option><mat-option value="tablet">Tablet</mat-option></mat-select></mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Sistema operativo</mat-label><input matInput formControlName="os" placeholder="Android" maxlength="80" />@if (rule.controls.os.invalid) { <mat-error>Usa texto de hasta 40 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Desde (HH:mm UTC)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" />@if (rule.controls.timeFrom.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Hasta (HH:mm UTC)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" />@if (rule.controls.timeTo.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="ejemplo.com" maxlength="400" />@if (rule.controls.referrer.invalid) { <mat-error>Usa texto de hasta 200 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" maxlength="200" />@if (rule.controls.campaign.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+                    </div>
+                  </section>
                 }
-                <input [matChipInputFor]="tagGrid" (matChipInputTokenEnd)="addTag($event)" placeholder="Añadir etiqueta…" />
-              </mat-chip-grid>
-            </mat-form-field>
-          </div>
-        </mat-tab>
-        <mat-tab label="UTM">
-          <div class="tab-pad">
-            <div class="tab-intro"><span><mat-icon>campaign</mat-icon></span><div><b>Parámetros de campaña</b><p>Añade UTM al destino para medir campañas; se aplican al redirigir.</p></div></div>
-            <div formGroupName="utm" class="utm-grid">
-              <mat-form-field appearance="outline"><mat-label>Source</mat-label><input matInput formControlName="source" placeholder="newsletter" /></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>Medium</mat-label><input matInput formControlName="medium" placeholder="email" /></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>Campaign</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" /></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>Term</mat-label><input matInput formControlName="term" /></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>Content</mat-label><input matInput formControlName="content" /></mat-form-field>
+              </div>
+              <button mat-stroked-button type="button" class="add-rule" (click)="addRule()" [disabled]="ruleForms.length >= 20"><mat-icon>add</mat-icon>Añadir regla</button>
             </div>
-          </div>
-        </mat-tab>
-        <mat-tab label="Reglas">
-          <div class="tab-pad">
-            <div class="tab-intro"><span><mat-icon>account_tree</mat-icon></span><div><b>Redirección condicional</b><p>La primera regla que coincida gana. Deja el destino vacío para borrar la regla.</p></div></div>
-            <div class="rules">
-              @for (rule of ruleForms; track rule; let i = $index) {
-                <div class="rule" [formGroup]="rule">
-                  <div class="rule-head">
-                    <b>Regla {{ i + 1 }}</b>
-                    <button mat-icon-button type="button" (click)="removeRule(i)" aria-label="Eliminar regla" [disabled]="ruleForms.length === 1">
-                      <mat-icon>delete_outline</mat-icon>
-                    </button>
-                  </div>
-                  <div class="rule-grid">
-                    <mat-form-field appearance="outline"><mat-label>País (ISO)</mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2" />@if (rule.controls.country.invalid) { <mat-error>Usa un código ISO de dos letras.</mat-error> }</mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es o es-ES" maxlength="8" />@if (rule.controls.language.invalid) { <mat-error>Usa un idioma (es) o una variante regional (es-ES).</mat-error> }</mat-form-field>
-                    <mat-form-field appearance="outline">
-                      <mat-label>Dispositivo</mat-label>
-                      <mat-select formControlName="device">
-                        <mat-option value="">Cualquiera</mat-option>
-                        <mat-option value="desktop">Escritorio</mat-option>
-                        <mat-option value="mobile">Móvil</mat-option>
-                        <mat-option value="tablet">Tablet</mat-option>
-                      </mat-select>
-                    </mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>SO (contiene)</mat-label><input matInput formControlName="os" placeholder="Android" maxlength="80" /></mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Desde (HH:mm UTC)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" />@if (rule.controls.timeFrom.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Hasta (HH:mm UTC)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" />@if (rule.controls.timeTo.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="twitter.com" maxlength="400" /></mat-form-field>
-                    <mat-form-field appearance="outline"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" maxlength="200" /></mat-form-field>
-                  </div>
-                  <mat-form-field appearance="outline" class="full">
-                    <mat-label>Destino de la regla</mat-label>
-                    <input matInput formControlName="destination" placeholder="https://ejemplo.com/oferta" />
-                    @if (rule.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales o déjala vacía.</mat-error> }
-                  </mat-form-field>
-                </div>
-              }
-            </div>
-            <button mat-stroked-button type="button" class="add-rule" (click)="addRule()" [disabled]="ruleForms.length >= 20">
-              <mat-icon>add</mat-icon> Añadir regla
-            </button>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
-    </form>
-  }
-
-  @if (error()) {
-    <div class="alert error">{{ error() }}</div>
+          </mat-tab>
+        </mat-tab-group>
+        @if (!templates().length) { <button mat-button type="button" class="save-template" (click)="saveAsTemplate()" [disabled]="busy()"><mat-icon>bookmark_add</mat-icon>Guardar como plantilla</button> }
+      </form>
+      <aside class="link-preview" aria-label="Vista previa del enlace">
+        <span class="preview-label">Tu enlace</span>
+        <div class="preview-address"><mat-icon aria-hidden="true">link</mat-icon><div><span>{{ previewDomain }}/</span><strong>{{ form.controls.alias.value.trim() || 'Alias automático' }}</strong></div></div>
+        <div class="preview-route" aria-hidden="true"><span></span><mat-icon>south</mat-icon></div>
+        <span class="preview-label">Abre este destino</span>
+        <p class="preview-destination">{{ form.controls.destination.value.trim() || 'Añade una URL para empezar.' }}</p>
+        <div class="preview-conditions">
+          @if ((!form.controls.clearPassword.value && (form.controls.password.value || data.link?.passwordProtected))) { <span><mat-icon aria-hidden="true">lock_outline</mat-icon>Con contraseña</span> }
+          @if (form.controls.singleUse.value) { <span><mat-icon aria-hidden="true">touch_app</mat-icon>Un solo uso</span> }
+          @if (form.controls.scheduledAt.value) { <span><mat-icon aria-hidden="true">schedule</mat-icon>Activación programada</span> }
+          @if (form.controls.expiresAt.value) { <span><mat-icon aria-hidden="true">event_busy</mat-icon>Con fecha de expiración</span> }
+        </div>
+        <p class="preview-note">{{ isEdit ? 'Los cambios se aplican al guardar.' : 'Podrás cambiar el destino después de crearlo.' }}</p>
+      </aside>
+    </div>
   }
 </mat-dialog-content>
 
-<mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close>Cancelar</button>
-  <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || hasInvalidRules || ['checking', 'taken', 'invalid', 'reserved'].includes(aliasStatus()) || busy() || loading() || (isEdit && !editDetailsLoaded())">
-    {{ busy() ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear enlace" }}
-  </button>
+@if (error()) { <div class="editor-request-error editor-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div> }
+<mat-dialog-actions class="editor-footer">
+  <p>{{ isEdit ? 'Conserva tu enlace. Cambia lo que necesitas.' : 'Solo necesitas una URL para empezar.' }}</p>
+  <div class="footer-buttons">
+    <button mat-button mat-dialog-close type="button">Cancelar</button>
+    <button mat-flat-button type="button" (click)="save()" [disabled]="form.invalid || hasInvalidRules || ['checking', 'taken', 'invalid', 'reserved'].includes(aliasStatus()) || busy() || loading() || (isEdit && !editDetailsLoaded())">
+      @if (!busy()) { <mat-icon>{{ isEdit ? 'check' : 'add_link' }}</mat-icon> }
+      {{ busy() ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear enlace' }}
+    </button>
+  </div>
 </mat-dialog-actions>

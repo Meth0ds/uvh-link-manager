@@ -1,354 +1,52 @@
-:host { display: block; container-type: inline-size; }
-
-// Alerts: left-ruled token bars, never red-tinted rounded boxes.
-.alert {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding: 12px 14px;
-  border-radius: 3px;
-  font-size: 13px;
-  line-height: 1.6;
-
-  > span {
-    flex: 1;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  > button {
-    flex: 0 0 auto;
-    margin-left: auto;
-  }
-
-  &.error {
-    border-left: 3px solid var(--uvh-danger);
-    background: var(--uvh-danger-soft);
-    color: var(--uvh-danger);
-  }
-
-  &.permission {
-    border-left: 2px solid var(--uvh-border);
-    background: var(--uvh-surface-raised);
-    color: var(--uvh-muted);
-  }
-}
-
-// Connect form: a flat framed plate with an editorial heading.
-.command-card {
-  margin-bottom: 26px;
-  padding: 20px 22px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface-raised);
-}
-
-.command-heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 16px;
-
-  h2 {
-    margin: 0;
-    color: var(--uvh-ink);
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: -.03em;
-  }
-
-  p {
-    max-width: 70ch;
-    margin: 6px 0 0;
-    color: var(--uvh-muted);
-    font-size: 12px;
-    line-height: 1.7;
-  }
-}
-
-.command-icon,
-.domain-icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  place-items: center;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface);
-  color: var(--uvh-electric);
-}
-
-.command-icon mat-icon,
-.domain-icon mat-icon {
-  width: 19px;
-  height: 19px;
-  font-size: 19px;
-}
-
-.add-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-
-  .grow {
-    flex: 1;
-  }
-
-  button {
-    min-height: 55px;
-  }
-}
-
-.domain-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-// Domain plates are not clickable as a whole: flat hairline frames, no lift.
-.domain-card {
-  padding: 18px 20px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface-raised);
-}
-
-.domain-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  > div:nth-child(2) {
-    display: flex;
-    min-width: 0;
-    flex: 1;
-    flex-direction: column;
-  }
-
-  > div:nth-child(2) > span {
-    margin-bottom: 4px;
-    color: var(--uvh-muted);
-    font: 10px/1.4 "Courier New", monospace;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-  }
-
-  b {
-    color: var(--uvh-ink);
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: -.02em;
-    // A domain is one unbreakable token. Wrapping it onto a second line keeps
-    // the row's identifier whole; an ellipsis would hide the one thing the row
-    // exists to name, to make room for the state chip beside it.
-    overflow-wrap: anywhere;
-  }
-}
-
-// DNS verification instructions read as a margin note with mono record values.
-.verify-box {
-  margin-top: 14px;
-  padding: 14px 16px;
-  border-left: 2px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface);
-
-  .verify-title {
-    margin: 0 0 8px;
-    color: var(--uvh-muted);
-    font-size: 12.5px;
-    font-weight: 700;
-  }
-
-  .txt-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-
-    code {
-      padding: 6px 9px;
-      border: 1px solid var(--uvh-border);
-      border-radius: 3px;
-      background: var(--uvh-surface);
-      font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-      font-size: 11.5px;
-    }
-
-    code:not(.txt-value) {
-      color: var(--uvh-muted);
-      font-size: 10px;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-    }
-
-    .txt-value {
-      flex: 1;
-      min-width: 0;
-      word-break: break-all;
-      color: var(--uvh-electric);
-    }
-  }
-
-  .step-title {
-    margin-top: 15px;
-  }
-}
-
-.dns-message {
-  margin: 14px 0 0;
-  padding: 10px 12px;
-  border-left: 3px solid var(--uvh-warn);
-  border-radius: 3px;
-  background: var(--uvh-warn-soft);
-  color: var(--uvh-warn);
-  font-size: 12.5px;
-  font-weight: 700;
-  line-height: 1.6;
-
-  &.degraded {
-    margin-bottom: 2px;
-  }
-}
-
-// Readiness checks: square framed monotags that fill when confirmed.
-.readiness {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-
-  span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 9px;
-    border: 1px solid var(--uvh-border);
-    border-radius: 3px;
-    color: var(--uvh-muted);
-    font: 10.5px/1.6 "Courier New", monospace;
-    letter-spacing: .04em;
-
-    &.ready {
-      border-color: transparent;
-      background: var(--uvh-success-soft);
-      color: var(--uvh-success);
-    }
-  }
-
-  mat-icon {
-    width: 15px;
-    height: 15px;
-    font-size: 15px;
-  }
-}
-
-.state-chip.needs-attention {
-  background: var(--uvh-warn-soft);
-  color: var(--uvh-warn);
-}
-
-// La preferencia de dominio predeterminado: una marca discreta, no un estado
-// de salud más —el chip de estado sigue siendo el que manda.
-.default-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface-raised);
-  color: var(--uvh-muted);
-  font: 10.5px/1.6 "Courier New", monospace;
-  letter-spacing: .04em;
-
-  mat-icon {
-    width: 14px;
-    height: 14px;
-    font-size: 14px;
-  }
-}
-
-// El impacto del dominio: cuántos enlaces dependen de él. El mismo peso
-// visual que la marca de predeterminado — no es un estado de salud.
-.links-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface-raised);
-  color: var(--uvh-muted);
-  font: 10.5px/1.6 "Courier New", monospace;
-  letter-spacing: .04em;
-
-  mat-icon {
-    width: 14px;
-    height: 14px;
-    font-size: 14px;
-  }
-}
-
-.domain-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-  flex-wrap: wrap;
-
-  .danger {
-    color: var(--uvh-danger);
-    --mat-icon-color: var(--uvh-danger);
-  }
-}
-
-.details-action {
-  margin-top: 10px;
-}
-
+// A domain registry: name, health, impact and the next action. DNS belongs to its diagnostic view.
+:host { display: block; min-width: 0; container-type: inline-size; }
+.alert { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; padding: 14px; font-size: 14px; line-height: 1.6; }
+.alert > span { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.alert.error { border-left: 3px solid var(--uvh-danger); background: var(--uvh-danger-soft); color: var(--uvh-danger); }
+.alert.permission { border-left: 2px solid var(--uvh-border); color: var(--uvh-muted); }
+.command-card { margin-bottom: 30px; padding: 24px; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface-raised); }
+.command-heading { display: flex; gap: 14px; align-items: flex-start; }
+.command-heading h2 { margin: 0; font-size: 22px; color: var(--uvh-ink); letter-spacing: -.03em; }
+.command-heading p { margin: 8px 0 0; max-width: 70ch; font-size: 14px; color: var(--uvh-muted); line-height: 1.7; }
+.command-heading code { color: var(--uvh-ink); font-size: 13px; }
+.command-icon, .domain-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 3px; color: var(--uvh-electric); }
+.command-icon mat-icon, .domain-icon mat-icon { width: 20px; height: 20px; font-size: 20px; }
+.connection-steps { display: flex; gap: 28px; flex-wrap: wrap; padding-left: 20px; margin: 20px 0 12px; font-size: 13px; color: var(--uvh-ink); line-height: 1.7; }
+.connection-steps li { padding-left: 4px; }
+.advanced-help { margin: 12px 0 18px; font-size: 13px; color: var(--uvh-muted); line-height: 1.7; }
+.advanced-help summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-weight: 700; }
+.advanced-help p { margin: 8px 0 0; max-width: 75ch; }
+.add-bar { display: flex; align-items: flex-start; gap: 12px; }
+.add-bar .grow { flex: 1; min-width: 0; }
+.add-bar button { min-height: 56px; }
+.domain-list { display: grid; gap: 0; }
+.domain-card { padding: 26px 0; border-bottom: 1px solid var(--uvh-border); }
+.domain-card:first-child { border-top: 1px solid var(--uvh-border); }
+.domain-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.domain-head > div { flex: 1 1 260px; min-width: 0; }
+.domain-name { color: var(--uvh-ink); font-size: 18px; font-weight: 800; text-decoration: none; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.domain-name:hover { color: var(--uvh-electric); text-decoration: underline; }
+.default-badge, .links-count { display: inline-flex; align-items: center; gap: 6px; color: var(--uvh-muted); font-size: 13px; }
+.default-badge mat-icon, .links-count mat-icon { width: 16px; height: 16px; font-size: 16px; }
+.state-chip.needs-attention { color: var(--uvh-warn); background: var(--uvh-warn-soft); }
+.next-step { margin: 14px 0 0; color: var(--uvh-muted); font-size: 14px; line-height: 1.7; }
+.dns-message { margin: 14px 0 0; padding: 12px 14px; border-left: 3px solid var(--uvh-warn); background: var(--uvh-warn-soft); color: var(--uvh-warn); font-size: 13px; line-height: 1.7; }
+.readiness { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px; }
+.readiness span { display: inline-flex; align-items: center; gap: 6px; color: var(--uvh-muted); font-size: 13px; }
+.readiness span.ready { color: var(--uvh-success); }
+.readiness mat-icon { width: 17px; height: 17px; font-size: 17px; }
+.domain-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.domain-actions .danger { color: var(--uvh-danger); --mat-icon-color: var(--uvh-danger); }
+button, .domain-actions a { min-height: 44px; }
+:is(a, button, input, summary):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
 @container (max-width: 620px) {
-  .add-bar {
-    flex-direction: column;
-  }
-
-  .add-bar .grow,
-  .add-bar button {
-    width: 100%;
-  }
-
-  .domain-head {
-    align-items: flex-start;
-    flex-wrap: wrap;
-
-    // When the row is tight the chip steps down to its own line (aligned under
-    // the name) instead of squeezing the domain out of the card's own header.
-    > div:nth-child(2) {
-      flex: 1 1 260px;
-    }
-  }
-
-  .domain-head .state-chip {
-    margin-left: 50px;
-  }
-
-  .verify-box .txt-row {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .verify-box .txt-row .txt-value {
-    min-width: 0;
-    flex-basis: calc(100% - 72px);
-  }
+  .command-card { padding: 20px 16px; }
+  .command-icon { display: none; }
+  .connection-steps { display: grid; gap: 8px; }
+  .add-bar { flex-direction: column; }
+  .add-bar .grow, .add-bar button { width: 100%; }
+  .domain-head > div { flex: 1 1 calc(100% - 52px); }
+  .domain-head .state-chip { margin-left: 50px; }
+  .domain-actions button, .domain-actions a { max-width: 100%; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

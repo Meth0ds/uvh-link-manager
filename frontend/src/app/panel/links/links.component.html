@@ -45,11 +45,13 @@
   </div>
   <div class="filters">
     <mat-form-field appearance="outline" class="search" subscriptSizing="dynamic">
-      <mat-icon matPrefix>search</mat-icon>
+      <mat-label>Buscar enlaces</mat-label>
+      <mat-icon matPrefix aria-hidden="true">search</mat-icon>
       <input matInput type="search" name="link-search" autocomplete="off" spellcheck="false" aria-label="Buscar enlaces" placeholder="Buscar por alias, destino o notas…" [value]="q()" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
       <button mat-icon-button matSuffix type="button" (click)="onSearch(searchInput.value)" aria-label="Ejecutar búsqueda"><mat-icon>arrow_forward</mat-icon></button>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
+      <mat-label>Estado</mat-label>
       <mat-select [value]="state()" (selectionChange)="onState($event.value)" aria-label="Estado">
         <mat-option value="">Todos los estados</mat-option>
         <mat-option value="active">Activos</mat-option>
@@ -61,7 +63,8 @@
       </mat-select>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
-      <mat-select [value]="domainId()" (selectionChange)="onDomain($event.value)" aria-label="Dominio">
+      <mat-label>Dominio</mat-label>
+      <mat-select [canSelectNullableOptions]="true" [value]="domainId()" (selectionChange)="onDomain($event.value)" aria-label="Dominio">
         <mat-option [value]="null">Todos los dominios</mat-option>
         @for (d of domainOptions(); track d.id) {
           <mat-option [value]="d.id">{{ d.domain }}</mat-option>
@@ -69,6 +72,7 @@
       </mat-select>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
+      <mat-label>Ordenar</mat-label>
       <mat-select [value]="sort()" (selectionChange)="onSort($event.value)" aria-label="Ordenar">
         <mat-option value="created_at_desc">Más recientes</mat-option>
         <mat-option value="created_at_asc">Más antiguos</mat-option>
@@ -88,12 +92,15 @@
       >Seleccionar página</mat-checkbox>
     }
     <div class="scale-tools">
-      <button mat-stroked-button type="button" (click)="openTags()"><mat-icon>sell</mat-icon> Etiquetas</button>
-      <button mat-stroked-button type="button" (click)="openCollections()"><mat-icon>folder</mat-icon> Colecciones</button>
-      @if (canWrite()) {
-        <button mat-stroked-button type="button" (click)="importCsv()"><mat-icon>upload</mat-icon> Importar CSV</button>
-      }
-      <button mat-stroked-button type="button" (click)="exportCsv()" [disabled]="exporting()"><mat-icon>download</mat-icon> Exportar CSV</button>
+      <div class="tool-group" role="group" aria-label="Organizar enlaces">
+        <button mat-button type="button" (click)="openTags()"><mat-icon aria-hidden="true">sell</mat-icon> Etiquetas</button>
+        <button mat-button type="button" (click)="openCollections()"><mat-icon aria-hidden="true">folder</mat-icon> Colecciones</button>
+      </div>
+      <button mat-stroked-button type="button" [matMenuTriggerFor]="csvMenu" aria-label="Importar o exportar enlaces en CSV"><mat-icon aria-hidden="true">import_export</mat-icon> CSV<mat-icon iconPositionEnd aria-hidden="true">expand_more</mat-icon></button>
+      <mat-menu #csvMenu="matMenu">
+        @if (canWrite()) { <button mat-menu-item type="button" (click)="importCsv()"><mat-icon aria-hidden="true">upload</mat-icon> Importar CSV</button> }
+        <button mat-menu-item type="button" (click)="exportCsv()" [disabled]="exporting()"><mat-icon aria-hidden="true">download</mat-icon> {{ exporting() ? 'Exportando…' : 'Exportar CSV' }}</button>
+      </mat-menu>
     </div>
   </div>
 </section>
@@ -101,18 +108,24 @@
 @if (selected().size > 0 && canWrite()) {
   <section class="bulk-bar" aria-label="Acciones sobre los enlaces seleccionados">
     <div class="bulk-line">
-      <b class="tnum">{{ selected().size }} seleccionados</b>
-      <button mat-button type="button" (click)="clearSelection()">Cancelar selección</button>
-      <span class="bulk-spacer"></span>
-      <button mat-stroked-button type="button" (click)="bulkState('pause')" [disabled]="actionId() !== null"><mat-icon>pause</mat-icon> Pausar</button>
-      <button mat-stroked-button type="button" (click)="bulkState('activate')" [disabled]="actionId() !== null"><mat-icon>play_arrow</mat-icon> Activar</button>
-      <button mat-stroked-button type="button" (click)="bulkState('archive')" [disabled]="actionId() !== null"><mat-icon>archive</mat-icon> Archivar</button>
-      <button mat-stroked-button type="button" (click)="openBulkPanel('tag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'tag'"><mat-icon>sell</mat-icon> Etiquetar</button>
-      <button mat-stroked-button type="button" (click)="openBulkPanel('untag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'untag'"><mat-icon>sell</mat-icon> Quitar etiqueta</button>
-      <button mat-stroked-button type="button" (click)="openBulkPanel('move')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'move'"><mat-icon>drive_file_move</mat-icon> Mover</button>
-      <button mat-stroked-button type="button" (click)="openBulkPanel('domain')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'domain'"><mat-icon>language</mat-icon> Cambiar dominio</button>
-      <button mat-stroked-button type="button" class="bulk-danger" (click)="bulkTrash()" [disabled]="actionId() !== null"><mat-icon>delete</mat-icon> Eliminar</button>
+      <div class="bulk-selection"><b class="tnum">{{ selected().size }} {{ selected().size === 1 ? 'enlace seleccionado' : 'enlaces seleccionados' }}</b><button mat-button type="button" (click)="clearSelection()" [disabled]="actionId() !== null">Cancelar selección</button></div>
+      <div class="bulk-tools" role="group" aria-label="Herramientas de la selección">
+        <button mat-stroked-button type="button" (click)="openBulkPanel('tag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'tag'"><mat-icon aria-hidden="true">sell</mat-icon> Etiquetar</button>
+        <button mat-stroked-button type="button" (click)="openBulkPanel('move')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'move'"><mat-icon aria-hidden="true">drive_file_move</mat-icon> Mover</button>
+        <button mat-stroked-button type="button" [matMenuTriggerFor]="bulkMenu" [disabled]="actionId() !== null" aria-label="Más acciones sobre los enlaces seleccionados"><mat-icon aria-hidden="true">more_horiz</mat-icon> Más acciones</button>
+        <mat-menu #bulkMenu="matMenu">
+          <button mat-menu-item type="button" (click)="bulkState('pause')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">pause</mat-icon> Pausar</button>
+          <button mat-menu-item type="button" (click)="bulkState('activate')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">play_arrow</mat-icon> Activar</button>
+          <button mat-menu-item type="button" (click)="bulkState('archive')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">archive</mat-icon> Archivar</button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item type="button" (click)="openBulkPanel('untag')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">sell</mat-icon> Quitar etiqueta</button>
+          <button mat-menu-item type="button" (click)="openBulkPanel('domain')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">language</mat-icon> Cambiar dominio</button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item type="button" class="danger" (click)="bulkTrash()" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> Eliminar</button>
+        </mat-menu>
+      </div>
     </div>
+    @if (actionId() !== null) { <p class="bulk-status" role="status">Aplicando cambios a la selección…</p> }
     @if (bulkPanel() === 'tag' || bulkPanel() === 'untag') {
       <div class="bulk-inline">
         <mat-form-field appearance="outline" class="bulk-tags">
@@ -126,7 +139,7 @@
       <div class="bulk-inline">
         <mat-form-field appearance="outline" class="bulk-collection">
           <mat-label>Colección</mat-label>
-          <mat-select [value]="bulkCollectionId()" (selectionChange)="bulkCollectionId.set($event.value)" aria-label="Colección de destino">
+          <mat-select [canSelectNullableOptions]="true" [value]="bulkCollectionId()" (selectionChange)="bulkCollectionId.set($event.value)" aria-label="Colección de destino">
             <mat-option [value]="null">Sin colección</mat-option>
             @for (collection of collections(); track collection.id) {
               <mat-option [value]="collection.id">{{ collection.name }}</mat-option>
@@ -140,7 +153,7 @@
       <div class="bulk-inline">
         <mat-form-field appearance="outline" class="bulk-collection">
           <mat-label>Dominio de destino</mat-label>
-          <mat-select [value]="bulkDomainId()" (selectionChange)="bulkDomainId.set($event.value)" aria-label="Dominio de destino">
+          <mat-select [canSelectNullableOptions]="true" [value]="bulkDomainId()" (selectionChange)="bulkDomainId.set($event.value)" aria-label="Dominio de destino">
             <mat-option [value]="null">Dominio de plataforma (uvh.es)</mat-option>
             @for (d of bulkDomainOptions(); track d.id) {
               <mat-option [value]="d.id">{{ d.domain }}{{ d.isDefault ? ' — Predeterminado' : '' }}</mat-option>

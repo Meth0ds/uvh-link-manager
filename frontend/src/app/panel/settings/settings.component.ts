@@ -21,6 +21,7 @@ import { MatSelectModule } from "@angular/material/select";
 import { MatPaginatorModule, type PageEvent } from "@angular/material/paginator";
 import QRCode from "qrcode";
 import { dateTimeMediumLabel } from "../../core/date-time-label";
+import { sessionAgentLabel } from "../../core/session-agent-label";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ThemeService, type ThemePreference } from "../../core/services/theme.service";
@@ -118,6 +119,14 @@ export class SettingsComponent implements AfterViewInit {
     privacy: "/app/settings/privacy",
     danger: "/app/settings/danger",
   };
+  readonly activeSection = signal(this.initialSection());
+  readonly sessionAgent = sessionAgentLabel;
+
+  private initialSection(): string {
+    const section: unknown = this.route.snapshot.data["section"];
+    return typeof section === "string" && Object.hasOwn(SettingsComponent.SECTION_PATHS, section) ? section : "account";
+  }
+
   private readonly accountSectionRef = viewChild<ElementRef<HTMLElement>>("accountSection");
   private readonly securitySectionRef = viewChild<ElementRef<HTMLElement>>("securitySection");
   private readonly notificationsSectionRef = viewChild<ElementRef<HTMLElement>>("notificationsSection");
@@ -129,6 +138,9 @@ export class SettingsComponent implements AfterViewInit {
    * No form is unmounted: unfinished MFA setup and recovery codes stay intact.
    */
   goToSection(event: Event, section: HTMLElement): void {
+    // Preserve the browser contract for opening a canonical link elsewhere.
+    if (event instanceof MouseEvent && (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
+    if (!Object.hasOwn(SettingsComponent.SECTION_PATHS, section.id)) return;
     event.preventDefault();
     this.jumpTo(section);
     // La barra de direcciones sigue a la sección visible para poder
@@ -151,6 +163,10 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   private jumpTo(section: HTMLElement): void {
+    this.activeSection.set(section.id);
+    // Reveal synchronously so focus does not land on a hidden destination.
+    // Angular reconciles all five visibility bindings on this event.
+    section.hidden = false;
     section.focus({ preventScroll: true });
     section.scrollIntoView({ block: "start", behavior: "instant" });
   }
@@ -203,6 +219,7 @@ export class SettingsComponent implements AfterViewInit {
   // ---------------- Account deletion ----------------
   readonly deletionImpact = signal<AccountDeletionImpact | null>(null);
   readonly deletionLoading = signal(true);
+  readonly deletionError = signal<string | null>(null);
 
   // ---------------- Privacy rights ----------------
   readonly privacyRequests = signal<PrivacyRightRequest[]>([]);
@@ -403,6 +420,7 @@ export class SettingsComponent implements AfterViewInit {
     this.exportRefreshing.set(false);
     this.exportBusy.set(false);
     this.deletionImpact.set(null);
+    this.deletionError.set(null);
     this.deletionLoading.set(false);
     this.privacyRequests.set([]);
     this.privacyTotal.set(0);
@@ -525,9 +543,9 @@ export class SettingsComponent implements AfterViewInit {
     this.sessionsLoading.set(true);
     this.sessionsError.set(null);
     try {
-      const now = Date.now();
       const { sessions, truncated } = await this.auth.listSessions({ signal: request.signal });
       if (!this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) return;
+      const now = Date.now();
       this.sessions.set(sessions.filter((session) => !session.revoked_at && new Date(session.expires_at).getTime() > now));
       this.sessionsTruncated.set(truncated);
     } catch (err) {
@@ -766,6 +784,7 @@ export class SettingsComponent implements AfterViewInit {
     const context = this.auth.sessionGeneration();
     const request = this.deletionRequest.begin(context);
     this.deletionLoading.set(true);
+    this.deletionError.set(null);
     try {
       const impact = await this.auth.accountDeletionImpact({ signal: request.signal });
       if (!this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) return;
@@ -773,6 +792,7 @@ export class SettingsComponent implements AfterViewInit {
     } catch (err) {
       if (!this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.deletionImpact.set(null);
+      this.deletionError.set(err instanceof ApiRequestError ? err.message : "No se pudo consultar el impacto de la eliminación");
       if (notify) this.toast(err, "No se pudo consultar el impacto de la eliminación");
     } finally {
       if (this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) this.deletionLoading.set(false);

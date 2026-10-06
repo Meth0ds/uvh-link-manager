@@ -14,8 +14,10 @@
 <section class="command-card" aria-labelledby="connect-domain-title">
   <div class="command-heading">
     <span class="command-icon" aria-hidden="true"><mat-icon>add_circle</mat-icon></span>
-    <div><h2 id="connect-domain-title">Conectar un dominio</h2><p>Introduce un subdominio que puedas dirigir mediante un CNAME directo. Apex, flattening y proxies no están soportados por este flujo.</p></div>
+    <div><h2 id="connect-domain-title">Conecta tu propia dirección</h2><p>Usa un subdominio como <code>go.tu-marca.com</code>. Después te mostraremos los registros DNS que debes añadir.</p></div>
   </div>
+  <ol class="connection-steps" aria-label="Pasos para conectar un dominio"><li>Añade el subdominio</li><li>Configura y comprueba DNS</li><li>Prepara HTTPS</li></ol>
+  <details class="advanced-help"><summary>Requisitos del proveedor DNS</summary><p>Necesitas acceso a los registros TXT y un CNAME directo. Apex, flattening y proxies no están soportados por este flujo. Conserva el TXT durante todo el uso del dominio.</p></details>
   <div class="add-bar">
     <mat-form-field appearance="outline" class="grow">
       <mat-label>Dominio</mat-label>
@@ -39,7 +41,7 @@
       <article class="domain-card">
         <div class="domain-head">
           <span class="domain-icon" aria-hidden="true"><mat-icon>language</mat-icon></span>
-          <div><span>Dominio personalizado</span><b class="tnum">{{ d.domain }}</b></div>
+          <div><a class="domain-name" [routerLink]="['/app/domains', d.id]">{{ d.domain }}</a></div>
           @if (d.isDefault) {
             <span class="default-badge" title="Los enlaces nuevos se preseleccionan con este dominio"><mat-icon>star</mat-icon> Predeterminado</span>
           }
@@ -52,55 +54,14 @@
         @if (tlsErrorLabel(d.tlsError); as tlsMessage) {
           <p class="dns-message" role="status">{{ tlsMessage }}</p>
         }
-        @if (canEdit() && d.verificationToken && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying' || d.state === 'disabled')) {
-          <div class="verify-box">
-            <p class="verify-title">1 · Confirma la propiedad con un registro TXT</p>
-            <div class="txt-row">
-              <code>Nombre</code>
-              <code class="txt-value tnum">{{ d.verificationHost }}</code>
-              <button mat-icon-button (click)="copy(d.verificationHost, 'Nombre')" aria-label="Copiar nombre del registro TXT"><mat-icon>content_copy</mat-icon></button>
-            </div>
-            <div class="txt-row">
-              <code>Valor</code>
-              <code class="txt-value tnum">{{ d.verificationToken }}</code>
-              <button mat-icon-button (click)="copy(d.verificationToken, 'Valor')" aria-label="Copiar valor del registro TXT"><mat-icon>content_copy</mat-icon></button>
-            </div>
-            <p class="verify-title step-title">2 · Dirige el tráfico con un registro CNAME</p>
-            <div class="txt-row">
-              <code>Nombre</code>
-              <code class="txt-value tnum">{{ d.domain }}</code>
-              <button mat-icon-button (click)="copy(d.domain, 'Nombre')" aria-label="Copiar nombre del CNAME"><mat-icon>content_copy</mat-icon></button>
-            </div>
-            @if (d.cnameTarget) {
-              <div class="txt-row">
-                <code>Destino</code>
-                <code class="txt-value tnum">{{ d.cnameTarget }}</code>
-                <button mat-icon-button (click)="copy(d.cnameTarget, 'Destino')" aria-label="Copiar destino del CNAME"><mat-icon>content_copy</mat-icon></button>
-              </div>
-            } @else {
-              <p class="dns-message">El destino CNAME todavía no está configurado en este entorno.</p>
-            }
-            <p class="verify-title keep-txt">Mantén este registro TXT mientras uses UVH: no lo borres tras verificar, lo comprobamos periódicamente.</p>
-            @if (isChecking(d)) {
-              <p class="verify-title step-title" role="status">Comprobando propiedad y ruta DNS…</p>
-            } @else {
-              <p class="verify-title step-title">3 · Cuando ambos registros propaguen, compruébalos</p>
-              <button mat-stroked-button color="primary" (click)="verify(d)" [disabled]="actionId() === d.id || isChecking(d)">
-                <mat-icon>verified_user</mat-icon>
-                {{ verifyingId() === d.id ? "Iniciando…" : "Verificar dominio" }}
-              </button>
-            }
-          </div>
-        }
-        @if (d.state === 'verified' || d.state === 'provisioning' || d.state === 'active') {
+        @if (d.state === 'pending' || d.state === 'error' || d.state === 'disabled' || d.state === 'verifying') {
+          <p class="next-step">{{ isChecking(d) ? 'Estamos comprobando la propiedad y la ruta DNS.' : d.state === 'disabled' ? 'Desactivado. Revisa la configuración antes de volver a conectarlo.' : 'Abre la configuración para añadir los registros TXT y CNAME y comprobarlos.' }}</p>
+        } @else {
           <div class="readiness" aria-label="Estado de conexión del dominio">
             <span [class.ready]="d.ownershipVerifiedAt"><mat-icon>{{ d.ownershipVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> Propiedad</span>
             <span [class.ready]="d.routingVerifiedAt"><mat-icon>{{ d.routingVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> Ruta DNS</span>
-            <span [class.ready]="d.tlsReadyAt"><mat-icon>{{ d.tlsReadyAt ? 'check_circle' : 'schedule' }}</mat-icon> Certificado HTTPS</span>
+            <span [class.ready]="d.tlsReadyAt"><mat-icon>{{ d.tlsReadyAt ? 'check_circle' : 'schedule' }}</mat-icon> HTTPS</span>
           </div>
-          @if (d.verificationHost) {
-            <p class="dns-message" role="status"><strong>Mantén el registro TXT</strong> en <code>{{ d.verificationHost }}</code>: lo comprobamos periódicamente para confirmar que sigues controlando el dominio. Si lo eliminas, el dominio puede dejar de servir enlaces tras el periodo de seguridad.</p>
-          }
         }
         @if (graceLabel(d); as grace) {
           <p class="dns-message degraded" role="status">{{ grace }}</p>
@@ -108,27 +69,30 @@
         @if (canEdit() && (d.state === 'verified' || d.state === 'provisioning' || d.state === 'active' || d.state === 'disabled')) {
           <div class="domain-actions">
             @if (d.state === 'verified') {
-              <button mat-stroked-button (click)="activate(d)" [disabled]="actionId() === d.id || isChecking(d) || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>play_arrow</mat-icon> Activar</button>
+              <button mat-stroked-button (click)="activate(d)" [disabled]="actionId() !== null || isChecking(d) || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>play_arrow</mat-icon> Activar</button>
             }
             @if ((d.state === 'active' || d.state === 'verified' || d.state === 'provisioning') && canAdmin()) {
-              <button mat-stroked-button (click)="disable(d)" [disabled]="actionId() === d.id"><mat-icon>pause</mat-icon> Desactivar</button>
+              <button mat-stroked-button (click)="disable(d)" [disabled]="actionId() !== null"><mat-icon>pause</mat-icon> Desactivar</button>
             }
             @if (d.state === 'verified' || d.state === 'active' || d.state === 'disabled') {
-              <button mat-stroked-button (click)="verify(d)" [disabled]="actionId() === d.id || isChecking(d)"><mat-icon>refresh</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Revalidar' }}</button>
+              <button mat-stroked-button (click)="verify(d)" [disabled]="actionId() !== null || isChecking(d)"><mat-icon>refresh</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Revalidar' }}</button>
             }
             @if (d.servingReady && !d.isDefault) {
-              <button mat-stroked-button (click)="setDefault(d, true)" [disabled]="actionId() === d.id"><mat-icon>star</mat-icon> Usar como predeterminado</button>
+              <button mat-stroked-button (click)="setDefault(d, true)" [disabled]="actionId() !== null"><mat-icon>star</mat-icon> Usar como predeterminado</button>
             }
             @if (d.isDefault) {
-              <button mat-stroked-button (click)="setDefault(d, false)" [disabled]="actionId() === d.id"><mat-icon>star_border</mat-icon> Quitar predeterminado</button>
+              <button mat-stroked-button (click)="setDefault(d, false)" [disabled]="actionId() !== null"><mat-icon>star_border</mat-icon> Quitar predeterminado</button>
             }
             @if (canAdmin()) {
-              <button mat-stroked-button class="danger" (click)="remove(d)" [disabled]="actionId() === d.id"><mat-icon>delete</mat-icon> Eliminar</button>
+              <button mat-stroked-button class="danger" (click)="remove(d)" [disabled]="actionId() !== null"><mat-icon>delete</mat-icon> Eliminar</button>
             }
           </div>
         }
+        @if (canEdit() && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying')) {
+          <div class="domain-actions"><button mat-stroked-button type="button" (click)="verify(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon>verified_user</mat-icon>{{ isChecking(d) ? 'Comprobando…' : 'Comprobar DNS' }}</button></div>
+        }
         <div class="domain-actions details-action">
-          <a mat-stroked-button [routerLink]="['/app/domains', d.id]"><mat-icon>monitor_heart</mat-icon> Ver diagnóstico</a>
+          <a mat-stroked-button [routerLink]="['/app/domains', d.id]"><mat-icon>settings</mat-icon> Configuración y diagnóstico</a>
           @if (d.linksCount > 0) {
             <a mat-stroked-button [routerLink]="['/app/links']" [queryParams]="{ domainId: d.id }"><mat-icon>link</mat-icon> Ver {{ linksLabel(d) }}</a>
           }
@@ -139,7 +103,7 @@
       <div class="empty-state">
         <mat-icon>language</mat-icon>
         <b>Sin dominios todavía</b>
-        <p>Añade un dominio para acortar enlaces con tu propia marca.</p>
+        <p>{{ canEdit() ? 'Añade un subdominio para compartir enlaces con tu propia dirección.' : 'Un editor, administrador o propietario puede conectar un subdominio para este workspace.' }}</p>
       </div>
     }
   </div>

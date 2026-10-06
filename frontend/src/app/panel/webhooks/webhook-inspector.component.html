@@ -9,6 +9,7 @@
   <section class="endpoint-card" aria-labelledby="endpoint-title">
     <div class="endpoint-address"><span class="eyebrow">Destino configurado</span><h2 id="endpoint-title">{{ w.url }}</h2></div>
     <dl class="configuration"><div><dt>Estado</dt><dd>{{ stateLabel(w.active) }}</dd></div><div><dt>Suscripciones</dt><dd>{{ w.events.length }} eventos</dd></div><div><dt>Secreto de firma</dt><dd>{{ w.hasSecret ? 'Configurado' : 'No configurado' }}</dd></div></dl>
+    <ul class="subscriptions" aria-label="Eventos suscritos">@for (event of w.events; track event) { <li><code>{{ event }}</code></li> }</ul>
     @if (canEdit()) {
       <div class="test-action"><button mat-flat-button type="button" (click)="sendTest()" [disabled]="actionId() !== null || !w.active || loading() || !!error()" [attr.aria-busy]="actionId() === 0"><mat-icon aria-hidden="true">send</mat-icon>{{ actionId() === 0 ? 'Encolando…' : 'Enviar ping' }}</button><p>{{ w.active ? 'Se añade a la cola. Consulta aquí el resultado de la entrega.' : 'Activa el webhook desde su configuración antes de enviar un ping.' }}</p></div>
     }
@@ -23,7 +24,7 @@
         <div class="delivery-head"><span class="status"><mat-icon aria-hidden="true">{{ deliveryIcon(d.status) }}</mat-icon>{{ deliveryLabel(d.status) }}</span><h3 [id]="'delivery-' + d.id">{{ d.event }}</h3><span class="attempts">{{ d.attempts }} {{ d.attempts === 1 ? 'intento' : 'intentos' }}</span></div>
         <p class="event-id"><span>ID del evento</span><code>{{ d.event_id }}</code></p>
         <dl class="timestamps"><div><dt>Creada</dt><dd><time [attr.datetime]="d.created_at">{{ formatDate(d.created_at) }}</time></dd></div><div><dt>Siguiente intento</dt><dd>@if (d.next_attempt_at) { <time [attr.datetime]="d.next_attempt_at">{{ formatDate(d.next_attempt_at) }}</time> } @else { Sin fecha programada }</dd></div><div><dt>Entregada</dt><dd>@if (d.delivered_at) { <time [attr.datetime]="d.delivered_at">{{ formatDate(d.delivered_at) }}</time> } @else { Sin entrega confirmada }</dd></div></dl>
-        @if (d.error; as deliveryError) { <p class="delivery-error"><strong>{{ deliveryError.code }}</strong><span>{{ deliveryError.message }}</span></p> }
+        @if (d.error; as deliveryError) { <details class="delivery-error"><summary>Ver motivo del fallo</summary><p><strong>{{ deliveryError.code }}</strong> {{ deliveryError.message }}</p></details> }
         <details><summary><span>Ver datos del evento<span class="payload-caption">Payload filtrado</span></span><mat-icon aria-hidden="true">expand_more</mat-icon></summary><pre tabindex="0" [attr.aria-label]="'Payload filtrado del evento ' + d.event_id">{{ payload(d) }}</pre></details>
         @if (canEdit() && (d.status === 'failed' || d.status === 'pending')) {
           <div class="delivery-actions"><button mat-stroked-button type="button" (click)="resend(d)" [disabled]="actionId() !== null || loading() || !!error()" [attr.aria-busy]="actionId() === d.id" [attr.aria-label]="(d.status === 'pending' ? 'Priorizar evento ' : 'Reenviar evento ') + d.event_id"><mat-icon aria-hidden="true">refresh</mat-icon>{{ actionId() === d.id ? 'Encolando…' : d.status === 'pending' ? 'Priorizar pendiente' : 'Reenviar' }}</button><span>Solicita otro intento; no confirma su entrega.</span></div>

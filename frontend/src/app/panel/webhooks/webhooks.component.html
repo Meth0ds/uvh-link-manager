@@ -72,59 +72,38 @@
 
 @if (!loading() && (!error() || webhooks().length)) {
   <div class="wh-list">
-    <header class="list-heading"><div><h2>Receptores configurados</h2><p>Abre un destino para consultar su configuración y las últimas entregas.</p></div><span>{{ webhooks().length }} {{ webhooks().length === 1 ? 'receptor' : 'receptores' }}</span></header>
-    <mat-accordion>
-      @for (w of webhooks(); track trackByWebhook($index, w)) {
-        <mat-expansion-panel (opened)="loadDeliveries(w)">
-          <mat-expansion-panel-header>
-            <mat-panel-title>
-              <span class="wh-icon" aria-hidden="true"><mat-icon>webhook</mat-icon></span>
-              <span class="wh-title"><small>Endpoint</small><span class="wh-url tnum">{{ w.url }}</span></span>
-              <span class="state-chip" [class.on]="w.active">{{ stateLabel(w.active) }}</span>
-            </mat-panel-title>
-          </mat-expansion-panel-header>
-          <div class="wh-body">
-            <div class="event-chips">
-              @for (e of w.events; track e) {
-                <span class="event-chip"><code>{{ e }}</code></span>
-              }
-            </div>
-            <p class="signature-note">Firma: {{ w.hasSecret ? 'secreto configurado' : 'sin secreto configurado' }}. {{ w.active ? 'Activo para recibir eventos; no garantiza que el receptor los esté aceptando.' : 'Pausado para nuevos eventos.' }}</p>
-            <div class="wh-actions">
-              <a mat-stroked-button [routerLink]="['/app/webhooks', w.id]"><mat-icon>manage_search</mat-icon> Abrir inspector</a>
-              @if (canEdit()) {
-              <button mat-stroked-button (click)="toggleActive(w)" [disabled]="actionId() !== null || saving() || !!error()">{{ w.active ? "Pausar" : "Activar" }}</button>
-              <button mat-stroked-button (click)="startEdit(w)" [disabled]="actionId() !== null || saving() || !!error()"><mat-icon>edit</mat-icon> Editar</button>
-              <button mat-stroked-button (click)="test(w)" [disabled]="actionId() !== null || saving() || !!error() || !w.active" [matTooltip]="w.active ? 'Añade una prueba a la cola de entregas' : 'Activa el webhook antes de probarlo'"><mat-icon>send</mat-icon> Enviar ping</button>
-              <button mat-stroked-button class="danger" (click)="remove(w)" [disabled]="actionId() !== null || saving() || !!error()"><mat-icon>delete</mat-icon> Eliminar</button>
-              }
-            </div>
-            <h3 class="deliveries-title">Últimas entregas <span>Hasta 20 registros · abre el inspector para consultar el detalle</span></h3>
-            @if (deliveriesLoading()[w.id]) {
-              <mat-progress-bar mode="indeterminate" aria-label="Cargando entregas" />
-            }
-            @if (deliveriesError()[w.id]; as message) {
-              <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadDeliveries(w)">Reintentar</button></div>
-            }
-            @for (d of deliveries()[w.id] ?? []; track d) {
-              <div class="delivery">
-                <span class="del-status" [class]="'st-' + d.status">{{ deliveryLabel(d.status) }}</span>
-                <span class="del-event"><code>{{ d.event }}</code></span>
-                <span class="del-meta tnum">{{ d.attempts }} {{ d.attempts === 1 ? 'intento' : 'intentos' }}{{ d.error ? " · " + d.error.message : "" }}</span>
-                @if (canEdit() && d.status === 'failed') {
-                  <button mat-icon-button (click)="resend(w, d.id)" [attr.aria-label]="'Reenviar evento ' + d.event_id" [disabled]="actionId() !== null || saving() || !!error()">
-                    <mat-icon>refresh</mat-icon>
-                  </button>
-                }
+    <header class="list-heading"><div><h2>Receptores configurados</h2><p>Consulta el estado de cada receptor. Su configuración e historial completo están en el detalle.</p></div><span>{{ webhooks().length }} {{ webhooks().length === 1 ? 'receptor' : 'receptores' }}</span></header>
+    @for (w of webhooks(); track trackByWebhook($index, w)) {
+      <article class="wh-card" [attr.aria-label]="'Receptor ' + w.url">
+        <header class="receiver-heading"><span class="wh-icon" aria-hidden="true"><mat-icon>webhook</mat-icon></span><div><a class="wh-url" [routerLink]="['/app/webhooks', w.id]">{{ w.url }}</a><p>{{ w.events.length }} {{ w.events.length === 1 ? 'evento suscrito' : 'eventos suscritos' }} · {{ w.hasSecret ? 'Firma configurada' : 'Sin secreto configurado' }}</p></div><span class="state-chip" [class.on]="w.active">{{ stateLabel(w.active) }}</span></header>
+        <p class="signature-note">{{ w.active ? 'Recibe nuevos eventos. Consulta las entregas para comprobar si el receptor los acepta.' : 'Pausado para nuevos eventos.' }}</p>
+        <div class="event-chips" aria-label="Eventos suscritos">@for (e of w.events; track e) { <span class="event-chip"><code>{{ e }}</code></span> }</div>
+        <div class="wh-actions">
+          <a mat-stroked-button [routerLink]="['/app/webhooks', w.id]"><mat-icon>manage_search</mat-icon> Configuración y entregas</a>
+          @if (canEdit()) {
+            <button mat-button type="button" (click)="startEdit(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="'Editar receptor ' + w.url"><mat-icon>edit</mat-icon>Editar</button>
+            <button mat-button type="button" (click)="toggleActive(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="(w.active ? 'Pausar receptor ' : 'Activar receptor ') + w.url">{{ w.active ? 'Pausar' : 'Activar' }}</button>
+            <button mat-button type="button" (click)="test(w)" [disabled]="actionId() !== null || saving() || !!error() || !w.active" [matTooltip]="w.active ? 'Añade una prueba a la cola de entregas' : 'Activa el webhook antes de probarlo'" [attr.aria-label]="'Enviar ping a ' + w.url"><mat-icon>send</mat-icon>Enviar ping</button>
+            <button mat-icon-button type="button" class="danger" (click)="remove(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="'Eliminar receptor ' + w.url"><mat-icon>delete</mat-icon></button>
+          }
+        </div>
+        <details class="delivery-history" (toggle)="onDeliveriesToggle($event, w)">
+          <summary>Últimas entregas<span>Hasta 20 registros</span><mat-icon aria-hidden="true">expand_more</mat-icon></summary>
+          @if (deliveriesLoading()[w.id]) { <mat-progress-bar mode="indeterminate" aria-label="Cargando entregas" /> }
+          <div class="history-actions"><button mat-button type="button" (click)="loadDeliveries(w, true)" [disabled]="deliveriesLoading()[w.id]"><mat-icon>refresh</mat-icon>Actualizar entregas</button><a [routerLink]="['/app/webhooks', w.id]">Abrir historial completo</a></div>
+          @if (deliveriesError()[w.id]; as message) { <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadDeliveries(w)">Reintentar</button></div> }
+          @for (d of deliveries()[w.id] ?? []; track d.id) {
+            <div class="delivery">
+              <div class="delivery-summary"><span class="del-status" [class]="'st-' + d.status">{{ deliveryLabel(d.status) }}</span><span class="del-event"><code>{{ d.event }}</code></span><span class="del-meta">{{ d.attempts }} {{ d.attempts === 1 ? 'intento' : 'intentos' }} · <time [attr.datetime]="d.created_at">{{ formatDate(d.created_at) }}</time></span>
+                @if (canEdit() && d.status === 'failed') { <button mat-icon-button type="button" (click)="resend(w, d.id)" [attr.aria-label]="'Reenviar evento ' + d.event_id" [disabled]="actionId() !== null || saving() || !!error() || deliveriesLoading()[w.id] || !!deliveriesError()[w.id]"><mat-icon>refresh</mat-icon></button> }
               </div>
-            }
-            @if (!(deliveries()[w.id] ?? []).length && !deliveriesLoading()[w.id] && !deliveriesError()[w.id]) {
-              <p class="none">Sin entregas todavía.</p>
-            }
-          </div>
-        </mat-expansion-panel>
-      }
-    </mat-accordion>
+              @if (d.error; as deliveryError) { <details class="delivery-error"><summary>Ver motivo del fallo</summary><p><code>{{ deliveryError.code }}</code> {{ deliveryError.message }}</p></details> }
+            </div>
+          }
+          @if (!(deliveries()[w.id] ?? []).length && !deliveriesLoading()[w.id] && !deliveriesError()[w.id]) { <p class="none">Sin entregas todavía.</p> }
+        </details>
+      </article>
+    }
     @if (!webhooks().length && !error()) {
       <div class="empty-state">
         <mat-icon>webhook</mat-icon>

@@ -83,20 +83,30 @@ function localDateTimeValidator(control: AbstractControl): ValidationErrors | nu
 // Creating a link whose window already closed leaves the user with a dead
 // short link and no signal of why. Edition keeps accepting a past expiry: an
 // expired link must stay editable without being forced to extend its life.
-function futureLocalDateTime(control: AbstractControl): ValidationErrors | null {
-  const instant = parseLocalDateTime(String(control.value ?? ""));
-  return instant !== null && instant <= Date.now() ? { pastDateTime: true } : null;
+function futureLocalDateTime(instant: bigint | null): ValidationErrors | null {
+  return instant !== null && instant <= BigInt(Date.now()) * 1000n ? { pastDateTime: true } : null;
 }
 
-function lifecycleOrderValidator(control: AbstractControl): ValidationErrors | null {
+type LifecycleField = "scheduledAt" | "expiresAt";
+
+function lifecycleOrderValidator(
+  control: AbstractControl,
+  instant: (field: LifecycleField, raw: string) => bigint | null,
+  preserves: (field: LifecycleField, raw: string) => boolean,
+): ValidationErrors | null {
   const scheduled = control.get("scheduledAt");
   const expires = control.get("expiresAt");
   // Skip only unparseable windows: a readable date still deserves the order
   // check even when another validator (e.g. a past expiry) already objects.
   if (!scheduled?.value || !expires?.value || scheduled.hasError("localDateTime") || expires.hasError("localDateTime")) return null;
-  const start = parseLocalDateTime(String(scheduled.value));
-  const end = parseLocalDateTime(String(expires.value));
-  return start !== null && end !== null && start < end ? null : { lifecycleOrder: true };
+  const start = instant("scheduledAt", String(scheduled.value));
+  const end = instant("expiresAt", String(expires.value));
+  // Equal DTO milliseconds can hide a valid stored microsecond window. Only
+  // untouched original dates are omitted from PATCH and revalidated in full
+  // precision by the server; typed dates and templates still need strict order.
+  const retainsWindow = start === end && preserves("scheduledAt", String(scheduled.value))
+    && preserves("expiresAt", String(expires.value));
+  return start !== null && end !== null && (start < end || retainsWindow) ? null : { lifecycleOrder: true };
 }
 
 function integerValidator(control: AbstractControl): ValidationErrors | null {
@@ -159,6 +169,12 @@ export class LinkDialogComponent {
   readonly aliasStatusText = signal("");
   private aliasRequest = 0;
   private saveRequest = 0;
+  // The minute input is a projection, not a replacement for a stored instant.
+  // A template becomes a new source even when its visible minute is unchanged.
+  private readonly lifecycleDates: Record<LifecycleField, { iso: string | null; local: string; fromLink: boolean }> = {
+    scheduledAt: { iso: this.data.link?.scheduledAt ?? null, local: localDateTimeValue(this.data.link?.scheduledAt), fromLink: this.isEdit },
+    expiresAt: { iso: this.data.link?.expiresAt ?? null, local: localDateTimeValue(this.data.link?.expiresAt), fromLink: this.isEdit },
+  };
 
   form = this.fb.nonNullable.group({
     destination: ["", [Validators.required, Validators.maxLength(2048), httpUrlValidator]],
@@ -176,7 +192,9 @@ export class LinkDialogComponent {
     maxClicks: [null as number | null, [Validators.min(1), Validators.max(10_000_000)]],
     singleUse: [false],
     scheduledAt: ["", [localDateTimeValidator]],
-    expiresAt: ["", [localDateTimeValidator, ...(this.isEdit ? [] : [futureLocalDateTime])]],
+    expiresAt: ["", [localDateTimeValidator, ...(this.isEdit ? [] : [
+      (control: AbstractControl) => futureLocalDateTime(this.lifecycleInstant("expiresAt", String(control.value ?? ""))),
+    ])]],
     notes: ["", [unicodeMaxLength(1000), noControlCharacters]],
     utm: this.fb.nonNullable.group({
       source: ["", [unicodeMaxLength(100), noControlCharacters]],
@@ -185,7 +203,11 @@ export class LinkDialogComponent {
       term: ["", [unicodeMaxLength(100), noControlCharacters]],
       content: ["", [unicodeMaxLength(100), noControlCharacters]],
     }),
-  }, { validators: lifecycleOrderValidator });
+  }, { validators: (control: AbstractControl) => lifecycleOrderValidator(
+    control,
+    (field, raw) => this.lifecycleInstant(field, raw),
+    (field, raw) => this.lifecyclePatchValue(field, raw) === undefined,
+  ) });
 
   rules = this.fb.array<RuleGroup>([]);
 
@@ -297,6 +319,46 @@ export class LinkDialogComponent {
     }
   }
 
+  private lifecycleValue(field: LifecycleField, raw: string): string | null {
+    const source = this.lifecycleDates[field];
+    return raw === source.local ? source.iso : localDateTimeIso(raw);
+  }
+
+  private lifecycleInstant(field: LifecycleField, raw: string): bigint | null {
+    // Malformed typed input keeps the strict calendar validator's verdict.
+    if (!raw || parseLocalDateTime(raw) === null) return null;
+    const iso = this.lifecycleValue(field, raw);
+    if (iso === null) return null;
+    const milliseconds = Date.parse(iso);
+    if (!Number.isFinite(milliseconds)) return null;
+    // Template payloads retain six digits; Date.parse alone truncates to three.
+    const fraction = /\.(\d{1,6})(?:Z|[+-]\d{2}:\d{2})$/.exec(iso)?.[1] ?? "";
+    const remainder = fraction.padEnd(6, "0").slice(3);
+    return BigInt(milliseconds) * 1000n + BigInt(remainder);
+  }
+
+  private lifecyclePatchValue(field: LifecycleField, raw: string): string | null | undefined {
+    const source = this.lifecycleDates[field];
+    // Omission lets the server retain precision beyond the DTO's milliseconds.
+    if (this.isEdit && source.fromLink && raw === source.local) return undefined;
+    return this.lifecycleValue(field, raw);
+  }
+
+  get platformDomain(): string {
+    // An existing platform link already carries its configured public host.
+    if (this.data.link?.domainId === null && this.data.link.shortUrl) {
+      try { return new URL(this.data.link.shortUrl).host; } catch { /* Keep the platform default. */ }
+    }
+    return "uvh.es";
+  }
+
+  get previewDomain(): string {
+    const domainId = this.form.controls.domainId.value;
+    if (domainId === null) return this.platformDomain;
+    return this.domains().find((domain) => domain.id === domainId)?.domain
+      ?? this.currentDomainUnavailable()?.domain ?? this.data.link?.domain ?? this.platformDomain;
+  }
+
   private patchFromLink(link: LinkDto): void {
     this.form.patchValue({
       destination: link.destination,
@@ -391,6 +453,10 @@ export class LinkDialogComponent {
   applyTemplate(template: LinkTemplateDto | null): void {
     if (!template) return;
     const payload = template.payload;
+    for (const field of ["scheduledAt", "expiresAt"] as const) {
+      const iso = (field === "scheduledAt" ? payload.scheduled_at : payload.expires_at) ?? null;
+      this.lifecycleDates[field] = { iso, local: localDateTimeValue(iso), fromLink: false };
+    }
     this.form.patchValue({
       destination: payload.destination ?? "",
       fallbackDestination: payload.fallback_destination ?? "",
@@ -414,6 +480,9 @@ export class LinkDialogComponent {
 
   async saveAsTemplate(): Promise<void> {
     const v = this.form.value;
+    // Capture the same form/source before awaiting the name prompt.
+    const scheduledAt = this.lifecycleValue("scheduledAt", v.scheduledAt ?? "");
+    const expiresAt = this.lifecycleValue("expiresAt", v.expiresAt ?? "");
     const destination = v.destination?.trim();
     if (!destination) {
       this.error.set("Escribe la URL de destino antes de guardar la plantilla.");
@@ -447,8 +516,8 @@ export class LinkDialogComponent {
       },
       max_clicks: v.maxClicks ?? null,
       single_use: v.singleUse === true,
-      scheduled_at: localDateTimeIso(v.scheduledAt ?? ""),
-      expires_at: localDateTimeIso(v.expiresAt ?? ""),
+      scheduled_at: scheduledAt,
+      expires_at: expiresAt,
       collection_id: v.collectionId ?? null,
     };
     this.busy.set(true);
@@ -562,8 +631,8 @@ export class LinkDialogComponent {
       password,
       maxClicks: v.maxClicks,
       singleUse: v.singleUse,
-      scheduledAt: localDateTimeIso(v.scheduledAt ?? ""),
-      expiresAt: localDateTimeIso(v.expiresAt ?? ""),
+      scheduledAt: this.lifecyclePatchValue("scheduledAt", v.scheduledAt ?? ""),
+      expiresAt: this.lifecyclePatchValue("expiresAt", v.expiresAt ?? ""),
       notes: v.notes?.trim() || null,
       utm: {
         source: v.utm?.source?.trim() || null,

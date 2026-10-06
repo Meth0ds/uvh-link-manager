@@ -1,7 +1,7 @@
 import type { Routes } from "@angular/router";
 import { authGuard, adminGuard } from "../core/guards/auth.guard";
 
-/** One long settings surface; the section routes name which part to open. */
+/** Persistent settings views; section routes name which task to open. */
 const settings = () => import("./settings/settings.component").then((m) => m.SettingsComponent);
 
 export const panelRoutes: Routes = [
@@ -75,7 +75,7 @@ export const panelRoutes: Routes = [
         path: "settings",
         loadComponent: settings,
       },
-      // Rutas de sección: cada una carga la misma página y activa su sección
+      // Rutas de sección: cada una carga la misma vista persistente y activa su tarea
       // (`data.section` es el id del elemento), para que un aviso enlace al
       // punto exacto donde se resuelve el asunto.
       { path: "settings/profile", data: { section: "account" }, loadComponent: settings },

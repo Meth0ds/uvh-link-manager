@@ -30,59 +30,47 @@ import type { TagDto } from "../../core/models";
   template: `
     <h2 mat-dialog-title>
       <span class="title-mark" aria-hidden="true"><mat-icon>sell</mat-icon></span>
-      <span><small>Biblioteca</small><b>Etiquetas</b></span>
+      <span><small>Organiza tus enlaces</small><b>Etiquetas</b></span>
     </h2>
-    <mat-dialog-content>
-      <p class="message">
-        El recuento muestra sólo enlaces vivos. Renombrar cambia el nombre donde quiera que
-        aparezca; fusionar funde las etiquetas seleccionadas en una sola.
-      </p>
-      @if (loading()) {
-        <p class="empty">Cargando etiquetas…</p>
-      } @else if (!tags().length) {
-        <p class="empty">Todavía no hay etiquetas: se crean al etiquetar un enlace.</p>
-      } @else {
-        <ul class="row-list">
+    <mat-dialog-content class="manager-content">
+      <p class="message">Encuentra enlaces por tema. Renombrar una etiqueta actualiza todos los enlaces que la usan.</p>
+      @if (loading()) { <p class="manager-status" role="status">Cargando etiquetas…</p> }
+      @if (loadError()) {
+        <div class="error manager-error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="reload()" [disabled]="loading() || busy()">Reintentar</button></div>
+      }
+      @if (!loading() && !loadError() && !tags().length) {
+        <div class="manager-empty"><mat-icon aria-hidden="true">sell</mat-icon><h3>Todavía no hay etiquetas</h3><p>{{ canWrite() ? 'Añádelas al crear o editar un enlace. Después podrás renombrarlas o fusionarlas aquí.' : 'Aquí aparecerán las etiquetas que utilice el equipo.' }}</p></div>
+      }
+      @if (tags().length) {
+        <div class="manager-summary"><h3>Tus etiquetas</h3><span>{{ tags().length }} en este espacio</span></div>
+        @if (canWrite()) { <p class="manager-hint">Selecciona dos o más etiquetas para fusionarlas en otra.</p> }
+        <ul class="row-list manager-list" [attr.aria-busy]="loading() || busy()" aria-label="Etiquetas del espacio">
           @for (tag of tags(); track tag.id) {
             <li class="row-item">
-              @if (canWrite()) {
-                <mat-checkbox
-                  [checked]="selected().has(tag.id)"
-                  (change)="toggle(tag.id)"
-                  [attr.aria-label]="'Seleccionar la etiqueta ' + tag.name"
-                ></mat-checkbox>
-              }
-              <span class="name">#{{ tag.name }}</span>
-              <span class="count">{{ tag.links }} enlaces</span>
-              @if (canWrite()) {
-                <button mat-stroked-button type="button" (click)="rename(tag)">Renombrar</button>
-              }
+              @if (canWrite()) { <mat-checkbox [checked]="selected().has(tag.id)" (change)="toggle(tag.id)" [disabled]="busy()" [aria-label]="'Seleccionar la etiqueta ' + tag.name"></mat-checkbox> }
+              <div class="row-copy"><span class="name">#{{ tag.name }}</span><span class="count">{{ tag.links }} {{ tag.links === 1 ? 'enlace' : 'enlaces' }}</span></div>
+              @if (canWrite()) { <button mat-button type="button" (click)="rename(tag)" [disabled]="busy()" [attr.aria-label]="'Renombrar etiqueta ' + tag.name">Renombrar</button> }
             </li>
           }
         </ul>
         @if (canWrite() && selected().size > 1) {
-          <div class="merge-bar">
-            <mat-form-field appearance="outline">
-              <mat-label>Fusionar en</mat-label>
-              <mat-select [value]="mergeTargetId()" (selectionChange)="mergeTargetId.set($event.value)">
-                @for (tag of mergeTargets(); track tag.id) {
-                  <mat-option [value]="tag.id">#{{ tag.name }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <button mat-flat-button color="primary" type="button" (click)="merge()" [disabled]="busy() || mergeTargetId() === null">
-              Fusionar {{ selected().size }} etiquetas
-            </button>
-          </div>
+          <section class="manager-merge" aria-label="Fusionar etiquetas seleccionadas">
+            <h3>{{ selected().size }} etiquetas seleccionadas</h3><p>Los enlaces pasarán a usar la etiqueta de destino. Las seleccionadas desaparecerán.</p>
+            @if (!mergeTargets().length) { <p class="manager-hint" role="status">Deja al menos una etiqueta sin seleccionar para usarla como destino.</p> }
+            <div class="merge-bar">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Etiqueta de destino</mat-label><mat-select [value]="mergeTargetId()" (selectionChange)="mergeTargetId.set($event.value)" [disabled]="busy() || !mergeTargets().length">
+                @for (tag of mergeTargets(); track tag.id) { <mat-option [value]="tag.id">#{{ tag.name }}</mat-option> }
+              </mat-select></mat-form-field>
+              <button mat-flat-button type="button" (click)="merge()" [disabled]="busy() || mergeTargetId() === null">Fusionar etiquetas</button>
+            </div>
+          </section>
         }
       }
-      @if (error()) {
-        <div class="error" role="alert">{{ error() }}</div>
-      }
+      @if (busy()) { <p class="manager-status" role="status">Guardando cambios…</p> }
+      @if (error() && !loadError()) { <div class="error" role="alert">{{ error() }}</div> }
+      <p class="note">Los recuentos no incluyen enlaces de la papelera.</p>
     </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-flat-button color="primary" type="button" (click)="close()">Cerrar</button>
-    </mat-dialog-actions>
+    <mat-dialog-actions align="end"><button mat-stroked-button type="button" (click)="close()">Cerrar</button></mat-dialog-actions>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["../dialog-identity.scss", "../scale-dialog.scss"],
@@ -103,9 +91,10 @@ export class TagsDialogComponent {
   private readonly openedIn = targetWorkspace(this.workspaces);
 
   readonly tags = signal<TagDto[]>([]);
-  readonly loading = signal(true);
+  readonly loading = signal(false);
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
+  readonly loadError = signal(false);
   readonly selected = signal<ReadonlySet<number>>(new Set());
   readonly mergeTargetId = signal<number | null>(null);
   private changed = false;
@@ -209,8 +198,10 @@ export class TagsDialogComponent {
     this.dialogRef.close(this.changed);
   }
 
-  private async reload(): Promise<void> {
-    if (!this.isCurrent()) return;
+  async reload(): Promise<void> {
+    if (!this.isCurrent() || this.loading()) return;
+    this.loadError.set(false);
+    this.error.set(null);
     this.loading.set(true);
     try {
       const res = await this.api.get("/api/v1/tags", undefined, decodeTagsResponse);
@@ -220,6 +211,7 @@ export class TagsDialogComponent {
     } catch (err) {
       if (!this.isCurrent()) return;
       this.loading.set(false);
+      this.loadError.set(true);
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las etiquetas");
     }
   }

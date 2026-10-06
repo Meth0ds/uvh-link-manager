@@ -140,3 +140,64 @@
   flex: 1;
   min-width: 170px;
 }
+
+
+// Catalog managers share a quiet row hierarchy. CSV retains its own layout.
+.manager-content { container-type: inline-size; overscroll-behavior: contain; }
+.manager-create { align-items: flex-start; gap: 12px; margin-bottom: 28px; }
+.manager-create button { min-height: 48px; margin-top: 4px; }
+.manager-create mat-form-field { min-width: 0; }
+.manager-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.manager-summary h3, .manager-empty h3, .manager-merge h3 { margin: 0; color: var(--uvh-ink); font-size: 16px; font-weight: 800; letter-spacing: -.02em; }
+.manager-summary > span, .manager-hint { color: var(--uvh-muted); font-size: 12px; line-height: 1.7; }
+.manager-hint { margin: 0 0 16px; }
+.manager-list .row-item { flex-wrap: nowrap; gap: 12px; padding: 16px 0; }
+.row-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 5px; }
+.manager-list .name { font-size: 14px; line-height: 1.5; }
+.manager-list .count { font-family: inherit; font-size: 12px; }
+.manager-actions { display: flex; flex-shrink: 0; align-items: center; gap: 4px; }
+.manager-list button { min-height: 44px; }
+.manager-list mat-checkbox { flex: 0 0 auto; }
+.manager-danger { color: var(--uvh-danger); }
+.manager-empty { display: flex; flex-direction: column; gap: 12px; padding: 28px 0; border-block: 1px solid var(--uvh-border); }
+.manager-empty > mat-icon { color: var(--uvh-electric); }
+.manager-empty p, .manager-merge > p { max-width: 60ch; margin: 0; color: var(--uvh-muted); font-size: 13px; line-height: 1.7; }
+.manager-status { color: var(--uvh-muted); font-size: 13px; line-height: 1.7; }
+.manager-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.manager-error > span { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.manager-merge { margin: 20px 0; padding-top: 20px; border-top: 1px solid var(--uvh-border); }
+.manager-merge > p { margin-block: 8px 16px; }
+.manager-merge .merge-bar { padding: 0; border: 0; background: transparent; }
+.manager-merge mat-form-field { min-width: 0; flex-basis: 200px; }
+.manager-merge button { min-height: 48px; }
+.manager-content :is(button, mat-checkbox):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 2px; }
+@container (max-width: 400px) {
+  .manager-create { flex-direction: column; align-items: stretch; }
+  .manager-create mat-form-field { width: 100%; }
+  .manager-create button { align-self: flex-start; margin: 0; }
+  .manager-list .row-item { flex-wrap: wrap; }
+  .manager-list .row-copy { flex-basis: calc(100% - 62px); }
+  .manager-actions { margin-left: auto; }
+  .manager-list .row-item > button { margin-left: auto; }
+}
+
+// CSV is a reading/checking sequence, with advanced format help on demand.
+.csv-content { container-type: inline-size; overscroll-behavior: contain; }
+.csv-start { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 24px; }
+.csv-start > span { color: var(--uvh-muted); font-size: 13px; line-height: 1.6; }
+.csv-start button { min-height: 44px; }
+.csv-label { display: block; margin-bottom: 8px; color: var(--uvh-ink); font-size: 14px; font-weight: 700; }
+.csv-content .csv-input { min-height: 180px; font-size: 13px; }
+.csv-help { margin-block: 20px; border-block: 1px solid var(--uvh-border); }
+.csv-help summary { padding-block: 14px; color: var(--uvh-ink); font-size: 13px; font-weight: 700; cursor: pointer; }
+.csv-help p { margin: 0 0 16px; color: var(--uvh-muted); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.csv-help code { color: var(--uvh-ink); font-size: 12px; }
+.csv-report { font-size: 13px; }
+.csv-status { color: var(--uvh-muted); font-size: 13px; }
+.csv-help summary:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 2px; }
+
+// Reserve room for the title and actions even on short mobile viewports.
+:host(.csv-dialog) { display: flex; flex-direction: column; max-height: calc(100dvh - 24px); }
+:host(.csv-dialog) h2 { flex: 0 0 auto; margin-bottom: 0; }
+:host(.csv-dialog) .csv-content { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; }
+:host(.csv-dialog) mat-dialog-actions { flex: 0 0 auto; }

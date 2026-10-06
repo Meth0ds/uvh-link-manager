@@ -1,4 +1,4 @@
-<app-page-header icon="manage_accounts" eyebrow="Tu cuenta UVH" title="Ajustes de perfil" description="Actualiza tu identidad, protege el acceso y decide qué ocurre con tus datos." />
+<app-page-header icon="manage_accounts" eyebrow="Tu cuenta UVH" title="Ajustes" description="Gestiona tu perfil, el acceso, los avisos y tus datos." />
 
 <section class="profile-masthead" aria-label="Tu perfil de cuenta">
   <span class="profile-monogram" aria-hidden="true">{{ userInitials() }}</span>
@@ -6,22 +6,16 @@
   <div class="profile-access"><mat-icon aria-hidden="true">{{ user()?.emailVerified ? 'mark_email_read' : 'mail_outline' }}</mat-icon><span>{{ user()?.emailVerified ? 'Email verificado' : 'Email sin verificar' }}</span></div>
 </section>
 
-<section class="security-strip" [class.protected]="!userRefreshRequired() && user()?.mfaEnabled" aria-label="Estado de seguridad de la cuenta">
-  <span class="security-icon" aria-hidden="true"><mat-icon>{{ userRefreshRequired() ? 'sync' : user()?.mfaEnabled ? 'verified_user' : 'shield' }}</mat-icon></span>
-  <div><b>{{ userRefreshRequired() ? 'Estado de seguridad pendiente de actualizar' : user()?.mfaEnabled ? 'Verificación en dos pasos activa' : 'Añade un segundo factor de acceso' }}</b><p>{{ userRefreshRequired() ? 'Comprueba los datos actuales en Acceso y seguridad.' : user()?.mfaEnabled ? 'Las operaciones sensibles requieren una comprobación adicional.' : 'Configura una aplicación autenticadora y guarda los códigos de recuperación.' }}</p></div>
-  <a class="security-state" href="#security" (click)="goToSection($event, securitySection)">{{ userRefreshRequired() ? 'Comprobar estado' : user()?.mfaEnabled ? 'Gestionar MFA' : 'Configurar MFA' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
-</section>
-
-<!-- La navegación local mantiene una página extensa predecible sin duplicar rutas ni estado. -->
+<!-- Five persistent views: changing tasks never destroys drafts or one-time data. -->
 <div class="settings-layout">
   <aside class="settings-sidebar" aria-label="Resumen y navegación de ajustes">
-    <p class="navigation-caption">Ajustes de perfil</p>
+    <p class="navigation-caption">Tu cuenta</p>
     <nav class="settings-nav" aria-label="Secciones de ajustes">
-      <a href="#account" (click)="goToSection($event, accountSection)"><mat-icon aria-hidden="true">person_outline</mat-icon><span><b>Perfil y apariencia</b><small>Nombre, email y tema</small></span></a>
-      <a href="#security" (click)="goToSection($event, securitySection)"><mat-icon aria-hidden="true">lock_outline</mat-icon><span><b>Acceso y seguridad</b><small>Contraseña, MFA y sesiones</small></span></a>
-      <a href="#notifications" (click)="goToSection($event, notificationsSection)"><mat-icon aria-hidden="true">notifications</mat-icon><span><b>Notificaciones</b><small>Avisos y su frecuencia</small></span></a>
-      <a href="#privacy" (click)="goToSection($event, privacySection)"><mat-icon aria-hidden="true">policy</mat-icon><span><b>Tus datos</b><small>Descargas y solicitudes</small></span></a>
-      <a href="#danger" (click)="goToSection($event, dangerSection)"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Cerrar la cuenta</b><small>Requisitos y consecuencias</small></span></a>
+      <a href="/app/settings/profile" [attr.aria-current]="activeSection() === 'account' ? 'page' : null" (click)="goToSection($event, accountSection)"><mat-icon aria-hidden="true">person_outline</mat-icon><span><b>Perfil y apariencia</b><small>Nombre, email y tema</small></span></a>
+      <a href="/app/settings/security" [attr.aria-current]="activeSection() === 'security' ? 'page' : null" (click)="goToSection($event, securitySection)"><mat-icon aria-hidden="true">lock_outline</mat-icon><span><b>Acceso y seguridad</b><small>Contraseña, MFA y sesiones</small></span></a>
+      <a href="/app/settings/notifications" [attr.aria-current]="activeSection() === 'notifications' ? 'page' : null" (click)="goToSection($event, notificationsSection)"><mat-icon aria-hidden="true">notifications</mat-icon><span><b>Notificaciones</b><small>Avisos y su frecuencia</small></span></a>
+      <a href="/app/settings/privacy" [attr.aria-current]="activeSection() === 'privacy' ? 'page' : null" (click)="goToSection($event, privacySection)"><mat-icon aria-hidden="true">policy</mat-icon><span><b>Tus datos</b><small>Descargas y solicitudes</small></span></a>
+      <a href="/app/settings/danger" [attr.aria-current]="activeSection() === 'danger' ? 'page' : null" (click)="goToSection($event, dangerSection)"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Cerrar la cuenta</b><small>Requisitos y consecuencias</small></span></a>
     </nav>
     <div class="privacy-note">
       <mat-icon aria-hidden="true">contact_support</mat-icon>
@@ -30,7 +24,7 @@
   </aside>
 
   <div class="settings-content">
-    <section #accountSection id="account" tabindex="-1" class="settings-section account-section" aria-labelledby="account-title">
+    <section #accountSection id="account" tabindex="-1" [hidden]="activeSection() !== 'account'" class="settings-section account-section" aria-labelledby="account-title">
       <header class="settings-section-head">
         <div><h2 id="account-title">Perfil y apariencia</h2><p>Los detalles que hacen que esta cuenta sea tuya.</p></div>
       </header>
@@ -90,9 +84,15 @@
     }
   </div>
 </div>
+
+<section class="security-strip" [class.protected]="!userRefreshRequired() && user()?.mfaEnabled" aria-label="Estado de seguridad de la cuenta">
+  <span class="security-icon" aria-hidden="true"><mat-icon>{{ userRefreshRequired() ? 'sync' : user()?.mfaEnabled ? 'verified_user' : 'shield' }}</mat-icon></span>
+  <div><b>{{ userRefreshRequired() ? 'Estado de seguridad pendiente de actualizar' : user()?.mfaEnabled ? 'Verificación en dos pasos activa' : 'Añade un segundo factor de acceso' }}</b><p>{{ userRefreshRequired() ? 'Comprueba los datos actuales en Acceso y seguridad.' : user()?.mfaEnabled ? 'Las operaciones sensibles requieren una comprobación adicional.' : 'Configura una aplicación autenticadora y guarda los códigos de recuperación.' }}</p></div>
+  <a class="security-state" href="/app/settings/security" (click)="goToSection($event, securitySection)">{{ userRefreshRequired() ? 'Comprobar estado' : user()?.mfaEnabled ? 'Gestionar MFA' : 'Configurar MFA' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
+</section>
     </section>
 
-    <section #securitySection id="security" tabindex="-1" class="settings-section security-section" aria-labelledby="security-title">
+    <section #securitySection id="security" tabindex="-1" [hidden]="activeSection() !== 'security'" class="settings-section security-section" aria-labelledby="security-title">
       <header class="settings-section-head">
         <div><h2 id="security-title">Acceso y seguridad</h2><p>Credenciales, segundo factor y dispositivos con sesión abierta.</p></div>
       </header>
@@ -217,15 +217,16 @@
       <div class="session-info">
         <mat-icon>{{ s.current ? 'laptop_mac' : 'devices' }}</mat-icon>
         <div>
-          <b>{{ s.user_agent ?? 'Dispositivo desconocido' }}</b>
+          <b>{{ sessionAgent(s.user_agent) }}</b>
             <span class="session-meta">
             <span class="tnum">Última actividad {{ formatDate(s.last_used_at) }}</span>
             @if (s.current) { <span class="current-badge">Este dispositivo</span> }
             @if (s.mfa_verified_at) { <span class="current-badge">MFA verificado</span> }
           </span>
+          @if (s.user_agent) { <details class="session-details"><summary>Detalles del navegador</summary><p>{{ s.user_agent }}</p></details> }
         </div>
       </div>
-      <button mat-stroked-button [class.danger]="s.current" (click)="revokeSession(s)">
+      <button mat-stroked-button [class.danger]="s.current" [attr.aria-label]="(s.current ? 'Cerrar esta sesión: ' : 'Revocar sesión: ') + sessionAgent(s.user_agent)" (click)="revokeSession(s)">
         {{ s.current ? 'Cerrar esta sesión' : 'Revocar' }}
       </button>
     </div>
@@ -242,7 +243,7 @@
 
     </section>
 
-    <section #notificationsSection id="notifications" tabindex="-1" class="settings-section notifications-settings-section" aria-labelledby="notifications-title">
+    <section #notificationsSection id="notifications" tabindex="-1" [hidden]="activeSection() !== 'notifications'" class="settings-section notifications-settings-section" aria-labelledby="notifications-title">
       <header class="settings-section-head">
         <div><h2 id="notifications-title">Notificaciones</h2><p>Elige cómo quieres recibir los avisos operativos. Los avisos de seguridad de tu cuenta llegan siempre.</p></div>
       </header>
@@ -276,7 +277,7 @@
                 <span class="pref-label"><mat-icon aria-hidden="true">{{ notificationKindIcon(pref.kind) }}</mat-icon><b>{{ notificationKindLabel(pref.kind) }}</b></span>
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
                   <mat-label>Frecuencia</mat-label>
-                  <mat-select [value]="pref.delivery" [disabled]="notificationPrefsBusy()" (selectionChange)="setNotificationDelivery(pref, $event.value)">
+                  <mat-select [aria-label]="'Frecuencia de ' + notificationKindLabel(pref.kind)" [value]="pref.delivery" [disabled]="notificationPrefsBusy()" (selectionChange)="setNotificationDelivery(pref, $event.value)">
                     @for (delivery of notificationDeliveries; track delivery) {
                       <mat-option [value]="delivery">{{ notificationDeliveryLabel(delivery) }}</mat-option>
                     }
@@ -289,7 +290,7 @@
       </div>
     </section>
 
-    <section #privacySection id="privacy" tabindex="-1" class="settings-section privacy-section" aria-labelledby="privacy-title">
+    <section #privacySection id="privacy" tabindex="-1" [hidden]="activeSection() !== 'privacy'" class="settings-section privacy-section" aria-labelledby="privacy-title">
       <header class="settings-section-head">
         <div><h2 id="privacy-title">Datos y privacidad</h2><p>Descarga tu información y gestiona tus derechos desde un expediente trazable.</p></div>
       </header>
@@ -424,7 +425,7 @@
 
     </section>
 
-    <section #dangerSection id="danger" tabindex="-1" class="settings-section danger-section" aria-labelledby="danger-title">
+    <section #dangerSection id="danger" tabindex="-1" [hidden]="activeSection() !== 'danger'" class="settings-section danger-section" aria-labelledby="danger-title">
       <header class="settings-section-head danger-section-head">
         <div><h2 id="danger-title">Cerrar la cuenta</h2><p>Antes de despedirte, revisa qué ocurre con tu acceso, tus datos y tus workspaces.</p></div>
       </header>
@@ -434,6 +435,8 @@
   <div class="card-heading"><span class="card-icon danger-icon"><mat-icon>person_remove</mat-icon></span><div><h3>Eliminación de cuenta</h3><p>Cierra el acceso y programa la anonimización de tus datos personales.</p></div></div>
   @if (deletionLoading()) {
     <app-panel-skeleton variant="form" label="Comprobando requisitos de eliminación" />
+  } @else if (deletionError(); as message) {
+    <div class="alert error deletion-read-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadDeletionImpact(false)" [disabled]="deletionLoading()">Reintentar comprobación</button></div>
   } @else if (deletionImpact(); as impact) {
     @if (impact.isPlatformAdmin) {
       <div class="deletion-blocker" role="status"><mat-icon>admin_panel_settings</mat-icon><div><b>Rol de plataforma activo</b><p>Otro administrador debe retirar este rol antes de poder eliminar la cuenta.</p></div></div>
@@ -446,7 +449,7 @@
       </div>
     } @else if (impact.blockingPrivacyRequests.length) {
       <div class="deletion-blocker" role="status"><mat-icon>policy</mat-icon><div><b>Hay solicitudes de privacidad en curso</b><p>Para no destruir información necesaria para responderlas, resuélvelas o cancélalas antes de programar la anonimización.</p></div></div>
-      <div class="owned-workspaces">@for (privacy of impact.blockingPrivacyRequests; track privacy.id) { <a mat-stroked-button href="#privacy" (click)="goToSection($event, privacySection)"><mat-icon>fact_check</mat-icon><span>{{ privacyTypeLabel(privacy.type) }} #{{ privacy.id }}</span></a> }</div>
+      <div class="owned-workspaces">@for (privacy of impact.blockingPrivacyRequests; track privacy.id) { <a mat-stroked-button href="/app/settings/privacy" (click)="goToSection($event, privacySection)"><mat-icon>fact_check</mat-icon><span>{{ privacyTypeLabel(privacy.type) }} #{{ privacy.id }}</span></a> }</div>
     } @else if (impact.request) {
       <div class="deletion-pending" aria-live="polite"><mat-icon>mark_email_unread</mat-icon><div><b>Confirmación pendiente</b><p>Revisa tu email antes de {{ formatDate(impact.request.confirmationExpiresAt) }}. La cuenta seguirá activa hasta que confirmes.</p></div></div>
     } @else if (impact.canDelete) {

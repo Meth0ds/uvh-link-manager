@@ -9,7 +9,6 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
-import { MatExpansionModule } from "@angular/material/expansion";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import type { WebhookDto, WebhookDelivery } from "../../core/models";
@@ -20,6 +19,7 @@ import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
+import { dateTimeMediumLabel } from "../../core/date-time-label";
 import { webhookDeliveryLabel, webhookStateLabel } from "../../core/webhook-label";
 import {
   decodeCreatedWebhookResponse,
@@ -60,7 +60,6 @@ const EVENTS = [
     MatCheckboxModule,
     MatProgressBarModule,
     MatSnackBarModule,
-    MatExpansionModule,
     MatTooltipModule,
     PageHeaderComponent,
     PanelSkeletonComponent,
@@ -216,6 +215,7 @@ export class WebhooksComponent {
     try {
       if (this.editId()) {
         await this.api.patch(`/api/v1/webhooks/${this.editId()}`, payload);
+        if (!this.mutationRequests.isCurrent(request, this.workspaces.currentId())) return;
         this.snackbar.open("Webhook actualizado", "Cerrar", { duration: 2500 });
       } else {
         const { webhook, secret } = await this.api.post<{ webhook: WebhookDto; secret: string }>(
@@ -318,9 +318,15 @@ export class WebhooksComponent {
     }
   }
 
-  async loadDeliveries(w: WebhookDto): Promise<void> {
-    if (this.deliveriesLoading()[w.id]) return;
-    if (this.deliveries()[w.id] && !this.deliveriesError()[w.id]) return;
+  onDeliveriesToggle(event: Event, w: WebhookDto): void {
+    if (event.target instanceof HTMLDetailsElement && event.target.open) void this.loadDeliveries(w);
+  }
+
+  formatDate(value: string | null): string { return dateTimeMediumLabel(value); }
+
+  async loadDeliveries(w: WebhookDto, refresh = false): Promise<void> {
+    if (!refresh && this.deliveriesLoading()[w.id]) return;
+    if (!refresh && this.deliveries()[w.id] && !this.deliveriesError()[w.id]) return;
     const workspaceId = this.workspaces.currentId();
     if (workspaceId === null) return;
     // Expanded rows may load concurrently, so each webhook needs an
@@ -353,7 +359,7 @@ export class WebhooksComponent {
   }
 
   async resend(w: WebhookDto, deliveryId: number): Promise<void> {
-    if (!this.canEdit() || this.actionId()) return;
+    if (!this.canEdit() || this.actionId() || this.deliveriesLoading()[w.id] || this.deliveriesError()[w.id]) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
     const action = this.mutations.begin(w.id);
@@ -361,7 +367,9 @@ export class WebhooksComponent {
       await this.api.post(`/api/v1/webhooks/${w.id}/deliveries/${deliveryId}/resend`);
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Reenvío programado", "Cerrar", { duration: 2500 });
-      this.deliveries.update((d) => ({ ...d, [w.id]: [] }));
+      // Read the accepted operation without inventing an empty history.
+      // A failed refresh keeps the last snapshot and its own recovery notice.
+      await this.loadDeliveries(w, true);
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
