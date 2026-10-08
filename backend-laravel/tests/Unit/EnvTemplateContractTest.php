@@ -82,6 +82,10 @@ class EnvTemplateContractTest extends TestCase
         // raising it without measuring the private volume first.
         'EXPORT_MAX_PLAINTEXT_BYTES' => 'operational export ceiling with a generous default, clamped in code',
         'VERIFIED_REQUIRED_TO_CREATE' => 'default true, which is the safe value',
+        // Internal cache TTL for the registration-pause switch, clamped in
+        // code between 5 and 300 seconds. Not operator surface: the pause
+        // itself is operated from the admin console, not from the environment.
+        'OPERATIONAL_SETTINGS_CACHE_SECONDS' => 'internal gate cache TTL with a working default, clamped in code',
         // Empty by default: the pool is derived from the worker command, so the
         // variable only exists for a deployment that splits the queues.
         'UVH_QUEUE_POOL' => 'empty means derive the pool from the worker command',

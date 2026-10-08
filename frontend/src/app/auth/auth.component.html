@@ -221,6 +221,9 @@
 
                 <input class="honeypot" type="text" formControlName="company" tabindex="-1" autocomplete="off" aria-hidden="true" />
 
+                @if (registrationsPaused() && !changeEmailMode()) {
+                  <div class="alert info" role="alert"><mat-icon aria-hidden="true">pause_circle</mat-icon><span>Registros temporalmente pausados. Inténtalo de nuevo más tarde.</span></div>
+                }
                 @if (error()) {
                   <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
                 }
@@ -229,7 +232,7 @@
                 }
                 <div class="register-actions">
                   <button mat-stroked-button type="button" (click)="previousRegisterStep()" [disabled]="busy()"><mat-icon aria-hidden="true">arrow_back</mat-icon> Atrás</button>
-                  <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy() || !captchaReady()">
+                  <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy() || !captchaReady() || (registrationsPaused() && !changeEmailMode())">
                     <span>{{ busy() ? (changeEmailMode() ? 'Actualizando…' : 'Creando cuenta…') : (changeEmailMode() ? 'Actualizar email' : 'Crear cuenta') }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
                   </button>
                 </div>

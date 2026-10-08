@@ -27,12 +27,16 @@ export const TERMS_VERSION = "2026-08-30";
 export const PRIVACY_VERSION = "2026-08-30";
 
 interface PublicAuthConfig {
+  registrationPaused?: boolean;
   hcaptcha?: {
     enabled?: boolean;
     siteKey?: string | null;
     developmentFallback?: boolean;
   };
 }
+
+/** Aviso público de pausa de registros; idéntico al que responde la API con 503. */
+export const REGISTRATION_PAUSED_MESSAGE = "Registros temporalmente pausados. Inténtalo de nuevo más tarde.";
 
 @Component({
   selector: "app-auth",
@@ -116,6 +120,8 @@ export class AuthComponent {
   readonly developmentCaptchaFallback = signal(false);
   readonly captchaReady = computed(() => !this.captchaConfigBusy()
     && (!!this.hcaptchaSiteKey() || this.developmentCaptchaFallback()));
+  /** La plataforma no acepta registros nuevos; la corrección de un pendiente sigue disponible. */
+  readonly registrationsPaused = signal(false);
   readonly loginCaptchaToken = signal("");
   readonly registerCaptchaToken = signal("");
   readonly resendCaptchaToken = signal("");
@@ -563,6 +569,12 @@ export class AuthComponent {
       this.error.set("No se pudo crear la cuenta");
       return;
     }
+    // La corrección de un registro pendiente no es un registro nuevo y sigue
+    // disponible durante la pausa; solo el alta se anuncia como pausada.
+    if (!this.changeEmailMode() && this.registrationsPaused()) {
+      this.error.set(REGISTRATION_PAUSED_MESSAGE);
+      return;
+    }
     if (!this.captchaReady()) {
       this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
       return;
@@ -840,6 +852,7 @@ export class AuthComponent {
         { signal: request.signal },
       );
       if (!this.captchaConfigRequests.isCurrent(request, "hcaptcha-config")) return;
+      this.registrationsPaused.set(config.registrationPaused === true);
       const siteKey = config.hcaptcha?.enabled ? config.hcaptcha.siteKey : null;
       const fallback = config.hcaptcha?.developmentFallback === true;
       if ((!siteKey && !fallback) || (siteKey && !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey))) {

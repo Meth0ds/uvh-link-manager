@@ -6,12 +6,20 @@ describe("public response decoders", () => {
     appUrl: "https://app.example.test",
     publicHost: "example.test",
     appHost: "app.example.test",
+    registrationPaused: false,
     legalIdentity: null,
     hcaptcha: { enabled: true, siteKey: "10000000-ffff-ffff-ffff-000000000001", developmentFallback: false },
   };
 
   it("reconstructs the public configuration projection", () => {
     expect(decodePublicConfig({ ...config, accidentalSecret: "must-not-propagate" })).toEqual(config);
+  });
+
+  it("reads the registration pause flag and never mistakes its absence for a pause", () => {
+    expect(decodePublicConfig({ ...config, registrationPaused: true }).registrationPaused).toBeTrue();
+    const { appUrl, publicHost, appHost, legalIdentity, hcaptcha } = config;
+    expect(decodePublicConfig({ appUrl, publicHost, appHost, legalIdentity, hcaptcha }).registrationPaused).toBeFalse();
+    expect(() => decodePublicConfig({ ...config, registrationPaused: "yes" })).toThrow();
   });
 
   it("fails closed for inconsistent captcha and unsafe app URLs", () => {

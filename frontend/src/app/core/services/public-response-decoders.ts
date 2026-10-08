@@ -4,6 +4,7 @@ export interface PublicConfig {
   appUrl: string;
   publicHost: string;
   appHost: string;
+  registrationPaused: boolean;
   legalIdentity: { name: string; taxId: string; address: string; registry: string; hostingProvider: string; hostingRegion: string } | null;
   hcaptcha: { enabled: boolean; siteKey: string | null; developmentFallback: boolean };
 }
@@ -28,6 +29,10 @@ export function decodePublicConfig(value: unknown): PublicConfig {
   if ((enabled && (!siteKey || !HCAPTCHA_SITE_KEY.test(siteKey))) || (!enabled && siteKey !== null)) {
     throw new Error("Invalid public config hCaptcha response");
   }
+  // Los despliegues anteriores no anuncian esta capacidad. Una respuesta sin
+  // el campo nunca debe leerse como pausa: solo un `true` explícito pausa.
+  const registrationPaused = source["registrationPaused"] === undefined
+    ? false : boolean(source["registrationPaused"], "public config");
 
   const publicHost = text(source["publicHost"], "public config", 253).toLowerCase();
   const appHost = text(source["appHost"], "public config", 253).toLowerCase();
@@ -46,6 +51,7 @@ export function decodePublicConfig(value: unknown): PublicConfig {
     appUrl: httpUrl(source["appUrl"], "public config"),
     publicHost,
     appHost,
+    registrationPaused,
     legalIdentity,
     hcaptcha: { enabled, siteKey, developmentFallback },
   };

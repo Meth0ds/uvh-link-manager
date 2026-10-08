@@ -266,6 +266,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     // Admin (MFA-gated).
     Route::prefix('admin')->middleware(['uvh.auth:admin', 'uvh.mfa:fresh', 'throttle:uvh-admin'])->group(function () {
         Route::get('overview', [AdminController::class, 'overview']);
+        Route::post('registration-pause', [AdminController::class, 'setRegistrationPause']);
         Route::get('users', [AdminController::class, 'users']);
         Route::get('pending-registrations', [AdminController::class, 'pendingRegistrations']);
         Route::patch('users/{id}', [AdminController::class, 'updateUser'])->where('id', '[0-9]+');

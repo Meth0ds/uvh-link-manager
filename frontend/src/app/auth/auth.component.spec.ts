@@ -209,6 +209,30 @@ describe("AuthComponent registration flow", () => {
     expect(component.step()).toBe("verify-pending");
   });
 
+  it("announces the pause and blocks new registrations without spending a CAPTCHA token", async () => {
+    showRegistrationStep();
+    component.registrationsPaused.set(true);
+    component.registerForm.patchValue({ name: "Ana García", email: "ana@example.com", password: "Strong-password-123!", confirmPassword: "Strong-password-123!", acceptTerms: true, company: "" });
+    fixture.detectChanges();
+    await component.onRegister();
+    expect(auth.register).not.toHaveBeenCalled();
+    expect(component.error()).toBe("Registros temporalmente pausados. Inténtalo de nuevo más tarde.");
+    const submit = fixture.nativeElement.querySelector("form.auth-step-panel button.submit") as HTMLButtonElement | null;
+    expect(submit?.disabled).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain("Registros temporalmente pausados");
+  });
+
+  it("keeps correcting a pending registration while new ones are paused", async () => {
+    component.tabIndex.set(1);
+    setFlow({ kind: "register", stage: 2, mode: "correct-email", originalEmail: "old@example.com" });
+    component.registrationsPaused.set(true);
+    component.registerForm.controls.email.setValue("new@example.com");
+    fixture.detectChanges();
+    await component.onRegister();
+    expect(auth.changeRegistrationEmail).toHaveBeenCalledWith("old@example.com", "new@example.com", jasmine.objectContaining({ captchaToken: "fresh-passcode" }));
+    expect(fixture.nativeElement.textContent).not.toContain("Registros temporalmente pausados");
+  });
+
   it("revokes the local capability when config refresh fails", async () => {
     await enableLocalFallback();
     api.get.and.rejectWith(new Error("API offline"));

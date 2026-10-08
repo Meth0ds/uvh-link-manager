@@ -17,9 +17,9 @@ function deferred<T>() {
   return { promise, resolve };
 }
 const stamp = "2026-10-07T12:00:00Z";
-const overview: AdminOverview = { users: 8, workspaces: 5, links: 21, clicks: 144, openReports: 1, blockedLinks: 2, domains: 3 };
+const overview: AdminOverview = { users: 8, workspaces: 5, links: 21, clicks: 144, openReports: 1, blockedLinks: 2, domains: 3, registrationPaused: false };
 const operations: AdminOperations = {
-  state: "healthy", environment: "production", generatedAt: stamp, checks: [],
+  state: "healthy", environment: "production", generatedAt: stamp, registrationPaused: false, checks: [],
   metrics: { pendingJobs: 0, oldestJobAgeSeconds: null, failedJobs: 0, webhookDeliveries: {}, oldestPendingWebhookAgeSeconds: null,
     mailOutbox: {}, oldestPendingMailAgeSeconds: null, activeSessions: 2, pendingRegistrations: 0, domains: {}, oldestDnsCheckAgeSeconds: null,
     oldestTlsProvisioningAgeSeconds: null, events60m: {}, queueHeartbeatAgeSeconds: 10, schedulerHeartbeatAgeSeconds: 20, activePrivacyRequests: 0, overduePrivacyRequests: 0 },
@@ -98,6 +98,15 @@ describe("Administration actual UI and context", () => {
     expect(state.api.post).toHaveBeenCalledWith("/api/v1/admin/mail-outbox/5/retry", {});
     expect(state.snack.open).toHaveBeenCalledWith("Correo admitido de nuevo en la cola", "Cerrar", jasmine.anything());
     expect(state.api.get.calls.allArgs().map(args => args[0])).toEqual(jasmine.arrayContaining(["/api/v1/admin/mail-outbox", "/api/v1/admin/operations", "/api/v1/admin/audit"]));
+    expect(state.component.actionKey()).toBeNull();
+  });
+  it("pauses registrations with confirmation, notice and reload", async () => {
+    state.api.get.calls.reset();
+    await state.component.toggleRegistrationPause(true);
+    expect(state.actions.confirm).toHaveBeenCalledWith(jasmine.objectContaining({ title: "Pausar registros", destructive: true }));
+    expect(state.api.post).toHaveBeenCalledWith("/api/v1/admin/registration-pause", { paused: true }, jasmine.any(Function));
+    expect(state.snack.open).toHaveBeenCalledWith("Registros pausados", "Cerrar", jasmine.anything());
+    expect(state.api.get.calls.allArgs().map(args => args[0])).toEqual(jasmine.arrayContaining(["/api/v1/admin/overview", "/api/v1/admin/operations", "/api/v1/admin/audit"]));
     expect(state.component.actionKey()).toBeNull();
   });
   it("does not dispatch a confirmation after the session changes", async () => {

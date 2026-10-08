@@ -57,7 +57,7 @@ de otra cuenta; no puede retirar una mutación o un Set-Cookie ya despachados.
 
 | Método | Ruta | Auth | Descripción |
 | ------ | ---- | ---- | ----------- |
-| POST | `/register` | — | Registro multistep con name/email/password/CAPTCHA/consentimientos. Nombre y contraseña se validan, pero no se guardan. Siempre crea un intento propio del navegador, con caducidad y generación, y responde `201 { user: null }` con cookie de edición opaca v4. Si la dirección está libre, crea además pending y bearer de verificación; si está ocupada o reservada, no modifica al ocupante y la admisión huérfana se suprime. Cuenta, credencial, workspace y aceptación legal sólo nacen tras probar el buzón. |
+| POST | `/register` | — | Registro multistep con name/email/password/CAPTCHA/consentimientos. Nombre y contraseña se validan, pero no se guardan. Siempre crea un intento propio del navegador, con caducidad y generación, y responde `201 { user: null }` con cookie de edición opaca v4. Si la dirección está libre, crea además pending y bearer de verificación; si está ocupada o reservada, no modifica al ocupante y la admisión huérfana se suprime. Cuenta, credencial, workspace y aceptación legal sólo nacen tras probar el buzón. Con la pausa operativa activa responde `503 { error: «Registros temporalmente pausados. Inténtalo de nuevo más tarde.», code: «registration_paused» }` —idéntico para dirección libre u ocupada, sin crear intento, pending, correo ni cookie— tras validar forma y CAPTCHA. Verificación, reenvío y corrección de pendientes existentes no se ven afectados. |
 | POST | `/login` | — | Requiere email/password/CAPTCHA. Una contraseña correcta conserva el acceso verificado con o sin MFA; una cuenta heredada sin verificar recibe `403 reason: email_verification_required`. Ante contraseña incorrecta o cuenta ausente, un contexto propio vigente para esa dirección recibe `403 reason: pending_registration` para revisar la solicitud, independientemente de la ocupación del email. Este reason histórico no afirma que exista una cuenta o pending. Sin contexto válido, `401` genérico. Nunca concede sesión/reto por una cookie de registro. |
 | POST | `/change-registration-email` | cookie de edición | `{ currentEmail, newEmail, captchaToken }` corrige la dirección elegida en el intento propio. Revalida cookie/generación/dirección/caducidad contra contexto bloqueado y responde `200 { ok: true }` con nueva cookie v4 en todos los destinos. Cada ACK gasta la generación anterior, incluso si el destino está ocupado. Sólo mueve el pending asociado a ese intento o crea uno nuevo si está libre; nunca altera User ni pending ajeno. En un conflicto conserva el bearer del pending propio y su dirección real, pero el contexto adopta la dirección solicitada para permitir otra corrección privada. Sin autoridad vigente o con currentEmail ajeno al contexto, `403` genérico. No crea sesión. |
 | POST | `/mfa/verify` | — | Completa login MFA con `{ challenge, code }` → `{ user }`. El challenge dura cinco minutos, está ligado a la versión de seguridad y se consume una sola vez. |
@@ -223,7 +223,10 @@ cifran en reposo; los listados nunca devuelven ciphertext ni generaciones de
 idempotencia.
 
 La configuración pública de hCaptcha y la identidad legal publicable se obtiene
-de `GET /api/v1/config`. La identidad se devuelve como una unidad o `null`, nunca
+de `GET /api/v1/config`. Devuelve además `registrationPaused` (booleano, sin
+PII): el formulario público lo usa para anunciar «Registros temporalmente
+pausados…» y deshabilitar el alta sin tener que adivinarlo con un registro.
+La identidad se devuelve como una unidad o `null`, nunca
 parcial; producción no arranca con campos pendientes. El
 `captchaToken` se verifica siempre en backend y el secreto nunca forma parte de
 la respuesta pública. Login, registro y reenvío usan el modo invisible: cada
@@ -554,7 +557,7 @@ de reautenticación y vuelve a la ruta interna original tras confirmar.
 
 | Método | Ruta | Descripción |
 | ------ | ---- | ----------- |
-| GET | `/overview` | Contadores globales. |
+| GET | `/overview` | Contadores globales + `registrationPaused` (booleano). |
 | GET | `/users` | `q`, `status`, `page`, `perPage` → `{ users[], total, page, perPage }`. Estados: `active`, `blocked`, `admin`, `mfa`. Sin `unverified`: una fila de usuario está verificada por definición y el registro sin verificar vive en `/pending-registrations`. |
 | PATCH | `/users/:id` | `{ isAdmin?, blocked? }`. |
 | GET | `/pending-registrations` | `q`, `page`, `perPage` → `{ registrations[], total, page, perPage }`. Registros que aún no han demostrado su buzón: `email`, `created_at`, `last_mail_at` (último correo de verificación emitido) y `link_expires_at` (caducidad de su enlace). Sin propuestas de contraseña ni bearers; sólo esta consola admin-gated lista estas direcciones. |
@@ -563,7 +566,8 @@ de reautenticación y vuelve a la ruta interna original tras confirmar.
 | POST | `/reports/:id/moderate` | `{ action, reason? }`, con `action=block|unblock|review|dismiss`. Actualiza denuncia y enlace en una única transacción. |
 | GET | `/domains` | `q`, `state`, `page`, `perPage` → `{ domains[], total, page, perPage }`; nunca devuelve el token DNS. Cada fila lleva `state` (etiqueta derivada) y la salud completa: `traffic_status`, `desired_state`, `ownership_status`, `routing_status`, `tls_status`, `edge_eligible`, `dns_error`, `tls_error`, `verified_at`, `tls_not_after` y `links_count`. |
 | GET | `/audit` | `q`, `action`, `resourceType`, `page`, `perPage` → `{ events[], total, page, perPage }`. |
-| GET | `/operations` | Estado no sensible de entorno, cola, trabajos fallidos, webhooks, sesiones y dominios. No sustituye al sistema externo de monitorización. |
+| GET | `/operations` | Estado no sensible de entorno, cola, trabajos fallidos, webhooks, sesiones y dominios, más `registrationPaused` (booleano). No sustituye al sistema externo de monitorización. |
+| POST | `/registration-pause` | `{ paused: boolean }` → `{ ok: true, paused }`. Pausa o reanuda los registros **nuevos**; los pendientes existentes siguen su curso. `paused` no booleano → `422` sin cambiar nada. Auditoría `admin.registration_pause`. Requiere rol de plataforma y `lockEligibleAdmin` vigente; si el rol/cuenta/MFA cambió → `409`. Procedimiento: [`registration-pause-runbook.md`](registration-pause-runbook.md). |
 | POST | `/links/:id/block` | `{ reason }` → bloquea. |
 | POST | `/links/:id/unblock` | Desbloquea. |
 | POST | `/links/:id/block-destination` | `{ reason, scope }`, con `scope=url|host` → bloquea el **destino** del enlace (no solo el enlace), lo añade a la denylist y reanaliza los enlaces que ya apuntaban a ese host. |

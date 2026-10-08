@@ -542,6 +542,13 @@ controlados.
   y `REGISTRATION_EDIT_TTL_HOURS`. Acredita que quien corrige la dirección de
   una inscripción sin verificar es el navegador que la creó; la contraseña que
   deja ese registro es una propuesta y no autoriza nada.
+- **Pausa operativa de registros** (1 variable interna, con defecto funcional):
+  `OPERATIONAL_SETTINGS_CACHE_SECONDS` (defecto `30`, clamp en código 5–300 s).
+  TTL de la caché de lectura del flag `registration_paused` en
+  `operational_settings`. No está en la plantilla de producción porque el
+  defecto es el correcto; sólo se ajusta para acelerar o amortiguar la
+  propagación de un cambio del operador. Procedimiento:
+  [`registration-pause-runbook.md`](registration-pause-runbook.md).
 
 Los cambios de esquema se aplican con `php artisan migrate`; las migraciones son
 idempotentes donde importa y los índices de tablas con historia se crean antes

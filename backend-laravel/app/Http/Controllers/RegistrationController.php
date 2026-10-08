@@ -14,6 +14,7 @@ use App\Support\Auth\VerificationResend;
 use App\Support\MailAdmissionException;
 use App\Support\PasswordStrength;
 use App\Support\RegistrationEdit;
+use App\Support\RegistrationGate;
 use App\Support\UvhRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -50,6 +51,14 @@ final class RegistrationController
         }
         if ($captchaError = $this->captchaError($request, $captchaToken)) {
             return $captchaError;
+        }
+
+        // Pausa operativa: solo bloquea registros NUEVOS, después de validar
+        // la forma (para no dar oráculos de validación distintos) y antes de
+        // crear intento, pendiente, correo o cookie. Verificación, reenvío y
+        // corrección de pendientes existentes siguen intactos.
+        if (RegistrationGate::isPaused()) {
+            return response()->json(['error' => 'Registros temporalmente pausados. Inténtalo de nuevo más tarde.', 'code' => 'registration_paused'], 503);
         }
 
         $email = strtolower($email);

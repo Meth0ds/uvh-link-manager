@@ -28,6 +28,7 @@ use App\Support\PrivateArtifactCleanup;
 use App\Support\ProductionSecurity;
 use App\Support\PublicSuffixes;
 use App\Support\QueueBacklog;
+use App\Support\RegistrationGate;
 use App\Support\SearchTerm;
 use App\Support\UvhMail;
 use App\Support\UvhRequest;
@@ -72,7 +73,38 @@ class AdminController
             'openReports' => DB::table('abuse_reports')->where('status', 'open')->count(),
             'blockedLinks' => DB::table('links')->where('state', 'blocked')->count(),
             'domains' => DB::table('custom_domains')->count(),
+            'registrationPaused' => RegistrationGate::isPaused(),
         ]);
+    }
+
+    /**
+     * Pausa o reanuda los registros NUEVOS. Los pendientes existentes
+     * siguen su curso (verificación, reenvío, corrección); el estado también
+     * se publica en `config` para que el formulario público lo anuncie.
+     */
+    public function setRegistrationPause(Request $request): JsonResponse
+    {
+        if (! $request->has('paused') || ! is_bool($request->input('paused'))) {
+            return response()->json(['error' => 'Datos inválidos'], 422);
+        }
+        $paused = $request->input('paused');
+
+        $actorId = UvhRequest::user($request)->id;
+        $sessionId = UvhRequest::sessionId($request);
+        $ip = UvhRequest::ip($request);
+        $updated = DB::transaction(function () use ($paused, $actorId, $sessionId, $ip): string {
+            if (! $this->lockEligibleAdmin($actorId, $sessionId)) {
+                return 'actor_changed';
+            }
+            RegistrationGate::setPaused($paused, $actorId, $ip);
+
+            return 'ok';
+        });
+        if ($updated === 'actor_changed') {
+            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+        }
+
+        return response()->json(['ok' => true, 'paused' => $paused]);
     }
 
     public function users(Request $request)
@@ -1102,6 +1134,7 @@ class AdminController
             'state' => $state,
             'environment' => $environment,
             'generatedAt' => now()->toIso8601String(),
+            'registrationPaused' => RegistrationGate::isPaused(),
             'checks' => $checks,
             'metrics' => [
                 'pendingJobs' => $jobCount,

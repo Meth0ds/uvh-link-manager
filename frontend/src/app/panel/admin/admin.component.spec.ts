@@ -28,12 +28,14 @@ const overview: AdminOverview = {
   openReports: 1,
   blockedLinks: 2,
   domains: 3,
+  registrationPaused: false,
 };
 
 const operations: AdminOperations = {
   state: "healthy",
   environment: "production",
   generatedAt: "2026-08-30T12:00:00Z",
+  registrationPaused: false,
   checks: [{ key: "queue", label: "Cola persistente", status: "ok", detail: null }],
   metrics: {
     pendingJobs: 0,
@@ -384,6 +386,16 @@ describe("AdminComponent", () => {
     // Neither the count nor the pager may describe a page that never arrived.
     expect(element.querySelector("mat-paginator")).toBeNull();
     expect(element.textContent).not.toContain("cuentas coinciden con los filtros");
+  });
+
+  it("pauses registrations from the system tab with confirmation and reload", async () => {
+    api.post.and.resolveTo(true);
+    await component.toggleRegistrationPause(true);
+    expect(actions.confirm).toHaveBeenCalledWith(jasmine.objectContaining({ title: "Pausar registros", destructive: true }));
+    expect(api.post).toHaveBeenCalledWith("/api/v1/admin/registration-pause", { paused: true }, jasmine.any(Function));
+    expect(api.get).toHaveBeenCalledWith("/api/v1/admin/overview", undefined, jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
+    expect(api.get).toHaveBeenCalledWith("/api/v1/admin/operations", undefined, jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
+    expect(component.actionKey()).toBeNull();
   });
 
   it("disables user actions while their rows may be stale", () => {

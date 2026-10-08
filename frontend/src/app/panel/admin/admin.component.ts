@@ -47,6 +47,7 @@ import {
   decodeAdminMailPage,
   decodeAdminOperations,
   decodeAdminOverview,
+  decodeRegistrationPause,
   decodeAdminPendingRegistrationsPage,
   decodeAdminRecoveriesPage,
   decodeAdminUsersPage,
@@ -691,6 +692,35 @@ export class AdminComponent {
       if (!operation.isCurrent()) return;
       this.showError(error);
       await this.mail.load();
+    } finally {
+      operation.settle();
+    }
+  }
+
+  async toggleRegistrationPause(paused: boolean): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.actionKey()) return;
+    const confirmed = await this.actions.confirm({
+      title: paused ? "Pausar registros" : "Reanudar registros",
+      message: paused
+        ? "Mientras dure la pausa, el formulario público anunciará «Registros temporalmente pausados» y no se creará ninguna cuenta nueva. Los registros pendientes existentes siguen su curso."
+        : "El formulario público volverá a aceptar registros nuevos.",
+      confirmLabel: paused ? "Pausar registros" : "Reanudar registros",
+      destructive: paused,
+    });
+    if (!confirmed || !intent()) return;
+
+    const operation = this.view.begin("registration-pause", intent);
+    if (!operation) return;
+    try {
+      const applied = await this.api.post("/api/v1/admin/registration-pause", { paused }, decodeRegistrationPause);
+      if (!operation.isCurrent()) return;
+      this.snackbar.open(applied ? "Registros pausados" : "Registros reanudados", "Cerrar", { duration: 3000 });
+      await Promise.all([this.loadOverview(), this.loadOperations(), this.audit.load()]);
+    } catch (error) {
+      if (!operation.isCurrent()) return;
+      this.showError(error);
+      await this.loadOverview();
     } finally {
       operation.settle();
     }

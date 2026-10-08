@@ -561,6 +561,8 @@ export interface AdminOverview {
   openReports: number;
   blockedLinks: number;
   domains: number;
+  /** Pausa operativa de registros nuevos; los pendientes existentes siguen su curso. */
+  registrationPaused: boolean;
 }
 
 export interface AdminUser {
@@ -688,6 +690,8 @@ export interface AdminOperations {
   state: "healthy" | "attention" | "critical";
   environment: string;
   generatedAt: string;
+  /** Pausa operativa de registros nuevos; los pendientes existentes siguen su curso. */
+  registrationPaused: boolean;
   checks: AdminOperationCheck[];
   metrics: {
     pendingJobs: number;

@@ -6,6 +6,7 @@ use App\Support\DestinationDenylist;
 use App\Support\DestinationReputationService;
 use App\Support\ExternalEndpoint;
 use App\Support\HCaptcha;
+use App\Support\RegistrationGate;
 use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
 use App\Support\UvhRequest;
@@ -100,6 +101,9 @@ class PublicController
             'appUrl' => $appUrl,
             'publicHost' => config('uvh.public_host'),
             'appHost' => config('uvh.app_host'),
+            // Capacidad global, sin PII: el formulario público la usa para
+            // anunciar la pausa sin tener que adivinarla con un registro.
+            'registrationPaused' => RegistrationGate::isPaused(),
             // These fields are legally public by design. Return null as one
             // unit in local environments rather than exposing partial data;
             // production startup rejects an incomplete identity altogether.

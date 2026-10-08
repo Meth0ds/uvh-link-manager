@@ -94,6 +94,7 @@ export function decodeAdminOverview(value: unknown): AdminOverview {
     openReports: integer(source["openReports"], "admin overview"),
     blockedLinks: integer(source["blockedLinks"], "admin overview"),
     domains: integer(source["domains"], "admin overview"),
+    registrationPaused: boolean(source["registrationPaused"], "admin overview"),
   };
 }
 
@@ -288,6 +289,7 @@ export function decodeAdminOperations(value: unknown): AdminOperations {
     state: literal(source["state"], new Set(["healthy", "attention", "critical"]), "admin operations state"),
     environment: text(source["environment"], "admin operations environment", 100),
     generatedAt: text(source["generatedAt"], "admin operations timestamp", 64),
+    registrationPaused: boolean(source["registrationPaused"], "admin operations"),
     checks: boundedArray(source["checks"], "admin operation checks", 32).map((item) => {
       const check = record(item, "admin operation check");
       return {
@@ -317,6 +319,13 @@ export function decodeAdminOperations(value: unknown): AdminOperations {
       overduePrivacyRequests: integer(metrics["overduePrivacyRequests"], "admin operations metrics"),
     },
   };
+}
+
+/** Resultado de operar la pausa de registros: confirmación más el estado aplicado. */
+export function decodeRegistrationPause(value: unknown): boolean {
+  const source = record(value, "registration pause");
+  if (source["ok"] !== true) invalid("registration pause confirmation");
+  return boolean(source["paused"], "registration pause flag");
 }
 
 export function decodeAdminMailPage(value: unknown, expected: AdminPageContext): AdminPageResponse<AdminMailOutboxMessage> {

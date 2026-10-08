@@ -5,6 +5,7 @@ import {
   decodeAdminMailPage,
   decodeAdminOperations,
   decodeAdminOverview,
+  decodeRegistrationPause,
   decodeAdminPendingRegistrationsPage,
   decodeAdminRecoveriesPage,
   decodeAdminReportsPage,
@@ -70,10 +71,16 @@ describe("admin response decoders", () => {
   });
 
   it("decodes overview, operations and recovery decisions", () => {
-    expect(decodeAdminOverview({ users: 1, workspaces: 2, links: 3, clicks: 4, openReports: 5, blockedLinks: 6, domains: 7 }).clicks).toBe(4);
+    expect(decodeAdminOverview({ users: 1, workspaces: 2, links: 3, clicks: 4, openReports: 5, blockedLinks: 6, domains: 7, registrationPaused: false }).clicks).toBe(4);
+    expect(decodeAdminOverview({ users: 1, workspaces: 2, links: 3, clicks: 4, openReports: 5, blockedLinks: 6, domains: 7, registrationPaused: true }).registrationPaused).toBeTrue();
+    expect(() => decodeAdminOverview({ users: 1, workspaces: 2, links: 3, clicks: 4, openReports: 5, blockedLinks: 6, domains: 7 })).toThrow();
+    expect(decodeRegistrationPause({ ok: true, paused: true })).toBeTrue();
+    expect(decodeRegistrationPause({ ok: true, paused: false })).toBeFalse();
+    expect(() => decodeRegistrationPause({ ok: true, paused: "yes" })).toThrow();
+    expect(() => decodeRegistrationPause({ ok: false, paused: true })).toThrow();
     expect(decodeAccountRecoveryDecision({ ok: true, status: "approved", approvalCount: 2 })).toEqual({ status: "approved", approvalCount: 2 });
     expect(decodeAdminOperations({
-      state: "healthy", environment: "testing", generatedAt: timestamp,
+      state: "healthy", environment: "testing", generatedAt: timestamp, registrationPaused: false,
       checks: [{ key: "queue", label: "Queue", status: "ok", detail: null }],
       metrics: {
         pendingJobs: 0, oldestJobAgeSeconds: null, failedJobs: 0,

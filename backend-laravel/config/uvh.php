@@ -50,6 +50,10 @@ return [
     // Vida del secreto y techo de su cookie. Nunca más que el bearer de
     // verificación que el registro emite a la vez (un día).
     'registration_edit_ttl_hours' => (int) env('REGISTRATION_EDIT_TTL_HOURS', 24),
+    // TTL de la caché del interruptor de pausa de registros. Se clampa entre
+    // 5 y 300 segundos: por debajo no es caché y por encima un cambio del
+    // operador tardaría demasiado en verse.
+    'operational_settings_cache_seconds' => min(300, max(5, (int) env('OPERATIONAL_SETTINGS_CACHE_SECONDS', 30))),
     // Piso de duración, en milisegundos, de toda respuesta `ok` del reenvío
     // público de verificación. La rama que conoce el registro hace trabajo real
     // (transacción, token, outbox) y la que no contesta de inmediato: sin este
