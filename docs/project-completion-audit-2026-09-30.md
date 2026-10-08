@@ -1745,3 +1745,136 @@ B211/P2: se comparaba la caducidad de sesiones con el reloj anterior al await; d
 Comparador O64:829 hashes actuales,811 fuentes previas ajenas intactas y112 specs previos íntegros. Un fixture existente cambió concurrentemente para abrir privacy; expectativas de foco y comandos conservadas. Cinco fuentes ajenas cambiadas/borradas y cinco scripts nuevos ajenos se registran aparte; manifests históricos O63 intactos. Inventario estático501/2369named/1271anonymous/3firmas/0provisional; anchors S01 388/86archivos,S02 205/32,S10 63/9. Enumeración de scripts compartidos no acredita revisión/ejecución del control ni CJS. Preparación fallida, primera full con3fallos de fixture y timeout CLI conservados; sólo los3 rojos nativos válidos sustentan B211/B212.
 
 Informe33 puntos:16/17/18 resueltos; detalles, fuentes y límites en `docs/superpowers/plans/2026-10-06-settings-sections-ux.md` y `.uvh-runtime/o64-settings-ux/`. Sin DB/cuentas/mail/providers/migraciones/worker/scheduler/control/commit/publicación ni nuevo gate backend. Próximo visual: dominios/webhooks. Pendientes: sesión caducada con vista abierta, revocación/identidad del Centro, despacho auxiliar bajo TX exterior/CSV, AuthService/frontendauth, S13 yrelease externo. **Objetivo global y S01–S13 abiertos.**
+
+
+## O65 — dominios/webhooks y recuperación del consumidor (07/10)
+
+Lista de dominios con siguiente paso y diagnóstico individual; TXT/CNAME en detalle y requisitos avanzados conservados. Receptores webhook con acciones visibles, historial diferido y errores expandibles; inspector mantiene payload filtrado y muestra suscripciones. Informe33 puntos22/23/24/25 resueltos dentro de este alcance.
+
+B213/P2: alta tardía borra nuevo dominio; B214/P2: PATCH publica éxito tras workspace/rol distinto; B215/P2: reenvío aceptado vacía/cachea historial; B216/P2: saveSurface borra root/mode posteriores; B217/P2: CNAME saludable se describe como desacuerdo con destino idéntico. Ocho rojos nativos previos y23 casos nuevos.41 dirigidos iniciales, **1513/1513 completos finales**, tipos/lint/build0 (6,325s). No nueva suite/backend ni DB real.
+
+Comparación íntegra:10 fuentes de producto,1spec nuevo,830 hashes,819 fuentes previas ajenas y115 specs anteriores conservados. Inventario estático501/2371named/1270anonymous/3firmas/0provisional; nuevos ledgers parciales S06/S08 con evidencia por función. QA del build/fake API8467:24 combinaciones de cuatro páginas/1440/390/320/claro/oscuro, viewer, lectura503/recovery, secreto ficticio fuera de live region y reenvío→GETfallido→GETrecuperado sin repetir comando.
+
+HAR conserva resets de descarga del servidor Python inicial; fixture ajustada HTTP1.1/backlog128. Transición nativa de tema no se asentó en35s bajo automatización y requiere investigación separada: matriz final con movimiento reducido, sin atribuir ID o solución a ese síntoma. Comparadores históricos intactos; no ejecución del control compartido. Evidencia `.uvh-runtime/o65-domains-webhooks-ux/` yplan `docs/superpowers/plans/2026-10-07-domains-webhooks-ux.md`.
+
+**Global/S01–S13 abiertos.** Próximo: transición de tema/navegación global ydashboard; pendientes administración/equipo/estado público, sesión abierta/Centro, despacho auxiliar bajoTX exterior/CSV, AuthService/frontendauth, S13 estático yrelease externo. Sin cuentas/correo/proveedor/DB/migraciones reales ni agentes/worktree/commit/push/deploy.
+
+
+## O66 — dashboard, navegación y acciones de dominio (07/10)
+
+Cinco bugs de consumidor corregidos: **B218/P2**, barras de países relativas a todos los clics y sin redondear tráfico pequeño a cero; **B219/P2**, fallo de una lectura no oculta la otra; **B220/P2**, preferencias tardías de la guía no alteran otro contexto; **B221/P2**, exclusión de PATCH opuestos en vuelo; **B222/P2**, cifra principal invisible por especificidad CSS, corregida en ambos temas. Optimización adicional: cambiar periodo y reintentar una sección sólo consultan su endpoint.
+
+Diez rojos nativos válidos (8 iniciales + 2 de contraste). **28 casos nuevos y 1541/1541 pruebas finales**, tipos/lint/build con salida 0. Diez archivos de producto, dos specs nuevos; **116 specs anteriores y 820 fuentes previas ajenas intactos**, 832 hashes finales. Inventario estático: 501 archivos, 2373 funciones con nombre, 1271 anónimas, 3 firmas, 0 propietarios provisionales. Ledgers parciales S09/S12; S06 conserva controles previos y recibe QA de composición, sin nuevo cambio de lógica del dominio.
+
+Dashboard ordenado por actividad/enlaces recientes, tres métricas respaldadas y accesos/guía secundarios. Creación contextual en dashboard/biblioteca; acceso lateral en otras páginas y drawer móvil. A petición del usuario, dominios separa configuración/enlaces, mantenimiento/preferencias y acciones destructivas en filas con consecuencias explícitas; comprobación/HTTPS contextual y confirmaciones/permisos conservados.
+
+QA del build con API ficticia loopback 8477: **30 estados únicos** de dashboard y dominios, 1440/390/320 px, claro/oscuro con movimiento nativo habilitado; fallos 503 y recuperación GET independiente, workspace vacío, editor/viewer y cancelación de desactivación sin comandos enviados. Sin overflow horizontal global/área principal; controles de gestión de al menos 44 px y separación comprobada. No acredita DNS/TLS, cuentas, autorización API o lectores de pantalla reales.
+
+Diagnóstico de tema nativo: promesas observadas y comprobación sin wrapper terminan con busy=false; no se reprodujo la causa del síntoma O65. Un navegador de QA quedó sin respuesta al snapshot y eval; sus endpoints CDP version/list también agotaron 5 s. Se cerró sólo esa instancia y se retomó en una nueva. La causa del bloqueo sigue sin determinar; no se asigna BugID ni se afirma resolverlo. Fallos de preparación de fixture, selector antiguo y expectativa 1.000/1000 se conservan como límites del harness, separados de los rojos de producto. Evidencia y comparador: `.uvh-runtime/o66-theme-navigation/`.
+
+**Proyecto y S01–S13 abiertos.** Próximo: administración/equipo/estado público, AuthService/frontend auth, sesiones con vista abierta/Centro de seguridad, despacho bajo TX exterior/CSV y S13/release externo. Sin DB/correo/proveedores/migraciones/worker/control compartido/agentes/worktree/commit/push/deploy. Manifests históricos intactos.
+
+
+## O67 — equipo: permisos, contexto y acciones (07/10)
+
+Siete bugs de consumidor corregidos, todos P2: **B223**, respuestas/recargas borran borradores posteriores de email/nombre (también fallo y retry); **B224**, slot global y feedback/follow-up tardíos atraviesan workspace/selección/rol/cuenta/destrucción; **B225**, administrador recibe acciones de administrador reservadas al propietario; **B226**, búsqueda antigua publica candidatos durante el debounce; **B227**, selección Material muestra el rol rechazado; **B228**, editor/viewer no pueden abandonar por UI; **B229**, controles de rol/removal/invitación carecen de identidad accesible.
+
+Código completo TeamComponent/HTML/SCSS leído; diez funciones backend conciliadas por permiso/payload/efecto, sin nueva ejecución SQL. Reutilización de OwnedMutations, captura de contexto y GET abortable; credenciales capturadas antes de confirmar y guardas de exclusión posteriores. No autorización delegada al frontend. Formularios de nombre sólo para gestión; salida personal separada de propiedad/eliminación; acciones con texto y separación; nombres/correos completos y texto funcional 13–18 px. Destinatario seleccionado móvil ocupa el ancho disponible y permite elegir otra persona con CTA visible.
+
+**24 casos nuevos y 1565/1565 frontend finales**, tipos/lint/build terminal0. Trece rojos nativos válidos: once iniciales, uno de borrador tras fallo/retry y uno de discrepancia de rol detectado durante implementación. Una comprobación geométrica de navegador además mostró identidad de destinatario 97/224 px (43%); tras ajuste usa al menos75% en320px. No se confunden los fallos de preparación/fixture con bugs: ruta de escritura errónea, doble genérico, proveedor Material/detectChanges y búsqueda «ana» sin coincidencias se conservan en logs separados.
+
+QA del build/API ficticia loopback8487: **32 estados**, cuatro roles,1440/390/320, ambos temas y movimiento nativo; búsqueda/team503→retry GET único, destinatario largo seleccionado y cancelación por teclado. Controles de gestión≥44px y sin overflow global/área principal. Cero comandos API reales o ficticios; no correo/transferencia/eliminación real ni lectores de pantalla reales. El foco tras eliminación efectiva de una fila requiere cobertura adicional; no se da por acreditado por cancelar un diálogo.
+
+Comparación: **3 fuentes de producto**,1spec nuevo y2 dobles adaptados dentro de1spec existente (expectativas/casos anteriores intactos); **117 specs previas íntegros**,826 fuentes previas ajenas sin cambios y833 hashes actuales. `uvh-control.mjs` y su test cambiaron concurrentemente y se registran aparte con snapshots/hashes, sin ejecución ni edición por este lote. `panel/src/app/panel-api.service.ts` también está modificado fuera del conjunto indexado; se conserva. Manifests históricos O64–O66 intactos. Inventario estático501/2378named/1277anonymous/3firmas/0provisional; ledger parcial S03 con34 anchors. Enumerar scripts no acredita revisión/ejecución del control.
+
+Plan/evidencia: `docs/superpowers/plans/2026-10-07-team-ux-context.md`, ledger S03 y `.uvh-runtime/o67-team-ux/verify.py`. **Global/S01–S13 abiertos**: administración/estado público, AuthService/frontendauth, sesiones con vista abierta/Centro, despacho bajo TX exterior/CSV, S13/release y demás gates. S03 no se cierra con este lote. Sin DB/cuentas/mail/providers/migraciones/worker/control compartido/agentes/worktree/commit/push/deploy.
+
+
+O68 — B230–B237/P2, administración/frontend (07/10):
+
+| ID | Fallo confirmado y corrección | Evidencia |
+| --- | --- | --- |
+| B230 | Confirmación/prompt despachaba desde otra sesión o vista; captura previa y guard vivo también ante pérdida de rol/MFA. | Casos reales de sesión/destrucción/pérdida de proyección; cuatro superficies. |
+| B231 | Resultado/error/evento/final tardío podía publicar en otro contexto o liberar un comando nuevo; propietario y guards de publicación. | Async deferred; slot nuevo conserva busy, cero eventos/feedback/follow-ups anteriores. |
+| B232 | Retry de correo no volvía a excluir concurrencia después del diálogo; begin compartido admite una sola operación actual. | Segundo comando iniciado durante confirmación y control positivo del retry. |
+| B233 | QueuePaging comparaba clave capturada consigo misma; pregunta viva de sesión/filtros/página/tamaño, reset y respuesta vigente. | Cambios antes de efecto y sin segunda carga; pruebas de colas y rechazos actuales. |
+| B234 | Overview pendiente/fallido ocultaba colas independientes; contenido renderiza y retry sólo pregunta por el resumen. | Plantilla real nativa y browser con snapshot503/retenido. |
+| B235 | Sin operaciones se fabricaba cero trabajos y salud previa parecía vigente tras fallo; Sin confirmar y Última lectura. | Nativos y QA del último snapshot seguido de503. |
+| B236 | Ausencia de Worker/Scheduler se llamaba Sin espera; ahora Sin señal, manteniendo espera vacía distinta. | Rojo real con plantilla Material estable; reversión controlada y QA de pulsos ausentes. |
+| B237 | Conteo/paginador describían filas antiguas mientras la nueva página aún no respondía; dependen de paging.stale. | Rojo nativo válido y browser de lectura fallida con acciones desarmadas. |
+
+
+O68 (07/10), administración: navegación lateral por Cuentas, Revisión y cumplimiento y Plataforma; contenido independiente y selector agrupado en contenedores estrechos. @switch sustituye MatTabs; resumen desplegable y atajos a moderación/sistema. Menú principal compacto de76px en administración, expansión con ratón/foco sin desplazar contenido, fijación explícita y drawer habitual en móvil. Acciones locales de denuncia separadas de bloqueo global URL/host; privacidad separa gestión, ampliación y cierre. Texto funcional13–16px, campos con etiquetas accesibles y filas adaptadas al espacio real. Se corrigen B230–B237: intención tras diálogo, publicación/finales anteriores, exclusión de retry, pregunta viva de colas, resumen independiente y representación honesta de lecturas/pulsos/conteos.
+
+34 casos nuevos de contexto y3 del menú principal, con30 rojos nativos válidos; un rojo histórico de heartbeat era fixture Material y se reemplazó por reversión controlada del fallo real.1602/1602 frontend,types/lint/build exit0. QA del build/API ficticia: 89 estados, ocho secciones,1440/1024/390/320 y comprobaciones a1920, ambas apariencias; teclado, resumen, fallo/retry503, snapshot pendiente y cancelación de seis decisiones sin comandos. Durante QA se corrigió una regresión CSS del footer de privacidad.21 fuentes de producto;115 specs previas intactas, cuatro adaptan sesión y el padre también selectores/orden semántico; el spec nuevo conserva34 casos.834 fuentes de partida:809 ajenas intactas;836 actuales incluyendo helper y spec del menú principal.
+
+Plan/ledger: `docs/superpowers/plans/2026-10-07-admin-ux-context.md`, `2026-10-07-s11-admin-function-review-ledger.md`; evidencia `.uvh-runtime/o68-admin-ux/verify.py`. Contratos backend leídos, sin edición/backend gate nuevo ni DB/cuentas/mail/providers/migraciones/workers/control compartido/agentes/commit/deploy. S11/S13/global S01–S13 permanecen abiertos; AuthService/auth frontend, Centro/sesiones abiertas, estado público, despacho bajo TX exterior/CSV y release siguen pendientes.
+
+
+O69 — bugs confirmados de frontend/sesiones (07–08/10):
+
+| ID | Fallo y corrección | Evidencia / límite |
+| --- | --- | --- |
+| B238/P2 | Confirmación despachaba tras cambio de cuenta/generación o destrucción; captura antes del diálogo y lifetime vivo. | Nueve rojos de tres acciones; no bypass backend demostrado. |
+| B239/P2 | Respuesta/final antiguo mostraba avisos, recargaba/navegaba o liberaba otro comando; tickets propios y contexto vivo. | Seis resultados/rechazos tardíos, comando nuevo y positivos de logout propio. |
+| B240/P2 | Datos de cuenta/MFA permanecían en vista montada; reads aceptaban otro usuario si epoch no cambiaba. | Reset/reactividad de contexto y pregunta viva; códigos/correo anteriores se limpian. |
+| B241/P2 | Revocación individual seguía habilitada durante refresh de registro. | Botones reales y método bloquean decisiones desde snapshot no vigente; QA de GET retenido. |
+| B242/P2 | Fallo del router tras cerrar todas se describía como fallo de cierre o no avisaba. | false/error del router: ACK de cierre conservado y aviso preciso, sin replay. |
+| B243/P2 | current localtrue anulaba currentfalse servidor y expulsaba otra sesión de misma cuenta. | HTTP real simulado; false explícito conserva usuario/espacios/storage, ACK sin campo conserva contrato anterior. |
+
+
+O69 (07–08/10) — Centro de seguridad y revocación de sesiones. B238–B243/P2 corregidos: intención previa al diálogo, publicaciones/finales anteriores, datos retenidos en vista montada/pregunta viva, decisiones durante refresco, cierre confirmado frente a navegación fallida y prioridad de current explícito del servidor frente a pista local. Captura/contexto/ticket comunes para tres revocaciones, sin abortar/repetir writes; sólo el logout propio exacto puede salir a login. Se corrige también la implementación inicial que cacheaba DestroyRef dentro de computed: lifetime se consulta en vivo.
+
+Sesiones y actividad primero, credenciales/recuperación después; controles44px, textos13–16px, dispositivos/fechas/email sin elipsis, agrupación de cierres, layout por contenedor y aviso de última lectura con decisiones desarmadas.28controles nuevos,25rojos nativos válidos;1630/1630frontend y types/lint/build0. QA del build/API ficticia:20estados, cinco anchuras1440/1024/768/390/320 y ventana corta640px, claro/oscuro; snapshot/registro503 y retry, GET retenido, registro vacío/acotado, cinco cancelaciones sin comandos. No acredita lector de pantalla/Firefox/DB/proveedores reales.
+
+Cuatro fuentes producto, un spec nuevo27casos y uno extendido+1; nueve casos antiguos del Centro preservados con doble de sesión/lifetime de logout correcto,46casos HTTP previos conservados,119specs anteriores intactos.837hashes actuales,830fuentes previas ajenas sin cambio; inventario502/2414named/1301anonymous/3signatures/0provisional y ledger parcial87funciones con nombre. PHP241hashes intactos; no backend gate nuevo. Primeros intentos sin fichero/timestamp válido y click sin GET retenido son límites del harness, separados de rojos de producto. Primera corrida verde interrumpida en Building: handle ausente y ps terminal, reanudada sin resultado atribuido al intento detenido.
+
+Evidencia `.uvh-runtime/o69-security-center/verify.py`; plan `docs/superpowers/plans/2026-10-07-security-center-context.md`; ledger `2026-10-07-s01-security-center-function-review-ledger.md`. S01/S13/global S01–S13 activos. Continuar Auth frontend/Settings con sesiones abiertas e indicadores de recuperación ambigua, estado público, TX exterior/CSV y operación/CI/release reales. Sin DB/cuentas/correo/proveedores/worker/control compartido/panel ajeno/agentes/commit/deploy.
+
+
+## O70 — Fallos confirmados y corregidos (08/10)
+
+| ID | Prioridad | Fallo | Resultado |
+| --- | --- | --- | --- |
+| B244 | P2 | Centro/Ajustes mantienen filas y estado de sesiones después de expires_at con la vista abierta. | Deadline compartido, retirada de filas vencidas y lectura única; sin logout por reloj del cliente. |
+| B245 | P2 | Lectura de sesiones de Ajustes publica la identidad anterior si id cambia antes del effect, sin cambio de generación. | Clave viva id+generación en admisión y publicación. |
+| B246 | P2 | Centro acepta proyección/lectura anterior y decisiones después de ACK MFA con datos pendientes. | Flags de proyección en contexto, lectura anterior retirada y recuperación explícita mediante /me. |
+| B247 | P2 | Centro/Ajustes describen códigos como disponibles pese a entrega incierta; /me no recupera el secreto. | Conteo oculto y aviso/acción de recuperación hasta emisión confirmada. |
+
+12 rojos válidos,31 casos nuevos,1661frontend; QA36 estados del build ficticio. Plan O70 conserva límites de harness y evidencia contraria para scroll: esa mejora no lleva ID histórico. Sin bypass backend demostrado ni cambio backend. Global abierto.
+
+
+## O71 — Tokens (08/10)
+
+| ID | Prioridad | Fallo confirmado | Corrección |
+| --- | --- | --- | --- |
+| B248 | P2 | Lecturas/secreto retenidos o publicados con otra cuenta/epoch/rol/selección ABA. | Contexto vivo y limpieza de proyección, factores y credencial; GET cancelable y ticket. |
+| B249 | P2 | Confirmación vieja despacha revocación en contexto nuevo o vista destruida. | Intención antes del diálogo y revalidación de contexto/fila/read/lifetime al admitir. |
+| B250 | P2 | ACK de emisión borra campos de un borrador posterior. | Captura payload y limpieza sólo de campos enviados que permanecen iguales. |
+| B251 | P2 | GET admitido antes del ACK elimina token recién emitido de la lista. | Retiro del GET anterior y publicación de nueva fila/ventana100. |
+| B252 | P2 | Emisión nueva sobrescribe secreto de un solo uso aún no reconocido. | Secreto independiente y acuse explícito antes de otra emisión. |
+| B253 | P2 | Finally de revocación antigua libera busy de una operación nueva. | Ticket único y finalización sólo del propietario vigente. |
+| B254 | P2 | Revocación admitida durante refresco del registro retenido. | Decisiones desarmadas en loading/error/registro pendiente, guardas antes y después de diálogo. |
+| B255 | P2 | Feedback de clipboard/refresh de creación se publica en contexto saliente. | Propiedad de contexto/lifetime/secreto y ticket de copia. |
+
+19rojos históricos,35nuevos casos y1696frontend finales. Dos defectos de foco ydos de confianza tras ACK detectados durante implementación también corregidos; no se cuentan como nuevos IDs históricos. Plan O71/ledger conservan evidence ylimits,QA45 del build ficticio; global/S01–S13 abiertos. Candidatos de DELETE/body y factor/proyección inciertos requieren reproducción en siguiente lote.
+
+
+## O72 — Confirmación de revocación y registro pendiente
+
+| ID | Prioridad | Fallo confirmado | Corrección |
+| --- | --- | --- | --- |
+| B256 | P2 | HTTP200 con ACK malformado afirma revocación y puede ocultar secreto no confirmado. | Decoder existente `{ok:true}` antes de overlay, feedback o retirada de credencial. |
+| B257 | P2 | Write incierto deja el snapshot previo apto para nuevas decisiones de revocación. | Retirar GET previo y exigir lectura posterior válida; aviso persistente sin éxito ficticio. |
+
+14controles,12rojos históricos y1710frontend; gates0,9estados QA y2writes ficticios. Plan/alcance por función: `docs/superpowers/plans/2026-10-08-token-revocation-ack.md`. S07/S13/global abiertos; no bypass backend ni operación real acreditados.
+
+
+## O73 — Cuenta después de step-up y retirada de secreto
+
+| ID | Prioridad | Fallo confirmado | Corrección |
+| --- | --- | --- | --- |
+| B258 | P2 | Factor puede consumirse con proyección de cuenta todavía descrita como vigente siACK se pierde, view sale o reauth sólo devuelve proof. | accountStepUp reutiliza coordinación de identidad/DTO y exige lectura propia; no replay. |
+| B259 | P2 | GET explícitamente revocado deja secreto entregado yfeedback/copia/foco. | Cleanup compartido tras prueba de revocación; no inferir estado por omisión/error. |
+
+27controles/19rojos históricos;1737frontend,gates0 y11estados ficticios. Plan/funciones/límites2026-10-08-stepup-account-projection.md; global abierto.
