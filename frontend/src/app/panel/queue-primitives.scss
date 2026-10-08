@@ -13,7 +13,7 @@
 @mixin paragraph-look {
   margin: 4px 0 0;
   color: var(--uvh-muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -32,7 +32,7 @@
     &.spaced { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--uvh-border); }
   }
   // En pantallas estrechas el encabezado deja de ser una fila.
-  @media (max-width: 650px) {
+  @container (max-width: 650px) {
     .section-heading { align-items: stretch; flex-direction: column; }
   }
 }
@@ -64,6 +64,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
     margin-bottom: 18px;
     padding: 12px 14px;
     border-left: 3px solid var(--uvh-danger);
@@ -72,7 +73,7 @@
     color: var(--uvh-danger);
     font-size: 13px;
     line-height: 1.6;
-    span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    span { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
     > button { flex: 0 0 auto; margin-left: auto; }
     &.compact { margin: 10px 0 14px; }
   }
@@ -84,14 +85,15 @@
   .filters {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 3px;
-    mat-form-field { width: 210px; }
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    mat-form-field { width: 210px; min-width: 0; max-width: 100%; }
     .filter-search { width: min(100%, 420px); }
     ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }
     ::ng-deep .mat-mdc-text-field-wrapper { background: var(--uvh-surface); }
   }
-  @media (max-width: 650px) {
+  @container (max-width: 650px) {
     .filters {
       flex-direction: column;
       mat-form-field, .filter-search { width: 100%; }
@@ -111,9 +113,9 @@
     border-radius: 3px;
     background: var(--uvh-surface);
     color: var(--uvh-muted);
-    font-size: 10px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: .02em;
+    letter-spacing: normal;
     white-space: nowrap;
     &.success { border-color: color-mix(in srgb, var(--uvh-success) 34%, var(--uvh-border)); background: var(--uvh-success-soft); color: var(--uvh-success); }
     &.warning { border-color: color-mix(in srgb, var(--uvh-warn) 34%, var(--uvh-border)); background: var(--uvh-warn-soft); color: var(--uvh-warn); }
@@ -126,7 +128,7 @@
 /// Lo destructivo se lee como una regla sobre el texto, nunca como una caja
 /// tintada.
 @mixin danger-button {
-  .danger-button { border-color: color-mix(in srgb, var(--uvh-danger) 30%, var(--uvh-border)) !important; color: var(--uvh-danger) !important; }
+  .danger-button { --mat-button-outlined-outline-color: color-mix(in srgb, var(--uvh-danger) 30%, var(--uvh-border)); --mat-button-outlined-label-text-color: var(--uvh-danger); --mat-button-outlined-state-layer-color: var(--uvh-danger); }
 }
 
 /// El vacío: lo dibuja el marco.
@@ -142,12 +144,46 @@
     text-align: center;
     mat-icon { width: 28px; height: 28px; margin-bottom: 5px; font-size: 28px; }
     b { color: var(--uvh-ink); font-size: 13px; }
-    span { font-size: 11.5px; }
+    span { font-size: 14px; }
     &.compact-empty { min-height: 130px; }
   }
 }
 
 /// El paginador: lo dibuja el marco.
 @mixin pager {
-  mat-paginator { margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background: transparent; }
+  mat-paginator { --mat-paginator-form-field-container-height: 44px; margin: 12px -10px -12px; border-radius: 0 0 3px 3px; background: transparent; }
+  ::ng-deep .mat-mdc-paginator-page-size-label,
+  ::ng-deep .mat-mdc-paginator-range-label { font-size: 13px; }
+}
+
+/// Las filas conservan sus etiquetas accesibles también cuando la cabecera
+/// visual de la tabla las sustituye en escritorio.
+@mixin field-labels {
+  .field-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  @container (max-width: 1180px) {
+    .field-label {
+      display: block;
+      position: static;
+      width: auto;
+      height: auto;
+      margin: 0 0 6px;
+      overflow: visible;
+      clip-path: none;
+      white-space: normal;
+      color: var(--uvh-muted);
+      font-size: 13px;
+      line-height: 1.5;
+      font-weight: 600;
+    }
+  }
 }

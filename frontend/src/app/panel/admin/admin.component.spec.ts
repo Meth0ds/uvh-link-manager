@@ -6,6 +6,7 @@ import { AdminComponent } from "./admin.component";
 import { AdminReportsComponent } from "./admin-reports.component";
 import { ApiService } from "../../core/services/api.service";
 import { ActionDialogService } from "../action-dialog.service";
+import { SessionContextService } from "../../core/services/session-context.service";
 import type { AdminOperations, AdminOverview } from "../../core/models";
 
 interface Deferred<T> {
@@ -87,6 +88,7 @@ describe("AdminComponent", () => {
       ],
     }).compileComponents();
 
+    TestBed.inject(SessionContextService).user.set({ id: 9001, name: "Operador", email: "operator@example.test", isAdmin: true, emailVerified: true, mfaEnabled: true });
     fixture = TestBed.createComponent(AdminComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -103,8 +105,7 @@ describe("AdminComponent", () => {
 
     // One more cycle so the end of the first paint reaches the DOM.
     fixture.detectChanges();
-    const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]');
-    (tabs[5] as HTMLElement).click();
+    (fixture.nativeElement.querySelector('[role=tab][aria-label="Auditoría"]') as HTMLElement).click();
     fixture.detectChanges();
     await fixture.whenStable();
 
@@ -131,9 +132,9 @@ describe("AdminComponent", () => {
       "Registros pendientes",
       "Recuperación de cuentas",
       "Moderación",
+      "Privacidad",
       "Dominios",
       "Auditoría",
-      "Privacidad",
       "Sistema",
     ]);
   });
@@ -166,8 +167,7 @@ describe("AdminComponent", () => {
     // A tab's content exists once the tab is open, so the queues are reached the
     // way an operator reaches them.
     fixture.detectChanges();
-    const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]');
-    (tabs[3] as HTMLElement).click();
+    (fixture.nativeElement.querySelector('[role=tab][aria-label="Moderación"]') as HTMLElement).click();
     fixture.detectChanges();
     await fixture.whenStable();
     const queue = fixture.debugElement.query(By.directive(AdminReportsComponent))?.componentInstance as AdminReportsComponent | undefined;
@@ -377,8 +377,8 @@ describe("AdminComponent", () => {
     fixture.detectChanges();
 
     const element: HTMLElement = fixture.nativeElement;
-    const buttons = Array.from(element.querySelectorAll("button")) as HTMLButtonElement[];
-    const userButtons = buttons.filter((button) => ["Hacer admin", "Bloquear"].includes(button.textContent?.trim() ?? ""));
+    const buttons = Array.from(element.querySelectorAll(".user-row .row-actions button")) as HTMLButtonElement[];
+    const userButtons = buttons;
     expect(userButtons.length).toBe(2);
     expect(userButtons.every((button) => button.disabled)).toBeTrue();
     // Neither the count nor the pager may describe a page that never arrived.
@@ -402,8 +402,8 @@ describe("AdminComponent", () => {
     component.users.loading.set(true);
     fixture.detectChanges();
 
-    const buttons = Array.from(fixture.nativeElement.querySelectorAll("button")) as HTMLButtonElement[];
-    const userButtons = buttons.filter((button) => ["Hacer admin", "Bloquear"].includes(button.textContent?.trim() ?? ""));
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll(".user-row .row-actions button")) as HTMLButtonElement[];
+    const userButtons = buttons;
     expect(userButtons.length).toBe(2);
     expect(userButtons.every((button) => button.disabled)).toBeTrue();
   });

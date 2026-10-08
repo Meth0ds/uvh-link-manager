@@ -4,6 +4,7 @@ import { MatSnackBar } from "@angular/material/snack-bar";
 import { AdminDestinationsComponent } from "./admin-destinations.component";
 import { ApiService } from "../../core/services/api.service";
 import { ActionDialogService } from "../action-dialog.service";
+import { SessionContextService } from "../../core/services/session-context.service";
 import type { AdminDestinationEntry } from "../../core/models";
 
 const entry: AdminDestinationEntry = {
@@ -39,6 +40,7 @@ describe("AdminDestinationsComponent", () => {
       ],
     }).compileComponents();
 
+    TestBed.inject(SessionContextService).user.set({ id: 9001, name: "Operador", email: "operator@example.test", isAdmin: true, emailVerified: true, mfaEnabled: true });
     fixture = TestBed.createComponent(AdminDestinationsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();

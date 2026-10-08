@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -7,7 +7,6 @@ import { MatInputModule } from "@angular/material/input";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSelectModule } from "@angular/material/select";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
-import { MatTabsModule } from "@angular/material/tabs";
 import type {
   AdminDomain,
   AdminAccountRecovery,
@@ -53,6 +52,8 @@ import {
   decodeAdminUsersPage,
 } from "../../core/services/admin-response-decoders";
 import { LatestRequest } from "../../core/services/latest-request";
+import { SessionContextService } from "../../core/services/session-context.service";
+import { AdminViewContext, type AdminIntent } from "./admin-view-context";
 import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-decoders";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
@@ -82,7 +83,6 @@ type PrivacyTypeFilter = "" | PrivacyRightType;
     QueueSectionComponent,
     MatSelectModule,
     MatSnackBarModule,
-    MatTabsModule,
     PageHeaderComponent,
     PanelSkeletonComponent,
     AdminAppealsComponent,
@@ -98,6 +98,41 @@ export class AdminComponent {
   private readonly api = inject(ApiService);
   private readonly snackbar = inject(MatSnackBar);
   private readonly actions = inject(ActionDialogService);
+  private readonly view = new AdminViewContext(inject(SessionContextService), this.destroyRef);
+  readonly canOperate = this.view.eligible;
+  readonly activeTab = signal(0);
+  readonly navigation = [
+    { label: "Cuentas", sections: [
+      { index: 0, label: "Usuarios", detail: "Permisos y estado", icon: "group" },
+      { index: 1, label: "Registros pendientes", detail: "Activación por email", icon: "mark_email_unread" },
+      { index: 2, label: "Recuperación de cuentas", detail: "Verificación independiente", icon: "support_agent" },
+    ] },
+    { label: "Revisión y cumplimiento", sections: [
+      { index: 3, label: "Moderación", detail: "Denuncias y apelaciones", icon: "flag" },
+      { index: 6, label: "Privacidad", detail: "Ejercicio de derechos", icon: "policy" },
+    ] },
+    { label: "Plataforma", sections: [
+      { index: 4, label: "Dominios", detail: "Propiedad, DNS y HTTPS", icon: "language" },
+      { index: 5, label: "Auditoría", detail: "Historial de decisiones", icon: "history" },
+      { index: 7, label: "Sistema", detail: "Estado y entregas", icon: "monitor_heart" },
+    ] },
+  ];
+  readonly sectionTitle = computed(() => this.navigation.flatMap(group => group.sections).find(section => section.index === this.activeTab())?.label ?? "Administración");
+
+  /** Manual activation: arrows move focus; Enter/Space activate the native button. */
+  onSectionKeydown(event: KeyboardEvent): void {
+    const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    const target = event.currentTarget as HTMLButtonElement;
+    const tabs = [...(target.closest('[role="tablist"]')?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
+    const index = tabs.indexOf(target);
+    if (index < 0) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+      : (index + (event.key === "ArrowDown" ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[next].focus();
+  }
+
 
   // The console's own sources: the two snapshots above the tabs and the guards
   // that keep a late answer from landing on a newer one.
@@ -116,7 +151,9 @@ export class AdminComponent {
   readonly summaryError = signal<string | null>(null);
   readonly operationsLoading = signal(false);
   readonly operationsError = signal<string | null>(null);
-  readonly actionKey = signal<string | null>(null);
+  readonly actionKey = this.view.actionKey;
+  readonly summaryLoading = signal(false);
+  readonly operationsConfirmed = computed(() => !!this.operations() && !this.operationsLoading() && !this.operationsError());
 
   // Each paged queue declares its filters and its request; the page on screen,
   // the loading flag, the notice and the cancel-on-supersede rule come from the
@@ -125,6 +162,8 @@ export class AdminComponent {
   readonly userStatus = signal<UserStatus>("");
   readonly users = new QueuePaging<AdminUser>({
     destroyRef: this.destroyRef,
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudieron cargar los usuarios",
     message: adminMessage,
     filters: () => [this.userQuery(), this.userStatus()],
@@ -145,6 +184,8 @@ export class AdminComponent {
   readonly pendingQuery = signal("");
   readonly pendingRegistrations = new QueuePaging<AdminPendingRegistration>({
     destroyRef: this.destroyRef,
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudieron cargar los registros pendientes",
     message: adminMessage,
     filters: () => [this.pendingQuery()],
@@ -163,6 +204,8 @@ export class AdminComponent {
   readonly recoveryStatus = signal<RecoveryStatus>("");
   readonly recoveries = new QueuePaging<AdminAccountRecovery>({
     destroyRef: this.destroyRef,
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudieron cargar las recuperaciones",
     message: adminMessage,
     filters: () => [this.recoveryQuery(), this.recoveryStatus()],
@@ -181,6 +224,8 @@ export class AdminComponent {
   readonly domainState = signal<DomainFilter>("");
   readonly domains = new QueuePaging<AdminDomain>({
     destroyRef: this.destroyRef,
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudieron cargar los dominios",
     message: adminMessage,
     filters: () => [this.domainQuery(), this.domainState()],
@@ -198,6 +243,8 @@ export class AdminComponent {
   readonly auditQuery = signal("");
   readonly audit = new QueuePaging<AuditEvent>({
     destroyRef: this.destroyRef,
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudo cargar la auditoría",
     message: adminMessage,
     pageSize: 50,
@@ -216,6 +263,8 @@ export class AdminComponent {
   readonly mailStatus = signal<MailStatusFilter>("failed");
   readonly mail = new QueuePaging<AdminMailOutboxMessage>({
     destroyRef: this.destroyRef,
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudo cargar el outbox de correo",
     message: adminMessage,
     filters: () => [this.mailStatus()],
@@ -234,6 +283,8 @@ export class AdminComponent {
   readonly privacyType = signal<PrivacyTypeFilter>("");
   readonly privacy = new QueuePaging<PrivacyRightRequest>({
     destroyRef: this.destroyRef,
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudieron cargar las solicitudes de privacidad",
     message: adminMessage,
     pageSize: 20,
@@ -304,7 +355,37 @@ export class AdminComponent {
   readonly formatDate = dateTimeLabel;
 
   constructor() {
+    let context = this.view.key();
+    effect(() => {
+      const current = this.view.key();
+      if (current === context) return;
+      context = current;
+      untracked(() => {
+        this.resetView();
+        void this.start();
+      });
+    });
     void this.start();
+  }
+
+  private resetView(): void {
+    this.reloadRequests.invalidate();
+    this.overviewRequests.invalidate();
+    this.operationsRequests.invalidate();
+    for (const queue of [this.users, this.pendingRegistrations, this.recoveries, this.domains, this.audit, this.mail, this.privacy]) queue.reset();
+    this.openedTabs.clear();
+    this.activeTab.set(0);
+    this.overview.set(null);
+    this.operations.set(null);
+    this.summaryError.set(null);
+    this.operationsError.set(null);
+    this.summaryLoading.set(false);
+    this.operationsLoading.set(false);
+    this.refreshing.set(false);
+    this.initialLoading.set(true);
+    this.userQuery.set(""); this.userStatus.set(""); this.pendingQuery.set("");
+    this.recoveryQuery.set(""); this.recoveryStatus.set(""); this.domainQuery.set(""); this.domainState.set("");
+    this.auditQuery.set(""); this.mailStatus.set("failed"); this.privacyStatus.set(""); this.privacyType.set("");
   }
 
   /**
@@ -318,9 +399,11 @@ export class AdminComponent {
    * that is what the button says. This initial read is what stays lazy.
    */
   private async start(): Promise<void> {
+    if (!this.canOperate()) { this.initialLoading.set(false); return; }
+    const intent = this.view.capture();
     this.openTab(0);
     await Promise.all([this.loadOverview(), this.loadOperations()]);
-    this.initialLoading.set(false);
+    if (intent()) this.initialLoading.set(false);
   }
 
   /** Tab position to the queue it pages; moderation owns its queues inside its own lazy content. */
@@ -334,14 +417,16 @@ export class AdminComponent {
 
   /** A tab reads its queue once, when first opened. */
   openTab(index: number): void {
-    if (this.openedTabs.has(index)) return;
+    this.activeTab.set(index);
+    if (!this.canOperate() || this.openedTabs.has(index)) return;
     this.openedTabs.add(index);
     const queue = this.queueForTab(index);
     if (queue) void queue.load();
   }
 
   async reloadAll(): Promise<void> {
-    const request = this.reloadRequests.begin(null);
+    if (!this.view.capture()()) return;
+    const request = this.reloadRequests.begin(this.view.key());
     this.refreshing.set(true);
     // The queues of the moderation tab re-read on the revision instead of being
     // awaited here: each one reports its own progress inside its own tab.
@@ -357,7 +442,7 @@ export class AdminComponent {
       this.mail.load(),
       this.privacy.load(),
     ]);
-    if (!this.reloadRequests.isCurrent(request, null)) return;
+    if (!this.reloadRequests.isCurrent(request, this.view.key())) return;
     this.initialLoading.set(false);
     this.refreshing.set(false);
   }
@@ -373,35 +458,41 @@ export class AdminComponent {
   }
 
   async approveRecovery(recovery: AdminAccountRecovery): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.recoveries.stale() || this.actionKey()) return;
     const confirmed = await this.actions.confirm({
       title: "Registrar aprobación independiente",
       message: `Confirma únicamente si has verificado personalmente la identidad de ${recovery.email} mediante el procedimiento externo aprobado. Esta decisión queda auditada y no sustituye la aprobación de otro administrador.`,
       confirmLabel: "He verificado la identidad",
       destructive: false,
     });
-    if (!confirmed || this.actionKey()) return;
-    await this.decideRecovery(recovery, "approve", "identity_verified_external");
+    if (!confirmed || !intent() || this.recoveries.stale()) return;
+    await this.decideRecovery(recovery, "approve", "identity_verified_external", intent);
   }
 
   async rejectRecovery(recovery: AdminAccountRecovery): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.recoveries.stale() || this.actionKey()) return;
     const confirmed = await this.actions.confirm({
       title: "Rechazar recuperación",
       message: `El expediente de ${recovery.email} se cerrará sin cambiar la contraseña, MFA ni sesiones de la cuenta.`,
       confirmLabel: "Rechazar expediente",
       destructive: true,
     });
-    if (!confirmed || this.actionKey()) return;
-    await this.decideRecovery(recovery, "reject", "insufficient_evidence");
+    if (!confirmed || !intent() || this.recoveries.stale()) return;
+    await this.decideRecovery(recovery, "reject", "insufficient_evidence", intent);
   }
 
-  private async decideRecovery(recovery: AdminAccountRecovery, decision: "approve" | "reject", reasonCode: string): Promise<void> {
-    this.actionKey.set(`recovery-${recovery.id}`);
+  private async decideRecovery(recovery: AdminAccountRecovery, decision: "approve" | "reject", reasonCode: string, intent: AdminIntent): Promise<void> {
+    const operation = this.view.begin(`recovery-${recovery.id}`, intent);
+    if (!operation) return;
     try {
       const result = await this.api.post<{ status: AccountRecoveryStatus; approvalCount: number }>(`/api/v1/admin/account-recoveries/${recovery.id}/decision`, {
         decision,
         reasonCode,
         identityVerified: decision === "approve",
       }, decodeAccountRecoveryDecision);
+      if (!operation.isCurrent()) return;
       const message = result.status === "approved"
         ? "Doble aprobación completada; se ha emitido un enlace de 30 minutos"
         : result.status === "in_review"
@@ -410,22 +501,27 @@ export class AdminComponent {
       this.snackbar.open(message, "Cerrar", { duration: 4000 });
       await Promise.all([this.recoveries.load(), this.audit.load(), this.loadOperations()]);
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.showError(error);
     } finally {
-      this.actionKey.set(null);
+      operation.settle();
     }
   }
 
   async loadOverview(): Promise<void> {
-    const request = this.overviewRequests.begin(null);
+    if (!this.view.capture()()) return;
+    const request = this.overviewRequests.begin(this.view.key());
+    this.summaryLoading.set(true);
     this.summaryError.set(null);
     try {
       const response = await this.api.get<AdminOverview>("/api/v1/admin/overview", undefined, decodeAdminOverview, { signal: request.signal });
-      if (!this.overviewRequests.isCurrent(request, null)) return;
+      if (!this.overviewRequests.isCurrent(request, this.view.key())) return;
       this.overview.set(response);
     } catch (error) {
-      if (!this.overviewRequests.isCurrent(request, null)) return;
+      if (!this.overviewRequests.isCurrent(request, this.view.key())) return;
       this.summaryError.set(adminMessage(error, "No se pudo cargar el resumen"));
+    } finally {
+      if (this.overviewRequests.isCurrent(request, this.view.key())) this.summaryLoading.set(false);
     }
   }
 
@@ -453,6 +549,8 @@ export class AdminComponent {
   }
 
   async toggleAdmin(user: AdminUser): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.users.stale() || this.actionKey()) return;
     const granting = !this.isAdminUser(user);
     const confirmed = await this.actions.confirm({
       title: granting ? "Conceder acceso administrador" : "Retirar acceso administrador",
@@ -462,22 +560,27 @@ export class AdminComponent {
       confirmLabel: granting ? "Conceder acceso" : "Retirar acceso",
       destructive: !granting,
     });
-    if (!confirmed || this.actionKey()) return;
+    if (!confirmed || !intent() || this.users.stale()) return;
 
     const key = `admin-${user.id}`;
-    this.actionKey.set(key);
+    const operation = this.view.begin(key, intent);
+    if (!operation) return;
     try {
       await this.api.patch(`/api/v1/admin/users/${user.id}`, { isAdmin: granting });
+      if (!operation.isCurrent()) return;
       this.snackbar.open("Permisos actualizados", "Cerrar", { duration: 2500 });
       await Promise.all([this.users.load(), this.audit.load()]);
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.showError(error);
     } finally {
-      this.actionKey.set(null);
+      operation.settle();
     }
   }
 
   async toggleBlock(user: AdminUser): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.users.stale() || this.actionKey()) return;
     const blocking = !user.deleted_at;
     const confirmed = await this.actions.confirm({
       title: blocking ? "Bloquear cuenta" : "Restaurar cuenta",
@@ -487,18 +590,21 @@ export class AdminComponent {
       confirmLabel: blocking ? "Bloquear cuenta" : "Restaurar cuenta",
       destructive: blocking,
     });
-    if (!confirmed || this.actionKey()) return;
+    if (!confirmed || !intent() || this.users.stale()) return;
 
     const key = `block-${user.id}`;
-    this.actionKey.set(key);
+    const operation = this.view.begin(key, intent);
+    if (!operation) return;
     try {
       await this.api.patch(`/api/v1/admin/users/${user.id}`, { blocked: blocking });
+      if (!operation.isCurrent()) return;
       this.snackbar.open(blocking ? "Cuenta bloqueada" : "Cuenta restaurada", "Cerrar", { duration: 2500 });
       await Promise.all([this.users.load(), this.loadOverview(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.showError(error);
     } finally {
-      this.actionKey.set(null);
+      operation.settle();
     }
   }
 
@@ -511,6 +617,7 @@ export class AdminComponent {
    * the only place that knows what a decision invalidates.
    */
   onModerationChanged(): void {
+    if (!this.view.capture()()) return;
     void this.refreshModeration();
   }
 
@@ -541,18 +648,19 @@ export class AdminComponent {
   }
 
   async loadOperations(): Promise<void> {
-    const request = this.operationsRequests.begin(null);
+    if (!this.view.capture()()) return;
+    const request = this.operationsRequests.begin(this.view.key());
     this.operationsLoading.set(true);
     this.operationsError.set(null);
     try {
       const response = await this.api.get<AdminOperations>("/api/v1/admin/operations", undefined, decodeAdminOperations, { signal: request.signal });
-      if (!this.operationsRequests.isCurrent(request, null)) return;
+      if (!this.operationsRequests.isCurrent(request, this.view.key())) return;
       this.operations.set(response);
     } catch (error) {
-      if (!this.operationsRequests.isCurrent(request, null)) return;
+      if (!this.operationsRequests.isCurrent(request, this.view.key())) return;
       this.operationsError.set(adminMessage(error, "No se pudo leer el estado operativo"));
     } finally {
-      if (this.operationsRequests.isCurrent(request, null)) this.operationsLoading.set(false);
+      if (this.operationsRequests.isCurrent(request, this.view.key())) this.operationsLoading.set(false);
     }
   }
 
@@ -562,25 +670,29 @@ export class AdminComponent {
   }
 
   async retryMail(message: AdminMailOutboxMessage): Promise<void> {
-    if (!message.retryable || this.actionKey()) return;
+    const intent = this.view.capture();
+    if (!intent() || !message.retryable || this.mail.stale() || this.actionKey()) return;
     const confirmed = await this.actions.confirm({
       title: "Reintentar correo transaccional",
       message: "Se volverá a comprobar el estado del evento antes de publicar el correo. El destinatario y el contenido permanecen cifrados y no se muestran en esta consola.",
       confirmLabel: "Reintentar entrega",
       destructive: false,
     });
-    if (!confirmed) return;
+    if (!confirmed || !intent() || this.mail.stale()) return;
 
-    this.actionKey.set(`mail-${message.id}`);
+    const operation = this.view.begin(`mail-${message.id}`, intent);
+    if (!operation) return;
     try {
       await this.api.post(`/api/v1/admin/mail-outbox/${message.id}/retry`, {});
+      if (!operation.isCurrent()) return;
       this.snackbar.open("Correo admitido de nuevo en la cola", "Cerrar", { duration: 3000 });
       await Promise.all([this.mail.load(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.showError(error);
       await this.mail.load();
     } finally {
-      this.actionKey.set(null);
+      operation.settle();
     }
   }
 
@@ -599,23 +711,31 @@ export class AdminComponent {
   }
 
   async requestPrivacyInformation(request: PrivacyRightRequest): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.privacy.stale() || this.actionKey()) return;
     const message = await this.privacyMessage("Solicitar información", "Explica qué información adicional es necesaria. No solicites contraseñas, códigos MFA ni documentos por este canal.", "Enviar petición");
-    if (message) await this.runPrivacyAction(request, "request_information", message);
+    if (message && intent()) await this.runPrivacyAction(request, "request_information", message, "", intent);
   }
 
   async completePrivacy(request: PrivacyRightRequest): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.privacy.stale() || this.actionKey()) return;
     const message = await this.privacyMessage("Resolver solicitud", "Redacta una respuesta autosuficiente que describa las medidas aplicadas o los datos facilitados.", "Registrar resolución");
-    if (message) await this.runPrivacyAction(request, "complete", message);
+    if (message && intent()) await this.runPrivacyAction(request, "complete", message, "", intent);
   }
 
   async rejectPrivacy(request: PrivacyRightRequest): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.privacy.stale() || this.actionKey()) return;
     const message = await this.privacyMessage("Cerrar con respuesta motivada", "Explica de forma concreta el fundamento, las alternativas y las vías de reclamación aplicables.", "Cerrar expediente", true);
-    if (message) await this.runPrivacyAction(request, "reject", message);
+    if (message && intent()) await this.runPrivacyAction(request, "reject", message, "", intent);
   }
 
   async extendPrivacy(request: PrivacyRightRequest, reasonCode: "complexity" | "request_volume"): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.privacy.stale() || this.actionKey()) return;
     const message = await this.privacyMessage("Ampliar plazo", "Explica por qué la complejidad o el volumen impiden responder dentro del mes ordinario.", "Notificar ampliación");
-    if (message) await this.runPrivacyAction(request, "extend", message, reasonCode);
+    if (message && intent()) await this.runPrivacyAction(request, "extend", message, reasonCode, intent);
   }
 
   private async privacyMessage(title: string, message: string, confirmLabel: string, destructive = false): Promise<string | null> {
@@ -633,17 +753,20 @@ export class AdminComponent {
     });
   }
 
-  private async runPrivacyAction(request: PrivacyRightRequest, action: "start_review" | "request_information" | "complete" | "reject" | "extend", message: string, reasonCode = ""): Promise<void> {
-    if (this.actionKey()) return;
-    this.actionKey.set(`privacy-${request.id}`);
+  private async runPrivacyAction(request: PrivacyRightRequest, action: "start_review" | "request_information" | "complete" | "reject" | "extend", message: string, reasonCode = "", intent = this.view.capture()): Promise<void> {
+    if (this.privacy.stale()) return;
+    const operation = this.view.begin(`privacy-${request.id}`, intent);
+    if (!operation) return;
     try {
       await this.api.post(`/api/v1/admin/privacy-requests/${request.id}/action`, { action, message, reasonCode });
+      if (!operation.isCurrent()) return;
       this.snackbar.open("Expediente actualizado", "Cerrar", { duration: 3000 });
       await Promise.all([this.privacy.load(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.showError(error);
     } finally {
-      this.actionKey.set(null);
+      operation.settle();
     }
   }
 
@@ -671,8 +794,8 @@ export class AdminComponent {
     return ({ local: "Desarrollo local", testing: "Pruebas", staging: "Preproducción", production: "Producción" } as Record<string, string>)[value] ?? value;
   }
 
-  ageLabel(seconds: number | null): string {
-    if (seconds === null) return "Sin espera";
+  ageLabel(seconds: number | null, absent = "Sin espera"): string {
+    if (seconds === null) return absent;
     if (seconds < 60) return `${seconds} s`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
     return `${Math.floor(seconds / 3600)} h`;

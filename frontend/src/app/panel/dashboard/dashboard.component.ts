@@ -50,7 +50,8 @@ export class DashboardComponent {
   private linkDialog = inject(LinkDialogService);
   private auth = inject(AuthService);
   private workspaces = inject(WorkspaceService);
-  private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly analyticsRequests = new LatestRequest(inject(DestroyRef));
+  private readonly recentRequests = new LatestRequest(inject(DestroyRef));
 
   readonly user = this.auth.user;
   readonly hasWorkspace = computed(() => this.workspaces.currentId() !== null);
@@ -61,8 +62,11 @@ export class DashboardComponent {
   });
   readonly overview = signal<AnalyticsOverview | null>(null);
   readonly recent = signal<LinkDto[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal<string | null>(null);
+  readonly analyticsLoading = signal(true);
+  readonly analyticsError = signal<string | null>(null);
+  readonly recentLoading = signal(true);
+  readonly recentError = signal<string | null>(null);
+  readonly recentLoaded = signal(false);
   readonly period = signal<DashboardPeriod>("30d");
   readonly periods: readonly DashboardPeriodOption[] = [
     { value: "24h", label: "24 h" },
@@ -80,62 +84,83 @@ export class DashboardComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
-      this.requests.invalidate();
+      this.analyticsRequests.invalidate();
+      this.recentRequests.invalidate();
       this.overview.set(null);
       this.recent.set([]);
-      this.error.set(null);
-      if (workspaceId === null) {
-        this.loading.set(false);
-        return;
-      }
-      void this.load();
+      this.recentLoaded.set(false);
+      this.analyticsError.set(null);
+      this.recentError.set(null);
+      this.analyticsLoading.set(workspaceId !== null);
+      this.recentLoading.set(workspaceId !== null);
+      if (workspaceId !== null) void this.load();
     });
   }
 
   async load(): Promise<void> {
+    // Each read publishes independently: one unavailable service must not hide
+    // the other service's successful response or make its retry fetch twice.
+    await Promise.all([this.loadAnalytics(), this.loadRecent()]);
+  }
+
+  async loadAnalytics(): Promise<void> {
     const workspaceId = this.workspaces.currentId();
+    const request = this.analyticsRequests.begin(workspaceId);
     if (workspaceId === null) {
-      this.requests.invalidate();
       this.overview.set(null);
-      this.recent.set([]);
-      this.loading.set(false);
+      this.analyticsError.set(null);
+      this.analyticsLoading.set(false);
       return;
     }
-    const request = this.requests.begin(workspaceId);
     const period = this.period();
-    this.loading.set(true);
-    this.error.set(null);
+    this.analyticsLoading.set(true);
+    this.analyticsError.set(null);
     try {
-      const [a, links] = await Promise.all([
-        this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period }, decodeAnalyticsOverview, { signal: request.signal }),
-        this.api.get<LinksResponse>("/api/v1/links", { sort: "created_at_desc", perPage: 5 },
-          (value) => decodeLinksResponse(value, { page: 1, perPage: 5 }), { signal: request.signal }),
-      ]);
-      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
-      this.overview.set(a);
-      this.recent.set(links.links);
-    } catch (err) {
-      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
-      const message = err instanceof ApiRequestError ? err.message : "No se pudieron cargar los datos";
-      this.error.set(message);
-      this.snackbar.open(message, "Cerrar", { duration: 3500 });
+      const overview = await this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period },
+        decodeAnalyticsOverview, { signal: request.signal });
+      if (this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) this.overview.set(overview);
+    } catch (error) {
+      if (!this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) return;
+      this.analyticsError.set(error instanceof ApiRequestError ? error.message : "No se pudo cargar la actividad del periodo.");
     } finally {
-      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
+      if (this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) this.analyticsLoading.set(false);
+    }
+  }
+
+  async loadRecent(): Promise<void> {
+    const workspaceId = this.workspaces.currentId();
+    const request = this.recentRequests.begin(workspaceId);
+    if (workspaceId === null) {
+      this.recent.set([]);
+      this.recentLoaded.set(false);
+      this.recentError.set(null);
+      this.recentLoading.set(false);
+      return;
+    }
+    this.recentLoading.set(true);
+    this.recentError.set(null);
+    try {
+      const links = await this.api.get<LinksResponse>("/api/v1/links", { sort: "created_at_desc", perPage: 5 },
+        (value) => decodeLinksResponse(value, { page: 1, perPage: 5 }), { signal: request.signal });
+      if (!this.recentRequests.isCurrent(request, this.workspaces.currentId())) return;
+      this.recent.set(links.links);
+      this.recentLoaded.set(true);
+    } catch (error) {
+      if (!this.recentRequests.isCurrent(request, this.workspaces.currentId())) return;
+      this.recentError.set(error instanceof ApiRequestError ? error.message : "No se pudieron cargar los enlaces recientes.");
+    } finally {
+      if (this.recentRequests.isCurrent(request, this.workspaces.currentId())) this.recentLoading.set(false);
     }
   }
 
   setPeriod(period: DashboardPeriod): void {
     if (this.period() === period) return;
-    // The period label changes immediately, so discard the prior snapshot
-    // before publishing that label and requesting its replacement.
-    this.requests.invalidate();
+    // Discard the previous period before showing its new label. Recent links
+    // are cumulative and independent, including a read that is still pending.
+    this.analyticsRequests.invalidate();
     this.overview.set(null);
     this.period.set(period);
-    void this.load();
-  }
-
-  retry(): void {
-    void this.load();
+    void this.loadAnalytics();
   }
 
   newLink(): void {
@@ -172,8 +197,9 @@ export class DashboardComponent {
 
   /** Percentage a country value represents of the total clicks (for bars). */
   geoPct(value: number, o: AnalyticsOverview): number {
-    const total = o.countries.reduce((s, c) => s + c.value, 0);
-    return total > 0 ? Math.round((value / total) * 100) : 0;
+    // Countries are capped by the API and omit unlocated clicks.
+    const total = o.totals.clicks;
+    return total > 0 ? Math.min(100, Math.max(0, (value / total) * 100)) : 0;
   }
 
   /** Regional emoji flag for a 2-letter country code. */

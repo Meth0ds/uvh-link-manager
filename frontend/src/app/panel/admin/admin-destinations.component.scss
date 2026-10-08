@@ -3,14 +3,16 @@
 // de alcance con el botón de retirada. No tiene barra de filtros.
 @use "../queue-primitives.scss" as primitives;
 
-:host { display: block; }
+:host { display: block; min-width: 0; container-type: inline-size; }
+button { min-height: 44px; }
+:is(button, input, mat-select):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
 
 @include primitives.projected-paragraph;
 @include primitives.badge;
 @include primitives.danger-button;
 
 .entry-list {
-  overflow: auto;
+  overflow: visible;
   margin-top: 13px;
   border: 1px solid var(--uvh-border);
   border-radius: 3px;
@@ -22,39 +24,35 @@
   grid-template-columns: minmax(0, 1.5fr) 118px 96px minmax(0, 1.5fr) 122px 122px 96px;
   align-items: center;
   gap: 14px;
-  min-width: 980px;
+  min-width: 0;
   padding: 13px 15px;
   border-bottom: 1px solid var(--uvh-border);
   color: var(--uvh-ink);
-  font-size: 12px;
+  font-size: 14px;
 
   &:last-child { border-bottom: 0; }
 
-  > button { justify-self: end; min-width: 0; font-size: 11px; }
+  > button { justify-self: end; min-width: 0; font-size: 14px; }
 }
 
 .entry-head {
   border-bottom: 1px solid var(--uvh-border-strong);
   background: var(--uvh-surface);
   color: var(--uvh-muted);
-  font-family: "Courier New", monospace;
-  font-size: 9px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .entry-value {
-  overflow: hidden;
-  font-family: "Courier New", monospace;
-  font-size: 11.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .entry-reason { color: var(--uvh-muted); line-height: 1.5; overflow-wrap: anywhere; }
 .entry-row time { color: var(--uvh-muted); font-variant-numeric: tabular-nums; }
 
-@media (max-width: 850px) {
+@container (max-width: 1180px) {
   .entry-list { overflow: visible; border: 0; background: transparent; }
   .entry-head { display: none; }
   .entry-row {
@@ -66,15 +64,10 @@
     background: var(--uvh-surface-raised);
     .entry-value { grid-column: 1 / -1; }
     > button { grid-column: 1 / -1; justify-self: start; }
-    [data-label]::before {
-      content: attr(data-label);
-      display: block;
-      margin-bottom: 3px;
-      color: var(--uvh-muted);
-      font-size: 8.5px;
-      font-weight: 750;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-    }
+
   }
 }
+
+@include primitives.field-labels;
+.entry-row > * { min-width: 0; overflow-wrap: anywhere; }
+@container (max-width: 650px) { .entry-row { grid-template-columns: minmax(0, 1fr); padding: 20px 16px; gap: 16px; } .entry-row > button { width: 100%; justify-self: stretch; } }

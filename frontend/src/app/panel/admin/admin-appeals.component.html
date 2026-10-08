@@ -11,7 +11,7 @@
   [pageSizes]="pageSizes"
 >
   <p queue-summary>
-    Un enlace bloqueado no tiene otra salida: aquí se decide si el bloqueo se mantiene o se levanta.@if (!appeals.error()) { {{ countLabel(appeals.total(), "caso coincide", "casos coinciden") }} con los filtros. }
+    Un enlace bloqueado no tiene otra salida: aquí se decide si el bloqueo se mantiene o se levanta.@if (!appeals.stale()) { {{ countLabel(appeals.total(), "caso coincide", "casos coinciden") }} con los filtros. }
   </p>
 
   <div class="filters" queue-filters>
@@ -42,8 +42,8 @@
         }
         <footer>
           @if (appeal.status === "open") {
-            <button mat-flat-button type="button" (click)="resolve(appeal, 'restore')" [disabled]="appeals.stale() || busy()"><mat-icon>restart_alt</mat-icon>Restaurar enlace</button>
-            <button mat-stroked-button class="danger-button" type="button" (click)="resolve(appeal, 'uphold')" [disabled]="appeals.stale() || busy()"><mat-icon>gavel</mat-icon>Confirmar bloqueo</button>
+            <button mat-flat-button type="button" (click)="resolve(appeal, 'restore')" [attr.aria-label]="'Restaurar /' + appeal.alias" [disabled]="appeals.stale() || busy()"><mat-icon>restart_alt</mat-icon>Restaurar enlace</button>
+            <button mat-stroked-button class="danger-button" type="button" (click)="resolve(appeal, 'uphold')" [attr.aria-label]="'Confirmar el bloqueo de /' + appeal.alias" [disabled]="appeals.stale() || busy()"><mat-icon>gavel</mat-icon>Confirmar bloqueo</button>
           } @else {
             <span class="appeal-settled"><mat-icon aria-hidden="true">done_all</mat-icon>Ya resuelta</span>
           }

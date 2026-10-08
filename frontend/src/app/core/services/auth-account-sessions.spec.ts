@@ -175,6 +175,16 @@ describe("Auth account session contracts", () => {
     }));
   }
 
+  it("respects an explicit server non-current result over a stale local current hint", fakeAsync(() => {
+    const result = observe(auth.revokeSession(id, true));
+    flushMicrotasks();
+    expectOwnedRequest(route("one"), "POST").flush({ ok: true, current: false });
+    flushMicrotasks();
+    expect(result.error).toBeUndefined();
+    expect(result.value).toBeFalse();
+    expectOriginalIdentity();
+  }));
+
   it("encodes the target identifier as one path segment", fakeAsync(() => {
     const target = "abc/def?g#h%&";
     const result = observe(auth.revokeSession(target));

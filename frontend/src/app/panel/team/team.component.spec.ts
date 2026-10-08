@@ -34,7 +34,7 @@ describe("TeamComponent invitation retry guards", () => {
         { provide: MatSnackBar, useValue: jasmine.createSpyObj("MatSnackBar", ["open"]) },
         { provide: Router, useValue: jasmine.createSpyObj("Router", ["navigate"]) },
         { provide: AuthService, useValue: { user: signal(null), sessionGeneration: () => 0 } },
-        { provide: WorkspaceService, useValue: { currentId: signal(1) } },
+        { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: () => "owner", selectionGeneration: () => 0 } },
         { provide: ActionDialogService, useValue: {} },
       ],
     })
@@ -115,7 +115,7 @@ describe("TeamComponent ownership transfer picker", () => {
           refreshWorkspaces: () => Promise.resolve(),
           refreshUser: () => Promise.resolve(),
         } },
-        { provide: WorkspaceService, useValue: { currentId: signal(1) } },
+        { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: () => "owner", selectionGeneration: () => 0 } },
         { provide: ActionDialogService, useValue: actions },
       ],
     })

@@ -6,18 +6,8 @@
 </app-page-header>
 
 @if (hasWorkspace()) {
-  <nav class="workbench" aria-label="Accesos rápidos del workspace">
-    <a routerLink="/app/links" class="workbench-primary"><span class="workbench-icon"><mat-icon aria-hidden="true">link</mat-icon></span><span><b>Tu archivo de enlaces</b><small>Busca, consulta y comparte lo que has publicado.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
-    <a routerLink="/app/analytics"><span class="workbench-icon"><mat-icon aria-hidden="true">query_stats</mat-icon></span><span><b>Entiende el recorrido</b><small>Consulta clics, fuentes y periodos.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
-    <a routerLink="/app/team"><span class="workbench-icon"><mat-icon aria-hidden="true">group</mat-icon></span><span><b>Trabaja en equipo</b><small>Consulta quién forma parte de este espacio.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
-  </nav>
-}
-
-<app-getting-started [compact]="true" />
-
-@if (hasWorkspace()) {
   <div class="period-heading">
-    <div><span class="section-eyebrow">Actividad del workspace</span><h2>El periodo, de un vistazo.</h2><p class="period-description">Elige el intervalo para leer las cifras y el gráfico juntos.</p></div>
+    <div><h2>Actividad del workspace</h2><p class="period-description">Cifras y evolución del periodo seleccionado.</p></div>
     <div class="period-switch" role="group" aria-label="Periodo de análisis">
       @for (option of periods; track option.value) {
         <button type="button" [class.active]="period() === option.value" [attr.aria-pressed]="period() === option.value"
@@ -27,17 +17,17 @@
   </div>
 }
 
-@if (loading() && overview()) {
-  <mat-progress-bar mode="indeterminate" aria-label="Actualizando el panel" />
+@if (analyticsLoading() && overview()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Actualizando la actividad" />
 }
-@if (error(); as message) {
+@if (analyticsError(); as message) {
   <div class="dashboard-alert" role="alert">
     <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <div><b>No hemos podido actualizar el panel</b><span>{{ message }}</span>@if (overview()) { <span>Los datos visibles corresponden a la última carga correcta.</span> }</div>
-    <button mat-stroked-button type="button" (click)="retry()">Reintentar</button>
+    <div><b>No se pudo cargar la actividad</b><span>{{ message }}</span>@if (overview()) { <span>Mostramos la última carga correcta del periodo seleccionado.</span> }</div>
+    <button mat-stroked-button type="button" [disabled]="analyticsLoading()" (click)="loadAnalytics()">Reintentar actividad</button>
   </div>
 }
-@if (loading() && !overview()) { <app-panel-skeleton variant="dashboard" label="Cargando el panel" /> }
+@if (analyticsLoading() && !overview()) { <p class="loading-note" role="status">Cargando la actividad del periodo…</p> }
 @if (!hasWorkspace()) {
   <section class="quiet-state"><mat-icon aria-hidden="true">workspaces</mat-icon><h2>Elige dónde trabajar</h2><p>Selecciona o crea un workspace desde la navegación para ver sus enlaces. Cada espacio mantiene sus propios datos.</p></section>
 }
@@ -46,18 +36,55 @@
   <dl class="metric-strip" aria-label="Resumen del periodo seleccionado">
     <div class="metric primary-metric"><dt>Clics registrados</dt><dd>{{ formatCount(o.totals.clicks) }}</dd><dd class="metric-note">Últimos {{ periodLabel() }}</dd></div>
     <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ formatCount(o.totals.visitors) }}</dd><dd class="metric-note">No son personas únicas; pueden repetirse entre días.</dd></div>
-    <div class="metric"><dt>Enlaces destacados</dt><dd>{{ formatCount(o.topLinks.length) }}</dd><dd class="metric-note">Enlaces que aparecen en la selección inferior.</dd></div>
     <div class="metric"><dt>Referentes</dt><dd>{{ formatCount(o.dimensionTotals.referrers) }}</dd><dd class="metric-note">Fuentes distintas de procedencia.</dd></div>
   </dl>
 
+}
+
+@if (hasWorkspace()) {
+  <section class="recent-section" aria-labelledby="recent-title">
+    <div class="section-header"><div><h2 id="recent-title">Tus últimos enlaces</h2></div><a class="text-link" routerLink="/app/links">Ver todos los enlaces <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+    <p class="section-intro">Los cinco enlaces más recientes. Sus clics son acumulados, no están filtrados por el periodo de arriba.</p>
+    @if (recentError(); as message) {
+      <div class="dashboard-alert" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon>
+        <div><b>No se pudieron actualizar los enlaces</b><span>{{ message }}</span>@if (recentLoaded()) { <span>La lista corresponde a la última carga correcta.</span> }</div>
+        <button mat-stroked-button type="button" [disabled]="recentLoading()" (click)="loadRecent()">Reintentar enlaces</button>
+      </div>
+    }
+    @if (recentLoading()) {
+      @if (recentLoaded()) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando enlaces recientes" /> }
+      @else { <app-panel-skeleton variant="list" label="Cargando enlaces recientes" /> }
+    }
+    <ul class="recent-list">
+      @for (l of recent(); track l.id) {
+        <li class="recent-row">
+          <!-- Native links keep keyboard/open-in-new-tab behaviour. Copy is a
+               sibling button: pressing Space on it must never open the detail. -->
+          <a class="recent-main" [routerLink]="['/app/links', l.id]" [attr.aria-label]="'Abrir enlace ' + displayUrl(l.shortUrl)"><b>{{ displayUrl(l.shortUrl) }}</b><span>{{ l.destination }}</span></a>
+          <span class="link-state" [class.is-active]="l.state === 'active'">{{ stateLabel(l.state) }}</span>
+          <span class="clicks"><b>{{ formatCount(l.clickCount) }}</b><small>acumulados</small></span>
+          <button mat-icon-button type="button" (click)="copy(l.shortUrl)" [attr.aria-label]="'Copiar enlace ' + displayUrl(l.shortUrl)"><mat-icon aria-hidden="true">content_copy</mat-icon></button>
+        </li>
+      }
+    </ul>
+    @if (recentLoaded() && !recentError() && !recentLoading() && !recent().length) {
+      <div class="quiet-state"><mat-icon aria-hidden="true">add_link</mat-icon><h3>Haz sitio al primer enlace.</h3>
+        <p>{{ canCreate() ? 'Empieza por un destino que conozcas. Después podrás editarlo, compartirlo y consultar su actividad.' : 'Aquí aparecerán los enlaces que cree el equipo. Tu rol permite consultarlos y copiar su URL.' }}</p>
+        @if (canCreate()) { <button mat-flat-button type="button" (click)="newLink()">Crear mi primer enlace</button> }
+      </div>
+    }
+  </section>
+}
+
+@if (overview(); as o) {
   <section class="activity-section" aria-labelledby="activity-title">
-    <div class="section-header"><div><span class="section-eyebrow">Evolución</span><h2 id="activity-title">El pulso de tus enlaces</h2></div><a class="text-link" routerLink="/app/analytics">Abrir analítica <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+    <div class="section-header"><div><h2 id="activity-title">El pulso de tus enlaces</h2></div><a class="text-link" routerLink="/app/analytics">Abrir analítica <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
     <app-charts [overview]="o" [showBreakdowns]="false" />
   </section>
 
   <div class="dash-cols">
     <section class="data-section" aria-labelledby="top-links-title">
-      <div class="section-header"><div><span class="section-eyebrow">Más clics</span><h2 id="top-links-title">Enlaces destacados</h2></div><span class="section-note">{{ periodLabel() }}</span></div>
+      <div class="section-header"><div><h2 id="top-links-title">Enlaces destacados</h2></div><span class="section-note">{{ periodLabel() }}</span></div>
       <ol class="top-list">
         @for (l of o.topLinks; track l.id; let i = $index) {
           <li><a class="top-row" [routerLink]="['/app/links', l.id]" [attr.aria-label]="'Abrir enlace ' + l.alias">
@@ -71,7 +98,7 @@
       @if (!o.topLinks.length) { <div class="quiet-state small"><h3>Todavía no hay destacados</h3><p>Cuando se registren clics, podrás comparar aquí los enlaces con más actividad.</p></div> }
     </section>
     <section class="data-section" aria-labelledby="origins-title">
-      <div class="section-header"><div><span class="section-eyebrow">Procedencia</span><h2 id="origins-title">Desde dónde llegan</h2></div></div>
+      <div class="section-header"><div><h2 id="origins-title">Desde dónde llegan</h2></div></div>
       <ul class="geo-list">
         @for (c of o.countries.slice(0, 6); track c.key) {
           <li class="geo-row"><span class="geo-flag" aria-hidden="true">{{ flag(c.key) }}</span><span class="geo-name">{{ countryName(c.key) }}</span>
@@ -79,32 +106,18 @@
         }
       </ul>
       @if (!o.countries.length) { <p class="none">Todavía no hay datos de localización para este periodo.</p> }
-      @if (o.countries.length) { <p class="data-footnote">Hasta seis orígenes disponibles. La ubicación es aproximada, no la dirección de una persona.</p> }
+      @if (o.countries.length) { <p class="data-footnote">Hasta seis países disponibles. Las barras muestran su proporción sobre todos los clics registrados; hay clics sin ubicación y países que no aparecen aquí. La ubicación es aproximada.</p> }
     </section>
   </div>
 }
 
-@if (hasWorkspace() && !loading() && (!error() || recent().length)) {
-  <section class="recent-section" aria-labelledby="recent-title">
-    <div class="section-header"><div><span class="section-eyebrow">Retoma el trabajo</span><h2 id="recent-title">Tus últimos enlaces</h2></div><a class="text-link" routerLink="/app/links">Ver todos los enlaces <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
-    <p class="section-intro">Los cinco enlaces más recientes. Sus clics son acumulados, no están filtrados por el periodo de arriba.</p>
-    <ul class="recent-list">
-      @for (l of recent(); track l.id) {
-        <li class="recent-row">
-          <!-- Native links keep keyboard/open-in-new-tab behaviour. Copy is a
-               sibling button: pressing Space on it must never open the detail. -->
-          <a class="recent-main" [routerLink]="['/app/links', l.id]" [attr.aria-label]="'Abrir enlace ' + displayUrl(l.shortUrl)"><b>{{ displayUrl(l.shortUrl) }}</b><span>{{ l.destination }}</span></a>
-          <span class="link-state" [class.is-active]="l.state === 'active'">{{ stateLabel(l.state) }}</span>
-          <span class="clicks"><b>{{ formatCount(l.clickCount) }}</b><small>acumulados</small></span>
-          <button mat-icon-button type="button" (click)="copy(l.shortUrl)" [attr.aria-label]="'Copiar enlace ' + displayUrl(l.shortUrl)"><mat-icon aria-hidden="true">content_copy</mat-icon></button>
-        </li>
-      }
-    </ul>
-    @if (!recent().length) {
-      <div class="quiet-state"><mat-icon aria-hidden="true">add_link</mat-icon><h3>Haz sitio al primer enlace.</h3>
-        <p>{{ canCreate() ? 'Empieza por un destino que conozcas. Después podrás editarlo, compartirlo y consultar su actividad.' : 'Aquí aparecerán los enlaces que cree el equipo. Tu rol permite consultarlos y copiar su URL.' }}</p>
-        @if (canCreate()) { <button mat-flat-button type="button" (click)="newLink()">Crear mi primer enlace</button> }
-      </div>
-    }
-  </section>
+
+@if (hasWorkspace()) { <app-getting-started [compact]="true" /> }
+
+@if (hasWorkspace()) {
+  <nav class="workbench" aria-label="Accesos rápidos del workspace">
+    <a routerLink="/app/links" class="workbench-primary"><span class="workbench-icon"><mat-icon aria-hidden="true">link</mat-icon></span><span><b>Tu archivo de enlaces</b><small>Busca, consulta y comparte lo que has publicado.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
+    <a routerLink="/app/analytics"><span class="workbench-icon"><mat-icon aria-hidden="true">query_stats</mat-icon></span><span><b>Entiende el recorrido</b><small>Consulta clics, fuentes y periodos.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
+    <a routerLink="/app/team"><span class="workbench-icon"><mat-icon aria-hidden="true">group</mat-icon></span><span><b>Trabaja en equipo</b><small>Consulta quién forma parte de este espacio.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
+  </nav>
 }

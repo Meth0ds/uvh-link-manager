@@ -8,6 +8,7 @@ import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import type { WorkspaceGettingStarted } from "../../core/models";
 import { decodeWorkspaceDismissal, decodeWorkspaceGettingStarted } from "../../core/services/workspace-response-decoders";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { LatestRequest } from "../../core/services/latest-request";
 import { PageHeaderComponent } from "../page-header.component";
 import { gettingStartedSteps } from "./getting-started.steps";
@@ -29,6 +30,8 @@ export class GettingStartedComponent {
   private readonly workspaces = inject(WorkspaceService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly requests = new LatestRequest(this.destroyRef);
+  private readonly preferenceMutations = new OwnedMutations();
+  readonly preferenceBusy = this.preferenceMutations.busy;
   private readonly state = signal<LoadState | null>(null);
   // Local override of the server-side presentation preference. A mutation's
   // result always wins over a GET that was already in flight when it happened.
@@ -61,9 +64,11 @@ export class GettingStartedComponent {
   readonly complete = computed(() => this.data() !== null && this.steps().filter((s) => !s.optional).every((s) => s.observed));
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.preferenceMutations.reset());
     effect(() => {
       this.context(); // Register the dependency that triggers a reload.
       untracked(() => {
+        this.preferenceMutations.reset();
         this.reviewing.set(false);
         this.preferenceError.set(false);
         this.preference.set(null);
@@ -99,13 +104,10 @@ export class GettingStartedComponent {
 
   async dismiss(): Promise<void> {
     await this.setHidden(true);
-    this.reviewing.set(false);
   }
 
   async resume(): Promise<void> {
     await this.setHidden(false);
-    this.reviewing.set(true);
-    void this.reload();
   }
 
   /**
@@ -116,7 +118,11 @@ export class GettingStartedComponent {
    */
   private async setHidden(hidden: boolean): Promise<void> {
     const context = this.context();
-    if (!context) return;
+    if (!context || this.destroyRef.destroyed || this.preferenceBusy()) return;
+    const operation = this.preferenceMutations.begin(0);
+    const isCurrent = () => !this.destroyRef.destroyed && this.preferenceMutations.isCurrent(operation)
+      && context.key === this.context()?.key;
+    this.preferenceError.set(false);
     this.preference.set({ key: context.key, hidden });
     try {
       const result = await this.api.patch<{ ok: true; dismissedAt: string | null }>(
@@ -124,13 +130,23 @@ export class GettingStartedComponent {
         { hidden },
         decodeWorkspaceDismissal,
       );
+      if (!isCurrent()) return;
       this.preference.set({ key: context.key, hidden: result.dismissedAt != null });
       this.preferenceError.set(false);
     } catch {
+      if (!isCurrent()) return;
       // The server keeps its own truth: fall back to it and warn instead of
       // claiming a dismissal that never happened.
       this.preference.set(null);
       this.preferenceError.set(true);
+    } finally {
+      // Follow-up presentation and reads belong to this operation too. A late
+      // response from A must not review/reload B, or release a newer A request.
+      if (isCurrent()) {
+        this.reviewing.set(!hidden);
+        if (!hidden) void this.reload();
+      }
+      this.preferenceMutations.settle(operation);
     }
   }
 }

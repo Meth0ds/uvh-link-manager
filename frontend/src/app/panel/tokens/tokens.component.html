@@ -1,123 +1,118 @@
-<app-page-header icon="key" eyebrow="Acceso programático" title="Tokens de API" description="Crea credenciales de alcance mínimo para integrar tu workspace con otros sistemas." />
-
-@if (loading() && tokens().length) {
-  <mat-progress-bar mode="indeterminate" aria-label="Cargando tokens" />
-}
-@if (error()) {
-  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
-}
-
-<section class="create-card" aria-labelledby="token-create-title">
-  <div class="card-intro">
-    <span class="card-icon" aria-hidden="true"><mat-icon>key</mat-icon></span>
-    <div><span class="section-kicker">Una credencial por integración</span><h2 id="token-create-title">Define qué podrá hacer.</h2><p>Dale un nombre reconocible y selecciona sólo los permisos necesarios. Podrás revocarla desde este registro.</p></div>
-  </div>
-  <div class="create-fields">
-    <mat-form-field appearance="outline" class="grow">
-      <mat-label>Nombre de la integración</mat-label>
-      <input matInput placeholder="CI, integración, cron…" [(ngModel)]="name" maxlength="80" />
-    </mat-form-field>
-    <mat-form-field appearance="outline" class="expires">
-      <mat-label>Caduca (opcional)</mat-label>
-      <input matInput type="datetime-local" [(ngModel)]="expiresAt" [attr.aria-invalid]="expiryInvalid() || null" />
-      @if (expiryInvalid()) {
-        <mat-hint class="err-hint" role="alert">Introduce una fecha y hora válidas.</mat-hint>
-      }
-    </mat-form-field>
-  </div>
-
-  <fieldset class="scopes">
-    <legend>Permisos del token</legend>
-    @for (s of scopeOptions; track s) {
-      <mat-checkbox
-        color="primary"
-        [checked]="selectedScopes().includes(s.value)"
-        (change)="toggleScope(s.value)"
-        >
-        <span class="scope-copy"><code>{{ s.value }}</code><small>{{ s.label }}</small></span>
-      </mat-checkbox>
-    }
-  </fieldset>
-
-  <div class="credential-fields">
-    <div class="credential-copy"><span class="section-kicker">Confirmación de identidad</span><b>Autoriza esta credencial</b><span>El token permite operar fuera de tu sesión. Confirma tu identidad antes de generarlo.</span></div>
-    <mat-form-field appearance="outline">
-      <mat-label>Contraseña actual</mat-label>
-      <input matInput type="password" [(ngModel)]="password" autocomplete="current-password" maxlength="72" />
-      <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
-    </mat-form-field>
-    @if (user()?.mfaEnabled) {
-      <mat-form-field appearance="outline">
-        <mat-label>Segundo factor</mat-label>
-        <input matInput [(ngModel)]="factorCode" autocomplete="one-time-code" maxlength="24" />
-        <mat-icon matPrefix aria-hidden="true">key</mat-icon>
-        <mat-hint>Código del autenticador o de recuperación.</mat-hint>
-      </mat-form-field>
-    }
-  </div>
-
-  <div class="issue-actions">
-    <button mat-flat-button color="primary" type="button" (click)="create()" [disabled]="!name().trim() || !selectedScopes().length || !password() || (user()?.mfaEnabled && !factorCode().trim()) || expiryInvalid() || creating()" [attr.aria-busy]="creating()">
-      <mat-icon aria-hidden="true">add</mat-icon> {{ creating() ? 'Generando token…' : 'Generar token' }}
+<app-page-header icon="key" eyebrow="Acceso programático" title="Tokens de API" description="Gestiona las credenciales que conectan otras aplicaciones con tu workspace.">
+  @if (canManage()) {
+    <button #createButton mat-flat-button type="button" (click)="openCreate($event)" [disabled]="formOpen() || mutationBusy() || !!plainToken() || creationUnconfirmed()" [attr.aria-expanded]="formOpen()" aria-controls="token-create-panel">
+      <mat-icon aria-hidden="true">add</mat-icon> Crear token
     </button>
-    <p>El secreto se mostrará una sola vez. Guárdalo fuera del código y de los registros de tu aplicación.</p>
-  </div>
+  }
+</app-page-header>
 
+@if (!canManage()) {
+  <section class="access-notice" aria-labelledby="token-access-title">
+    <mat-icon aria-hidden="true">lock_outline</mat-icon>
+    <div><h2 id="token-access-title">Acceso a las credenciales</h2><p>{{ user() ? 'Necesitas permisos de edición y una cuenta verificada para consultar o gestionar los tokens de este workspace.' : 'Inicia sesión para gestionar las credenciales de un workspace.' }}</p></div>
+  </section>
+} @else {
   @if (plainToken(); as pt) {
-    <!-- Announce availability, not the credential itself: live regions must
-         not read the secret aloud as soon as a successful response arrives. -->
     <p class="issued-notice" role="status">Token generado. Guarda el secreto que se muestra a continuación.</p>
-    <section class="plain-box" aria-label="Secreto del token generado">
-      <p class="warning"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Guarda este token ahora.</b> Sólo se muestra una vez y no podrás volver a verlo.</span></p>
-      <div class="plain-row">
-        <code class="tnum">{{ pt }}</code>
-        <button mat-icon-button type="button" (click)="copyPlain()" aria-label="Copiar token"><mat-icon aria-hidden="true">content_copy</mat-icon></button>
+    <!-- The live region announces availability only, never the credential. -->
+    <section #issuedSection class="plain-box" tabindex="-1" aria-labelledby="token-issued-title">
+      <div class="issued-heading"><mat-icon aria-hidden="true">key</mat-icon><div><h2 id="token-issued-title">Guarda el token de {{ issuedName() }}</h2><p>Es la única vez que podrás ver este secreto. Guárdalo en el gestor de secretos de tu integración.</p></div></div>
+      <code class="plain-value tnum">{{ pt }}</code>
+      <div class="plain-actions">
+        <button mat-stroked-button type="button" (click)="copyPlain()" [disabled]="copyBusy()" [attr.aria-busy]="copyBusy()"><mat-icon aria-hidden="true">{{ copyFeedback() === 'Token copiado' ? 'check' : 'content_copy' }}</mat-icon>{{ copyBusy() ? 'Copiando…' : copyFeedback() === 'Token copiado' ? 'Token copiado' : 'Copiar token' }}</button>
+        <button mat-flat-button type="button" (click)="finishIssued($event)"><mat-icon aria-hidden="true">done</mat-icon> Ya lo he guardado</button>
       </div>
+      @if (copyFeedback()) { <p class="copy-feedback" role="status">{{ copyFeedback() }}</p> }
+      <p class="secret-note">Al confirmar, el secreto se ocultará. Podrás revocar el token desde el registro.</p>
     </section>
   }
-</section>
 
-<p class="registry-timezone">Fechas en tu zona horaria: {{ timeZone }}.</p>
-<div class="registry-heading"><div><span class="section-kicker">Credenciales del workspace</span><h2 id="token-registry-title">Registro de tokens</h2></div><span class="registry-note">Revocar interrumpe las integraciones que lo usan.</span></div>
-
-@if (loading() && !tokens().length) {
-  <app-panel-skeleton variant="list" label="Cargando tokens" />
-}
-
-@if (!loading() && (!error() || tokens().length)) {
-  <section class="token-list" aria-labelledby="token-registry-title">
-    @for (t of tokens(); track trackByToken($index, t)) {
-      <article class="token-row">
-        <span class="token-icon" aria-hidden="true"><mat-icon>{{ stateIcon(t) }}</mat-icon></span>
-        <div class="token-main">
-          <div class="token-title"><b>{{ t.name }}</b><span class="state-chip" [class.st-disabled]="state(t) === 'revoked'" [class.st-active]="state(t) === 'active'" [class.st-expired]="state(t) === 'expired'">{{ stateLabel(t) }}</span></div>
-          <div class="scope-chips">
-            @for (s of t.scopes; track s) {
-              <span class="scope-chip"><code>{{ s }}</code></span>
-            }
-          </div>
-          <span class="meta tnum">
-            Creado <time [attr.datetime]="t.createdAt">{{ formatDate(t.createdAt) }}</time>
-            @if (t.lastUsedAt) { · Último uso <time [attr.datetime]="t.lastUsedAt">{{ formatDate(t.lastUsedAt) }}</time> } @else { · Sin usar }
-            @if (t.expiresAt) { · {{ state(t) === 'expired' ? 'Caducó' : 'Caduca' }} <time [attr.datetime]="t.expiresAt">{{ formatDate(t.expiresAt) }}</time> } @else { · Sin caducidad }
-          </span>
+  @if (issueError()) {
+    <section class="issue-error" role="alert">
+      <p>{{ issueError() }}</p>
+      @if (creationUnconfirmed()) {
+        <div class="uncertain-actions">
+          <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || mutationBusy()">Actualizar registro</button>
+          <button mat-stroked-button type="button" (click)="acknowledgeUnconfirmed()" [disabled]="loading() || !!error() || mutationBusy() || !creationReviewed()">He revisado el registro</button>
         </div>
-        <div class="token-actions">
-          <button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="!!t.revokedAt || revokingId() !== null || !!error()" [attr.aria-label]="actionAriaLabel(t)"><mat-icon aria-hidden="true">block</mat-icon> {{ actionLabel(t) }}</button>
-        </div>
-      </article>
-    }
-    <!-- A bounded registry is not a complete one: revoked credentials are kept
-         as history and eventually push older rows out of the response. -->
-    @if (truncated() && !error()) {
-      <p class="registry-window" role="status">Se muestran los tokens más recientes. El workspace ha emitido más credenciales de las que caben en esta página: revoca las que ya no uses y vuelve a cargar para ver las siguientes.</p>
-    }
-    @if (!tokens().length && !error()) {
-      <div class="empty-state">
-        <mat-icon aria-hidden="true">key_off</mat-icon>
-        <b>Sin tokens</b>
-        <p>Si necesitas conectar una aplicación, configura su credencial arriba. Para usar el panel no necesitas ningún token.</p>
+      }
+    </section>
+  }
+
+  @if (formOpen()) {
+    <form id="token-create-panel" class="create-card" (ngSubmit)="create()" aria-labelledby="token-create-title">
+      <div class="create-heading"><div><h2 id="token-create-title">Una credencial para tu integración</h2><p>Define qué podrá hacer y hasta cuándo tendrá acceso.</p></div><button mat-button type="button" (click)="cancelCreate($event)" [disabled]="mutationBusy()">Cancelar</button></div>
+      <div class="create-fields">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Nombre de la integración</mat-label>
+          <input #nameInput matInput placeholder="Por ejemplo, informes de marketing" [(ngModel)]="name" name="tokenName" maxlength="80" [attr.aria-invalid]="nameInvalid() || null" />
+          @if (nameInvalid()) { <mat-hint class="err-hint">Utiliza entre 2 y 80 caracteres, sin caracteres de control.</mat-hint> }
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Caducidad opcional</mat-label>
+          <input matInput type="datetime-local" [(ngModel)]="expiresAt" name="expiry" [attr.aria-invalid]="!!expiryError() || null" />
+          <mat-hint [class.err-hint]="expiryError()">{{ expiryError() || 'Sin fecha, mantiene el acceso hasta que lo revoques.' }}</mat-hint>
+        </mat-form-field>
       </div>
+      <p class="form-timezone">La caducidad usa tu zona horaria: {{ timeZone }}.</p>
+      <fieldset class="scopes">
+        <legend>¿Qué necesita hacer esta integración?</legend>
+        @for (s of scopeOptions; track s.value) {
+          <mat-checkbox [checked]="selectedScopes().includes(s.value)" (change)="toggleScope(s.value)">
+            <span class="scope-copy"><span>{{ s.label }}</span><small>{{ s.description }}</small><code>{{ s.value }}</code></span>
+          </mat-checkbox>
+        }
+      </fieldset>
+      <p class="scope-note">Selecciona sólo los permisos necesarios. {{ selectedScopes().length ? selectedScopes().length + ' seleccionados.' : 'Aún no has seleccionado ninguno.' }}</p>
+      <section class="identity-check" aria-labelledby="token-identity-title">
+        <div><h3 id="token-identity-title">Confirma tu identidad</h3><p>Esta credencial permite operar fuera de tu sesión.</p></div>
+        <div class="credential-fields">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Contraseña actual</mat-label>
+            <input matInput type="password" [(ngModel)]="password" name="password" autocomplete="current-password" maxlength="72" [disabled]="creating()" />
+            <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
+          </mat-form-field>
+          @if (user()?.mfaEnabled) {
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Segundo factor</mat-label>
+              <input matInput [(ngModel)]="factorCode" name="factor" autocomplete="one-time-code" maxlength="24" [disabled]="creating()" />
+              <mat-icon matPrefix aria-hidden="true">key</mat-icon>
+              <mat-hint>Código del autenticador o de recuperación.</mat-hint>
+            </mat-form-field>
+          }
+        </div>
+      </section>
+      <div class="issue-actions"><p>El secreto se mostrará una sola vez. No lo incluyas en el código ni en los registros de tu aplicación.</p><button mat-flat-button type="submit" [disabled]="!canCreate()" [attr.aria-busy]="creating()"><mat-icon aria-hidden="true">{{ creating() ? 'hourglass_empty' : 'key' }}</mat-icon>{{ creating() ? 'Generando token…' : 'Generar token' }}</button></div>
+    </form>
+  }
+
+  <section class="registry" aria-labelledby="token-registry-title">
+    <div class="registry-heading"><div><h2 id="token-registry-title">Registro de tokens</h2><p>Revocar un token interrumpe las integraciones que lo usan.</p></div><button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || mutationBusy()" [attr.aria-busy]="loading()"><mat-icon aria-hidden="true">refresh</mat-icon>{{ loading() ? 'Actualizando…' : 'Actualizar' }}</button></div>
+    <p class="registry-timezone">Fechas en tu zona horaria: {{ timeZone }}.</p>
+    @if (loading() && tokens().length) {
+      <mat-progress-bar mode="indeterminate" aria-label="Actualizando tokens" />
+      <p class="read-notice" role="status">Se muestra la última lectura mientras se actualiza el registro. Espera a que termine para revocar un token.</p>
     }
+    @if (registryNeedsRefresh() && !loading()) { <p class="read-notice" role="status">El registro necesita una lectura actualizada. Comprueba el estado de las credenciales antes de revocar.</p> }
+    @if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()" [disabled]="loading()">Reintentar</button></div> }
+    @if (loading() && !tokens().length) { <app-panel-skeleton variant="list" label="Cargando tokens" /> }
+    <div class="token-list">
+      @for (t of tokens(); track trackByToken($index, t)) {
+        <article class="token-row">
+          <span class="token-icon" aria-hidden="true"><mat-icon>{{ stateIcon(t) }}</mat-icon></span>
+          <div class="token-main">
+            <div class="token-title"><b>{{ t.name }}</b><span class="state-chip" [class.st-disabled]="state(t) === 'revoked'" [class.st-active]="state(t) === 'active'" [class.st-expired]="state(t) === 'expired'">{{ stateLabel(t) }}</span></div>
+            <div class="scope-chips">@for (s of t.scopes; track s) { <span class="scope-chip"><code>{{ s }}</code></span> }</div>
+            <span class="meta tnum">Creado <time [attr.datetime]="t.createdAt">{{ formatDate(t.createdAt) }}</time>
+              @if (t.lastUsedAt) { · Último uso <time [attr.datetime]="t.lastUsedAt">{{ formatDate(t.lastUsedAt) }}</time> } @else { · Sin usar }
+              @if (t.expiresAt) { · {{ state(t) === 'expired' ? 'Caducó' : 'Caduca' }} <time [attr.datetime]="t.expiresAt">{{ formatDate(t.expiresAt) }}</time> } @else { · Sin caducidad }
+            </span>
+          </div>
+          <div class="token-actions"><button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="isRevoked(t) || mutationBusy() || loading() || registryNeedsRefresh() || !!error()" [attr.aria-label]="actionAriaLabel(t)" [attr.aria-busy]="revokingId() === t.id"><mat-icon aria-hidden="true">block</mat-icon>{{ revokingId() === t.id ? 'Revocando…' : actionLabel(t) }}</button></div>
+        </article>
+      }
+      @if (truncated()) { <p class="registry-window">Se muestran los 100 tokens más recientes, incluidos los revocados. Este registro no incluye todas las credenciales emitidas por el workspace.</p> }
+      @if (!loading() && !tokens().length && !error()) { <div class="empty-state"><mat-icon aria-hidden="true">key_off</mat-icon><b>Aún no hay tokens</b><p>Para conectar una aplicación, utiliza «Crear token». No necesitas una credencial API para usar el panel.</p></div> }
+    </div>
   </section>
 }

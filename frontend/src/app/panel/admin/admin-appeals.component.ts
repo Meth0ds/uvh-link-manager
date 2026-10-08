@@ -14,6 +14,8 @@ import { QueuePaging } from "../../core/queue-paging";
 import { ApiService } from "../../core/services/api.service";
 import { decodeAdminAppealsPage } from "../../core/services/admin-response-decoders";
 import { ActionDialogService } from "../action-dialog.service";
+import { SessionContextService } from "../../core/services/session-context.service";
+import { AdminViewContext } from "./admin-view-context";
 import { QueueSectionComponent } from "../queue-section.component";
 
 type AppealStatusFilter = "" | LinkAppealStatus;
@@ -38,6 +40,8 @@ export class AdminAppealsComponent {
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionDialogService);
   private readonly snackbar = inject(MatSnackBar);
+  private readonly view = new AdminViewContext(inject(SessionContextService), inject(DestroyRef));
+  readonly canOperate = this.view.eligible;
 
   /** Bumped by the console when another view of these links changed. */
   readonly reloadToken = input(0);
@@ -47,10 +51,12 @@ export class AdminAppealsComponent {
 
   readonly status = signal<AppealStatusFilter>("open");
   /** One verdict at a time: every case waits for the one in flight. */
-  readonly busy = signal(false);
+  readonly busy = this.view.busy;
 
   readonly appeals = new QueuePaging<AdminAppeal>({
     destroyRef: inject(DestroyRef),
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudieron cargar las apelaciones",
     filters: () => [this.status()],
     read: async (page, perPage, signal) => {
@@ -73,9 +79,18 @@ export class AdminAppealsComponent {
   readonly pageSizes = [10, 25, 50];
 
   constructor() {
+    let context = this.view.key();
     effect(() => {
+      const current = this.view.key();
       this.reloadToken();
-      untracked(() => void this.appeals.load());
+      untracked(() => {
+        if (current !== context) {
+          context = current;
+          this.appeals.reset();
+          this.status.set("open");
+        }
+        void this.appeals.load();
+      });
     });
   }
 
@@ -93,7 +108,8 @@ export class AdminAppealsComponent {
    * views that describe it.
    */
   async resolve(appeal: AdminAppeal, decision: "restore" | "uphold"): Promise<void> {
-    if (this.busy()) return;
+    const intent = this.view.capture();
+    if (!intent() || this.appeals.stale() || this.busy()) return;
     const restoring = decision === "restore";
     const note = await this.actions.prompt({
       title: restoring ? "Restaurar el enlace" : "Confirmar el bloqueo",
@@ -108,16 +124,19 @@ export class AdminAppealsComponent {
       inputMaxLength: 500,
     });
     // `null` is a cancelled dialog; an empty string is a decision without a note.
-    if (note === null || this.busy()) return;
-    this.busy.set(true);
+    if (note === null || this.appeals.stale()) return;
+    const operation = this.view.begin(`appeal-${appeal.id}`, intent);
+    if (!operation) return;
     try {
       await this.api.post(`/api/v1/admin/appeals/${appeal.id}/decision`, { decision, note: note.trim() });
+      if (!operation.isCurrent()) return;
       this.snackbar.open(restoring ? "Enlace restaurado" : "Bloqueo confirmado", "Cerrar", { duration: 2500 });
       this.changed.emit();
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.snackbar.open(apiMessage(error, "No se pudo completar la acción"), "Cerrar", { duration: 4000 });
     } finally {
-      this.busy.set(false);
+      operation.settle();
     }
   }
 }

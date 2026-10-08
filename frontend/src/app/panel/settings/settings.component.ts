@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
+import { NgZone, Component, computed, effect, inject, signal, untracked, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
 import { Location } from "@angular/common";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
@@ -47,6 +47,7 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-decoders";
+import { ReadDeadline } from "../../core/read-deadline";
 import { AsyncPoller } from "../../core/async-poller";
 import { AsyncOperationStatusComponent, type AsyncOperationTone } from "../async-operation-status.component";
 
@@ -187,6 +188,12 @@ export class SettingsComponent implements AfterViewInit {
   readonly sessionsTruncated = signal(false);
   readonly sessionsLoading = signal(true);
   readonly sessionsError = signal<string | null>(null);
+  private sessionDeadlineContext: string | null = null;
+  private readonly sessionDeadline = new ReadDeadline(this.destroyRef, inject(NgZone), () => {
+    if (this.sessionDeadlineContext !== this.accountContext() || !this.user() || this.sessionsLoading()) return;
+    this.sessions.update(rows => rows.filter(row => Date.parse(row.expires_at) > Date.now()));
+    void this.loadSessions();
+  });
 
   // ---------------- Data export ----------------
   readonly exportStatus = signal<DataExportStatus | null>(null);
@@ -405,6 +412,8 @@ export class SettingsComponent implements AfterViewInit {
     this.profileBusy.set(false);
     this.profileRefreshBusy.set(false);
     this.profileForm.reset({ name: this.user()?.name ?? "" });
+    this.sessionDeadline.stop();
+    this.sessionDeadlineContext = null;
     this.sessions.set([]);
     this.sessionsTruncated.set(false);
     this.sessionsLoading.set(false);
@@ -538,23 +547,27 @@ export class SettingsComponent implements AfterViewInit {
 
   async loadSessions(): Promise<void> {
     if (!this.user() || this.destroyRef.destroyed) return;
-    const context = this.auth.sessionGeneration();
+    this.sessionDeadline.stop();
+    const context = this.accountContext();
     const request = this.sessionsRequest.begin(context);
     this.sessionsLoading.set(true);
     this.sessionsError.set(null);
     try {
       const { sessions, truncated } = await this.auth.listSessions({ signal: request.signal });
-      if (!this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) return;
+      if (!this.sessionsRequest.isCurrent(request, this.accountContext())) return;
       const now = Date.now();
       this.sessions.set(sessions.filter((session) => !session.revoked_at && new Date(session.expires_at).getTime() > now));
       this.sessionsTruncated.set(truncated);
+      this.sessionDeadlineContext = context;
+      const deadlines = this.sessions().map(row => Date.parse(row.expires_at));
+      this.sessionDeadline.schedule(deadlines.length ? Math.min(...deadlines) : null);
     } catch (err) {
-      if (!this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) return;
+      if (!this.sessionsRequest.isCurrent(request, this.accountContext())) return;
       this.sessions.set([]);
       this.sessionsTruncated.set(false);
       this.sessionsError.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las sesiones");
     } finally {
-      if (this.sessionsRequest.isCurrent(request, this.auth.sessionGeneration())) this.sessionsLoading.set(false);
+      if (this.sessionsRequest.isCurrent(request, this.accountContext())) this.sessionsLoading.set(false);
     }
   }
 
@@ -968,6 +981,8 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async revokeSession(session: Session): Promise<void> {
+    if (!this.user() || this.destroyRef.destroyed || this.sessionsLoading() || this.sessionsError()
+      || session.revoked_at !== null || Date.parse(session.expires_at) <= Date.now()) return;
     const generation = this.auth.sessionGeneration();
     const context = this.accountContext();
     const request = this.sessionRevocationRequests.begin(context);

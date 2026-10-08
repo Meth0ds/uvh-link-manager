@@ -11,7 +11,7 @@ import { AuthRouteReuseStrategy } from "./core/auth-route-reuse";
 export const routes: Routes = [
   {
     path: "",
-    title: "UVH · Enlaces con recorrido",
+    title: "UVH · Acorta y gestiona tus enlaces",
     loadComponent: () => import("./landing/landing.component").then((m) => m.LandingComponent),
   },
   {

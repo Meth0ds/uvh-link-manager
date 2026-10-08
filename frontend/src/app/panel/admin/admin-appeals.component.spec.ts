@@ -4,6 +4,7 @@ import { MatSnackBar } from "@angular/material/snack-bar";
 import { AdminAppealsComponent } from "./admin-appeals.component";
 import { ApiService } from "../../core/services/api.service";
 import { ActionDialogService } from "../action-dialog.service";
+import { SessionContextService } from "../../core/services/session-context.service";
 import type { AdminAppeal } from "../../core/models";
 
 const appeal: AdminAppeal = {
@@ -43,6 +44,7 @@ describe("AdminAppealsComponent", () => {
       ],
     }).compileComponents();
 
+    TestBed.inject(SessionContextService).user.set({ id: 9001, name: "Operador", email: "operator@example.test", isAdmin: true, emailVerified: true, mfaEnabled: true });
     fixture = TestBed.createComponent(AdminAppealsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();

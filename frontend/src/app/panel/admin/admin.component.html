@@ -2,70 +2,107 @@
   icon="admin_panel_settings"
   eyebrow="Operación de plataforma"
   title="Administración"
-  description="Gestiona cuentas, resuelve denuncias y supervisa la operación desde un único lugar."
+  description="Revisa cuentas y denuncias, atiende solicitudes y comprueba el estado de la plataforma."
 >
-  <button mat-flat-button type="button" (click)="reloadAll()" [disabled]="refreshing()">
+  <button mat-flat-button type="button" (click)="openTab(3)" [disabled]="!canOperate()"><mat-icon>flag</mat-icon>Ir a moderación</button>
+  <button mat-stroked-button type="button" (click)="reloadAll()" [disabled]="refreshing() || !canOperate()">
     <mat-icon [class.spin]="refreshing()">refresh</mat-icon>
-    Actualizar
+    Actualizar todo
   </button>
 </app-page-header>
 
-@if (initialLoading()) {
-  <app-panel-skeleton variant="dashboard" label="Cargando administración" />
+@if (!canOperate()) {
+  <div class="alert error" role="alert"><span>El acceso a administración requiere una cuenta administradora verificada y MFA activo. Vuelve a autenticarte.</span></div>
 } @else {
+  @if (initialLoading() && !overview() && !summaryError()) {
+    <app-panel-skeleton variant="cards" label="Cargando resumen administrativo" />
+  }
   @if (summaryError(); as message) {
     <div class="alert error" role="alert">
       <mat-icon aria-hidden="true">lock_outline</mat-icon>
       <span>{{ message }}</span>
-      <button mat-stroked-button type="button" (click)="reloadAll()">Reintentar</button>
+      <button mat-stroked-button type="button" (click)="loadOverview()" [disabled]="summaryLoading()">Reintentar</button>
     </div>
   }
 
-  @if (overview(); as overviewData) {
-    <section class="command-strip" aria-label="Estado de la plataforma">
-      <div class="command-state" [class]="'state-' + (operations()?.state ?? 'attention')">
-        <span class="state-dot" aria-hidden="true"></span>
-        <div>
-          <b>{{ operations()?.state === 'healthy' ? 'Operación normal' : operations()?.state === 'critical' ? 'Intervención necesaria' : 'Revisión pendiente' }}</b>
-          <span>{{ countLabel(overviewData.openReports, "denuncia abierta", "denuncias abiertas") }} · {{ countLabel(operations()?.metrics?.failedJobs ?? 0, "trabajo fallido", "trabajos fallidos") }}</span>
-        </div>
+  <section class="command-strip" aria-label="Estado de la plataforma">
+    <div class="command-state" [class]="'state-' + (operationsConfirmed() ? operations()!.state : 'attention')">
+      <span class="state-dot" aria-hidden="true"></span>
+      <div>
+        <b>{{ !operationsConfirmed() ? 'Sin confirmar' : operations()!.state === 'healthy' ? 'Operación normal' : operations()!.state === 'critical' ? 'Intervención necesaria' : 'Revisión pendiente' }}</b>
+        <span>
+          @if (operationsConfirmed()) { {{ countLabel(operations()!.metrics.failedJobs, 'trabajo fallido', 'trabajos fallidos') }} }
+          @else { {{ operationsLoading() ? 'Comprobando el estado operativo…' : 'No hay una lectura vigente del estado operativo.' }} }
+        </span>
       </div>
-      <span class="command-time">
-        @if (operations()?.generatedAt) { Actualizado {{ formatDate(operations()!.generatedAt) }} }
-      </span>
-    </section>
+    </div>
+    <div class="command-meta"><span class="command-time">
+      @if (operations()?.generatedAt) { {{ operationsConfirmed() ? 'Actualizado' : 'Última lectura' }} {{ formatDate(operations()!.generatedAt) }} }
+    </span><button mat-stroked-button type="button" (click)="openTab(7)">Ver estado</button></div>
+  </section>
 
-    <section class="stat-cards" aria-label="Resumen administrativo">
-      <article class="stat-card">
-        <span><mat-icon>person</mat-icon>Usuarios activos</span>
+  @if (overview(); as overviewData) {
+    @if (summaryLoading() || summaryError()) { <p class="snapshot-note" role="status">Las cifras muestran el último resumen disponible.</p> }
+    <details class="summary-disclosure">
+      <summary>Resumen de la plataforma<mat-icon aria-hidden="true">expand_more</mat-icon></summary>
+    <section class="platform-summary" aria-label="Resumen administrativo">
+      <article class="platform-metric">
+        <span>Usuarios activos</span>
         <b class="tnum">{{ overviewData.users }}</b>
       </article>
-      <article class="stat-card">
-        <span><mat-icon>workspaces</mat-icon>Workspaces</span>
+      <article class="platform-metric">
+        <span>Workspaces</span>
         <b class="tnum">{{ overviewData.workspaces }}</b>
       </article>
-      <article class="stat-card">
-        <span><mat-icon>link</mat-icon>Enlaces</span>
+      <article class="platform-metric">
+        <span>Enlaces</span>
         <b class="tnum">{{ overviewData.links }}</b>
       </article>
-      <article class="stat-card">
-        <span><mat-icon>touch_app</mat-icon>Clics</span>
+      <article class="platform-metric">
+        <span>Clics</span>
         <b class="tnum">{{ overviewData.clicks }}</b>
       </article>
-      <article class="stat-card attention">
-        <span><mat-icon>flag</mat-icon>Por revisar</span>
+      <article class="platform-metric attention">
+        <span>Por revisar</span>
         <b class="tnum">{{ overviewData.openReports }}</b>
       </article>
-      <article class="stat-card blocked">
-        <span><mat-icon>block</mat-icon>Bloqueados</span>
+      <article class="platform-metric blocked">
+        <span>Bloqueados</span>
         <b class="tnum">{{ overviewData.blockedLinks }}</b>
       </article>
     </section>
+    </details>
 
-    <mat-tab-group animationDuration="180ms" class="admin-tabs" (selectedIndexChange)="openTab($event)">
-      <mat-tab aria-label="Usuarios">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true">group</mat-icon><span class="tab-label-text">Usuarios</span></ng-template>
-        <ng-template matTabContent>
+  }
+    <mat-form-field appearance="outline" class="section-picker">
+      <mat-label>Sección de administración</mat-label>
+      <mat-select [value]="activeTab()" (selectionChange)="openTab($event.value)" aria-label="Sección de administración">
+        @for (group of navigation; track group.label) {
+          <mat-optgroup [label]="group.label">
+            @for (section of group.sections; track section.index) { <mat-option [value]="section.index">{{ section.label }}</mat-option> }
+          </mat-optgroup>
+        }
+      </mat-select>
+    </mat-form-field>
+    <div class="admin-layout">
+      <aside class="admin-sidebar">
+        <div class="section-navigation" role="tablist" aria-label="Secciones de administración" aria-orientation="vertical">
+          @for (group of navigation; track group.label) {
+            <div class="navigation-group" role="group" [attr.aria-label]="group.label">
+              <h2>{{ group.label }}</h2>
+              @for (section of group.sections; track section.index) {
+                <button type="button" role="tab" [id]="'admin-section-' + section.index" [attr.aria-label]="section.label" [attr.aria-selected]="activeTab() === section.index" [attr.tabindex]="activeTab() === section.index ? 0 : -1" aria-controls="admin-content" (click)="openTab(section.index)" (keydown)="onSectionKeydown($event)">
+                  <mat-icon aria-hidden="true">{{ section.icon }}</mat-icon>
+                  <span><b>{{ section.label }}</b><small>{{ section.detail }}</small></span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </aside>
+      <section class="admin-content" id="admin-content" role="tabpanel" tabindex="0" [attr.aria-label]="sectionTitle()">
+        @switch (activeTab()) {
+          @case (0) {
         <section class="tab-panel">
           <!-- A failed read leaves the previous page on screen for context, but
                nothing on it may act and no total may claim to describe it. -->
@@ -80,7 +117,7 @@
             emptyHint="Prueba con otro término o filtro."
             [pageSizes]="[10, 25, 50, 100]"
           >
-            <p queue-summary>@if (!users.error()) { {{ countLabel(users.total(), 'cuenta coincide', 'cuentas coinciden') }} con los filtros. }</p>
+            <p queue-summary>@if (!users.stale()) { {{ countLabel(users.total(), 'cuenta coincide', 'cuentas coinciden') }} con los filtros. }</p>
             <div class="filters" queue-filters>
               <mat-form-field appearance="outline" class="filter-search">
                 <mat-label>Buscar usuarios</mat-label>
@@ -104,19 +141,19 @@
                     <span class="avatar">{{ user.name.slice(0, 1).toUpperCase() }}</span>
                     <span><b>{{ user.name }}</b><small>{{ user.email }}</small></span>
                   </div>
-                  <div class="badges" data-label="Acceso">
+                  <div class="badges" data-label="Acceso"><span class="field-label">Acceso</span>
                     <span class="badge" [class.danger]="!!user.deleted_at" [class.success]="!user.deleted_at">{{ accountStateLabel(!!user.deleted_at) }}</span>
                     @if (isAdminUser(user)) { <span class="badge accent">{{ accountFlags.admin }}</span> }
                     @if (!user.email_verified_at) { <span class="badge warning">{{ accountFlags.unverified }}</span> }
                     @if (hasMfa(user)) { <span class="badge neutral">{{ accountFlags.mfa }}</span> }
                   </div>
-                  <div class="usage" data-label="Actividad"><b>{{ user.links }}</b><small>enlaces</small><b>{{ user.workspaces }}</b><small>workspaces</small></div>
-                  <time data-label="Alta">{{ formatDate(user.created_at) }}</time>
+                  <div class="usage" data-label="Actividad"><span class="field-label">Actividad</span><b>{{ user.links }}</b><small>enlaces</small><b>{{ user.workspaces }}</b><small>workspaces</small></div>
+                  <time data-label="Alta"><span class="field-label">Alta</span>{{ formatDate(user.created_at) }}</time>
                   <div class="row-actions">
-                    <button mat-stroked-button type="button" (click)="toggleAdmin(user)" [disabled]="usersRead || actionKey() !== null">
-                      {{ isAdminUser(user) ? 'Retirar admin' : 'Hacer admin' }}
+                    <button mat-stroked-button type="button" (click)="toggleAdmin(user)" [attr.aria-label]="(isAdminUser(user) ? 'Retirar acceso administrador de ' : 'Conceder acceso administrador a ') + user.email" [disabled]="usersRead || actionKey() !== null">
+                      {{ isAdminUser(user) ? 'Retirar admin' : 'Conceder admin' }}
                     </button>
-                    <button mat-stroked-button type="button" [class.danger-button]="!user.deleted_at" (click)="toggleBlock(user)" [disabled]="usersRead || actionKey() !== null">
+                    <button mat-stroked-button type="button" [class.danger-button]="!user.deleted_at" (click)="toggleBlock(user)" [attr.aria-label]="(user.deleted_at ? 'Restaurar la cuenta de ' : 'Bloquear la cuenta de ') + user.email" [disabled]="usersRead || actionKey() !== null">
                       {{ user.deleted_at ? 'Restaurar' : 'Bloquear' }}
                     </button>
                   </div>
@@ -125,12 +162,9 @@
             </div>
           </app-queue-section>
         </section>
-        </ng-template>
-      </mat-tab>
+          }
 
-      <mat-tab aria-label="Registros pendientes">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true">mark_email_unread</mat-icon><span class="tab-label-text">Registros</span></ng-template>
-        <ng-template matTabContent>
+          @case (1) {
         <section class="tab-panel">
           <!-- Sólo el correo, cuándo se emitió el último y hasta cuándo vive su
                enlace: lo que responde «¿llegó el correo?», sin propuestas de
@@ -146,7 +180,7 @@
             emptyHint="Todos los registros han activado su cuenta o caducaron y se purgaron."
             [pageSizes]="[10, 25, 50, 100]"
           >
-            <p queue-summary>@if (!pendingRegistrations.error()) { {{ countLabel(pendingRegistrations.total(), 'registro pendiente coincide', 'registros pendientes coinciden') }} con los filtros. }</p>
+            <p queue-summary>@if (!pendingRegistrations.stale()) { {{ countLabel(pendingRegistrations.total(), 'registro pendiente coincide', 'registros pendientes coinciden') }} con los filtros. }</p>
             <div class="filters" queue-filters>
               <mat-form-field appearance="outline" class="filter-search">
                 <mat-label>Buscar por email</mat-label>
@@ -160,20 +194,17 @@
               @for (registration of pendingRegistrations.rows(); track registration.id) {
                 <article class="data-row pending-row" [class.is-stale]="pendingRead">
                   <div class="identity"><span><b>{{ registration.email }}</b></span></div>
-                  <time data-label="Alta">{{ formatDate(registration.created_at) }}</time>
-                  <span data-label="Último correo">{{ registration.last_mail_at ? formatDate(registration.last_mail_at) : '—' }}</span>
-                  <span data-label="Caducidad del enlace">{{ registration.link_expires_at ? formatDate(registration.link_expires_at) : '—' }}</span>
+                  <time data-label="Alta"><span class="field-label">Alta</span>{{ formatDate(registration.created_at) }}</time>
+                  <span data-label="Último correo"><span class="field-label">Último correo</span>{{ registration.last_mail_at ? formatDate(registration.last_mail_at) : '—' }}</span>
+                  <span data-label="Caducidad del enlace"><span class="field-label">Caducidad del enlace</span>{{ registration.link_expires_at ? formatDate(registration.link_expires_at) : '—' }}</span>
                 </article>
               }
             </div>
           </app-queue-section>
         </section>
-        </ng-template>
-      </mat-tab>
+          }
 
-      <mat-tab aria-label="Recuperación de cuentas">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true">support_agent</mat-icon><span class="tab-label-text">Recuperación</span></ng-template>
-        <ng-template matTabContent>
+          @case (2) {
         <section class="tab-panel">
           @let recoveriesRead = recoveries.stale();
           <app-queue-section
@@ -186,7 +217,7 @@
             emptyHint="No hay recuperaciones que coincidan con esta vista."
             [pageSizes]="[10, 25, 50, 100]"
           >
-            <p queue-summary>@if (!recoveries.error()) { {{ recoveries.total() }} expedientes. } Cada aprobación exige verificación de identidad externa y queda auditada.</p>
+            <p queue-summary>@if (!recoveries.stale()) { {{ recoveries.total() }} expedientes. } Cada aprobación exige verificación de identidad externa y queda auditada.</p>
             <div class="policy-note" queue-filters><mat-icon aria-hidden="true">policy</mat-icon><span>UVH no almacena documentos de identidad en estos expedientes. Dos administradores distintos, ambos con MFA activo, deben comprobar el procedimiento externo por separado.</span></div>
             <div class="filters" queue-filters>
               <mat-form-field appearance="outline" class="filter-search">
@@ -225,12 +256,9 @@
             </div>
           </app-queue-section>
         </section>
-        </ng-template>
-      </mat-tab>
+          }
 
-      <mat-tab aria-label="Moderación">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true">flag</mat-icon><span class="tab-label-text">Moderación</span></ng-template>
-        <ng-template matTabContent>
+          @case (3) {
         <section class="tab-panel">
           <!-- The tab is three queues with three owners. Each one keeps its own
                state and actions, and the console is the only place that knows
@@ -239,12 +267,9 @@
           <app-admin-appeals [reloadToken]="moderationRevision()" (changed)="onModerationChanged()" />
           <app-admin-destinations [reloadToken]="moderationRevision()" (changed)="onModerationChanged()" />
         </section>
-        </ng-template>
-      </mat-tab>
+          }
 
-      <mat-tab aria-label="Dominios">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true">language</mat-icon><span class="tab-label-text">Dominios</span></ng-template>
-        <ng-template matTabContent>
+          @case (4) {
         <section class="tab-panel">
           <app-queue-section
             title="Dominios de la plataforma"
@@ -256,7 +281,7 @@
             emptyHint="No hay resultados para esta vista."
             [pageSizes]="[10, 25, 50, 100]"
           >
-            <p queue-summary>@if (!domains.error()) { {{ countLabel(domains.total(), 'dominio coincide', 'dominios coinciden') }} con los filtros. }</p>
+            <p queue-summary>@if (!domains.stale()) { {{ countLabel(domains.total(), 'dominio coincide', 'dominios coinciden') }} con los filtros. }</p>
             <div class="filters" queue-filters>
               <mat-form-field appearance="outline" class="filter-search"><mat-label>Buscar dominio o workspace</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="domainQuery()" (keyup.enter)="searchDomains(domainSearch.value)" #domainSearch /><button mat-icon-button matSuffix type="button" (click)="searchDomains(domainSearch.value)" aria-label="Buscar dominios"><mat-icon>arrow_forward</mat-icon></button></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>Estado</mat-label><mat-select [value]="domainState()" (selectionChange)="filterDomains($event.value)"><mat-option value="">Todos</mat-option>@for (state of domainStateOptions; track state) { <mat-option [value]="state">{{ domainLabel(state) }}</mat-option> }</mat-select></mat-form-field>
@@ -264,17 +289,14 @@
             <div class="data-list domain-list" queue-rows>
               <div class="data-row data-head" aria-hidden="true"><span>Dominio</span><span>Workspace</span><span>Estado</span><span>Verificado</span><span>Actualizado</span></div>
               @for (domain of domains.rows(); track domain.id) {
-                <article class="data-row domain-row"><div class="domain-name"><span class="domain-icon"><mat-icon>language</mat-icon></span><div><b>{{ domain.domain }}</b><small>Propiedad {{ healthLabel(domain.ownership_status) }} · Ruta {{ healthLabel(domain.routing_status) }} · TLS {{ healthLabel(domain.tls_status) }} · {{ domain.links_count }} {{ domain.links_count === 1 ? 'enlace' : 'enlaces' }}</small>@if (domain.dns_error || domain.tls_error || domain.tls_not_after) { <small>@if (domain.dns_error) { DNS: {{ domain.dns_error }}. }@if (domain.tls_error) { TLS: {{ domain.tls_error }}. }@if (domain.tls_not_after) { Caduca el {{ formatDate(domain.tls_not_after) }}. }</small> }</div></div><span data-label="Workspace">{{ domain.workspace_name }} <small>#{{ domain.workspace_id }}</small></span><span data-label="Estado"><span class="badge" [class.success]="domain.state === 'active'" [class.warning]="domain.state === 'pending' || domain.state === 'verifying' || domain.state === 'provisioning'" [class.danger]="domain.state === 'error'" [class.neutral]="domain.state === 'verified' || domain.state === 'disabled'">{{ domainLabel(domain.state) }}</span></span><time data-label="Verificado">{{ domain.verified_at ? formatDate(domain.verified_at) : '—' }}</time><time data-label="Actualizado">{{ formatDate(domain.updated_at) }}</time></article>
+                <article class="data-row domain-row"><div class="domain-name"><span class="domain-icon"><mat-icon>language</mat-icon></span><div><b>{{ domain.domain }}</b><small>Propiedad {{ healthLabel(domain.ownership_status) }} · Ruta {{ healthLabel(domain.routing_status) }} · TLS {{ healthLabel(domain.tls_status) }} · {{ domain.links_count }} {{ domain.links_count === 1 ? 'enlace' : 'enlaces' }}</small>@if (domain.dns_error || domain.tls_error || domain.tls_not_after) { <small>@if (domain.dns_error) { DNS: {{ domain.dns_error }}. }@if (domain.tls_error) { TLS: {{ domain.tls_error }}. }@if (domain.tls_not_after) { Caduca el {{ formatDate(domain.tls_not_after) }}. }</small> }</div></div><span data-label="Workspace"><span class="field-label">Workspace</span>{{ domain.workspace_name }} <small>#{{ domain.workspace_id }}</small></span><span data-label="Estado"><span class="field-label">Estado</span><span class="badge" [class.success]="domain.state === 'active'" [class.warning]="domain.state === 'pending' || domain.state === 'verifying' || domain.state === 'provisioning'" [class.danger]="domain.state === 'error'" [class.neutral]="domain.state === 'verified' || domain.state === 'disabled'">{{ domainLabel(domain.state) }}</span></span><time data-label="Verificado"><span class="field-label">Verificado</span>{{ domain.verified_at ? formatDate(domain.verified_at) : '—' }}</time><time data-label="Actualizado"><span class="field-label">Actualizado</span>{{ formatDate(domain.updated_at) }}</time></article>
               }
             </div>
           </app-queue-section>
         </section>
-        </ng-template>
-      </mat-tab>
+          }
 
-      <mat-tab aria-label="Auditoría">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true">history</mat-icon><span class="tab-label-text">Auditoría</span></ng-template>
-        <ng-template matTabContent>
+          @case (5) {
         <section class="tab-panel">
           <app-queue-section
             title="Registro de actividad"
@@ -286,7 +308,7 @@
             emptyHint="No hay resultados para esta búsqueda."
             [pageSizes]="[25, 50, 100]"
           >
-            <p queue-summary>@if (!audit.error()) { {{ audit.total() }} eventos disponibles. }</p>
+            <p queue-summary>@if (!audit.stale()) { {{ audit.total() }} eventos disponibles. }</p>
             <div class="filters" queue-filters><mat-form-field appearance="outline" class="filter-search"><mat-label>Buscar acción o recurso</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="auditQuery()" (keyup.enter)="searchAudit(auditSearch.value)" #auditSearch /><button mat-icon-button matSuffix type="button" (click)="searchAudit(auditSearch.value)" aria-label="Buscar eventos"><mat-icon>arrow_forward</mat-icon></button></mat-form-field></div>
             <div class="audit-list" queue-rows>
               @for (event of audit.rows(); track event.id) {
@@ -295,12 +317,9 @@
             </div>
           </app-queue-section>
         </section>
-        </ng-template>
-      </mat-tab>
+          }
 
-      <mat-tab aria-label="Privacidad">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true">policy</mat-icon><span class="tab-label-text">Privacidad</span></ng-template>
-        <ng-template matTabContent>
+          @case (6) {
         <section class="tab-panel">
           @let privacyRead = privacy.stale();
           <app-queue-section
@@ -323,10 +342,14 @@
                   @if (request.messages.length) { <div class="privacy-thread">@for (message of request.messages; track message.id) { <div [class.admin]="message.authorRole === 'admin'"><span>{{ message.authorRole === 'admin' ? 'Equipo' : 'Usuario' }} · {{ formatDate(message.createdAt) }}</span><p>{{ message.body ?? 'Contenido cifrado no disponible' }}</p></div> }</div> }
                   @if (privacyActive(request.status)) {
                     <footer>
+                      <div class="privacy-case-actions">
                       @if (request.status === 'submitted') { <button mat-stroked-button type="button" (click)="startPrivacyReview(request)" [disabled]="privacyRead || actionKey() !== null">Tomar expediente</button> }
                       @if (request.status !== 'waiting_user') { <button mat-stroked-button type="button" (click)="requestPrivacyInformation(request)" [disabled]="privacyRead || actionKey() !== null">Pedir información</button> }
-                      @if (!request.extendedUntil) { <button mat-stroked-button type="button" (click)="extendPrivacy(request, 'complexity')" [disabled]="privacyRead || actionKey() !== null">Ampliar: complejidad</button><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'request_volume')" [disabled]="privacyRead || actionKey() !== null">Ampliar: volumen</button> }
                       <button mat-flat-button color="primary" type="button" (click)="completePrivacy(request)" [disabled]="privacyRead || actionKey() !== null">Resolver</button>
+                      </div>
+                      @if (!request.extendedUntil) {
+                        <div class="privacy-deadline-actions"><p>Ampliación del plazo</p><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'complexity')" [disabled]="privacyRead || actionKey() !== null">Por complejidad</button><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'request_volume')" [disabled]="privacyRead || actionKey() !== null">Por volumen</button></div>
+                      }
                       <button mat-stroked-button class="danger-button" type="button" (click)="rejectPrivacy(request)" [disabled]="privacyRead || actionKey() !== null">Cerrar motivadamente</button>
                     </footer>
                   }
@@ -335,20 +358,18 @@
             </div>
           </app-queue-section>
         </section>
-        </ng-template>
-      </mat-tab>
+          }
 
-      <mat-tab aria-label="Sistema">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true">monitor_heart</mat-icon><span class="tab-label-text">Sistema</span></ng-template>
-        <ng-template matTabContent>
+          @case (7) {
         <section class="tab-panel system-panel">
           <header class="section-heading"><div><h2>Estado operativo</h2><p>Señales internas para detectar colas detenidas, entregas fallidas o configuración incompleta.</p></div><button mat-stroked-button type="button" (click)="loadOperations(); mail.load()" [disabled]="operationsLoading() || mail.loading()"><mat-icon>refresh</mat-icon>Actualizar</button></header>
           @if (operationsLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando estado operativo" /> }
           @if (operationsError(); as message) { <div class="alert error compact" role="alert"><mat-icon>error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadOperations()">Reintentar</button></div> }
           @if (operations(); as operation) {
-            <div class="system-overview"><div><span>Entorno</span><b>{{ environmentLabel(operation.environment) }}</b></div><div><span>Trabajos pendientes</span><b>{{ operation.metrics.pendingJobs }}</b><small>espera máxima {{ ageLabel(operation.metrics.oldestJobAgeSeconds) }}</small></div><div><span>Worker</span><b [class.metric-alert]="operation.metrics.queueHeartbeatAgeSeconds === null || operation.metrics.queueHeartbeatAgeSeconds > 180">{{ ageLabel(operation.metrics.queueHeartbeatAgeSeconds) }}</b><small>desde el último pulso</small></div><div><span>Scheduler</span><b [class.metric-alert]="operation.metrics.schedulerHeartbeatAgeSeconds === null || operation.metrics.schedulerHeartbeatAgeSeconds > 210">{{ ageLabel(operation.metrics.schedulerHeartbeatAgeSeconds) }}</b><small>desde el último pulso</small></div><div><span>Trabajos fallidos</span><b [class.metric-alert]="operation.metrics.failedJobs > 0">{{ operation.metrics.failedJobs }}</b></div><div><span>Correo pendiente</span><b>{{ count(operation.metrics.mailOutbox, 'pending') + count(operation.metrics.mailOutbox, 'queued') + count(operation.metrics.mailOutbox, 'processing') + count(operation.metrics.mailOutbox, 'comp_pending') + count(operation.metrics.mailOutbox, 'compensating') }}</b><small><span [class.metric-alert]="operation.metrics.oldestPendingMailAgeSeconds !== null && operation.metrics.oldestPendingMailAgeSeconds > 600">espera máxima {{ ageLabel(operation.metrics.oldestPendingMailAgeSeconds) }}</span></small></div><div><span>Correo fallido</span><b [class.metric-alert]="count(operation.metrics.mailOutbox, 'failed') > 0">{{ count(operation.metrics.mailOutbox, 'failed') }}</b></div><div><span>Solicitudes RGPD</span><b>{{ operation.metrics.activePrivacyRequests }}</b><small><span [class.metric-alert]="operation.metrics.overduePrivacyRequests > 0">{{ operation.metrics.overduePrivacyRequests }} fuera de plazo</span></small></div><div><span>Sesiones activas</span><b>{{ operation.metrics.activeSessions }}</b></div><div><span>Registros pendientes</span><b>{{ operation.metrics.pendingRegistrations }}</b></div><div><span>Webhooks fallidos</span><b [class.metric-alert]="count(operation.metrics.webhookDeliveries, 'failed') > 0">{{ count(operation.metrics.webhookDeliveries, 'failed') }}</b></div></div>
+            @if (!operationsConfirmed()) { <p class="snapshot-note" role="status">Datos de la última lectura. El estado actual está sin confirmar.</p> }
+            <div class="system-overview"><div><span>Entorno</span><b>{{ environmentLabel(operation.environment) }}</b></div><div><span>Trabajos pendientes</span><b>{{ operation.metrics.pendingJobs }}</b><small>espera máxima {{ ageLabel(operation.metrics.oldestJobAgeSeconds) }}</small></div><div><span>Worker</span><b [class.metric-alert]="operation.metrics.queueHeartbeatAgeSeconds === null || operation.metrics.queueHeartbeatAgeSeconds > 180">{{ ageLabel(operation.metrics.queueHeartbeatAgeSeconds, 'Sin señal') }}</b><small>desde el último pulso</small></div><div><span>Scheduler</span><b [class.metric-alert]="operation.metrics.schedulerHeartbeatAgeSeconds === null || operation.metrics.schedulerHeartbeatAgeSeconds > 210">{{ ageLabel(operation.metrics.schedulerHeartbeatAgeSeconds, 'Sin señal') }}</b><small>desde el último pulso</small></div><div><span>Trabajos fallidos</span><b [class.metric-alert]="operation.metrics.failedJobs > 0">{{ operation.metrics.failedJobs }}</b></div><div><span>Correo pendiente</span><b>{{ count(operation.metrics.mailOutbox, 'pending') + count(operation.metrics.mailOutbox, 'queued') + count(operation.metrics.mailOutbox, 'processing') + count(operation.metrics.mailOutbox, 'comp_pending') + count(operation.metrics.mailOutbox, 'compensating') }}</b><small><span [class.metric-alert]="operation.metrics.oldestPendingMailAgeSeconds !== null && operation.metrics.oldestPendingMailAgeSeconds > 600">espera máxima {{ ageLabel(operation.metrics.oldestPendingMailAgeSeconds) }}</span></small></div><div><span>Correo fallido</span><b [class.metric-alert]="count(operation.metrics.mailOutbox, 'failed') > 0">{{ count(operation.metrics.mailOutbox, 'failed') }}</b></div><div><span>Solicitudes RGPD</span><b>{{ operation.metrics.activePrivacyRequests }}</b><small><span [class.metric-alert]="operation.metrics.overduePrivacyRequests > 0">{{ operation.metrics.overduePrivacyRequests }} fuera de plazo</span></small></div><div><span>Sesiones activas</span><b>{{ operation.metrics.activeSessions }}</b></div><div><span>Registros pendientes</span><b>{{ operation.metrics.pendingRegistrations }}</b></div><div><span>Webhooks fallidos</span><b [class.metric-alert]="count(operation.metrics.webhookDeliveries, 'failed') > 0">{{ count(operation.metrics.webhookDeliveries, 'failed') }}</b></div></div>
             <div class="system-columns">
-              <section class="check-card"><header><div><h3>Preparación del entorno</h3><p>Requisitos evaluados por la aplicación.</p></div><span class="badge" [class.success]="operation.state === 'healthy'" [class.warning]="operation.state === 'attention'" [class.danger]="operation.state === 'critical'">{{ operation.state === 'healthy' ? 'Correcto' : operation.state === 'critical' ? 'Crítico' : 'Atención' }}</span></header><div class="check-list">@for (check of operation.checks; track check.key) { <div class="check-row" [class]="'check-' + check.status"><mat-icon>{{ check.status === 'ok' ? 'check_circle' : check.status === 'critical' ? 'cancel' : 'warning' }}</mat-icon><div><b>{{ check.label }}</b>@if (check.detail) { <span>{{ check.detail }}</span> }</div></div> }</div></section>
+              <section class="check-card"><header><div><h3>Preparación del entorno</h3><p>Requisitos evaluados por la aplicación.</p></div><span class="badge" [class.success]="operationsConfirmed() && operation.state === 'healthy'" [class.warning]="operationsConfirmed() && operation.state === 'attention'" [class.danger]="operationsConfirmed() && operation.state === 'critical'">{{ !operationsConfirmed() ? 'Sin confirmar' : operation.state === 'healthy' ? 'Correcto' : operation.state === 'critical' ? 'Crítico' : 'Atención' }}</span></header><div class="check-list">@for (check of operation.checks; track check.key) { <div class="check-row" [class]="'check-' + check.status"><mat-icon>{{ check.status === 'ok' ? 'check_circle' : check.status === 'critical' ? 'cancel' : 'warning' }}</mat-icon><div><b>{{ check.label }}</b>@if (check.detail) { <span>{{ check.detail }}</span> }</div></div> }</div></section>
               <section class="check-card"><header><div><h3>Entrega e incidentes</h3><p>Señales agregadas de la última hora, sin rutas, destinatarios, cuentas ni contenido.</p></div></header><div class="metric-list"><div><span>Webhooks pendientes</span><b>{{ count(operation.metrics.webhookDeliveries, 'pending') }}</b></div><div><span>Webhooks en proceso</span><b>{{ count(operation.metrics.webhookDeliveries, 'processing') }}</b></div><div><span>Espera webhook máxima</span><b [class.metric-alert]="operation.metrics.oldestPendingWebhookAgeSeconds !== null && operation.metrics.oldestPendingWebhookAgeSeconds > 600">{{ ageLabel(operation.metrics.oldestPendingWebhookAgeSeconds) }}</b></div><div><span>Webhooks entregados</span><b>{{ count(operation.metrics.webhookDeliveries, 'success') }}</b></div><div><span>Webhooks fallidos</span><b [class.metric-alert]="count(operation.metrics.webhookDeliveries, 'failed') > 0">{{ count(operation.metrics.webhookDeliveries, 'failed') }}</b></div><div><span>Correos enviados</span><b>{{ count(operation.metrics.mailOutbox, 'sent') }}</b></div><div><span>Correos fallidos</span><b [class.metric-alert]="count(operation.metrics.mailOutbox, 'failed') > 0">{{ count(operation.metrics.mailOutbox, 'failed') }}</b></div><div><span>DNS en curso</span><b [class.metric-alert]="operation.metrics.oldestDnsCheckAgeSeconds !== null && operation.metrics.oldestDnsCheckAgeSeconds > 600">{{ ageLabel(operation.metrics.oldestDnsCheckAgeSeconds) }}</b></div><div><span>TLS en curso</span><b [class.metric-alert]="operation.metrics.oldestTlsProvisioningAgeSeconds !== null && operation.metrics.oldestTlsProvisioningAgeSeconds > 3600">{{ ageLabel(operation.metrics.oldestTlsProvisioningAgeSeconds) }}</b></div><div><span>Respuestas 5xx</span><b [class.metric-alert]="count(operation.metrics.events60m, 'http.server_error') > 0">{{ count(operation.metrics.events60m, 'http.server_error') }}</b></div><div><span>Respuestas 429</span><b>{{ count(operation.metrics.events60m, 'http.too_many_requests') }}</b></div><div><span>hCaptcha no disponible</span><b [class.metric-alert]="count(operation.metrics.events60m, 'hcaptcha.unavailable') > 0">{{ count(operation.metrics.events60m, 'hcaptcha.unavailable') }}</b></div><div><span>Fallos de auditoría</span><b [class.metric-alert]="count(operation.metrics.events60m, 'audit.write_failed') > 0">{{ count(operation.metrics.events60m, 'audit.write_failed') }}</b></div><div><span>Fallos de housekeeping</span><b [class.metric-alert]="count(operation.metrics.events60m, 'housekeeping.stage_failed') > 0">{{ count(operation.metrics.events60m, 'housekeeping.stage_failed') }}</b></div></div></section>
             </div>
           }
@@ -384,8 +405,8 @@
             </app-queue-section>
           </section>
         </section>
-        </ng-template>
-      </mat-tab>
-    </mat-tab-group>
-  }
+          }
+        }
+      </section>
+    </div>
 }

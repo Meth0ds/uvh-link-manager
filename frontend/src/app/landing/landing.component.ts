@@ -11,6 +11,7 @@ import { decodePublicConfig } from "../core/services/public-response-decoders";
 import { PublicThemeToggleComponent } from "../core/public-theme-toggle.component";
 
 type ProductViewId = "publish" | "route" | "measure";
+type NavigationSection = "producto" | "control" | "operacion" | "faq";
 
 interface ProductView {
   id: ProductViewId;
@@ -46,6 +47,17 @@ export class LandingComponent {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private layoutFrame?: number;
+  private focusFrame?: number;
+  private sizeObserver?: ResizeObserver;
+  private layout?: {
+    header: HTMLElement | null;
+    form: HTMLElement | null;
+    closing: HTMLElement | null;
+    create: HTMLElement | null;
+    login: HTMLElement | null;
+    sections: { id: NavigationSection; element: HTMLElement }[];
+  };
 
   @ViewChild("menuButton") private menuButton?: ElementRef<HTMLButtonElement>;
 
@@ -56,12 +68,21 @@ export class LandingComponent {
   readonly mobileOpen = signal(false);
   readonly scrolled = signal(false);
   readonly pageProgress = signal(0);
+  readonly compactHeader = signal(false);
+  readonly activeSection = signal<NavigationSection | null>(null);
+  readonly showMobileCreate = signal(false);
+  readonly mobileCreateVisible = computed(() => this.showMobileCreate() && !this.mobileOpen());
+  readonly navigationItems: { id: NavigationSection; label: string }[] = [
+    { id: "producto", label: "Qué puedes hacer" },
+    { id: "control", label: "Cómo empezar" },
+    { id: "operacion", label: "Para equipos" },
+    { id: "faq", label: "Preguntas" },
+  ];
   // The illustration is a local demonstration, never a published link or a
   // reserved alias. Switching it does not send the visitor's URL anywhere.
   readonly destinationChanged = signal(false);
   readonly year = new Date().getFullYear();
-  readonly destinationPreview = computed(() => this.previewDestination(this.demoUrl()));
-  readonly destinationReady = computed(() => this.destinationPreview()?.valid === true);
+  readonly destinationReady = computed(() => this.isValidDestination(this.demoUrl()));
 
   readonly activeProductViewId = signal<ProductViewId>("publish");
   readonly activeProductView = computed(() => this.productViews.find((view) => view.id === this.activeProductViewId())!);
@@ -69,9 +90,9 @@ export class LandingComponent {
   readonly productViews: ProductView[] = [
     {
       id: "publish",
-      label: "Una carta impresa",
+      label: "Cartas y documentos",
       icon: "add_link",
-      title: "Cambian los platos. Las mesas siguen puestas.",
+      title: "Actualiza la carta sin cambiar el enlace impreso.",
       description: "Has impreso la dirección de tu carta en cada mesa. Cuando llegue la nueva temporada, cambia el destino en UVH y conserva el enlace que tus clientes ya tienen.",
       bullets: ["Elige un alias que puedas leer en voz alta: /carta.", "Publica el enlace y úsalo en tus materiales.", "Actualiza el destino cuando cambie el menú."],
       alias: "go.turestaurante.es/carta",
@@ -81,21 +102,21 @@ export class LandingComponent {
     },
     {
       id: "route",
-      label: "Un evento bilingüe",
+      label: "Eventos e idiomas",
       icon: "route",
-      title: "Un cartel. Cada lector, a su programa.",
+      title: "Comparte el programa en el idioma adecuado.",
       description: "Comparte una sola dirección para el evento. Una regla de idioma puede llevar al programa en español; el destino principal atiende a quienes no coincidan con esa regla.",
       bullets: ["Define el programa general como destino principal.", "Añade una regla para el idioma español.", "Ordena las reglas: se aplica la primera que coincida."],
       alias: "go.tuevento.es/programa",
       before: "/programme",
       after: "/es/programa",
-      note: "Idioma es → programa en español. Sin coincidencia → programa general.",
+      note: "Si el idioma es español, se abre su programa. Si ninguna regla coincide, se abre el programa general.",
     },
     {
       id: "measure",
-      label: "Una newsletter",
+      label: "Campañas y clics",
       icon: "query_stats",
-      title: "Después de enviar, aún queda trabajo.",
+      title: "Consulta los clics de cada campaña.",
       description: "Prepara un enlace para tu boletín y consulta sus clics por periodo. Si la página de destino se mueve, puedes corregirla sin reenviar el correo a toda la lista.",
       bullets: ["Usa un enlace específico para cada envío.", "Consulta cuándo recibe clics y desde qué dispositivos.", "Corrige el destino si cambia la página de la campaña."],
       alias: "uvh.es/edicion-septiembre",
@@ -106,9 +127,9 @@ export class LandingComponent {
   ];
 
   readonly operations = [
-    { icon: "language", guide: "domains", title: "Dominios propios", text: "Comparte go.tumarca.es en lugar de una dirección ajena. Requiere un subdominio con CNAME directo, verificación DNS y activación TLS." },
-    { icon: "key", guide: "api", title: "API tokens", text: "Crea enlaces desde tus propias herramientas. Limita los permisos de cada token, define su caducidad y revócalo cuando deje de hacer falta." },
-    { icon: "webhook", guide: "webhooks", title: "Webhooks", text: "Recibe eventos en tu sistema y revisa el historial de entregas. Las firmas y los reintentos te ayudan a comprobar qué has recibido." },
+    { icon: "language", guide: "domains", title: "Dominios propios", text: "Usa una dirección como go.tumarca.es para que tus enlaces también lleven tu marca. El panel te guía para verificar y activar el subdominio." },
+    { icon: "key", guide: "api", title: "Conecta tus herramientas", text: "Crea y gestiona enlaces desde otros sistemas con API tokens. Define sus permisos y caducidad, y retira el acceso cuando ya no lo necesites." },
+    { icon: "webhook", guide: "webhooks", title: "Recibe eventos en tu sistema", text: "Conecta webhooks para recibir los eventos de UVH. Consulta las entregas y sus reintentos, y verifica su origen mediante firmas." },
   ];
 
   readonly faqs = [
@@ -144,50 +165,87 @@ export class LandingComponent {
       .get<{ appUrl: string }>("/api/v1/config", undefined, decodePublicConfig)
       .then((config) => this.appUrl.set(this.resolveAppUrl(config.appUrl)))
       .catch(() => undefined);
-    afterNextRender(() => this.installRevealObserver());
+    afterNextRender(() => this.captureLayout());
     this.destroyRef.onDestroy(() => {
       this.document.body.classList.remove("uvh-menu-open");
+      this.sizeObserver?.disconnect();
+      const view = this.document.defaultView;
+      if (this.layoutFrame !== undefined) view?.cancelAnimationFrame(this.layoutFrame);
+      if (this.focusFrame !== undefined) view?.cancelAnimationFrame(this.focusFrame);
+      this.layoutFrame = undefined;
+      this.focusFrame = undefined;
+      this.layout = undefined;
     });
+  }
+
+  /** Cache owned elements, not their bounds: FAQ, fonts and responsive content
+   * may change their position without a scroll event. One frame reads all bounds.
+   */
+  private captureLayout(): void {
+    if (this.destroyRef.destroyed) return;
+    const root = this.host.nativeElement;
+    this.layout = {
+      header: root.querySelector(".site-header"),
+      form: root.querySelector(".hero-form"),
+      closing: root.querySelector(".closing-section"),
+      create: root.querySelector(".mobile-create"),
+      login: root.querySelector(".login-link"),
+      sections: this.navigationItems.flatMap(({ id }) => {
+        const element = root.querySelector<HTMLElement>("#" + id);
+        return element ? [{ id, element }] : [];
+      }),
+    };
+    if (typeof ResizeObserver !== "undefined") {
+      this.sizeObserver = new ResizeObserver(() => this.scheduleMeasurements());
+      const main = root.querySelector("main");
+      if (main) this.sizeObserver.observe(main);
+      if (this.layout.header) this.sizeObserver.observe(this.layout.header);
+    }
+    this.scheduleMeasurements();
   }
 
   @HostListener("window:scroll")
   onWindowScroll(): void {
+    this.scheduleMeasurements();
+  }
+
+  private scheduleMeasurements(): void {
     const view = this.document.defaultView;
-    const offset = view?.scrollY ?? 0;
-    const travel = this.document.documentElement.scrollHeight - (view?.innerHeight ?? 0);
+    if (!view || this.destroyRef.destroyed || this.layoutFrame !== undefined) return;
+    this.layoutFrame = view.requestAnimationFrame(() => {
+      this.layoutFrame = undefined;
+      if (!this.destroyRef.destroyed) this.measureLayout();
+    });
+  }
+
+  private measureLayout(): void {
+    const view = this.document.defaultView;
+    if (!view) return;
+    const offset = view.scrollY;
+    const travel = this.document.documentElement.scrollHeight - view.innerHeight;
     this.scrolled.set(offset > 18);
     this.pageProgress.set(travel > 0 ? Math.min(1, Math.max(0, offset / travel)) : 0);
+    // Hysteresis avoids repeated expansion/collapse when header height changes.
+    if (offset > 160) this.compactHeader.set(true);
+    else if (offset < 64) this.compactHeader.set(false);
+    const layout = this.layout;
+    if (!layout) return;
+    const line = (layout.header?.getBoundingClientRect().height ?? 72) + 32;
+    this.activeSection.set(layout.sections.find(({ element }) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.top <= line + 1 && bounds.bottom > line;
+    })?.id ?? null);
+    const form = layout.form?.getBoundingClientRect();
+    const closing = layout.closing?.getBoundingClientRect();
+    const focusedCreate = this.document.activeElement === layout.create;
+    const focusedLogin = this.document.activeElement === layout.login;
+    this.showMobileCreate.set(view.innerWidth <= 760 && !focusedLogin &&
+      (focusedCreate || (!!form && form.bottom < line && (!closing || closing.top > view.innerHeight))));
   }
 
   @HostListener("window:resize")
   onWindowResize(): void {
-    if ((this.document.defaultView?.innerWidth ?? 0) > 940 && this.mobileOpen()) this.closeMobileMenu();
-    this.onWindowScroll();
-  }
-
-  /** Observe once and disconnect on teardown. The observer adds motion only;
-   * it never owns content visibility, even in a throttled background tab.
-   */
-  private installRevealObserver(): void {
-    const view = this.document.defaultView;
-    if (!view || typeof IntersectionObserver === "undefined"
-      || (typeof view.matchMedia === "function" && view.matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        entry.target.classList.remove("reveal-pending");
-        entry.target.classList.add("reveal-enter");
-        observer.unobserve(entry.target);
-      }
-    }, { threshold: 0.08 });
-    const elements = this.host.nativeElement.querySelectorAll<HTMLElement>(".section-heading, .case-study, .guide-heading, .guide-notes article, .team-intro, .workspace-sheet, .operations-list article, .faq-intro, .faq-list, .closing-inner");
-    elements.forEach((element) => {
-      if (element.getBoundingClientRect().top > view.innerHeight) {
-        element.classList.add("scroll-reveal", "reveal-pending");
-        observer.observe(element);
-      }
-    });
-    this.destroyRef.onDestroy(() => observer.disconnect());
+    if ((this.document.defaultView?.innerWidth ?? 0) > 1000 && this.mobileOpen()) this.closeMobileMenu();
     this.onWindowScroll();
   }
 
@@ -226,7 +284,7 @@ export class LandingComponent {
   closeMobileMenu(restoreFocus = false): void {
     this.mobileOpen.set(false);
     this.document.body.classList.remove("uvh-menu-open");
-    if (restoreFocus) this.document.defaultView?.requestAnimationFrame(() => this.menuButton?.nativeElement.focus());
+    if (restoreFocus) this.queueFocus(() => this.menuButton?.nativeElement.focus());
   }
 
   async submitDemo(): Promise<void> {
@@ -251,14 +309,31 @@ export class LandingComponent {
   }
 
   focusHero(): void {
+    this.focusTarget("hero-url", "center");
+  }
+
+  focusStart(): void {
+    this.focusTarget("hero-title", "start");
+  }
+
+  private focusTarget(id: string, block: ScrollLogicalPosition): void {
     this.closeMobileMenu();
-    this.document.defaultView?.requestAnimationFrame(() => {
-      const input = this.document.getElementById("hero-url") as HTMLInputElement | null;
-      input?.focus({ preventScroll: true });
+    this.queueFocus(() => {
+      const target = this.host.nativeElement.querySelector<HTMLElement>("#" + id);
+      target?.focus({ preventScroll: true });
       const view = this.document.defaultView;
-      const reducedMotion = typeof view?.matchMedia === "function"
-        && view.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      input?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+      const reduced = typeof view?.matchMedia === "function" && view.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      target?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block });
+    });
+  }
+
+  private queueFocus(action: () => void): void {
+    const view = this.document.defaultView;
+    if (!view || this.destroyRef.destroyed) return;
+    if (this.focusFrame !== undefined) view.cancelAnimationFrame(this.focusFrame);
+    this.focusFrame = view.requestAnimationFrame(() => {
+      this.focusFrame = undefined;
+      if (!this.destroyRef.destroyed) action();
     });
   }
 
@@ -279,7 +354,7 @@ export class LandingComponent {
     event.preventDefault();
     this.selectProductView(this.productViews[nextIndex].id);
     const tabs = (event.currentTarget as HTMLElement | null)?.parentElement?.querySelectorAll<HTMLButtonElement>("[role='tab']");
-    this.document.defaultView?.requestAnimationFrame(() => tabs?.item(nextIndex!)?.focus());
+    this.queueFocus(() => tabs?.item(nextIndex!)?.focus());
   }
 
   /** Small seam for testing the public-to-app handoff without navigating the test runner. */
@@ -288,25 +363,21 @@ export class LandingComponent {
   }
 
   private validDestination(raw: string): boolean {
-    if (!this.previewDestination(raw)?.valid) {
-      this.demoError.set("Introduce una URL http(s) válida, sin credenciales embebidas.");
+    if (!this.isValidDestination(raw)) {
+      this.demoError.set("Introduce una URL http(s) válida. Debe empezar por http:// o https:// y no incluir usuario ni contraseña.");
       return false;
     }
     return true;
   }
 
-  private previewDestination(raw: string): { valid: true; host: string; destination: string; alias: string } | null {
+  private isValidDestination(raw: string): boolean {
     const value = raw.trim();
-    if (!value || value.length > 2048) return null;
+    if (!value || value.length > 2048) return false;
     try {
       const url = new URL(value);
-      if (!/^https?:$/.test(url.protocol) || url.username || url.password) return null;
-      const host = url.hostname.replace(/^www\./i, "");
-      const candidate = url.pathname.split("/").filter(Boolean).at(-1) || host.split(".")[0] || "enlace";
-      const alias = candidate.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 28) || "mi-enlace";
-      return { valid: true, host, destination: `${host}${url.pathname === "/" ? "" : url.pathname}`, alias };
+      return /^https?:$/.test(url.protocol) && !url.username && !url.password;
     } catch {
-      return null;
+      return false;
     }
   }
 

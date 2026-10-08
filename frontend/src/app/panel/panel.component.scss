@@ -3,12 +3,12 @@
 :host { display: block; height: 100%; }
 .skip-link { position: fixed; z-index: 100; top: 10px; left: 12px; padding: 12px 16px; transform: translateY(-180%); background: var(--uvh-ink); color: var(--uvh-surface); font-size: 13px; font-weight: 800; }
 .skip-link:focus { transform: none; }
-.shell { height: 100vh; height: 100dvh; background: var(--paper); }
+.shell { --navigation-wide: 264px; --navigation-space: var(--navigation-wide); height: 100vh; height: 100dvh; background: var(--paper); }
 
 // The navigation uses the same semantic palette as the workspace. This keeps
 // Material hover/focus layers legible when the user switches theme.
 .side {
-  width: 264px; min-width: 264px; border-right: 1px solid var(--line);
+  width: var(--navigation-wide); min-width: var(--navigation-wide); border-right: 1px solid var(--line);
   border-radius: 0; background: var(--paper-raised); color: var(--ink);
   @include mat.button-overrides((text-label-text-color: var(--muted), text-state-layer-color: var(--ink)));
 }
@@ -59,8 +59,8 @@
 .workspace-create { width: 100%; margin-block: 4px 8px; font-size: 11px; }
 .new-link { width: 100%; min-height: 46px; }
 .side-primary { margin-top: 16px; }
-.new-link mat-icon, .new-link-top mat-icon { transition: transform 180ms ease; }
-.new-link:hover mat-icon, .new-link-top:hover mat-icon { transform: rotate(-10deg); }
+.new-link mat-icon { transition: transform 180ms ease; }
+.new-link:hover mat-icon { transform: rotate(-10deg); }
 .side-account { display: flex; align-items: center; gap: 10px; padding: 12px 0 0; min-height: 44px; border-top: 1px solid var(--line); text-decoration: none; color: var(--ink); }
 .account-initials { display: grid; flex: 0 0 34px; height: 34px; place-items: center; border: 1px solid var(--line); background: var(--guide); font-size: 11px; font-weight: 800; border-radius: 3px; }
 .side-account > span:nth-child(2) { min-width: 0; flex: 1; }
@@ -71,7 +71,9 @@
 .route-context > span { color: var(--line); font-size: 24px; font-weight: 400; }
 .route-context b { font-weight: 650; color: var(--muted); }
 
-.content { display: flex; height: 100%; flex-direction: column; background: var(--paper); }
+// Own the reserved width explicitly: Material's measured inline margin would
+// otherwise make a hover expansion move the page (or leave a stale margin).
+.content { margin-left: var(--navigation-space) !important; display: flex; height: 100%; flex-direction: column; background: var(--paper); transition: margin-left 220ms cubic-bezier(.22, 1, .36, 1); }
 .topbar { position: relative; z-index: 20; display: flex; flex: 0 0 80px; gap: 16px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--paper-raised); color: var(--ink); }
 .workspace-picker { min-width: 0; max-width: 310px; height: 56px; padding-inline: 8px; color: var(--ink); border: 1px solid transparent; border-radius: 3px; }
 .workspace-picker:hover { border-color: var(--line); }
@@ -90,7 +92,6 @@
 .workspace-add { color: var(--muted); }
 .workspace-add:hover { color: var(--accent); }
 .spacer { flex: 1; }
-.new-link-top { min-height: 44px; white-space: nowrap; }
 .panel-theme { flex: 0 0 44px; }
 .avatar-btn { min-width: 44px; height: 48px; padding-inline: 8px; border-left: 1px solid var(--line); border-radius: 0; color: var(--ink); }
 .user-button-copy { display: inline-flex; flex-direction: column; margin-left: 9px; max-width: 120px; text-align: left; vertical-align: middle; }
@@ -103,7 +104,7 @@
 .workspace-menu-copy b { max-width: 230px; overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-menu-copy small { margin-top: 2px; color: var(--muted); font-size: 10px; }
 .main { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 34px 32px 56px; }
-.main-inner { width: min(100%, 1280px); margin: 0 auto; animation: panel-enter 280ms ease-out; }
+.main-inner { width: min(100%, 1280px); margin: 0 auto; }
 .main-inner:focus { outline: none; }
 .main-inner:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
 .menu-btn { display: none; }
@@ -115,18 +116,21 @@
 .menu-btn.open .menu-glyph i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
 .menu-btn.open .menu-glyph i:nth-child(2) { opacity: 0; }
 .menu-btn.open .menu-glyph i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
-@keyframes panel-enter { from { opacity: .5; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@keyframes navigation-label-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
+}
 @media (max-width: 1100px) {
   .user-button-copy, .avatar-btn::after { display: none; }
   .route-context { display: none; }
-  .side { width: 228px; min-width: 228px; }
+  .shell { --navigation-wide: 228px; }
   .topbar { padding-inline: 20px; gap: 8px; }
   .main { padding: 28px 22px 48px; }
   .ws-switch { width: 180px; }
-  .new-link-top { display: none; }
 }
 // Keep this breakpoint paired with PanelComponent's BreakpointObserver.
 @media (max-width: 720px) {
+  .shell { --navigation-space: 0px; }
   .workspace-picker { flex: 1; max-width: none; padding-inline: 4px; text-align: left; }
   .workspace-picker-copy { max-width: 30vw; }
   .workspace-picker-copy small, .workspace-emblem { display: none; }
@@ -168,4 +172,52 @@
   .brand-caption, .workspace-summary { display: none; }
   .nav-list { flex: 1 0 auto; overflow: visible; }
   .side-foot { flex-shrink: 0; }
+}
+
+// The main menu reveals over the page and any section menu; pinning is the
+// only deliberate action that reserves the full drawer width.
+.shell.navigation-rail {
+  --navigation-space: 76px;
+  &.navigation-pinned { --navigation-space: var(--navigation-wide); }
+  .side { transition: width 240ms cubic-bezier(.22, 1, .36, 1), box-shadow 180ms ease; min-width: 76px; overflow: hidden; }
+  .side:not(.navigation-expanded) { width: 76px; }
+  .side.navigation-expanded { box-shadow: 8px 0 24px rgb(0 0 0 / 12%); }
+  .side.navigation-expanded .navigation-copy,
+  .side.navigation-expanded .nav-group { animation: navigation-label-in 180ms ease-out 60ms backwards; }
+  &.navigation-pinned .side { box-shadow: none; }
+  .side-head { padding: 12px 12px 8px; }
+  .brand { justify-content: center; min-height: 44px; }
+  .brand-name { font-size: 28px; white-space: nowrap; }
+  .brand-caption, .workspace-summary { display: none; }
+  .side-primary { margin-top: 8px; }
+  .nav-list { padding-inline: 8px; }
+  .nav-group { padding: 12px 12px 6px; height: 32px; box-sizing: border-box; }
+  .side-foot { padding: 8px 12px 12px; }
+  .workspace-create { min-height: 44px; font-size: 12px; }
+  .navigation-pin { flex: 0 0 44px; color: var(--muted); }
+  .navigation-pin[aria-pressed="true"] { color: var(--accent); background: var(--soft); }
+  .side:not(.navigation-expanded) {
+    .navigation-copy, .nav-arrow, .help-link mat-icon:last-child, .side-account > mat-icon {
+      display: none;
+    }
+    .nav-group { color: transparent; overflow: hidden; white-space: nowrap; }
+    .nav-item { padding-inline: 0; }
+    .nav-item mat-icon { margin-inline: 17px 0; }
+    .side-primary, .workspace-create { min-width: 44px; padding-inline: 0; }
+    .side-primary mat-icon, .workspace-create mat-icon { margin: 0; }
+    .help-link, .side-account { justify-content: center; padding-inline: 0; }
+    .nav-item:hover mat-icon { transform: none; }
+  }
+}
+
+.topbar :is(.navigation-pin, .notifications-bell, .avatar-btn, .workspace-picker) {
+  transition: transform 160ms cubic-bezier(.22, 1, .36, 1), background-color 160ms ease;
+  &:active:not(:disabled) { transform: scale(.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .content, .shell.navigation-rail .side,
+  .shell.navigation-rail .side.navigation-expanded :is(.navigation-copy, .nav-group),
+  .topbar :is(.navigation-pin, .notifications-bell, .avatar-btn, .workspace-picker) {
+    animation: none !important; transition: none !important;
+  }
 }

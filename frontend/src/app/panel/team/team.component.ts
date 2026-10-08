@@ -6,7 +6,7 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
 import { MatFormFieldModule } from "@angular/material/form-field";
-import { MatSelectModule } from "@angular/material/select";
+import { MatSelectModule, type MatSelect } from "@angular/material/select";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatPaginatorModule, type PageEvent } from "@angular/material/paginator";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
@@ -19,6 +19,7 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { InvitationRetryService } from "./invitation-retry.service";
 import { LatestRequest } from "../../core/services/latest-request";
+import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { decodeWorkspaceDetail, decodeWorkspaceMemberSearch } from "../../core/services/workspace-response-decoders";
 import { isWorkspaceRole, workspaceRoleLabel } from "../../core/workspace-role-label";
@@ -66,7 +67,8 @@ export class TeamComponent {
   readonly renameValue = signal("");
   readonly inviteEmail = signal("");
   readonly inviteRole = signal<"admin" | "editor" | "viewer">("editor");
-  readonly saving = signal(false);
+  private readonly mutations = new OwnedMutations();
+  readonly saving = this.mutations.busy;
   readonly error = signal<string | null>(null);
   readonly user = this.auth.user;
   readonly transferOpen = signal(false);
@@ -92,24 +94,66 @@ export class TeamComponent {
   readonly roleLabel = (r: string) => (isWorkspaceRole(r) ? workspaceRoleLabel(r) : r);
   readonly invitationLabel = invitationStatusLabel;
   /** The roles an admin hands out here; ownership is transferred, never assigned. */
-  readonly assignableRoles = ["admin", "editor", "viewer"] as const;
+  readonly assignableRoles = computed<readonly ("admin" | "editor" | "viewer")[]>(() =>
+    this.isOwner() ? ["admin", "editor", "viewer"] : ["editor", "viewer"]);
 
-  readonly isOwner = computed(() => this.detail()?.workspace.role === "owner");
+  private readonly effectiveRole = computed(() => {
+    const workspace = this.detail()?.workspace;
+    return workspace?.id === this.workspaces.currentId() && workspace.role === this.workspaces.currentRole()
+      ? workspace.role : null;
+  });
+  readonly isOwner = computed(() => this.effectiveRole() === "owner");
+  readonly canLeave = computed(() => this.effectiveRole() !== null && this.effectiveRole() !== "owner");
   readonly isAdmin = computed(() => {
-    const role = this.detail()?.workspace.role;
+    const role = this.effectiveRole();
     return role === "owner" || role === "admin";
   });
 
-  private loadedWorkspaceId: number | null | undefined;
+  private loadedContext: string | undefined;
+  private lastWorkspaceName: string | null = null;
+
+  /** View publication is scoped to the account, selection revision and role. */
+  private viewContext(): string {
+    return `${this.auth.sessionGeneration()}:${this.user()?.id ?? ""}:${this.workspaces.selectionGeneration()}:${this.workspaces.currentId()}:${this.workspaces.currentRole()}`;
+  }
+
+  private captureTarget(workspaceId: number | null) {
+    const target = targetWorkspace(this.workspaces, workspaceId);
+    const context = this.viewContext();
+    return {
+      workspaceId: target.workspaceId,
+      isCurrent: () => !this.destroyRef.destroyed && context === this.viewContext() && target.isCurrent(),
+    };
+  }
+
+  canManageMember(member: Member): boolean {
+    return this.isAdmin() && member.role !== "owner" && (this.isOwner() || member.role !== "admin");
+  }
+
+  canManageInvitation(invitation: Invitation): boolean {
+    return this.isAdmin() && (this.isOwner() || invitation.role !== "admin");
+  }
 
   constructor() {
     this.destroyRef.onDestroy(() => {
       if (this.transferSearchTimer !== null) clearTimeout(this.transferSearchTimer);
+      this.mutations.reset();
+      this.deletePassword.set("");
+      this.deleteFactorCode.set("");
+      this.transferPassword.set("");
+      this.transferFactorCode.set("");
     });
     effect(() => {
       const workspaceId = this.workspaces.currentId();
-      if (workspaceId === this.loadedWorkspaceId) return;
-      this.loadedWorkspaceId = workspaceId;
+      const context = this.viewContext();
+      if (context === this.loadedContext) return;
+      this.loadedContext = context;
+      this.mutations.reset();
+      this.renameValue.set("");
+      this.lastWorkspaceName = null;
+      this.inviteEmail.set("");
+      this.inviteRole.set("editor");
+      this.error.set(null);
       this.requests.invalidate();
       this.mutationContexts.invalidate();
       this.detail.set(null);
@@ -140,7 +184,9 @@ export class TeamComponent {
       this.loading.set(false);
       return;
     }
-    const request = this.requests.begin(wid);
+    const context = this.viewContext();
+    const request = this.requests.begin(context);
+    const previousName = this.lastWorkspaceName;
     const memberPage = this.memberPageIndex() + 1;
     const memberPerPage = this.memberPageSize();
     const invitationPage = this.invitationPageIndex() + 1;
@@ -160,7 +206,7 @@ export class TeamComponent {
         invitationPage,
         invitationPerPage,
       }), { signal: request.signal });
-      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.requests.isCurrent(request, this.viewContext())) return;
       if (detail.members.length === 0 && detail.membersPage.total > 0 && this.memberPageIndex() > 0) {
         this.memberPageIndex.set(Math.max(0, Math.ceil(detail.membersPage.total / detail.membersPage.perPage) - 1));
         await this.load();
@@ -172,84 +218,101 @@ export class TeamComponent {
         return;
       }
       this.detail.set(detail);
-      this.renameValue.set(detail.workspace.name);
+      if (previousName === null || this.renameValue() === previousName) {
+        this.renameValue.set(detail.workspace.name);
+      }
+      this.lastWorkspaceName = detail.workspace.name;
     } catch (err) {
-      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.requests.isCurrent(request, this.viewContext())) return;
       this.detail.set(null);
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar el workspace");
     } finally {
-      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
+      if (this.requests.isCurrent(request, this.viewContext())) this.loading.set(false);
     }
   }
 
   async rename(): Promise<void> {
-    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const target = this.captureTarget(this.detail()?.workspace.id ?? null);
     const { workspaceId } = target;
-    if (workspaceId === null || !this.renameValue().trim() || this.saving()) return;
-    this.saving.set(true);
+    if (workspaceId === null || !target.isCurrent() || !this.isAdmin() || !this.renameValue().trim() || this.saving()) return;
+    const generation = this.auth.sessionGeneration();
+    const name = this.renameValue().trim();
+    const operation = this.mutations.begin(workspaceId ?? 0);
     try {
-      await this.api.patch(`/api/v1/workspaces/${workspaceId}`, { name: this.renameValue().trim() });
+      await this.api.patch(`/api/v1/workspaces/${workspaceId}`, { name });
       // The navigation list is account-wide, so it is refreshed even when the
       // selection moved on: the new name must not be lost with the view that
       // asked for it.
+      if (generation !== this.auth.sessionGeneration()) return;
       await this.auth.refreshWorkspaces();
       if (!target.isCurrent()) return;
+      if (this.renameValue().trim() === name) this.renameValue.set(name);
       this.snackbar.open("Workspace renombrado", "Cerrar", { duration: 2500 });
+      const detail = this.detail();
+      if (detail) this.detail.set({ ...detail, workspace: { ...detail.workspace, name } });
+      this.lastWorkspaceName = name;
       void this.load();
     } catch (err) {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.saving.set(false);
+      this.mutations.settle(operation);
     }
   }
 
   async invite(): Promise<void> {
-    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const target = this.captureTarget(this.detail()?.workspace.id ?? null);
     const { workspaceId } = target;
     const email = this.inviteEmail().trim();
-    if (workspaceId === null || !target.isCurrent() || !email || this.saving()
+    if (workspaceId === null || !target.isCurrent() || !email || !this.isAdmin() || !this.assignableRoles().includes(this.inviteRole()) || this.saving()
       || this.invitationRetry.remaining(workspaceId, email) > 0) return;
-    this.saving.set(true);
+    const operation = this.mutations.begin(workspaceId ?? 0);
     try {
       await this.api.post(`/api/v1/workspaces/${workspaceId}/invitations`, {
         email,
         role: this.inviteRole(),
       });
       if (!target.isCurrent()) return;
-      this.inviteEmail.set("");
+      if (this.inviteEmail().trim() === email) this.inviteEmail.set("");
       this.invitationPageIndex.set(0);
       this.snackbar.open("Invitación enviada", "Cerrar", { duration: 3000 });
       void this.load();
     } catch (err) {
-      this.showInvitationError(err, workspaceId, email);
+      if (target.isCurrent()) this.showInvitationError(err, workspaceId, email);
     } finally {
-      this.saving.set(false);
+      this.mutations.settle(operation);
     }
   }
 
-  async changeRole(m: Member, role: WorkspaceRole): Promise<void> {
-    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+  async changeRole(m: Member, role: WorkspaceRole, selection?: MatSelect): Promise<void> {
+    const target = this.captureTarget(this.detail()?.workspace.id ?? null);
     const { workspaceId } = target;
-    if (workspaceId === null || !target.isCurrent() || this.saving()) return;
-    this.saving.set(true);
+    if (workspaceId === null || !target.isCurrent() || !this.canManageMember(m)
+      || role === "owner" || !this.assignableRoles().includes(role) || this.saving()) {
+      if (selection) selection.value = m.role;
+      return;
+    }
+    const operation = this.mutations.begin(workspaceId ?? 0);
     try {
       await this.api.patch(`/api/v1/workspaces/${workspaceId}/members/${m.id}`, { role });
       if (!target.isCurrent()) return;
+      const detail = this.detail();
+      if (detail) this.detail.set({ ...detail, members: detail.members.map(row => row.id === m.id ? { ...row, role } : row) });
       this.snackbar.open("Rol actualizado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
       if (!target.isCurrent()) return;
+      if (selection) selection.value = m.role;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.saving.set(false);
+      this.mutations.settle(operation);
     }
   }
 
   async removeMember(m: Member): Promise<void> {
-    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const target = this.captureTarget(this.detail()?.workspace.id ?? null);
     const { workspaceId } = target;
-    if (workspaceId === null) return;
+    if (workspaceId === null || !target.isCurrent() || !this.canManageMember(m) || this.saving()) return;
     const confirmed = await this.actions.confirm({
       title: "Eliminar miembro",
       message: `¿Eliminar a ${m.name} del workspace? Perderá el acceso a sus enlaces y analítica, y se desactivarán los webhooks que creó. Si hay una entrega en curso, podrás reintentar al terminar.`,
@@ -259,40 +322,43 @@ export class TeamComponent {
     // The confirmation names a member of one workspace. Never apply it to a
     // newer selection or once another mutation is already running.
     if (!confirmed || this.saving() || !target.isCurrent()) return;
-    this.saving.set(true);
+    const operation = this.mutations.begin(workspaceId ?? 0);
     try {
       await this.api.delete(`/api/v1/workspaces/${workspaceId}/members/${m.id}`);
+      if (!target.isCurrent()) return;
       this.snackbar.open("Miembro eliminado", "Cerrar", { duration: 2500 });
-      void this.load();
-    } catch (err) {
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
-    } finally {
-      this.saving.set(false);
-    }
-  }
-
-  async cancelInvite(inv: Invitation): Promise<void> {
-    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
-    const { workspaceId } = target;
-    if (workspaceId === null || !target.isCurrent() || this.saving()) return;
-    this.saving.set(true);
-    try {
-      await this.api.delete(`/api/v1/workspaces/${workspaceId}/invitations/${inv.id}`);
       void this.load();
     } catch (err) {
       if (!target.isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      this.saving.set(false);
+      this.mutations.settle(operation);
+    }
+  }
+
+  async cancelInvite(inv: Invitation): Promise<void> {
+    const target = this.captureTarget(this.detail()?.workspace.id ?? null);
+    const { workspaceId } = target;
+    if (workspaceId === null || !target.isCurrent() || !this.canManageInvitation(inv) || this.saving()) return;
+    const operation = this.mutations.begin(workspaceId ?? 0);
+    try {
+      await this.api.delete(`/api/v1/workspaces/${workspaceId}/invitations/${inv.id}`);
+      if (!target.isCurrent()) return;
+      void this.load();
+    } catch (err) {
+      if (!target.isCurrent()) return;
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+    } finally {
+      this.mutations.settle(operation);
     }
   }
 
   async resendInvite(inv: Invitation): Promise<void> {
-    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const target = this.captureTarget(this.detail()?.workspace.id ?? null);
     const { workspaceId } = target;
-    if (workspaceId === null || !target.isCurrent() || this.saving()
+    if (workspaceId === null || !target.isCurrent() || !this.canManageInvitation(inv) || this.saving()
       || this.invitationRetry.remaining(workspaceId, inv.email) > 0) return;
-    this.saving.set(true);
+    const operation = this.mutations.begin(workspaceId ?? 0);
     try {
       await this.api.post(`/api/v1/workspaces/${workspaceId}/invitations/${inv.id}/resend`);
       if (!target.isCurrent()) return;
@@ -300,13 +366,13 @@ export class TeamComponent {
       // Refresh expiry/status after rotation. A refresh failure must not imply
       // that the already-admitted mail failed and encourage another resend.
       await this.load();
-      if (this.error()) {
+      if (target.isCurrent() && this.error()) {
         this.snackbar.open("Invitación reenviada. Recarga para actualizar su estado.", "Cerrar", { duration: 4000 });
       }
     } catch (err) {
-      this.showInvitationError(err, workspaceId, inv.email);
+      if (target.isCurrent()) this.showInvitationError(err, workspaceId, inv.email);
     } finally {
-      this.saving.set(false);
+      this.mutations.settle(operation);
     }
   }
 
@@ -328,7 +394,7 @@ export class TeamComponent {
     if (this.saving()) return;
     // Leaving is irreversible from the panel, so it must target the workspace
     // the confirmation was opened for, not whichever one is selected now.
-    const target = targetWorkspace(this.workspaces, this.detail()?.workspace.id ?? null);
+    const target = this.captureTarget(this.detail()?.workspace.id ?? null);
     const generation = this.auth.sessionGeneration();
     const request = this.mutationContexts.begin(target.workspaceId);
     const isCurrent = () => generation === this.auth.sessionGeneration()
@@ -342,7 +408,7 @@ export class TeamComponent {
       destructive: true,
     });
     if (!confirmed || this.saving() || !isCurrent()) return;
-    this.saving.set(true);
+    const operation = this.mutations.begin(workspaceId ?? 0);
     try {
       await this.api.post(`/api/v1/workspaces/${workspaceId}/leave`);
       if (isCurrent()) void this.router.navigate(["/app/dashboard"]);
@@ -351,21 +417,25 @@ export class TeamComponent {
       if (!isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      if (!this.destroyRef.destroyed) this.saving.set(false);
+      this.mutations.settle(operation);
     }
   }
 
   async deleteWorkspace(): Promise<void> {
     if (this.saving()) return;
     const workspace = this.detail()?.workspace;
-    const target = targetWorkspace(this.workspaces, workspace?.id ?? null);
+    const target = this.captureTarget(workspace?.id ?? null);
     const generation = this.auth.sessionGeneration();
     const request = this.mutationContexts.begin(target.workspaceId);
     const isCurrent = () => generation === this.auth.sessionGeneration()
       && this.mutationContexts.isCurrent(request, this.workspaces.currentId()) && target.isCurrent();
-    if (!workspace || !isCurrent() || this.deleteConfirmation() !== workspace.name
+    if (!workspace || !this.isOwner() || !isCurrent() || this.deleteConfirmation() !== workspace.name
       || !this.deletePassword()
       || (this.user()?.mfaEnabled && !this.deleteFactorCode().trim())) return;
+    const payload = {
+      confirmation: this.deleteConfirmation(), password: this.deletePassword(),
+      ...(this.deleteFactorCode().trim() ? { factorCode: this.deleteFactorCode().trim() } : {}),
+    };
     const confirmed = await this.actions.confirm({
       title: "Eliminar workspace definitivamente",
       message: `Se eliminará “${workspace.name}” con sus enlaces, dominios, tokens y miembros. Esta acción no se puede deshacer.`,
@@ -374,17 +444,11 @@ export class TeamComponent {
     });
     if (!confirmed || this.saving()) return;
     if (!isCurrent()) {
-      // The panel below belongs to a workspace this decision no longer names.
-      this.cancelWorkspaceDeletion();
       return;
     }
-    this.saving.set(true);
+    const operation = this.mutations.begin(workspace.id);
     try {
-      await this.api.delete(`/api/v1/workspaces/${workspace.id}`, {
-        confirmation: this.deleteConfirmation(),
-        password: this.deletePassword(),
-        ...(this.deleteFactorCode().trim() ? { factorCode: this.deleteFactorCode().trim() } : {}),
-      });
+      await this.api.delete(`/api/v1/workspaces/${workspace.id}`, payload);
       if (isCurrent()) {
         this.deleteOpen.set(false);
         this.deleteConfirmation.set("");
@@ -403,12 +467,12 @@ export class TeamComponent {
       if (!isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
-      if (!this.destroyRef.destroyed) this.saving.set(false);
+      this.mutations.settle(operation);
     }
   }
 
   beginWorkspaceDeletion(): void {
-    if (this.saving()) return;
+    if (this.saving() || !this.isOwner()) return;
     this.deleteOpen.set(true);
     this.deleteConfirmation.set("");
     this.deletePassword.set("");
@@ -424,7 +488,7 @@ export class TeamComponent {
   }
 
   beginOwnershipTransfer(): void {
-    if (this.saving()) return;
+    if (this.saving() || !this.isOwner()) return;
     this.transferOpen.set(true);
     this.resetTransferPicker();
     this.transferPassword.set("");
@@ -459,6 +523,11 @@ export class TeamComponent {
   /** Debounce keystrokes so typing a name is one search, not one per letter. */
   onTransferQuery(value: string): void {
     this.transferQuery.set(value);
+    this.transferRequests.invalidate();
+    this.transferResults.set(null);
+    this.transferTotal.set(0);
+    this.transferSearching.set(true);
+    this.transferSearchError.set(false);
     if (this.transferSearchTimer !== null) clearTimeout(this.transferSearchTimer);
     this.transferSearchTimer = setTimeout(() => {
       this.transferSearchTimer = null;
@@ -473,10 +542,13 @@ export class TeamComponent {
    */
   async searchTransferCandidates(): Promise<void> {
     const detail = this.detail();
-    if (!detail) return;
+    if (!detail || !this.isOwner()) return;
+    const target = this.captureTarget(detail.workspace.id);
+    if (!target.isCurrent()) return;
     const query = this.transferQuery().trim();
     const request = this.transferRequests.begin(query);
     this.transferSearching.set(true);
+    this.transferResults.set(null);
     this.transferSearchError.set(false);
     try {
       const result = await this.api.get<{ members: MemberSearchHit[]; total: number }>(
@@ -485,22 +557,23 @@ export class TeamComponent {
         decodeWorkspaceMemberSearch,
         { signal: request.signal },
       );
-      if (!this.transferRequests.isCurrent(request, query)) return;
+      if (!(target.isCurrent() && this.transferRequests.isCurrent(request, this.transferQuery().trim()))) return;
       // Ownership is transferred, never assigned: the current owner is never a
       // candidate, whatever page of the team list happens to be loaded.
       this.transferResults.set(result.members.filter((member) => member.role !== "owner"));
       this.transferTotal.set(result.total);
     } catch {
-      if (!this.transferRequests.isCurrent(request, query)) return;
+      if (!(target.isCurrent() && this.transferRequests.isCurrent(request, this.transferQuery().trim()))) return;
       this.transferResults.set(null);
       this.transferSearchError.set(true);
     } finally {
-      if (this.transferRequests.isCurrent(request, query)) this.transferSearching.set(false);
+      if (target.isCurrent() && this.transferRequests.isCurrent(request, this.transferQuery().trim())) this.transferSearching.set(false);
     }
   }
 
   selectTransferTarget(candidate: MemberSearchHit): void {
-    if (this.saving() || candidate.role === "owner") return;
+    if (this.saving() || !this.isOwner() || this.transferSearching() || candidate.role === "owner"
+      || !this.transferResults()?.some(row => row.id === candidate.id)) return;
     this.transferTarget.set(candidate);
     this.transferResults.set(null);
   }
@@ -514,37 +587,30 @@ export class TeamComponent {
   async transferOwnership(): Promise<void> {
     if (this.saving()) return;
     const detail = this.detail();
-    const scope = targetWorkspace(this.workspaces, detail?.workspace.id ?? null);
+    const scope = this.captureTarget(detail?.workspace.id ?? null);
     const generation = this.auth.sessionGeneration();
     const request = this.mutationContexts.begin(scope.workspaceId);
     const isCurrent = () => generation === this.auth.sessionGeneration()
       && this.mutationContexts.isCurrent(request, this.workspaces.currentId()) && scope.isCurrent();
     const recipient = this.transferTarget();
-    if (!detail || !recipient || recipient.role === "owner" || !this.transferPassword()
+    if (!detail || !this.isOwner() || !recipient || recipient.role === "owner" || !this.transferPassword()
       || (this.user()?.mfaEnabled && !this.transferFactorCode()) || this.saving()) return;
 
+    const payload = {
+      targetUserId: recipient.id, password: this.transferPassword(),
+      ...(this.transferFactorCode().trim() ? { factorCode: this.transferFactorCode().trim() } : {}),
+    };
     const confirmed = await this.actions.confirm({
       title: "Transferir propiedad",
       message: `${recipient.name} pasará a controlar el workspace. Tu rol cambiará a administrador y sólo el nuevo propietario podrá eliminarlo o volver a transferirlo. Las invitaciones pendientes de administrador que enviaste quedarán canceladas.`,
       confirmLabel: "Transferir propiedad",
       destructive: true,
     });
-    if (!confirmed) return;
-    if (!isCurrent()) {
-      // A different workspace is selected now; this recipient and password
-      // belong to the previous one, so drop the panel instead of transferring
-      // blindly.
-      this.cancelOwnershipTransfer();
-      return;
-    }
+    if (!confirmed || this.saving() || !isCurrent()) return;
 
-    this.saving.set(true);
+    const operation = this.mutations.begin(scope.workspaceId ?? 0);
     try {
-      await this.api.post(`/api/v1/workspaces/${detail.workspace.id}/transfer-ownership`, {
-        targetUserId: recipient.id,
-        password: this.transferPassword(),
-        ...(this.transferFactorCode().trim() ? { factorCode: this.transferFactorCode().trim() } : {}),
-      });
+      await this.api.post(`/api/v1/workspaces/${detail.workspace.id}/transfer-ownership`, payload);
       if (isCurrent()) {
         this.transferOpen.set(false);
         this.transferPassword.set("");
@@ -564,7 +630,7 @@ export class TeamComponent {
       if (!isCurrent()) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo transferir la propiedad", "Cerrar", { duration: 4000 });
     } finally {
-      if (!this.destroyRef.destroyed) this.saving.set(false);
+      this.mutations.settle(operation);
     }
   }
 

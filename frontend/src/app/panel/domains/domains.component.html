@@ -38,7 +38,7 @@
 @if (!loading() && (!error() || domains().length)) {
   <div class="domain-list">
     @for (d of domains(); track trackByDomain($index, d)) {
-      <article class="domain-card">
+      <article class="domain-card" [attr.aria-label]="d.domain">
         <div class="domain-head">
           <span class="domain-icon" aria-hidden="true"><mat-icon>language</mat-icon></span>
           <div><a class="domain-name" [routerLink]="['/app/domains', d.id]">{{ d.domain }}</a></div>
@@ -66,37 +66,65 @@
         @if (graceLabel(d); as grace) {
           <p class="dns-message degraded" role="status">{{ grace }}</p>
         }
-        @if (canEdit() && (d.state === 'verified' || d.state === 'provisioning' || d.state === 'active' || d.state === 'disabled')) {
-          <div class="domain-actions">
-            @if (d.state === 'verified') {
-              <button mat-stroked-button (click)="activate(d)" [disabled]="actionId() !== null || isChecking(d) || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>play_arrow</mat-icon> Activar</button>
-            }
-            @if ((d.state === 'active' || d.state === 'verified' || d.state === 'provisioning') && canAdmin()) {
-              <button mat-stroked-button (click)="disable(d)" [disabled]="actionId() !== null"><mat-icon>pause</mat-icon> Desactivar</button>
-            }
-            @if (d.state === 'verified' || d.state === 'active' || d.state === 'disabled') {
-              <button mat-stroked-button (click)="verify(d)" [disabled]="actionId() !== null || isChecking(d)"><mat-icon>refresh</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Revalidar' }}</button>
-            }
-            @if (d.servingReady && !d.isDefault) {
-              <button mat-stroked-button (click)="setDefault(d, true)" [disabled]="actionId() !== null"><mat-icon>star</mat-icon> Usar como predeterminado</button>
-            }
-            @if (d.isDefault) {
-              <button mat-stroked-button (click)="setDefault(d, false)" [disabled]="actionId() !== null"><mat-icon>star_border</mat-icon> Quitar predeterminado</button>
-            }
-            @if (canAdmin()) {
-              <button mat-stroked-button class="danger" (click)="remove(d)" [disabled]="actionId() !== null"><mat-icon>delete</mat-icon> Eliminar</button>
+        <div class="domain-footer domain-actions">
+          <div class="domain-navigation details-action">
+            <a mat-stroked-button class="neutral-action" [routerLink]="['/app/domains', d.id]" [attr.aria-label]="'Configuración y diagnóstico de ' + d.domain"><mat-icon aria-hidden="true">settings</mat-icon> Configuración y diagnóstico</a>
+            @if (d.linksCount > 0) {
+              <a mat-button class="neutral-action" [routerLink]="['/app/links']" [queryParams]="{ domainId: d.id }" [attr.aria-label]="'Ver ' + linksLabel(d) + ' de ' + d.domain"><mat-icon aria-hidden="true">link</mat-icon> Ver {{ linksLabel(d) }}</a>
             }
           </div>
-        }
-        @if (canEdit() && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying')) {
-          <div class="domain-actions"><button mat-stroked-button type="button" (click)="verify(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon>verified_user</mat-icon>{{ isChecking(d) ? 'Comprobando…' : 'Comprobar DNS' }}</button></div>
-        }
-        <div class="domain-actions details-action">
-          <a mat-stroked-button [routerLink]="['/app/domains', d.id]"><mat-icon>settings</mat-icon> Configuración y diagnóstico</a>
-          @if (d.linksCount > 0) {
-            <a mat-stroked-button [routerLink]="['/app/links']" [queryParams]="{ domainId: d.id }"><mat-icon>link</mat-icon> Ver {{ linksLabel(d) }}</a>
+          @if (canEdit() && d.state === 'verified') {
+            <button mat-flat-button type="button" (click)="activate(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon aria-hidden="true">https</mat-icon> Preparar HTTPS</button>
+          }
+          @if (canEdit() && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying')) {
+            <button mat-flat-button type="button" (click)="verify(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon aria-hidden="true">dns</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Comprobar DNS' }}</button>
           }
         </div>
+        @if (canEdit() && (d.state === 'verified' || d.state === 'active' || d.state === 'disabled' || (d.state === 'provisioning' && canAdmin()))) {
+          <details class="domain-management">
+            <summary [attr.aria-label]="'Opciones de ' + d.domain">
+              <span class="management-heading"><strong>Opciones del dominio</strong><span>DNS, preferencias y disponibilidad</span></span>
+              <mat-icon aria-hidden="true">expand_more</mat-icon>
+            </summary>
+            <div class="management-content">
+              <div class="management-settings" role="group" [attr.aria-label]="'Mantenimiento y preferencias de ' + d.domain">
+              @if (d.state === 'verified' || d.state === 'active' || d.state === 'disabled') {
+                <div class="management-row">
+                  <div><h3>Comprobar la conexión</h3><p>Vuelve a consultar la propiedad y la ruta DNS. El resultado se actualizará automáticamente.</p></div>
+                  <button mat-stroked-button class="neutral-action" type="button" (click)="verify(d)" [attr.aria-label]="'Revalidar DNS de ' + d.domain" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon aria-hidden="true">refresh</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Revalidar DNS' }}</button>
+                </div>
+              }
+              @if (d.servingReady && !d.isDefault) {
+                <div class="management-row">
+                  <div><h3>Dominio para enlaces nuevos</h3><p>Preselecciona esta dirección al crear un enlace. Los enlaces existentes mantienen su dominio.</p></div>
+                  <button mat-stroked-button class="neutral-action" type="button" (click)="setDefault(d, true)" [attr.aria-label]="'Usar ' + d.domain + ' por defecto'" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">star</mat-icon> Usar por defecto</button>
+                </div>
+              }
+              @if (d.isDefault) {
+                <div class="management-row">
+                  <div><h3>Dominio predeterminado</h3><p>Esta dirección se preselecciona al crear enlaces. Puedes quitar esa preferencia.</p></div>
+                  <button mat-stroked-button class="neutral-action" type="button" (click)="setDefault(d, false)" [attr.aria-label]="'Quitar preferencia de ' + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">star_border</mat-icon> Quitar preferencia</button>
+                </div>
+              }
+              </div>
+              @if (canAdmin()) {
+                <div class="management-risk" role="group" [attr.aria-label]="'Acciones que afectan a ' + d.domain">
+                  <div class="management-risk-heading"><mat-icon aria-hidden="true">warning_amber</mat-icon><span>Disponibilidad y eliminación</span></div>
+                  @if (d.state === 'active' || d.state === 'verified' || d.state === 'provisioning') {
+                    <div class="management-row">
+                      <div><h3>Desactivar el dominio</h3><p>Sus enlaces dejarán de responder mientras esté desactivado. Los enlaces se conservan.</p></div>
+                      <button mat-stroked-button type="button" class="danger" (click)="disable(d)" [attr.aria-label]="'Desactivar ' + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">pause</mat-icon> Desactivar</button>
+                    </div>
+                  }
+                  <div class="management-row">
+                    <div><h3>Eliminar el dominio</h3><p>Antes debes reasignar sus enlaces, incluidos los de la papelera. Se pedirá confirmación.</p></div>
+                    <button mat-stroked-button type="button" class="danger" (click)="remove(d)" [attr.aria-label]="'Eliminar ' + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> Eliminar dominio</button>
+                  </div>
+                </div>
+              }
+            </div>
+          </details>
+        }
       </article>
     }
     @if (!domains().length && !error()) {

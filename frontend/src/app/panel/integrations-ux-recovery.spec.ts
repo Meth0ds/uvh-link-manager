@@ -233,4 +233,27 @@ describe("Integrations UX recovery", () => {
     expect(f.nativeElement.querySelector('.domain-actions button').textContent).toContain('Comprobar DNS');
   });
 
+  it("describes a healthy observed CNAME without inventing a destination mismatch", async () => {
+    const f = await mount(DomainDetailComponent); const c = f.componentInstance;
+    c.domain.set(domainDto({ dnsObservedAt: "2026-10-07T00:00:00Z", routingObservedTarget: "edge.example.test", routingObservedTtl: 300 }));
+    f.detectChanges();
+    expect(c.observedRoutingLabel()).toBe("El CNAME apunta a «edge.example.test» (TTL 300 s).");
+    expect(f.nativeElement.textContent).not.toContain("pero el resolvedor devuelve");
+  });
+  it("preserves the observed versus expected target when DNS routing is degraded", async () => {
+    const f = await mount(DomainDetailComponent); const c = f.componentInstance;
+    c.domain.set(domainDto({ dnsObservedAt: "2026-10-07T00:00:00Z", routingStatus: "degraded", routingObservedTarget: "other.example.test", routingObservedTtl: 60 }));
+    expect(c.observedRoutingLabel()).toBe("Esperábamos «edge.example.test», pero el resolvedor devuelve «other.example.test» (TTL 60 s).");
+  });
+  it("keeps the unsupported address-only routing diagnosis", async () => {
+    const f = await mount(DomainDetailComponent); const c = f.componentInstance;
+    c.domain.set(domainDto({ dnsObservedAt: "2026-10-07T00:00:00Z", routingStatus: "degraded", routingObservedAddresses: ["192.0.2.10"] }));
+    expect(c.observedRoutingLabel()).toContain("No hay CNAME en este nombre");
+    expect(c.observedRoutingLabel()).toContain("192.0.2.10");
+  });
+  it("does not claim a DNS result before an observation exists", async () => {
+    const f = await mount(DomainDetailComponent);
+    expect(f.componentInstance.observedRoutingLabel()).toBeNull();
+  });
+
 });

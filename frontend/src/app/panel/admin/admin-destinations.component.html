@@ -19,11 +19,11 @@
     @for (entry of entries.rows(); track entry.id) {
       <article class="entry-row">
         <b class="entry-value" [title]="entry.match_value">{{ entry.match_value }}</b>
-        <span data-label="Alcance"><span class="badge" [class.danger]="entry.match_kind === 'host'" [class.neutral]="entry.match_kind === 'url'">{{ kindLabel(entry.match_kind) }}</span></span>
-        <span data-label="Origen">{{ sourceLabel(entry.source) }}</span>
-        <span data-label="Motivo" class="entry-reason">{{ entry.reason }}</span>
-        <time data-label="Alta">{{ formatDate(entry.created_at) }}</time>
-        <time data-label="Caduca">{{ entry.expires_at ? formatDate(entry.expires_at) : "Sin caducidad" }}</time>
+        <span data-label="Alcance"><span class="field-label">Alcance</span><span class="badge" [class.danger]="entry.match_kind === 'host'" [class.neutral]="entry.match_kind === 'url'">{{ kindLabel(entry.match_kind) }}</span></span>
+        <span data-label="Origen"><span class="field-label">Origen</span>{{ sourceLabel(entry.source) }}</span>
+        <span data-label="Motivo" class="entry-reason"><span class="field-label">Motivo</span>{{ entry.reason }}</span>
+        <time data-label="Alta"><span class="field-label">Alta</span>{{ formatDate(entry.created_at) }}</time>
+        <time data-label="Caduca"><span class="field-label">Caduca</span>{{ entry.expires_at ? formatDate(entry.expires_at) : "Sin caducidad" }}</time>
         <button mat-stroked-button class="danger-button" type="button" (click)="withdraw(entry)" [disabled]="entries.stale() || busy()" [attr.aria-label]="'Retirar el bloqueo de ' + entry.match_value">
           <mat-icon aria-hidden="true">delete_outline</mat-icon>Retirar
         </button>

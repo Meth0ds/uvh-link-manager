@@ -178,11 +178,11 @@
     </section>
   } @else {
     @if (recoveryIssueUnconfirmed()) {
-      <div class="inline-note" role="status"><mat-icon aria-hidden="true">key</mat-icon><span>No se recibieron códigos de recuperación utilizables. Regenera un nuevo conjunto y guárdalo antes de depender de él.</span></div>
+      <div class="inline-note" role="status"><mat-icon aria-hidden="true">key</mat-icon><span><b>Entrega no confirmada.</b> No se recibieron códigos de recuperación utilizables. Regenera un nuevo conjunto y guárdalo antes de depender de él.</span></div>
     }
     <div class="mfa-summary">
       <div><span class="summary-icon"><mat-icon>phonelink_lock</mat-icon></span><span><b>Aplicación autenticadora</b><small>Vinculada y activa</small></span><mat-icon class="summary-check">check_circle</mat-icon></div>
-      <div [class.attention]="(user()?.recoveryCodesRemaining ?? 0) <= 2"><span class="summary-icon"><mat-icon>key</mat-icon></span><span><b>Códigos de recuperación</b><small>{{ user()?.recoveryCodesRemaining ?? 0 }} disponibles</small></span><strong>{{ user()?.recoveryCodesRemaining ?? 0 }}</strong></div>
+      <div [class.attention]="recoveryIssueUnconfirmed() || (user()?.recoveryCodesRemaining ?? 0) <= 2"><span class="summary-icon"><mat-icon>key</mat-icon></span><span><b>Códigos de recuperación</b><small>{{ recoveryIssueUnconfirmed() ? 'Entrega no confirmada' : (user()?.recoveryCodesRemaining ?? 0) + ' disponibles' }}</small></span><strong>{{ recoveryIssueUnconfirmed() ? '—' : user()?.recoveryCodesRemaining ?? 0 }}</strong></div>
     </div>
     <div class="mfa-manage-actions"><button mat-stroked-button type="button" (click)="beginMfaReconfiguration()" [disabled]="mfaBusy()"><mat-icon>sync</mat-icon>Cambiar aplicación</button><button mat-stroked-button type="button" (click)="beginRecoveryRegeneration()" [disabled]="mfaBusy()"><mat-icon>autorenew</mat-icon>Regenerar códigos</button></div>
 
@@ -201,9 +201,13 @@
 
 <!-- Sessions -->
 <div class="card-block sessions-card">
-  <div class="card-heading"><span class="card-icon"><mat-icon>devices</mat-icon></span><div><h3>Sesiones activas</h3><p>Revisa y revoca accesos que ya no reconozcas.</p></div>@if (!sessionsLoading() && !sessionsError()) { <span class="count-badge tnum">{{ sessions().length }}{{ sessionsTruncated() ? '+' : '' }}</span> }</div>
-  @if (sessionsLoading()) {
+  <div class="card-heading"><span class="card-icon"><mat-icon>devices</mat-icon></span><div><h3>Sesiones activas</h3><p>Revisa y revoca accesos que ya no reconozcas.</p></div>@if (!sessionsLoading() && !sessionsError()) { <span class="count-badge tnum">{{ sessions().length }}{{ sessionsTruncated() ? '+' : '' }}</span> }<button mat-stroked-button type="button" class="sessions-refresh" (click)="loadSessions()" [disabled]="sessionsLoading()" [attr.aria-busy]="sessionsLoading()"><mat-icon aria-hidden="true">refresh</mat-icon>Actualizar</button></div>
+  @if (sessionsLoading() && !sessions().length) {
     <app-panel-skeleton variant="list" label="Cargando sesiones" />
+  }
+  @if (sessionsLoading() && sessions().length) {
+    <mat-progress-bar mode="indeterminate" aria-label="Actualizando sesiones" />
+    <p class="sessions-read-notice" role="status">Actualizando sesiones. Se muestra la última lectura hasta que termine.</p>
   }
   @if (sessionsError(); as message) {
     <div class="alert error" role="alert">
@@ -226,7 +230,7 @@
           @if (s.user_agent) { <details class="session-details"><summary>Detalles del navegador</summary><p>{{ s.user_agent }}</p></details> }
         </div>
       </div>
-      <button mat-stroked-button [class.danger]="s.current" [attr.aria-label]="(s.current ? 'Cerrar esta sesión: ' : 'Revocar sesión: ') + sessionAgent(s.user_agent)" (click)="revokeSession(s)">
+      <button mat-stroked-button [class.danger]="s.current" [attr.aria-label]="(s.current ? 'Cerrar esta sesión: ' : 'Revocar sesión: ') + sessionAgent(s.user_agent)" (click)="revokeSession(s)" [disabled]="sessionsLoading() || sessionsError() !== null">
         {{ s.current ? 'Cerrar esta sesión' : 'Revocar' }}
       </button>
     </div>

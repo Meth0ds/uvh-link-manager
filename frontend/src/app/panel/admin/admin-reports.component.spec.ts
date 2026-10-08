@@ -4,6 +4,7 @@ import { MatSnackBar } from "@angular/material/snack-bar";
 import { AdminReportsComponent } from "./admin-reports.component";
 import { ApiService } from "../../core/services/api.service";
 import { ActionDialogService } from "../action-dialog.service";
+import { SessionContextService } from "../../core/services/session-context.service";
 import type { AdminReport } from "../../core/models";
 
 interface Deferred<T> {
@@ -55,6 +56,7 @@ describe("AdminReportsComponent", () => {
       ],
     }).compileComponents();
 
+    TestBed.inject(SessionContextService).user.set({ id: 9001, name: "Operador", email: "operator@example.test", isAdmin: true, emailVerified: true, mfaEnabled: true });
     fixture = TestBed.createComponent(AdminReportsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();

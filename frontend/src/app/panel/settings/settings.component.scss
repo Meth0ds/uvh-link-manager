@@ -994,3 +994,17 @@ app-async-operation-status {
 .session-row > button { flex: 0 0 auto; }
 .deletion-read-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--uvh-danger); font-size: 14px; line-height: 1.6; }
 .deletion-read-error > span { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+
+.sessions-card .card-heading { flex-wrap: wrap; align-items: center; }
+.sessions-card .card-heading > div { flex: 1 1 180px; }
+.sessions-refresh { min-height: 44px; flex: 0 0 auto; }
+.sessions-read-notice { margin: 8px 0 16px; color: var(--uvh-muted); font-size: 13px; line-height: 1.6; }
+
+.settings-section:not([hidden]) { animation: settings-section-in 220ms cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes settings-section-in {
+  from { opacity: .35; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-section:not([hidden]) { animation: none !important; }
+}

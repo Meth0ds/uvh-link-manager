@@ -15,14 +15,14 @@
   </div>
 }
 <ng-content select="[queue-rows]" />
-@if (!paging().loading() && !paging().error() && paging().count() === 0) {
+@if (!paging().stale() && paging().count() === 0) {
   <div class="empty" [class.compact-empty]="compactEmpty()">
     <mat-icon aria-hidden="true">{{ emptyIcon() }}</mat-icon>
     <b>{{ emptyTitle() }}</b>
     <span>{{ emptyHint() }}</span>
   </div>
 }
-@if (!paging().error() && (showPagerWhenEmpty() || paging().total() > 0)) {
+@if (!paging().stale() && (showPagerWhenEmpty() || paging().total() > 0)) {
   <mat-paginator
     [length]="paging().total()"
     [pageIndex]="paging().page()"

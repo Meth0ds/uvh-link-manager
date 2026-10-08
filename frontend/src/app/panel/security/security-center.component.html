@@ -1,21 +1,32 @@
 <app-page-header icon="security" eyebrow="Protección de cuenta" title="Centro de seguridad" description="Estado, credenciales, recuperación, sesiones y actividad sensible en un único lugar." />
 @if (loading() && !snapshot()) { <app-panel-skeleton variant="cards" label="Cargando centro de seguridad" /> }
-@if (loading() && snapshot()) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando seguridad" /> }
+@if (loading() && snapshot()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Actualizando seguridad" />
+  <p class="read-notice" role="status">Actualizando seguridad. Se muestra la última lectura y las acciones estarán disponibles al terminar.</p>
+}
 @if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div> }
+
+@if (userRefreshRequired()) {
+  <app-async-operation-status class="account-refresh-notice" tone="expired" icon="sync" role="status">
+    <b>Comprueba el estado actual de tu cuenta</b>
+    <p>{{ userMutationUnconfirmed() ? 'No se pudo confirmar el resultado del envío. Actualiza los datos antes de volver a modificar tu seguridad.' : 'El cambio está confirmado. Actualiza los datos para ver el estado actual de tu seguridad.' }}</p>
+    <button mat-stroked-button type="button" (click)="refreshAccount()" [disabled]="refreshingAccount()" [attr.aria-busy]="refreshingAccount()">{{ refreshingAccount() ? 'Actualizando…' : 'Actualizar datos' }}</button>
+  </app-async-operation-status>
+}
+@if (recoveryIssueUnconfirmed()) {
+  <app-async-operation-status class="recovery-delivery-notice" tone="expired" icon="key" role="status">
+    <b>Entrega no confirmada</b>
+    <p>No se recibieron códigos de recuperación utilizables. Regenera un nuevo conjunto y guárdalo antes de depender de él.</p>
+    <a mat-stroked-button routerLink="/app/settings/security">Revisar recuperación</a>
+  </app-async-operation-status>
+}
 
 @if (snapshot(); as data) {
   <section class="posture" [class.protected]="data.summary.mfaEnabled" aria-labelledby="posture-title">
     <mat-icon>{{ data.summary.mfaEnabled ? 'verified_user' : 'gpp_maybe' }}</mat-icon>
-    <div><span class="eyebrow">Resumen de postura</span><h2 id="posture-title">{{ data.summary.mfaEnabled ? 'Segundo factor activo' : 'Protección adicional pendiente' }}</h2><p>{{ data.summary.activeSessions }} sesiones activas · {{ data.summary.recoveryCodesRemaining }} códigos de recuperación disponibles</p></div>
-    <button mat-stroked-button type="button" (click)="load()" [disabled]="loading()"><mat-icon>refresh</mat-icon> Actualizar</button>
+    <div><span class="eyebrow">Resumen de postura</span><h2 id="posture-title">{{ data.summary.mfaEnabled ? 'Segundo factor activo' : 'Protección adicional pendiente' }}</h2><p>{{ data.summary.activeSessions }} sesiones activas · {{ recoveryIssueUnconfirmed() ? 'Entrega no confirmada de códigos de recuperación' : data.summary.recoveryCodesRemaining + ' códigos de recuperación disponibles' }}</p></div>
+    <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || revokingId() !== null"><mat-icon>refresh</mat-icon> Actualizar</button>
   </section>
-
-  <div class="control-grid">
-    <a class="control-card" routerLink="/app/settings" fragment="security"><mat-icon>password</mat-icon><div><h2>Contraseña</h2><p>Último cambio registrado: {{ formatDate(data.summary.lastPasswordEventAt) }}</p><small>Requiere contraseña actual y, con MFA activo, un factor actual.</small></div><mat-icon>arrow_forward</mat-icon></a>
-    <a class="control-card" routerLink="/app/settings" fragment="security"><mat-icon>phonelink_lock</mat-icon><div><h2>MFA y recuperación</h2><p>{{ data.summary.mfaEnabled ? 'Activo' : 'Inactivo' }} · {{ data.summary.recoveryCodesRemaining }} códigos restantes</p><small>Alta, sustitución, regeneración y baja reautentican cada operación.</small></div><mat-icon>arrow_forward</mat-icon></a>
-    <a class="control-card" routerLink="/app/settings" fragment="account"><mat-icon>alternate_email</mat-icon><div><h2>Email de acceso</h2><p>{{ data.summary.pendingEmail ? 'Pendiente: ' + data.summary.pendingEmail : 'Sin cambio pendiente' }}</p><small>Confirmación por el nuevo buzón y cierre de sesiones al completar.</small></div><mat-icon>arrow_forward</mat-icon></a>
-    <a class="control-card" routerLink="/auth/account-recovery"><mat-icon>support_agent</mat-icon><div><h2>Recuperación de cuenta</h2><p>Flujo revisado por soporte si pierdes el segundo factor.</p><small>No concede acceso por sí solo y revoca credenciales al completarse.</small></div><mat-icon>arrow_forward</mat-icon></a>
-  </div>
 
   <div class="security-columns">
     <section class="panel" aria-labelledby="sessions-title">
@@ -23,16 +34,16 @@
         <div><span class="eyebrow">Accesos actuales</span><h2 id="sessions-title">Sesiones activas</h2></div>
         <!-- Cierres masivos: siempre bajo confirmación y sin tocar credenciales;
              el servidor responde con el recuento real, incluido cero. -->
-        <div class="bulk-actions">
-          <button mat-stroked-button type="button" (click)="closeOtherSessions()" [disabled]="loading() || revokingId() !== null">Cerrar las demás</button>
-          <button mat-stroked-button type="button" (click)="closeAllSessions()" [disabled]="loading() || revokingId() !== null">Cerrar todas</button>
+        <div class="bulk-actions" aria-label="Gestionar las sesiones de otros dispositivos">
+          <button mat-stroked-button type="button" (click)="closeOtherSessions()" [disabled]="!canDecide() || revokingId() !== null">Cerrar las demás</button>
+          <button mat-stroked-button type="button" class="close-all" (click)="closeAllSessions()" [disabled]="!canDecide() || revokingId() !== null">Cerrar todas</button>
         </div>
-        <span class="count">{{ sessions().length }}{{ sessionsTruncated() ? '+' : '' }}</span>
+        <span class="count" aria-label="Sesiones visibles">{{ sessions().length }}{{ sessionsTruncated() ? '+' : '' }}</span>
       </header>
       @for (session of sessions(); track session.id) {
-        <article class="session"><mat-icon>devices</mat-icon><div><b>{{ agent(session.user_agent) }}</b><span>Último uso: {{ formatDate(session.last_used_at) }}</span><small>{{ session.current ? 'Esta sesión' : 'Otra sesión' }}{{ session.mfa_verified_at ? ' · MFA verificado' : '' }}</small></div><button mat-stroked-button type="button" (click)="revoke(session)" [disabled]="revokingId() !== null">{{ session.current ? 'Cerrar' : 'Revocar' }}</button></article>
+        <article class="session"><mat-icon>devices</mat-icon><div><b>{{ agent(session.user_agent) }}</b><span>Último uso: {{ formatDate(session.last_used_at) }}</span><small>{{ session.current ? 'Esta sesión' : 'Otra sesión' }}{{ session.mfa_verified_at ? ' · MFA verificado' : '' }}</small></div><button mat-stroked-button type="button" (click)="revoke(session)" [attr.aria-label]="session.current ? 'Cerrar esta sesión' : 'Revocar la sesión de ' + agent(session.user_agent)" [disabled]="!canDecide() || revokingId() !== null">{{ session.current ? 'Cerrar' : 'Revocar' }}</button></article>
       }
-      @if (!sessions().length) { <p class="empty">No hay sesiones activas visibles.</p> }
+      @if (!sessions().length && !loading()) { <p class="empty">No hay sesiones activas visibles.</p> }
       <!-- The registry is bounded server-side, so an omitted device must not be
            read as "this account has no other sessions". -->
       @if (sessionsTruncated()) { <p class="bounded-note">Se muestran las sesiones con actividad más reciente. La cuenta tiene más registros de los que caben aquí: revoca las que no reconozcas y actualiza para ver las siguientes.</p> }
@@ -48,4 +59,13 @@
       <p class="privacy-note">Esta vista omite metadatos internos, hashes de IP y material de credenciales.</p>
     </section>
   </div>
+  <section class="credentials" aria-labelledby="credentials-title">
+    <h2 id="credentials-title">Credenciales y recuperación</h2>
+    <div class="control-grid">
+    <a class="control-card" routerLink="/app/settings" fragment="security"><mat-icon>password</mat-icon><div><h2>Contraseña</h2><p>Último cambio registrado: {{ formatDate(data.summary.lastPasswordEventAt) }}</p><small>Requiere contraseña actual y, con MFA activo, un factor actual.</small></div><mat-icon>arrow_forward</mat-icon></a>
+    <a class="control-card" routerLink="/app/settings" fragment="security"><mat-icon>phonelink_lock</mat-icon><div><h2>MFA y recuperación</h2><p>{{ data.summary.mfaEnabled ? 'Activo' : 'Inactivo' }} · {{ recoveryIssueUnconfirmed() ? 'Entrega no confirmada' : data.summary.recoveryCodesRemaining + ' códigos restantes' }}</p><small>Alta, sustitución, regeneración y baja reautentican cada operación.</small></div><mat-icon>arrow_forward</mat-icon></a>
+    <a class="control-card" routerLink="/app/settings" fragment="account"><mat-icon>alternate_email</mat-icon><div><h2>Email de acceso</h2><p>{{ data.summary.pendingEmail ? 'Pendiente: ' + data.summary.pendingEmail : 'Sin cambio pendiente' }}</p><small>Confirmación por el nuevo buzón y cierre de sesiones al completar.</small></div><mat-icon>arrow_forward</mat-icon></a>
+    <a class="control-card" routerLink="/auth/account-recovery"><mat-icon>support_agent</mat-icon><div><h2>Recuperación de cuenta</h2><p>Flujo revisado por soporte si pierdes el segundo factor.</p><small>No concede acceso por sí solo y revoca credenciales al completarse.</small></div><mat-icon>arrow_forward</mat-icon></a>
+  </div>
+  </section>
 }

@@ -1,8 +1,10 @@
+import { signal } from "@angular/core";
 import { TestBed, type ComponentFixture } from "@angular/core/testing";
 import { provideRouter, Router } from "@angular/router";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import type { SecurityCenterSnapshot, Session } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
+import { SessionContextService } from "../../core/services/session-context.service";
 import { AuthService } from "../../core/services/auth.service";
 import { ActionDialogService } from "../action-dialog.service";
 import { SecurityCenterComponent } from "./security-center.component";
@@ -49,6 +51,9 @@ describe("SecurityCenterComponent", () => {
       "sessionGeneration", "listSessions", "revokeSession", "revokeOtherSessions", "revokeAllSessions",
     ]);
     auth.sessionGeneration.and.returnValue(1);
+    for (const key of ["userRefreshRequired", "userMutationUnconfirmed", "mfaRecoveryIssueUnconfirmed"] as const) {
+      Object.defineProperty(auth, key, { value: signal(false) });
+    }
     auth.listSessions.and.resolveTo({ sessions: [session("current", true), session("other")], truncated: false });
     auth.revokeSession.and.resolveTo(false);
     auth.revokeOtherSessions.and.resolveTo(1);
@@ -65,6 +70,10 @@ describe("SecurityCenterComponent", () => {
         { provide: ActionDialogService, useValue: actions },
       ],
     }).compileComponents();
+    const context = TestBed.inject(SessionContextService);
+    context.user.set({ id: 1, name: "Ana", email: "ana@example.invalid", isAdmin: false, emailVerified: true, mfaEnabled: true });
+    auth.sessionGeneration.and.callFake(() => context.generation());
+    auth.revokeAllSessions.and.callFake(async () => { context.advance(); context.user.set(null); return 2; });
     // The real router backs the template's routerLink; only navigation is spied.
     router = TestBed.inject(Router);
     spyOn(router, "navigate").and.resolveTo(true);
@@ -126,7 +135,7 @@ describe("SecurityCenterComponent", () => {
   });
 
   it("leaves the panel when the revoked session is the current one", async () => {
-    auth.revokeSession.and.resolveTo(true);
+    auth.revokeSession.and.callFake(async () => { const context = TestBed.inject(SessionContextService); context.advance(); context.user.set(null); return true; });
     await component.revoke(session("current", true));
 
     expect(router.navigate).toHaveBeenCalledWith(["/auth"]);

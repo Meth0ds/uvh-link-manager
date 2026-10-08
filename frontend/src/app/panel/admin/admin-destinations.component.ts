@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, signal, untracked } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, untracked } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatSnackBar } from "@angular/material/snack-bar";
@@ -11,6 +11,8 @@ import { QueuePaging } from "../../core/queue-paging";
 import { ApiService } from "../../core/services/api.service";
 import { decodeAdminDestinationsPage, decodeDestinationRemoval } from "../../core/services/admin-response-decoders";
 import { ActionDialogService } from "../action-dialog.service";
+import { SessionContextService } from "../../core/services/session-context.service";
+import { AdminViewContext } from "./admin-view-context";
 import { QueueSectionComponent } from "../queue-section.component";
 
 /**
@@ -37,6 +39,8 @@ export class AdminDestinationsComponent {
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionDialogService);
   private readonly snackbar = inject(MatSnackBar);
+  private readonly view = new AdminViewContext(inject(SessionContextService), inject(DestroyRef));
+  readonly canOperate = this.view.eligible;
 
   /**
    * Bumped by the console after a case blocks a destination.
@@ -50,10 +54,12 @@ export class AdminDestinationsComponent {
   readonly changed = output<void>();
 
   /** A withdrawal is in flight: one at a time, and every row waits for it. */
-  readonly busy = signal(false);
+  readonly busy = this.view.busy;
 
   readonly entries = new QueuePaging<AdminDestinationEntry>({
     destroyRef: inject(DestroyRef),
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudieron cargar los destinos bloqueados",
     // This list has no filters: one page is identified by its number alone.
     filters: () => null,
@@ -75,9 +81,17 @@ export class AdminDestinationsComponent {
   readonly pageSizes = [10, 25, 50];
 
   constructor() {
+    let context = this.view.key();
     effect(() => {
+      const current = this.view.key();
       this.reloadToken();
-      untracked(() => void this.entries.load());
+      untracked(() => {
+        if (current !== context) {
+          context = current;
+          this.entries.reset();
+        }
+        void this.entries.load();
+      });
     });
   }
 
@@ -93,7 +107,8 @@ export class AdminDestinationsComponent {
    * of them would decide against a list the operator cannot see.
    */
   async withdraw(entry: AdminDestinationEntry): Promise<void> {
-    if (this.entries.stale() || this.busy()) return;
+    const intent = this.view.capture();
+    if (!intent() || this.entries.stale() || this.busy()) return;
     const confirmed = await this.actions.confirm({
       title: "Retirar el bloqueo",
       message: entry.match_kind === "host"
@@ -102,10 +117,12 @@ export class AdminDestinationsComponent {
       confirmLabel: "Retirar entrada",
       destructive: true,
     });
-    if (!confirmed || this.entries.stale() || this.busy()) return;
-    this.busy.set(true);
+    if (!confirmed || this.entries.stale()) return;
+    const operation = this.view.begin(`entry-${entry.id}`, intent);
+    if (!operation) return;
     try {
       const result = await this.api.delete(`/api/v1/admin/destinations/${entry.id}`, undefined, decodeDestinationRemoval);
+      if (!operation.isCurrent()) return;
       this.snackbar.open(
         result.releasedLinks > 0
           ? `Entrada retirada. ${countLabel(result.releasedLinks, "enlace recupera su estado", "enlaces recuperan su estado")}.`
@@ -117,9 +134,10 @@ export class AdminDestinationsComponent {
       // included, so a reload here would ask the same question twice.
       this.changed.emit();
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.snackbar.open(apiMessage(error, "No se pudo retirar la entrada"), "Cerrar", { duration: 4000 });
     } finally {
-      this.busy.set(false);
+      operation.settle();
     }
   }
 }

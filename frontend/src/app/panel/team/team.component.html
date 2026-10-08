@@ -1,7 +1,7 @@
 <app-page-header icon="group" eyebrow="Colaboración" title="Equipo" description="Gestiona el workspace, sus miembros, roles e invitaciones pendientes." />
 
 @if (loading() && detail()) {
-  <mat-progress-bar mode="indeterminate" />
+  <mat-progress-bar mode="indeterminate" aria-label="Actualizando equipo" />
 }
 @if (loading() && !detail()) {
   <app-panel-skeleton variant="cards" label="Cargando equipo" />
@@ -21,14 +21,18 @@
 @if (detail(); as d) {
   <div class="card-block workspace-card">
     <div class="card-heading"><span class="card-icon"><mat-icon>workspaces</mat-icon></span><div><h2>Workspace</h2><p>Identidad visible para todas las personas del equipo.</p></div></div>
-    <div class="rename-row">
-      <mat-form-field appearance="outline" class="grow">
-        <mat-label>Nombre del workspace</mat-label>
-        <input matInput [(ngModel)]="renameValue" />
-      </mat-form-field>        <button mat-flat-button color="primary" (click)="rename()" [disabled]="!isAdmin() || !renameValue().trim() || saving()">
-        Renombrar
-      </button>
-    </div>
+    <div class="workspace-identity"><strong>{{ d.workspace.name }}</strong><span class="role-chip">Tu acceso: {{ d.workspace.role ? roleLabel(d.workspace.role) : 'Acceso sin confirmar' }}</span></div>
+    @if (isAdmin()) {
+      <div class="rename-row">
+        <mat-form-field appearance="outline" class="grow">
+          <mat-label>Nombre del workspace</mat-label>
+          <input matInput [(ngModel)]="renameValue" />
+        </mat-form-field>
+        <button mat-stroked-button type="button" (click)="rename()" [disabled]="renameValue().trim().length < 2 || renameValue().trim() === d.workspace.name || saving()">Guardar nombre</button>
+      </div>
+    } @else {
+      <p class="workspace-note">El propietario y los administradores pueden cambiar el nombre y gestionar el equipo.</p>
+    }
   </div>
   <div class="card-block">
     <div class="card-heading"><span class="card-icon"><mat-icon>group</mat-icon></span><div><h2>Miembros</h2><p>Acceso y responsabilidades dentro de este workspace.</p></div><span class="count-badge tnum">{{ d.membersPage.total }}</span></div>
@@ -42,19 +46,19 @@
           </div>
         </div>
         <div class="member-actions">
-          @if (isAdmin() && m.role !== 'owner') {
+          @if (canManageMember(m)) {
             <mat-form-field appearance="outline">
-              <mat-select [value]="m.role" (selectionChange)="changeRole(m, $event.value)" aria-label="Rol" [disabled]="saving()">
-                @for (role of assignableRoles; track role) { <mat-option [value]="role">{{ roleLabel(role) }}</mat-option> }
+              <mat-select #memberRole [value]="m.role" (selectionChange)="changeRole(m, $event.value, memberRole)" [aria-label]="'Rol de ' + m.name + ' (' + m.email + ')'" [disabled]="saving()">
+                @for (role of assignableRoles(); track role) { <mat-option [value]="role">{{ roleLabel(role) }}</mat-option> }
               </mat-select>
             </mat-form-field>
           }
-          @if (!isAdmin() || m.role === 'owner') {
+          @if (!canManageMember(m)) {
             <span class="role-chip">{{ roleLabel(m.role) }}</span>
           }
-          @if (isAdmin() && m.role !== 'owner') {
-            <button mat-icon-button (click)="removeMember(m)" aria-label="Eliminar miembro" [disabled]="saving()">
-              <mat-icon>person_remove</mat-icon>
+          @if (canManageMember(m)) {
+            <button mat-stroked-button type="button" class="remove-member" (click)="removeMember(m)" [attr.aria-label]="'Eliminar a ' + m.name + ' del workspace'" [disabled]="saving()">
+              <mat-icon>person_remove</mat-icon> Eliminar
             </button>
           }
         </div>
@@ -65,16 +69,16 @@
     }
   </div>
   @if (isAdmin()) {
-    <div class="card-block">
+    <div class="card-block invitations-card">
       <div class="card-heading"><span class="card-icon"><mat-icon>person_add</mat-icon></span><div><h2>Invitaciones</h2><p>Asigna el rol mínimo necesario antes de enviar el acceso.</p></div></div>
-      <div class="invite-row">
+      <div class="invite-row invite-form">
         <mat-form-field appearance="outline" class="grow">
           <mat-label>Email</mat-label>
-          <input matInput type="email" [(ngModel)]="inviteEmail" (keyup.enter)="invite()" />
+          <input matInput type="email" autocomplete="email" maxlength="254" [(ngModel)]="inviteEmail" (keyup.enter)="invite()" />
         </mat-form-field>
         <mat-form-field appearance="outline" class="role">
-          <mat-select [(ngModel)]="inviteRole" aria-label="Rol">
-            @for (role of assignableRoles; track role) { <mat-option [value]="role">{{ roleLabel(role) }}</mat-option> }
+          <mat-select [(ngModel)]="inviteRole" aria-label="Rol de la nueva invitación">
+            @for (role of assignableRoles(); track role) { <mat-option [value]="role">{{ roleLabel(role) }}</mat-option> }
           </mat-select>
         </mat-form-field>
         <button mat-flat-button color="primary" (click)="invite()" [disabled]="!inviteEmail().trim() || saving() || invitationRetry.remaining(d.workspace.id, inviteEmail()) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inviteEmail()) > 0 ? 'invite-retry-wait' : null">
@@ -96,33 +100,33 @@
               }
             </div>
           </div>
-          @if (inv.status === 'pending' || inv.status === 'expired') {
+          @if (canManageInvitation(inv) && (inv.status === 'pending' || inv.status === 'expired')) {
             <div class="member-actions">
-              <button mat-stroked-button (click)="resendInvite(inv)" [disabled]="saving() || invitationRetry.remaining(d.workspace.id, inv.email) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inv.email) > 0 ? 'invite-retry-' + inv.id : null"><mat-icon>refresh</mat-icon> Reenviar</button>
+              <button mat-stroked-button type="button" (click)="resendInvite(inv)" [attr.aria-label]="'Reenviar invitación a ' + inv.email" [disabled]="saving() || invitationRetry.remaining(d.workspace.id, inv.email) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inv.email) > 0 ? 'invite-retry-' + inv.id : null"><mat-icon>refresh</mat-icon> Reenviar</button>
               @if (inv.status === 'pending') {
-                <button mat-icon-button (click)="cancelInvite(inv)" aria-label="Cancelar invitación" [disabled]="saving()"><mat-icon>close</mat-icon></button>
+                <button mat-stroked-button type="button" (click)="cancelInvite(inv)" [attr.aria-label]="'Cancelar invitación a ' + inv.email" [disabled]="saving()"><mat-icon>close</mat-icon> Cancelar</button>
               }
             </div>
           }
         </div>
       }
+      @if (d.invitations.length === 0) { <p class="workspace-note">No hay invitaciones en esta página. Invita a alguien por email para compartir el workspace.</p> }
       @if (d.invitationsPage.total > d.invitationsPage.perPage) {
         <mat-paginator class="team-paginator" [length]="d.invitationsPage.total" [pageIndex]="invitationPageIndex()" [pageSize]="invitationPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" aria-label="Paginar invitaciones" (page)="onInvitationsPage($event)" />
       }
     </div>
   }
-  @if (isAdmin()) {
-    <div class="card-block danger-zone">
-      <div class="card-heading danger-heading"><span class="card-icon"><mat-icon>warning_amber</mat-icon></span><div><h2>Zona de peligro</h2><p>Acciones destructivas o que cambian tu acceso al workspace.</p></div></div>
+  @if (canLeave()) {
+    <div class="card-block membership-card">
       <div class="danger-row">
-        <div>
-          <b>Abandonar workspace</b>
-          <span>Deja de ser miembro (no aplica al propietario).</span>
-        </div>
-        @if (!isOwner()) {
-          <button mat-stroked-button (click)="leave()" [disabled]="saving()">Abandonar</button>
-        }
+        <div><b>Tu pertenencia al equipo</b><span>Si abandonas este workspace, necesitarás otra invitación para volver.</span></div>
+        <button mat-stroked-button type="button" (click)="leave()" [disabled]="saving()">Abandonar</button>
       </div>
+    </div>
+  }
+  @if (isOwner()) {
+    <div class="card-block danger-zone">
+      <div class="card-heading danger-heading"><span class="card-icon"><mat-icon>warning_amber</mat-icon></span><div><h2>Propiedad del workspace</h2><p>Estas decisiones cambian el control del equipo o eliminan sus datos.</p></div></div>
       @if (isOwner()) {
         <div class="danger-row transfer-row">
           <div>
@@ -140,24 +144,25 @@
             <div class="transfer-form-copy"><b>Nuevo propietario</b><p>La transferencia requiere tu contraseña{{ user()?.mfaEnabled ? ' y segundo factor' : '' }}.</p></div>
             @if (transferTarget(); as target) {
               <div class="transfer-selected">
-                <mat-icon>how_to_reg</mat-icon>
                 <div><b>{{ target.name }}</b><span>{{ target.email }} · {{ roleLabel(target.role) }}</span></div>
-                <button mat-icon-button type="button" (click)="clearTransferTarget()" aria-label="Elegir a otra persona"><mat-icon>close</mat-icon></button>
+                <button mat-stroked-button type="button" (click)="clearTransferTarget()" [disabled]="saving()"><mat-icon>person_search</mat-icon> Elegir otra persona</button>
               </div>
             } @else {
               <mat-form-field appearance="outline" class="transfer-search"><mat-label>Buscar por nombre o email</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="transferQuery()" (input)="onTransferQuery(memberSearch.value)" #memberSearch autocomplete="off" maxlength="120" aria-label="Buscar entre todos los miembros del workspace" />@if (transferSearching()) { <mat-icon matSuffix>sync</mat-icon> }</mat-form-field>
               <div class="transfer-results">
                 @if (transferSearchError()) {
-                  <p class="transfer-search-error">No se pudo buscar miembros. Inténtalo de nuevo.</p>
+                  <p class="transfer-search-error" role="alert">No se pudo buscar miembros.</p><button mat-stroked-button type="button" (click)="searchTransferCandidates()" [disabled]="transferSearching()">Reintentar búsqueda</button>
                 } @else if (transferResults(); as results) {
                   @for (candidate of results; track candidate.id) {
-                    <button mat-stroked-button type="button" class="transfer-result" (click)="selectTransferTarget(candidate)"><b>{{ candidate.name }}</b><span>{{ candidate.email }} · {{ roleLabel(candidate.role) }}</span></button>
+                    <button type="button" class="transfer-result" (click)="selectTransferTarget(candidate)"><span class="candidate-name">{{ candidate.name }}</span><span>{{ candidate.email }}</span><span class="role-chip">{{ roleLabel(candidate.role) }}</span></button>
                   } @empty {
                     <p class="transfer-search-hint">Ningún miembro coincide con la búsqueda.</p>
                   }
                   @if (transferTotal() > results.length) {
                     <p class="transfer-search-hint">{{ transferTotal() }} coincidencias en el workspace; sigue escribiendo para acotar.</p>
                   }
+                } @else if (transferSearching()) {
+                  <p class="transfer-search-hint" role="status">Buscando miembros…</p>
                 } @else {
                   <p class="transfer-search-hint">Escribe para buscar entre todos los miembros del workspace, no sólo de esta página.</p>
                 }

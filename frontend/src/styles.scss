@@ -539,26 +539,15 @@ html .mat-typography .mat-body-small {
   -webkit-font-smoothing: antialiased;
 }
 
-.main app-page-header,
-.main app-page-header ~ .stat-cards,
-.main app-page-header ~ .filter-card,
-.main app-page-header ~ .card-block,
-.main app-page-header ~ .create-card,
-.main app-page-header ~ .domain-list,
-.main app-page-header ~ .token-list,
-.main app-page-header ~ .wh-list,
-.main app-page-header ~ .link-list,
-.main app-page-header ~ .tabs {
-  animation: panel-content-in 360ms cubic-bezier(.22, 1, .36, 1) both;
+// Animate one route surface, instead of stacking separate entrance effects on
+// every header/card. Angular inserts route hosts after the outlet; this global
+// selector also reaches those dynamically-created hosts across encapsulation.
+app-panel #panel-content > router-outlet + * {
+  display: block;
+  animation: panel-page-in 300ms cubic-bezier(.22, 1, .36, 1) both;
 }
-
-.main app-page-header ~ .stat-cards,
-.main app-page-header ~ .filter-card,
-.main app-page-header ~ .card-block,
-.main app-page-header ~ .create-card { animation-delay: 45ms; }
-
-@keyframes panel-content-in {
-  from { opacity: 0; transform: translateY(7px); }
+@keyframes panel-page-in {
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
 
@@ -781,7 +770,8 @@ html .mat-typography .mat-body-small {
   }
 
   .main app-page-header,
-  .main app-page-header ~ * { animation: none !important; }
+  .main app-page-header ~ *,
+  app-panel #panel-content > router-outlet + * { animation: none !important; }
 }
 
 @media (max-height: 760px) {

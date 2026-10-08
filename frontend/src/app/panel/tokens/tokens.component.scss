@@ -1,376 +1,91 @@
 :host { display: block; container-type: inline-size; }
+h2, h3 { margin: 0; color: var(--ink); font-weight: 750; letter-spacing: -.025em; }
+h2 { font-size: 22px; line-height: 1.25; }
+h3 { font-size: 17px; }
+p { color: var(--muted); font-size: 14px; line-height: 1.65; }
+button { min-height: 44px; }
+:is(button, section):focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.err-hint { color: var(--uvh-danger); }
+.access-notice { display: flex; gap: 16px; padding: 24px 0; border-block: 1px solid var(--line); }
+.access-notice > mat-icon { flex: 0 0 24px; color: var(--muted); }
+.access-notice p { max-width: 66ch; margin-bottom: 0; }
 
-// A form error on a hint line: Material renders `mat-error` only for control
-// error states, and this field is validated against the calendar instead.
-.err-hint {
-  color: var(--uvh-danger);
-}
+.create-card { margin-bottom: 36px; padding: 26px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper-raised); animation: token-editor-in 220ms cubic-bezier(.22, 1, .36, 1) both; }
+.create-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 24px; }
+.create-heading > div { min-width: 0; }
+.create-heading p { margin: 8px 0 0; }
+.create-heading > button { flex-shrink: 0; }
+.create-fields, .credential-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+mat-form-field { min-width: 0; width: 100%; }
+.form-timezone { margin: 8px 0 26px; font-size: 13px; }
+.scopes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0; border: 0; margin: 0; }
+.scopes legend { width: 100%; margin-bottom: 14px; color: var(--ink); font-size: 16px; font-weight: 650; }
+.scopes mat-checkbox { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--paper); transition: background-color 160ms ease, border-color 160ms ease; }
+.scopes mat-checkbox:hover, .scopes mat-checkbox:focus-within { border-color: var(--accent); }
+.scopes mat-checkbox.mat-mdc-checkbox-checked { background: color-mix(in srgb, var(--accent) 5%, var(--paper)); border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.scope-copy { display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+.scope-copy > span { font-size: 14px; line-height: 1.5; color: var(--ink); }
+.scope-copy small { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.scope-copy code { font-size: 12px; color: var(--muted); }
+.scope-note { margin: 12px 0 28px; font-size: 13px; }
+.identity-check { padding-top: 24px; border-top: 1px solid var(--line); }
+.identity-check p { margin: 6px 0 22px; }
+.issue-actions { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.issue-actions p { max-width: 58ch; font-size: 13px; margin: 0; }
+.issue-actions button { flex-shrink: 0; }
 
-// Tokens: credential issuance is a flat framed plate; the one-time secret is a
-// left-ruled margin note; the registry is a ledger with mono scope tags.
-.alert {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding: 12px 14px;
-  border-left: 3px solid var(--uvh-danger);
-  border-radius: 3px;
-  background: var(--uvh-danger-soft);
-  color: var(--uvh-danger);
-  font-size: 13px;
-  line-height: 1.6;
+.issued-notice { margin: 0 0 10px; color: var(--uvh-success); font-size: 14px; }
+.plain-box { padding: 24px; margin-bottom: 32px; border: 1px solid var(--line); border-inline-start: 3px solid var(--accent); background: var(--paper-raised); animation: token-editor-in 220ms cubic-bezier(.22, 1, .36, 1) both; }
+.issued-heading { display: flex; align-items: flex-start; gap: 14px; }
+.issued-heading > mat-icon { color: var(--accent); flex: 0 0 24px; }
+.issued-heading > div { min-width: 0; }
+.issued-heading h2 { overflow-wrap: anywhere; }
+.issued-heading p { max-width: 68ch; margin: 8px 0 0; }
+.plain-value { display: block; width: 100%; box-sizing: border-box; margin: 22px 0 18px; padding: 16px; background: var(--paper); border: 1px solid var(--line); color: var(--ink); font-size: 15px; line-height: 1.7; overflow-wrap: anywhere; user-select: all; }
+.plain-actions, .uncertain-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.copy-feedback { margin: 14px 0 0; font-size: 13px; }
+.secret-note { margin: 16px 0 0; font-size: 13px; }
+.issue-error, .alert { margin-bottom: 24px; padding: 16px; border-inline-start: 3px solid var(--uvh-danger); background: var(--uvh-danger-soft); color: var(--uvh-danger); }
+.issue-error p { color: inherit; margin: 0; }
+.uncertain-actions { margin-top: 16px; }
+.alert { display: flex; align-items: center; gap: 16px; font-size: 14px; }
+.alert > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.alert > button { flex-shrink: 0; }
 
-  > span {
-    flex: 1;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
+.registry-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+.registry-heading p { margin: 8px 0 0; }
+.registry-heading button { flex-shrink: 0; }
+.registry-timezone { margin: 14px 0 20px; font-size: 13px; }
+.read-notice { margin: 10px 0 16px; font-size: 13px; }
+.token-list { border-top: 1px solid var(--line); }
+.token-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+.token-icon { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); }
+.token-icon mat-icon { width: 20px; height: 20px; font-size: 20px; }
+.token-main { min-width: 0; }
+.token-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.token-title b { color: var(--ink); font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
+.scope-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.scope-chip { min-width: 0; padding: 3px 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.token-actions .danger { color: var(--uvh-danger); --mat-icon-color: var(--uvh-danger); }
+.registry-window { padding: 12px 0; margin: 0; font-size: 13px; }
+@keyframes token-editor-in { from { opacity: .35; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
 
-  > button {
-    flex: 0 0 auto;
-    margin-left: auto;
-  }
-}
-
-.create-card {
-  margin-bottom: 26px;
-  padding: 20px 22px;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface-raised);
-
-  .create-fields {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 240px);
-    align-items: flex-start;
-    gap: 12px;
-
-    mat-form-field {
-      min-width: 0;
-      width: 100%;
-    }
-  }
-}
-
-.card-intro {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 17px;
-
-  > div { min-width: 0; }
-
-  h2 {
-    margin: 0;
-    color: var(--uvh-ink);
-    font-size: clamp(22px, 3cqi, 30px);
-    font-weight: 800;
-    letter-spacing: -.045em;
-    text-wrap: balance;
-  }
-
-  p {
-    max-width: 70ch;
-    margin: 6px 0 0;
-    color: var(--uvh-muted);
-    font-size: 12px;
-    line-height: 1.7;
-  }
-}
-
-.card-icon,
-.token-icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  place-items: center;
-  border: 1px solid var(--uvh-border);
-  border-radius: 3px;
-  background: var(--uvh-surface);
-  color: var(--uvh-electric);
-}
-
-.card-icon mat-icon,
-.token-icon mat-icon {
-  width: 19px;
-  height: 19px;
-  font-size: 19px;
-}
-
-// Scope selection: framed checkboxes in a mono legend grid.
-.scopes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 2px 0 16px;
-  padding: 0;
-  border: 0;
-
-  legend {
-    width: 100%;
-    margin-bottom: 8px;
-    color: var(--uvh-muted);
-    font: 10px/1.5 "Courier New", monospace;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-  }
-
-  mat-checkbox {
-    min-width: 0;
-    padding: 7px 9px;
-    border: 1px solid var(--uvh-border);
-    border-radius: 3px;
-    background: var(--uvh-surface);
-    transition: border-color 160ms ease, background-color 160ms ease;
-  }
-
-  mat-checkbox:hover {
-    border-color: color-mix(in srgb, var(--uvh-electric) 30%, var(--uvh-border));
-    background: color-mix(in srgb, var(--uvh-electric) 4%, var(--uvh-surface));
-  }
-}
-
-.scope-copy {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 1px;
-  overflow-wrap: anywhere;
-
-  code {
-    color: var(--uvh-ink);
-    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-    font-size: 11.5px;
-    font-weight: 750;
-  }
-
-  small {
-    color: var(--uvh-muted);
-    font-size: 10.5px;
-  }
-}
-
-// Re-auth grid: a ruled data section, not an accent-tinted rounded card.
-.credential-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0 0 14px;
-  padding: 14px 0 14px 16px;
-  border-left: 2px solid var(--uvh-border);
-  border-radius: 3px;
-}
-
-.credential-copy {
-  display: flex;
-  grid-column: 1 / -1;
-  flex-direction: column;
-  gap: 2px;
-
-  b {
-    color: var(--uvh-ink);
-    font-size: 12.5px;
-    font-weight: 800;
-  }
-
-  span {
-    color: var(--uvh-muted);
-    font-size: 11px;
-    line-height: 1.6;
-  }
-}
-
-// One-time plain token: left-ruled warn margin note; no teal rgba.
-.plain-box {
-  margin-top: 16px;
-  padding: 14px 16px;
-  border-left: 3px solid var(--uvh-warn);
-  border-radius: 3px;
-  background: var(--uvh-warn-soft);
-
-  .warning {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin: 0 0 8px;
-    color: var(--uvh-warn);
-    font-size: 12.5px;
-    line-height: 1.6;
-
-    mat-icon {
-      width: 18px;
-      height: 18px;
-      flex: 0 0 auto;
-      font-size: 18px;
-    }
-
-    b {
-      font-weight: 800;
-    }
-  }
-
-  .plain-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    code {
-      flex: 1;
-      min-width: 0;
-      overflow-wrap: anywhere;
-      color: var(--uvh-ink);
-      font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-      font-size: 12.5px;
-    }
-  }
-}
-
-.token-list {
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--uvh-border);
-}
-
-// The registry is bounded server-side. Sentence the bound instead of letting
-// the last page pass for every credential the workspace ever issued.
-.registry-window {
-  margin: 12px 0 0;
-  color: var(--uvh-muted);
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-// Registry ledger: hairline rows, mono scope tags, no hover lift.
-.token-row {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 4px;
-  border-bottom: 1px solid var(--uvh-border);
-  transition: background-color 160ms ease;
-  &:hover, &:focus-within { background: var(--uvh-surface-raised); }
-
-  .token-main {
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    flex-direction: column;
-    gap: 6px;
-
-    b {
-      color: var(--uvh-ink);
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: -.015em;
-      overflow-wrap: anywhere;
-    }
-
-    .scope-chips {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-
-      .scope-chip {
-        min-width: 0;
-        overflow-wrap: anywhere;
-        padding: 2px 7px;
-        border: 1px solid var(--uvh-border);
-        border-radius: 3px;
-        color: var(--uvh-muted);
-
-        code {
-          font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-          font-size: 10.5px;
-        }
-      }
-    }
-
-    .meta {
-      overflow-wrap: anywhere;
-      color: var(--uvh-muted);
-      font-size: 13px;
-      line-height: 1.7;
-    }
-  }
-
-  .token-actions {
-    .danger {
-      color: var(--uvh-danger);
-      --mat-icon-color: var(--uvh-danger);
-    }
-  }
-}
-
-.token-title {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
-}
-
-@container (max-width: 640px) {
-  // Match the desktop selector: a lower-specificity mobile selector left
-  // the fixed expiry width in force, overflowing the narrow form.
-  .create-card .create-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .scopes,
-  .credential-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .token-row {
-    align-items: flex-start;
-    grid-template-columns: 38px minmax(0, 1fr);
-  }
-
-  .token-actions {
-    grid-column: 2;
-    justify-self: start;
-    min-width: 0;
-  }
-
-}
-
-.section-kicker { display: block; margin-bottom: 8px; color: var(--uvh-muted); font: 10px/1.5 "Courier New", monospace; letter-spacing: .08em; text-transform: uppercase; }
-.registry-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin: 32px 0 20px; }
-.registry-heading h2 { margin: 0; color: var(--uvh-ink); font-size: 22px; font-weight: 800; letter-spacing: -.035em; }
-.registry-note { max-width: 32ch; color: var(--uvh-muted); font-size: 11px; line-height: 1.7; }
-.credential-fields mat-form-field { min-width: 0; width: 100%; }
-.issue-actions { display: flex; align-items: center; gap: 18px; }
-.issue-actions button { flex-shrink: 0; min-height: 44px; }
-.issue-actions p { max-width: 54ch; margin: 0; color: var(--uvh-muted); font-size: 11px; line-height: 1.7; }
-.plain-row button { flex: 0 0 48px; }
-.issued-notice { color: var(--uvh-success); font-size: 12px; line-height: 1.7; }
-.token-actions button { min-height: 44px; }
-:is(button, a):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
-@container (max-width: 640px) {
-  .registry-heading { align-items: flex-start; flex-direction: column; }
-  .issue-actions { align-items: stretch; flex-direction: column; }
+@container (max-width: 720px) {
+  .create-fields, .credential-fields, .scopes { grid-template-columns: minmax(0, 1fr); }
+  .create-fields, .credential-fields { gap: 20px; }
+  .issue-actions { flex-direction: column; align-items: stretch; gap: 16px; }
+  .token-row { grid-template-columns: 38px minmax(0, 1fr); align-items: flex-start; }
+  .token-actions { grid-column: 2; }
 }
 @container (max-width: 420px) {
-  .create-card { padding: 20px 14px; }
-  .card-intro { gap: 10px; }
-  .card-icon { width: 30px; height: 30px; flex-basis: 30px; }
-  .credential-fields { padding-left: 10px; }
-  .scopes mat-checkbox { padding-inline: 3px; }
-  .token-row { gap: 10px; }
-  .plain-box { padding: 14px 10px; }
-  .alert { flex-wrap: wrap; }
-  .alert > button { margin-left: 0; }
+  .create-card, .plain-box { padding: 18px 14px; }
+  .create-heading, .registry-heading { flex-direction: column; gap: 14px; }
+  .create-heading > button, .registry-heading > button { align-self: stretch; }
+  .plain-actions, .uncertain-actions { flex-direction: column; align-items: stretch; }
+  .alert { align-items: stretch; flex-direction: column; }
+  .token-row { gap: 12px; }
+  .plain-value { padding: 12px; font-size: 14px; }
+  h2 { font-size: 20px; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
-.registry-timezone { margin: 24px 0 0; color: var(--uvh-muted); font-size: 12px; line-height: 1.6; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

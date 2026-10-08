@@ -20,7 +20,7 @@
       <p>Topología admitida: subdominio con CNAME directo. No se validan apex, flattening ni proxies DNS.</p>
     </div>
     <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
-    <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || actionBusy()"><mat-icon>refresh</mat-icon> Actualizar estado</button>
+    <button mat-stroked-button class="neutral-action" type="button" (click)="load()" [disabled]="loading() || actionBusy()"><mat-icon aria-hidden="true">refresh</mat-icon> Actualizar estado</button>
   </section>
 
   @if (!canEdit()) {
@@ -81,12 +81,15 @@
     @if (dnsErrorLabel(d.dnsError); as dnsMessage) { <p class="warning" role="status">{{ dnsMessage }}</p> }
     @if (graceLabel(); as grace) { <p class="warning degraded" role="status">{{ grace }}</p> }
     @if (canEdit()) {
-      <div class="actions">
-        <button mat-flat-button color="primary" type="button" (click)="startDnsCheck()" [disabled]="actionBusy() || d.dnsCheckInProgress || d.state === 'provisioning'"><mat-icon>dns</mat-icon> {{ d.dnsCheckInProgress ? 'Comprobación en curso' : 'Comprobar ahora' }}</button>
+      <div class="actions" role="group" aria-label="Comprobación de DNS y preparación de HTTPS">
+        <button mat-flat-button color="primary" type="button" (click)="startDnsCheck()" [disabled]="actionBusy() || d.dnsCheckInProgress || d.state === 'provisioning'"><mat-icon aria-hidden="true">dns</mat-icon> {{ d.dnsCheckInProgress ? 'Comprobación en curso' : 'Comprobar ahora' }}</button>
         @if (d.state === 'verified') {
-          <button mat-stroked-button type="button" (click)="activate()" [disabled]="actionBusy() || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon>https</mat-icon> {{ d.dnsCheckInProgress ? 'Preparar HTTPS (espera la comprobación)' : 'Preparar HTTPS' }}</button>
+          <button mat-stroked-button class="neutral-action" type="button" (click)="activate()" [disabled]="actionBusy() || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon aria-hidden="true">https</mat-icon> Preparar HTTPS</button>
         }
       </div>
+      @if (d.state === 'verified' && d.dnsCheckInProgress) {
+        <p class="scheduler-note" role="status">Podrás preparar HTTPS cuando termine la comprobación DNS.</p>
+      }
     }
     <p class="scheduler-note">La fecha indica cuándo el planificador puede admitir el trabajo. La ejecución puede demorarse por cola. Mientras haya una comprobación o una emisión en curso, esta página se actualiza sola.</p>
   </section>

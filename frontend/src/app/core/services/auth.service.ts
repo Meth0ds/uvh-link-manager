@@ -166,10 +166,11 @@ export class AuthService {
     this.userMutationUnconfirmed.set(unconfirmed);
   }
 
-  private async confirmedMfaMutation<T>(operation: MfaConfigurationOperation, command: () => Promise<T>): Promise<T> {
+  private async confirmedMfaMutation<T>(operation: MfaConfigurationOperation | "step-up", command: () => Promise<T>): Promise<T> {
     const generation = this.generation;
     const account = this.user()?.id ?? null;
-    const affectsUser = operation !== "setup" && operation !== "cancel";
+    const affectsUser = operation !== "setup" && operation !== "cancel"
+      && (operation !== "step-up" || this.user()?.mfaEnabled === true);
     const issuesCodes = operation === "enable" || operation === "regenerate";
     let result: T;
     try {
@@ -449,6 +450,15 @@ export class AuthService {
     await this.me();
   }
 
+  /**
+   * A step-up can consume a recovery factor without returning a User DTO.
+   * Keep its account projection fenced even when the invoking view has gone;
+   * the caller can refresh it, but must never replay an uncertain command.
+   */
+  accountStepUp<T>(command: () => Promise<T>): Promise<T> {
+    return this.confirmedMfaMutation("step-up", command);
+  }
+
   async mfaSessionStatus(): Promise<MfaSessionStatus> {
     const generation = this.generation;
     const status = await this.entry.mfaSessionStatus();
@@ -458,9 +468,7 @@ export class AuthService {
   }
 
   async reauthenticateMfa(password: string, factorCode: string): Promise<{ verifiedAt: string; expiresAt: string }> {
-    const generation = this.generation;
-    const result = await this.entry.reauthenticateMfa(password, factorCode);
-    this.assertCurrent(generation);
+    const result = await this.accountStepUp(() => this.entry.reauthenticateMfa(password, factorCode));
     this.adminMfaReauthenticationRequired.set(false);
     return { verifiedAt: result.verifiedAt, expiresAt: result.expiresAt };
   }
@@ -573,8 +581,11 @@ export class AuthService {
     const generation = this.generation;
     const result = await this.accountSessions.revoke(id);
     this.assertCurrent(generation);
-    if (current || result.current) this.sessionExpired();
-    return result.current === true || current;
+    // The cookie may have moved to another session of the same account. An
+    // explicit server answer takes precedence over the list's older hint.
+    const revokedCurrent = result.current ?? current;
+    if (revokedCurrent) this.sessionExpired();
+    return revokedCurrent;
   }
 
   /**

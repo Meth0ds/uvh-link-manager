@@ -14,7 +14,8 @@ test("un token mínimo funciona por Bearer y deja de funcionar al revocarlo", as
   await page.goto("/app/tokens");
 
   const tokenName = `lector-e2e-${Date.now()}`;
-  await page.getByLabel("Nombre").fill(tokenName);
+  await page.getByRole("button", { name: "Crear token", exact: true }).click();
+  await page.getByLabel("Nombre de la integración").fill(tokenName);
   await page.getByRole("checkbox", { name: /Consultar enlaces/ }).check();
   await page.getByLabel("Contraseña actual").fill(E2E_PASSWORD);
   const createPromise = page.waitForResponse((response) => response.url().endsWith("/api/v1/tokens") && response.request().method() === "POST");

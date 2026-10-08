@@ -1,6 +1,9 @@
 <a class="skip-link" href="#panel-content" (click)="skipToContent($event)">Saltar al contenido</a>
-<mat-sidenav-container class="shell">
-  <mat-sidenav #sidenav id="panel-navigation" [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" fixedInViewport aria-label="Navegación principal">
+<mat-sidenav-container class="shell" [class.navigation-rail]="mainNavRail()" [class.navigation-pinned]="mainNavPinned()">
+  <mat-sidenav #sidenav id="panel-navigation" [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" [class.navigation-expanded]="mainNavExpanded()"
+    (mouseenter)="mainNavHovered.set(true)" (mouseleave)="mainNavHovered.set(false)"
+    (focusin)="onMainNavFocusIn($event)" (focusout)="onMainNavFocusOut($event)"
+    fixedInViewport aria-label="Navegación principal">
     <div class="side-head">
       <a class="brand" routerLink="/" aria-label="UVH · Ir al inicio">
         <span class="brand-name" aria-hidden="true">uvh<span>.</span></span>
@@ -11,8 +14,8 @@
         <mat-icon aria-hidden="true">workspaces</mat-icon>
         <span><b>{{ workspaceName() }}</b><small>{{ roleLabel() }}</small></span>
       </div>
-      @if (canCreate()) {
-        <button mat-flat-button class="new-link side-primary" type="button" (click)="newLink()"><mat-icon aria-hidden="true">add</mat-icon> Crear enlace</button>
+      @if (canCreate() && (isMobile() || !hasContextualCreate())) {
+        <button mat-flat-button class="new-link side-primary" type="button" (click)="newLink()" aria-label="Crear enlace"><mat-icon aria-hidden="true">add</mat-icon><span class="navigation-copy">Crear enlace</span></button>
       }
     </div>
 
@@ -27,9 +30,10 @@
             ariaCurrentWhenActive="page"
             (click)="mobileOpen.set(false)"
             class="nav-item"
+            [attr.aria-label]="item.label"
             >
-            <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-            <span matListItemTitle>{{ item.label }}</span>
+            <mat-icon matListItemIcon aria-hidden="true">{{ item.icon }}</mat-icon>
+            <span matListItemTitle class="navigation-copy">{{ item.label }}</span>
             <!-- A CSS chevron avoids Material's meta typography overriding the
                  icon ligature and exposing a clipped "che" on active rows. -->
             <span matListItemMeta class="nav-arrow" aria-hidden="true"></span>
@@ -39,14 +43,24 @@
     </mat-nav-list>
 
     <div class="side-foot">
-      <a class="help-link" routerLink="/help"><mat-icon aria-hidden="true">help_outline</mat-icon><span>¿Cómo se hace?<small>Guías y soluciones</small></span><mat-icon aria-hidden="true">north_east</mat-icon></a>
-      <button mat-button class="workspace-create" (click)="createWorkspace()"><mat-icon aria-hidden="true">create_new_folder</mat-icon> Crear workspace</button>
-      <a class="side-account" routerLink="/app/settings" (click)="mobileOpen.set(false)"><span class="account-initials" aria-hidden="true">{{ initials() }}</span><span><b>{{ user()?.name || 'Tu cuenta' }}</b><small>Perfil y preferencias</small></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
+      <a class="help-link" routerLink="/help" aria-label="Ayuda: guías y soluciones"><mat-icon aria-hidden="true">help_outline</mat-icon><span class="navigation-copy">¿Cómo se hace?<small>Guías y soluciones</small></span><mat-icon aria-hidden="true">north_east</mat-icon></a>
+      <button mat-button class="workspace-create" (click)="createWorkspace()" aria-label="Crear workspace"><mat-icon aria-hidden="true">create_new_folder</mat-icon><span class="navigation-copy">Crear workspace</span></button>
+      <a class="side-account" aria-label="Perfil y preferencias" routerLink="/app/settings" (click)="mobileOpen.set(false)"><span class="account-initials" aria-hidden="true">{{ initials() }}</span><span class="navigation-copy"><b>{{ user()?.name || 'Tu cuenta' }}</b><small>Perfil y preferencias</small></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
     </div>
   </mat-sidenav>
 
   <mat-sidenav-content class="content">
     <mat-toolbar class="topbar" aria-label="Barra de herramientas">
+      @if (mainNavRail()) {
+        <button mat-icon-button class="navigation-pin" type="button"
+          (click)="mainNavPinned.set(!mainNavPinned())" [attr.aria-pressed]="mainNavPinned()"
+          [attr.aria-label]="mainNavPinned() ? 'Volver al menú compacto' : 'Mantener el menú principal abierto'"
+          [matTooltip]="mainNavPinned() ? 'Volver al menú compacto' : 'Mantener el menú principal abierto'"
+          aria-controls="panel-navigation">
+          <mat-icon aria-hidden="true">{{ mainNavPinned() ? 'menu_open' : 'push_pin' }}</mat-icon>
+        </button>
+      }
+
       <button
         mat-icon-button
         class="menu-btn"
@@ -77,10 +91,6 @@
 
       <span class="spacer"></span>
 
-      @if (canCreate()) { <button mat-flat-button color="primary" class="new-link-top" (click)="newLink()">
-        <mat-icon>add_link</mat-icon> Crear enlace
-      </button> }
-
       <a mat-icon-button class="notifications-bell" routerLink="/app/notifications" [attr.aria-label]="unreadNotificationsLabel()">
         <mat-icon aria-hidden="true">notifications</mat-icon>
         @if (notifications.unread() > 0) {
@@ -107,7 +117,7 @@
       </mat-menu>
     </mat-toolbar>
 
-    <main class="main">
+    <main #panelMain class="main">
       <div #panelContent class="main-inner" id="panel-content" tabindex="-1">
         <router-outlet />
       </div>

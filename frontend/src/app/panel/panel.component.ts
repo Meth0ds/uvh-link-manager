@@ -93,18 +93,53 @@ export class PanelComponent {
     map(event => event.urlAfterRedirects.split(/[?#]/)[0]),
     startWith(this.router.url.split(/[?#]/)[0]),
   ));
+  readonly hasContextualCreate = computed(() => ["/app/dashboard", "/app/links"].includes(this.currentUrl() ?? ""));
   readonly currentPage = computed(() => this.nav.flatMap(group => group.items)
     .find(item => this.currentUrl() === item.path || this.currentUrl()?.startsWith(item.path + "/"))?.label ?? "Panel");
   readonly mobileOpen = signal(false);
   readonly logoutBusy = signal(false);
   readonly isMobile = toSignal(this.breakpoint.observe("(max-width: 720px)").pipe(map((state) => state.matches)), { initialValue: false });
+  readonly panelMain = viewChild<ElementRef<HTMLElement>>("panelMain");
+  private mainPagePath = this.router.url.split(/[?#]/)[0];
   readonly panelContent = viewChild.required<ElementRef<HTMLElement>>("panelContent");
+  // Reserve a compact main rail throughout the desktop dashboard. Revealing
+  // its labels overlays the page; only explicit pinning reserves more space.
+  readonly mainNavPinned = signal(false);
+  readonly mainNavHovered = signal(false);
+  readonly mainNavFocused = signal(false);
+  readonly mainNavRail = computed(() => !this.isMobile());
+  readonly mainNavExpanded = computed(() => !this.mainNavRail() ||
+    this.mainNavPinned() || this.mainNavHovered() || this.mainNavFocused());
+
+  onMainNavFocusIn(event: FocusEvent): void {
+    // Pointer focus must not keep a hover reveal open after the pointer leaves.
+    const target = event.target;
+    this.mainNavFocused.set(target instanceof HTMLElement && target.matches(":focus-visible"));
+  }
+
+  onMainNavFocusOut(event: FocusEvent): void {
+    const next = event.relatedTarget;
+    if (!(next instanceof Node) || !(event.currentTarget as HTMLElement).contains(next)) {
+      this.mainNavFocused.set(false);
+    }
+  }
+
 
   // La campana sigue el ritmo de navegación: cada página del panel puede haber
   // registrado o leído avisos. El fallo silencioso conserva el último contador.
   private readonly unreadRefresh = this.router.events
     .pipe(filter((event) => event instanceof NavigationEnd), takeUntilDestroyed())
-    .subscribe(() => { void this.notifications.refreshUnread().catch(() => undefined); });
+    .subscribe(event => {
+      const path = (event as NavigationEnd).urlAfterRedirects.split(/[?#]/)[0];
+      if (path !== this.mainPagePath) {
+        // The panel scrolls inside <main>; window scroll restoration cannot
+        // reset this container. Same-page filters keep the reader's position.
+        const main = this.panelMain()?.nativeElement;
+        if (main) main.scrollTop = 0;
+      }
+      this.mainPagePath = path;
+      void this.notifications.refreshUnread().catch(() => undefined);
+    });
 
   constructor() {
     void this.notifications.refreshUnread().catch(() => undefined);

@@ -18,6 +18,8 @@ import { reportStatusLabel, REPORT_STATUS_ORDER } from "../../core/report-status
 import { ApiService } from "../../core/services/api.service";
 import { decodeAdminReportsPage, decodeDestinationBlock } from "../../core/services/admin-response-decoders";
 import { ActionDialogService } from "../action-dialog.service";
+import { SessionContextService } from "../../core/services/session-context.service";
+import { AdminViewContext, type AdminIntent } from "./admin-view-context";
 import { QueueSectionComponent } from "../queue-section.component";
 
 type ReportStatus = "" | AdminReport["status"];
@@ -45,6 +47,8 @@ export class AdminReportsComponent {
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionDialogService);
   private readonly snackbar = inject(MatSnackBar);
+  private readonly view = new AdminViewContext(inject(SessionContextService), inject(DestroyRef));
+  readonly canOperate = this.view.eligible;
 
   /** Bumped by the console when another view of these links changed. */
   readonly reloadToken = input(0);
@@ -55,10 +59,12 @@ export class AdminReportsComponent {
   readonly query = signal("");
   readonly status = signal<ReportStatus>("open");
   /** One decision at a time: every row waits for the one in flight. */
-  readonly busy = signal(false);
+  readonly busy = this.view.busy;
 
   readonly reports = new QueuePaging<AdminReport>({
     destroyRef: inject(DestroyRef),
+    context: () => this.view.key(),
+    enabled: () => this.view.capture()(),
     fallback: "No se pudieron cargar las denuncias",
     filters: () => [this.query(), this.status()],
     read: async (page, perPage, signal) => {
@@ -82,9 +88,18 @@ export class AdminReportsComponent {
   readonly pageSizes = [10, 25, 50];
 
   constructor() {
+    let context = this.view.key();
     effect(() => {
+      const current = this.view.key();
       this.reloadToken();
-      untracked(() => void this.reports.load());
+      untracked(() => {
+        if (current !== context) {
+          context = current;
+          this.reports.reset();
+          this.query.set(""); this.status.set("open");
+        }
+        void this.reports.load();
+      });
     });
   }
 
@@ -103,16 +118,20 @@ export class AdminReportsComponent {
   }
 
   async dismiss(report: AdminReport): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.reports.stale() || this.busy()) return;
     const confirmed = await this.actions.confirm({
       title: "Desestimar denuncia",
       message: `La denuncia sobre “${report.alias}” se cerrará sin modificar el enlace.`,
       confirmLabel: "Desestimar",
       destructive: false,
     });
-    if (confirmed) await this.moderate(report, "dismiss", "Denuncia desestimada");
+    if (confirmed && intent()) await this.moderate(report, "dismiss", "Denuncia desestimada", undefined, intent);
   }
 
   async block(report: AdminReport): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.reports.stale() || this.busy()) return;
     const reason = await this.actions.prompt({
       title: "Bloquear enlace",
       message: `La resolución de “${report.alias}” se detendrá y la denuncia quedará resuelta.`,
@@ -125,17 +144,19 @@ export class AdminReportsComponent {
       inputMinLength: 3,
       inputMaxLength: 500,
     });
-    if (reason) await this.moderate(report, "block", "Enlace bloqueado", reason);
+    if (reason && intent()) await this.moderate(report, "block", "Enlace bloqueado", reason, intent);
   }
 
   async unblock(report: AdminReport): Promise<void> {
+    const intent = this.view.capture();
+    if (!intent() || this.reports.stale() || this.busy()) return;
     const confirmed = await this.actions.confirm({
       title: "Desbloquear enlace",
       message: `“${report.alias}” volverá al estado que corresponda según su programación y caducidad.`,
       confirmLabel: "Desbloquear",
       destructive: false,
     });
-    if (confirmed) await this.moderate(report, "unblock", "Enlace desbloqueado");
+    if (confirmed && intent()) await this.moderate(report, "unblock", "Enlace desbloqueado", undefined, intent);
   }
 
   /**
@@ -147,7 +168,8 @@ export class AdminReportsComponent {
    * that follows is bounded, so the answer says whether it reached every link.
    */
   async blockDestination(report: AdminReport, scope: "url" | "host"): Promise<void> {
-    if (this.busy()) return;
+    const intent = this.view.capture();
+    if (!intent() || this.reports.stale() || this.busy()) return;
     const host = this.hostOf(report.destination);
     if (scope === "host" && host === null) {
       this.snackbar.open("No se pudo leer el host de ese destino", "Cerrar", { duration: 3500 });
@@ -167,20 +189,23 @@ export class AdminReportsComponent {
       inputMinLength: 3,
       inputMaxLength: 500,
     });
-    if (reason === null || this.busy()) return;
-    this.busy.set(true);
+    if (reason === null || this.reports.stale()) return;
+    const operation = this.view.begin(`destination-${report.link_id}`, intent);
+    if (!operation) return;
     try {
       const result = await this.api.post(
         `/api/v1/admin/links/${report.link_id}/block-destination`,
         { reason: reason.trim(), scope },
         decodeDestinationBlock,
       );
+      if (!operation.isCurrent()) return;
       this.snackbar.open(`Destino bloqueado. ${this.sweepLabel(result.linksScheduled, result.linksSweepTruncated)}`, "Cerrar", { duration: 4500 });
       this.changed.emit();
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.showError(error);
     } finally {
-      this.busy.set(false);
+      operation.settle();
     }
   }
 
@@ -209,17 +234,21 @@ export class AdminReportsComponent {
     action: "block" | "unblock" | "review" | "dismiss",
     success: string,
     reason?: string,
+    intent: AdminIntent = this.view.capture(),
   ): Promise<void> {
-    if (this.busy()) return;
-    this.busy.set(true);
+    if (this.reports.stale()) return;
+    const operation = this.view.begin(`report-${report.id}`, intent);
+    if (!operation) return;
     try {
       await this.api.post(`/api/v1/admin/reports/${report.id}/moderate`, { action, reason });
+      if (!operation.isCurrent()) return;
       this.snackbar.open(success, "Cerrar", { duration: 2500 });
       this.changed.emit();
     } catch (error) {
+      if (!operation.isCurrent()) return;
       this.showError(error);
     } finally {
-      this.busy.set(false);
+      operation.settle();
     }
   }
 

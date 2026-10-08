@@ -5,7 +5,9 @@
 @use "../queue-primitives.scss" as primitives;
 @use "./moderation-card.scss";
 
-:host { display: block; }
+:host { display: block; min-width: 0; container-type: inline-size; }
+button { min-height: 44px; }
+:is(button, input, mat-select):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
 
 @include primitives.filters;
 @include primitives.projected-paragraph;
@@ -15,8 +17,8 @@
 .appeal-verdict {
   padding: 10px 0 12px;
   border-bottom: 1px solid var(--uvh-border);
-  span { color: var(--uvh-muted); font-family: "Courier New", monospace; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
-  p { margin: 5px 0 0; color: var(--uvh-ink); font-size: 11.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  span { color: var(--uvh-muted); font-size: 13px; letter-spacing: normal; text-transform: none; }
+  p { margin: 5px 0 0; color: var(--uvh-ink); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 }
 
 .appeal-settled {
@@ -24,6 +26,6 @@
   align-items: center;
   gap: 6px;
   color: var(--uvh-muted);
-  font-size: 11px;
+  font-size: 14px;
   mat-icon { width: 16px; height: 16px; font-size: 16px; }
 }

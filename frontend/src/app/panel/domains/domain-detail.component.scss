@@ -1,6 +1,6 @@
 // Domain diagnostics: flat plates with editorial eyebrows; observations are
 // ruled ledgers, warnings are left-ruled bars on token aliases.
-:host { display: block; container-type: inline-size; }
+:host { display: block; min-width: 0; container-type: inline-size; }
 
 .back-link {
   display: inline-flex;
@@ -87,6 +87,7 @@
   font-size: 17px;
   font-weight: 800;
   letter-spacing: -.03em;
+  overflow-wrap: anywhere;
 }
 
 .summary-card p,
@@ -223,6 +224,7 @@
     font-size: 13px;
     font-weight: 700;
     line-height: 1.6;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -241,16 +243,22 @@
   }
 
   > button {
-    margin-top: 8px;
+    margin-top: 0;
+    min-height: 56px;
   }
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 9px;
-  margin-top: 14px;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--uvh-border);
 }
+
+.neutral-action { --mat-button-outlined-label-text-color: var(--uvh-ink); --mat-button-outlined-outline-color: var(--uvh-border); --mat-button-outlined-state-layer-color: var(--uvh-ink); }
+button { min-height: 44px; }
 
 .scheduler-note {
   margin: 14px 0 0;
@@ -324,6 +332,10 @@
   .schedule-card dl {
     grid-template-columns: minmax(0, 1fr);
   }
+  .summary-card, .schedule-card { padding: 20px 16px; }
+  .summary-card > button { width: 100%; }
+  .actions { flex-direction: column; align-items: stretch; }
+  .actions > button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

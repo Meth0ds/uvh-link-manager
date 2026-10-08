@@ -11,26 +11,26 @@
       @if (hidden()) {
         <span class="eyebrow">Sin prisa</span><h2>Has omitido esta guía</h2>
         <p>No se han cambiado tus recursos ni tu configuración de seguridad. Puedes retomarla cuando quieras.</p>
-        <button mat-flat-button type="button" (click)="resume()">Reanudar guía</button>
+        <button mat-flat-button type="button" [disabled]="preferenceBusy()" (click)="resume()">Reanudar guía</button>
       } @else if (loading()) {
         <span class="eyebrow">Consultando tu workspace</span><p role="status">Comprobando el estado real de {{ workspace.name }}…</p>
         <mat-progress-bar mode="indeterminate" aria-label="Cargando primeros pasos" />
-        <button mat-button type="button" (click)="dismiss()">Omitir por ahora</button>
+        <button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()">Omitir por ahora</button>
       } @else if (error(); as message) {
         <div class="guide-message" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><p>{{ message }}</p></div>
         <button mat-stroked-button type="button" (click)="reload()">Reintentar comprobación</button>
-        <button mat-button type="button" (click)="dismiss()">Omitir por ahora</button>
+        <button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()">Omitir por ahora</button>
       } @else if (complete() && !reviewing()) {
         <span class="eyebrow">Buen comienzo</span><div class="guide-message"><mat-icon aria-hidden="true">check_circle</mat-icon><h2>Las tres señales iniciales están presentes</h2></div>
         <p>La sugerencia deja de aparecer en el panel. Esto no certifica la llegada al destino ni la preparación para producción.</p>
-        <button mat-stroked-button type="button" (click)="resume()">Revisar guía y opciones</button>
+        <button mat-stroked-button type="button" [disabled]="preferenceBusy()" (click)="resume()">Revisar guía y opciones</button>
       } @else if (data()) {
         <div class="guide-heading">
           <div><span class="eyebrow">{{ compact() ? '¿Acabas de llegar?' : 'Una base, tres pasos' }}</span><h2>{{ compact() ? 'Dale un buen comienzo a tu workspace.' : 'De la primera URL a una cuenta protegida.' }}</h2><p>{{ observed() }} de 3 señales iniciales observadas. Dominio y equipo son opcionales.</p></div>
           <span class="progress-count" aria-hidden="true"><b>{{ observed() }}</b><span>/ 3</span></span>
         </div>
         @if (compact()) {
-          <div class="guide-actions"><a mat-stroked-button routerLink="/app/getting-started">Abrir guía <mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></a><button mat-button type="button" (click)="dismiss()">Omitir por ahora</button></div>
+          <div class="guide-actions"><a mat-stroked-button routerLink="/app/getting-started">Abrir guía <mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></a><button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()">Omitir por ahora</button></div>
         } @else {
           <ol class="steps">
             @for (step of steps(); track step.id; let i = $index) {
@@ -41,7 +41,7 @@
               </li>
             }
           </ol>
-          <div class="guide-actions"><button mat-flat-button type="button" (click)="reload()">Actualizar estado</button><button mat-button type="button" (click)="dismiss()">Omitir por ahora</button></div>
+          <div class="guide-actions"><button mat-flat-button type="button" (click)="reload()">Actualizar estado</button><button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()">Omitir por ahora</button></div>
           <aside class="guide-note"><mat-icon aria-hidden="true">info_outline</mat-icon><div><b>Tú decides cuándo dar el siguiente paso.</b><p>Sólo abrimos pantallas internas. Ningún enlace se visita ni se envía correo automáticamente. Puedes reanudar la guía desde «Primeros pasos» en el menú.</p></div></aside>
         }
       }

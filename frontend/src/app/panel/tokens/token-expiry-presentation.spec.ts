@@ -19,8 +19,8 @@ describe("Token expiry presentation", () => {
     api.get.and.resolveTo({ tokens: [], truncated: false });
     await TestBed.configureTestingModule({ imports: [TokensComponent], providers: [
       { provide: ApiService, useValue: api },
-      { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: signal("owner") } },
-      { provide: AuthService, useValue: { user: signal(null) } },
+      { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: signal("owner"), selectionGeneration: () => 0 } },
+      { provide: AuthService, useValue: { user: signal({ id: 1, emailVerified: true, mfaEnabled: false }) } },
     ] }).compileComponents();
     fixture = TestBed.createComponent(TokensComponent); fixture.detectChanges(); await fixture.whenStable();
   });

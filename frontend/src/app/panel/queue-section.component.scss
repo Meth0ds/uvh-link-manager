@@ -4,7 +4,9 @@
 // incluye por bloques para que ninguna regla se compile donde no puede casar.
 @use "./queue-primitives.scss" as primitives;
 
-:host { display: block; }
+:host { display: block; min-width: 0; container-type: inline-size; }
+button { min-height: 44px; }
+:is(button, input, mat-select):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
 
 @include primitives.heading;
 @include primitives.notice;

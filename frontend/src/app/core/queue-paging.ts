@@ -12,6 +12,10 @@ export interface QueuePage<Row> {
 export interface QueuePagingOptions<Row> {
   /** The filters this queue pages through, as the identity of one request. */
   filters: () => unknown;
+  /** Session/view identity, checked live when an answer arrives. */
+  context?: () => string | number | null;
+  /** A mounted view can lose access without being destroyed. */
+  enabled?: () => boolean;
   /** Read one page. The signal cancels a read whose question has been replaced. */
   read: (page: number, perPage: number, signal: AbortSignal) => Promise<QueuePage<Row>>;
   /** Shown when the failure carries no message of its own. */
@@ -48,7 +52,9 @@ export class QueuePaging<Row> implements QueuePagingView {
    * The page on screen is being replaced, so nothing on it may act and no count
    * derived from it may be presented as the answer.
    */
-  readonly stale = computed(() => this.loading() || this.error() !== null);
+  readonly stale = computed(() => this.loading() || this.error() !== null || this.answerContext() !== this.question());
+
+  private readonly answerContext = signal<string | null>(null);
 
   private readonly requests: LatestRequest;
   private readonly message: (error: unknown, fallback: string) => string;
@@ -61,25 +67,45 @@ export class QueuePaging<Row> implements QueuePagingView {
 
   /** Read the current page, with the filters as they are now. */
   async load(): Promise<void> {
+    if (this.options.enabled?.() === false) {
+      this.reset();
+      return;
+    }
     const page = this.page() + 1;
     const perPage = this.pageSize();
     // The filters are part of the identity of the request: an answer that lands
     // after they changed describes rows nobody asked for.
-    const context = JSON.stringify([this.options.filters(), page, perPage]);
+    const context = this.question();
     const request = this.requests.begin(context);
     this.loading.set(true);
     this.error.set(null);
     try {
       const result = await this.options.read(page, perPage, request.signal);
-      if (!this.requests.isCurrent(request, context)) return;
+      if (!this.requests.isCurrent(request, this.question())) return;
       this.rows.set(result.rows);
       this.total.set(result.total);
+      this.answerContext.set(context);
     } catch (error) {
-      if (!this.requests.isCurrent(request, context)) return;
+      if (!this.requests.isCurrent(request, this.question())) return;
       this.error.set(this.message(error, this.options.fallback));
     } finally {
-      if (this.requests.isCurrent(request, context)) this.loading.set(false);
+      if (this.requests.isCurrent(request, this.question())) this.loading.set(false);
     }
+  }
+
+  private question(): string {
+    return JSON.stringify([this.options.context?.() ?? null, this.options.filters(), this.page() + 1, this.pageSize()]);
+  }
+
+  /** Clear a departing security context and abort its reads, including unvisited tabs. */
+  reset(): void {
+    this.requests.invalidate();
+    this.rows.set([]);
+    this.total.set(0);
+    this.page.set(0);
+    this.loading.set(false);
+    this.error.set(null);
+    this.answerContext.set(null);
   }
 
   /**
@@ -109,6 +135,7 @@ export interface QueuePagingView {
   readonly page: Signal<number>;
   readonly pageSize: Signal<number>;
   readonly loading: Signal<boolean>;
+  readonly stale: Signal<boolean>;
   readonly error: Signal<string | null>;
   load: () => Promise<void>;
   goTo: (pageIndex: number, pageSize: number) => void;

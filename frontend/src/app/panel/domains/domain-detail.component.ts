@@ -445,6 +445,7 @@ export class DomainDetailComponent {
     if (!d?.dnsObservedAt) return null;
     if (d.routingObservedTarget !== null) {
       const ttl = d.routingObservedTtl === null ? "" : ` (TTL ${d.routingObservedTtl} s)`;
+      if (d.routingStatus === "healthy") return `El CNAME apunta a «${d.routingObservedTarget}»${ttl}.`;
       return `Esperábamos «${d.cnameTarget ?? "el destino indicado"}», pero el resolvedor devuelve «${d.routingObservedTarget}»${ttl}.`;
     }
     if (d.routingObservedAddresses?.length) {
