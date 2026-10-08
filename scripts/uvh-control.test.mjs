@@ -210,6 +210,19 @@ describe('real HTTP security boundary', () => {
     assert.equal((await request('/api/op', { method: 'POST', body: JSON.stringify({ mode: 'stop', padding: 'x'.repeat(5000) }) })).status, 413);
     assert.equal(calls.length, 0);
   });
+  it('rejects unknown confirm fields and undecodable paths without a 500', async () => {
+    const { request, origin } = await http();
+    const confirm = await request('/api/confirm', { method: 'POST',
+      body: JSON.stringify({ mode: 'migrate', destination: 'uvh_test', extra: true }) });
+    assert.equal(confirm.status, 400);
+    // fetch normalizes or rejects '/%' on the client; go raw like the hostile-Host probe.
+    const raw = (path) => new Promise((yes, no) => {
+      const req = httpRequest(`${origin}${path}`, { headers: { Host: new URL(origin).host } },
+        (res) => { res.resume(); yes(res.statusCode); });
+      req.on('error', no); req.end();
+    });
+    assert.equal(await raw('/%'), 404);
+  });
   it('cannot follow static symlinks out of its asset root', async () => {
     const { request, root } = await http();
     writeFileSync(join(root, 'secret.txt'), 'never serve me');

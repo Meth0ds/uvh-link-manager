@@ -615,7 +615,8 @@ export function createController(options = {}) {
       try {
         if (req.headers.host !== new URL(origin).host || (req.headers.origin !== undefined && req.headers.origin !== origin)
           || ['cross-site', 'same-site'].includes(req.headers['sec-fetch-site'])) throw new ControlError('Origen local no autorizado.', 403);
-        const url = new URL(req.url, origin);
+        let url;
+        try { url = new URL(req.url, origin); } catch { throw new ControlError('URL no válida.', 400); }
         if (url.origin !== origin) throw new ControlError('URL no autorizada.', 403);
         if (url.pathname === '/api/session' && req.method === 'GET') { json(200, { ok: true, schema: 1, token }); return; }
         if (url.pathname.startsWith('/api/')) {
@@ -627,7 +628,10 @@ export function createController(options = {}) {
           else if (req.method === 'GET' && url.pathname === '/api/logs') json(200, await logs(url.searchParams.get('target')));
           else if (req.method === 'POST' && ['/api/op', '/api/confirm'].includes(url.pathname)) {
             const body = await readBody(req);
-            if (url.pathname === '/api/confirm') json(200, confirm(body.mode, body.destination));
+            if (url.pathname === '/api/confirm') {
+              if (Object.keys(body).some((key) => !['mode', 'destination'].includes(key))) throw new ControlError('Campos no admitidos.', 400);
+              json(200, confirm(body.mode, body.destination));
+            }
             else {
               if (Object.keys(body).some((key) => !['mode', 'requestId', 'confirmationId'].includes(key))) throw new ControlError('Campos no admitidos.', 400);
               json(202, { ok: true, operation: await admit(body.mode, body.requestId, body.confirmationId) });
@@ -636,7 +640,9 @@ export function createController(options = {}) {
           return;
         }
         if (req.method !== 'GET') throw new ControlError('Método no permitido.', 405);
-        const name = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname).slice(1);
+        let name;
+        try { name = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname).slice(1); }
+        catch { throw new ControlError('Ruta no encontrada.', 404); }
         if (!name || name.includes('\\') || name.includes('\0') || name.split('/').includes('..')) throw new ControlError('Ruta no encontrada.', 404);
         const full = realpathSync(join(staticRoot, name));
         const rel = relative(staticRoot, full);

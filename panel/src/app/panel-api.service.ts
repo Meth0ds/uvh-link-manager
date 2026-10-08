@@ -62,7 +62,7 @@ export class PanelApiService {
     }
     return this.session;
   }
-  private async request(path: string, body?: object): Promise<Record<string, unknown>> {
+  private async request(path: string, body?: object, retried = false): Promise<Record<string, unknown>> {
     try {
       const token = await this.getToken();
       const options = { headers: { 'X-UVH-Session': token } };
@@ -71,6 +71,14 @@ export class PanelApiService {
       return response;
     } catch (error) {
       if (error instanceof HttpErrorResponse) {
+        // Un controlador reiniciado emite otra sesión: re-sesionar una vez en
+        // silencio en lugar de mostrar un error que el siguiente sondeo curaría.
+        // El 401 salta antes de admitir nada y el requestId es idempotente, así
+        // que reintentar un POST no puede duplicar una operación.
+        if (error.status === 401 && !retried && path !== '/api/session') {
+          this.token = null;
+          return this.request(path, body, true);
+        }
         if (error.status === 401) this.token = null;
         if (error.status === 0) throw new PanelNetworkError();
         const value: unknown = error.error;

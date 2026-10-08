@@ -19,6 +19,7 @@ for (const row of coverage.split('\n')) {
 
 function proposedSystem(path, name = '') {
   const file = basename(path);
+  if (file === 'read-deadline.ts') return { system: 'S13', basis: 'owned read-expiry scheduling; S01 security and Settings consumers require reconciliation' };
   if (file === 'session-agent-label.ts') return { system: 'S01', basis: 'session presentation shared by Settings and security center; not identity authority' };
   if (['auth-entry.service.ts', 'registration.service.ts', 'auth-session-contracts.ts'].includes(file)) return { system: 'S01', basis: 'entry/registration transport and wire types; facade state and callers require review' };
   if (['account-profile.service.ts', 'account-mfa.service.ts', 'account-sessions.service.ts', 'auth-user-mutations.ts'].includes(file)) return { system: 'S01', basis: 'account transport/reconciliation; callers require review' };
