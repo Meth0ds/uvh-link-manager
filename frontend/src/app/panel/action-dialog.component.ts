@@ -12,6 +12,8 @@ export interface ActionDialogData {
   confirmLabel: string;
   destructive?: boolean;
   inputLabel?: string;
+  inputValue?: string;
+  inputMultiline?: boolean;
   inputPlaceholder?: string;
   inputHint?: string;
   inputRequired?: boolean;
@@ -36,6 +38,11 @@ export type ActionDialogResult = true | string | null;
         <form (ngSubmit)="submit()" class="input-form">
           <mat-form-field appearance="outline" class="full">
             <mat-label>{{ data.inputLabel }}</mat-label>
+            @if (data.inputMultiline) {
+              <textarea matInput rows="5" [placeholder]="data.inputPlaceholder ?? ''"
+                [maxlength]="data.inputMaxLength ? data.inputMaxLength * 2 : null"
+                [required]="data.inputRequired === true" [(ngModel)]="value" name="actionValue" autocomplete="off"></textarea>
+            } @else {
             <input
               matInput
               [placeholder]="data.inputPlaceholder ?? ''"
@@ -45,6 +52,7 @@ export type ActionDialogResult = true | string | null;
               name="actionValue"
               autocomplete="off"
             />
+            }
             @if (data.inputHint) { <mat-hint>{{ data.inputHint }}</mat-hint> }
           </mat-form-field>
           @if (error()) { <div class="error" role="alert">{{ error() }}</div> }
@@ -71,7 +79,7 @@ export type ActionDialogResult = true | string | null;
 export class ActionDialogComponent {
   readonly data = inject<ActionDialogData>(MAT_DIALOG_DATA);
   private readonly dialogRef = inject(MatDialogRef<ActionDialogComponent, ActionDialogResult>);
-  value = "";
+  value = this.data.inputValue ?? "";
   readonly error = signal<string | null>(null);
 
   validInput(): boolean {

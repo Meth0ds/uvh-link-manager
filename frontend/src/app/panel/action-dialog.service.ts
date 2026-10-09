@@ -24,12 +24,15 @@ export class ActionDialogService {
 
   prompt(options: Pick<ActionDialogData, "title" | "message" | "confirmLabel" | "inputLabel"> & {
     destructive?: boolean;
+    inputValue?: string;
+    inputMultiline?: boolean;
     inputPlaceholder?: string;
     inputHint?: string;
     inputRequired?: boolean;
     inputMinLength?: number;
     inputMaxLength?: number;
-  }): Promise<string | null> {
+  }, lifetime?: { signal: AbortSignal }): Promise<string | null> {
+    if (lifetime?.signal.aborted) return Promise.resolve(null);
     const ref = this.dialog.open<ActionDialogComponent, ActionDialogData, ActionDialogResult>(ActionDialogComponent, {
       data: { ...options },
       width: "min(500px, 92vw)",
@@ -37,6 +40,10 @@ export class ActionDialogService {
       autoFocus: "first-tabbable",
       role: "alertdialog",
     });
-    return firstValueFrom(ref.afterClosed()).then((result) => typeof result === "string" ? result : null);
+    const cancel = () => ref.close(null);
+    lifetime?.signal.addEventListener("abort", cancel, { once: true });
+    return firstValueFrom(ref.afterClosed())
+      .then((result) => typeof result === "string" ? result : null)
+      .finally(() => lifetime?.signal.removeEventListener("abort", cancel));
   }
 }
