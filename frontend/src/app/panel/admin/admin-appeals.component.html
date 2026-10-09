@@ -11,7 +11,7 @@
   [pageSizes]="pageSizes"
 >
   <p queue-summary>
-    Un enlace bloqueado no tiene otra salida: aquí se decide si el bloqueo se mantiene o se levanta.@if (!appeals.stale()) { {{ countLabel(appeals.total(), "caso coincide", "casos coinciden") }} con los filtros. }
+    Revisa las solicitudes de los propietarios para mantener o retirar el bloqueo de sus enlaces.@if (!appeals.stale()) { {{ countLabel(appeals.total(), "caso coincide", "casos coinciden") }} con los filtros. }
   </p>
 
   <div class="filters" queue-filters>
@@ -33,7 +33,7 @@
         </header>
         <div class="moderation-target"><b>/{{ appeal.alias }}</b><span [title]="appeal.destination">{{ appeal.destination }}</span></div>
         <div class="moderation-copy">
-          <span>Lo que alega el propietario</span>
+          <span>Motivo presentado por el propietario</span>
           @if (appeal.message) { <p>{{ appeal.message }}</p> } @else { <p>Sin comentario.</p> }
         </div>
         <dl><div><dt>Workspace</dt><dd>#{{ appeal.workspace_id }}</dd></div><div><dt>Enlace</dt><dd>{{ linkStateLabel(appeal.link_state) }}</dd></div><div><dt>Solicitada</dt><dd>{{ formatDate(appeal.created_at) }}</dd></div></dl>

@@ -33,7 +33,7 @@
     }
     <!-- A failed read is not an empty history. Keep recovery in the error
          region instead of suggesting that no deliveries exist. -->
-    @if (!deliveries().length && !loading() && !error()) { <div class="empty-state"><mat-icon aria-hidden="true">inbox</mat-icon><h3>Aún no hay entregas</h3><p>{{ !canEdit() ? 'Las entregas aparecerán aquí cuando se generen eventos. Puedes pedir a un editor que envíe un ping de prueba.' : w.active ? 'Envía un ping desde el destino configurado para comprobar el recorrido de una entrega.' : 'El webhook está pausado. Actívalo desde su configuración para recibir nuevos eventos.' }}</p></div> }
+    @if (!deliveries().length && !loading() && !error()) { <div class="empty-state"><mat-icon aria-hidden="true">inbox</mat-icon><h3>Aún no hay entregas</h3><p>{{ !canEdit() ? 'Las entregas aparecerán aquí cuando se generen eventos. Puedes pedir a un editor que envíe un ping de prueba.' : w.active ? 'Envía un ping desde el destino configurado para comprobar el envío y la respuesta de tu servidor.' : 'El webhook está pausado. Actívalo desde su configuración para recibir nuevos eventos.' }}</p></div> }
     @if (total() > perPage && !error()) {
       <nav class="pagination" aria-label="Páginas de entregas"><button mat-stroked-button type="button" (click)="load(page() - 1)" [disabled]="loading() || page() <= 1"><mat-icon aria-hidden="true">chevron_left</mat-icon>Anterior</button><span>Página {{ page() }} de {{ pages() }}</span><button mat-stroked-button type="button" (click)="load(page() + 1)" [disabled]="loading() || page() >= pages()">Siguiente<mat-icon iconPositionEnd aria-hidden="true">chevron_right</mat-icon></button></nav>
     }

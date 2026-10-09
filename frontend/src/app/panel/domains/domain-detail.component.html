@@ -1,5 +1,5 @@
 <a class="back-link" routerLink="/app/domains"><mat-icon>arrow_back</mat-icon> Volver a dominios</a>
-<app-page-header icon="monitor_heart" eyebrow="Diagnóstico individual" title="Salud del dominio" description="Comprueba propiedad, ruta DNS, HTTPS y el calendario real de revalidación." />
+<app-page-header icon="monitor_heart" eyebrow="Diagnóstico individual" title="Diagnóstico del dominio" description="Comprueba propiedad, ruta DNS, HTTPS y el calendario real de revalidación." />
 
 @if (loading() && !domain()) {
   <app-panel-skeleton variant="cards" label="Cargando diagnóstico del dominio" />
@@ -99,7 +99,7 @@
       <span class="eyebrow">Historial</span>
       <h2 id="activity-title">Actividad del dominio</h2>
     </div>
-    <p class="scheduler-note">Lo que ha pasado con este dominio y por qué: los mismos eventos que reciben las integraciones, sin datos internos.</p>
+    <p class="scheduler-note">Historial de cambios y comprobaciones del dominio, con los eventos disponibles para las integraciones.</p>
     @if (activityError(); as message) {
       <p class="warning" role="status">{{ message }}</p>
     } @else if (activityLoading() && !activity().length) {
@@ -125,9 +125,9 @@
   <section class="schedule-card" aria-labelledby="surface-title">
     <div>
       <span class="eyebrow">Comportamiento del dominio</span>
-      <h2 id="surface-title">Superficie de visitante</h2>
+      <h2 id="surface-title">Página principal y rutas desconocidas</h2>
     </div>
-    <p class="scheduler-note">Qué ve quien llegue a este dominio fuera de los enlaces: hacia dónde va la raíz <code>/</code> y qué responde una ruta desconocida.</p>
+    <p class="scheduler-note">Configura el destino de la página principal <code>/</code> y la respuesta para una ruta desconocida.</p>
     @if (canEdit()) {
       <div class="surface-form">
         <mat-form-field appearance="outline" class="surface-root">

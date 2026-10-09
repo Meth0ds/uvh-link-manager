@@ -44,23 +44,24 @@
   @if (hasBreakdownData()) {
     <div class="breakdowns">
       @for (b of breakdownKeys; track b) {
+        @let data = breakdown(b);
         <section class="breakdown" [attr.aria-label]="label(b)">
           <div class="breakdown-title"><h3>{{ label(b) }}</h3><span>{{ dimensionCount(b) }} valores distintos</span></div>
           <ul>
-            @for (item of breakdown(b).items; track item.key) {
+            @for (item of data.items; track item.key) {
               <li class="bar-row"><span class="bar-label">{{ item.key }}</span><span class="bar-value">{{ formatCount(item.value) }} <small>clics</small></span>
-                <div class="bar-track" aria-hidden="true"><div class="bar-fill" [style.width.%]="pct(item.value, breakdown(b).max)"></div></div>
+                <div class="bar-track" aria-hidden="true"><div class="bar-fill" [style.width.%]="pct(item.value, data.max)"></div></div>
               </li>
             }
           </ul>
-          @if (!breakdown(b).items.length) { <p class="bar-empty">Sin datos para este periodo.</p> }
+          @if (!data.items.length) { <p class="bar-empty">Sin datos para este periodo.</p> }
         </section>
       }
     </div>
   } @else {
     <div class="breakdowns-empty" role="status">
       <span>Desglose del periodo</span>
-      <b>Aún no hay señales que comparar.</b>
+      <b>Todavía no hay datos para comparar.</b>
       <p>Cuando lleguen clics, aquí podrás contrastar países, dispositivos, navegadores, sistemas, referentes y campañas.</p>
     </div>
   }

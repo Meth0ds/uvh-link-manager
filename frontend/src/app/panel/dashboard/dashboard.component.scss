@@ -55,7 +55,7 @@ h2 { margin: 7px 0 0; color: var(--uvh-ink); font-size: clamp(19px, 2.5cqi, 24px
 .top-main > span, .recent-main > span { color: var(--uvh-muted); font-size: 13px; line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clicks { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; color: var(--uvh-ink); font-variant-numeric: tabular-nums; }
 .clicks b { font-size: 14px; font-weight: 750; }
-.clicks small { font-size: 12px; color: var(--uvh-muted); }
+.clicks small { font-size: 13px; color: var(--uvh-muted); }
 .row-arrow { width: 16px; height: 16px; font-size: 16px; color: var(--uvh-muted); transition: transform 180ms ease, color 180ms ease; }
 .top-row:hover .row-arrow { color: var(--uvh-electric); transform: translate(2px, -2px); }
 .geo-row { display: grid; grid-template-columns: 22px minmax(70px, 1fr) minmax(28px, .7fr) auto; gap: 10px; align-items: center; min-height: 55px; border-bottom: 1px solid var(--uvh-border); }
@@ -64,7 +64,7 @@ h2 { margin: 7px 0 0; color: var(--uvh-ink); font-size: clamp(19px, 2.5cqi, 24px
 .geo-bar { height: 4px; background: var(--soft); }
 .geo-bar i { display: block; height: 100%; background: var(--uvh-teal); }
 .geo-row > b { color: var(--uvh-ink); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
-.geo-row small { font-size: 12px; font-weight: 500; color: var(--uvh-muted); }
+.geo-row small { font-size: 13px; font-weight: 500; color: var(--uvh-muted); }
 .data-footnote { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
 .none { color: var(--uvh-muted); font-size: 13px; line-height: 1.8; }
 .recent-section { margin-bottom: 36px; }
@@ -74,7 +74,7 @@ h2 { margin: 7px 0 0; color: var(--uvh-ink); font-size: clamp(19px, 2.5cqi, 24px
 .recent-row:first-child { border-top: 1px solid var(--uvh-border); }
 .recent-main { padding-block: 5px; color: var(--uvh-electric); text-decoration: none; min-height: 44px; justify-content: center; }
 .recent-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
-.link-state { justify-self: start; border: 1px solid var(--uvh-border); border-radius: 3px; padding: 5px 8px; color: var(--uvh-muted); font-size: 12px; }
+.link-state { justify-self: start; border: 1px solid var(--uvh-border); border-radius: 3px; padding: 5px 8px; color: var(--uvh-muted); font-size: 13px; }
 .link-state.is-active { color: var(--uvh-success); background: var(--uvh-success-soft); border-color: transparent; }
 .quiet-state { padding: 30px 24px; border: 1px solid var(--uvh-border); border-radius: 4px; background: var(--uvh-surface-raised); }
 .quiet-state > mat-icon { color: var(--uvh-electric); margin-bottom: 12px; }

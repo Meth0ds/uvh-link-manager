@@ -1,4 +1,4 @@
-<app-page-header icon="query_stats" eyebrow="Rendimiento" title="Analítica" description="Lee el recorrido real de tus enlaces sin confundir actividad con personas.">
+<app-page-header icon="query_stats" eyebrow="Rendimiento" title="Analítica" description="Consulta clics, procedencia y campañas en el periodo seleccionado.">
   <div class="period-switch" role="group" aria-label="Periodo de la analítica">
     @for (option of periodOptions; track option.value) {
       <button type="button" [class.active]="period() === option.value" [attr.aria-pressed]="period() === option.value" [attr.aria-label]="option.label" (click)="onPeriod(option.value)">{{ option.short }}</button>
@@ -23,7 +23,7 @@
 
 <aside class="reading-note" aria-label="Cómo interpretar estas métricas">
   <mat-icon aria-hidden="true">privacy_tip</mat-icon>
-  <p><b>Una lectura respetuosa con la privacidad.</b> “Pseudónimos diarios” no significa personas únicas: una misma visita puede contarse de nuevo otro día.</p>
+  <p><b>Cómo interpretar estos datos.</b> “Pseudónimos diarios” no significa personas únicas: una misma visita puede contarse de nuevo otro día.</p>
   <a routerLink="/help" fragment="analytics">Cómo leer la analítica<mat-icon aria-hidden="true">arrow_outward</mat-icon></a>
 </aside>
 
