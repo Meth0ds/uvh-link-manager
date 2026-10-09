@@ -1,5 +1,5 @@
 import type { PrivacyRightMessage, PrivacyRightRequest, PrivacyRightStatus, PrivacyRightType } from "../models";
-import { boolean, boundedArray, integer, invalid, literal, nullableInteger, nullableText, record, text } from "./response-decoder-helpers";
+import { boolean, boundedArray, integer, invalid, literal, nullableInteger, nullableMultiline, nullableText, record, text } from "./response-decoder-helpers";
 
 const TYPES = new Set<PrivacyRightType>(["access", "rectification", "erasure", "objection", "restriction", "portability"]);
 const STATUSES = new Set<PrivacyRightStatus>(["submitted", "in_progress", "waiting_user", "completed", "rejected", "cancelled"]);
@@ -24,7 +24,7 @@ function message(value: unknown): PrivacyRightMessage {
   return {
     id: integer(source["id"], "privacy message", 1),
     authorRole: literal(source["authorRole"], AUTHOR_ROLES, "privacy message author"),
-    body: nullableText(source["body"], "privacy message body", 2000, true),
+    body: nullableMultiline(source["body"], "privacy message body", 2000, true),
     createdAt: text(source["createdAt"], "privacy message timestamp", 64),
   };
 }
@@ -68,4 +68,21 @@ export function decodePrivacyRequestsPage(value: unknown, expected: PrivacyPageC
     .map((item) => privacyRequest(item, expected.admin === true));
   if (page !== expected.page || perPage !== expected.perPage || requests.length > total) invalid("privacy requests page context");
   return { requests, total, page, perPage };
+}
+
+/** Admission must identify the right that was actually sent, before its draft is cleared. */
+export function decodePrivacyRequestCreated(value: unknown, expectedType: PrivacyRightType): PrivacyRightRequest {
+  const source = record(value, "privacy request admission");
+  const request = privacyRequest(source["request"], false);
+  if (request.type !== expectedType || request.status !== "submitted"
+    || !Number.isFinite(Date.parse(request.createdAt.replace(" ", "T").replace(/([+-]\d{2})$/, "$1:00"))) || !Number.isFinite(Date.parse(request.dueAt.replace(" ", "T").replace(/([+-]\d{2})$/, "$1:00")))) {
+    invalid("privacy request admission context");
+  }
+  return request;
+}
+
+/** A legal decision is confirmed only by its exact resulting state. */
+export function decodePrivacyAdminAction(value: unknown, expectedStatus: PrivacyRightStatus): void {
+  const source = record(value, "privacy action acknowledgement");
+  if (source["ok"] !== true || source["status"] !== expectedStatus) invalid("privacy action acknowledgement context");
 }

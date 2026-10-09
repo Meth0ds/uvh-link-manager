@@ -1,4 +1,4 @@
-import { NgZone, Component, computed, effect, inject, signal, untracked, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
+import { afterNextRender, NgZone, Component, computed, effect, inject, signal, untracked, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
 import { Location } from "@angular/common";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
@@ -19,7 +19,7 @@ import { MatDividerModule } from "@angular/material/divider";
 import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatSelectModule } from "@angular/material/select";
 import { MatPaginatorModule, type PageEvent } from "@angular/material/paginator";
-import QRCode from "qrcode";
+import { QrCodeService } from "../../core/services/qr-code.service";
 import { dateTimeMediumLabel } from "../../core/date-time-label";
 import { sessionAgentLabel } from "../../core/session-agent-label";
 import { AuthService } from "../../core/services/auth.service";
@@ -37,6 +37,9 @@ import {
 } from "../../core/notification-kinds";
 import { NotificationService } from "../../core/services/notification.service";
 import {
+  PRIVACY_RIGHT_GUIDANCE,
+  privacyRightMessageAuthor,
+  privacyRightNextStep,
   privacyRightIsActive,
   privacyRightStatusLabel,
   privacyRightTypeLabel,
@@ -46,7 +49,8 @@ import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
-import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-decoders";
+import { decodePrivacyRequestsPage, decodePrivacyRequestCreated } from "../../core/services/privacy-response-decoders";
+import { decodePublicActionAcknowledgement } from "../../core/services/public-action-response-decoders";
 import { ReadDeadline } from "../../core/read-deadline";
 import { AsyncPoller } from "../../core/async-poller";
 import { AsyncOperationStatusComponent, type AsyncOperationTone } from "../async-operation-status.component";
@@ -92,6 +96,7 @@ export class SettingsComponent implements AfterViewInit {
   private readonly dialogs = inject(MatDialog);
   private readonly injector = inject(Injector);
   private readonly notifications = inject(NotificationService);
+  private readonly qrCode = inject(QrCodeService);
   private deletionDialog?: MatDialogRef<AccountDeletionDialogComponent, boolean>;
   private emailDialog?: MatDialogRef<EmailAccessDialogComponent, boolean>;
   private passwordDialog?: MatDialogRef<PasswordChangeDialogComponent, boolean>;
@@ -121,6 +126,8 @@ export class SettingsComponent implements AfterViewInit {
     danger: "/app/settings/danger",
   };
   readonly activeSection = signal(this.initialSection());
+  /** Per-view admission of section reads, cleared with the account context. */
+  private readonly initializedSections = new Set<string>();
   readonly sessionAgent = sessionAgentLabel;
 
   private initialSection(): string {
@@ -165,6 +172,7 @@ export class SettingsComponent implements AfterViewInit {
 
   private jumpTo(section: HTMLElement): void {
     this.activeSection.set(section.id);
+    this.loadSection(section.id);
     // Reveal synchronously so focus does not land on a hidden destination.
     // Angular reconciles all five visibility bindings on this event.
     section.hidden = false;
@@ -223,6 +231,8 @@ export class SettingsComponent implements AfterViewInit {
     attempt: () => void this.loadExportStatus(false, true),
   });
   private readonly privacyFormBlock = viewChild<ElementRef<HTMLElement>>("privacyFormBlock");
+  private readonly privacyResponseInput = viewChild<ElementRef<HTMLTextAreaElement>>("privacyResponseInput");
+  private readonly privacyReceiptBlock = viewChild<ElementRef<HTMLElement>>("privacyReceiptBlock");
   // ---------------- Account deletion ----------------
   readonly deletionImpact = signal<AccountDeletionImpact | null>(null);
   readonly deletionLoading = signal(true);
@@ -233,10 +243,15 @@ export class SettingsComponent implements AfterViewInit {
   readonly privacyLoading = signal(true);
   readonly privacyBusy = signal(false);
   readonly privacyError = signal<string | null>(null);
+  readonly privacyMutationError = signal<string | null>(null);
+  readonly privacyAction = signal<"create" | "respond" | "cancel" | null>(null);
+  readonly privacyReceipt = signal<Pick<PrivacyRightRequest, "id" | "type" | "dueAt"> | null>(null);
   readonly privacyPage = signal(0);
   readonly privacyPageSize = signal(5);
   readonly privacyTotal = signal(0);
   readonly privacyResponseId = signal<number | null>(null);
+  private readonly privacyResponseDrafts = new Map<string, string>();
+  private privacyResponseContext: string | null = null;
   privacyForm = this.fb.nonNullable.group({
     type: ["access" as PrivacyRightType, [Validators.required]],
     details: ["", [Validators.maxLength(2000)]],
@@ -250,6 +265,7 @@ export class SettingsComponent implements AfterViewInit {
   readonly mfaSecret = signal<string | null>(null);
   readonly mfaUri = signal<string | null>(null);
   readonly mfaQr = signal<string | null>(null);
+  readonly mfaQrLoading = signal(false);
   readonly recoveryCodes = signal<string[]>([]);
   readonly recoveryCodesAcknowledged = signal(false);
   readonly recoveryIssueUnconfirmed = this.auth.mfaRecoveryIssueUnconfirmed;
@@ -392,16 +408,33 @@ export class SettingsComponent implements AfterViewInit {
 
   private loadAccountView(): void {
     if (!this.user() || this.destroyRef.destroyed) return;
-    void this.loadSessions();
+    // Observe pending exports even before Privacy is opened, preserving the
+    // existing polling, completion/history refresh and expiry behavior.
     void this.loadExportStatus(true, false, false);
-    void this.loadExportHistory();
-    void this.loadDeletionImpact();
-    void this.loadPrivacyRequests();
-    void this.loadNotificationPreferences();
+    this.loadSection(this.activeSection());
+  }
+
+  private loadSection(section: string): void {
+    if (!this.user() || this.destroyRef.destroyed || this.initializedSections.has(section)
+      || !Object.hasOwn(SettingsComponent.SECTION_PATHS, section)) return;
+    // Mark before starting reads: direct routes also activate after view init,
+    // and returning while a request is pending must not restart it. Explicit
+    // retries and mutation refreshes keep using their existing read methods.
+    this.initializedSections.add(section);
+    switch (section) {
+      case "security": void this.loadSessions(); break;
+      case "notifications": void this.loadNotificationPreferences(); break;
+      case "privacy":
+        void this.loadExportHistory();
+        void this.loadPrivacyRequests();
+        break;
+      case "danger": void this.loadDeletionImpact(); break;
+    }
   }
 
   /** Clear the outgoing owner's data before any replacement reads can settle. */
   private clearAccountView(): void {
+    this.initializedSections.clear();
     this.clearSensitiveMfaUi();
     this.resetNotificationPreferences();
     for (const requests of [this.profileRequests, this.profileRefreshRequests, this.workspaceNavigationRequests,
@@ -437,7 +470,14 @@ export class SettingsComponent implements AfterViewInit {
     this.privacyLoading.set(false);
     this.privacyBusy.set(false);
     this.privacyError.set(null);
+    this.privacyMutationError.set(null);
+    this.privacyAction.set(null);
+    this.privacyReceipt.set(null);
+    this.privacyForm.enable({ emitEvent: false });
+    this.privacyResponseForm.enable({ emitEvent: false });
     this.privacyResponseId.set(null);
+    this.privacyResponseDrafts.clear();
+    this.privacyResponseContext = null;
     this.privacyForm.reset({ type: "access", details: "" });
     this.privacyResponseForm.reset();
     const overlays = [this.deletionDialog, this.emailDialog, this.passwordDialog, this.exportDialog];
@@ -885,10 +925,21 @@ export class SettingsComponent implements AfterViewInit {
     }
     const request = this.privacyMutationRequest.begin(this.accountContext());
     const current = () => this.privacyMutationRequest.isCurrent(request, this.accountContext());
-    this.privacyBusy.set(true);
+    this.startPrivacyMutation("create");
     try {
-      await this.api.post("/api/v1/auth/privacy-requests", { type, details });
+      const response = await this.api.post<unknown>("/api/v1/auth/privacy-requests", { type, details });
       if (!current()) return;
+      let admitted: PrivacyRightRequest;
+      try { admitted = decodePrivacyRequestCreated(response, type); }
+      catch { throw new ApiRequestError("No pudimos confirmar el registro. Conservamos el texto; comprueba el seguimiento antes de volver a enviarlo.", 502); }
+      this.privacyReceipt.set({ id: admitted.id, type: admitted.type, dueAt: admitted.dueAt });
+      afterNextRender(() => {
+        if (current() && this.activeSection() === "privacy" && this.privacyReceipt()?.id === admitted.id) {
+          const receipt = this.privacyReceiptBlock()?.nativeElement;
+          receipt?.focus({ preventScroll: true });
+          receipt?.scrollIntoView({ block: "nearest", behavior: "instant" });
+        }
+      }, { injector: this.injector });
       this.privacyForm.reset({ type: "access", details: "" });
       this.privacyPage.set(0);
       await this.loadPrivacyRequests(false);
@@ -896,17 +947,25 @@ export class SettingsComponent implements AfterViewInit {
       this.snackbar.open("Solicitud registrada y plazo iniciado", "Cerrar", { duration: 3500 });
     } catch (error) {
       if (!current()) return;
-      this.toast(error, "");
+      this.privacyMutationError.set(this.privacyFailure(error));
       await this.loadPrivacyRequests(false);
     } finally {
-      if (current()) this.privacyBusy.set(false);
+      if (current()) this.finishPrivacyMutation();
     }
   }
 
   beginPrivacyResponse(id: number): void {
     if (!this.user() || this.destroyRef.destroyed || this.privacyBusy()) return;
+    const context = this.accountContext();
+    if (this.privacyResponseId() === id && this.privacyResponseContext === context) return;
+    this.rememberPrivacyResponse();
     this.privacyResponseId.set(id);
-    this.privacyResponseForm.reset();
+    this.privacyResponseContext = context;
+    this.privacyResponseForm.reset({ message: this.privacyResponseDrafts.get(`${context}:${id}`) ?? "" });
+    afterNextRender(() => {
+      if (!this.destroyRef.destroyed && context === this.accountContext() && this.privacyResponseId() === id
+        && this.activeSection() === "privacy") this.privacyResponseInput()?.nativeElement.focus({ preventScroll: true });
+    }, { injector: this.injector });
   }
 
   async respondPrivacy(request: PrivacyRightRequest): Promise<void> {
@@ -917,20 +976,26 @@ export class SettingsComponent implements AfterViewInit {
     }
     const mutation = this.privacyMutationRequest.begin(this.accountContext());
     const current = () => this.privacyMutationRequest.isCurrent(mutation, this.accountContext());
-    this.privacyBusy.set(true);
+    this.startPrivacyMutation("respond");
     try {
-      await this.api.post(`/api/v1/auth/privacy-requests/${request.id}/respond`, {
+      const response = await this.api.post<unknown>(`/api/v1/auth/privacy-requests/${request.id}/respond`, {
         message: this.privacyResponseForm.controls.message.value.trim(),
       });
       if (!current()) return;
+      this.confirmPrivacyAcknowledgement(response);
+      this.privacyResponseDrafts.delete(`${this.accountContext()}:${request.id}`);
       this.privacyResponseId.set(null);
+      this.privacyResponseContext = null;
+      this.privacyResponseForm.reset();
       await this.loadPrivacyRequests(false);
       if (!current()) return;
       this.snackbar.open("Respuesta incorporada al expediente", "Cerrar", { duration: 3000 });
     } catch (error) {
-      if (current()) this.toast(error, "");
+      if (!current()) return;
+      this.privacyMutationError.set(this.privacyFailure(error));
+      await this.loadPrivacyRequests(false);
     } finally {
-      if (current()) this.privacyBusy.set(false);
+      if (current()) this.finishPrivacyMutation();
     }
   }
 
@@ -945,19 +1010,71 @@ export class SettingsComponent implements AfterViewInit {
       destructive: true,
     });
     if (!confirmed || !current() || this.privacyBusy()) return;
-    this.privacyBusy.set(true);
+    this.startPrivacyMutation("cancel");
     try {
-      await this.api.post(`/api/v1/auth/privacy-requests/${request.id}/cancel`, {});
+      const response = await this.api.post<unknown>(`/api/v1/auth/privacy-requests/${request.id}/cancel`, {});
       if (!current()) return;
+      this.confirmPrivacyAcknowledgement(response);
       await this.loadPrivacyRequests();
       if (!current()) return;
       this.snackbar.open("Solicitud cancelada", "Cerrar", { duration: 2500 });
     } catch (error) {
-      if (current()) this.toast(error, "");
+      if (!current()) return;
+      this.privacyMutationError.set(this.privacyFailure(error));
+      await this.loadPrivacyRequests(false);
     } finally {
-      if (current()) this.privacyBusy.set(false);
+      if (current()) this.finishPrivacyMutation();
     }
   }
+
+  closePrivacyResponse(): void {
+    if (this.privacyBusy() || this.destroyRef.destroyed) return;
+    this.rememberPrivacyResponse();
+    this.privacyResponseId.set(null);
+    this.privacyResponseContext = null;
+  }
+
+  private rememberPrivacyResponse(): void {
+    const id = this.privacyResponseId(), context = this.privacyResponseContext;
+    if (id === null || context !== this.accountContext()) return;
+    const key = `${context}:${id}`;
+    this.privacyResponseDrafts.delete(key);
+    if (this.privacyResponseDrafts.size >= 20) {
+      const oldest = this.privacyResponseDrafts.keys().next().value;
+      if (oldest !== undefined) this.privacyResponseDrafts.delete(oldest);
+    }
+    this.privacyResponseDrafts.set(key, this.privacyResponseForm.controls.message.value);
+  }
+
+  private startPrivacyMutation(action: "create" | "respond" | "cancel"): void {
+    this.privacyBusy.set(true);
+    this.privacyAction.set(action);
+    this.privacyMutationError.set(null);
+    this.privacyReceipt.set(null);
+    this.privacyForm.disable({ emitEvent: false });
+    this.privacyResponseForm.disable({ emitEvent: false });
+  }
+
+  private finishPrivacyMutation(): void {
+    this.privacyBusy.set(false);
+    this.privacyAction.set(null);
+    this.privacyForm.enable({ emitEvent: false });
+    this.privacyResponseForm.enable({ emitEvent: false });
+  }
+
+  private confirmPrivacyAcknowledgement(response: unknown): void {
+    try { decodePublicActionAcknowledgement(response); }
+    catch { throw new ApiRequestError("No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.", 502); }
+  }
+
+  private privacyFailure(error: unknown): string {
+    return error instanceof ApiRequestError ? error.message
+      : "No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.";
+  }
+
+  readonly privacyGuidance = PRIVACY_RIGHT_GUIDANCE;
+  readonly privacyMessageAuthor = privacyRightMessageAuthor;
+  readonly privacyNextStep = privacyRightNextStep;
 
   readonly privacyTypeLabel = privacyRightTypeLabel;
   readonly privacyStatusLabel = privacyRightStatusLabel;
@@ -1035,10 +1152,15 @@ export class SettingsComponent implements AfterViewInit {
     try {
       const { secret, uri } = await this.auth.mfaSetup(password, code);
       if (!current()) return;
+      this.mfaCodeForm.reset();
       this.mfaSecret.set(secret);
       this.mfaUri.set(uri);
+      this.mfaQr.set(null);
+      this.mfaQrLoading.set(true);
       try {
-        const qr = await QRCode.toDataURL(uri, { width: 240, margin: 1 });
+        const generator = await this.qrCode.load();
+        if (!current()) return;
+        const qr = await generator.toDataURL(uri, { width: 480 });
         if (!current()) return;
         this.mfaQr.set(qr);
       } catch {
@@ -1047,8 +1169,9 @@ export class SettingsComponent implements AfterViewInit {
         // instead of inviting a retry that could rotate it again.
         this.mfaQr.set(null);
         this.snackbar.open("La configuración está preparada, pero no se pudo generar el QR. Usa la clave manual mostrada.", "Cerrar", { duration: 5000 });
+      } finally {
+        if (current()) this.mfaQrLoading.set(false);
       }
-      this.mfaCodeForm.reset();
       if (code) await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
     } catch (err) {
       if (!current()) return;
@@ -1164,6 +1287,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   private clearMfaSetupUi(): void {
+    this.mfaQrLoading.set(false);
     this.mfaSecret.set(null);
     this.mfaUri.set(null);
     this.mfaQr.set(null);

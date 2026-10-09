@@ -1,4 +1,4 @@
-import { decodePrivacyRequestsPage } from "./privacy-response-decoders";
+import { decodePrivacyRequestsPage, decodePrivacyRequestCreated, decodePrivacyAdminAction } from "./privacy-response-decoders";
 
 const timestamp = "2026-09-06T10:00:00Z";
 const request = {
@@ -23,5 +23,27 @@ describe("privacy response decoders", () => {
     expect(() => decodePrivacyRequestsPage({ requests: [], total: 0, page: 2, perPage: 10 }, { page: 1, perPage: 10 })).toThrow();
     expect(() => decodePrivacyRequestsPage({ requests: [{ ...request, status: "unknown" }], total: 1, page: 1, perPage: 10 }, { page: 1, perPage: 10 })).toThrow();
   });
+  it("requires a complete admission for the sent right and accepts server timezone timestamps", () => {
+    expect(decodePrivacyRequestCreated({ request }, "access").id).toBe(1);
+    expect(decodePrivacyRequestCreated({ request: { ...request, dueAt: "2026-10-06 10:00:00+00" } }, "access").dueAt).toContain("+00");
+    for (const value of [{}, { request: { id: 1 } }, { request: { ...request, type: "erasure" } },
+      { request: { ...request, status: "completed" } }, { request: { ...request, dueAt: "unknown" } }]) {
+      expect(() => decodePrivacyRequestCreated(value, "access")).toThrow();
+    }
+  });
+
+  it("requires an affirmative legal decision with the expected resulting status", () => {
+    expect(() => decodePrivacyAdminAction({ ok: true, status: "completed" }, "completed")).not.toThrow();
+    for (const value of [{}, { ok: "true", status: "completed" }, { ok: true }, { ok: true, status: "rejected" }]) {
+      expect(() => decodePrivacyAdminAction(value, "completed")).toThrow();
+    }
+  });
+
+  it("preserves multiline legal messages and rejects unsafe control characters", () => {
+    const multiline = { ...request, messages: [{ id: 2, authorRole: "admin", body: "Respuesta motivada.\nSegunda línea.\tDetalle.", createdAt: timestamp }] };
+    expect(decodePrivacyRequestCreated({ request: multiline }, "access").messages[0].body).toContain("\nSegunda línea.");
+    expect(() => decodePrivacyRequestCreated({ request: { ...multiline, messages: [{ ...multiline.messages[0], body: "Unsafe\u0000content" }] } }, "access")).toThrow();
+  });
+
 });
 

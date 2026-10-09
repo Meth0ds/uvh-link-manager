@@ -337,9 +337,11 @@
             <div class="privacy-grid" queue-rows>
               @for (request of privacy.rows(); track request.id) {
                 <article class="privacy-admin-card" [class.overdue]="request.overdue">
-                  <header><div><b>{{ privacyTypeLabel(request.type) }}</b><span>#{{ request.id }} · {{ request.email ?? 'cuenta eliminada' }}</span></div><span class="badge" [class.warning]="request.status === 'submitted' || request.status === 'waiting_user'" [class.accent]="request.status === 'in_progress'" [class.success]="request.status === 'completed'" [class.danger]="request.overdue" [class.neutral]="request.status === 'rejected' || request.status === 'cancelled'">{{ request.overdue ? 'Fuera de plazo' : privacyStatusLabel(request.status) }}</span></header>
+                  <header><div><b>{{ privacyTypeLabel(request.type) }}</b><span>#{{ request.id }} · {{ request.email ?? 'cuenta eliminada' }}</span></div><span class="badge" [class.warning]="request.status === 'submitted' || request.status === 'waiting_user'" [class.accent]="request.status === 'in_progress'" [class.success]="request.status === 'completed'" [class.danger]="request.overdue" [class.neutral]="request.status === 'rejected' || request.status === 'cancelled'">{{ privacyStatusLabel(request.status) }}</span></header>
+                  @if (request.overdue) { <p class="privacy-admin-notice overdue">Plazo vencido. Registra una respuesta motivada y las vías de reclamación; el estado de revisión se mantiene visible.</p> }
+                  @if (privacyUnconfirmed()[request.id]) { <p class="privacy-admin-notice" role="status">Actualización sin confirmar. Compara el estado y la conversación antes de repetirla. El texto enviado se conserva en el diálogo de la misma acción durante esta sesión.</p> }
                   <dl><div><dt>Persona</dt><dd>{{ request.name ?? 'Cuenta eliminada' }}</dd></div><div><dt>Responsable</dt><dd>{{ request.assignedAdminName ?? 'Sin asignar' }}</dd></div><div><dt>Fecha límite</dt><dd>{{ formatDate(request.extendedUntil ?? request.dueAt) }}</dd></div><div><dt>Identidad</dt><dd>{{ request.identityVerifiedAt ? 'Sesión verificada' : 'Pendiente' }}</dd></div></dl>
-                  @if (request.messages.length) { <div class="privacy-thread">@for (message of request.messages; track message.id) { <div [class.admin]="message.authorRole === 'admin'"><span>{{ message.authorRole === 'admin' ? 'Equipo' : 'Usuario' }} · {{ formatDate(message.createdAt) }}</span><p>{{ message.body ?? 'Contenido cifrado no disponible' }}</p></div> }</div> }
+                  @if (request.messages.length) { <div class="privacy-thread" tabindex="0" role="region" [attr.aria-label]="'Conversación del expediente #' + request.id">@for (message of request.messages; track message.id) { <div [class.admin]="message.authorRole === 'admin'"><span>{{ privacyMessageAuthor(message.authorRole) }} · {{ formatDate(message.createdAt) }}</span><p>{{ message.body ?? 'Mensaje no disponible. Revisa el expediente antes de responder.' }}</p></div> }</div> }
                   @if (privacyActive(request.status)) {
                     <footer>
                       <div class="privacy-case-actions">
@@ -347,7 +349,7 @@
                       @if (request.status !== 'waiting_user') { <button mat-stroked-button type="button" (click)="requestPrivacyInformation(request)" [disabled]="privacyRead || actionKey() !== null">Pedir información</button> }
                       <button mat-flat-button color="primary" type="button" (click)="completePrivacy(request)" [disabled]="privacyRead || actionKey() !== null">Resolver</button>
                       </div>
-                      @if (!request.extendedUntil) {
+                      @if (!request.extendedUntil && !request.overdue) {
                         <div class="privacy-deadline-actions"><p>Ampliación del plazo</p><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'complexity')" [disabled]="privacyRead || actionKey() !== null">Por complejidad</button><button mat-stroked-button type="button" (click)="extendPrivacy(request, 'request_volume')" [disabled]="privacyRead || actionKey() !== null">Por volumen</button></div>
                       }
                       <button mat-stroked-button class="danger-button" type="button" (click)="rejectPrivacy(request)" [disabled]="privacyRead || actionKey() !== null">Cerrar motivadamente</button>

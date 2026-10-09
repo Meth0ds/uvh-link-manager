@@ -75,6 +75,60 @@ describe("Administration actual UI and context", () => {
     const pending = state.component.completePrivacy(request); expect(state.actions.prompt).toHaveBeenCalledTimes(1); state.session.advance(); prompt.resolve("Respuesta completa para el expediente"); await pending;
     expect(state.api.post).not.toHaveBeenCalled();
   });
+
+  const privacyRequest: PrivacyRightRequest = { id: 4, type: "access", status: "submitted", identityVerifiedAt: stamp, acknowledgedAt: null,
+    dueAt: stamp, extendedUntil: null, extensionReasonCode: null, completedAt: null, cancelledAt: null, createdAt: stamp, updatedAt: stamp, overdue: false, messages: [] };
+
+  it("retains an unconfirmed operator draft and prefills only the same action", async () => {
+    await state.component.privacy.load(); state.api.get.calls.reset();
+    state.api.post.and.resolveTo({ ok: true, status: "rejected" });
+    state.actions.prompt.and.resolveTo("Respuesta motivada que debe conservarse.");
+    await state.component.completePrivacy(privacyRequest);
+    expect(state.snack.open.calls.allArgs().some(([message]) => message === "Expediente actualizado")).toBeFalse();
+    expect(state.component.privacyUnconfirmed()[4]).toBeTrue();
+    expect(state.api.get).toHaveBeenCalledWith("/api/v1/admin/privacy-requests", jasmine.anything(), jasmine.any(Function), jasmine.anything());
+    state.actions.prompt.calls.reset(); state.actions.prompt.and.resolveTo(null);
+    await state.component.completePrivacy(privacyRequest);
+    expect(state.actions.prompt).toHaveBeenCalledWith(jasmine.objectContaining({ inputValue: "Respuesta motivada que debe conservarse." }), jasmine.anything());
+    state.actions.prompt.calls.reset(); await state.component.rejectPrivacy(privacyRequest);
+    expect(state.actions.prompt).toHaveBeenCalledWith(jasmine.objectContaining({ inputValue: "" }), jasmine.anything());
+  });
+
+  it("erases operator drafts after confirmed decisions and actor replacement", async () => {
+    await state.component.privacy.load(); state.api.post.and.resolveTo({ ok: false });
+    await state.component.completePrivacy(privacyRequest);
+    state.api.post.and.resolveTo({ ok: true, status: "completed" });
+    await state.component.completePrivacy(privacyRequest);
+    expect(state.component.privacyUnconfirmed()[4]).toBeUndefined();
+    state.actions.prompt.calls.reset(); state.actions.prompt.and.resolveTo(null); await state.component.completePrivacy(privacyRequest);
+    expect(state.actions.prompt).toHaveBeenCalledWith(jasmine.objectContaining({ inputValue: "" }), jasmine.anything());
+    state.actions.prompt.and.resolveTo("Otro borrador que no debe cruzar sesiones."); state.api.post.and.resolveTo({ ok: false });
+    await state.component.completePrivacy(privacyRequest); state.session.advance(); state.fixture.detectChanges(); await state.fixture.whenStable();
+    await state.component.privacy.load(); state.actions.prompt.calls.reset(); state.actions.prompt.and.resolveTo(null);
+    await state.component.completePrivacy(privacyRequest);
+    expect(state.actions.prompt).toHaveBeenCalledWith(jasmine.objectContaining({ inputValue: "" }), jasmine.anything());
+    expect(state.component.privacyUnconfirmed()[4]).toBeUndefined();
+  });
+
+  it("does not restore a late operator draft after the session changes", async () => {
+    await state.component.privacy.load();
+    const response = deferred<unknown>(); state.api.post.and.returnValue(response.promise);
+    const pending = state.component.completePrivacy(privacyRequest); await Promise.resolve();
+    state.session.advance(); state.fixture.detectChanges(); await state.fixture.whenStable();
+    response.resolve({}); await pending;
+    expect(state.component.privacyUnconfirmed()[4]).toBeUndefined();
+    expect(state.snack.open).not.toHaveBeenCalled();
+  });
+
+  it("cancels the private operator prompt when its actor is replaced", async () => {
+    await state.component.privacy.load();
+    const prompt = deferred<string | null>(); state.actions.prompt.and.returnValue(prompt.promise);
+    const pending = state.component.completePrivacy(privacyRequest);
+    const lifetime = state.actions.prompt.calls.mostRecent().args[1]; expect(lifetime?.signal.aborted).toBeFalse();
+    state.session.advance(); state.fixture.detectChanges(); await state.fixture.whenStable();
+    expect(lifetime?.signal.aborted).toBeTrue();
+    prompt.resolve(null); await pending; expect(state.api.post).not.toHaveBeenCalled();
+  });
   it("drops the operations snapshot when the session changes before effects run", async () => {
     const response = deferred<AdminOperations>(); state.api.get.and.returnValue(response.promise);
     const pending = state.component.loadOperations(); state.session.advance(); response.resolve({ ...operations, generatedAt: "2099-01-01T12:00:00Z" }); await pending;

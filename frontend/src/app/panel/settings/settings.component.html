@@ -147,14 +147,15 @@
   } @else if (mfaSecret()) {
     <section class="mfa-enrol" aria-labelledby="mfa-link-title">
       <div class="enrol-copy"><span class="setup-kicker"><mat-icon>qr_code_2</mat-icon>Paso 2</span><h3 id="mfa-link-title">Vincula tu aplicación</h3><p>Escanea el QR con tu aplicación autenticadora. Si no puedes escanearlo, introduce la clave manual.</p></div>
-      <div class="mfa-setup">
+      <div class="mfa-setup" [class.manual-only]="!mfaQrLoading() && !mfaQr()">
+        @if (mfaQrLoading()) { <div class="mfa-qr-loading" role="status"><mat-progress-bar mode="indeterminate" aria-label="Preparando código QR" /><span>Preparando código QR…</span></div> }
         @if (mfaQr()) { <img [src]="mfaQr()" alt="Código QR para añadir UVH a la aplicación autenticadora" class="mfa-qr" /> }
         <div class="mfa-secret"><b>Clave manual</b><code class="tnum">{{ mfaSecret() }}</code><small>Cuenta: {{ user()?.email }}</small></div>
       </div>
       @if (user()?.mfaEnabled) { <div class="inline-note"><mat-icon>info</mat-icon>La aplicación actual seguirá funcionando hasta confirmar la nueva.</div> }
       <form class="stack" [formGroup]="mfaCodeForm" (ngSubmit)="enableMfa()">
         <mat-form-field appearance="outline" class="setup-code"><mat-label>Código de la nueva aplicación</mat-label><input matInput formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /><mat-icon matPrefix>pin</mat-icon><mat-hint>Introduce los 6 dígitos para comprobar la vinculación.</mat-hint></mat-form-field>
-        <div class="row-actions"><button mat-stroked-button type="button" (click)="cancelMfaSetup()" [disabled]="mfaBusy()">Cancelar</button><button mat-flat-button color="primary" type="submit" [disabled]="mfaCodeForm.invalid || mfaBusy()">{{ mfaBusy() ? 'Comprobando…' : 'Verificar y continuar' }}</button></div>
+        <div class="row-actions"><button mat-stroked-button type="button" (click)="cancelMfaSetup()" [disabled]="mfaBusy()">Cancelar</button><button mat-flat-button color="primary" type="submit" [disabled]="mfaCodeForm.invalid || mfaBusy()">{{ mfaBusy() ? (mfaQrLoading() ? 'Preparando QR…' : 'Comprobando…') : 'Verificar y continuar' }}</button></div>
       </form>
     </section>
   } @else if (!user()?.mfaEnabled) {
@@ -386,45 +387,58 @@
     <li><span aria-hidden="true">2</span><div><b>Recibe tu expediente</b><p>La solicitud queda registrada con su estado y fecha límite de respuesta.</p></div></li>
     <li><span aria-hidden="true">3</span><div><b>Sigue la conversación</b><p>Consulta las respuestas y aporta información adicional cuando se solicite.</p></div></li>
   </ol>
+  @if (privacyMutationError(); as message) {
+    <div class="alert error privacy-feedback" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span></div>
+  }
+  @if (privacyReceipt(); as receipt) {
+    <section #privacyReceiptBlock tabindex="-1" class="privacy-receipt" aria-labelledby="privacy-receipt-title" animate.enter="privacy-reveal">
+      <span class="receipt-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4 10-10" /></svg></span>
+      <div><small>Registro confirmado · #{{ receipt.id }}</small><h3 id="privacy-receipt-title">Tu solicitud ya tiene expediente</h3><p>{{ privacyTypeLabel(receipt.type) }} · Fecha límite de respuesta: <b>{{ formatDate(receipt.dueAt) }}</b>.</p><p>Consulta las respuestas y cualquier ampliación motivada en el seguimiento.</p></div>
+    </section>
+  }
   <div class="privacy-layout">
-    <form #privacyFormBlock tabindex="-1" class="stack privacy-form" [formGroup]="privacyForm" (ngSubmit)="submitPrivacyRequest()">
+    <form #privacyFormBlock tabindex="-1" class="stack privacy-form" [attr.aria-busy]="privacyAction() === 'create'" [formGroup]="privacyForm" (ngSubmit)="submitPrivacyRequest()">
       <h3>Nueva solicitud</h3>
       <p>El plazo ordinario empieza al registrarla. No incluyas contraseñas, códigos MFA ni documentos de identidad en el texto.</p>
       <mat-form-field appearance="outline"><mat-label>Derecho que quieres ejercer</mat-label><mat-select formControlName="type">@for (type of privacyTypeOptions; track type) { <mat-option [value]="type">{{ privacyTypeLabel(type) }}</mat-option> }</mat-select><mat-icon matPrefix>rule</mat-icon></mat-form-field>
+      <div class="privacy-guidance"><mat-icon aria-hidden="true">info_outline</mat-icon><p>{{ privacyGuidance[privacyForm.controls.type.value] }}</p></div>
       <mat-form-field appearance="outline"><mat-label>Alcance o datos concretos</mat-label><textarea matInput formControlName="details" rows="4" maxlength="2000"></textarea><mat-hint align="end">{{ privacyForm.controls.details.value.length }}/2000</mat-hint>@if (privacyForm.controls.details.hasError('detailRequired')) { <mat-error>Describe el alcance en al menos 10 caracteres.</mat-error> }</mat-form-field>
-      <div class="row-actions"><button mat-flat-button color="primary" type="submit" [disabled]="privacyBusy()">{{ privacyBusy() ? 'Registrando…' : 'Registrar solicitud' }}</button></div>
+      <div class="row-actions privacy-submit"><button mat-flat-button color="primary" type="submit" [disabled]="privacyBusy()">{{ privacyAction() === 'create' ? 'Registrando…' : 'Registrar solicitud' }}</button></div>
     </form>
 
     <section class="privacy-history" aria-labelledby="privacy-history-title">
-      <div class="privacy-history-heading"><div><h3 id="privacy-history-title">Seguimiento</h3><p>{{ privacyTotal() }} solicitudes registradas</p></div><button mat-icon-button type="button" (click)="loadPrivacyRequests()" [disabled]="privacyLoading()" aria-label="Actualizar solicitudes"><mat-icon>refresh</mat-icon></button></div>
+      <div class="privacy-history-heading"><div><h3 id="privacy-history-title">Seguimiento</h3><p>{{ privacyLoading() ? 'Actualizando seguimiento…' : privacyTotal() + ' solicitudes registradas' }}</p></div><button mat-icon-button type="button" (click)="loadPrivacyRequests()" [disabled]="privacyLoading()" aria-label="Actualizar solicitudes"><mat-icon>refresh</mat-icon></button></div>
       @if (privacyLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando solicitudes de privacidad" /> }
       @if (privacyError(); as message) { <div class="alert error" role="alert"><mat-icon>error_outline</mat-icon><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadPrivacyRequests()">Reintentar</button></div> }
       <div class="privacy-cases">
         @for (request of privacyRequests(); track request.id) {
           <article class="privacy-case" [class.overdue]="request.overdue">
-            <header><div><b>{{ privacyTypeLabel(request.type) }}</b><span>Expediente #{{ request.id }}</span></div><span class="privacy-status" [class.waiting]="request.status === 'waiting_user'" [class.done]="request.status === 'completed'" [class.overdue]="request.overdue">{{ request.overdue ? 'Plazo vencido' : privacyStatusLabel(request.status) }}</span></header>
+            <header><div><b>{{ privacyTypeLabel(request.type) }}</b><span>Expediente #{{ request.id }}</span></div><span class="privacy-status" [class.waiting]="request.status === 'waiting_user'" [class.done]="request.status === 'completed'" >{{ privacyStatusLabel(request.status) }}</span></header>
+            <p class="privacy-next-step">{{ privacyNextStep(request.status) }}</p>
+            @if (request.overdue) { <p class="privacy-overdue"><mat-icon aria-hidden="true">schedule</mat-icon>Plazo vencido. Puedes contactar con privacidad o acudir a la AEPD.</p> }
             <dl><div><dt>Registrada</dt><dd>{{ formatDate(request.createdAt) }}</dd></div><div><dt>Fecha límite</dt><dd>{{ formatDate(request.extendedUntil ?? request.dueAt) }}</dd></div></dl>
-            @if (request.extendedUntil) { <div class="privacy-extension"><mat-icon>event_repeat</mat-icon>Plazo ampliado por {{ request.extensionReasonCode === 'request_volume' ? 'volumen de solicitudes' : 'complejidad' }}.</div> }
+            @if (request.extendedUntil) { <div class="privacy-extension"><mat-icon>event_repeat</mat-icon>Plazo ampliado por {{ request.extensionReasonCode === 'request_volume' ? 'volumen de solicitudes' : 'complejidad' }}. Plazo ordinario: {{ formatDate(request.dueAt) }}. Revisa la motivación en la conversación.</div> }
             @if (request.messages.length) {
-              <div class="privacy-messages">
+              <div class="privacy-messages" tabindex="0" role="region" [attr.aria-label]="'Conversación del expediente #' + request.id">
                 @for (message of request.messages; track message.id) {
-                  <div [class.operator]="message.authorRole === 'admin'"><span>{{ message.authorRole === 'admin' ? 'Equipo de privacidad' : 'Tú' }} · {{ formatDate(message.createdAt) }}</span><p>{{ message.body ?? 'Este mensaje no se puede descifrar. Contacta con soporte.' }}</p></div>
+                  <div [class.operator]="message.authorRole === 'admin'"><span>{{ privacyMessageAuthor(message.authorRole, true) }} · {{ formatDate(message.createdAt) }}</span><p>{{ message.body ?? 'Este mensaje no está disponible. Contacta con privacidad indicando el número de expediente.' }}</p></div>
                 }
               </div>
             }
             @if (request.status === 'waiting_user') {
               @if (privacyResponseId() === request.id) {
-                <form class="stack privacy-response" [formGroup]="privacyResponseForm" (ngSubmit)="respondPrivacy(request)"><mat-form-field appearance="outline"><mat-label>Tu respuesta</mat-label><textarea matInput formControlName="message" rows="3" maxlength="2000"></textarea><mat-hint align="end">{{ privacyResponseForm.controls.message.value.length }}/2000</mat-hint></mat-form-field><div class="row-actions"><button mat-stroked-button type="button" (click)="privacyResponseId.set(null)">Cancelar</button><button mat-flat-button color="primary" type="submit" [disabled]="privacyResponseForm.invalid || privacyBusy()">Enviar respuesta</button></div></form>
-              } @else { <button mat-flat-button color="primary" type="button" (click)="beginPrivacyResponse(request.id)"><mat-icon>reply</mat-icon>Responder</button> }
+                <form class="stack privacy-response" animate.enter="privacy-reveal" [attr.aria-busy]="privacyAction() === 'respond'" [formGroup]="privacyResponseForm" (ngSubmit)="respondPrivacy(request)"><mat-form-field appearance="outline"><mat-label>Tu respuesta</mat-label><textarea #privacyResponseInput matInput formControlName="message" rows="3" maxlength="2000"></textarea><mat-hint align="end">{{ privacyResponseForm.controls.message.value.length }}/2000</mat-hint></mat-form-field><div class="row-actions"><button mat-stroked-button type="button" (click)="closePrivacyResponse()" [disabled]="privacyBusy()">Cerrar respuesta</button><button mat-flat-button color="primary" type="submit" [disabled]="privacyResponseForm.invalid || privacyBusy()">{{ privacyAction() === 'respond' ? 'Enviando…' : 'Enviar respuesta' }}</button></div></form>
+              } @else { <button mat-flat-button color="primary" type="button" (click)="beginPrivacyResponse(request.id)" [disabled]="privacyBusy() || privacyLoading()"><mat-icon>reply</mat-icon>Responder</button> }
             }
-            @if (privacyIsActive(request.status)) { <footer><button mat-button type="button" class="danger" (click)="cancelPrivacy(request)" [disabled]="privacyBusy()">Cancelar solicitud</button></footer> }
+            @if (privacyIsActive(request.status)) { <footer><button mat-button type="button" class="danger" (click)="cancelPrivacy(request)" [disabled]="privacyBusy() || privacyLoading()">Cancelar solicitud</button></footer> }
           </article>
         }
       </div>
       @if (!privacyLoading() && !privacyError() && !privacyRequests().length) { <div class="privacy-empty"><mat-icon>fact_check</mat-icon><b>Aún no hay solicitudes</b><span>Cuando registres una, podrás seguir aquí su plazo y respuesta.</span></div> }
-      <mat-paginator [length]="privacyTotal()" [pageIndex]="privacyPage()" [pageSize]="privacyPageSize()" [pageSizeOptions]="[5, 10, 20]" showFirstLastButtons (page)="onPrivacyPage($event)" aria-label="Paginación de solicitudes de privacidad" />
+      <mat-paginator [disabled]="privacyBusy() || privacyLoading()" [length]="privacyTotal()" [pageIndex]="privacyPage()" [pageSize]="privacyPageSize()" [pageSizeOptions]="[5, 10, 20]" showFirstLastButtons (page)="onPrivacyPage($event)" aria-label="Paginación de solicitudes de privacidad" />
     </section>
   </div>
+  <aside class="privacy-help"><b>Ayuda para ejercer tus derechos</b><p>También puedes escribir a <a href="mailto:privacidad@uvh.es">privacidad&#64;uvh.es</a>, aunque no tengas acceso a una cuenta. Si la respuesta no atiende tu derecho o vence el plazo, puedes reclamar ante la AEPD o acudir a los tribunales.</p><div><a href="/legal/privacidad#derechos">Política de privacidad <mat-icon aria-hidden="true">arrow_forward</mat-icon></a><a href="https://www.aepd.es/derechos-y-deberes/ejerce-tus-derechos" target="_blank" rel="noopener noreferrer">Ejercer tus derechos en la AEPD <mat-icon aria-hidden="true">open_in_new</mat-icon><span class="sr-only"> (abre una nueva pestaña)</span></a></div></aside>
 </div>
 
     </section>

@@ -25,13 +25,14 @@ import type {
 } from "../../core/models";
 import { adminMessage, apiMessage } from "../../core/api-message";
 import { QueuePaging } from "../../core/queue-paging";
-import { ApiService } from "../../core/services/api.service";
+import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { accountRecoveryStateLabel, ACCOUNT_RECOVERY_REVIEW_FILTER } from "../../core/account-recovery-state-label";
 import { resourceTypeLabel } from "../../core/resource-type-label";
 import { ADMIN_ACCOUNT_FLAG_LABEL, ADMIN_USER_FILTERS, adminAccountStateLabel, type AdminUserFilterValue } from "../../core/admin-user-label";
 import { DOMAIN_STATE_ORDER, domainStateLabel } from "../../core/domain-state-label";
 import { mailOutboxStateLabel, MAIL_OUTBOX_STATE_ORDER } from "../../core/mail-outbox-state-label";
 import {
+  privacyRightMessageAuthor,
   privacyRightIsActive,
   privacyRightStatusLabel,
   privacyRightTypeLabel,
@@ -55,7 +56,7 @@ import {
 import { LatestRequest } from "../../core/services/latest-request";
 import { SessionContextService } from "../../core/services/session-context.service";
 import { AdminViewContext, type AdminIntent } from "./admin-view-context";
-import { decodePrivacyRequestsPage } from "../../core/services/privacy-response-decoders";
+import { decodePrivacyRequestsPage, decodePrivacyAdminAction } from "../../core/services/privacy-response-decoders";
 import { ActionDialogService } from "../action-dialog.service";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
@@ -69,6 +70,7 @@ type RecoveryStatus = "" | AccountRecoveryStatus;
 type DomainFilter = "" | DomainState;
 type MailStatusFilter = "" | MailOutboxStatus;
 type PrivacyStatusFilter = "" | PrivacyRightStatus;
+type PrivacyAction = "start_review" | "request_information" | "complete" | "reject" | "extend";
 type PrivacyTypeFilter = "" | PrivacyRightType;
 
 @Component({
@@ -282,6 +284,9 @@ export class AdminComponent {
 
   readonly privacyStatus = signal<PrivacyStatusFilter>("");
   readonly privacyType = signal<PrivacyTypeFilter>("");
+  private readonly privacyPromptRequests = new LatestRequest(this.destroyRef);
+  private readonly privacyDrafts = signal<Record<string, string>>({});
+  readonly privacyUnconfirmed = signal<Record<number, boolean>>({});
   readonly privacy = new QueuePaging<PrivacyRightRequest>({
     destroyRef: this.destroyRef,
     context: () => this.view.key(),
@@ -338,6 +343,7 @@ export class AdminComponent {
   };
   readonly recoveryLabel = accountRecoveryStateLabel;
   readonly mailStatusLabel = mailOutboxStateLabel;
+  readonly privacyMessageAuthor = privacyRightMessageAuthor;
   readonly privacyStatusLabel = privacyRightStatusLabel;
   readonly privacyTypeLabel = privacyRightTypeLabel;
   readonly privacyActive = privacyRightIsActive;
@@ -356,6 +362,7 @@ export class AdminComponent {
   readonly formatDate = dateTimeLabel;
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.privacyDrafts.set({}));
     let context = this.view.key();
     effect(() => {
       const current = this.view.key();
@@ -370,6 +377,9 @@ export class AdminComponent {
   }
 
   private resetView(): void {
+    this.privacyPromptRequests.invalidate();
+    this.privacyDrafts.set({});
+    this.privacyUnconfirmed.set({});
     this.reloadRequests.invalidate();
     this.overviewRequests.invalidate();
     this.operationsRequests.invalidate();
@@ -743,58 +753,79 @@ export class AdminComponent {
   async requestPrivacyInformation(request: PrivacyRightRequest): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.privacy.stale() || this.actionKey()) return;
-    const message = await this.privacyMessage("Solicitar información", "Explica qué información adicional es necesaria. No solicites contraseñas, códigos MFA ni documentos por este canal.", "Enviar petición");
+    const message = await this.privacyMessage(request, "request_information", "", "Solicitar información", "Explica qué información adicional es necesaria. No solicites contraseñas, códigos MFA ni documentos por este canal.", "Enviar petición");
     if (message && intent()) await this.runPrivacyAction(request, "request_information", message, "", intent);
   }
 
   async completePrivacy(request: PrivacyRightRequest): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.privacy.stale() || this.actionKey()) return;
-    const message = await this.privacyMessage("Resolver solicitud", "Redacta una respuesta autosuficiente que describa las medidas aplicadas o los datos facilitados.", "Registrar resolución");
+    const message = await this.privacyMessage(request, "complete", "", "Resolver solicitud", "Redacta una respuesta autosuficiente que describa las medidas aplicadas o los datos facilitados.", "Registrar resolución");
     if (message && intent()) await this.runPrivacyAction(request, "complete", message, "", intent);
   }
 
   async rejectPrivacy(request: PrivacyRightRequest): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.privacy.stale() || this.actionKey()) return;
-    const message = await this.privacyMessage("Cerrar con respuesta motivada", "Explica de forma concreta el fundamento, las alternativas y las vías de reclamación aplicables.", "Cerrar expediente", true);
+    const message = await this.privacyMessage(request, "reject", "", "Cerrar con respuesta motivada", "Explica de forma concreta el fundamento, las alternativas y las vías de reclamación aplicables.", "Cerrar expediente", true);
     if (message && intent()) await this.runPrivacyAction(request, "reject", message, "", intent);
   }
 
   async extendPrivacy(request: PrivacyRightRequest, reasonCode: "complexity" | "request_volume"): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.privacy.stale() || this.actionKey()) return;
-    const message = await this.privacyMessage("Ampliar plazo", "Explica por qué la complejidad o el volumen impiden responder dentro del mes ordinario.", "Notificar ampliación");
+    const message = await this.privacyMessage(request, "extend", reasonCode, "Ampliar plazo", "Explica por qué la complejidad o el volumen impiden responder dentro del mes ordinario.", "Notificar ampliación");
     if (message && intent()) await this.runPrivacyAction(request, "extend", message, reasonCode, intent);
   }
 
-  private async privacyMessage(title: string, message: string, confirmLabel: string, destructive = false): Promise<string | null> {
+  private privacyDraftKey(request: PrivacyRightRequest, action: PrivacyAction, reasonCode: string): string {
+    return `${this.view.key()}:${request.id}:${action}:${reasonCode}`;
+  }
+
+  private async privacyMessage(request: PrivacyRightRequest, action: PrivacyAction, reasonCode: string, title: string, message: string, confirmLabel: string, destructive = false): Promise<string | null> {
+    const prompt = this.privacyPromptRequests.begin(this.view.key());
     return this.actions.prompt({
       title,
       message,
       confirmLabel,
       destructive,
       inputLabel: "Respuesta para el expediente",
+      inputMultiline: true,
+      inputValue: this.privacyDrafts()[this.privacyDraftKey(request, action, reasonCode)] ?? "",
       inputPlaceholder: "Respuesta clara y verificable…",
       inputHint: "Entre 10 y 2.000 caracteres.",
       inputRequired: true,
       inputMinLength: 10,
       inputMaxLength: 2000,
-    });
+    }, { signal: prompt.signal });
   }
 
-  private async runPrivacyAction(request: PrivacyRightRequest, action: "start_review" | "request_information" | "complete" | "reject" | "extend", message: string, reasonCode = "", intent = this.view.capture()): Promise<void> {
+  private async runPrivacyAction(request: PrivacyRightRequest, action: PrivacyAction, message: string, reasonCode = "", intent = this.view.capture()): Promise<void> {
     if (this.privacy.stale()) return;
     const operation = this.view.begin(`privacy-${request.id}`, intent);
     if (!operation) return;
+    const draftKey = this.privacyDraftKey(request, action, reasonCode);
+    if (message) {
+      // Memory only, bounded, and namespaced by the actor before its reset effect runs.
+      this.privacyDrafts.update(drafts => ({ ...Object.fromEntries(Object.entries(drafts).slice(-19)), [draftKey]: message }));
+    }
     try {
-      await this.api.post(`/api/v1/admin/privacy-requests/${request.id}/action`, { action, message, reasonCode });
+      const response = await this.api.post<unknown>(`/api/v1/admin/privacy-requests/${request.id}/action`, { action, message, reasonCode });
       if (!operation.isCurrent()) return;
+      const expectedStatus: PrivacyRightStatus = action === "start_review" ? "in_progress"
+        : action === "request_information" ? "waiting_user" : action === "complete" ? "completed"
+          : action === "reject" ? "rejected" : request.status;
+      try { decodePrivacyAdminAction(response, expectedStatus); }
+      catch { throw new ApiRequestError("No pudimos confirmar la actualización. Revisa el expediente antes de repetirla; el borrador se conserva en esta sesión.", 502); }
+      this.privacyDrafts.update(drafts => { const next = { ...drafts }; delete next[draftKey]; return next; });
+      this.privacyUnconfirmed.update(cases => { const next = { ...cases }; delete next[request.id]; return next; });
       this.snackbar.open("Expediente actualizado", "Cerrar", { duration: 3000 });
       await Promise.all([this.privacy.load(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
       if (!operation.isCurrent()) return;
+      this.privacyUnconfirmed.update(cases => ({ ...cases, [request.id]: true }));
       this.showError(error);
+      await this.privacy.load();
     } finally {
       operation.settle();
     }

@@ -123,6 +123,100 @@ describe("SettingsComponent async safety", () => {
     snackbar.open.calls.reset();
   });
 
+  for (const acknowledgement of [{}, { ok: false }, { request: { id: 1 } }]) {
+    it(`preserves the privacy request draft without claiming admission for ${JSON.stringify(acknowledgement)}`, async () => {
+      component.privacyForm.setValue({ type: "rectification", details: "Corrige los datos indicados en esta solicitud." });
+      api.post.and.resolveTo(acknowledgement as never);
+      await component.submitPrivacyRequest();
+      expect(component.privacyForm.getRawValue()).toEqual({ type: "rectification", details: "Corrige los datos indicados en esta solicitud." });
+      expect(snackbar.open.calls.allArgs().some(([message]) => message === "Solicitud registrada y plazo iniciado")).toBeFalse();
+    });
+  }
+
+  it("keeps an unconfirmed privacy response available for the account owner", async () => {
+    component.beginPrivacyResponse(4);
+    component.privacyResponseForm.setValue({ message: "Información adicional para tramitar mi solicitud." });
+    api.post.and.resolveTo({ ok: "true" } as never);
+    await component.respondPrivacy({ id: 4 } as never);
+    expect(component.privacyResponseId()).toBe(4);
+    expect(component.privacyResponseForm.controls.message.value).toBe("Información adicional para tramitar mi solicitud.");
+    expect(snackbar.open.calls.allArgs().some(([message]) => message === "Respuesta incorporada al expediente")).toBeFalse();
+  });
+
+  it("does not announce cancellation without an affirmative acknowledgement", async () => {
+    const actions = TestBed.inject(ActionDialogService) as jasmine.SpyObj<ActionDialogService>;
+    actions.confirm.and.resolveTo(true);
+    api.post.and.resolveTo({ ok: false } as never);
+    await component.cancelPrivacy({ id: 4 } as never);
+    expect(snackbar.open.calls.allArgs().some(([message]) => message === "Solicitud cancelada")).toBeFalse();
+  });
+
+
+  const privacyAdmission = {
+    id: 12, type: "access", status: "submitted", identityVerifiedAt: null, acknowledgedAt: null,
+    dueAt: "2026-11-09T10:00:00Z", extendedUntil: null, extensionReasonCode: null, completedAt: null,
+    cancelledAt: null, createdAt: "2026-10-09T10:00:00Z", updatedAt: "2026-10-09T10:00:00Z", overdue: false, messages: [],
+  };
+
+  it("locks both privacy forms until admission settles and only then shows its actual receipt", async () => {
+    const response = deferred<unknown>(); api.post.and.returnValue(response.promise);
+    component.privacyForm.setValue({ type: "access", details: "Consulta de mis datos." });
+    const pending = component.submitPrivacyRequest();
+    expect(component.privacyForm.disabled).toBeTrue();
+    expect(component.privacyResponseForm.disabled).toBeTrue();
+    expect(component.privacyReceipt()).toBeNull();
+    await component.submitPrivacyRequest(); expect(api.post).toHaveBeenCalledTimes(1);
+    response.resolve({ request: privacyAdmission }); await pending;
+    expect(component.privacyReceipt()).toEqual({ id: 12, type: "access", dueAt: "2026-11-09T10:00:00Z" });
+    expect(component.privacyForm.enabled).toBeTrue();
+    expect(component.privacyResponseForm.enabled).toBeTrue();
+    expect(component.privacyForm.controls.details.value).toBe("");
+  });
+
+  it("rejects an admission for a different right without clearing the draft", async () => {
+    component.privacyForm.setValue({ type: "portability", details: "Los datos que he facilitado." });
+    api.post.and.resolveTo({ request: privacyAdmission }); await component.submitPrivacyRequest();
+    expect(component.privacyReceipt()).toBeNull();
+    expect(component.privacyForm.controls.type.value).toBe("portability");
+    expect(component.privacyMutationError()).toContain("comprueba el seguimiento");
+    expect(component.privacyForm.enabled).toBeTrue();
+  });
+
+  it("clears private drafts and unlocks forms on account replacement without showing the late receipt", async () => {
+    TestBed.tick();
+    const response = deferred<unknown>(); api.post.and.returnValue(response.promise);
+    component.privacyForm.setValue({ type: "access", details: "Datos del anterior titular." });
+    const pending = component.submitPrivacyRequest();
+    auth.sessionGeneration.and.returnValue(2); auth.user.set({ ...auth.user()!, id: 2, name: "Other" }); TestBed.tick();
+    expect(component.privacyForm.enabled).toBeTrue();
+    expect(component.privacyForm.controls.details.value).toBe("");
+    response.resolve({ request: privacyAdmission }); await pending;
+    expect(component.privacyReceipt()).toBeNull();
+    expect(component.privacyBusy()).toBeFalse();
+    expect(snackbar.open).not.toHaveBeenCalled();
+  });
+
+  it("keeps an active response open while it is pending and clears it only after acknowledgement", async () => {
+    component.beginPrivacyResponse(4); component.privacyResponseForm.setValue({ message: "Respuesta a la información pedida." });
+    const response = deferred<unknown>(); api.post.and.returnValue(response.promise);
+    const pending = component.respondPrivacy({ id: 4 } as never); component.closePrivacyResponse();
+    expect(component.privacyResponseId()).toBe(4); expect(component.privacyResponseForm.disabled).toBeTrue();
+    response.resolve({ ok: true }); await pending;
+    expect(component.privacyResponseId()).toBeNull(); expect(component.privacyResponseForm.enabled).toBeTrue();
+    expect(component.privacyResponseForm.controls.message.value).toBe("");
+  });
+
+  it("recovers response drafts after closing or changing cases and clears them on account replacement", () => {
+    TestBed.tick();
+    component.beginPrivacyResponse(4); component.privacyResponseForm.setValue({ message: "Borrador del expediente cuatro.\nOtra línea." });
+    component.closePrivacyResponse(); component.beginPrivacyResponse(4);
+    expect(component.privacyResponseForm.controls.message.value).toBe("Borrador del expediente cuatro.\nOtra línea.");
+    component.beginPrivacyResponse(5); expect(component.privacyResponseForm.controls.message.value).toBe("");
+    component.privacyResponseForm.setValue({ message: "Borrador del expediente cinco." }); component.beginPrivacyResponse(4);
+    expect(component.privacyResponseForm.controls.message.value).toContain("cuatro");
+    auth.sessionGeneration.and.returnValue(2); auth.user.set({ ...auth.user()!, id: 2 }); TestBed.tick();
+    component.beginPrivacyResponse(4); expect(component.privacyResponseForm.controls.message.value).toBe("");
+  });
   it("groups notification preferences and never silences a critical notice", async () => {
     notifications.preferences.and.resolveTo([
       { kind: "password_changed", category: "mandatory", delivery: "immediate" },
@@ -479,6 +573,7 @@ describe("SettingsComponent async safety", () => {
   });
 
   it("does not report a confirmed current-session revocation as failed when navigation is cancelled", async () => {
+    await component.loadSessions();
     auth.revokeSession.and.resolveTo(true);
     router.navigate.and.resolveTo(false);
 
@@ -676,10 +771,12 @@ describe("SettingsComponent async safety", () => {
   });
 
   it("does not reload sessions or report an old revocation in another account", async () => {
+    await component.loadSessions();
     const response = deferred<boolean>();
     auth.revokeSession.and.returnValue(response.promise);
     auth.listSessions.calls.reset();
     const operation = component.revokeSession(session("other", false));
+    expect(auth.revokeSession).toHaveBeenCalled();
     auth.sessionGeneration.and.returnValue(2);
     response.resolve(false);
     await operation;
@@ -688,6 +785,7 @@ describe("SettingsComponent async safety", () => {
   });
 
   it("still navigates to login after deliberately revoking this browser's session", async () => {
+    await component.loadSessions();
     auth.revokeSession.and.callFake(async () => {
       auth.sessionGeneration.and.returnValue(2);
       auth.user.set(null);
@@ -698,9 +796,11 @@ describe("SettingsComponent async safety", () => {
   });
 
   it("does not navigate for an old current-session result after a newer login", async () => {
+    await component.loadSessions();
     const response = deferred<boolean>();
     auth.revokeSession.and.returnValue(response.promise);
     const operation = component.revokeSession(session("current", true));
+    expect(auth.revokeSession).toHaveBeenCalled();
     auth.sessionGeneration.and.returnValue(3);
     auth.user.set({ ...auth.user()!, id: 2 });
     response.resolve(true);

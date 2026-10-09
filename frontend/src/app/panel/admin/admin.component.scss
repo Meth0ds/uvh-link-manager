@@ -306,3 +306,8 @@ button { min-height: 44px; }
 .admin-content { min-width: 0; container-type: inline-size; border: 1px solid var(--uvh-border); border-radius: 3px; background: var(--uvh-surface-raised); }
 .admin-content:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
 @container (max-width: 900px) { .admin-layout { display: block; } .admin-sidebar { display: none; } }
+
+.privacy-admin-notice { margin: 12px 0 0; padding: 11px 12px; border-left: 2px solid var(--uvh-warn); color: var(--uvh-ink); background: var(--uvh-warn-soft); font-size: 13px; line-height: 1.6; }
+.privacy-admin-notice.overdue { border-color: var(--uvh-danger); background: var(--uvh-danger-soft); }
+
+.privacy-thread:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 2px; }
