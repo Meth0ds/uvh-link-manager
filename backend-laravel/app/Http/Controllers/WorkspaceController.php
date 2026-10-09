@@ -8,6 +8,7 @@ use App\Models\Membership;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Audit;
+use App\Support\BoundedPositiveInteger;
 use App\Support\FrontendUrl;
 use App\Support\Ids;
 use App\Support\InvitationBudgetExceeded;
@@ -1094,19 +1095,10 @@ class WorkspaceController
     /** @return array{0: int, 1: int} */
     private function pagination(Request $request, string $pageKey, string $perPageKey): array
     {
-        $page = $this->positiveInteger($request->query($pageKey), 1, 10_000);
-        $perPage = $this->positiveInteger($request->query($perPageKey), 25, 100);
+        $page = BoundedPositiveInteger::parse($request->query($pageKey), 1, 10_000);
+        $perPage = BoundedPositiveInteger::parse($request->query($perPageKey), 25, 100);
 
         return [$page, $perPage];
-    }
-
-    private function positiveInteger(mixed $value, int $default, int $max): int
-    {
-        if (is_string($value) && preg_match('/^[0-9]+$/D', $value)) {
-            $value = (int) $value;
-        }
-
-        return is_int($value) && $value >= 1 ? min($value, $max) : $default;
     }
 
     private function appUrl(): string

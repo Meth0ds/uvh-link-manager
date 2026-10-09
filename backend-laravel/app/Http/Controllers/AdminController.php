@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\AccountRecoveryLifecycle;
 use App\Support\AdminText;
 use App\Support\Audit;
+use App\Support\BoundedPositiveInteger;
 use App\Support\DestinationDenylist;
 use App\Support\DestinationReputationService;
 use App\Support\DomainStatus;
@@ -1302,8 +1303,8 @@ class AdminController
         // Admin endpoints join several operational tables. Bounding OFFSET
         // prevents a privileged-but-stale client from forcing pathological
         // scans while preserving ample room for the current UI pagination.
-        $page = $this->positiveInteger($request->query('page'), 1, 10_000);
-        $perPage = $this->positiveInteger($request->query('perPage'), $defaultPerPage, 100);
+        $page = BoundedPositiveInteger::parse($request->query('page'), 1, 10_000);
+        $perPage = BoundedPositiveInteger::parse($request->query('perPage'), $defaultPerPage, 100);
 
         return [$page, $perPage];
     }
@@ -1334,18 +1335,6 @@ class AdminController
         // definition of its clamp is how two surfaces drift apart the day it
         // changes.
         return MfaFreshness::isFresh(Carbon::parse($session->mfa_verified_at));
-    }
-
-    private function positiveInteger(mixed $value, int $default, int $max): int
-    {
-        if (is_string($value) && preg_match('/^[0-9]+$/D', $value) === 1) {
-            $value = (int) $value;
-        }
-        if (! is_int($value) || $value < 1) {
-            return $default;
-        }
-
-        return min($value, $max);
     }
 
     /**
