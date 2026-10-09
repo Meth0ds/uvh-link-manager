@@ -24,26 +24,26 @@ export class HelpComponent {
   @ViewChild("guideSearch") private guideSearch?: ElementRef<HTMLInputElement>;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly corpus = signal<Record<string, string>>(Object.create(null) as Record<string, string>);
-  readonly guideVersion = "2026-09-08";
+  readonly guideVersion = "2026-10-08";
   readonly query = signal("");
   readonly hasQuery = computed(() => this.query().trim().length > 0);
   readonly copyMessage = signal("");
   private copyTimer?: ReturnType<typeof setTimeout>;
   readonly fragmentMatch = { paths: "exact", fragment: "exact", queryParams: "ignored", matrixParams: "ignored" } as const;
   readonly chapters = [
-    { id: "links", title: "Publicar y mantener un enlace", summary: "Del alias al destino: reglas, campañas, pausas y comprobaciones antes de compartir.", tags: "crear editar cambiar destino reglas UTM pausa papelera QR campaña" },
-    { id: "domains", title: "Conectar tu dominio", summary: "Qué configurar en tu proveedor DNS y qué revisar antes de publicar por HTTPS.", tags: "DNS TLS certificado verificación proveedor" },
-    { id: "team", title: "Trabajar en equipo", summary: "Elige el workspace correcto y entiende qué permite cada rol.", tags: "workspace propietario owner admin editor viewer permisos invitación" },
-    { id: "analytics", title: "Leer la analítica con criterio", summary: "Entiende las diferencias entre clics, personas y conversiones en tu sitio.", tags: "clics visitas robots métricas UTM estadísticas" },
-    { id: "api", title: "Conectar con la API", summary: "Una primera petición de lectura, ámbitos del token y respuestas de error.", tags: "token bearer integración scopes programación permisos 401 403 422 429" },
-    { id: "webhooks", title: "Recibir webhooks", summary: "Comprueba firmas, guarda los eventos y evita efectos duplicados.", tags: "eventos firma HMAC reintentos entrega duplicados timestamp" },
-    { id: "troubleshooting", title: "Resolver los problemas habituales", summary: "Acceso, protección antiabuso, enlaces que no abren y recursos que no aparecen.", tags: "error login registro captcha acceso protección antiabuso ayuda entrar iniciar sesión acceder no puedo" },
+    { id: "links", title: "Crear y editar enlaces", summary: "Destino, alias, reglas y comprobaciones antes de compartir.", tags: "crear editar cambiar destino reglas UTM pausa papelera QR campaña" },
+    { id: "domains", title: "Configurar un dominio", summary: "Qué configurar en tu proveedor DNS y qué revisar antes de publicar por HTTPS.", tags: "DNS TLS certificado verificación proveedor" },
+    { id: "team", title: "Permisos del equipo", summary: "Elige el workspace correcto y entiende qué permite cada rol.", tags: "workspace propietario owner admin editor viewer permisos invitación" },
+    { id: "analytics", title: "Consultar los clics", summary: "Entiende las diferencias entre clics, personas y conversiones en tu sitio.", tags: "analítica clics visitas robots métricas UTM estadísticas" },
+    { id: "api", title: "Usar la API", summary: "Una primera petición de lectura, ámbitos del token y respuestas de error.", tags: "token bearer integración scopes programación permisos 401 403 422 429" },
+    { id: "webhooks", title: "Verificar webhooks", summary: "Comprueba firmas, guarda los eventos y evita efectos duplicados.", tags: "eventos firma HMAC reintentos entrega duplicados timestamp" },
+    { id: "troubleshooting", title: "Resolver problemas", summary: "Acceso, protección antiabuso, enlaces que no abren y recursos que no aparecen.", tags: "error login registro captcha acceso protección antiabuso ayuda entrar iniciar sesión acceder no puedo" },
   ];
   readonly starts = [
-    { id: "links", icon: "link", label: "Quiero compartir un enlace", detail: "Crear, revisar y cambiar el destino." },
-    { id: "domains", icon: "language", label: "Quiero usar mi dominio", detail: "DNS, verificación y conexión HTTPS." },
-    { id: "troubleshooting", icon: "key", label: "No puedo entrar o editar", detail: "Acceso, hCaptcha y permisos." },
-    { id: "api", icon: "terminal", label: "Estoy conectando una herramienta", detail: "Tokens de API y eventos de webhook." },
+    { id: "links", icon: "link", label: "Crear un enlace", detail: "Crear, revisar y cambiar el destino." },
+    { id: "domains", icon: "language", label: "Configurar un dominio", detail: "DNS, verificación y conexión HTTPS." },
+    { id: "troubleshooting", icon: "key", label: "Resolver un problema de acceso", detail: "Acceso, hCaptcha y permisos." },
+    { id: "api", icon: "terminal", label: "Conectar una integración", detail: "Tokens de API y eventos de webhook." },
   ];
   readonly problems = [
     { title: "La protección antiabuso no se completa", steps: ["Deja cargar el formulario. Si el reto ha caducado, complétalo de nuevo.", "Comprueba si una extensión o el navegador está bloqueando el proveedor del reto.", "Si aparece un aviso de indisponibilidad, reintenta la carga. No hay un acceso alternativo sin protección."], next: "Si persiste, anota la hora y el mensaje exacto, sin incluir contraseñas ni códigos.", id: "troubleshooting" },

@@ -131,6 +131,23 @@ describe("ReportComponent", () => {
     expect(component.captchaToken()).toBe("");
   });
 
+  for (const response of [{ ok: false }, {}, null, "received", { ok: "true" }, { ok: 1 }]) {
+    it(`does not confirm or discard a report after an invalid acknowledgement ${JSON.stringify(response)}`, async () => {
+      api.post.and.resolveTo(response);
+      component.form.setValue({ link: "incident-42", reason: "Otro", details: "Contexto que hay que conservar", email: "" });
+      component.onCaptchaToken("single-use-token");
+      await component.submit();
+      fixture.detectChanges();
+      expect(component.done()).toBeFalse();
+      expect(component.form.controls.link.value).toBe("incident-42");
+      expect(component.form.controls.details.value).toBe("Contexto que hay que conservar");
+      expect(component.error()).not.toBeNull();
+      expect(fixture.nativeElement.querySelector(".report-receipt")).toBeNull();
+      expect(component.captchaToken()).toBe("");
+      expect(component.busy()).toBeFalse();
+    });
+  }
+
   it("does not submit until hCaptcha has produced a token", async () => {
     component.form.setValue({
       link: "incident-42",
@@ -143,6 +160,18 @@ describe("ReportComponent", () => {
 
     expect(api.post).not.toHaveBeenCalled();
     expect(component.error()).toContain("comprobación antiabuso");
+  });
+
+  it("snapshots the admitted reference as plain text and clears it for the next report", async () => {
+    component.form.setValue({ link: "uvh.es/incident-42", reason: "Otro", details: "", email: "" });
+    component.onCaptchaToken("captcha-token");
+    await component.submit(); fixture.detectChanges();
+    expect(component.receivedReference()).toBe("https://uvh.es/incident-42");
+    expect(fixture.nativeElement.querySelector(".receipt-reference").textContent).toContain("https://uvh.es/incident-42");
+    expect(fixture.nativeElement.querySelector(".receipt-reference a")).toBeNull();
+    component.startAnotherReport(); fixture.detectChanges();
+    expect(component.receivedReference()).toBeNull();
+    expect(component.form.controls.link.value).toBe("");
   });
 
   it("focuses the missing link without sending an incomplete report", async () => {
@@ -190,7 +219,7 @@ describe("ReportComponent", () => {
 
     const submission = component.submit();
     fixture.destroy();
-    response.resolve({});
+    response.resolve({ ok: true });
     await submission;
 
     expect(component.done()).toBeFalse();

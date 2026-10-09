@@ -1,4 +1,5 @@
-import { Component, DestroyRef, ElementRef, inject, signal, ChangeDetectionStrategy, ViewChild } from "@angular/core";
+import { DOCUMENT } from "@angular/common";
+import { Component, DestroyRef, ElementRef, Injector, afterNextRender, inject, signal, ChangeDetectionStrategy, ViewChild } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from "@angular/forms";
@@ -13,6 +14,7 @@ import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { HCaptchaWidgetComponent } from "../auth/hcaptcha-widget.component";
 import { LatestRequest } from "../core/services/latest-request";
 import { decodePublicConfig } from "../core/services/public-response-decoders";
+import { decodePublicActionAcknowledgement } from "../core/services/public-action-response-decoders";
 
 interface PublicConfigResponse {
   hcaptcha?: {
@@ -80,6 +82,9 @@ export class ReportComponent {
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly configRequests = new LatestRequest(inject(DestroyRef));
   private readonly submitRequests = new LatestRequest(inject(DestroyRef));
 
@@ -104,6 +109,7 @@ export class ReportComponent {
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   readonly done = signal(false);
+  readonly receivedReference = signal<string | null>(null);
   readonly captchaConfigBusy = signal(true);
   readonly captchaConfigError = signal<string | null>(null);
   readonly hcaptchaSiteKey = signal("");
@@ -154,6 +160,24 @@ export class ReportComponent {
     }
   }
 
+  startAnotherReport(): void {
+    if (this.busy() || !this.done()) return;
+    this.done.set(false);
+    this.receivedReference.set(null);
+    this.error.set(null);
+    this.focusAfterRender('[formControlName="link"]');
+  }
+
+  private focusAfterRender(selector: string): void {
+    afterNextRender(() => {
+      if (this.destroyRef.destroyed) return;
+      const active = this.document.activeElement;
+      // Do not steal focus from navigation chosen while the response arrived.
+      if (active !== this.document.body && active && !this.host.nativeElement.querySelector(".report-card")?.contains(active)) return;
+      this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus();
+    }, { injector: this.injector });
+  }
+
   async submit(): Promise<void> {
     if (this.busy()) return;
     if (this.form.invalid) {
@@ -172,10 +196,11 @@ export class ReportComponent {
     this.done.set(false);
 
     const v = this.form.getRawValue();
+    this.form.disable({ emitEvent: false });
     const context = normalizeReportReference(v.link);
     const request = this.submitRequests.begin(context);
     try {
-      await this.api.post("/api/v1/report", {
+      const response = await this.api.post<unknown>("/api/v1/report", {
         reportedUrl: context,
         reason: v.reason,
         details: v.details?.trim() || undefined,
@@ -183,8 +208,15 @@ export class ReportComponent {
         captchaToken: this.captchaToken(),
       });
       if (!this.submitRequests.isCurrent(request, context)) return;
+      try {
+        decodePublicActionAcknowledgement(response);
+      } catch {
+        throw new ApiRequestError("No se ha podido confirmar el registro de la denuncia. Los datos se han conservado para que puedas revisarlos.", 502);
+      }
+      this.receivedReference.set(context);
       this.done.set(true);
       this.form.reset();
+      this.focusAfterRender(".report-receipt");
     } catch (err) {
       if (this.submitRequests.isCurrent(request, context)) {
         this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo enviar la denuncia");
@@ -193,6 +225,7 @@ export class ReportComponent {
       // hCaptcha tokens are single-use even when the API rejects another
       // field, so never retain a token after an attempted submission.
       if (this.submitRequests.isCurrent(request, context)) {
+        this.form.enable({ emitEvent: false });
         this.captchaToken.set("");
         this.captchaWidget?.reset();
         this.busy.set(false);

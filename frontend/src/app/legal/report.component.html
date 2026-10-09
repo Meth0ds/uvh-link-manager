@@ -1,31 +1,26 @@
 <app-legal-shell>
-  <section class="report-hero" aria-labelledby="report-title">
-    <div class="report-hero-copy">
-      <span class="report-eyebrow">Un canal para actuar</span>
-      <h1 id="report-title">¿Algo no está bien?<br /><em>Denuncia el enlace.</em></h1>
-      <p>Pega la dirección, elige un motivo y envíala. No necesitas una cuenta ni abrir la web de destino.</p>
-      <div class="report-promises"><span><mat-icon aria-hidden="true">person_off</mat-icon>Sin iniciar sesión</span><span><mat-icon aria-hidden="true">alternate_email</mat-icon>Email opcional</span><span><mat-icon aria-hidden="true">open_in_new_off</mat-icon>No abrimos el destino</span></div>
-      <a class="report-jump" [routerLink]="[]" fragment="report-form-title">Ir al formulario <span aria-hidden="true">↓</span></a>
-    </div>
-    <aside class="urgent-card"><span><mat-icon aria-hidden="true">emergency</mat-icon>Si hay peligro inmediato</span><h2>Primero, tu seguridad.</h2><p>Contacta con los servicios de emergencia o las autoridades de tu país. Este formulario no es un canal de atención urgente.</p></aside>
-  </section>
+  <header class="report-hero" aria-labelledby="report-title">
+    <h1 id="report-title">Denunciar un enlace</h1>
+    <p>Comunica un posible abuso en un enlace de UVH o de un dominio personalizado. Indica la dirección y el motivo para que podamos revisarlo.</p>
+    <div class="report-promises"><span><mat-icon aria-hidden="true">person_off</mat-icon>No necesitas una cuenta</span><span><mat-icon aria-hidden="true">alternate_email</mat-icon>Email opcional</span><span><mat-icon aria-hidden="true">open_in_new_off</mat-icon>No necesitas abrir el destino</span></div>
+  </header>
 
   <section class="report-workspace" aria-labelledby="report-form-title">
-    <aside class="report-process">
-      <span class="process-kicker">Después de enviar</span><h2>Una señal.<br /><em>Una revisión.</em></h2>
-      <p class="process-lead">No bloqueamos un enlace solo porque alguien lo denuncie. Revisamos el contexto disponible antes de decidir.</p>
-      <ol><li><span>01</span><div><b>Identificamos el enlace</b><p>Localizamos la referencia dentro de UVH o de sus dominios personalizados.</p></div></li><li><span>02</span><div><b>Revisamos lo que nos cuentas</b><p>El motivo y el contexto nos ayudan a valorar el riesgo.</p></div></li><li><span>03</span><div><b>Decidimos qué procede</b><p>Podemos aplicar medidas sobre el enlace o descartar la denuncia. El envío no garantiza su retirada.</p></div></li></ol>
-      <div class="safety-tip"><mat-icon aria-hidden="true">gpp_good</mat-icon><div><b>No te expongas para conseguir pruebas.</b><p>Copia la dirección desde el mensaje donde la encontraste. No introduzcas contraseñas ni descargues archivos.</p></div></div>
-      <a class="process-help" routerLink="/help" fragment="troubleshooting">¿El problema es con tu cuenta? <span aria-hidden="true">↗</span></a>
-    </aside>
 
-    <form class="report-card" [formGroup]="form" (ngSubmit)="submit()" aria-labelledby="report-form-title" novalidate>
+    <form class="report-card" [formGroup]="form" (ngSubmit)="submit()" aria-labelledby="report-form-title" [attr.aria-busy]="busy()" novalidate>
       @if (busy()) { <mat-progress-bar mode="indeterminate" class="report-progress" aria-label="Enviando denuncia" /> }
-      <header class="form-header"><div><span>Formulario de denuncia</span><h2 id="report-form-title">Cuéntanos qué has encontrado.</h2><p>Solo el enlace, el motivo y la comprobación antiabuso son obligatorios.</p></div></header>
+      <header class="form-header"><h2 id="report-form-title">Datos de la denuncia</h2><p>El enlace, el motivo y la comprobación antiabuso son obligatorios.</p></header>
 
-      @if (done()) { <div class="report-alert ok" role="status"><mat-icon aria-hidden="true">task_alt</mat-icon><div><b>Denuncia registrada. Gracias por avisarnos.</b><span>La revisaremos junto con la información disponible. No siempre podremos responder individualmente. No necesitas repetir el envío.</span></div></div> }
+      @if (done()) {
+        <section class="report-receipt" tabindex="-1" aria-labelledby="receipt-title" role="status" animate.enter="report-enter">
+          <svg class="receipt-check" viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="21" /><path d="m14 24 7 7 13-14" /></svg><h2 id="receipt-title">Denuncia recibida</h2><p>Revisaremos el enlace junto con la información disponible. El envío no garantiza su retirada y no siempre podremos responder individualmente.</p>
+          @if (receivedReference(); as reference) { <div class="receipt-reference"><span>Enlace comunicado</span><b>{{ reference }}</b></div> }
+          <p>No necesitas repetir esta denuncia.</p>
+          <div class="receipt-actions"><button class="report-another" mat-flat-button type="button" (click)="startAnotherReport()">Enviar otra denuncia</button><a routerLink="/">Volver al inicio<mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+        </section>
+      } @else {
 
-      <div class="form-part"><span>01</span><div><h3>Lo imprescindible</h3><p>¿Qué enlace es y qué problema has detectado?</p></div></div>
+      <div class="form-part"><span>01</span><div><h3>Enlace y motivo</h3><p>¿Qué enlace es y qué problema has detectado?</p></div></div>
       <div class="field-block">
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
           <mat-label>Enlace corto o alias</mat-label>
@@ -49,12 +44,13 @@
         <p class="reason-guidance" id="reason-guidance" role="status">{{ selectedReasonHint }}</p>
       </div>
 
-      <div class="form-part optional-part"><span>02</span><div><h3>Si quieres añadir contexto</h3><p>Estos dos campos son opcionales. Puedes dejarlos vacíos.</p></div></div>
+      <div class="form-part optional-part"><span>02</span><div><h3>Información adicional</h3><p>Estos dos campos son opcionales. Puedes dejarlos vacíos.</p></div></div>
       <div class="field-block">
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
           <mat-label>Qué has observado (opcional)</mat-label>
           <textarea matInput formControlName="details" rows="4" maxlength="2000" placeholder="Por ejemplo: dónde recibiste el enlace y qué solicitaba el mensaje." aria-label="Detalles de la denuncia"></textarea>
-          <mat-hint>No incluyas contraseñas, documentos de identidad ni otros datos innecesarios.</mat-hint><mat-hint align="end">{{ form.controls.details.value.length }} / 2.000</mat-hint>
+          <mat-hint>No incluyas contraseñas, documentos de identidad ni otros datos innecesarios.</mat-hint><mat-hint align="end" class="details-count">{{ form.controls.details.value.length }} / 2.000</mat-hint>
+          @if (form.controls.details.hasError('maxlength')) { <mat-error>El contexto no puede superar 2.000 caracteres.</mat-error> }
         </mat-form-field>
       </div>
       <div class="field-block">
@@ -68,8 +64,8 @@
         </mat-form-field>
       </div>
 
-      <div class="form-part"><span>03</span><div><h3>Última comprobación</h3><p>Protege este canal frente a envíos automatizados.</p></div></div>
-      <div class="field-block captcha-block">
+      <div class="form-part"><span>03</span><div><h3>Comprobación antiabuso</h3><p>Protege este canal frente a envíos automatizados.</p></div></div>
+      <div class="field-block captcha-block" [attr.inert]="busy() ? '' : null">
         <div class="captcha-stage">
           @if (captchaConfigBusy()) {
             <div class="captcha-loading" role="status"><span>Cargando comprobación…</span><mat-progress-bar mode="indeterminate" /></div>
@@ -81,14 +77,24 @@
           }
         </div>
       </div>
-      @if (error()) { <div class="report-alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><div><b>No pudimos registrar la denuncia</b><span>{{ error() }}</span></div></div> }
+      @if (error()) { <div class="report-alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><div><b>No pudimos confirmar el envío</b><span>{{ error() }}</span></div></div> }
       <div class="form-submit"><p>Cómo tratamos la información que nos envías: <a routerLink="/legal/privacidad">Política de privacidad</a>.</p><button mat-flat-button color="primary" type="submit" [disabled]="busy() || captchaConfigBusy() || !captchaToken()"><span>{{ busy() ? 'Enviando…' : 'Enviar denuncia' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon></button></div>
+      }
     </form>
+    <aside class="report-process">
+      <h2>Cómo revisamos una denuncia</h2>
+      <p class="process-lead">No bloqueamos un enlace solo porque alguien lo denuncie. Revisamos el contexto disponible antes de decidir.</p>
+      <ol><li><span>01</span><div><b>Identificamos el enlace</b><p>Localizamos la referencia dentro de UVH o de sus dominios personalizados.</p></div></li><li><span>02</span><div><b>Revisamos lo que nos cuentas</b><p>El motivo y el contexto nos ayudan a valorar el riesgo.</p></div></li><li><span>03</span><div><b>Decidimos qué procede</b><p>Podemos aplicar medidas sobre el enlace o descartar la denuncia. El envío no garantiza su retirada.</p></div></li></ol>
+      <div class="safety-tip"><mat-icon aria-hidden="true">gpp_good</mat-icon><div><b>No te expongas para conseguir pruebas.</b><p>Copia la dirección desde el mensaje donde la encontraste. No introduzcas contraseñas ni descargues archivos.</p></div></div>
+      <div class="urgent-card"><mat-icon aria-hidden="true">emergency</mat-icon><div><h3>No es un canal de atención urgente</h3><p>Ante peligro inmediato, contacta con los servicios de emergencia o las autoridades de tu país.</p></div></div>
+      <a class="process-help" routerLink="/help" fragment="troubleshooting">¿El problema es con tu cuenta? <span aria-hidden="true">↗</span></a>
+    </aside>
+
   </section>
 
   <section class="report-types" aria-labelledby="report-types-title">
-    <div class="section-intro"><span>Para qué sirve este canal</span><h2 id="report-types-title">Qué puedes comunicar.</h2></div>
+    <div class="section-intro"><h2 id="report-types-title">Motivos de denuncia</h2></div>
     <div class="report-type-grid">@for (type of reportTypes; track type.title) { <article><span><mat-icon aria-hidden="true">{{ type.icon }}</mat-icon></span><h3>{{ type.title }}</h3><p>{{ type.text }}</p></article> }</div>
   </section>
-  <footer class="report-contact"><span>¿Buscabas otra cosa?</span><div><article><mat-icon aria-hidden="true">manage_accounts</mat-icon><div><b>Problemas con tu cuenta</b><a routerLink="/help" fragment="troubleshooting">Consultar la ayuda</a></div></article><article><mat-icon aria-hidden="true">policy</mat-icon><div><b>Privacidad y derechos</b><a href="mailto:privacidad@uvh.es">privacidad&#64;uvh.es</a></div></article><article><mat-icon aria-hidden="true">gavel</mat-icon><div><b>Requerimientos formales</b><a href="mailto:legal@uvh.es">legal&#64;uvh.es</a></div></article></div></footer>
+  <section class="report-contact" aria-labelledby="report-contact-title"><h2 id="report-contact-title">Otros canales de contacto</h2><div><article><mat-icon aria-hidden="true">manage_accounts</mat-icon><div><b>Problemas con tu cuenta</b><a routerLink="/help" fragment="troubleshooting">Consultar la ayuda</a></div></article><article><mat-icon aria-hidden="true">policy</mat-icon><div><b>Privacidad y derechos</b><a href="mailto:privacidad@uvh.es">privacidad&#64;uvh.es</a></div></article><article><mat-icon aria-hidden="true">gavel</mat-icon><div><b>Notificaciones formales</b><a href="mailto:abuse@uvh.es">abuse&#64;uvh.es</a><p>Consulta los datos y la declaración necesarios en los <a routerLink="/legal/terminos" fragment="notificaciones-formales">Términos del servicio</a>.</p></div></article></div></section>
 </app-legal-shell>
