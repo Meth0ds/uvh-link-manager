@@ -22,7 +22,7 @@
     </nav>
   </div>
   <main [attr.inert]="mobileOpen() ? '' : null">
-    <section class="hero wrap" id="crear-enlace" aria-labelledby="hero-title">
+    <section class="hero wrap" id="crear-enlace" tabindex="-1" aria-labelledby="hero-title">
       <div class="hero-layout">
         <div class="hero-copy">
           <span class="product-category"><mat-icon aria-hidden="true">link</mat-icon> Acortador y gestor de enlaces</span>
@@ -56,7 +56,7 @@
       </div>
     </section>
     <div class="benefit-strip"><div class="wrap"><div><mat-icon aria-hidden="true">edit_square</mat-icon><span>Actualiza el destino cuando lo necesites</span></div><div><mat-icon aria-hidden="true">query_stats</mat-icon><span>Consulta los clics de tus enlaces</span></div><div><mat-icon aria-hidden="true">groups</mat-icon><span>Organiza el trabajo con tu equipo</span></div></div></div>
-    <section class="practice-section wrap section-space" id="producto" aria-labelledby="practice-title">
+    <section class="practice-section wrap section-space" id="producto" tabindex="-1" aria-labelledby="practice-title">
       <div class="section-heading"><h2 id="practice-title">Un enlace para<br />cada proyecto.</h2><p>Desde una carta impresa hasta una campaña por email. Elige un ejemplo y descubre cómo puedes usar UVH.</p></div>
       <div class="product-tabs" role="tablist" aria-label="Ejemplos de uso">
         @for (view of productViews; track view.id; let tabIndex = $index) {
@@ -70,7 +70,7 @@
         </div>
       }
     </section>
-    <section class="field-guide" id="control" aria-labelledby="guide-title">
+    <section class="field-guide" id="control" tabindex="-1" aria-labelledby="guide-title">
       <div class="wrap section-space">
         <div class="section-heading"><h2 id="guide-title">Empieza con una URL.<br />Compártela en tres pasos.</h2><p>Prepara el destino aquí y termina de configurar tu enlace desde tu cuenta.</p></div>
         <ol class="start-steps">
@@ -81,12 +81,12 @@
         <div class="guide-tip"><mat-icon aria-hidden="true">tips_and_updates</mat-icon><p><strong>Antes de compartirlo, pruébalo.</strong> Si añades reglas, revisa su orden y comprueba también el destino principal. Se aplica la primera regla que coincide.</p><a class="text-link" routerLink="/help">Guía de uso <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
       </div>
     </section>
-    <section class="team-section wrap section-space" id="operacion" aria-labelledby="team-title">
+    <section class="team-section wrap section-space" id="operacion" tabindex="-1" aria-labelledby="team-title">
       <div class="team-intro"><h2 id="team-title">Gestiona los enlaces<br />con tu equipo.</h2><p>Reúne los enlaces en un espacio de trabajo, invita a tu equipo y asigna permisos. Las etiquetas, las notas y la actividad ayudan a mantener todo organizado.</p><a class="text-link" routerLink="/help">Conoce los permisos <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
       <div class="workspace-sheet"><div class="workspace-heading"><span><mat-icon aria-hidden="true">folder_open</mat-icon> Equipo de comunicación</span><span>Ejemplo de permisos</span></div><div class="role-row"><span>Administración</span><span>Owner / Admin</span><p>Gestionar el equipo y su trabajo.</p></div><div class="role-row"><span>Edición</span><span>Editor</span><p>Crear y actualizar enlaces.</p></div><div class="role-row"><span>Consulta</span><span>Viewer</span><p>Consultar enlaces y analítica.</p></div></div>
       <div class="operations-list">@for (operation of operations; track operation.title) { <article><mat-icon aria-hidden="true">{{ operation.icon }}</mat-icon><h3>{{ operation.title }}</h3><p>{{ operation.text }}</p><a class="text-link operation-guide" routerLink="/help" [fragment]="operation.guide" [attr.aria-label]="'Ver guía de ' + operation.title">Ver la guía <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></article> }</div>
     </section>
-    <section class="faq-section wrap section-space" id="faq" aria-labelledby="faq-title">
+    <section class="faq-section wrap section-space" id="faq" tabindex="-1" aria-labelledby="faq-title">
       <div class="faq-intro"><h2 id="faq-title">Preguntas<br />frecuentes.</h2><p>Lo que necesitas saber para preparar y gestionar tus enlaces.</p><a class="text-link" routerLink="/help">Centro de ayuda <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
       <mat-accordion class="faq-list" [multi]="true">@for (item of faqs; track item.q; let index = $index) { <mat-expansion-panel #faqPanel [expanded]="index === 0" [hideToggle]="true"><mat-expansion-panel-header><mat-panel-title>{{ item.q }}</mat-panel-title><span class="faq-plus" [class.expanded]="faqPanel.expanded" aria-hidden="true">+</span></mat-expansion-panel-header><p>{{ item.a }}</p></mat-expansion-panel> }</mat-accordion>
     </section>

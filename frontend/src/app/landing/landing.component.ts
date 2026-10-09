@@ -1,4 +1,4 @@
-import { DOCUMENT } from "@angular/common";
+import { DOCUMENT, ViewportScroller } from "@angular/common";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, ViewChild, afterNextRender, computed, inject, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import { FormsModule } from "@angular/forms";
@@ -45,6 +45,7 @@ export class LandingComponent {
   private readonly api = inject(ApiService);
   private readonly intents = inject(PendingLinkIntentService);
   private readonly document = inject(DOCUMENT);
+  private readonly scroller = inject(ViewportScroller);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private layoutFrame?: number;
@@ -160,6 +161,9 @@ export class LandingComponent {
   ];
 
   constructor() {
+    // Router anchor scrolling uses coordinates rather than CSS scroll-margin.
+    // Evaluate the responsive header at navigation time, including its border.
+    this.scroller.setOffset(() => [0, (this.host.nativeElement.querySelector(".site-header")?.getBoundingClientRect().height ?? 72) + 32]);
     this.appUrl.set(this.currentOrigin());
     this.api
       .get<{ appUrl: string }>("/api/v1/config", undefined, decodePublicConfig)
@@ -167,6 +171,7 @@ export class LandingComponent {
       .catch(() => undefined);
     afterNextRender(() => this.captureLayout());
     this.destroyRef.onDestroy(() => {
+      this.scroller.setOffset([0, 0]);
       this.document.body.classList.remove("uvh-menu-open");
       this.sizeObserver?.disconnect();
       const view = this.document.defaultView;
@@ -230,10 +235,12 @@ export class LandingComponent {
     else if (offset < 64) this.compactHeader.set(false);
     const layout = this.layout;
     if (!layout) return;
-    const line = (layout.header?.getBoundingClientRect().height ?? 72) + 32;
+    // Sample one CSS pixel inside the target: native scroll coordinates are
+    // rounded, while section bounds may retain a fractional pixel.
+    const line = (layout.header?.getBoundingClientRect().height ?? 72) + 33;
     this.activeSection.set(layout.sections.find(({ element }) => {
       const bounds = element.getBoundingClientRect();
-      return bounds.top <= line + 1 && bounds.bottom > line;
+      return bounds.top <= line && bounds.bottom > line;
     })?.id ?? null);
     const form = layout.form?.getBoundingClientRect();
     const closing = layout.closing?.getBoundingClientRect();

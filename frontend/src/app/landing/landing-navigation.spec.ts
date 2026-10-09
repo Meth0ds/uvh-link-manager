@@ -55,6 +55,10 @@ describe("Landing navigation and preparation ownership", () => {
     box("#producto", -800, 40); box("#control", 90, 700); component.onWindowScroll(); flush(); expect(current()).toBe("#control"); expect(current(".mobile-sheet")).toBe("#control");
     expect(host.querySelectorAll(".desktop-nav [aria-current]").length).toBe(1);
   });
+  it("selects the target after a native anchor rounds fractional section coordinates", () => {
+    box("#producto", -800, 116.45); box("#control", 116.45, 900); component.onWindowScroll(); flush();
+    expect(current()).toBe("#control");
+  });
   it("clears the active item outside sections", () => {
     box("#faq", 80, 500); component.onWindowScroll(); flush(); expect(current()).toBe("#faq");
     box("#faq", -800, 40); component.onWindowScroll(); flush(); expect(current()).toBeNull();

@@ -31,11 +31,11 @@ Files: modify `frontend/src/app/landing/landing.component.ts` and `.html`; creat
 
 Interfaces: `navigationItems` (IDs producto/control/operacion/faq), `activeSection`, `compactHeader`, `showMobileCreate`, `mobileCreateVisible`, private `scheduleMeasurements()`/`measureLayout()`/`captureLayout()`, `focusStart()` and owned `queueFocus()`.
 
-- [ ] Add component tests through actual DOM: section aria-current follows geometry, clears outside sections; frame coalescing/destruction; contextual action preserves focused controls; pending request freezes the input and unlocks on failure without replay.
-- [ ] Run focused tests against O74 and preserve failing output; keep all126 existing specs intact.
-- [ ] Cache owned elements after render. Schedule at most one frame, guard destroyed ref, calculate covered section using header bottom+32px. Clamp progress to[0,1]. Observe main/header sizes and disconnect on destroy.
-- [ ] Add active state/aria-current to native desktop/mobile links. Add mobile contextual button without overlaying content, preserve focus through visibility changes. Queue and cancel focus work for input/start/menu/tabs.
-- [ ] Run directed tests including existing landing contract tests.
+- [x] Add component tests through actual DOM: section aria-current follows geometry, clears outside sections; frame coalescing/destruction; contextual action preserves focused controls; pending request freezes the input and unlocks on failure without replay.
+- [x] Run focused tests against O74 and preserve failing output; keep all126 existing specs intact.
+- [x] Cache owned elements after render. Schedule at most one frame, guard destroyed ref, calculate covered section using header bottom+32px. Clamp progress to[0,1]. Observe main/header sizes and disconnect on destroy.
+- [x] Add active state/aria-current to native desktop/mobile links. Add mobile contextual button without overlaying content, preserve focus through visibility changes. Queue and cancel focus work for input/start/menu/tabs.
+- [x] Run directed tests including existing landing contract tests.
 
 Core measurement rules:
 ```ts
@@ -51,17 +51,17 @@ const selected = sections.find(({ element }) => {
 
 Files: modify `.html` and `.scss`.
 
-- [ ] Footer has brand/access, Product (four native section links), Help (help/status), Legal (privacy/terms/report), copyright and `focusStart()` button, followed by giant UVH.
-- [ ] Use3 link columns on desktop and2 on mobile. All links/buttons keep minimum44px and visible focus; heading receives programmatic focus for return-to-start.
-- [ ] Compact header, active underline and demo enter motion answer state changes. Existing reduced-motion override disables them. No repeated scroll reveals.
+- [x] Footer has brand/access, Product (four native section links), Help (help/status), Legal (privacy/terms/report), copyright and `focusStart()` button, followed by giant UVH.
+- [x] Use3 link columns on desktop and2 on mobile. All links/buttons keep minimum44px and visible focus; heading receives programmatic focus for return-to-start.
+- [x] Compact header, active underline and demo enter motion answer state changes. Existing reduced-motion override disables them. No repeated scroll reveals.
 
 ## Task3 — URL feedback and preparation
 
 Files: modify `.ts` and `.html`/`.scss`; tests in new spec and isolated browser fixture.
 
-- [ ] Replace unused host/alias preview derivation with a boolean format check preserving http(s), no credentials and2048-character limit.
-- [ ] Show truthful format feedback; link input/help/error/status IDs correctly. During preparation use native readonly and aria-busy, preserving selected destination and allowing copy. Failure releases the field, keeps the entered URL and permits deliberate retry.
-- [ ] Preserve one request and opaque fragment handoff; no destination in auth URL. Fake browser command only; never real API/DB/accounts.
+- [x] Replace unused host/alias preview derivation with a boolean format check preserving http(s), no credentials and2048-character limit.
+- [x] Show truthful format feedback; link input/help/error/status IDs correctly. During preparation use native readonly and aria-busy, preserving selected destination and allowing copy. Failure releases the field, keeps the entered URL and permits deliberate retry.
+- [x] Preserve one request and opaque fragment handoff; no destination in auth URL. Fake browser command only; never real API/DB/accounts.
 
 ```html
 <input [readOnly]="submitting()" />
@@ -70,8 +70,25 @@ Files: modify `.ts` and `.html`/`.scss`; tests in new spec and isolated browser 
 
 ## Task4 — Verification and evidence
 
-- [ ] Directed tests, full frontend suite, build, lint and typecheck. Preserve terminal handles/results; only claim verified outcomes.
-- [ ] Owned static loopback fixture with no real proxy. Agent-browser preferred; documented O74 driver loss permits Playwright fallback. Test five widths and both themes, active anchors at every section, compact height/no jitter, footer grouping/wordmark, contextual action/focus/menu, deferred preparation/retry, tabs/FAQ/demo and reduced motion. Inspect screenshots after finite animations settle.
-- [ ] Freeze final hashes/build, regenerate source function inventory using read-only script, verify unchanged126 specs and backend241/E2E. Record requirement evidence and limits in selected planning files.
+- [x] Directed tests, full frontend suite, build, lint and typecheck. Preserve terminal handles/results; only claim verified outcomes.
+- [x] Owned static loopback fixture with no real proxy. Agent-browser preferred; documented O74 driver loss permits Playwright fallback. Test five widths and both themes, active anchors at every section, compact height/no jitter, footer grouping/wordmark, contextual action/focus/menu, deferred preparation/retry, tabs/FAQ/demo and reduced motion. Inspect screenshots after finite animations settle.
+- [x] Freeze final hashes/build, regenerate source function inventory using read-only script, verify unchanged126 specs and backend241/E2E. Record requirement evidence and limits in selected planning files.
 
 No shared uvh-control scripts or independent panel, accounts/mail/providers/workers/migrations, real writes, agents, commit or deployment. O74 verifier is historical after any product edit. This plan proves a local landing lot, not global completion.
+
+## Additional finding during native-anchor QA
+
+The router's coordinate scrolling ignores CSS scroll-margin. The landing previously had no ViewportScroller offset, so actual menu/footer clicks positioned section headings underneath the sticky header. Reuse the legal-shell pattern: a landing-owned callback measures the current header plus32px, reset on destroy. Focusable anchor sections allow Angular to transfer keyboard focus after mobile-menu navigation. Diagnostic JSON shows all four targets at approximately0px before correction despite104px computed margin. New test is red (one failure/15 successes) before the fix; verify real clicks after it.
+
+
+## O75 — Menú, footer e interacciones del landing (08/10/2026)
+
+Menú con sección visible/aria-current, cabecera compacta con histéresis160/64, footer agrupado Producto/Ayuda/Legal y acceso/retorno al inicio, acción contextual móvil que conserva foco, feedback de formato y URL readonly durante la preparación, transición local del destino/reduced-motion. Un RAF de medidas y otro de foco se cancelan al salir; ResizeObserver propio se desconecta. Se eliminan cálculos de preview sin uso. Navegación real reveló dos fallos corregidos: ViewportScroller ignoraba scroll-margin y tapaba destinos; coordenadas fraccionarias podían dejar marcada la sección anterior. Offset vivo de cabecera+32px, secciones enfocables, muestreo un píxel dentro del destino y restauración de offset al salir.
+
+23 pruebas dirigidas finales, compilación29,770s/lint del landing/tipos exit0,87 estados de navegador en cinco anchos/ambos temas y dos POST ficticios (intento inicial y reintento explícito), sin overflow/pageerrors. Todos los procesos propios terminales; fixture81051 detenida130, QA33481 exit0,23dirigidas50122 ybuild/lint/tipos5108 exit0. Verificador29986 exit0. Tres fuentes de producto propias y un spec nuevo; hashes propios/build congelados. Capturas inspeccionadas: menú, anclas desktop/móvil, héroe y footer/wordmark en ambos temas.
+
+Límite global: durante las comprobaciones llegaron cambios concurrentes en registro/admin/backend, conservados sin editarlos. Full inicial1752 pasó antes de corregir anclas; full posterior69177 exit1:1756 correctas/1 fallo en pausa de registros del admin. Lint global82815 exit1 por dos directivas de depuración no usadas; no se declara verde el workspace. Índice503/2448named/1333anonymous/3signatures se actualiza, pero no acredita revisión ni invariancia del backend concurrente. Evidencia ` .uvh-runtime/o75-landing-navigation/verify.py` y plan `docs/superpowers/plans/2026-10-08-landing-navigation-polish.md`. No API real/DB/cuentas/mail/control/panel ajeno/agentes/commit/deploy. O74 congelado.
+
+Nuevo objetivo del usuario sustituye el anterior: terminar este lote y rehacer Ayuda/Denunciar enlace, extender lenguaje directo, diseño serio y profesional, transiciones y mejoras visuales a las demás páginas. Se empieza por shell público, Ayuda y Denuncia; después documentos/estado y restantes superficies, respetando cambios concurrentes.
+
+La comprobación global se ejecutó y su fallo concurrente se registra: no queda certificada en verde. La invariancia de126 specs/backend241 del plan inicial no puede afirmarse tras los cambios concurrentes; se sustituye esa acreditación por hashes de los cuatro archivos propios.

@@ -436,11 +436,28 @@ html .mat-typography .mat-body-small {
   font-weight: 800;
 }
 
-.main button.mat-mdc-button-base:not(:disabled) {
+.main button.mat-mdc-button-base:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
   transition: transform 180ms cubic-bezier(.22, 1, .36, 1), box-shadow 180ms ease, background-color 160ms ease, color 160ms ease;
 
-  &:hover { transform: translateY(-1px); }
   &:active { transform: translateY(0) scale(.985); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .main button.mat-mdc-button-base:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]):hover { transform: translateY(-1px); }
+}
+
+.main .copy-action { inline-size: 160px; flex-shrink: 0; }
+.main button.mat-mdc-button-base app-copy-feedback-icon { margin-right: 8px; }
+.main button.mat-mdc-icon-button app-copy-feedback-icon { margin-right: 0; }
+
+// Material retains keyboard navigation and its own ripple. The icon response
+// follows focus or a fine pointer; destructive/disabled actions stay still.
+.mat-mdc-menu-item:not(.danger):not([disabled]):not([aria-disabled="true"]) > .mat-icon {
+  transition: transform 180ms cubic-bezier(.22, 1, .36, 1), color 180ms ease;
+}
+.mat-mdc-menu-item:not(.danger):not([disabled]):not([aria-disabled="true"]):focus-visible > .mat-icon { transform: translateX(2px); }
+@media (hover: hover) and (pointer: fine) {
+  .mat-mdc-menu-item:not(.danger):not([disabled]):not([aria-disabled="true"]):hover > .mat-icon { transform: translateX(2px); }
 }
 
 .main .mat-mdc-form-field {

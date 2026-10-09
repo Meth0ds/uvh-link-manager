@@ -358,3 +358,17 @@ section[id] { scroll-margin-top: 104px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+// Answer pointer and keyboard actions without moving the layout.
+.desktop-nav a:focus-visible::after { transform: scaleX(1); }
+.button mat-icon, .poster-action mat-icon, .mobile-sheet > a mat-icon { transition: transform 180ms ease; }
+.button:active:not(:disabled), .poster-action:active { filter: brightness(.88); }
+@media (hover: hover) and (pointer: fine) {
+  .desktop-nav a:hover::after { transform: scaleX(1); }
+  .header-create:hover mat-icon, .hero-submit:hover:not(:disabled) .submit-arrow, .closing-button:hover mat-icon, .mobile-sheet > button:hover mat-icon { transform: translateX(3px); }
+  .mobile-sheet > a:hover mat-icon { transform: translateX(3px); }
+  .mobile-sheet > a:hover, .menu-trigger:hover { color: var(--accent); }
+  .poster-action:hover mat-icon { transform: translateX(2px); }
+  .footer-navigation a:hover, .footer-account a:hover { text-decoration: underline; text-underline-offset: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
