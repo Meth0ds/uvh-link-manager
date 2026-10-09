@@ -222,6 +222,21 @@ describe("AuthComponent registration flow", () => {
     expect(fixture.nativeElement.textContent).toContain("Registros temporalmente pausados");
   });
 
+  it("switches to the paused state when the server answers a registration with reason registration_paused", async () => {
+    await enableLocalFallback(null);
+    showRegistrationStep();
+    auth.register.and.rejectWith(new ApiRequestError("Registros temporalmente pausados. Inténtalo de nuevo más tarde.", 503, undefined, undefined, "registration_paused"));
+    component.registerForm.patchValue({ name: "Ana García", email: "ana@example.com", password: "Strong-password-123!", confirmPassword: "Strong-password-123!", acceptTerms: true, company: "" });
+    fixture.detectChanges();
+    await component.onRegister();
+    fixture.detectChanges();
+    expect(component.registrationsPaused()).toBeTrue();
+    expect(component.error()).toBeNull();
+    expect(fixture.nativeElement.querySelector(".alert.info")?.textContent).toContain("Registros temporalmente pausados");
+    const submit = fixture.nativeElement.querySelector("form.auth-step-panel button.submit") as HTMLButtonElement | null;
+    expect(submit?.disabled).toBeTrue();
+  });
+
   it("keeps correcting a pending registration while new ones are paused", async () => {
     component.tabIndex.set(1);
     setFlow({ kind: "register", stage: 2, mode: "correct-email", originalEmail: "old@example.com" });
@@ -309,8 +324,8 @@ describe("AuthComponent registration flow", () => {
         captchaToken: "fresh-passcode",
         website: "",
         acceptTerms: true,
-        termsVersion: "2026-08-30",
-        privacyVersion: "2026-08-30",
+        termsVersion: "2026-10-09",
+        privacyVersion: "2026-10-09",
       },
     );
     expect(component.step()).toBe("verify-pending");
@@ -659,7 +674,7 @@ describe("AuthComponent registration flow", () => {
     expect(component.step()).toBe("verify-pending");
     expect(component.verificationEmail()).toBe("ana@example.com");
     expect(component.verificationRecovery()).toBeTrue();
-    expect(fixture.nativeElement.textContent).toContain("Recupera tu verificación");
+    expect(fixture.nativeElement.textContent).toContain("Solicitar otro enlace de verificación");
     expect(fixture.nativeElement.textContent).not.toContain("Correo enviado a");
   });
 

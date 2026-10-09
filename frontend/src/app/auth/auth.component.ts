@@ -15,6 +15,7 @@ import { decodePublicConfig } from "../core/services/public-response-decoders";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { LatestRequest } from "../core/services/latest-request";
+import { TERMS_VERSION, PRIVACY_VERSION } from "../core/legal-documents";
 import { safeReturnTo } from "../core/guards/auth.guard";
 import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 import { intentBearer } from "./auth-bearer";
@@ -23,8 +24,7 @@ import type { AuthFlowState, RegisterStep } from "./auth-flow-state";
 
 import { assessPassword, passwordBands, passwordStrengthLabel } from "./password-policy";
 
-export const TERMS_VERSION = "2026-08-30";
-export const PRIVACY_VERSION = "2026-08-30";
+export { TERMS_VERSION, PRIVACY_VERSION } from "../core/legal-documents";
 
 interface PublicAuthConfig {
   registrationPaused?: boolean;
@@ -631,11 +631,18 @@ export class AuthComponent {
       this.registerCaptchaToken.set("");
     } catch (err) {
       if (!stillCurrent()) return;
-      this.error.set(
-        err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
-          ? err.message
-          : "No se pudo crear la cuenta",
-      );
+      if (err instanceof ApiRequestError && err.reason === "registration_paused") {
+        // La pausa se activó con la página abierta: el banner ya lo anuncia,
+        // así que no se repite como error.
+        this.registrationsPaused.set(true);
+        this.error.set(null);
+      } else {
+        this.error.set(
+          err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
+            ? err.message
+            : "No se pudo crear la cuenta",
+        );
+      }
       // hCaptcha tokens are short-lived and single-use. Never reuse one after
       // the server has attempted verification, even when credentials fail.
       this.registerCaptchaToken.set("");

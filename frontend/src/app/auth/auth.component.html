@@ -36,14 +36,14 @@
           <section id="login-panel" class="auth-step login-step" role="tabpanel" aria-labelledby="login-tab login-title">
             <div class="welcome-row">
               <div>
-                <h2 id="login-title">Vuelve a tus enlaces.</h2>
-                <p>{{ pendingLink() ? 'Accede para retomar el enlace que acabas de preparar.' : 'Destinos, campañas y trabajo compartido. Continúa donde lo dejaste.' }}</p>
+                <h2 id="login-title">Iniciar sesión en UVH</h2>
+                <p>{{ pendingLink() ? 'Accede para retomar el enlace que acabas de preparar.' : 'Accede a tu cuenta para gestionar enlaces, dominios y equipo.' }}</p>
               </div>
               <span class="step-icon blue"><mat-icon aria-hidden="true">login</mat-icon></span>
             </div>
 
             <form class="form" [formGroup]="loginForm" (ngSubmit)="onLogin()" novalidate>
-              <mat-form-field appearance="outline">
+              <mat-form-field subscriptSizing="dynamic" appearance="outline">
                 <mat-label>Email</mat-label>
                 <input #loginEmail matInput type="email" formControlName="email" autocomplete="email" />
                 <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
@@ -54,7 +54,7 @@
                   <mat-error>Introduce un email válido.</mat-error>
                 }
               </mat-form-field>
-              <mat-form-field appearance="outline">
+              <mat-form-field subscriptSizing="dynamic" appearance="outline">
                 <mat-label>Contraseña</mat-label>
                 <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="current-password" maxlength="72" />
                 <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
@@ -96,10 +96,14 @@
             <div class="register-heading">
               <div>
                 <h2 id="register-title">{{ changeEmailMode() ? 'Corrige tu email' : 'Crea tu cuenta en UVH' }}</h2>
-                <p>{{ changeEmailMode() ? 'Actualiza la dirección para continuar con tu solicitud.' : (pendingLink() ? 'Crea tu cuenta y retoma el enlace al terminar.' : 'Una cuenta para los enlaces que compartes hoy y los cambios que vendrán después.') }}</p>
+                <p>{{ changeEmailMode() ? 'Actualiza la dirección para continuar con tu solicitud.' : (pendingLink() ? 'Crea tu cuenta y retoma el enlace al terminar.' : 'Crea enlaces cortos y gestiona sus destinos desde tu panel.') }}</p>
               </div>
               <span class="step-icon teal"><mat-icon aria-hidden="true">rocket_launch</mat-icon></span>
             </div>
+
+            @if (registrationsPaused() && !changeEmailMode()) {
+              <div class="alert info" role="alert"><mat-icon aria-hidden="true">pause_circle</mat-icon><span>Registros temporalmente pausados. Inténtalo de nuevo más tarde.</span></div>
+            }
 
             <ol class="register-progress" [attr.aria-label]="'Paso ' + registerStep() + ' de 2'">
               <li [class.active]="registerStep() === 1" [class.complete]="registerStep() === 2">
@@ -115,9 +119,9 @@
 
             @if (registerStep() === 1) {
               <form class="form auth-step-panel" [formGroup]="registerForm" (ngSubmit)="nextRegisterStep()" novalidate>
-                <div class="section-label"><mat-icon aria-hidden="true">{{ changeEmailMode() ? 'alternate_email' : 'person_outline' }}</mat-icon><span>{{ changeEmailMode() ? 'Escribe la dirección correcta' : 'Cuéntanos quién eres' }}</span></div>
+                <div class="section-label"><mat-icon aria-hidden="true">{{ changeEmailMode() ? 'alternate_email' : 'person_outline' }}</mat-icon><span>{{ changeEmailMode() ? 'Escribe la dirección correcta' : 'Datos de tu cuenta' }}</span></div>
                 @if (!changeEmailMode()) {
-                <mat-form-field appearance="outline">
+                <mat-form-field subscriptSizing="dynamic" appearance="outline">
                   <mat-label>Nombre completo</mat-label>
                   <input matInput formControlName="name" autocomplete="name" maxlength="80" />
                   <mat-icon matPrefix aria-hidden="true">badge</mat-icon>
@@ -129,7 +133,7 @@
                   }
                 </mat-form-field>
                 }
-                <mat-form-field appearance="outline">
+                <mat-form-field subscriptSizing="dynamic" appearance="outline">
                   <mat-label>Email</mat-label>
                   <input matInput type="email" formControlName="email" autocomplete="email" maxlength="254" />
                   <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
@@ -172,7 +176,7 @@
                 }
                 @if (!changeEmailMode()) {
                 <div class="password-grid">
-                  <mat-form-field appearance="outline">
+                  <mat-form-field subscriptSizing="dynamic" appearance="outline">
                     <mat-label>Contraseña</mat-label>
                     <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="72" />
                     <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
@@ -181,7 +185,7 @@
                     </button>
                     <mat-hint>Mínimo 10 caracteres</mat-hint>
                   </mat-form-field>
-                  <mat-form-field appearance="outline">
+                  <mat-form-field subscriptSizing="dynamic" appearance="outline">
                     <mat-label>Repite la contraseña</mat-label>
                     <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="confirmPassword" autocomplete="new-password" maxlength="72" />
                     <mat-icon matPrefix aria-hidden="true">check_circle_outline</mat-icon>
@@ -221,9 +225,6 @@
 
                 <input class="honeypot" type="text" formControlName="company" tabindex="-1" autocomplete="off" aria-hidden="true" />
 
-                @if (registrationsPaused() && !changeEmailMode()) {
-                  <div class="alert info" role="alert"><mat-icon aria-hidden="true">pause_circle</mat-icon><span>Registros temporalmente pausados. Inténtalo de nuevo más tarde.</span></div>
-                }
                 @if (error()) {
                   <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
                 }
@@ -288,7 +289,7 @@
         <h2 class="card-title" id="recovery-title">Usa un código de recuperación</h2>
         <p class="card-sub">Cada código funciona una sola vez. Puedes escribirlo con o sin guiones.</p>
         <form class="form" [formGroup]="recoveryForm" (ngSubmit)="onRecovery()">
-          <mat-form-field appearance="outline" class="recovery-field">
+          <mat-form-field subscriptSizing="dynamic" appearance="outline" class="recovery-field">
             <mat-label>Código de recuperación</mat-label>
             <input #recoveryCode matInput formControlName="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX" />
             <mat-icon matPrefix aria-hidden="true">key</mat-icon>
@@ -320,7 +321,7 @@
         }
 
         <div class="pending-symbol" aria-hidden="true"><mat-icon>outgoing_mail</mat-icon><span></span></div>
-        <h2 class="card-title" id="pending-title">{{ verificationRecovery() ? 'Recupera tu verificación.' : 'Tu siguiente paso está en el correo.' }}</h2>
+        <h2 class="card-title" id="pending-title">{{ verificationRecovery() ? 'Solicitar otro enlace de verificación' : 'Confirma tu email' }}</h2>
         <p class="pending-intro">{{ verificationRecovery() ? 'Si ya solicitaste la cuenta, pide otro enlace para confirmar tu dirección. Lo enviaremos solo si sigue pendiente.' : (verificationEditable() ? 'Si esta dirección puede completar el registro, recibirás un enlace para confirmarla y elegir tu contraseña. Si ya tienes una cuenta, vuelve al inicio de sesión o recupera tu contraseña.' : 'Abre el enlace que te enviamos para confirmar tu dirección y poder acceder a tu espacio.') }}</p>
 
         @if (verificationEmail(); as pendingEmail) {

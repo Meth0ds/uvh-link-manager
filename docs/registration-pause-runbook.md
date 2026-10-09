@@ -11,7 +11,7 @@ pendientes existentes siguen intactos.
 | Flag | `operational_settings(key=registration_paused, value_bool)`; sin fila = abierto |
 | Lectura | `RegistrationGate::isPaused()`, caché ~30 s (`OPERATIONAL_SETTINGS_CACHE_SECONDS`, clamp 5–300) |
 | Escritura | `RegistrationGate::setPaused()` con `lockForUpdate`, auditoría `admin.registration_pause` en la misma transacción, invalidación de caché en commit y `afterCommit` |
-| Bloqueo | `POST /register` responde `503 { error: «Registros temporalmente pausados. Inténtalo de nuevo más tarde.», code: «registration_paused» }`, idéntico para dirección libre u ocupada, tras validar forma y CAPTCHA y antes de crear intento, pending, correo o cookie |
+| Bloqueo | `POST /register` responde `503 { error: «Registros temporalmente pausados. Inténtalo de nuevo más tarde.», reason: «registration_paused» }`, idéntico para dirección libre u ocupada, tras validar forma y CAPTCHA y antes de crear intento, pending, correo o cookie |
 | Público | `GET /api/v1/config` expone `registrationPaused` (bool, sin PII); el formulario anuncia «Registros temporalmente pausados…» y deshabilita el alta |
 | Admin | `GET /overview` y `GET /operations` exponen `registrationPaused`; `POST /api/v1/admin/registration-pause { paused: boolean }` → `{ ok: true, paused }` (grupo `uvh.auth:admin + uvh.mfa:fresh + throttle:uvh-admin`) |
 | Consola | Administración → Estado operativo → Registro de cuentas: badge Abiertos/Pausados + botón Pausar/Reanudar con confirmación |
@@ -39,7 +39,7 @@ La propagación a lecturas con caché puede tardar hasta el TTL vigente
 ## Verificación
 
 - `GET /api/v1/config` → `registrationPaused` refleja el estado, sin auth.
-- `POST /register` en pausa → `503` con `code: registration_paused`, sin
+- `POST /register` en pausa → `503` con `reason: registration_paused`, sin
   `Set-Cookie` de edición y sin filas nuevas (intento/pending/correo).
 - `POST /resend-verification`, `POST /verify-email` y
   `POST /change-registration-email` responden igual en pausa que en abierto.

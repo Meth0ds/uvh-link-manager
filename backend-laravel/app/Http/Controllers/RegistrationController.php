@@ -58,7 +58,7 @@ final class RegistrationController
         // crear intento, pendiente, correo o cookie. Verificación, reenvío y
         // corrección de pendientes existentes siguen intactos.
         if (RegistrationGate::isPaused()) {
-            return response()->json(['error' => 'Registros temporalmente pausados. Inténtalo de nuevo más tarde.', 'code' => 'registration_paused'], 503);
+            return response()->json(['error' => 'Registros temporalmente pausados. Inténtalo de nuevo más tarde.', 'reason' => 'registration_paused'], 503);
         }
 
         $email = strtolower($email);
