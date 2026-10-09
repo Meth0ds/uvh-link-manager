@@ -5,7 +5,7 @@ export interface PublicConfig {
   publicHost: string;
   appHost: string;
   registrationPaused: boolean;
-  legalIdentity: { name: string; taxId: string; address: string; registry: string; hostingProvider: string; hostingRegion: string } | null;
+  legalIdentity: { name: string; taxId: string; address: string; registryStatus: "registered" | "not_registered"; registry: string | null; hostingProvider: string; hostingRegion: string } | null;
   hcaptcha: { enabled: boolean; siteKey: string | null; developmentFallback: boolean };
 }
 
@@ -38,13 +38,22 @@ export function decodePublicConfig(value: unknown): PublicConfig {
   const appHost = text(source["appHost"], "public config", 253).toLowerCase();
   if (!HOST.test(publicHost) || !HOST.test(appHost)) throw new Error("Invalid public config host response");
   const legalSource = source["legalIdentity"] === null ? null : record(source["legalIdentity"], "public legal identity");
-  const legalIdentity = legalSource === null ? null : {
-    name: text(legalSource["name"], "public legal identity", 200),
-    taxId: text(legalSource["taxId"], "public legal identity", 40),
-    address: text(legalSource["address"], "public legal identity", 500),
-    registry: text(legalSource["registry"], "public legal identity", 500),
-    hostingProvider: text(legalSource["hostingProvider"], "public legal identity", 200),
-    hostingRegion: text(legalSource["hostingRegion"], "public legal identity", 200),
+  // Old APIs publish only complete registered identities. Absence of a registry
+  // needs a new, explicit declaration; never infer it from a missing field.
+  const registryStatus = legalSource && legalSource["registryStatus"] !== undefined ? legalSource["registryStatus"] : "registered";
+  if (registryStatus !== "registered" && registryStatus !== "not_registered") throw new Error("Invalid public legal identity response");
+  const registry = legalSource === null ? null : registryStatus === "registered"
+    ? legalText(legalSource["registry"], 3, 500)
+    : nullableText(legalSource["registry"], "public legal identity", 500);
+  if (registryStatus === "not_registered" && registry !== null) throw new Error("Invalid public legal identity response");
+  const legalIdentity: PublicConfig["legalIdentity"] = legalSource === null ? null : {
+    name: legalText(legalSource["name"], 2, 200),
+    taxId: legalText(legalSource["taxId"], 3, 40),
+    address: legalText(legalSource["address"], 10, 500),
+    registryStatus,
+    registry,
+    hostingProvider: legalText(legalSource["hostingProvider"], 2, 200),
+    hostingRegion: legalText(legalSource["hostingRegion"], 2, 200),
   };
 
   return {
@@ -55,4 +64,13 @@ export function decodePublicConfig(value: unknown): PublicConfig {
     legalIdentity,
     hcaptcha: { enabled, siteKey, developmentFallback },
   };
+}
+
+/** Match the server's publication bounds; unfinished data is not an identity. */
+function legalText(value: unknown, minimum: number, maximum: number): string {
+  const decoded = text(value, "public legal identity", maximum).trim();
+  if (Array.from(decoded).length < minimum || /(?:\bpendiente\b|por completar|\btodo\b|\btbd\b|change.?me|example)/iu.test(decoded)) {
+    throw new Error("Invalid public legal identity response");
+  }
+  return decoded;
 }

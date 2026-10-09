@@ -26,9 +26,9 @@ use Illuminate\Support\Facades\Hash;
  */
 final class RegistrationAdmission
 {
-    public const TERMS_VERSION = '2026-08-30';
+    public const TERMS_VERSION = '2026-10-09';
 
-    public const PRIVACY_VERSION = '2026-08-30';
+    public const PRIVACY_VERSION = '2026-10-09';
 
     /**
      * The caller supplies a validated, lowercase mailbox. No identity or

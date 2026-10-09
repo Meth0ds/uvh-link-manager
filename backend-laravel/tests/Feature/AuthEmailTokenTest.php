@@ -55,8 +55,8 @@ class AuthEmailTokenTest extends TestCase
             'password' => 'correct-horse-battery-74',
             'name' => 'Example User',
             'acceptTerms' => true,
-            'termsVersion' => '2026-08-30',
-            'privacyVersion' => '2026-08-30',
+            'termsVersion' => '2026-10-09',
+            'privacyVersion' => '2026-10-09',
         ])->assertStatus(400)->assertJsonPath('error', 'Token inválido o caducado');
 
         $this->postJson('/api/v1/auth/reset-password', [
@@ -235,8 +235,8 @@ class AuthEmailTokenTest extends TestCase
             'password' => 'Viento-Verde-42!',
             'name' => 'Nombre Elegido',
             'acceptTerms' => true,
-            'termsVersion' => '2026-08-30',
-            'privacyVersion' => '2026-08-30',
+            'termsVersion' => '2026-10-09',
+            'privacyVersion' => '2026-10-09',
         ];
 
         $this->postJson('/api/v1/auth/verify-email', $activation)

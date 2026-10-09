@@ -1,0 +1,46 @@
+{
+  "terminos": {
+    "version": "2026-08-30",
+    "sourceSha256": "606ae9c2561bd3b9148f769e00989dffb777035fcd2314baf666d08a575eab27",
+    "sections": 14,
+    "anchors": [
+      "alcance",
+      "servicio",
+      "cuentas",
+      "workspaces",
+      "uso-aceptable",
+      "contenido",
+      "medidas",
+      "limites",
+      "datos",
+      "propiedad",
+      "terminacion",
+      "responsabilidad",
+      "cambios",
+      "ley"
+    ],
+    "context": "Dynamic identity and hosting are annotated; no deployment identity is substituted."
+  },
+  "privacidad": {
+    "version": "2026-08-30",
+    "sourceSha256": "5cd2646f01d5b977ca62dda771b1c29404a5130ecd93974671133ac83e8b91d7",
+    "sections": 14,
+    "anchors": [
+      "responsable",
+      "datos-tratados",
+      "finalidades",
+      "analitica",
+      "captcha",
+      "cookies",
+      "destinatarios",
+      "transferencias",
+      "conservacion",
+      "derechos",
+      "seguridad",
+      "terceros",
+      "menores",
+      "cambios-privacidad"
+    ],
+    "context": "Dynamic identity and hosting are annotated; no deployment identity is substituted."
+  }
+}

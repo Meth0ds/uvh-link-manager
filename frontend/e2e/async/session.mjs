@@ -58,8 +58,8 @@ export async function register(email, name = "Persona Async") {
       password,
       captchaToken: `uvh-e2e-pass-${crypto.randomBytes(8).toString("hex")}`,
       acceptTerms: true,
-      termsVersion: "2026-08-30",
-      privacyVersion: "2026-08-30",
+      termsVersion: "2026-10-09",
+      privacyVersion: "2026-10-09",
     },
   });
 }

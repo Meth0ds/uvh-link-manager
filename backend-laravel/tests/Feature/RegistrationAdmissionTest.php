@@ -54,7 +54,7 @@ final class RegistrationAdmissionTest extends TestCase
             return ['/api/v1/auth/change-registration-email', ['currentEmail' => $pending->email, 'newEmail' => 'destination@example.test', 'captchaToken' => 'fixture'], $pending];
         }
 
-        return ['/api/v1/auth/register', ['email' => 'destination@example.test', 'name' => 'Example Owner', 'password' => 'brujula-limonero-zafiro-93', 'acceptTerms' => true, 'termsVersion' => '2026-08-30', 'privacyVersion' => '2026-08-30', 'captchaToken' => 'fixture'], null];
+        return ['/api/v1/auth/register', ['email' => 'destination@example.test', 'name' => 'Example Owner', 'password' => 'brujula-limonero-zafiro-93', 'acceptTerms' => true, 'termsVersion' => '2026-10-09', 'privacyVersion' => '2026-10-09', 'captchaToken' => 'fixture'], null];
     }
 
     #[DataProvider('cases')]

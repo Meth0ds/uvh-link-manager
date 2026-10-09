@@ -30,6 +30,7 @@ return [
         'tax_id' => env('LEGAL_TAX_ID'),
         'address' => env('LEGAL_ADDRESS'),
         'registry' => env('LEGAL_REGISTRY_DETAILS'),
+        'registry_status' => env('LEGAL_REGISTRY_STATUS', 'registered'),
         'hosting_provider' => env('LEGAL_HOSTING_PROVIDER'),
         'hosting_region' => env('LEGAL_HOSTING_REGION'),
     ],

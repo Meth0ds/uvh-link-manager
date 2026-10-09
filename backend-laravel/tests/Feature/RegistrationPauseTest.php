@@ -28,8 +28,8 @@ final class RegistrationPauseTest extends TestCase
             'name' => 'Pause Probe',
             'password' => 'brujula-limonero-zafiro-93',
             'acceptTerms' => true,
-            'termsVersion' => '2026-08-30',
-            'privacyVersion' => '2026-08-30',
+            'termsVersion' => '2026-10-09',
+            'privacyVersion' => '2026-10-09',
             'captchaToken' => 'fixture',
         ];
     }
@@ -52,7 +52,7 @@ final class RegistrationPauseTest extends TestCase
                 ->assertStatus(503)
                 ->assertExactJson([
                     'error' => 'Registros temporalmente pausados. Inténtalo de nuevo más tarde.',
-                    'code' => 'registration_paused',
+                    'reason' => 'registration_paused',
                 ]);
             $this->assertNull($this->editCookie($response));
         }

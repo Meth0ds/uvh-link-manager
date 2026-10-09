@@ -423,6 +423,7 @@ class AppServiceProvider extends ServiceProvider
             'legal_tax_id' => config('uvh.legal.tax_id'),
             'legal_address' => config('uvh.legal.address'),
             'legal_registry' => config('uvh.legal.registry'),
+            'legal_registry_status' => config('uvh.legal.registry_status', 'registered'),
             'legal_hosting_provider' => config('uvh.legal.hosting_provider'),
             'legal_hosting_region' => config('uvh.legal.hosting_region'),
             'cookie_secure' => config('uvh.cookie_secure'),

@@ -1,0 +1,60 @@
+{
+  "terminos": {
+    "version": "2026-10-09",
+    "sha256": "60c645ddbb7645ce0832431c197a7879d599a378b9653be4c8c488d512c42085",
+    "sections": 20,
+    "anchors": [
+      "alcance",
+      "servicio",
+      "cuentas",
+      "workspaces",
+      "uso-aceptable",
+      "contenido",
+      "medidas",
+      "limites",
+      "datos",
+      "propiedad",
+      "terminacion",
+      "responsabilidad",
+      "cambios",
+      "ley",
+      "integraciones",
+      "notificaciones-formales",
+      "revision",
+      "planes-pago",
+      "consumo",
+      "exportacion"
+    ],
+    "status": "published-source",
+    "deploymentIdentity": "See current public configuration; not certified by this copy."
+  },
+  "privacidad": {
+    "version": "2026-10-09",
+    "sha256": "ea43c69a76de75fdb26830dfaa42528038c3987c6cf2feb85cc857931d00f3e8",
+    "sections": 20,
+    "anchors": [
+      "responsable",
+      "datos-tratados",
+      "finalidades",
+      "analitica",
+      "captcha",
+      "cookies",
+      "destinatarios",
+      "transferencias",
+      "conservacion",
+      "derechos",
+      "seguridad",
+      "terceros",
+      "menores",
+      "cambios-privacidad",
+      "procedencia",
+      "roles-tratamiento",
+      "automatizacion",
+      "preferencias",
+      "correo",
+      "actualizaciones"
+    ],
+    "status": "published-source",
+    "deploymentIdentity": "See current public configuration; not certified by this copy."
+  }
+}

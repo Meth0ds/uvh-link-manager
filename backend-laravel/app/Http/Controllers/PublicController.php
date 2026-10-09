@@ -6,6 +6,7 @@ use App\Support\DestinationDenylist;
 use App\Support\DestinationReputationService;
 use App\Support\ExternalEndpoint;
 use App\Support\HCaptcha;
+use App\Support\LegalIdentity;
 use App\Support\RegistrationGate;
 use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
@@ -88,14 +89,7 @@ class PublicController
         $captchaSiteKey = $publicCaptcha
             ? config('uvh.hcaptcha.public_site_key')
             : config('uvh.hcaptcha.site_key');
-        $legalIdentity = [
-            'name' => trim((string) config('uvh.legal.name')),
-            'taxId' => trim((string) config('uvh.legal.tax_id')),
-            'address' => trim((string) config('uvh.legal.address')),
-            'registry' => trim((string) config('uvh.legal.registry')),
-            'hostingProvider' => trim((string) config('uvh.legal.hosting_provider')),
-            'hostingRegion' => trim((string) config('uvh.legal.hosting_region')),
-        ];
+        $legalIdentity = LegalIdentity::publicProjection((array) config('uvh.legal', []));
 
         return response()->json([
             'appUrl' => $appUrl,
@@ -107,7 +101,7 @@ class PublicController
             // These fields are legally public by design. Return null as one
             // unit in local environments rather than exposing partial data;
             // production startup rejects an incomplete identity altogether.
-            'legalIdentity' => in_array('', $legalIdentity, true) ? null : $legalIdentity,
+            'legalIdentity' => $legalIdentity,
             'hcaptcha' => [
                 // Capability only: the API rechecks its gates at submission.
                 'developmentFallback' => $captchaSurface === 'app' && HCaptcha::developmentFallbackAllowed($request),

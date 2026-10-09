@@ -98,7 +98,7 @@ export async function mailOutboxOutageDrill({ email, session, workspaceId }) {
     const token = (await messagesFor(outageEmail)).map((message) => tokenFromUrl(message.raw)).find(Boolean) ?? null;
     const verified = token
       ? await api("POST", "/api/v1/auth/verify-email", {
-          json: { token, password, name: "Persona E2E", acceptTerms: true, termsVersion: "2026-08-30", privacyVersion: "2026-08-30" },
+          json: { token, password, name: "Persona E2E", acceptTerms: true, termsVersion: "2026-10-09", privacyVersion: "2026-10-09" },
         })
       : { status: 0 };
     check(

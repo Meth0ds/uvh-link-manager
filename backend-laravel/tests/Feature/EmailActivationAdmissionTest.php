@@ -33,7 +33,7 @@ final class EmailActivationAdmissionTest extends TestCase
         $token = Ids::randomToken(32);
         DB::table('email_tokens')->insert(['id' => Ids::sha256Hex($token), $legacy ? 'user_id' : 'pending_registration_id' => $owner->id, 'kind' => 'verify', 'expires_at' => now()->addHour(), 'created_at' => now()]);
 
-        return [$owner, ['token' => $token, 'password' => 'brujula-limonero-zafiro-93', 'name' => 'Mailbox Owner', 'acceptTerms' => true, 'termsVersion' => '2026-08-30', 'privacyVersion' => '2026-08-30']];
+        return [$owner, ['token' => $token, 'password' => 'brujula-limonero-zafiro-93', 'name' => 'Mailbox Owner', 'acceptTerms' => true, 'termsVersion' => '2026-10-09', 'privacyVersion' => '2026-10-09']];
     }
 
     public static function auditCases(): array
@@ -141,7 +141,7 @@ final class EmailActivationAdmissionTest extends TestCase
         $this->assertDatabaseCount('quotas', $legacy ? 0 : 1);
         $this->assertDatabaseCount('legal_acceptances', 2);
         foreach (['terms', 'privacy_notice'] as $type) {
-            $this->assertDatabaseHas('legal_acceptances', ['user_id' => $user->id, 'document_type' => $type, 'version' => '2026-08-30', 'source' => 'registration']);
+            $this->assertDatabaseHas('legal_acceptances', ['user_id' => $user->id, 'document_type' => $type, 'version' => '2026-10-09', 'source' => 'registration']);
         }
         $this->assertDatabaseCount('sessions', 0);
         $this->assertCount(0, collect($response->headers->getCookies())->filter(static fn ($cookie) => in_array($cookie->getName(), ['uvh_session', 'uvh_mfa_challenge'], true)));

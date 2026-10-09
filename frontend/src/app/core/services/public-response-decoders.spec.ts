@@ -44,7 +44,7 @@ describe("public response decoders", () => {
       hostingProvider: "Proveedor de infraestructura SL",
       hostingRegion: "España, Unión Europea",
     };
-    expect(decodePublicConfig({ ...config, legalIdentity }).legalIdentity).toEqual(legalIdentity);
+    expect(decodePublicConfig({ ...config, legalIdentity }).legalIdentity).toEqual({ ...legalIdentity, registryStatus: "registered" });
     expect(() => decodePublicConfig({ ...config, legalIdentity: { ...legalIdentity, taxId: undefined } })).toThrow();
   });
 
@@ -53,5 +53,27 @@ describe("public response decoders", () => {
     expect(decodeAccountDeletionConfirmation({ ok: true, current: true, executeAfter: "2026-10-01T00:00:00Z" }).ok).toBeTrue();
     expect(() => decodePublicActionMessage({ ok: false, message: "No" })).toThrow();
     expect(() => decodeAccountDeletionConfirmation({ ok: true, current: true, executeAfter: "not-a-date" })).toThrow();
+  });
+
+  it("requires an explicit declaration before accepting the absence of a registry entry", () => {
+    const identity = { name: "Persona de prueba", taxId: "TEST", address: "Domicilio de prueba, España", hostingProvider: "Proveedor de prueba", hostingRegion: "Unión Europea", registry: null };
+    expect(() => decodePublicConfig({ ...config, legalIdentity: identity })).toThrow();
+    expect(decodePublicConfig({ ...config, legalIdentity: { ...identity, registryStatus: "not_registered" } }).legalIdentity)
+      .toEqual(jasmine.objectContaining({ ...identity, registryStatus: "not_registered" }));
+  });
+
+  it("rejects contradictory and unknown registry declarations", () => {
+    const identity = { name: "Entidad de prueba", taxId: "TEST", address: "Domicilio de prueba, España", hostingProvider: "Proveedor de prueba", hostingRegion: "Unión Europea", registry: "Registro de prueba" };
+    for (const registryStatus of ["not_registered", "unknown", "", null, false]) {
+      expect(() => decodePublicConfig({ ...config, legalIdentity: { ...identity, registryStatus } })).toThrow();
+    }
+    expect(() => decodePublicConfig({ ...config, legalIdentity: { ...identity, registry: null, registryStatus: "registered" } })).toThrow();
+  });
+
+  it("does not present blank or unfinished operator data as a published identity", () => {
+    const identity = { name: "Persona de prueba", taxId: "TEST", address: "Domicilio de prueba, España", hostingProvider: "Proveedor de prueba", hostingRegion: "Unión Europea", registry: null, registryStatus: "not_registered" };
+    for (const [field, value] of [["name", "   "], ["taxId", " "], ["address", "Madrid"], ["hostingProvider", "Pendiente de completar"], ["hostingRegion", "TBD"]]) {
+      expect(() => decodePublicConfig({ ...config, legalIdentity: { ...identity, [field]: value } })).toThrow();
+    }
   });
 });

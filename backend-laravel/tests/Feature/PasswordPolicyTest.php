@@ -33,8 +33,8 @@ class PasswordPolicyTest extends TestCase
             'website' => '',
             'captchaToken' => 'test-registration-passcode',
             'acceptTerms' => true,
-            'termsVersion' => '2026-08-30',
-            'privacyVersion' => '2026-08-30',
+            'termsVersion' => '2026-10-09',
+            'privacyVersion' => '2026-10-09',
         ];
     }
 
@@ -131,8 +131,8 @@ class PasswordPolicyTest extends TestCase
             'password' => 'tiovivo-cobrizo-astilla-42',
             'name' => 'Contract User',
             'acceptTerms' => true,
-            'termsVersion' => '2026-08-30',
-            'privacyVersion' => '2026-08-30',
+            'termsVersion' => '2026-10-09',
+            'privacyVersion' => '2026-10-09',
         ])->assertStatus(200);
 
         $login = $this->postJson('/api/v1/auth/login', [

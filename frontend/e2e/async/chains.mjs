@@ -35,7 +35,7 @@ export async function mailChain() {
   check("mail: accepted message carries a verification bearer", Boolean(token));
 
   const verified = await api("POST", "/api/v1/auth/verify-email", {
-    json: { token, password, name: "Persona E2E", acceptTerms: true, termsVersion: "2026-08-30", privacyVersion: "2026-08-30" },
+    json: { token, password, name: "Persona E2E", acceptTerms: true, termsVersion: "2026-10-09", privacyVersion: "2026-10-09" },
   });
   check("mail: bearer from the provider verifies the account", verified.status === 200, `HTTP ${verified.status}`);
 

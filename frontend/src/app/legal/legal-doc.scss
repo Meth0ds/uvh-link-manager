@@ -1,52 +1,47 @@
-// A document layout prioritizes reading and navigation. Legal text, versions,
-// identity loading and all existing section anchors remain unchanged.
+// Shared reading layout for the legal documents.
 :host { display: block; }
 * { box-sizing: border-box; }
 .legal-doc { color: var(--ink); }
 .doc-hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 72px; align-items: end; padding-bottom: 42px; border-bottom: 1px solid var(--line); }
-.doc-kicker, .doc-summary > span, .doc-toc > span, .sidebar-card > span, .privacy-overview article > span, .doc-contact > span { font: 10px/1.6 "Courier New", monospace; letter-spacing: .055em; text-transform: uppercase; color: var(--accent); }
+.doc-kicker, .doc-summary > span, .sidebar-card > span, .privacy-overview article > span, .doc-contact > span { font-size: 13px; line-height: 1.7; font-weight: 700; color: var(--accent); }
 .doc-kicker i { display: none; }
-.doc-hero h1 { margin: 24px 0; color: var(--ink); font-size: clamp(44px, 5.1vw, 72px); line-height: 1.04; letter-spacing: -.065em; font-weight: 800; }
-.doc-hero-copy > p { max-width: 580px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.8; }
-.doc-meta { display: flex; flex-wrap: wrap; gap: 12px 22px; margin-top: 25px; color: var(--muted); font: 10px/1.7 "Courier New", monospace; }
+.doc-hero h1 { margin: 24px 0; color: var(--ink); font-size: clamp(38px, 4.6vw, 60px); line-height: 1.12; letter-spacing: -.045em; font-weight: 800; }
+.doc-hero-copy > p { max-width: 580px; margin: 0; color: var(--muted); font-size: 16px; line-height: 1.8; }
+.doc-meta { display: flex; flex-wrap: wrap; gap: 12px 22px; margin-top: 25px; color: var(--muted); font-size: 13px; line-height: 1.7; }
 .doc-meta b { display: block; color: var(--ink); }
-.doc-summary { padding: 26px; border-top: 3px solid var(--ink); background: var(--soft); }
+.doc-summary { padding: 26px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
 .doc-summary ul { margin: 18px 0 0; padding-left: 16px; }
-.doc-summary li { color: var(--muted); font-size: 12px; line-height: 1.7; margin-bottom: 12px; }
+.doc-summary li { color: var(--muted); font-size: 14px; line-height: 1.7; margin-bottom: 12px; }
 .doc-summary li:last-child { margin-bottom: 0; }
 .legal-readiness { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 18px 0; margin-bottom: 44px; border-bottom: 1px solid var(--line); }
-.readiness-label, .readiness-state { font: 9px "Courier New", monospace; color: var(--muted); }
+.readiness-label, .readiness-state { font-size: 13px; color: var(--muted); }
 .legal-readiness > div { flex: 1; min-width: 220px; }
-.legal-readiness b { font-size: 12px; }
-.legal-readiness p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.legal-readiness b { font-size: 14px; }
+.legal-readiness p { margin: 5px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .legal-readiness[role="alert"] { border-left: 3px solid var(--accent); padding-left: 16px; background: var(--soft); }
 .privacy-overview { display: grid; grid-template-columns: repeat(4, 1fr); border-block: 1px solid var(--line); margin-bottom: 50px; }
 .privacy-overview article { padding: 20px 18px; min-width: 0; }
 .privacy-overview article + article { border-left: 1px solid var(--line); }
 .privacy-overview b { display: block; margin-top: 12px; font-size: 13px; line-height: 1.5; }
-.privacy-overview p { color: var(--muted); font-size: 11px; line-height: 1.7; margin-bottom: 0; }
+.privacy-overview p { color: var(--muted); font-size: 14px; line-height: 1.7; margin-bottom: 0; }
 .doc-layout { display: grid; grid-template-columns: 245px minmax(0, 1fr); gap: 72px; align-items: start; }
 .doc-sidebar { position: sticky; top: 110px; max-height: calc(100vh - 130px); overflow-y: auto; padding-right: 12px; }
-.doc-toc { display: grid; gap: 0; }
-.doc-toc > span { display: block; margin-bottom: 14px; }
-.doc-toc a { display: flex; gap: 12px; align-items: baseline; padding: 10px 0; color: var(--muted); font-size: 11px; text-decoration: none; border-bottom: 1px solid var(--line); transition: color 160ms, padding-left 160ms; }
-.doc-toc a b { font: 9px monospace; color: var(--accent); }
-.doc-toc a:hover { color: var(--accent); padding-left: 4px; }
-.doc-toc a.is-current { color: var(--accent); border-bottom-color: var(--accent); font-weight: 800; }
 .doc-section:target .section-number { text-decoration: underline; text-underline-offset: 7px; }
 .doc-end { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-top: 30px; }
-.doc-end > span { font: 9px/1.7 "Courier New", monospace; color: var(--muted); }
-.doc-end a { display: inline-flex; align-items: center; gap: 22px; min-height: 44px; color: var(--accent); font-size: 12px; text-underline-offset: 5px; }
+.doc-end > span { font-size: 13px; line-height: 1.7; color: var(--muted); }
+.doc-end a { display: inline-flex; align-items: center; gap: 22px; min-height: 44px; color: var(--accent); font-size: 14px; text-underline-offset: 5px; }
+.doc-versions { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 30px; padding-block: 20px; border-bottom: 1px solid var(--line); }
+.doc-versions a { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: var(--accent); font-size: 14px; line-height: 1.7; text-underline-offset: 4px; overflow-wrap: anywhere; }
 .sidebar-card { margin-top: 28px; padding: 18px; background: var(--soft); border-left: 2px solid var(--accent); }
-.sidebar-card b { display: block; font-size: 12px; margin-top: 12px; }
-.sidebar-card p { font-size: 11px; line-height: 1.7; color: var(--muted); }
-.sidebar-card a { color: var(--accent); font-size: 11px; overflow-wrap: anywhere; }
-.doc-content { min-width: 0; }
+.sidebar-card b { display: block; font-size: 14px; margin-top: 12px; }
+.sidebar-card p { font-size: 14px; line-height: 1.7; color: var(--muted); }
+.sidebar-card a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-size: 14px; overflow-wrap: anywhere; }
+.doc-content { min-width: 0; max-width: 75ch; }
 .doc-section { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 18px; padding-bottom: 40px; border-bottom: 1px solid var(--line); scroll-margin-top: 115px; }
 .doc-section + .doc-section { padding-top: 40px; }
-.section-number { font: 11px monospace; color: var(--accent); padding-top: 8px; }
+.section-number { font-size: 13px; color: var(--accent); padding-top: 8px; }
 .doc-section h2 { margin: 0 0 20px; color: var(--ink); font-size: 27px; font-weight: 700; line-height: 1.2; letter-spacing: -.04em; }
-.doc-section p, .doc-section li { color: var(--muted); font-size: 14px; line-height: 1.85; }
+.doc-section p, .doc-section li { color: var(--muted); font-size: 16px; line-height: 1.85; }
 .doc-section p { margin: 0 0 16px; }
 .doc-section p:last-child { margin-bottom: 0; }
 .doc-section strong { color: var(--ink); }
@@ -54,26 +49,32 @@
 .doc-section ul { padding-left: 18px; }
 .doc-section li { margin-bottom: 10px; }
 .clause-note { margin: 22px 0; padding: 18px; border-left: 2px solid var(--accent); background: var(--soft); }
-.clause-note b { display: block; margin-bottom: 8px; font-size: 12px; }
-.clause-note span { color: var(--muted); font-size: 12px; line-height: 1.8; }
+.clause-note b { display: block; margin-bottom: 8px; font-size: 14px; }
+.clause-note span { color: var(--muted); font-size: 14px; line-height: 1.8; }
 .identity-grid, .data-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-block: 22px; }
 .identity-grid > span, .data-cards article { padding: 18px; border: 1px solid var(--line); background: var(--paper-raised); min-width: 0; }
-.identity-grid small { display: block; color: var(--muted); font: 9px monospace; text-transform: uppercase; }
-.identity-grid b, .data-cards b { display: block; margin-top: 8px; font-size: 12px; overflow-wrap: anywhere; }
-.data-cards article p { margin-top: 12px; font-size: 12px; }
+.identity-grid small { display: block; color: var(--muted); font-size: 13px; text-transform: uppercase; }
+.identity-grid b, .data-cards b { display: block; margin-top: 8px; font-size: 14px; overflow-wrap: anywhere; }
+.data-cards article p { margin-top: 12px; font-size: 14px; }
 .legal-table { border: 1px solid var(--line); margin-block: 24px; overflow-x: auto; }
 .legal-table > div { display: grid; grid-template-columns: 1fr .8fr; }
 .legal-table > div + div { border-top: 1px solid var(--line); }
-.legal-table [role="cell"], .legal-table [role="columnheader"] { padding: 14px; font-size: 12px; line-height: 1.7; color: var(--muted); overflow-wrap: anywhere; }
+.legal-table [role="cell"], .legal-table [role="columnheader"] { padding: 14px; font-size: 14px; line-height: 1.7; color: var(--muted); overflow-wrap: anywhere; }
 .legal-table [role="cell"] + [role="cell"], .legal-table [role="columnheader"] + [role="columnheader"] { border-left: 1px solid var(--line); }
 .legal-table .table-head { background: var(--soft); }
 .legal-table [role="columnheader"] { color: var(--ink); font-weight: 700; }
 .legal-table b, .legal-table small { display: block; }
-.legal-table small { margin-top: 5px; font-size: 11px; }
+.legal-table small { margin-top: 5px; font-size: 14px; }
+.doc-section table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-block: 24px; font-size: 14px; line-height: 1.8; }
+.doc-section caption { text-align: left; color: var(--ink); font-weight: 700; padding-bottom: 12px; }
+.doc-section th, .doc-section td { padding: 14px; border: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: anywhere; color: var(--muted); }
+.doc-section th { color: var(--ink); font-weight: 700; }
+.doc-section thead { background: var(--soft); }
+.doc-section th:first-child { width: 36%; }
 .doc-contact { display: grid; grid-template-columns: 1fr 2fr auto; gap: 28px; align-items: center; margin-top: 60px; padding: 30px; background: var(--guide); border-block: 1px solid var(--line); }
 .doc-contact h2 { color: var(--ink); font-size: 23px; font-weight: 700; letter-spacing: -.04em; margin: 0; }
-.doc-contact p { color: var(--muted); font-size: 12px; line-height: 1.8; margin: 10px 0 0; }
-.doc-contact > a { display: inline-flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 20px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 700; text-decoration: none; }
+.doc-contact p { color: var(--muted); font-size: 14px; line-height: 1.8; margin: 10px 0 0; }
+.doc-contact > a { display: inline-flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 20px; background: var(--accent); color: var(--accent-ink); font-size: 14px; font-weight: 700; text-decoration: none; }
 a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 @media (max-width: 1000px) {
   .doc-hero { grid-template-columns: 1fr; gap: 32px; }
@@ -84,21 +85,50 @@ a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
   .doc-contact { grid-template-columns: 1fr; gap: 18px; }
 }
 @media (max-width: 680px) {
-  .doc-hero h1 { font-size: 46px; overflow-wrap: anywhere; }
-  .doc-hero-copy > p { font-size: 13px; }
+  .doc-hero h1 { font-size: 38px; overflow-wrap: anywhere; }
+  .doc-hero-copy > p { font-size: 16px; }
   .doc-layout { grid-template-columns: 1fr; gap: 36px; }
   .doc-sidebar { position: static; max-height: none; padding: 0; }
-  .doc-toc { grid-template-columns: 1fr 1fr; gap: 0 16px; }
-  .doc-toc > span { grid-column: 1 / -1; }
-  .doc-toc a { font-size: 10px; gap: 7px; }
   .sidebar-card { display: none; }
   .doc-section { grid-template-columns: 22px minmax(0, 1fr); gap: 10px; scroll-margin-top: 150px; }
   .doc-section h2 { font-size: 25px; }
-  .doc-section p, .doc-section li { font-size: 13px; }
+  .doc-section p, .doc-section li { font-size: 16px; }
   .identity-grid, .data-cards, .privacy-overview { grid-template-columns: 1fr; }
   .privacy-overview article + article { border-left: 0; }
   .legal-readiness > div { min-width: 0; flex-basis: 100%; }
   .doc-contact { padding: 22px; }
-  .legal-table [role="cell"], .legal-table [role="columnheader"] { padding: 10px; font-size: 11px; }
+  .legal-table [role="cell"], .legal-table [role="columnheader"] { padding: 10px; font-size: 14px; }
+  .doc-section th, .doc-section td { padding: 10px 8px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.doc-hero { animation: doc-arrive 420ms cubic-bezier(.2, .8, .2, 1); }
+@keyframes doc-arrive { from { opacity: .3; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.identity-retry { min-height: 44px; padding: 10px 18px; border: 1px solid var(--accent); border-radius: 6px; background: var(--paper-raised); color: var(--accent); font: 700 14px Manrope, sans-serif; cursor: pointer; }
+.identity-retry:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .identity-retry:hover { background: var(--soft); } }
+@media print {
+  .legal-doc { --ink: #000; --muted: #222; --accent: #000; --accent-ink: #fff; --paper: #fff; --paper-raised: #fff; --soft: #fff; --guide: #fff; --line: #aaa; }
+  .legal-doc { color: #000; }
+  .doc-hero, .doc-layout { display: block; }
+  .doc-hero { padding-bottom: 20px; animation: none; }
+  .doc-hero h1 { font-size: 30pt; margin-block: 12px; }
+  .doc-summary { margin-top: 20px; padding: 12px; }
+  .doc-sidebar, .identity-retry, .doc-end a, .doc-versions { display: none !important; }
+  .doc-content { max-width: none; }
+  .legal-readiness { margin-bottom: 24px; }
+  .doc-section, .doc-section + .doc-section { padding-block: 18px; }
+  .doc-section h2 { font-size: 16pt; break-after: avoid; }
+  .doc-section p, .doc-section li { font-size: 11pt; line-height: 1.6; orphans: 3; widows: 3; }
+  .doc-section a { color: #000; }
+  .doc-section a[href^="mailto:"]::after, .doc-contact a[href^="mailto:"]::after { content: " (" attr(href) ")"; font-size: 10pt; }
+  .doc-section a[href^="https:"]::after { content: " (" attr(href) ")"; font-size: 9pt; overflow-wrap: anywhere; }
+  .clause-note, .doc-contact, .doc-summary, .identity-grid > span, .data-cards article { break-inside: avoid; }
+  .doc-contact { display: block; margin-top: 24px; padding: 12px; }
+  .doc-contact > a { color: #000; background: #fff; padding: 8px 0; }
+  .privacy-overview { margin-block: 24px; }
+  .doc-section table { font-size: 10pt; }
+  .doc-section tr { break-inside: avoid; }
+}

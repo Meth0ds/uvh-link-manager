@@ -449,26 +449,15 @@ final class ProductionSecurity
     /** @param array<string, mixed> $settings */
     private static function validLegalIdentity(array $settings): bool
     {
-        $limits = [
-            'legal_name' => [2, 200],
-            'legal_tax_id' => [3, 40],
-            'legal_address' => [10, 500],
-            'legal_registry' => [3, 500],
-            'legal_hosting_provider' => [2, 200],
-            'legal_hosting_region' => [2, 200],
-        ];
-        foreach ($limits as $key => [$minimum, $maximum]) {
-            $value = trim((string) ($settings[$key] ?? ''));
-            if (! mb_check_encoding($value, 'UTF-8')
-                || mb_strlen($value) < $minimum
-                || mb_strlen($value) > $maximum
-                || preg_match('/[\x00-\x1f\x7f]/u', $value)
-                || preg_match('/(?:\bpendiente\b|por completar|\btodo\b|\btbd\b|change.?me|example)/iu', $value)) {
-                return false;
-            }
-        }
-
-        return true;
+        return LegalIdentity::publicProjection([
+            'name' => $settings['legal_name'] ?? null,
+            'tax_id' => $settings['legal_tax_id'] ?? null,
+            'address' => $settings['legal_address'] ?? null,
+            'registry' => $settings['legal_registry'] ?? null,
+            'registry_status' => array_key_exists('legal_registry_status', $settings) ? $settings['legal_registry_status'] : 'registered',
+            'hosting_provider' => $settings['legal_hosting_provider'] ?? null,
+            'hosting_region' => $settings['legal_hosting_region'] ?? null,
+        ]) !== null;
     }
 
     public static function validTrustedProxies(string $raw): bool

@@ -111,7 +111,7 @@ final class EmailActionBoundaryTest extends TestCase
         } else {
             EmailToken::create(['id' => Ids::sha256Hex($token), $action === 'pending' ? 'pending_registration_id' : 'user_id' => $owner->id, 'kind' => $action === 'reset' ? 'reset' : 'verify', 'expires_at' => now()->addSeconds($seconds)]);
         }
-        $payload = ['token' => $token, 'password' => 'brujula-limonero-zafiro-93', 'name' => 'Mailbox Owner', 'acceptTerms' => true, 'termsVersion' => '2026-08-30', 'privacyVersion' => '2026-08-30'];
+        $payload = ['token' => $token, 'password' => 'brujula-limonero-zafiro-93', 'name' => 'Mailbox Owner', 'acceptTerms' => true, 'termsVersion' => '2026-10-09', 'privacyVersion' => '2026-10-09'];
         $path = '/api/v1/auth/'.match ($action) {
             'pending', 'legacy' => 'verify-email',
             'reset' => 'reset-password',

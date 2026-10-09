@@ -1763,8 +1763,8 @@ class ApiParityTest extends TestCase
         return [
             'captchaToken' => 'test-registration-passcode',
             'acceptTerms' => true,
-            'termsVersion' => '2026-08-30',
-            'privacyVersion' => '2026-08-30',
+            'termsVersion' => '2026-10-09',
+            'privacyVersion' => '2026-10-09',
         ];
     }
 
@@ -1783,8 +1783,8 @@ class ApiParityTest extends TestCase
             'password' => self::PASSWORD,
             'name' => $name,
             'acceptTerms' => true,
-            'termsVersion' => '2026-08-30',
-            'privacyVersion' => '2026-08-30',
+            'termsVersion' => '2026-10-09',
+            'privacyVersion' => '2026-10-09',
         ];
     }
 

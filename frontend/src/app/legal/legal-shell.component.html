@@ -1,17 +1,26 @@
-<!-- RouterLink keeps this fragment on the current document despite base href="/". -->
-<a class="skip-link" [routerLink]="[]" fragment="public-content" (click)="publicContent.focus()">Ir al contenido</a>
+<a class="skip-link" [routerLink]="[]" fragment="public-content" (click)="publicContent.focus()" [attr.inert]="mobileOpen() ? '' : null">Ir al contenido</a>
 <header class="legal-header">
   <div class="legal-header-inner">
-    <a class="brand" routerLink="/" aria-label="UVH, volver a la página principal">uvh<span>.</span></a>
-    <span class="brand-caption">Enlaces con recorrido.</span>
-    <nav class="legal-nav-links" aria-label="Documentos legales y soporte">
-      <a routerLink="/help" routerLinkActive="active" ariaCurrentWhenActive="page">Ayuda</a>
-      <a routerLink="/legal/terminos" routerLinkActive="active" ariaCurrentWhenActive="page">Términos</a>
-      <a routerLink="/legal/privacidad" routerLinkActive="active" ariaCurrentWhenActive="page">Privacidad</a>
-      <a routerLink="/legal/denuncias" routerLinkActive="active" ariaCurrentWhenActive="page">Denunciar enlace</a>
+    <a class="brand" routerLink="/" aria-label="UVH, volver a la página principal" (click)="closeMenu()">uvh<span>.</span></a>
+    <span class="brand-caption">Acorta y gestiona<br />tus enlaces.</span>
+    <nav class="legal-nav-links" aria-label="Navegación pública">
+      @for (page of pages; track page.path) { <a [routerLink]="page.path" routerLinkActive="active" ariaCurrentWhenActive="page">{{ page.label }}</a> }
     </nav>
-    <div class="legal-actions"><app-public-theme-toggle /><a class="back-product" routerLink="/">Volver a UVH <span aria-hidden="true">↗</span></a></div>
+    <div class="legal-actions"><app-public-theme-toggle /><a class="public-account" routerLink="/auth" (click)="closeMenu()">Entrar</a><button #menuButton type="button" class="public-menu-trigger" aria-controls="public-mobile-navigation" [attr.aria-expanded]="mobileOpen()" [attr.aria-label]="mobileOpen() ? 'Cerrar navegación' : 'Abrir navegación'" (click)="toggleMenu()"><span>{{ mobileOpen() ? 'Cerrar' : 'Menú' }}</span><mat-icon aria-hidden="true">{{ mobileOpen() ? 'close' : 'menu' }}</mat-icon></button></div>
   </div>
 </header>
-<main #publicContent class="legal-main" id="public-content" tabindex="-1"><div class="legal-container"><ng-content /></div></main>
-<footer class="legal-footer"><div class="legal-footer-inner"><a class="brand" routerLink="/" aria-label="UVH, inicio">uvh<span>.</span></a><p>Enlaces cortos.<br />Decisiones que siguen en tus manos.</p><nav aria-label="Enlaces del pie legal"><a routerLink="/help">Ayuda</a><a routerLink="/status">Estado del servicio</a><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos</a></nav><span class="copyright">© {{ year }} UVH</span></div></footer>
+<div class="public-mobile-layer" [class.open]="mobileOpen()" [attr.aria-hidden]="!mobileOpen()" [attr.inert]="mobileOpen() ? null : ''">
+  <nav id="public-mobile-navigation" class="public-mobile-nav" aria-label="Navegación móvil">
+    @for (page of pages; track page.path) { <a [routerLink]="page.path" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMenu()">{{ page.label }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a> }
+    <a class="public-mobile-account" routerLink="/auth" (click)="closeMenu()">Entrar a mi cuenta<mat-icon aria-hidden="true">login</mat-icon></a>
+    <a class="public-mobile-home" routerLink="/" (click)="closeMenu()">Volver al inicio<mat-icon aria-hidden="true">home</mat-icon></a>
+  </nav>
+</div>
+<main #publicContent class="legal-main" id="public-content" tabindex="-1" [attr.inert]="mobileOpen() ? '' : null"><div class="legal-container"><ng-content /></div></main>
+<footer class="legal-footer" [attr.inert]="mobileOpen() ? '' : null"><div class="legal-footer-inner">
+  <div class="footer-brand"><a class="brand" routerLink="/" aria-label="UVH, inicio">uvh<span>.</span></a><p>Acorta, organiza y actualiza<br />los enlaces que compartes.</p></div>
+  <nav aria-label="Ayuda y soporte"><h2>Ayuda y soporte</h2><a routerLink="/help">Centro de ayuda</a><a routerLink="/status">Estado del servicio</a><a routerLink="/legal/denuncias">Denunciar un enlace</a></nav>
+  <nav aria-label="Información legal"><h2>Información legal</h2><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos del servicio</a></nav>
+  <nav aria-label="Tu cuenta"><h2>Tu cuenta</h2><a routerLink="/auth">Entrar</a><a routerLink="/auth" [queryParams]="{mode: 'register'}">Crear cuenta</a></nav>
+  <div class="footer-bottom"><span>© {{ year }} UVH</span><a routerLink="/">Volver al inicio<mat-icon aria-hidden="true">arrow_upward</mat-icon></a></div>
+</div></footer>

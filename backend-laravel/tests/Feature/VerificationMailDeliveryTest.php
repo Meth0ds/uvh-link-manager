@@ -63,7 +63,7 @@ final class VerificationMailDeliveryTest extends TestCase
         $this->assertSame('mailbox@example.test', $message->getTo()[0]->getAddress());
         $this->assertSame(1, preg_match('/token=([A-Za-z0-9_-]{43})/', $message->getTextBody(), $match));
         $this->assertSame($row->resource_id, Ids::sha256Hex($match[1]));
-        $this->postJson('/api/v1/auth/verify-email', ['token' => $match[1], 'password' => 'brujula-limonero-zafiro-93', 'name' => 'Mailbox Owner', 'acceptTerms' => true, 'termsVersion' => '2026-08-30', 'privacyVersion' => '2026-08-30'])->assertOk();
+        $this->postJson('/api/v1/auth/verify-email', ['token' => $match[1], 'password' => 'brujula-limonero-zafiro-93', 'name' => 'Mailbox Owner', 'acceptTerms' => true, 'termsVersion' => '2026-10-09', 'privacyVersion' => '2026-10-09'])->assertOk();
         $user = User::where('email', 'mailbox@example.test')->firstOrFail();
         $this->assertNotNull($user->email_verified_at);
         if ($legacy) {

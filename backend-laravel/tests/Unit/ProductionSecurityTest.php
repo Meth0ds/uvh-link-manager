@@ -276,6 +276,43 @@ class ProductionSecurityTest extends TestCase
         );
     }
 
+    public function test_an_explicitly_unregistered_provider_does_not_need_an_invented_registry_entry(): void
+    {
+        $settings = $this->validSettings();
+        $settings['legal_registry_status'] = 'not_registered';
+        $settings['legal_registry'] = null;
+
+        $this->assertSame([], ProductionSecurity::errors($settings));
+    }
+
+    public function test_registry_declarations_must_be_consistent_and_known(): void
+    {
+        foreach (['not_registered', 'unknown', ''] as $status) {
+            $settings = $this->validSettings();
+            $settings['legal_registry_status'] = $status;
+            $this->assertContains(
+                'La identidad legal del prestador debe estar completa y no contener marcadores pendientes',
+                ProductionSecurity::errors($settings),
+                $status,
+            );
+        }
+    }
+
+    public function test_unregistered_status_never_exempts_other_required_identity_fields(): void
+    {
+        foreach (['legal_name', 'legal_tax_id', 'legal_address', 'legal_hosting_provider', 'legal_hosting_region'] as $field) {
+            $settings = $this->validSettings();
+            $settings['legal_registry_status'] = 'not_registered';
+            $settings['legal_registry'] = null;
+            $settings[$field] = '';
+            $this->assertContains(
+                'La identidad legal del prestador debe estar completa y no contener marcadores pendientes',
+                ProductionSecurity::errors($settings),
+                $field,
+            );
+        }
+    }
+
     public function test_previous_secret_requires_a_short_lived_rotation_window(): void
     {
         $settings = $this->validSettings();

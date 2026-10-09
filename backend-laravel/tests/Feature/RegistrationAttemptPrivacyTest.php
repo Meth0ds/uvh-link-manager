@@ -30,7 +30,7 @@ final class RegistrationAttemptPrivacyTest extends TestCase
         $traces = [];
         foreach (['verified', 'foreign-pending', 'free'] as $kind) {
             $email = $kind.'@example.test';
-            $registration = $this->postJson('/api/v1/auth/register', ['email' => $email, 'name' => 'Probe Author', 'password' => 'brujula-limonero-zafiro-93', 'acceptTerms' => true, 'termsVersion' => '2026-08-30', 'privacyVersion' => '2026-08-30', 'captchaToken' => 'fixture'])->assertStatus(201)->assertExactJson(['user' => null]);
+            $registration = $this->postJson('/api/v1/auth/register', ['email' => $email, 'name' => 'Probe Author', 'password' => 'brujula-limonero-zafiro-93', 'acceptTerms' => true, 'termsVersion' => '2026-10-09', 'privacyVersion' => '2026-10-09', 'captchaToken' => 'fixture'])->assertStatus(201)->assertExactJson(['user' => null]);
             $cookie = collect($registration->headers->getCookies())->first(static fn ($cookie) => $cookie->getName() === RegistrationEdit::cookieName());
             $this->assertNotNull($cookie);
             $this->withCookie(RegistrationEdit::cookieName(), $cookie->getValue());
@@ -71,7 +71,7 @@ final class RegistrationAttemptPrivacyTest extends TestCase
 
     private function register(string $email): string
     {
-        $response = $this->postJson('/api/v1/auth/register', ['email' => $email, 'name' => 'Context Author', 'password' => 'brujula-limonero-zafiro-93', 'acceptTerms' => true, 'termsVersion' => '2026-08-30', 'privacyVersion' => '2026-08-30', 'captchaToken' => 'fixture'])->assertCreated()->assertExactJson(['user' => null]);
+        $response = $this->postJson('/api/v1/auth/register', ['email' => $email, 'name' => 'Context Author', 'password' => 'brujula-limonero-zafiro-93', 'acceptTerms' => true, 'termsVersion' => '2026-10-09', 'privacyVersion' => '2026-10-09', 'captchaToken' => 'fixture'])->assertCreated()->assertExactJson(['user' => null]);
 
         return $this->receipt($response);
     }

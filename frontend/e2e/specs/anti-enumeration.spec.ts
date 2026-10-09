@@ -50,8 +50,8 @@ function registerBody(email: string, password: string): Record<string, unknown> 
     password,
     captchaToken: CAPTCHA_TOKEN,
     acceptTerms: true,
-    termsVersion: "2026-08-30",
-    privacyVersion: "2026-08-30",
+    termsVersion: "2026-10-09",
+    privacyVersion: "2026-10-09",
   };
 }
 
@@ -74,8 +74,8 @@ async function verifyThroughMail(request: APIRequestContext, csrf: string, email
     password: E2E_PASSWORD,
     name: "Persona E2E",
     acceptTerms: true,
-    termsVersion: "2026-08-30",
-    privacyVersion: "2026-08-30",
+    termsVersion: "2026-10-09",
+    privacyVersion: "2026-10-09",
   })).status()).toBe(200);
 }
 
