@@ -1,0 +1,14 @@
+# O90 — Perfil de consultas por autor de enlaces
+
+Lote de fase5 del plan global. Empezar sólo después de cerrar las verificaciones y recursos propios O89. Lectura actual: `AdminController::users` cuenta enlaces no borrados por `created_by` mediante una subconsulta por usuario; `AccountExportDocument::rowSources` recorre todos los enlaces del autor ordenados por id y reutiliza ese scope en reglas, etiquetas y analítica. Las migraciones ya indexan memberships por user_id: no proponer ese índice de nuevo. No se ha encontrado índice de links por created_by en la lectura de migraciones; confirmar el catálogo real antes de decidir.
+
+El objetivo es reducir trabajo de consultas observado, conservando cuerpos, conteos, orden, filtros, autor/tenant, enlaces borrados en exportaciones y controles de acceso. No convertir la exportación cursor en colección, ni cachear identidades/permisos. Ninguna ganancia está demostrada todavía.
+
+- [ ] Entorno propio `_test`, red interna, fuentes congeladas y catálogo de índices guardado. Capturar SQL y bindings desde los consumidores reales, incluido count separado del listado de admin; datos sintéticos deterministas sin correo/proveedores.
+- [ ] Baseline en al menos tres volúmenes: usuarios/enlaces pequeños, medianos y grandes; autores dispersos y un autor concentrado, enlaces vivos/borrados, empates de created_at, usuarios sin enlaces. Igual semilla y configuración por comparación. Registrar versiones/configuración, tablas/índices y ANALYZE.
+- [ ] EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) y muestras repetidas del listado admin (25/100, página inicial y desplazada, filtros) y lectura de exportación por autor/id. Separar ejecución inicial de repetida; registrar dispersión, mediana y percentiles descriptivos, lecturas y loops, sin extrapolar capacidad productiva.
+- [ ] Comparar alternativas en la base propia: índice completo por autor/id, índice parcial de enlaces vivos y, sólo si lo justifican los planes, reescritura acotada de la consulta. Medir bytes del índice y coste de inserts/updates/deletes representativos. No imponer índices ni planes al optimizador para fabricar resultados.
+- [ ] Adoptar únicamente una mejora con beneficio suficiente para sus costes. Si necesita migración: compatible y reversible, ensayar up/down, documentar bloqueo y aplicación operativa; no ejecutar sobre DB compartida ni desplegar. Mantener constraints e índices existentes.
+- [ ] Comparar resultados exactos antes/después (IDs, totales, autor, borrados, orden) y ejecutar pruebas HTTP/exportación/privacidad/MFA pertinentes; Pint/PHPStan y suite backend completa si se modifica producto. Cerrar recursos propios y registrar decisión implementada/descartada y límites.
+
+Este lote no certifica la optimización de todos los listados, deep pagination, analítica ni jobs. Es una primera medición SQL que aporta evidencia para priorizar las unidades restantes.

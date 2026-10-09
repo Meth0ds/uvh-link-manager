@@ -1,8 +1,8 @@
 # Inventario de funciones y superficies — 2026-10-02
 
-Captura del árbol: 2026-10-08T05:23:16.900Z. La fecha del nombre identifica la creación del inventario; esta captura registra su actualización.
+Captura del árbol: 2026-10-09T06:00:15.435Z. La fecha del nombre identifica la creación del inventario; esta captura registra su actualización.
 
-503 archivos; 2440 funciones/métodos con nombre; 1327 callbacks/closures anónimos; 3 firmas sin cuerpo. 0 archivos sin propuesta específica de propietario. Todas las propuestas requieren conciliación por consumidor; enumerar no acredita revisar. La [matriz de rutas](2026-10-01-system-review-coverage.md) conserva la evidencia previa; el [JSON](2026-10-02-source-function-inventory.json) contiene líneas, hashes, funciones y propietario propuesto.
+521 archivos; 2509 funciones/métodos con nombre; 1371 callbacks/closures anónimos; 3 firmas sin cuerpo. 9 archivos sin propuesta específica de propietario. Todas las propuestas requieren conciliación por consumidor; enumerar no acredita revisar. La [matriz de rutas](2026-10-01-system-review-coverage.md) conserva la evidencia previa; el [JSON](2026-10-02-source-function-inventory.json) contiene líneas, hashes, funciones y propietario propuesto.
 
 Cobertura: PHP app/bootstrap/config/routes y AST TypeScript/JavaScript de frontend src/public/scripts. HTML/Blade/SCSS y scripts Python/PHP auxiliares se inventarían como superficies; no se analizan expresiones de plantilla ni JS embebido. Migraciones, infraestructura YAML/Docker/CI y dependencias necesitan inventario específico S13. No se ejecuta código de la aplicación ni se conecta a la DB. Callbacks heredan función contenedora cuando es identificable; propietarios compartidos deben conciliarse por consumidor antes de cerrar un sistema.
 
@@ -16,18 +16,18 @@ node scripts/review-source-inventory.mjs
 | Sistema propuesto | Entradas de funciones/callbacks |
 | --- | --- |
 | S01 | 679 |
-| S02 | 285 |
-| S03 | 231 |
-| S04 | 386 |
+| S02 | 298 |
+| S03 | 230 |
+| S04 | 397 |
 | S05 | 55 |
 | S06 | 237 |
 | S07 | 87 |
 | S08 | 145 |
-| S09 | 169 |
+| S09 | 170 |
 | S10 | 181 |
-| S11 | 328 |
-| S12 | 194 |
-| S13 | 793 |
+| S11 | 337 |
+| S12 | 245 |
+| S13 | 822 |
 
 | Archivo | Sistema propuesto | Con nombre | Anónimas | Estado de conciliación |
 | --- | --- | --- | --- | --- |
@@ -49,7 +49,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Http/Controllers/AccountProfileController.php` | S01 | 2 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/AccountRecoveryController.php` | S01 | 3 | 1 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/AccountSessionsController.php` | S01 | 5 | 0 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/AdminController.php` | S11 | 33 | 33 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/AdminController.php` | S11 | 33 | 34 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/AnalyticsController.php` | S09 | 8 | 4 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/AuthController.php` | S01 | 2 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/CollectionController.php` | S04 | 6 | 9 | Conciliar evidencia por función |
@@ -80,7 +80,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Http/Controllers/TokenController.php` | S07 | 6 | 4 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/WebhookController.php` | S08 | 12 | 12 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/WorkspaceActivityController.php` | S09 | 1 | 8 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/WorkspaceController.php` | S03 | 22 | 19 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/WorkspaceController.php` | S03 | 21 | 19 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/WorkspaceOnboardingController.php` | S03 | 2 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/WorkspaceUsageController.php` | S03, S09 | 2 | 1 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Middleware/CorrelateRequest.php` | S13 | 1 | 1 | Conciliar evidencia por función |
@@ -167,6 +167,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Support/Auth/SecurityIncidentNotice.php` | S01 | 4 | 3 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/Auth/SessionRevocationAdmission.php` | S01 | 3 | 3 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/Auth/VerificationResend.php` | S01 | 1 | 1 | Conciliar evidencia por función |
+| `backend-laravel/app/Support/BoundedPositiveInteger.php` | S13 | 1 | 0 | Propietario provisional |
 | `backend-laravel/app/Support/Csv.php` | S13 | 4 | 2 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/DestinationDenylist.php` | S11 | 20 | 6 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/DestinationReputationService.php` | S11 | 22 | 7 | Conciliar evidencia por función |
@@ -191,6 +192,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Support/InvitationBudgetUnavailable.php` | S03 | 0 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/InvitationMailBudget.php` | S03 | 4 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/IsoDate.php` | S13 | 4 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Support/LegalIdentity.php` | S13 | 2 | 0 | Propietario provisional |
 | `backend-laravel/app/Support/LinkBlockReason.php` | S11 | 5 | 1 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/LinkIntentLifetime.php` | S04 | 1 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/LinkIntentRegistry.php` | S04 | 6 | 2 | Conciliar evidencia por función |
@@ -221,6 +223,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Support/QueueBacklog.php` | S13 | 6 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/RedirectService.php` | S05 | 13 | 5 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/RegistrationEdit.php` | S01 | 11 | 0 | Conciliar evidencia por función |
+| `backend-laravel/app/Support/RegistrationGate.php` | S13 | 3 | 3 | Propietario provisional |
 | `backend-laravel/app/Support/ReleaseReadiness.php` | S13 | 1 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/ReputationProvider.php` | S11 | 0 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Support/ReputationVerdict.php` | S11 | 11 | 0 | Conciliar evidencia por función |
@@ -277,6 +280,11 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/routes/web.php` | S13 | 0 | 1 | Conciliar evidencia por función |
 | `frontend/public/hcaptcha-frame.html` | S01 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/public/hcaptcha-frame.v1.js` | S01 | 8 | 4 | Conciliar evidencia por función |
+| `frontend/public/legal/versions/2026-08-30/privacidad.html` | S12 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/public/legal/versions/2026-08-30/terminos.html` | S12 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/public/legal/versions/2026-10-09/privacidad.html` | S12 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/public/legal/versions/2026-10-09/terminos.html` | S12 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/public/legal/versions/archive.css` | S12 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/public/theme-init.v1.js` | S12 | 0 | 1 | Conciliar evidencia por función |
 | `frontend/public/uvh-password-policy.v1.js` | S01 | 6 | 2 | Conciliar evidencia por función |
 | `frontend/src/app/app.component.ts` | S13 | 1 | 1 | Conciliar evidencia por función |
@@ -324,13 +332,14 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/core/idempotent-intent.ts` | S13 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/interceptors/api.interceptor.ts` | S13 | 4 | 3 | Conciliar evidencia por función |
 | `frontend/src/app/core/invitation-status-label.ts` | S03 | 1 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/legal-documents.ts` | S13 | 0 | 0 | Propietario provisional |
 | `frontend/src/app/core/link-appeal-status.ts` | S11 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/link-state-label.ts` | S04 | 2 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/mail-outbox-state-label.ts` | S10 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/models.ts` | S13 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/notification-kinds.ts` | S10 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/paginator-intl.ts` | S13 | 1 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/core/privacy-right-label.ts` | S02 | 3 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/privacy-right-label.ts` | S02 | 5 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/public-theme-toggle.component.ts` | S12 | 2 | 5 | Conciliar evidencia por función |
 | `frontend/src/app/core/queue-paging.ts` | S13 | 6 | 2 | Conciliar evidencia por función |
 | `frontend/src/app/core/read-deadline.ts` | S13 | 5 | 3 | Conciliar evidencia por función |
@@ -342,7 +351,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/core/services/account-mfa.service.ts` | S01 | 5 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/account-profile.service.ts` | S01 | 3 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/account-sessions.service.ts` | S01 | 4 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/core/services/admin-response-decoders.ts` | S11 | 18 | 9 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/admin-response-decoders.ts` | S11 | 19 | 9 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/api.service.ts` | S13 | 24 | 16 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/auth-entry.service.ts` | S01 | 6 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/auth-response-decoders.ts` | S01, S02 | 30 | 6 | Conciliar evidencia por función |
@@ -350,6 +359,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/core/services/auth-user-mutations.ts` | S01 | 3 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/auth.service.ts` | S01, S02 | 60 | 16 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/browser-download.ts` | S02 | 1 | 1 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/copy-feedback.service.ts` | S13 | 7 | 5 | Propietario provisional |
 | `frontend/src/app/core/services/credential-response-decoders.ts` | S07, S08, S13 | 16 | 4 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/domain-response-decoders.ts` | S06 | 9 | 5 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/handoff-response-decoders.ts` | S03 | 4 | 0 | Conciliar evidencia por función |
@@ -362,10 +372,13 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/core/services/pending-handoff.service.ts` | S03 | 15 | 20 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/pending-invitation.service.ts` | S03 | 5 | 3 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/pending-link-intent.service.ts` | S04 | 7 | 3 | Conciliar evidencia por función |
-| `frontend/src/app/core/services/privacy-response-decoders.ts` | S02 | 3 | 1 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/privacy-response-decoders.ts` | S02 | 5 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/public-action-response-decoders.ts` | S01, S02 | 6 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/core/services/public-response-decoders.ts` | S12 | 1 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/public-response-decoders.ts` | S12 | 2 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/public-status-response.ts` | S12 | 2 | 5 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/qr-brand.ts` | S13 | 1 | 0 | Propietario provisional |
+| `frontend/src/app/core/services/qr-code.service.ts` | S13 | 2 | 4 | Propietario provisional |
+| `frontend/src/app/core/services/qr-renderer.ts` | S13 | 1 | 0 | Propietario provisional |
 | `frontend/src/app/core/services/registration.service.ts` | S01 | 3 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/response-decoder-helpers.ts` | S13 | 15 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/retry-after.ts` | S13 | 1 | 0 | Conciliar evidencia por función |
@@ -387,22 +400,24 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/help/help.component.ts` | S12 | 6 | 7 | Conciliar evidencia por función |
 | `frontend/src/app/landing/landing.component.html` | S12 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/landing/landing.component.scss` | S12 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/landing/landing.component.ts` | S12 | 19 | 11 | Conciliar evidencia por función |
+| `frontend/src/app/landing/landing.component.ts` | S12 | 25 | 17 | Conciliar evidencia por función |
 | `frontend/src/app/legal/legal-doc.scss` | S12 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/legal/legal-identity.service.ts` | S12 | 1 | 3 | Conciliar evidencia por función |
+| `frontend/src/app/legal/legal-document-navigation.component.scss` | S12 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/legal/legal-document-navigation.component.ts` | S12 | 11 | 15 | Conciliar evidencia por función |
+| `frontend/src/app/legal/legal-identity.service.ts` | S12 | 2 | 3 | Conciliar evidencia por función |
 | `frontend/src/app/legal/legal-shell.component.html` | S12 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/legal/legal-shell.component.scss` | S12 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/legal/legal-shell.component.ts` | S12 | 1 | 2 | Conciliar evidencia por función |
+| `frontend/src/app/legal/legal-shell.component.ts` | S12 | 6 | 3 | Conciliar evidencia por función |
 | `frontend/src/app/legal/legal.routes.ts` | S12 | 3 | 3 | Conciliar evidencia por función |
 | `frontend/src/app/legal/privacy.component.html` | S02 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/legal/privacy.component.ts` | S02 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/legal/report.component.html` | S12 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/legal/report.component.scss` | S12 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/legal/report.component.ts` | S12 | 7 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/legal/report.component.ts` | S12 | 9 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/legal/terms.component.html` | S12 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/legal/terms.component.ts` | S12 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/action-dialog.component.ts` | S12 | 3 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/action-dialog.service.ts` | S12 | 2 | 2 | Conciliar evidencia por función |
+| `frontend/src/app/panel/action-dialog.service.ts` | S12 | 3 | 3 | Conciliar evidencia por función |
 | `frontend/src/app/panel/activity/activity-page.ts` | S09 | 5 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/panel/activity/activity.component.html` | S09 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/activity/activity.component.scss` | S09 | 0 | 0 | Conciliar evidencia por función |
@@ -419,18 +434,19 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/panel/admin/admin-view-context.ts` | S11 | 5 | 6 | Conciliar evidencia por función |
 | `frontend/src/app/panel/admin/admin.component.html` | S11 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/admin/admin.component.scss` | S11 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/admin/admin.component.ts` | S11 | 72 | 15 | Conciliar evidencia por función |
+| `frontend/src/app/panel/admin/admin.component.ts` | S11 | 74 | 20 | Conciliar evidencia por función |
 | `frontend/src/app/panel/admin/moderation-card.scss` | S11 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/analytics/analytics.component.html` | S09 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/analytics/analytics.component.scss` | S09 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/analytics/analytics.component.ts` | S09 | 10 | 4 | Conciliar evidencia por función |
 | `frontend/src/app/panel/analytics/charts.component.html` | S09 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/analytics/charts.component.scss` | S09 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/analytics/charts.component.ts` | S09 | 7 | 18 | Conciliar evidencia por función |
+| `frontend/src/app/panel/analytics/charts.component.ts` | S09 | 8 | 19 | Conciliar evidencia por función |
 | `frontend/src/app/panel/async-operation-status.component.ts` | S12 | 0 | 2 | Conciliar evidencia por función |
+| `frontend/src/app/panel/copy-feedback-icon.component.ts` | S13 | 0 | 0 | Propietario provisional |
 | `frontend/src/app/panel/dashboard/dashboard.component.html` | S09 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/dashboard/dashboard.component.scss` | S09 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/dashboard/dashboard.component.ts` | S09 | 12 | 13 | Conciliar evidencia por función |
+| `frontend/src/app/panel/dashboard/dashboard.component.ts` | S09 | 13 | 11 | Conciliar evidencia por función |
 | `frontend/src/app/panel/dialog-identity.scss` | S12 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/domains/domain-detail.component.html` | S06 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/domains/domain-detail.component.scss` | S06 | 0 | 0 | Conciliar evidencia por función |
@@ -446,7 +462,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/panel/links/csv-import-dialog.component.ts` | S04 | 10 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/link-detail.component.html` | S04 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/link-detail.component.scss` | S04 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/links/link-detail.component.ts` | S04 | 19 | 8 | Conciliar evidencia por función |
+| `frontend/src/app/panel/links/link-detail.component.ts` | S04 | 20 | 7 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/link-dialog.component.html` | S04 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/link-dialog.component.scss` | S04 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/link-dialog.component.ts` | S04 | 29 | 24 | Conciliar evidencia por función |
@@ -456,8 +472,10 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/panel/links/link-trash.component.ts` | S04 | 9 | 6 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/links.component.html` | S04 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/links.component.scss` | S04 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/links/links.component.ts` | S04 | 41 | 24 | Conciliar evidencia por función |
-| `frontend/src/app/panel/links/qr-dialog.component.ts` | S04 | 3 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/panel/links/links.component.ts` | S04 | 42 | 22 | Conciliar evidencia por función |
+| `frontend/src/app/panel/links/qr-dialog.component.html` | S04 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/panel/links/qr-dialog.component.scss` | S04 | 0 | 0 | Conciliar evidencia por función |
+| `frontend/src/app/panel/links/qr-dialog.component.ts` | S04 | 11 | 4 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/tags-dialog.component.ts` | S04 | 7 | 8 | Conciliar evidencia por función |
 | `frontend/src/app/panel/notifications/notifications.component.html` | S10 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/notifications/notifications.component.scss` | S10 | 0 | 0 | Conciliar evidencia por función |
@@ -491,7 +509,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/panel/settings/password-change-dialog.component.ts` | S01 | 8 | 2 | Conciliar evidencia por función |
 | `frontend/src/app/panel/settings/settings.component.html` | S02 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/settings/settings.component.scss` | S02 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/settings/settings.component.ts` | S01, S02 | 86 | 26 | Conciliar evidencia por función |
+| `frontend/src/app/panel/settings/settings.component.ts` | S01, S02 | 93 | 28 | Conciliar evidencia por función |
 | `frontend/src/app/panel/team/invitation-retry.service.ts` | S03 | 4 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/team/team.component.html` | S03 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/team/team.component.scss` | S03 | 0 | 0 | Conciliar evidencia por función |

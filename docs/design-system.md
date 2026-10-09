@@ -179,3 +179,14 @@ ficticios y no acreditan comportamiento.
   decidir si se elimina.
 - Los overlays sí conservan elevación real: el diálogo usa `--uvh-shadow-lg` y
   el menú `--uvh-shadow-md`. Es intencional.
+
+## Preferencia del titular: microinteracciones cuidadas
+
+Confirmada expresamente el 9 de octubre de 2026: las microinteracciones tienen mucho peso en la experiencia de UVH. Diseñar respuestas perceptibles al hover, teclado, pulsación, apertura, validación, espera y confirmación; deben explicar lo que cambia y mantener la identidad existente. Priorizar transiciones de 180–280 ms y confirmaciones puntuales, sin retrasar acciones ni introducir movimientos repetidos en reposo. Usar transform/opacity cuando corresponda, y conservar un estado inmediato y legible con prefers-reduced-motion. Nunca mostrar éxito o animarlo antes de confirmar la respuesta del servidor. El recorrido de lectura es sólo posición visual y no evidencia de aceptación legal.
+
+
+### Feedback compartido de copia
+
+Dashboard, lista y detalle usan `CopyFeedbackService` por vista y `CopyFeedbackIconComponent`: espera visible, check dibujado tras resolver `Clipboard.writeText` y error recuperable. No abrir el destino ni leer el portapapeles. Los intentos en curso se agrupan; sesión, revisión del workspace y contexto del detalle invalidan respuestas antiguas. Una espera de permisos vence a los 20 segundos y la confirmación temporal se limpia a los 2,4 segundos. La destrucción cancela los temporizadores. Mientras hay una copia pendiente, los otros controles de copia de esa vista quedan temporalmente desactivados. El feedback de éxito/error también se comunica mediante el snackbar existente.
+
+Los botones compartidos del panel tienen respuesta de pulsación; la elevación al hover sólo se aplica con puntero preciso. Los iconos de menú acompañan hover o foco de teclado con un desplazamiento de 2 px. Los controles deshabilitados u ocupados no reciben estas transformaciones. Mantener `prefers-reduced-motion` en cada primitiva nueva y evitar que una etiqueta de confirmación cambie el ancho del botón.
