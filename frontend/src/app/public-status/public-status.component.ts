@@ -8,12 +8,12 @@ import { decodePublicStatus } from "../core/services/public-status-response";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
-import { PublicThemeToggleComponent } from "../core/public-theme-toggle.component";
+import { LegalShellComponent } from "../legal/legal-shell.component";
 
 @Component({
   selector: "app-public-status",
   standalone: true,
-  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, PublicThemeToggleComponent],
+  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, LegalShellComponent],
   templateUrl: "./public-status.component.html",
   styleUrl: "./public-status.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,7 +24,6 @@ export class PublicStatusComponent implements OnInit {
   readonly loading = signal(true);
   readonly snapshot = signal<PublicStatusSnapshot | null>(null);
   readonly unavailable = signal(false);
-  readonly year = new Date().getFullYear();
   // Unknown is also a valid server projection, not only a transport failure.
   // A stale snapshot must never keep the page painted as currently healthy.
   readonly unknown = computed(() => {

@@ -1,24 +1,19 @@
-<div class="status-shell">
-  <a class="skip-link" href="#service-status" (click)="$event.preventDefault(); content.focus()">Ir al estado del servicio</a>
-  <header class="public-header">
-    <a class="brand" routerLink="/" aria-label="UVH, inicio">uvh<span>.</span></a><span class="brand-caption">Enlaces con recorrido.</span>
-    <nav aria-label="Navegación pública"><a routerLink="/help">Ayuda</a><a routerLink="/auth/login">Iniciar sesión</a></nav><app-public-theme-toggle />
-  </header>
-  <main #content id="service-status" tabindex="-1" aria-labelledby="status-title">
+<app-legal-shell>
+  <section id="service-status" class="status-content" tabindex="-1" aria-labelledby="status-title">
     <div class="page-heading">
-      <div><p class="eyebrow">Disponibilidad / Medición externa</p><h1 id="status-title">Estado del servicio</h1><p class="intro">Una lectura de la disponibilidad de UVH a partir del monitor externo. Que esta página cargue no significa que todos los servicios funcionen.</p></div>
+      <div><h1 id="status-title">Estado del servicio</h1><p class="intro">Consulta la última medición del monitor externo, el estado de cada servicio y los incidentes comunicados.</p></div>
       <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()"><mat-icon aria-hidden="true">refresh</mat-icon>{{ loading() ? 'Consultando…' : 'Actualizar estado' }}</button>
     </div>
 
     @if (loading() && !snapshot()) {
-      <section class="state-card loading" role="status"><span class="state-icon" aria-hidden="true"><mat-icon>hourglass_empty</mat-icon></span><div><span class="eyebrow">Consulta en curso</span><h2>Buscando la última medición.</h2><p>Todavía no hay un resultado que mostrar.</p><mat-progress-bar mode="indeterminate" aria-label="Consultando medición externa" /></div></section>
+      <section class="state-card loading" role="status" animate.enter="status-enter"><span class="state-icon" aria-hidden="true"><mat-icon>hourglass_empty</mat-icon></span><div><span class="eyebrow">Consulta en curso</span><h2>Buscando la última medición.</h2><p>Todavía no hay un resultado que mostrar.</p><mat-progress-bar mode="indeterminate" aria-label="Consultando medición externa" /></div></section>
     } @else if (unknown()) {
-      <section class="state-card unknown" role="status"><span class="state-icon" aria-hidden="true"><mat-icon>help_outline</mat-icon></span><div><span class="eyebrow">Sin confirmación externa</span><h2>Estado desconocido</h2><p>No hay una medición externa reciente y válida. No asumimos que el servicio esté operativo ni que esté caído.</p></div></section>
+      <section class="state-card unknown" role="status" animate.enter="status-enter"><span class="state-icon" aria-hidden="true"><mat-icon>help_outline</mat-icon></span><div><span class="eyebrow">Sin confirmación externa</span><h2>Estado desconocido</h2><p>No hay una medición externa reciente y válida. No asumimos que el servicio esté operativo ni que esté caído.</p></div></section>
       <div class="unknown-guidance"><h3>¿Qué puedes hacer ahora?</h3><p>Vuelve a consultar el estado dentro de unos minutos. Si estás resolviendo un problema concreto, la ayuda puede orientarte aunque no haya una medición disponible.</p><a routerLink="/help">Consultar la ayuda<mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
     } @else if (snapshot(); as state) {
-      <section class="state-card" [attr.data-status]="state.overall" role="status"><span class="state-icon" aria-hidden="true"><mat-icon>{{ statusIcon(state.overall) }}</mat-icon></span><div><span class="eyebrow">Resultado de la medición disponible</span><h2>{{ statusLabel(state.overall) }}</h2><p>Generada el <time [attr.datetime]="state.generatedAt">{{ state.generatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</time> · hora de tu dispositivo.</p></div></section>
+      <section class="state-card" [attr.data-status]="state.overall" role="status" animate.enter="status-enter"><span class="state-icon" aria-hidden="true"><mat-icon>{{ statusIcon(state.overall) }}</mat-icon></span><div><span class="eyebrow">Resultado de la medición disponible</span><h2>{{ statusLabel(state.overall) }}</h2><p>Generada el <time [attr.datetime]="state.generatedAt">{{ state.generatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</time> · hora de tu dispositivo.</p></div></section>
       @if (loading()) { <p class="refresh-note" role="status">Consultando de nuevo. Mientras tanto se muestra la medición anterior.</p> }
-      <section class="components" aria-labelledby="components-title"><div class="section-heading"><h2 id="components-title">Servicio por servicio</h2><span>{{ state.components.length }} componentes públicos</span></div>
+      <section class="components" aria-labelledby="components-title"><div class="section-heading"><h2 id="components-title">Estado por servicio</h2><span>{{ state.components.length }} componentes públicos</span></div>
         <div class="component-grid">@for (component of state.components; track component.id) {
           <article [attr.data-status]="component.status"><span class="component-icon" aria-hidden="true"><mat-icon>{{ component.id === 'links' ? 'link' : component.id === 'panel' ? 'space_dashboard' : 'webhook' }}</mat-icon></span><h3>{{ component.label }}</h3><p class="component-state"><mat-icon aria-hidden="true">{{ statusIcon(component.status) }}</mat-icon>{{ statusLabel(component.status) }}</p></article>
         }</div>
@@ -31,7 +26,6 @@
       </section>
     }
 
-    <details class="reading-guide"><summary>Cómo leer esta página<mat-icon aria-hidden="true">expand_more</mat-icon></summary><div><p><b>Mediciones, no promesas.</b> Se muestra una instantánea del monitor externo, no una comprobación continua desde tu navegador. Usa «Actualizar estado» para consultar otra vez.</p><p><b>Sin señal no significa operativo.</b> Si el feed falta, está caducado o no cumple el contrato, el resultado es desconocido. No publicamos versiones, direcciones internas ni topología.</p><p><b>Una página no demuestra independencia.</b> La continuidad del monitor durante una caída de UVH debe verificarse en el despliegue. El diseño de esta pantalla no acredita esa prueba.</p></div></details>
-  </main>
-  <footer><span>© {{ year }} UVH / Estado del servicio</span><nav aria-label="Información y soporte"><a routerLink="/help">Ayuda</a><a routerLink="/legal/privacidad">Privacidad</a></nav></footer>
-</div>
+    <details class="reading-guide"><summary>Cómo interpretar el estado<mat-icon aria-hidden="true">expand_more</mat-icon></summary><div><p><b>Última medición.</b> Los datos muestran el resultado y la fecha del monitor externo. Esta página no comprueba los servicios continuamente; usa «Actualizar estado» para consultar otra vez.</p><p><b>Estado desconocido.</b> Si no hay una medición reciente y válida, no podemos confirmar la disponibilidad. Vuelve a consultar más tarde.</p><p><b>Estado por servicio.</b> Revisa también cada componente. Que esta página cargue o que no haya incidentes publicados no garantiza que todos los servicios funcionen.</p></div></details>
+  </section>
+</app-legal-shell>

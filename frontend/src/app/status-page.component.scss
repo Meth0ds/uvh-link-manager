@@ -2,22 +2,14 @@
 .skip-link {
   position: absolute; left: 16px; top: -60px; z-index: 30;
   padding: 12px 18px; background: var(--accent, #b53c20); color: var(--accent-ink, #fffaf0);
-  font: 700 12px Manrope, sans-serif; text-decoration: none;
+  font: 700 14px Manrope, sans-serif; text-decoration: none;
   transition: top 140ms ease;
 }
 .skip-link:focus-visible { top: 14px; }
 app-public-theme-toggle { position: fixed; top: 22px; right: 24px; z-index: 20; }
 main { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 48px 24px; outline: none; }
 .wrap { width: min(640px, 100%); text-align: center; animation: status-in 380ms ease-out; }
-.kicker {
-  display: inline-flex; align-items: center; gap: 12px; margin: 0 0 30px;
-  color: var(--muted, #626357);
-  font: 11px "Courier New", monospace; letter-spacing: .16em; text-transform: uppercase;
-}
-.kicker::before, .kicker::after {
-  content: ""; width: 34px; height: 1px;
-  background: color-mix(in srgb, var(--ink, #262821) 22%, transparent);
-}
+.kicker { margin: 0 0 28px; color: var(--muted, #626357); font: 700 14px/1.7 Manrope, sans-serif; }
 h1 { margin: 0; }
 .code {
   display: block;
@@ -33,19 +25,23 @@ h1 { margin: 0; }
 .lead {
   max-width: 46ch; margin: 18px auto 34px;
   color: var(--muted, #626357);
-  font: 400 13px/1.8 Manrope, sans-serif;
+  font: 400 16px/1.8 Manrope, sans-serif;
 }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 .actions a {
   display: inline-flex; align-items: center; gap: 9px;
-  min-height: 48px; padding-inline: 20px; border-radius: 3px;
-  font: 700 12px Manrope, sans-serif;
+  min-height: 48px; padding-inline: 20px; border-radius: 6px;
+  font: 700 14px Manrope, sans-serif;
 }
 .actions mat-icon { width: 18px; height: 18px; font-size: 18px; }
 a:focus-visible { outline: 3px solid var(--accent, #b53c20); outline-offset: 3px; }
-@keyframes status-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes status-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (max-width: 560px) {
   .actions { flex-direction: column; }
   .actions a { justify-content: center; }
 }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.actions mat-icon { transition: transform 180ms ease; }
+@media (hover: hover) and (pointer: fine) { .actions a:hover mat-icon { transform: translateX(2px); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
