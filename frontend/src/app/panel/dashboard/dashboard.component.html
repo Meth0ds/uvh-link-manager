@@ -1,5 +1,5 @@
 <app-page-header icon="space_dashboard" eyebrow="Vista general" [title]="workspaceName() || 'Tu panel de trabajo'"
-  description="Retoma tus enlaces, consulta su recorrido y prepara lo siguiente.">
+  description="Gestiona tus enlaces recientes y consulta los clics del periodo seleccionado.">
   @if (canCreate()) {
     <button mat-flat-button class="create-link" type="button" (click)="newLink()"><mat-icon aria-hidden="true">add_link</mat-icon> Crear enlace</button>
   }
@@ -29,7 +29,7 @@
 }
 @if (analyticsLoading() && !overview()) { <p class="loading-note" role="status">Cargando la actividad del periodo…</p> }
 @if (!hasWorkspace()) {
-  <section class="quiet-state"><mat-icon aria-hidden="true">workspaces</mat-icon><h2>Elige dónde trabajar</h2><p>Selecciona o crea un workspace desde la navegación para ver sus enlaces. Cada espacio mantiene sus propios datos.</p></section>
+  <section class="quiet-state"><mat-icon aria-hidden="true">workspaces</mat-icon><h2>Selecciona un workspace</h2><p>Selecciona o crea un workspace desde la navegación para ver sus enlaces. Cada espacio mantiene sus propios datos.</p></section>
 }
 
 @if (overview(); as o) {
@@ -63,12 +63,12 @@
           <a class="recent-main" [routerLink]="['/app/links', l.id]" [attr.aria-label]="'Abrir enlace ' + displayUrl(l.shortUrl)"><b>{{ displayUrl(l.shortUrl) }}</b><span>{{ l.destination }}</span></a>
           <span class="link-state" [class.is-active]="l.state === 'active'">{{ stateLabel(l.state) }}</span>
           <span class="clicks"><b>{{ formatCount(l.clickCount) }}</b><small>acumulados</small></span>
-          <button mat-icon-button type="button" (click)="copy(l.shortUrl)" [attr.aria-label]="'Copiar enlace ' + displayUrl(l.shortUrl)"><mat-icon aria-hidden="true">content_copy</mat-icon></button>
+          <button mat-icon-button type="button" (click)="copy(l.shortUrl)" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(l.shortUrl, copyScope) === 'copying'" [attr.aria-label]="'Copiar enlace ' + displayUrl(l.shortUrl)"><app-copy-feedback-icon [phase]="copyFeedback.phase(l.shortUrl, copyScope)" /></button>
         </li>
       }
     </ul>
     @if (recentLoaded() && !recentError() && !recentLoading() && !recent().length) {
-      <div class="quiet-state"><mat-icon aria-hidden="true">add_link</mat-icon><h3>Haz sitio al primer enlace.</h3>
+      <div class="quiet-state"><mat-icon aria-hidden="true">add_link</mat-icon><h3>Todavía no hay enlaces</h3>
         <p>{{ canCreate() ? 'Empieza por un destino que conozcas. Después podrás editarlo, compartirlo y consultar su actividad.' : 'Aquí aparecerán los enlaces que cree el equipo. Tu rol permite consultarlos y copiar su URL.' }}</p>
         @if (canCreate()) { <button mat-flat-button type="button" (click)="newLink()">Crear mi primer enlace</button> }
       </div>
@@ -78,7 +78,7 @@
 
 @if (overview(); as o) {
   <section class="activity-section" aria-labelledby="activity-title">
-    <div class="section-header"><div><h2 id="activity-title">El pulso de tus enlaces</h2></div><a class="text-link" routerLink="/app/analytics">Abrir analítica <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+    <div class="section-header"><div><h2 id="activity-title">Evolución de los clics</h2></div><a class="text-link" routerLink="/app/analytics">Abrir analítica <mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
     <app-charts [overview]="o" [showBreakdowns]="false" />
   </section>
 
@@ -116,8 +116,8 @@
 
 @if (hasWorkspace()) {
   <nav class="workbench" aria-label="Accesos rápidos del workspace">
-    <a routerLink="/app/links" class="workbench-primary"><span class="workbench-icon"><mat-icon aria-hidden="true">link</mat-icon></span><span><b>Tu archivo de enlaces</b><small>Busca, consulta y comparte lo que has publicado.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
-    <a routerLink="/app/analytics"><span class="workbench-icon"><mat-icon aria-hidden="true">query_stats</mat-icon></span><span><b>Entiende el recorrido</b><small>Consulta clics, fuentes y periodos.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
+    <a routerLink="/app/links" class="workbench-primary"><span class="workbench-icon"><mat-icon aria-hidden="true">link</mat-icon></span><span><b>Gestionar enlaces</b><small>Busca, consulta y comparte lo que has publicado.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
+    <a routerLink="/app/analytics"><span class="workbench-icon"><mat-icon aria-hidden="true">query_stats</mat-icon></span><span><b>Consultar la analítica</b><small>Consulta clics, fuentes y periodos.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
     <a routerLink="/app/team"><span class="workbench-icon"><mat-icon aria-hidden="true">group</mat-icon></span><span><b>Trabaja en equipo</b><small>Consulta quién forma parte de este espacio.</small></span><mat-icon class="workbench-arrow" aria-hidden="true">arrow_forward</mat-icon></a>
   </nav>
 }

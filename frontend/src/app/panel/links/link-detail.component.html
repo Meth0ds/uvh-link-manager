@@ -26,7 +26,7 @@
         </div>
       </div>
       <div class="actions">
-        <button mat-stroked-button (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar</button>
+        <button class="copy-action" mat-stroked-button [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(link.shortUrl, copyScope) === 'copying'" (click)="copy(link.shortUrl)"><app-copy-feedback-icon [phase]="copyFeedback.phase(link.shortUrl, copyScope)" /> {{ copyFeedback.phase(link.shortUrl, copyScope) === 'copied' ? 'Copiado' : copyFeedback.phase(link.shortUrl, copyScope) === 'copying' ? 'Copiando…' : 'Copiar' }}</button>
         <button mat-stroked-button (click)="showQr()"><mat-icon>qr_code_2</mat-icon> QR</button>
         @if (canWrite()) {
           <button mat-flat-button color="primary" (click)="edit()" [disabled]="actionBusy()"><mat-icon>edit</mat-icon> Editar</button>

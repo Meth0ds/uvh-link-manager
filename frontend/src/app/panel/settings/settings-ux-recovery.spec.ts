@@ -186,9 +186,10 @@ describe("Settings UX recovery", () => {
   });
 
   it("recovers closure prerequisites through the retry control without opening a mutation", async () => {
+    open("danger"); await fixture.whenStable();
     auth.accountDeletionImpact.and.rejectWith(new ApiRequestError("No se pudo comprobar el cierre", 503));
     await fixture.componentInstance.loadDeletionImpact(false);
-    open("danger");
+    fixture.detectChanges();
     auth.accountDeletionImpact.and.resolveTo({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null });
     fixture.nativeElement.querySelector('.deletion-read-error button').click();
     await fixture.whenStable(); fixture.detectChanges();
@@ -197,13 +198,14 @@ describe("Settings UX recovery", () => {
     expect(TestBed.inject(MatDialog).open).not.toHaveBeenCalled();
   });
 
-  it("names each notification frequency by its actual notice", () => {
+  it("names each notification frequency by its actual notice", async () => {
+    open("notifications"); await fixture.whenStable();
     fixture.componentInstance.notificationPrefsLoading.set(false);
     fixture.componentInstance.notificationPreferences.set([
       { kind: "api_token_created", category: "operational", delivery: "immediate" },
       { kind: "webhook_exhausted", category: "operational", delivery: "daily_digest" },
     ]);
-    open("notifications");
+    fixture.detectChanges();
     const names = [...fixture.nativeElement.querySelectorAll('.pref-row [role="combobox"]')].map((x) => (x as HTMLElement).getAttribute("aria-label"));
     expect(names).toEqual(["Frecuencia de Se creó un token de API", "Frecuencia de Una entrega de webhook requiere revisión"]);
   });

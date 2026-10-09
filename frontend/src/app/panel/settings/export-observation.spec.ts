@@ -44,11 +44,9 @@ describe("Export observation with real account transport", () => {
   });
   afterEach(() => { fixture?.destroy(); http.verify(); });
   function sideReads(): void {
-    http.expectOne("/api/v1/auth/sessions").flush({ sessions: [], truncated: false });
     http.expectOne("/api/v1/auth/data-export/history").flush({ exports: [] });
-    http.expectOne("/api/v1/auth/account-deletion").flush({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null });
     http.expectOne((r) => r.url === "/api/v1/auth/privacy-requests").flush({ requests: [], total: 0, page: 1, perPage: 5 });
-    http.expectOne("/api/v1/notifications/preferences").flush({ preferences: [] });
+    http.expectNone(r => ["/api/v1/auth/sessions", "/api/v1/auth/account-deletion", "/api/v1/notifications/preferences"].includes(r.url));
   }
   function start(): TestRequest {
     auth.user.set(user()); auth.loaded.set(true);

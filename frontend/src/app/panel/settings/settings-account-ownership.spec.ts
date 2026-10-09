@@ -60,8 +60,18 @@ describe("Settings private account ownership with real auth transport", () => {
   function mount(): SettingsComponent {
     auth.user.set(user()); auth.loaded.set(true);
     fixture = TestBed.createComponent(SettingsComponent); fixture.detectChanges();
+    activateAllSections();
     finishReads(); fixture.detectChanges(); snack.open.calls.reset();
     return fixture.componentInstance;
+  }
+  // Ownership scenarios intentionally exercise every private projection. The
+  // view now loads those snapshots by visiting their task, rather than eagerly
+  // on Profile. Keep the same transport and cleanup assertions after visits.
+  function activateAllSections(): void {
+    for (const id of ["security", "notifications", "privacy", "danger", "account"]) {
+      fixture.componentInstance.goToSection(new MouseEvent("click", { cancelable: true }), fixture.nativeElement.querySelector(`#${id}`));
+      fixture.detectChanges();
+    }
   }
   function changeAccount(id = 2): void {
     void auth.me();
@@ -69,6 +79,7 @@ describe("Settings private account ownership with real auth transport", () => {
     flushMicrotasks();
     for (const r of http.match("/api/v1/workspaces")) r.flush({ workspaces: [] });
     flushMicrotasks(); fixture.detectChanges();
+    activateAllSections();
   }
 
   it("navigates after its own confirmed current-device revocation despite account cleanup", fakeAsync(() => {
@@ -364,7 +375,7 @@ describe("Settings private account ownership with real auth transport", () => {
     expect(probe.request.headers.has("X-Uvh-Account-Id")).toBeFalse();
     probe.flush({ user: user(2) }); flushMicrotasks();
     http.expectOne("/api/v1/workspaces").flush({ workspaces: [] }); flushMicrotasks();
-    fixture.detectChanges(); finishReads(2);
+    fixture.detectChanges(); activateAllSections(); finishReads(2);
     answer(true); flushMicrotasks();
     expect(auth.user()?.id).toBe(2);
     expect(c.privacyRequests()[0]?.id).toBe(2);

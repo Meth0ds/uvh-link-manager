@@ -29,13 +29,17 @@ import {
   decodeLinkActivityResponse,
   decodeLinkDetailResponse,
 } from "../../core/services/link-response-decoders";
+import { CopyFeedbackService } from "../../core/services/copy-feedback.service";
+import { CopyFeedbackIconComponent } from "../copy-feedback-icon.component";
 import { linkStateLabel } from "../../core/link-state-label";
 import { linkAppealStatusLabel } from "../../core/link-appeal-status";
 
 @Component({
   selector: "app-link-detail",
   standalone: true,
+  providers: [CopyFeedbackService],
   imports: [
+    CopyFeedbackIconComponent,
     RouterLink,
     MatButtonModule,
     MatIconModule,
@@ -60,6 +64,8 @@ export class LinkDetailComponent {
   private snackbar = inject(MatSnackBar);
   private dialog = inject(MatDialog);
   private workspaces = inject(WorkspaceService);
+  readonly copyFeedback = inject(CopyFeedbackService);
+  readonly copyScope = () => `${this.workspaces.currentId()}:${this.workspaces.selectionGeneration()}:${this.copyRouteRevision()}:${this.linkId()}:${this.link()?.shortUrl ?? ""}`;
   private actions = inject(ActionDialogService);
   private linkDialog = inject(LinkDialogService);
   private readonly loadRequests = new LatestRequest(inject(DestroyRef));
@@ -112,12 +118,16 @@ export class LinkDetailComponent {
    * while the URL names another one.
    */
   private readonly linkId = signal(this.paramId());
+  private readonly copyRouteRevision = signal(0);
 
   /** `workspace:link` the current view belongs to; null while unresolved. */
   private loadedContext: string | null = null;
 
   constructor() {
-    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => this.linkId.set(this.paramId()));
+    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.copyRouteRevision.update(revision => revision + 1);
+      this.linkId.set(this.paramId());
+    });
 
     effect(() => {
       const workspaceId = this.workspaces.currentId();
@@ -270,21 +280,11 @@ export class LinkDetailComponent {
     await this.loadAnalytics();
   }
 
-  copy(url: string): void {
-    const write = navigator.clipboard?.writeText(url);
-    if (!write) {
-      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
-      return;
-    }
-    void write.then(
-      () => this.snackbar.open("Enlace copiado", "Cerrar", { duration: 2000 }),
-      () => this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }),
-    );
-  }
+  copy(url: string): void { this.copyFeedback.copy(url, this.copyScope); }
 
   showQr(): void {
     const l = this.link();
-    if (l) this.dialog.open(QrDialogComponent, { data: l.shortUrl });
+    if (l) this.dialog.open(QrDialogComponent, { data: l.shortUrl, width: "760px", maxWidth: "calc(100vw - 32px)" });
   }
 
   edit(): void {

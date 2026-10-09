@@ -1,0 +1,74 @@
+<h2 mat-dialog-title>
+  <span class="title-icon" aria-hidden="true"><mat-icon>qr_code_2</mat-icon></span>
+  <span><b>QR del enlace</b><small>Personalízalo y descarga tu archivo</small></span>
+</h2>
+<mat-dialog-content class="qr-body">
+  <div class="qr-layout">
+    <figure class="qr-preview" [attr.aria-busy]="previewBusy()">
+      <div class="qr-preview-stage" [class.updating]="previewBusy()">
+        @if (dataUrl()) {
+          <img [src]="dataUrl()" alt="Código QR de {{ url }}" class="qr-img" width="240" height="240" />
+        } @else {
+          <mat-icon class="preview-placeholder" aria-hidden="true">qr_code_2</mat-icon>
+        }
+      </div>
+      @if (previewBusy()) {
+        <mat-progress-bar mode="indeterminate" aria-label="Generando vista previa del QR" />
+        <p class="preview-status" role="status">Actualizando vista previa…</p>
+      }
+      <figcaption class="url tnum">{{ url }}</figcaption>
+      <p class="export-summary">PNG · {{ downloadSize() }} × {{ downloadSize() }} px</p>
+    </figure>
+    <section class="qr-options" aria-labelledby="qr-options-title">
+      <div class="options-heading">
+        <h3 id="qr-options-title">Opciones del QR</h3>
+        <button mat-icon-button type="button" (click)="resetOptions()" [disabled]="downloadBusy() || isDefault()"
+          aria-label="Restablecer opciones del QR" matTooltip="Restablecer opciones">
+          <mat-icon>restart_alt</mat-icon>
+        </button>
+      </div>
+      <div class="brand-option">
+        <mat-checkbox [checked]="includeLogo()" (change)="setIncludeLogo($event.checked)" [disabled]="downloadBusy()">Incluir logo UVH</mat-checkbox>
+        <p>Sin logo, el QR será clásico.</p>
+      </div>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Redundancia</mat-label>
+        <mat-select [value]="correctionLevel()" (selectionChange)="selectCorrectionLevel($event.value)" [disabled]="downloadBusy() || includeLogo()">
+          @for (option of correctionLevels; track option.level) {
+            <mat-option [value]="option.level">{{ option.label }} · {{ option.level }}</mat-option>
+          }
+        </mat-select>
+        <mat-hint>{{ includeLogo() ? 'El logo requiere el nivel máximo.' : 'Recupera datos si el QR se deteriora.' }}</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Margen blanco</mat-label>
+        <mat-select [value]="quietZone()" (selectionChange)="selectQuietZone($event.value)" [disabled]="downloadBusy()">
+          @for (option of margins; track option.size) {
+            <mat-option [value]="option.size">{{ option.label }} · {{ option.size }} módulos</mat-option>
+          }
+        </mat-select>
+        <mat-hint>Espacio que facilita el escaneo.</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="resolution-field">
+        <mat-label>Resolución de descarga</mat-label>
+        <mat-select [value]="downloadSize()" (selectionChange)="selectDownloadSize($event.value)" [disabled]="downloadBusy()">
+          @for (option of downloadSizes; track option.size) {
+            <mat-option [value]="option.size">{{ option.size }} × {{ option.size }} px · {{ option.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </section>
+  </div>
+  @if (error()) {
+    <div class="qr-error" role="alert">
+      <p>{{ error() }}</p>
+      @if (!dataUrl() && !previewBusy()) { <button mat-button (click)="retryPreview()">Reintentar</button> }
+    </div>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Cerrar</button>
+  <button mat-flat-button color="primary" (click)="download()" [disabled]="!dataUrl() || previewBusy() || downloadBusy()" [attr.aria-busy]="downloadBusy()">
+    <mat-icon>download</mat-icon> {{ downloadBusy() ? 'Preparando PNG…' : 'Descargar PNG' }}
+  </button>
+</mat-dialog-actions>

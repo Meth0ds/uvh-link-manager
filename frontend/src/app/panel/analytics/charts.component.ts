@@ -90,10 +90,27 @@ export class ChartsComponent {
     return this.breakdownKeys.some((key) => this.overview()[key].length > 0);
   });
 
-  breakdown(key: (typeof this.breakdownKeys)[number]) {
-    const items = this.overview()[key];
+  // A maximum belongs to the input snapshot, not to each rendered bar.
+  // Keep each dimension explicit so the mapping stays checked by TypeScript.
+  private readonly breakdownValues = computed(() => {
+    const overview = this.overview();
+    return {
+      countries: this.readBreakdown(overview.countries),
+      devices: this.readBreakdown(overview.devices),
+      browsers: this.readBreakdown(overview.browsers),
+      os: this.readBreakdown(overview.os),
+      referrers: this.readBreakdown(overview.referrers),
+      campaigns: this.readBreakdown(overview.campaigns),
+    };
+  });
+
+  private readBreakdown(items: AnalyticsOverview["countries"]) {
     const max = Math.max(1, ...items.map((i) => i.value));
     return { items, max };
+  }
+
+  breakdown(key: (typeof this.breakdownKeys)[number]) {
+    return this.breakdownValues()[key];
   }
 
   pct(value: number, max: number): number {

@@ -35,6 +35,8 @@ import { decodeBulkActionResponse, decodeCollectionsResponse } from "../../core/
 import { parseRouteId } from "../../core/strict-wire";
 import { AuthService } from "../../core/services/auth.service";
 import { downloadBlob } from "../../core/services/browser-download";
+import { CopyFeedbackService } from "../../core/services/copy-feedback.service";
+import { CopyFeedbackIconComponent } from "../copy-feedback-icon.component";
 import { linkStateLabel } from "../../core/link-state-label";
 import { TagsDialogComponent } from "./tags-dialog.component";
 import { CollectionsDialogComponent } from "./collections-dialog.component";
@@ -45,7 +47,9 @@ type StateFilter = "" | LinkState;
 @Component({
   selector: "app-links",
   standalone: true,
+  providers: [CopyFeedbackService],
   imports: [
+    CopyFeedbackIconComponent,
     RouterLink,
     FormsModule,
     MatButtonModule,
@@ -77,6 +81,8 @@ export class LinksComponent {
   private snackbar = inject(MatSnackBar);
   private linkDialog = inject(LinkDialogService);
   private workspaces = inject(WorkspaceService);
+  readonly copyFeedback = inject(CopyFeedbackService);
+  readonly copyScope = () => `${this.workspaces.currentId()}:${this.workspaces.selectionGeneration()}`;
   private actions = inject(ActionDialogService);
   private intents = inject(PendingLinkIntentService);
   private readonly requests = new LatestRequest(inject(DestroyRef));
@@ -494,20 +500,10 @@ export class LinksComponent {
     }
   }
 
-  copy(url: string): void {
-    const write = navigator.clipboard?.writeText(url);
-    if (!write) {
-      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
-      return;
-    }
-    void write.then(
-      () => this.snackbar.open("Enlace copiado", "Cerrar", { duration: 2000 }),
-      () => this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }),
-    );
-  }
+  copy(url: string): void { this.copyFeedback.copy(url, this.copyScope); }
 
   showQr(url: string): void {
-    this.dialog.open(QrDialogComponent, { data: url, width: "auto" });
+    this.dialog.open(QrDialogComponent, { data: url, width: "760px", maxWidth: "calc(100vw - 32px)" });
   }
 
   create(): void {

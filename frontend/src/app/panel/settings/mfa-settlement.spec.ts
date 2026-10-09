@@ -10,6 +10,8 @@ import { ApiRequestError } from "../../core/services/api.service";
 import { apiInterceptor } from "../../core/interceptors/api.interceptor";
 import { ActionDialogService } from "../action-dialog.service";
 import { SettingsComponent } from "./settings.component";
+import QRCode from "qrcode";
+import { QR_CODE_IMPORT, type QrCodeGenerator } from "../../core/services/qr-code.service";
 
 const user = (enabled = false): AuthUser => ({ id: 1, email: "user@example.test", name: "Fixture", isAdmin: false, emailVerified: true, mfaEnabled: enabled, recoveryCodesRemaining: enabled ? 10 : 0 });
 const setupSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
@@ -21,17 +23,22 @@ describe("MFA confirmation and projection with real auth transport", () => {
   let http: HttpTestingController;
   let auth: AuthService;
   let snack: jasmine.SpyObj<MatSnackBar>;
+  let importer: jasmine.Spy<() => Promise<QrCodeGenerator>>;
 
   beforeEach(() => {
     spyOnProperty(document, "cookie", "get").and.returnValue("uvh_csrf=fixture");
     snack = jasmine.createSpyObj("MatSnackBar", ["open"]);
+    // Keep fakeAsync transport cases deterministic while rendering real PNGs.
+    // The service's separate async test exercises its production import.
+    importer = jasmine.createSpy("QR importer").and.callFake(() => Promise.resolve(QRCode));
     TestBed.configureTestingModule({ providers: [
       provideHttpClient(withInterceptors([apiInterceptor])), provideHttpClientTesting(),
       { provide: Router, useValue: { navigate: jasmine.createSpy("navigate").and.resolveTo(true), navigateByUrl: jasmine.createSpy("navigateByUrl").and.resolveTo(true) } },
-      { provide: ActivatedRoute, useValue: { snapshot: { data: {} } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { data: { section: "security" } } } },
       { provide: Location, useValue: { replaceState: jasmine.createSpy("replaceState") } },
       { provide: MatSnackBar, useValue: snack },
       { provide: ActionDialogService, useValue: { confirm: jasmine.createSpy("confirm").and.resolveTo(true) } },
+      { provide: QR_CODE_IMPORT, useValue: importer },
     ] });
     // MatSnackBarModule supplies a component injector instance: observe that
     // actual caller rather than a root spy the rendered view never uses.
@@ -48,10 +55,7 @@ describe("MFA confirmation and projection with real auth transport", () => {
     fixture.detectChanges();
     http.expectOne("/api/v1/auth/sessions").flush({ sessions: [session("current", true), session("other")], truncated: false });
     http.expectOne("/api/v1/auth/data-export").flush({ export: null });
-    http.expectOne("/api/v1/auth/data-export/history").flush({ exports: [] });
-    http.expectOne("/api/v1/auth/account-deletion").flush({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null });
-    http.expectOne((r) => r.url === "/api/v1/auth/privacy-requests").flush({ requests: [], total: 0, page: 1, perPage: 5 });
-    http.expectOne("/api/v1/notifications/preferences").flush({ preferences: [] });
+    http.expectNone(r => ["/api/v1/auth/data-export/history", "/api/v1/auth/account-deletion", "/api/v1/auth/privacy-requests", "/api/v1/notifications/preferences"].includes(r.url));
     flushMicrotasks();
     fixture.detectChanges();
     snack.open.calls.reset();
@@ -62,6 +66,115 @@ describe("MFA confirmation and projection with real auth transport", () => {
     void promise.then(() => { result.done = true; }, (error: unknown) => { result.error = error; });
     return result;
   }
+
+  for (const failure of ["import", "render"] as const) {
+    it(`keeps admitted manual MFA setup after a QR ${failure} failure without repeating the write`, fakeAsync(() => {
+      const fixture = mount();
+      expect(importer).not.toHaveBeenCalled();
+      const render = jasmine.createSpy("render").and.rejectWith(new Error("Fixture render"));
+      if (failure === "import") importer.and.callFake(() => Promise.reject(new Error("Fixture import")));
+      else importer.and.resolveTo({ toDataURL: render } as QrCodeGenerator);
+      const c = fixture.componentInstance;
+      c.mfaPasswordForm.setValue({ password: "fixture" });
+      observe(c.startMfaSetup()); flushMicrotasks();
+      http.expectOne("/api/v1/auth/mfa/setup").flush(setupReply);
+      flushMicrotasks(); fixture.detectChanges();
+      expect(importer).toHaveBeenCalledTimes(1);
+      expect(c.mfaSecret()).toBe(setupSecret);
+      expect(c.mfaUri()).toBe(setupReply.uri);
+      expect(c.mfaQr()).toBeNull();
+      expect(c.mfaBusy()).toBeFalse();
+      expect(c.mfaQrLoading()).toBeFalse();
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain(setupSecret);
+      expect(snack.open.calls.allArgs().some(([message]) => String(message).includes("Usa la clave manual"))).toBeTrue();
+      http.expectNone(r => r.method === "POST");
+      fixture.destroy();
+    }));
+  }
+
+  for (const end of ["owner", "destroy"] as const) {
+    it(`does not render private MFA instructions after ${end} changes while library code is loading`, fakeAsync(() => {
+      let loaded!: (value: QrCodeGenerator) => void;
+      importer.and.returnValue(new Promise<QrCodeGenerator>(done => loaded = done));
+      const render = jasmine.createSpy("render").and.resolveTo("data:image/png;base64,fixture");
+      const fixture = mount();
+      const c = fixture.componentInstance;
+      c.mfaPasswordForm.setValue({ password: "fixture" });
+      observe(c.startMfaSetup()); flushMicrotasks();
+      http.expectOne("/api/v1/auth/mfa/setup").flush(setupReply);
+      flushMicrotasks();
+      expect(importer).toHaveBeenCalledTimes(1);
+      expect(c.mfaBusy()).toBeTrue();
+      expect(c.mfaQrLoading()).toBeTrue();
+      expect(c.mfaSecret()).toBe(setupSecret);
+      if (end === "destroy") fixture.destroy();
+      else {
+        auth.sessionExpired(); fixture.detectChanges();
+        void auth.me(); http.expectOne("/api/v1/auth/me").flush({ user: { ...user(), id: 2, email: "other@example.test" } });
+        flushMicrotasks(); http.expectOne("/api/v1/workspaces").flush({ workspaces: [] });
+        flushMicrotasks(); fixture.detectChanges();
+        http.expectOne("/api/v1/auth/sessions").flush({ sessions: [], truncated: false });
+        http.expectOne("/api/v1/auth/data-export").flush({ export: null });
+        flushMicrotasks();
+      }
+      snack.open.calls.reset(); loaded({ toDataURL: render } as QrCodeGenerator); flushMicrotasks();
+      expect(render).not.toHaveBeenCalled();
+      expect(c.mfaSecret()).toBeNull();
+      expect(c.mfaQr()).toBeNull();
+      expect(c.mfaQrLoading()).toBeFalse();
+      expect(snack.open).not.toHaveBeenCalled();
+      http.expectNone(r => r.method === "POST");
+      fixture.destroy();
+    }));
+  }
+
+  for (const outcome of ["success", "failure"] as const) {
+    it(`keeps a code entered during QR loading after ${outcome}, clearing only the old setup code`, fakeAsync(() => {
+      let resolve!: (generator: QrCodeGenerator) => void;
+      let reject!: (error: Error) => void;
+      importer.and.returnValue(new Promise<QrCodeGenerator>((done, fail) => { resolve = done; reject = fail; }));
+      const fixture = mount(), c = fixture.componentInstance;
+      c.mfaCodeForm.setValue({ code: "654321" });
+      c.mfaPasswordForm.setValue({ password: "fixture" });
+      observe(c.startMfaSetup()); flushMicrotasks();
+      http.expectOne("/api/v1/auth/mfa/setup").flush(setupReply);
+      flushMicrotasks(); fixture.detectChanges();
+      expect(c.mfaCodeForm.controls.code.value).toBe("");
+      c.mfaCodeForm.setValue({ code: "123456" });
+      fixture.detectChanges();
+      expect(c.mfaBusy()).toBeTrue();
+      if (outcome === "success") resolve(QRCode); else reject(new Error("Fixture import"));
+      flushMicrotasks(); fixture.detectChanges();
+      expect(c.mfaCodeForm.controls.code.value).toBe("123456");
+      expect(c.mfaBusy()).toBeFalse();
+      expect(c.mfaCodeForm.valid).toBeTrue();
+      http.expectNone(r => r.method === "POST");
+      fixture.destroy();
+    }));
+  }
+
+  it("does not show a previous QR beside a newly admitted manual key while the library is pending", fakeAsync(() => {
+    let loaded!: (value: QrCodeGenerator) => void;
+    importer.and.returnValue(new Promise<QrCodeGenerator>(done => loaded = done));
+    const fixture = mount();
+    const c = fixture.componentInstance;
+    c.mfaQr.set("data:image/png;base64,old-fixture");
+    c.mfaPasswordForm.setValue({ password: "fixture" });
+    observe(c.startMfaSetup()); flushMicrotasks();
+    http.expectOne("/api/v1/auth/mfa/setup").flush(setupReply);
+    flushMicrotasks(); fixture.detectChanges();
+    expect(c.mfaSecret()).toBe(setupSecret);
+    expect(c.mfaQr()).toBeNull();
+    expect(fixture.nativeElement.querySelector(".mfa-qr")).toBeNull();
+    expect(fixture.nativeElement.querySelector(".mfa-qr-loading")?.textContent).toContain("Preparando código QR");
+    loaded(QRCode); flushMicrotasks(); fixture.detectChanges();
+    expect(c.mfaQr()).toMatch(/^data:image\/png;base64,/);
+    const png = Uint8Array.from(atob(c.mfaQr()!.split(",")[1]), char => char.charCodeAt(0));
+    expect(new DataView(png.buffer).getUint32(16)).toBe(480);
+    expect(new DataView(png.buffer).getUint32(20)).toBe(480);
+    expect(c.mfaQrLoading()).toBeFalse();
+    fixture.destroy();
+  }));
   for (const replacement of [false, true]) {
     it(`never publishes inconsistent ${replacement ? "replacement" : "initial"} manual/QR instructions`, fakeAsync(() => {
       const fixture = mount(replacement);
@@ -192,10 +305,7 @@ describe("MFA confirmation and projection with real auth transport", () => {
     fixture.detectChanges();
     http.expectOne("/api/v1/auth/sessions").flush({ sessions: [], truncated: false });
     http.expectOne("/api/v1/auth/data-export").flush({ export: null });
-    http.expectOne("/api/v1/auth/data-export/history").flush({ exports: [] });
-    http.expectOne("/api/v1/auth/account-deletion").flush({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null });
-    http.expectOne((r) => r.url === "/api/v1/auth/privacy-requests").flush({ requests: [], total: 0, page: 1, perPage: 5 });
-    http.expectOne("/api/v1/notifications/preferences").flush({ preferences: [] });
+    http.expectNone(r => ["/api/v1/auth/data-export/history", "/api/v1/auth/account-deletion", "/api/v1/auth/privacy-requests", "/api/v1/notifications/preferences"].includes(r.url));
     flushMicrotasks(); fixture.detectChanges();
     snack.open.calls.reset();
     expect(write.cancelled).toBeFalse();

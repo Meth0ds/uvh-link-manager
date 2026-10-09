@@ -4,7 +4,7 @@ import { Router, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
-import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
+import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
@@ -16,6 +16,8 @@ import { GettingStartedComponent } from "../getting-started/getting-started.comp
 import type { AnalyticsOverview, LinksResponse, LinkDto } from "../../core/models";
 import { LatestRequest } from "../../core/services/latest-request";
 import { decodeAnalyticsOverview, decodeLinksResponse } from "../../core/services/link-response-decoders";
+import { CopyFeedbackService } from "../../core/services/copy-feedback.service";
+import { CopyFeedbackIconComponent } from "../copy-feedback-icon.component";
 import { linkStateLabel } from "../../core/link-state-label";
 
 type DashboardPeriod = "24h" | "7d" | "30d" | "90d";
@@ -28,7 +30,9 @@ interface DashboardPeriodOption {
 @Component({
   selector: "app-dashboard",
   standalone: true,
+  providers: [CopyFeedbackService],
   imports: [
+    CopyFeedbackIconComponent,
     RouterLink,
     MatButtonModule,
     MatIconModule,
@@ -46,10 +50,11 @@ interface DashboardPeriodOption {
 export class DashboardComponent {
   private api = inject(ApiService);
   readonly router = inject(Router);
-  private snackbar = inject(MatSnackBar);
   private linkDialog = inject(LinkDialogService);
   private auth = inject(AuthService);
   private workspaces = inject(WorkspaceService);
+  readonly copyFeedback = inject(CopyFeedbackService);
+  readonly copyScope = () => `${this.workspaces.currentId()}:${this.workspaces.selectionGeneration()}`;
   private readonly analyticsRequests = new LatestRequest(inject(DestroyRef));
   private readonly recentRequests = new LatestRequest(inject(DestroyRef));
 
@@ -172,17 +177,7 @@ export class DashboardComponent {
     });
   }
 
-  copy(url: string): void {
-    const write = navigator.clipboard?.writeText(url);
-    if (!write) {
-      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
-      return;
-    }
-    void write.then(
-      () => this.snackbar.open("Enlace copiado", "Cerrar", { duration: 2000 }),
-      () => this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }),
-    );
-  }
+  copy(url: string): void { this.copyFeedback.copy(url, this.copyScope); }
 
   /** Short URL without the scheme, for display. */
   displayUrl(url: string): string {
