@@ -10,7 +10,7 @@ import { MatInputModule } from "@angular/material/input";
 import { MatIconModule } from "@angular/material/icon";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { AuthShellComponent } from "./auth-shell.component";
-import { PRIVACY_VERSION, TERMS_VERSION } from "./auth.component";
+import { PRIVACY_VERSION, TERMS_VERSION } from "../core/legal-documents";
 import { ApiService, ApiRequestError } from "../core/services/api.service";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";

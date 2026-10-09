@@ -19,15 +19,15 @@ import { PublicThemeToggleComponent } from "../core/public-theme-toggle.componen
       </header>
       <aside class="auth-brand">
         <div class="brand-copy">
-          <span class="eyebrow">TU ESPACIO EN UVH</span>
-          <h1>Lo que compartes.<br /><em>Lo que viene<br />después.</em></h1>
-          <p>Un sitio para tus enlaces, tu equipo y las decisiones que aún puedes cambiar.</p>
+          <span class="eyebrow">Acortador y gestor de enlaces</span>
+          <h1>Gestiona tus enlaces.<br /><span>Actualiza su destino.</span></h1>
+          <p>Crea direcciones cortas, consulta sus clics y organiza el trabajo con tu equipo.</p>
         </div>
-        <div class="brand-note"><span class="note-index">01 / UN ENLACE CON RECORRIDO</span><div class="note-alias">uvh.es/<b>tu-proximo-paso</b></div><div class="note-path" aria-hidden="true">└───────────→</div><p>La dirección se queda.<br />Tú decides adónde lleva.</p></div>
-        <div class="brand-footer"><span>ENLACES CON RECORRIDO.</span><a routerLink="/help">¿Necesitas ayuda? ↗</a></div>
+        <div class="brand-note"><span class="note-index">El enlace que compartes</span><div class="note-alias">uvh.es/<b>catalogo</b></div><div class="note-destination"><span aria-hidden="true">↳</span><div><span>Destino editable</span><code>tienda.example/catalogo</code></div></div><p>Puedes cambiar el destino conservando la dirección corta.</p><small>Ejemplo ilustrativo.</small></div>
+        <div class="brand-footer"><span>Enlaces, dominios y equipo.</span><a routerLink="/help">Centro de ayuda <span aria-hidden="true">↗</span></a></div>
       </aside>
       <main #mainContent class="auth-main" tabindex="-1"><ng-content /></main>
-      <footer class="auth-footer"><span>UVH / ACCESO A TU CUENTA</span><nav aria-label="Información legal"><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos</a><a routerLink="/help">Ayuda</a></nav></footer>
+      <footer class="auth-footer"><span>UVH · Acceso a tu cuenta</span><nav aria-label="Información legal"><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos</a><a routerLink="/help">Ayuda</a></nav></footer>
     </div>
   `,
   styleUrl: "./auth-shell.component.scss",

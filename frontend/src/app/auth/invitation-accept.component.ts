@@ -30,7 +30,7 @@ const NOT_PARKED = "No hemos podido guardar la invitación en este navegador. Vu
           <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.invitation-neutral]="rejected()" [class.bad]="!busy() && !ok() && !rejected() && done() && !needsLogin()">{{ busy() ? 'hourglass_empty' : ok() ? 'group_add' : (rejected() ? 'person_remove' : (done() && !needsLogin() ? 'error_outline' : 'group_add')) }}</mat-icon>
-        <h2 id="invitation-accept-title">{{ busy() ? 'Procesando invitación' : ok() ? 'Ya formas parte del equipo' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Tú decides si te unes' : (sessionUnavailable() ? 'No se pudo comprobar la sesión' : done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
+        <h2 id="invitation-accept-title">{{ busy() ? 'Procesando invitación' : ok() ? 'Ya formas parte del equipo' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Invitación al equipo' : (sessionUnavailable() ? 'No se pudo comprobar la sesión' : done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
         <p class="sub" role="status">{{ busy() ? 'Espera a que termine la comprobación. No cierres la página mientras se procesa una acción.' : message() }}</p>
         @if (ready()) {
           <div class="decision-guide"><div><h3>Si aceptas</h3><p>Se añadirá tu cuenta al workspace de la invitación. El servidor comprobará que corresponde a tu cuenta.</p></div><div><h3>Si rechazas</h3><p>Este enlace de invitación quedará invalidado. Tendrás que pedir una nueva invitación si cambias de opinión.</p></div></div>

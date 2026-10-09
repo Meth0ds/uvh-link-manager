@@ -28,7 +28,7 @@ import { decodeAccountRecoveryCompletion } from "../core/services/public-action-
 
         @if (!done()) {
           <form class="form" [formGroup]="form" (ngSubmit)="complete()">
-            <mat-form-field appearance="outline">
+            <mat-form-field subscriptSizing="dynamic" appearance="outline">
               <mat-label>Nueva contraseña</mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="72" />
               <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
@@ -40,11 +40,11 @@ import { decodeAccountRecoveryCompletion } from "../core/services/public-action-
               <small>{{ passwordLabel() }}</small>
             </div>
             <p class="sub" role="status">{{ passwordAssessment().feedback }} La estimación no comprueba tus datos personales.</p>
-            <mat-form-field appearance="outline">
+            <mat-form-field subscriptSizing="dynamic" appearance="outline">
               <mat-label>Repite la contraseña</mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
             </mat-form-field>
-            <mat-form-field appearance="outline">
+            <mat-form-field subscriptSizing="dynamic" appearance="outline">
               <mat-label>Confirmación escrita</mat-label>
               <input matInput formControlName="confirmation" autocomplete="off" maxlength="20" />
               <mat-hint>Escribe exactamente RECUPERAR MI CUENTA.</mat-hint>

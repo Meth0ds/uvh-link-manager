@@ -35,7 +35,7 @@ interface PublicAuthConfig {
           </ol>
 
           <form class="form" [formGroup]="form" (ngSubmit)="submit()">
-            <mat-form-field appearance="outline">
+            <mat-form-field subscriptSizing="dynamic" appearance="outline">
               <mat-label>Email de la cuenta</mat-label>
               <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
               <input matInput type="email" formControlName="email" autocomplete="email" maxlength="254" />
