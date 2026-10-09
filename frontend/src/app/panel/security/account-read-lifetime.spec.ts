@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from "@angular/common
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { Location } from "@angular/common";
 import { SpyLocation } from "@angular/common/testing";
-import { provideRouter, Router } from "@angular/router";
+import { ActivatedRoute, provideRouter, Router } from "@angular/router";
 import type { AuthUser, Session } from "../../core/models";
 import { AuthService } from "../../core/services/auth.service";
 import { SessionContextService } from "../../core/services/session-context.service";
@@ -29,6 +29,7 @@ describe("Mounted account read lifetime with real auth and HTTP", () => {
     spyOnProperty(document, "cookie", "get").and.returnValue("uvh_csrf=fixture");
     await TestBed.configureTestingModule({ imports: [SettingsComponent, SecurityCenterComponent], providers: [
       provideHttpClient(withInterceptors([apiInterceptor])), provideHttpClientTesting(), provideRouter([]),
+      { provide: ActivatedRoute, useValue: { snapshot: { data: { section: "security" } } } },
       { provide: Location, useClass: SpyLocation },
       { provide: ActionDialogService, useValue: { confirm: jasmine.createSpy("confirm").and.resolveTo(true) } },
     ] }).compileComponents();

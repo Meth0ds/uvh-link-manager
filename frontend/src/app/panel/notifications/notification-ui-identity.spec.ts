@@ -33,7 +33,7 @@ describe("Notification UI identity through the real HTTP boundary", () => {
       provideHttpClient(withInterceptors([apiInterceptor])), provideHttpClientTesting(), FormBuilder,
       { provide: Router, useValue: { navigate: jasmine.createSpy("navigate").and.resolveTo(true), navigateByUrl: jasmine.createSpy("navigateByUrl").and.resolveTo(true) } },
       { provide: Location, useValue: { replaceState: jasmine.createSpy("replaceState") } },
-      { provide: ActivatedRoute, useValue: { snapshot: { data: {} } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { data: { section: "notifications" } } } },
       { provide: MatSnackBar, useValue: snackbar },
       { provide: MatDialog, useValue: { open: jasmine.createSpy("open") } },
       { provide: ActionDialogService, useValue: jasmine.createSpyObj("ActionDialogService", ["confirm", "prompt"]) },
@@ -53,7 +53,7 @@ describe("Notification UI identity through the real HTTP boundary", () => {
 
   function settings(): SettingsComponent {
     const component = TestBed.runInInjectionContext(() => new SettingsComponent());
-    http.expectOne((request) => request.url.includes("/privacy-requests")).flush({ requests: [], total: 0, page: 1, perPage: 5 });
+    http.expectNone((request) => request.url.includes("/privacy-requests"));
     TestBed.tick();
     return component;
   }
@@ -92,7 +92,7 @@ describe("Notification UI identity through the real HTTP boundary", () => {
     flushMicrotasks();
     TestBed.tick();
     expect(auth.sessionGeneration()).toBeGreaterThan(originalGeneration);
-    http.expectOne((request) => request.url.includes("/privacy-requests")).flush({ requests: [], total: 0, page: 1, perPage: 5 });
+    http.expectNone((request) => request.url.includes("/privacy-requests"));
     // The repaired component refreshes its new identity; the original has no read.
     for (const read of http.match("/api/v1/notifications/preferences")) read.flush({ preferences: [preference] });
     flushMicrotasks();
