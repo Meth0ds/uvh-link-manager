@@ -2,7 +2,7 @@
 # release es, el digest qué bytes son. Dependabot propone la actualización y
 # `scripts/check-image-digests.mjs` verifica en CI que el digest sigue
 # resolviendo y avisa si la etiqueta ya apunta a otro sitio.
-FROM composer:2@sha256:aaeab4b6b031e0a88efb907f0f26b563532a644fc2f4ea0d000ecf8658f7a2b8 AS vendor
+FROM composer:2@sha256:af98f42dfff7c68ba8d53c2164fd9fde1087b7d449514baa38c418b1f6bc4bac AS vendor
 
 WORKDIR /build
 COPY backend-laravel/composer.json backend-laravel/composer.lock ./
