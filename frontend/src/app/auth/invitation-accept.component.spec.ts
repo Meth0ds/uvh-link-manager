@@ -216,6 +216,43 @@ describe("InvitationAcceptComponent async safety", () => {
     expect(component.message()).toContain("No se pudo comprobar la sesión");
   });
 
+  it("finishes initialization when adopting the initial identity advances the session generation", async () => {
+    loaded.set(false);
+    authenticated.set(false);
+    auth.init.and.callFake(async () => {
+      generation += 1;
+      loaded.set(true);
+      authenticated.set(true);
+    });
+    await create();
+
+    expect(component.busy()).toBeFalse();
+    expect(component.ready()).toBeTrue();
+    expect(api.post).not.toHaveBeenCalled();
+    await component.accept();
+    expect(api.post).toHaveBeenCalledOnceWith("/api/v1/workspaces/invitations/accept", {});
+    expect(component.ok()).toBeTrue();
+  });
+
+  it("does not offer a replaced invitation after initial session loading finishes", async () => {
+    loaded.set(false);
+    const initialization = deferred<void>();
+    auth.init.and.returnValue(initialization.promise);
+    await create();
+    expect(auth.init).toHaveBeenCalled();
+    revision.update((value) => value + 1);
+    generation += 1;
+    loaded.set(true);
+    initialization.resolve();
+    await settle();
+
+    expect(component.ready()).toBeFalse();
+    await component.accept();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(invitations.hide).not.toHaveBeenCalled();
+    expect(invitations.forget).not.toHaveBeenCalled();
+  });
+
   it("does not mistake an absorbed session transport failure for an anonymous session", async () => {
     loaded.set(false);
     authenticated.set(false);

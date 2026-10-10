@@ -275,7 +275,9 @@ export class InvitationAcceptComponent {
       return;
     }
     this.revision = this.invitations.revision();
-    const request = this.operations.begin(this.context());
+    // Initial identity adoption can advance the session generation. Setup
+    // belongs to this park; accept/reject bind to the established session.
+    const request = this.operations.begin(this.parkContext());
     if (!this.stillParked()) {
       this.busy.set(false);
       this.done.set(true);
@@ -286,7 +288,7 @@ export class InvitationAcceptComponent {
       try {
         await this.auth.init();
       } catch (error) {
-        if (this.operations.isCurrent(request, this.context())) {
+        if (this.operations.isCurrent(request, this.parkContext())) {
           this.busy.set(false);
           this.done.set(true);
           this.sessionUnavailable.set(true);
@@ -297,7 +299,7 @@ export class InvitationAcceptComponent {
         return;
       }
     }
-    if (!this.operations.isCurrent(request, this.context()) || !this.stillParked()) return;
+    if (!this.operations.isCurrent(request, this.parkContext()) || !this.stillParked()) return;
     if (!this.auth.loaded()) {
       this.busy.set(false);
       this.done.set(true);
@@ -324,7 +326,11 @@ export class InvitationAcceptComponent {
 
   /** Ordering key of a request: which park, under which session generation. */
   private context(generation = this.auth.sessionGeneration()): string {
-    return `${this.parked}:${this.revision}:${generation}`;
+    return `${this.parkContext()}:${generation}`;
+  }
+
+  private parkContext(): string {
+    return `${this.parked}:${this.revision}`;
   }
 
   /** True when the server has taken the park and nothing about it moved since. */
