@@ -1,0 +1,46 @@
+# Validation only. Never deploy this file: all databases end in _test.
+name: uvh-upcloud-ac760d0-validation
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_DB: uvh_test
+      POSTGRES_USER: uvh_release_test
+      POSTGRES_PASSWORD: uvh-release-validation-test-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uvh_release_test -d uvh_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  php:
+    build:
+      context: ../../../.uvh-runtime/upcloud-ac760d0
+      dockerfile: docker/php/Dockerfile
+    image: uvh-upcloud-validation-php:ac760d0
+    working_dir: /app
+    volumes:
+      - ../../../.uvh-runtime/upcloud-ac760d0/backend-laravel:/app
+      - ../../../.uvh-runtime/upcloud-ac760d0:/repo:ro
+    environment:
+      COMPOSER_ALLOW_SUPERUSER: "1"
+      UVH_REPO_ROOT: /repo
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: uvh_test
+      DB_USERNAME: uvh_release_test
+      DB_PASSWORD: uvh-release-validation-test-only
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      MAIL_MAILER: array
+      LOG_CHANNEL: stderr
+      SESSION_DOMAIN: ""
+      COOKIE_DOMAIN: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["php", "-v"]

@@ -1,0 +1,3 @@
+step	exit_code
+frontend	1
+isolated-compose-cleanup	0

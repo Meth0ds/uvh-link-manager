@@ -1,0 +1,186 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@angular/build": {
+      "name": "@angular/build",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "karma"
+      ],
+      "effects": [],
+      "range": ">=19.2.0-next.0",
+      "nodes": [
+        "node_modules/@angular/build"
+      ],
+      "fixAvailable": {
+        "name": "@angular/build",
+        "version": "19.1.9",
+        "isSemVerMajor": true
+      }
+    },
+    "braces": {
+      "name": "braces",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1240992,
+          "name": "braces",
+          "dependency": "braces",
+          "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+          "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+          "severity": "high",
+          "cwe": [
+            "CWE-674"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<=3.0.3"
+        }
+      ],
+      "effects": [
+        "chokidar",
+        "karma"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/braces"
+      ],
+      "fixAvailable": {
+        "name": "karma",
+        "version": "4.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    "chokidar": {
+      "name": "chokidar",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "braces"
+      ],
+      "effects": [
+        "karma"
+      ],
+      "range": "2.0.0 - 3.6.0",
+      "nodes": [
+        "node_modules/karma/node_modules/chokidar"
+      ],
+      "fixAvailable": {
+        "name": "karma",
+        "version": "4.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    "karma": {
+      "name": "karma",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "braces",
+        "chokidar"
+      ],
+      "effects": [
+        "@angular/build",
+        "karma-jasmine",
+        "karma-jasmine-html-reporter"
+      ],
+      "range": ">=2.0.3",
+      "nodes": [
+        "node_modules/karma"
+      ],
+      "fixAvailable": {
+        "name": "karma",
+        "version": "4.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    "karma-jasmine": {
+      "name": "karma-jasmine",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "karma"
+      ],
+      "effects": [],
+      "range": ">=5.0.0",
+      "nodes": [
+        "node_modules/karma-jasmine"
+      ],
+      "fixAvailable": {
+        "name": "karma-jasmine",
+        "version": "4.0.2",
+        "isSemVerMajor": true
+      }
+    },
+    "karma-jasmine-html-reporter": {
+      "name": "karma-jasmine-html-reporter",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "karma",
+        "karma-jasmine"
+      ],
+      "effects": [],
+      "range": ">=2.0.0",
+      "nodes": [
+        "node_modules/karma-jasmine-html-reporter"
+      ],
+      "fixAvailable": {
+        "name": "karma-jasmine-html-reporter",
+        "version": "1.7.0",
+        "isSemVerMajor": true
+      }
+    },
+    "source-map-js": {
+      "name": "source-map-js",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1241209,
+          "name": "source-map-js",
+          "dependency": "source-map-js",
+          "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+          "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+          "severity": "high",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=1.0.0 <1.2.2"
+        }
+      ],
+      "effects": [],
+      "range": "1.0.0 - 1.2.1",
+      "nodes": [
+        "node_modules/source-map-js"
+      ],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 7,
+      "critical": 0,
+      "total": 7
+    },
+    "dependencies": {
+      "prod": 54,
+      "dev": 655,
+      "optional": 141,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 708
+    }
+  }
+}

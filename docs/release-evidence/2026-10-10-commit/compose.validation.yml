@@ -1,0 +1,44 @@
+name: uvh-commit-20261010-validation
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_DB: uvh_test
+      POSTGRES_USER: uvh_test
+      POSTGRES_PASSWORD: uvh-commit-test-only-credential
+    volumes:
+      - validation_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uvh_test -d uvh_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  php:
+    image: uvh-php:8.4
+    working_dir: /app
+    volumes:
+      - ../../../.uvh-runtime/commit-push-20261010/source/backend-laravel:/app
+      - ../../../.uvh-runtime/commit-push-20261010/source:/repo:ro
+    environment:
+      COMPOSER_ALLOW_SUPERUSER: "1"
+      COMPOSER_PROCESS_TIMEOUT: "0"
+      UVH_REPO_ROOT: /repo
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_SECRET: uvh-commit-validation-test-only
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: uvh_test
+      DB_USERNAME: uvh_test
+      DB_PASSWORD: uvh-commit-test-only-credential
+      SESSION_DOMAIN: ""
+      COOKIE_DOMAIN: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["php", "-v"]
+
+volumes:
+  validation_pgdata:

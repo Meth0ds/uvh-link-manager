@@ -1,0 +1,8 @@
+step	exit_code
+backend-install	0
+backend-validate	0
+backend-audit	0
+backend-quality	0
+backend-schema	0
+backend-tests	1
+cleanup	0
