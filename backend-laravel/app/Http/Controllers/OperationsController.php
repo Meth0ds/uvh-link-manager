@@ -56,28 +56,26 @@ final class OperationsController
         $this->appendGauge($lines, 'uvh_queue_pending_jobs', array_sum($pendingByPool));
         $this->appendGauge($lines, 'uvh_queue_failed_jobs', DB::table('failed_jobs')->count());
         $this->appendGauge($lines, 'uvh_queue_oldest_job_age_seconds', $readableAges === [] ? 0 : max($readableAges));
-        foreach (['pending', 'queued', 'processing', 'sent', 'failed', 'obsolete', 'comp_pending', 'compensating', 'compensated'] as $status) {
-            $this->appendGauge($lines, 'uvh_mail_outbox_'.$status, DB::table('mail_outbox')->where('status', $status)->count());
+        $mail = $this->mailOutboxSnapshot();
+        foreach ($mail['counts'] as $status => $count) {
+            $this->appendGauge($lines, 'uvh_mail_outbox_'.$status, $count);
         }
         $this->appendGauge($lines, 'uvh_audit_outbox_pending', DB::table('audit_outbox')->count());
         $this->appendGauge($lines, 'uvh_security_incident_audits_pending', DB::table('security_incident_audits')->count());
-        $oldestPendingMail = DB::table('mail_outbox')
-            ->whereIn('status', ['pending', 'queued', 'processing', 'comp_pending', 'compensating'])
-            ->min('created_at');
+        $oldestPendingMail = $mail['oldest'];
         $this->appendGauge(
             $lines,
             'uvh_mail_outbox_oldest_pending_age_seconds',
             $oldestPendingMail === null ? 0 : max(0, time() - Carbon::parse($oldestPendingMail)->getTimestamp()),
         );
-        foreach (['pending', 'processing', 'success', 'failed'] as $status) {
-            $this->appendGauge($lines, 'uvh_webhook_deliveries_'.$status, DB::table('webhook_deliveries')->where('status', $status)->count());
+        $webhooks = $this->webhookSnapshot();
+        foreach ($webhooks['counts'] as $status => $count) {
+            $this->appendGauge($lines, 'uvh_webhook_deliveries_'.$status, $count);
         }
         // Counts alone cannot distinguish fresh work from a stopped worker.
         // Use creation time because it remains stable through retries and thus
         // measures how long the oldest unresolved event has existed.
-        $oldestPendingWebhook = DB::table('webhook_deliveries')
-            ->whereIn('status', ['pending', 'processing'])
-            ->min('created_at');
+        $oldestPendingWebhook = $webhooks['oldest'];
         $this->appendGauge(
             $lines,
             'uvh_webhook_oldest_pending_age_seconds',
@@ -170,6 +168,47 @@ final class OperationsController
             'Cache-Control' => 'no-store',
             'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+
+    /** @return array{counts: array<string, int>, oldest: string|null} */
+    private function mailOutboxSnapshot(): array
+    {
+        $states = ['pending', 'queued', 'processing', 'sent', 'failed', 'obsolete', 'comp_pending', 'compensating', 'compensated'];
+        // Keep the selective status indexes for a mostly terminal history.
+        // Scalar subqueries share one SQL snapshot and one database round trip;
+        // combining MIN with filtered counts would force a full heap scan.
+        $query = DB::query();
+        foreach ($states as $state) {
+            $query->selectSub(DB::table('mail_outbox')->where('status', $state)->selectRaw('COUNT(*)'), $state);
+        }
+        $snapshot = $query->selectSub(DB::table('mail_outbox')
+            ->whereIn('status', ['pending', 'queued', 'processing', 'comp_pending', 'compensating'])
+            ->selectRaw('MIN(created_at)'), 'oldest')->first();
+        $counts = [];
+        foreach ($states as $state) {
+            $counts[$state] = (int) ($snapshot->$state ?? 0);
+        }
+
+        return ['counts' => $counts, 'oldest' => $snapshot?->oldest === null ? null : (string) $snapshot->oldest];
+    }
+
+    /** @return array{counts: array<string, int>, oldest: string|null} */
+    private function webhookSnapshot(): array
+    {
+        // Both the counts and the oldest unresolved delivery need the same
+        // table. One aggregate avoids scanning the delivery history twice.
+        $states = ['pending', 'processing', 'success', 'failed'];
+        $query = DB::table('webhook_deliveries');
+        foreach ($states as $state) {
+            $query->selectRaw('COUNT(*) FILTER (WHERE status = ?) AS "'.$state.'"', [$state]);
+        }
+        $snapshot = $query->selectRaw('MIN(created_at) FILTER (WHERE status IN (?, ?)) AS oldest', ['pending', 'processing'])->first();
+        $counts = [];
+        foreach ($states as $state) {
+            $counts[$state] = (int) ($snapshot->$state ?? 0);
+        }
+
+        return ['counts' => $counts, 'oldest' => $snapshot?->oldest === null ? null : (string) $snapshot->oldest];
     }
 
     /** @param list<string> $lines */

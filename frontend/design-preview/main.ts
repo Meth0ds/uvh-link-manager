@@ -25,6 +25,7 @@ import { StatusPageComponent } from "../src/app/status-page.component";
 import { PublicStatusPreviewComponent } from "./public-status-preview.component";
 import { SecurityPreviewComponent } from "./security-preview.component";
 import { SettingsPreviewComponent } from "./settings-preview.component";
+import { QrPreviewComponent } from "./qr-preview.component";
 
 @Component({
   selector: "app-design-preview-content",
@@ -68,6 +69,7 @@ class DesignPreviewRootComponent {}
 void bootstrapApplication(DesignPreviewRootComponent, {
   providers: [
     provideRouter([
+      { path: "preview/qr", component: QrPreviewComponent },
       { path: "preview/mfa", component: SecurityPreviewComponent, data: { page: "mfa" } },
       { path: "preview/invitation", component: SecurityPreviewComponent, data: { page: "invitation" } },
       { path: "status", component: PublicStatusPreviewComponent, title: "Estado · Vista de diseño" },

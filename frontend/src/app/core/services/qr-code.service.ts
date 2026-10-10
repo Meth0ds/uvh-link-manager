@@ -3,6 +3,8 @@ import type { QRCodeToDataURLOptions } from "qrcode";
 
 export type QrCodeRenderOptions = QRCodeToDataURLOptions & {
   includeLogo?: boolean;
+  /** Raster canvas prepared locally; never an external image URL. */
+  customLogo?: HTMLCanvasElement;
 };
 
 export interface QrCodeGenerator {

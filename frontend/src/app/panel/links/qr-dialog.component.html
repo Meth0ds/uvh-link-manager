@@ -18,6 +18,7 @@
       }
       <figcaption class="url tnum">{{ url }}</figcaption>
       <p class="export-summary">PNG · {{ downloadSize() }} × {{ downloadSize() }} px</p>
+      <p class="scan-advice">Prueba el QR con tu móvil antes de imprimirlo.</p>
     </figure>
     <section class="qr-options" aria-labelledby="qr-options-title">
       <div class="options-heading">
@@ -28,9 +29,38 @@
         </button>
       </div>
       <div class="brand-option">
-        <mat-checkbox [checked]="includeLogo()" (change)="setIncludeLogo($event.checked)" [disabled]="downloadBusy()">Incluir logo UVH</mat-checkbox>
-        <p>Sin logo, el QR será clásico.</p>
+        <mat-checkbox [checked]="includeLogo()" (change)="setIncludeLogo($event.checked)" [disabled]="downloadBusy()">Incluir logo en el centro</mat-checkbox>
+        <p>Desactívalo para descargar un QR clásico.</p>
       </div>
+      @if (includeLogo()) {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Logo del QR</mat-label>
+          <mat-select [value]="logoSource()" (selectionChange)="selectLogoSource($event.value)" [disabled]="downloadBusy()">
+            <mat-option value="uvh">Logo UVH</mat-option>
+            <mat-option value="custom">Mi propio logo</mat-option>
+          </mat-select>
+        </mat-form-field>
+        @if (logoSource() === 'custom') {
+          <div class="custom-logo" [attr.aria-busy]="logoBusy()">
+            <input #logoInput type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden (change)="uploadLogo($event)" />
+            @if (customLogo(); as logo) {
+              <div class="logo-file">
+                <div class="logo-thumbnail"><img [src]="logo.preview" alt="Vista previa de tu logo" /></div>
+                <span><b>{{ logo.name }}</b><small>Ajustado sin deformar</small></span>
+                <button mat-icon-button type="button" (click)="removeCustomLogo()" [disabled]="downloadBusy()" aria-label="Quitar mi logo" matTooltip="Quitar logo"><mat-icon>close</mat-icon></button>
+              </div>
+            }
+            <button mat-stroked-button type="button" (click)="logoInput.click()" [disabled]="downloadBusy() || logoBusy()">
+              <mat-icon>{{ customLogo() ? 'swap_horiz' : 'upload' }}</mat-icon>
+              {{ logoBusy() ? 'Preparando logo…' : customLogo() ? 'Cambiar imagen' : 'Elegir imagen' }}
+            </button>
+            <p class="logo-help">PNG o JPG · hasta 2 MB y 4096 px por lado.<br />Tu imagen se procesa aquí y no se sube al servidor.</p>
+            @if (logoBusy()) { <mat-progress-bar mode="indeterminate" aria-label="Preparando tu logo" /> }
+            @if (logoError()) { <p class="logo-error" role="alert">{{ logoError() }}</p> }
+            @if (needsCustomLogo() && !logoBusy()) { <p class="logo-pending" role="status">Elige tu logo para ver y descargar el QR.</p> }
+          </div>
+        }
+      }
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>Redundancia</mat-label>
         <mat-select [value]="correctionLevel()" (selectionChange)="selectCorrectionLevel($event.value)" [disabled]="downloadBusy() || includeLogo()">
@@ -68,7 +98,7 @@
 </mat-dialog-content>
 <mat-dialog-actions align="end">
   <button mat-button mat-dialog-close>Cerrar</button>
-  <button mat-flat-button color="primary" (click)="download()" [disabled]="!dataUrl() || previewBusy() || downloadBusy()" [attr.aria-busy]="downloadBusy()">
+  <button mat-flat-button color="primary" (click)="download()" [disabled]="!dataUrl() || previewBusy() || logoBusy() || needsCustomLogo() || downloadBusy()" [attr.aria-busy]="downloadBusy()">
     <mat-icon>download</mat-icon> {{ downloadBusy() ? 'Preparando PNG…' : 'Descargar PNG' }}
   </button>
 </mat-dialog-actions>

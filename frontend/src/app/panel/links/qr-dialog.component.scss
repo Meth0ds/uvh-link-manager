@@ -16,6 +16,18 @@ h2 small { color: var(--uvh-muted); font-size: 12px; font-weight: 400; line-heig
 .preview-status { color: var(--uvh-muted); font-size: 12px; margin: 10px 0; }
 .url { color: var(--uvh-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; margin-top: 16px; }
 .export-summary { color: var(--uvh-ink); font-size: 12px; font-variant-numeric: tabular-nums; margin: 10px 0 0; }
+.scan-advice { margin: 10px auto 0; max-width: 230px; color: var(--uvh-muted); font-size: 12px; line-height: 1.6; }
+.custom-logo { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px dashed var(--uvh-border); border-radius: 6px; background: var(--uvh-surface); transition: border-color 160ms ease; }
+.custom-logo:focus-within { border-color: var(--uvh-electric); }
+.custom-logo > button { min-height: 44px; width: 100%; }
+.logo-file { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.logo-thumbnail { display: grid; flex: 0 0 44px; width: 44px; height: 44px; place-items: center; border: 1px solid var(--uvh-border); border-radius: 4px; background: #fff; }
+.logo-thumbnail img { max-width: 34px; max-height: 34px; object-fit: contain; }
+.logo-file > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.logo-file b { color: var(--uvh-ink); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.logo-file small, .logo-help, .logo-pending { color: var(--uvh-muted); font-size: 11px; line-height: 1.6; }
+.logo-help, .logo-pending, .logo-error { margin: 0; }
+.logo-error { color: var(--uvh-danger); font-size: 12px; line-height: 1.6; }
 .qr-options { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-left: 24px; border-left: 1px solid var(--uvh-border); }
 .options-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .options-heading h3 { color: var(--uvh-ink); font-size: 14px; font-weight: 700; margin: 0; }
@@ -37,4 +49,5 @@ mat-dialog-actions button { min-height: 44px; }
   h2 b { font-size: 21px; }
   mat-dialog-actions { padding-inline: 14px; }
 }
-@media (prefers-reduced-motion: reduce) { .qr-img { transition: none; } }
+@media (min-width: 641px) { .qr-preview { position: sticky; top: 0; } }
+@media (prefers-reduced-motion: reduce) { .qr-img, .custom-logo { transition: none; } }

@@ -49,4 +49,68 @@ describe("Branded QR rendering", () => {
     await renderQr("https://uvh.test/one", { width: 480, includeLogo: false, margin: NaN });
     expect(generator.calls.mostRecent().args[2]).toEqual(jasmine.objectContaining({ margin: 4 }));
   });
+  for (const [width, height] of [[200, 100], [100, 200], [120, 120]]) {
+    it(`fits a ${width}x${height} custom logo without stretching or a UVH badge`, async () => {
+      const customLogo = document.createElement("canvas");
+      customLogo.width = width; customLogo.height = height;
+      const source = customLogo.getContext("2d")!;
+      source.fillStyle = "#e14165"; source.fillRect(0, 0, width, height);
+      const generator = spyOn(QRCode, "toCanvas").and.callThrough();
+      const png = await renderQr("https://uvh.test/custom", { width: 480, includeLogo: true, customLogo, errorCorrectionLevel: "L", margin: 8 });
+      const options = generator.calls.mostRecent().args[2];
+      expect(options).toEqual(jasmine.objectContaining({ errorCorrectionLevel: "H", margin: 8 }));
+      expect(options).not.toEqual(jasmine.objectContaining({ customLogo }));
+      const canvas = generator.calls.mostRecent().args[0] as HTMLCanvasElement;
+      const pixels = canvas.getContext("2d")!.getImageData(0, 0, 480, 480).data;
+      let left = 480, right = 0, top = 480, bottom = 0, accent = 0;
+      for (let y = 0; y < 480; y++) for (let x = 0; x < 480; x++) {
+        const i = (y * 480 + x) * 4;
+        if (pixels[i] === 225 && pixels[i + 1] === 65 && pixels[i + 2] === 101) {
+          left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+        }
+        if (pixels[i] === 247 && pixels[i + 1] === 149 && pixels[i + 2] === 115) accent++;
+        expect(pixels[i + 3]).toBe(255);
+      }
+      expect((right - left + 1) / (bottom - top + 1)).toBeCloseTo(width / height, 1);
+      expect((left + right) / 2).toBeCloseTo(239.5, 0);
+      expect((top + bottom) / 2).toBeCloseTo(239.5, 0);
+      expect(right - left + 1).toBeLessThanOrEqual(96);
+      expect(bottom - top + 1).toBeLessThanOrEqual(96);
+      expect(accent).toBe(0); expect(png).toMatch(/^data:image\/png;base64,/);
+    });
+  }
+
+  it("omits a custom logo completely when the user chooses the classic QR", async () => {
+    const customLogo = document.createElement("canvas"); customLogo.width = 100; customLogo.height = 100;
+    const text = "https://uvh.test/classic";
+    const plain = await renderQr(text, { width: 480, includeLogo: false, customLogo, errorCorrectionLevel: "M" });
+    expect(plain).toBe(await QRCode.toDataURL(text, { width: 480, margin: 4, errorCorrectionLevel: "M", color: { dark: "#000000", light: "#FFFFFF" } }));
+  });
+
+  for (const width of [480, 512, 1024, 2048, 4096]) {
+    it(`exports exactly ${width}px with every supported margin despite floating point rounding`, async () => {
+      for (const margin of [4, 6, 8]) {
+        const png = await renderQr("https://enlaces.ejemplo.test/" + "campana-".repeat(20), { width, margin });
+        const bytes = Uint8Array.from(atob(png.split(",")[1]), char => char.charCodeAt(0));
+        const dimensions = new DataView(bytes.buffer);
+        expect(dimensions.getUint32(16)).toBe(width); expect(dimensions.getUint32(20)).toBe(width);
+      }
+    });
+  }
+
+  it("fixes the classic QR's missing pixel with white padding while preserving every original module pixel", async () => {
+    const text = "https://enlaces.ejemplo.test/promocion-2026", width = 512, margin = 6;
+    const original = document.createElement("canvas");
+    await QRCode.toCanvas(original, text, { width, margin, errorCorrectionLevel: "H", color: { dark: "#000000", light: "#FFFFFF" } });
+    expect(original.width).toBe(511);
+    const expected = original.getContext("2d")!.getImageData(0, 0, 511, 511).data;
+    const generator = spyOn(QRCode, "toCanvas").and.callThrough();
+    await renderQr(text, { width, margin, includeLogo: false });
+    const canvas = generator.calls.mostRecent().args[0] as HTMLCanvasElement;
+    expect(canvas.width).toBe(512);
+    const actual = canvas.getContext("2d")!.getImageData(0, 0, 511, 511).data;
+    expect(actual).toEqual(expected);
+    expect([...canvas.getContext("2d")!.getImageData(511, 0, 1, 1).data]).toEqual([255, 255, 255, 255]);
+  });
+
 });

@@ -1,12 +1,12 @@
 {
-  "capturedAt": "2026-10-10T04:59:46.172Z",
+  "capturedAt": "2026-10-10T07:55:46.731Z",
   "date": "2026-10-02",
   "scope": "PHP app/bootstrap/config/routes; frontend src/public; backend resources; scripts. Excludes vendor, dependencies, build/cache, tests, migration history and non-code infrastructure. Surface files include Blade/HTML/SCSS without parsing template expressions or embedded scripts.",
   "caveats": "Enumeration is not review. PHP named functions, signatures, closures and arrow tokens; TypeScript AST executable functions, methods, accessors and arrows. Anonymous expressions inherit their enclosing named function where known. Proposed ownership is provisional and must be reconciled per caller; route coverage retains existing evidence. No runtime execution or Laravel bootstrap.",
   "totals": {
-    "files": 522,
-    "named": 2529,
-    "anonymous": 1384,
+    "files": 528,
+    "named": 2553,
+    "anonymous": 1397,
     "signatures": 3,
     "provisionalFiles": 0
   },
@@ -5114,14 +5114,14 @@
     },
     {
       "path": "backend-laravel/app/Http/Controllers/OperationsController.php",
-      "sha256": "2a4105e8478ac129a24ca8b7c379ad98d3e8d4e09cec76e09055047ae2ba3ae1",
+      "sha256": "a8f9ad3bb17706de4a7fdc613db2c736dd8a3db6e138506bb91adb70a6d55ba6",
       "language": "php",
       "functions": [
         {
           "name": "metrics",
           "kind": "named",
           "line": 18,
-          "endLine": 173,
+          "endLine": 171,
           "proposedOwner": {
             "system": "S13",
             "basis": "route matrix"
@@ -5143,8 +5143,8 @@
         {
           "name": null,
           "kind": "closure",
-          "line": 100,
-          "endLine": 103,
+          "line": 98,
+          "endLine": 101,
           "ownerFunction": "metrics",
           "proposedOwner": {
             "system": "S13",
@@ -5155,8 +5155,32 @@
         {
           "name": null,
           "kind": "closure",
-          "line": 117,
-          "endLine": 120,
+          "line": 115,
+          "endLine": 118,
+          "ownerFunction": "metrics",
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "route matrix"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "kind": "closure",
+          "line": 119,
+          "endLine": 129,
+          "ownerFunction": "metrics",
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "route matrix"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "kind": "closure",
+          "line": 120,
+          "endLine": 124,
           "ownerFunction": "metrics",
           "proposedOwner": {
             "system": "S13",
@@ -5168,7 +5192,7 @@
           "name": null,
           "kind": "closure",
           "line": 121,
-          "endLine": 131,
+          "endLine": 123,
           "ownerFunction": "metrics",
           "proposedOwner": {
             "system": "S13",
@@ -5179,8 +5203,8 @@
         {
           "name": null,
           "kind": "closure",
-          "line": 122,
-          "endLine": 126,
+          "line": 124,
+          "endLine": 128,
           "ownerFunction": "metrics",
           "proposedOwner": {
             "system": "S13",
@@ -5191,8 +5215,8 @@
         {
           "name": null,
           "kind": "closure",
-          "line": 123,
-          "endLine": 125,
+          "line": 125,
+          "endLine": 127,
           "ownerFunction": "metrics",
           "proposedOwner": {
             "system": "S13",
@@ -5201,34 +5225,32 @@
           "review": "Inventory only; reconcile with coverage matrix and direct evidence"
         },
         {
-          "name": null,
-          "kind": "closure",
-          "line": 126,
-          "endLine": 130,
-          "ownerFunction": "metrics",
+          "name": "mailOutboxSnapshot",
+          "kind": "named",
+          "line": 174,
+          "endLine": 193,
           "proposedOwner": {
             "system": "S13",
-            "basis": "route matrix"
+            "basis": "file proposal; reconcile callers"
           },
           "review": "Inventory only; reconcile with coverage matrix and direct evidence"
         },
         {
-          "name": null,
-          "kind": "closure",
-          "line": 127,
-          "endLine": 129,
-          "ownerFunction": "metrics",
+          "name": "webhookSnapshot",
+          "kind": "named",
+          "line": 196,
+          "endLine": 212,
           "proposedOwner": {
             "system": "S13",
-            "basis": "route matrix"
+            "basis": "file proposal; reconcile callers"
           },
           "review": "Inventory only; reconcile with coverage matrix and direct evidence"
         },
         {
           "name": "appendGauge",
           "kind": "named",
-          "line": 176,
-          "endLine": 180,
+          "line": 215,
+          "endLine": 219,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -5238,8 +5260,8 @@
         {
           "name": "heartbeatAge",
           "kind": "named",
-          "line": 182,
-          "endLine": 194,
+          "line": 221,
+          "endLine": 233,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -23663,7 +23685,7 @@
     {
       "path": "frontend/src/app/auth/invitation-accept.component.ts",
       "language": "typescript/javascript",
-      "sha256": "2db765d1e1969b32206107feb3f8b64c852bad044ca69fe47276f1a416b1b80d",
+      "sha256": "2b648fbd06772dc7087a68cbc691196704b1180fa9f6da175024cfa685e8cfe3",
       "functions": [
         {
           "name": "hasParkedInvitation",
@@ -23766,7 +23788,7 @@
           "ownerFunction": null,
           "kind": "named",
           "line": 241,
-          "endLine": 323,
+          "endLine": 325,
           "proposedOwner": {
             "system": "S03",
             "basis": "file proposal; reconcile callers"
@@ -23777,8 +23799,20 @@
           "name": "context",
           "ownerFunction": null,
           "kind": "named",
-          "line": 326,
-          "endLine": 328,
+          "line": 328,
+          "endLine": 330,
+          "proposedOwner": {
+            "system": "S03",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "parkContext",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 332,
+          "endLine": 334,
           "proposedOwner": {
             "system": "S03",
             "basis": "file proposal; reconcile callers"
@@ -23789,8 +23823,8 @@
           "name": "parkIsSpendable",
           "ownerFunction": null,
           "kind": "named",
-          "line": 331,
-          "endLine": 335,
+          "line": 337,
+          "endLine": 341,
           "proposedOwner": {
             "system": "S03",
             "basis": "file proposal; reconcile callers"
@@ -23801,8 +23835,8 @@
           "name": "stillParked",
           "ownerFunction": null,
           "kind": "named",
-          "line": 337,
-          "endLine": 339,
+          "line": 343,
+          "endLine": 345,
           "proposedOwner": {
             "system": "S03",
             "basis": "file proposal; reconcile callers"
@@ -30966,14 +31000,14 @@
     {
       "path": "frontend/src/app/core/services/qr-code.service.ts",
       "language": "typescript/javascript",
-      "sha256": "58f8e0bb20b4edab5e415ccfa0ea5a161207631ac8032f2b564d55e1a40ac4e2",
+      "sha256": "00520908bcee887f6d9f884d683e51e639f4a7eee1bd982120f704c4eb52dc3d",
       "functions": [
         {
           "name": "factory",
           "ownerFunction": null,
           "kind": "arrow",
-          "line": 14,
-          "endLine": 14,
+          "line": 16,
+          "endLine": 16,
           "proposedOwner": {
             "system": "S04",
             "basis": "shared QR renderer/import/brand; S01 MFA and S04 link preview/export consumers verified O85–O88"
@@ -30984,8 +31018,8 @@
           "name": null,
           "ownerFunction": "factory",
           "kind": "arrow",
-          "line": 14,
-          "endLine": 14,
+          "line": 16,
+          "endLine": 16,
           "proposedOwner": {
             "system": "S04",
             "basis": "shared QR renderer/import/brand; S01 MFA and S04 link preview/export consumers verified O85–O88"
@@ -30996,8 +31030,8 @@
           "name": null,
           "ownerFunction": "factory",
           "kind": "arrow",
-          "line": 14,
-          "endLine": 14,
+          "line": 16,
+          "endLine": 16,
           "proposedOwner": {
             "system": "S04",
             "basis": "shared QR renderer/import/brand; S01 MFA and S04 link preview/export consumers verified O85–O88"
@@ -31008,8 +31042,8 @@
           "name": "load",
           "ownerFunction": null,
           "kind": "named",
-          "line": 23,
-          "endLine": 28,
+          "line": 25,
+          "endLine": 30,
           "proposedOwner": {
             "system": "S04",
             "basis": "shared QR renderer/import/brand; S01 MFA and S04 link preview/export consumers verified O85–O88"
@@ -31020,8 +31054,8 @@
           "name": null,
           "ownerFunction": "load",
           "kind": "arrow",
-          "line": 24,
-          "endLine": 24,
+          "line": 26,
+          "endLine": 26,
           "proposedOwner": {
             "system": "S04",
             "basis": "shared QR renderer/import/brand; S01 MFA and S04 link preview/export consumers verified O85–O88"
@@ -31032,8 +31066,8 @@
           "name": null,
           "ownerFunction": "load",
           "kind": "arrow",
-          "line": 24,
-          "endLine": 27,
+          "line": 26,
+          "endLine": 29,
           "proposedOwner": {
             "system": "S04",
             "basis": "shared QR renderer/import/brand; S01 MFA and S04 link preview/export consumers verified O85–O88"
@@ -31047,16 +31081,75 @@
       }
     },
     {
+      "path": "frontend/src/app/core/services/qr-custom-logo.ts",
+      "language": "typescript/javascript",
+      "sha256": "37ac90ad49afb49fd00624cb50f68c00e7153af54eb3df03663aaa4453e1e569",
+      "functions": [
+        {
+          "name": "dimensions",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 11,
+          "endLine": 33,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "local raster validation/normalization for link QR custom-logo preview and export; no uploads or persistence"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": "dimensions",
+          "kind": "arrow",
+          "line": 13,
+          "endLine": 13,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "local raster validation/normalization for link QR custom-logo preview and export; no uploads or persistence"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "checkDimensions",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 35,
+          "endLine": 39,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "local raster validation/normalization for link QR custom-logo preview and export; no uploads or persistence"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "prepareQrCustomLogo",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 42,
+          "endLine": 85,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "local raster validation/normalization for link QR custom-logo preview and export; no uploads or persistence"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        }
+      ],
+      "proposedOwner": {
+        "system": "S04",
+        "basis": "local raster validation/normalization for link QR custom-logo preview and export; no uploads or persistence"
+      }
+    },
+    {
       "path": "frontend/src/app/core/services/qr-renderer.ts",
       "language": "typescript/javascript",
-      "sha256": "10903502377461641b02ff65675c6c8e2685b77f6fc10a6cf011e7d12053b6ad",
+      "sha256": "8d1657981c92913ee8b0935aeedf448940b31fd4298517b7042992c05ca086ad",
       "functions": [
         {
           "name": "renderQr",
           "ownerFunction": null,
           "kind": "named",
           "line": 6,
-          "endLine": 26,
+          "endLine": 54,
           "proposedOwner": {
             "system": "S04",
             "basis": "shared QR renderer/import/brand; S01 MFA and S04 link preview/export consumers verified O85–O88"
@@ -41373,7 +41466,7 @@
     {
       "path": "frontend/src/app/panel/links/qr-dialog.component.html",
       "language": "surface/file",
-      "sha256": "fa79b50258f2f4e71562d93f80faecc51f2a5fdafb7a49dbece93817c559be5c",
+      "sha256": "a1b98a0bf5b96c9135b01a8006628c7bcb75784e463dac8801935482fa00e94a",
       "functions": [],
       "proposedOwner": {
         "system": "S04",
@@ -41383,7 +41476,7 @@
     {
       "path": "frontend/src/app/panel/links/qr-dialog.component.scss",
       "language": "surface/file",
-      "sha256": "377c667a8702bf0b7741b4b27e05b6c32ea2d8e8daabbf7aebfd0925c81222db",
+      "sha256": "4993d124d563856a356a8edd1d89f9d73ded7ad75d9e970956aa2431a37f19e3",
       "functions": [],
       "proposedOwner": {
         "system": "S04",
@@ -41393,14 +41486,26 @@
     {
       "path": "frontend/src/app/panel/links/qr-dialog.component.ts",
       "language": "typescript/javascript",
-      "sha256": "96e23113fac9d2edb391e4c3070f6d597269f836037d4e2eeb2e74d4e665f21a",
+      "sha256": "efb717283bce58acfc50343090e7cf35c24bbc03113d3f1861c340846f9f0b83",
       "functions": [
         {
           "name": null,
           "ownerFunction": null,
           "kind": "arrow",
-          "line": 33,
-          "endLine": 33,
+          "line": 35,
+          "endLine": 35,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 39,
+          "endLine": 39,
           "proposedOwner": {
             "system": "S04",
             "basis": "file proposal; reconcile callers"
@@ -41411,8 +41516,8 @@
           "name": "constructor",
           "ownerFunction": null,
           "kind": "named",
-          "line": 53,
-          "endLine": 55,
+          "line": 60,
+          "endLine": 62,
           "proposedOwner": {
             "system": "S04",
             "basis": "file proposal; reconcile callers"
@@ -41423,8 +41528,8 @@
           "name": "selectDownloadSize",
           "ownerFunction": null,
           "kind": "named",
-          "line": 57,
-          "endLine": 60,
+          "line": 64,
+          "endLine": 67,
           "proposedOwner": {
             "system": "S04",
             "basis": "file proposal; reconcile callers"
@@ -41435,8 +41540,8 @@
           "name": null,
           "ownerFunction": "selectDownloadSize",
           "kind": "arrow",
-          "line": 59,
-          "endLine": 59,
+          "line": 66,
+          "endLine": 66,
           "proposedOwner": {
             "system": "S04",
             "basis": "file proposal; reconcile callers"
@@ -41445,18 +41550,6 @@
         },
         {
           "name": "setIncludeLogo",
-          "ownerFunction": null,
-          "kind": "named",
-          "line": 62,
-          "endLine": 67,
-          "proposedOwner": {
-            "system": "S04",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": "selectCorrectionLevel",
           "ownerFunction": null,
           "kind": "named",
           "line": 69,
@@ -41468,19 +41561,7 @@
           "review": "Inventory only; reconcile with coverage matrix and direct evidence"
         },
         {
-          "name": null,
-          "ownerFunction": "selectCorrectionLevel",
-          "kind": "arrow",
-          "line": 71,
-          "endLine": 71,
-          "proposedOwner": {
-            "system": "S04",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": "selectQuietZone",
+          "name": "selectLogoSource",
           "ownerFunction": null,
           "kind": "named",
           "line": 77,
@@ -41492,71 +41573,11 @@
           "review": "Inventory only; reconcile with coverage matrix and direct evidence"
         },
         {
-          "name": null,
-          "ownerFunction": "selectQuietZone",
-          "kind": "arrow",
-          "line": 79,
-          "endLine": 79,
-          "proposedOwner": {
-            "system": "S04",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": "resetOptions",
+          "name": "uploadLogo",
           "ownerFunction": null,
           "kind": "named",
           "line": 84,
-          "endLine": 92,
-          "proposedOwner": {
-            "system": "S04",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": "retryPreview",
-          "ownerFunction": null,
-          "kind": "named",
-          "line": 94,
-          "endLine": 96,
-          "proposedOwner": {
-            "system": "S04",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": "renderOptions",
-          "ownerFunction": null,
-          "kind": "named",
-          "line": 98,
-          "endLine": 100,
-          "proposedOwner": {
-            "system": "S04",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": "download",
-          "ownerFunction": null,
-          "kind": "named",
-          "line": 102,
-          "endLine": 128,
-          "proposedOwner": {
-            "system": "S04",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": "generate",
-          "ownerFunction": null,
-          "kind": "named",
-          "line": 130,
-          "endLine": 149,
+          "endLine": 103,
           "proposedOwner": {
             "system": "S04",
             "basis": "file proposal; reconcile callers"
@@ -41567,8 +41588,152 @@
           "name": "current",
           "ownerFunction": null,
           "kind": "arrow",
-          "line": 132,
-          "endLine": 132,
+          "line": 90,
+          "endLine": 90,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "removeCustomLogo",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 105,
+          "endLine": 110,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "invalidateLogoLoad",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 112,
+          "endLine": 116,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "selectCorrectionLevel",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 118,
+          "endLine": 124,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": "selectCorrectionLevel",
+          "kind": "arrow",
+          "line": 120,
+          "endLine": 120,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "selectQuietZone",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 126,
+          "endLine": 131,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": "selectQuietZone",
+          "kind": "arrow",
+          "line": 128,
+          "endLine": 128,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "resetOptions",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 133,
+          "endLine": 144,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "retryPreview",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 146,
+          "endLine": 148,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "renderOptions",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 150,
+          "endLine": 153,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "download",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 155,
+          "endLine": 181,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "generate",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 183,
+          "endLine": 208,
+          "proposedOwner": {
+            "system": "S04",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "current",
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 191,
+          "endLine": 191,
           "proposedOwner": {
             "system": "S04",
             "basis": "file proposal; reconcile callers"
@@ -49294,6 +49459,113 @@
       }
     },
     {
+      "path": "scripts/npm-audit-policy.mjs",
+      "language": "typescript/javascript",
+      "sha256": "1026f7293ebcc3de36bc998c986ae0f8ea5f62aad92aa089c64d34fa9ee4e021",
+      "functions": [
+        {
+          "name": "object",
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 12,
+          "endLine": 12,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "demand",
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 13,
+          "endLine": 13,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "evaluateAudit",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 16,
+          "endLine": 69,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": "evaluateAudit",
+          "kind": "arrow",
+          "line": 22,
+          "endLine": 22,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "resolvesToException",
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 50,
+          "endLine": 60,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": "resolvesToException",
+          "kind": "arrow",
+          "line": 55,
+          "endLine": 55,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": "resolvesToException",
+          "kind": "arrow",
+          "line": 57,
+          "endLine": 59,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "main",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 71,
+          "endLine": 86,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        }
+      ],
+      "proposedOwner": {
+        "system": "S13",
+        "basis": "file proposal; reconcile callers"
+      }
+    },
+    {
       "path": "scripts/review-php-source-inventory.php",
       "language": "surface/file",
       "sha256": "4718a5eb7aa3186c730df27e44596625082a171a2030be6cb5e137f9793d4b4a",
@@ -49306,14 +49578,14 @@
     {
       "path": "scripts/review-source-inventory.mjs",
       "language": "typescript/javascript",
-      "sha256": "bd783dd12b60819919882bf9a2c18c3f0ea400edc8282ce8c338646c3adc136d",
+      "sha256": "90cbacccc0a0cd8b8b634d3f30223f945a8a12f9961f9b3c8561fbba4928c935",
       "functions": [
         {
           "name": "proposedSystem",
           "ownerFunction": null,
           "kind": "named",
           "line": 20,
-          "endLine": 72,
+          "endLine": 73,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -49324,8 +49596,8 @@
           "name": null,
           "ownerFunction": null,
           "kind": "arrow",
-          "line": 75,
-          "endLine": 75,
+          "line": 76,
+          "endLine": 76,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -49336,8 +49608,8 @@
           "name": "visit",
           "ownerFunction": null,
           "kind": "named",
-          "line": 84,
-          "endLine": 94,
+          "line": 85,
+          "endLine": 95,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -49348,8 +49620,8 @@
           "name": null,
           "ownerFunction": "visit",
           "kind": "arrow",
-          "line": 93,
-          "endLine": 93,
+          "line": 94,
+          "endLine": 94,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -49360,8 +49632,8 @@
           "name": null,
           "ownerFunction": null,
           "kind": "arrow",
-          "line": 99,
-          "endLine": 99,
+          "line": 100,
+          "endLine": 100,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -49372,56 +49644,8 @@
           "name": null,
           "ownerFunction": null,
           "kind": "arrow",
-          "line": 107,
-          "endLine": 107,
-          "proposedOwner": {
-            "system": "S13",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": null,
-          "ownerFunction": null,
-          "kind": "arrow",
-          "line": 118,
-          "endLine": 118,
-          "proposedOwner": {
-            "system": "S13",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": null,
-          "ownerFunction": null,
-          "kind": "arrow",
-          "line": 118,
-          "endLine": 118,
-          "proposedOwner": {
-            "system": "S13",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": null,
-          "ownerFunction": null,
-          "kind": "arrow",
-          "line": 118,
-          "endLine": 118,
-          "proposedOwner": {
-            "system": "S13",
-            "basis": "file proposal; reconcile callers"
-          },
-          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
-        },
-        {
-          "name": null,
-          "ownerFunction": null,
-          "kind": "arrow",
-          "line": 118,
-          "endLine": 118,
+          "line": 108,
+          "endLine": 108,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -49434,6 +49658,54 @@
           "kind": "arrow",
           "line": 119,
           "endLine": 119,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 119,
+          "endLine": 119,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 119,
+          "endLine": 119,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 119,
+          "endLine": 119,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 120,
+          "endLine": 120,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -49781,6 +50053,241 @@
           "kind": "arrow",
           "line": 434,
           "endLine": 434,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        }
+      ],
+      "proposedOwner": {
+        "system": "S13",
+        "basis": "file proposal; reconcile callers"
+      }
+    },
+    {
+      "path": "scripts/upcloud-caddy-drill.mjs",
+      "language": "typescript/javascript",
+      "sha256": "94e86fe00637676fc2cf735f48ad1dffcac55ed261aac71b940709e1a2a9e280",
+      "functions": [
+        {
+          "name": "run",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 25,
+          "endLine": 30,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "dc",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 31,
+          "endLine": 31,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "certificate",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 32,
+          "endLine": 39,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "request",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 92,
+          "endLine": 94,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 106,
+          "endLine": 106,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        }
+      ],
+      "proposedOwner": {
+        "system": "S13",
+        "basis": "file proposal; reconcile callers"
+      }
+    },
+    {
+      "path": "scripts/upcloud-compose-check.mjs",
+      "language": "typescript/javascript",
+      "sha256": "9b7c498c24d96070a9ef7494d114b2871713a9dd2d9de3b4132887b0e5e8c6b7",
+      "functions": [
+        {
+          "name": "inspect",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 11,
+          "endLine": 29,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": "inspect",
+          "kind": "arrow",
+          "line": 13,
+          "endLine": 14,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": "inspect",
+          "kind": "arrow",
+          "line": 18,
+          "endLine": 18,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 39,
+          "endLine": 39,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 40,
+          "endLine": 40,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 61,
+          "endLine": 61,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 61,
+          "endLine": 61,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        }
+      ],
+      "proposedOwner": {
+        "system": "S13",
+        "basis": "file proposal; reconcile callers"
+      }
+    },
+    {
+      "path": "scripts/upcloud-image-bundle.py",
+      "language": "surface/file",
+      "sha256": "1002197766bf1ebe78c4b4c0719f677d917c16d1c06510d877c152d6229acbef",
+      "functions": [],
+      "proposedOwner": {
+        "system": "S13",
+        "basis": "file proposal; reconcile callers"
+      }
+    },
+    {
+      "path": "scripts/upcloud-postgres-drill.mjs",
+      "language": "typescript/javascript",
+      "sha256": "b75aae4d3e7dde5521bc751b0101089f0ad971b62c04e2085d4709f6153c79a8",
+      "functions": [
+        {
+          "name": "run",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 20,
+          "endLine": 29,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "dc",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 30,
+          "endLine": 30,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": null,
+          "ownerFunction": null,
+          "kind": "arrow",
+          "line": 49,
+          "endLine": 49,
+          "proposedOwner": {
+            "system": "S13",
+            "basis": "file proposal; reconcile callers"
+          },
+          "review": "Inventory only; reconcile with coverage matrix and direct evidence"
+        },
+        {
+          "name": "sql",
+          "ownerFunction": null,
+          "kind": "named",
+          "line": 71,
+          "endLine": 78,
           "proposedOwner": {
             "system": "S13",
             "basis": "file proposal; reconcile callers"
@@ -51425,7 +51932,7 @@
     {
       "path": "scripts/verify-local.mjs",
       "language": "typescript/javascript",
-      "sha256": "ddabd058a4a22f86e9a7a8342270462fd063b729f52785190e01575f051ac38e",
+      "sha256": "9c81538db0be6563d62b839ed918626868de00ff5ce5ead8e29a18c09762d836",
       "functions": [
         {
           "name": "flag",

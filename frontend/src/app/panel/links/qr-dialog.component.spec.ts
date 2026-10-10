@@ -242,4 +242,71 @@ describe("QrDialogComponent", () => {
     expect(click).toHaveBeenCalledTimes(1);
     expect(component.error()).toBeNull();
   });
+  async function logoFile(): Promise<File> {
+    const canvas = document.createElement("canvas");
+    canvas.width = 120; canvas.height = 60;
+    canvas.getContext("2d")!.fillRect(0, 0, 120, 60);
+    const blob = await new Promise<Blob>(done => canvas.toBlob(blob => done(blob!), "image/png"));
+    return new File([blob], "brand.png", { type: "image/png" });
+  }
+
+  function upload(component: QrDialogComponent, file: File): Promise<void> {
+    return component.uploadLogo({ target: { files: [file], value: "fixture" } } as unknown as Event);
+  }
+
+  it("requires an actual custom logo and exports the same normalized canvas used in preview", async () => {
+    const render = jasmine.createSpy("render").and.resolveTo("data:image/png;base64,fixture");
+    const component = await create(() => Promise.resolve({ toDataURL: render }));
+    await fixture.whenStable();
+    await component.selectLogoSource("custom");
+    expect(component.dataUrl()).toBeNull(); expect(component.needsCustomLogo()).toBeTrue();
+    const click = spyOn(HTMLAnchorElement.prototype, "click");
+    await component.download(); expect(click).not.toHaveBeenCalled();
+    await upload(component, await logoFile());
+    expect(component.needsCustomLogo()).toBeFalse();
+    const canvas = component.customLogo()!.canvas;
+    expect(render.calls.mostRecent().args[1].customLogo).toBe(canvas);
+    await component.download();
+    expect(render.calls.mostRecent().args[1]).toEqual({ width: 2048, includeLogo: true, errorCorrectionLevel: "H", margin: 4, customLogo: canvas });
+    expect(click).toHaveBeenCalledTimes(1);
+    await component.setIncludeLogo(false);
+    expect(render.calls.mostRecent().args[1].customLogo).toBeUndefined();
+    await component.resetOptions();
+    expect(component.customLogo()).toBeNull(); expect(component.logoSource()).toBe("uvh"); expect(component.isDefault()).toBeTrue();
+  });
+
+  it("keeps a previously valid custom logo when replacement is invalid", async () => {
+    const component = await create(); await fixture.whenStable();
+    await component.selectLogoSource("custom");
+    await upload(component, await logoFile());
+    const logo = component.customLogo(), preview = component.dataUrl();
+    await upload(component, new File(["<svg/>"], "fake.png", { type: "image/png" }));
+    expect(component.customLogo()).toBe(logo); expect(component.dataUrl()).toBe(preview);
+    expect(component.logoError()).toContain("PNG o JPG"); expect(component.logoBusy()).toBeFalse();
+    await component.removeCustomLogo(); expect(component.dataUrl()).toBeNull(); expect(component.logoError()).toBeNull();
+  });
+
+  for (const action of ["replace", "reset", "switch", "remove", "close"] as const) {
+    it(`ignores a pending logo read after ${action} and blocks download during preparation`, async () => {
+      const component = await create(); await fixture.whenStable();
+      await component.selectLogoSource("custom");
+      const file = await logoFile();
+      let resolve!: (bytes: ArrayBuffer) => void;
+      const bytes = await file.arrayBuffer();
+      spyOn(file, "arrayBuffer").and.returnValue(new Promise<ArrayBuffer>(done => resolve = done));
+      const pending = upload(component, file);
+      expect(component.logoBusy()).toBeTrue();
+      const click = spyOn(HTMLAnchorElement.prototype, "click");
+      await component.download(); expect(click).not.toHaveBeenCalled();
+      if (action === "replace") await upload(component, await logoFile());
+      if (action === "reset") await component.resetOptions();
+      if (action === "switch") await component.selectLogoSource("uvh");
+      if (action === "remove") await component.removeCustomLogo();
+      if (action === "close") fixture.destroy();
+      const current = component.customLogo(), preview = component.dataUrl();
+      resolve(bytes); await pending;
+      expect(component.customLogo()).toBe(current); expect(component.dataUrl()).toBe(preview); expect(component.logoError()).toBeNull();
+    });
+  }
+
 });

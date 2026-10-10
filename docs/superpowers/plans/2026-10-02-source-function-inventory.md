@@ -1,8 +1,8 @@
 # Inventario de funciones y superficies — 2026-10-02
 
-Captura del árbol: 2026-10-10T04:59:46.172Z. La fecha del nombre identifica la creación del inventario; esta captura registra su actualización.
+Captura del árbol: 2026-10-10T07:55:46.731Z. La fecha del nombre identifica la creación del inventario; esta captura registra su actualización.
 
-522 archivos; 2529 funciones/métodos con nombre; 1384 callbacks/closures anónimos; 3 firmas sin cuerpo. 0 archivos sin propuesta específica de propietario. Todas las propuestas requieren conciliación por consumidor; enumerar no acredita revisar. La [matriz de rutas](2026-10-01-system-review-coverage.md) conserva la evidencia previa; el [JSON](2026-10-02-source-function-inventory.json) contiene líneas, hashes, funciones y propietario propuesto.
+528 archivos; 2553 funciones/métodos con nombre; 1397 callbacks/closures anónimos; 3 firmas sin cuerpo. 0 archivos sin propuesta específica de propietario. Todas las propuestas requieren conciliación por consumidor; enumerar no acredita revisar. La [matriz de rutas](2026-10-01-system-review-coverage.md) conserva la evidencia previa; el [JSON](2026-10-02-source-function-inventory.json) contiene líneas, hashes, funciones y propietario propuesto.
 
 Cobertura: PHP app/bootstrap/config/routes y AST TypeScript/JavaScript de frontend src/public/scripts. HTML/Blade/SCSS y scripts Python/PHP auxiliares se inventarían como superficies; no se analizan expresiones de plantilla ni JS embebido. Migraciones, infraestructura YAML/Docker/CI y dependencias necesitan inventario específico S13. No se ejecuta código de la aplicación ni se conecta a la DB. Callbacks heredan función contenedora cuando es identificable; propietarios compartidos deben conciliarse por consumidor antes de cerrar un sistema.
 
@@ -17,8 +17,8 @@ node scripts/review-source-inventory.mjs
 | --- | --- |
 | S01 | 685 |
 | S02 | 298 |
-| S03 | 231 |
-| S04 | 434 |
+| S03 | 232 |
+| S04 | 444 |
 | S05 | 55 |
 | S06 | 237 |
 | S07 | 87 |
@@ -27,7 +27,7 @@ node scripts/review-source-inventory.mjs
 | S10 | 181 |
 | S11 | 337 |
 | S12 | 259 |
-| S13 | 794 |
+| S13 | 820 |
 
 | Archivo | Sistema propuesto | Con nombre | Anónimas | Estado de conciliación |
 | --- | --- | --- | --- | --- |
@@ -68,7 +68,7 @@ node scripts/review-source-inventory.mjs
 | `backend-laravel/app/Http/Controllers/MfaConfigurationController.php` | S01 | 7 | 2 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/MfaSessionController.php` | S01 | 3 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/NotificationController.php` | S10 | 10 | 6 | Conciliar evidencia por función |
-| `backend-laravel/app/Http/Controllers/OperationsController.php` | S13 | 3 | 8 | Conciliar evidencia por función |
+| `backend-laravel/app/Http/Controllers/OperationsController.php` | S13 | 5 | 8 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/PasswordRecoveryController.php` | S01 | 2 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/PendingHandoffController.php` | S03, S05 | 4 | 0 | Conciliar evidencia por función |
 | `backend-laravel/app/Http/Controllers/PrivacyRightsController.php` | S02 | 12 | 8 | Conciliar evidencia por función |
@@ -307,7 +307,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/auth/forgot-password.component.html` | S01 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/auth/forgot-password.component.ts` | S01 | 5 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/auth/hcaptcha-widget.component.ts` | S01 | 23 | 6 | Conciliar evidencia por función |
-| `frontend/src/app/auth/invitation-accept.component.ts` | S03 | 11 | 1 | Conciliar evidencia por función |
+| `frontend/src/app/auth/invitation-accept.component.ts` | S03 | 12 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/auth/mfa-reauthenticate.component.ts` | S01 | 9 | 7 | Conciliar evidencia por función |
 | `frontend/src/app/auth/otp-code-input.component.ts` | S01 | 8 | 4 | Conciliar evidencia por función |
 | `frontend/src/app/auth/password-policy.ts` | S01 | 2 | 1 | Conciliar evidencia por función |
@@ -379,6 +379,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/core/services/public-status-response.ts` | S12 | 2 | 5 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/qr-brand.ts` | S04 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/qr-code.service.ts` | S04 | 2 | 4 | Conciliar evidencia por función |
+| `frontend/src/app/core/services/qr-custom-logo.ts` | S04 | 3 | 1 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/qr-renderer.ts` | S04 | 1 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/registration.service.ts` | S01 | 3 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/core/services/response-decoder-helpers.ts` | S13 | 15 | 0 | Conciliar evidencia por función |
@@ -476,7 +477,7 @@ node scripts/review-source-inventory.mjs
 | `frontend/src/app/panel/links/links.component.ts` | S04 | 43 | 23 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/qr-dialog.component.html` | S04 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/qr-dialog.component.scss` | S04 | 0 | 0 | Conciliar evidencia por función |
-| `frontend/src/app/panel/links/qr-dialog.component.ts` | S04 | 11 | 4 | Conciliar evidencia por función |
+| `frontend/src/app/panel/links/qr-dialog.component.ts` | S04 | 16 | 5 | Conciliar evidencia por función |
 | `frontend/src/app/panel/links/tags-dialog.component.ts` | S04 | 7 | 8 | Conciliar evidencia por función |
 | `frontend/src/app/panel/notifications/notifications.component.html` | S10 | 0 | 0 | Conciliar evidencia por función |
 | `frontend/src/app/panel/notifications/notifications.component.scss` | S10 | 0 | 0 | Conciliar evidencia por función |
@@ -546,9 +547,14 @@ node scripts/review-source-inventory.mjs
 | `scripts/check-image-digests.mjs` | S13 | 9 | 26 | Conciliar evidencia por función |
 | `scripts/fix-phpstan-baseline.py` | S13 | 0 | 0 | Conciliar evidencia por función |
 | `scripts/image-evidence.mjs` | S13 | 6 | 12 | Conciliar evidencia por función |
+| `scripts/npm-audit-policy.mjs` | S13 | 5 | 3 | Conciliar evidencia por función |
 | `scripts/review-php-source-inventory.php` | S13 | 0 | 0 | Conciliar evidencia por función |
 | `scripts/review-source-inventory.mjs` | S13 | 2 | 9 | Conciliar evidencia por función |
 | `scripts/scan-pinned-images.mjs` | S13 | 6 | 22 | Conciliar evidencia por función |
+| `scripts/upcloud-caddy-drill.mjs` | S13 | 4 | 1 | Conciliar evidencia por función |
+| `scripts/upcloud-compose-check.mjs` | S13 | 1 | 6 | Conciliar evidencia por función |
+| `scripts/upcloud-image-bundle.py` | S13 | 0 | 0 | Conciliar evidencia por función |
+| `scripts/upcloud-postgres-drill.mjs` | S13 | 3 | 1 | Conciliar evidencia por función |
 | `scripts/uvh-control-screenshot-review.mjs` | S13 | 0 | 1 | Conciliar evidencia por función |
 | `scripts/uvh-control-smoke.mjs` | S13 | 0 | 10 | Conciliar evidencia por función |
 | `scripts/uvh-control.mjs` | S13 | 62 | 60 | Conciliar evidencia por función |

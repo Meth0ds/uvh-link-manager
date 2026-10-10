@@ -9,6 +9,7 @@ import { MatSelectModule } from "@angular/material/select";
 import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { QrCodeService, type QrCodeRenderOptions } from "../../core/services/qr-code.service";
+import { prepareQrCustomLogo, type QrCustomLogo } from "../../core/services/qr-custom-logo";
 
 @Component({
   selector: "app-qr-dialog",
@@ -27,11 +28,17 @@ export class QrDialogComponent {
   readonly downloadBusy = signal(false);
   readonly downloadSize = signal(2048);
   readonly includeLogo = signal(true);
+  readonly logoSource = signal<"uvh" | "custom">("uvh");
+  readonly customLogo = signal<QrCustomLogo | null>(null);
+  readonly logoBusy = signal(false);
+  readonly logoError = signal<string | null>(null);
+  readonly needsCustomLogo = computed(() => this.includeLogo() && this.logoSource() === "custom" && !this.customLogo());
   readonly correctionLevel = signal<"L" | "M" | "Q" | "H">("H");
   readonly quietZone = signal(4);
   readonly previewBusy = signal(true);
-  readonly isDefault = computed(() => this.downloadSize() === 2048 && this.includeLogo() && this.correctionLevel() === "H" && this.quietZone() === 4);
+  readonly isDefault = computed(() => this.downloadSize() === 2048 && this.includeLogo() && this.logoSource() === "uvh" && !this.customLogo() && !this.logoBusy() && this.correctionLevel() === "H" && this.quietZone() === 4);
   private previewRevision = 0;
+  private logoRevision = 0;
   readonly correctionLevels = [
     { level: "L", label: "Baja" },
     { level: "M", label: "Media" },
@@ -62,8 +69,50 @@ export class QrDialogComponent {
   async setIncludeLogo(include: boolean): Promise<void> {
     if (this.downloadBusy() || this.destroyRef.destroyed || include === this.includeLogo()) return;
     this.includeLogo.set(include);
+    this.invalidateLogoLoad();
     if (include) this.correctionLevel.set("H");
     await this.generate();
+  }
+
+  async selectLogoSource(source: string): Promise<void> {
+    if (this.downloadBusy() || this.destroyRef.destroyed || !this.includeLogo() || (source !== "uvh" && source !== "custom")) return;
+    this.invalidateLogoLoad();
+    this.logoSource.set(source);
+    await this.generate();
+  }
+
+  async uploadLogo(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ""; // Permit choosing the same file again after a read error.
+    if (!file || this.downloadBusy() || this.destroyRef.destroyed || !this.includeLogo() || this.logoSource() !== "custom") return;
+    const revision = ++this.logoRevision;
+    const current = () => !this.destroyRef.destroyed && revision === this.logoRevision;
+    this.logoBusy.set(true);
+    this.logoError.set(null);
+    try {
+      const logo = await prepareQrCustomLogo(file);
+      if (!current()) return;
+      this.customLogo.set(logo);
+      await this.generate();
+    } catch (error) {
+      if (current()) this.logoError.set(error instanceof Error ? error.message : "No se pudo preparar el logo. Prueba con otra imagen.");
+    } finally {
+      if (current()) this.logoBusy.set(false);
+    }
+  }
+
+  async removeCustomLogo(): Promise<void> {
+    if (this.downloadBusy() || this.destroyRef.destroyed) return;
+    this.invalidateLogoLoad();
+    this.customLogo.set(null);
+    await this.generate();
+  }
+
+  private invalidateLogoLoad(): void {
+    ++this.logoRevision;
+    this.logoBusy.set(false);
+    this.logoError.set(null);
   }
 
   async selectCorrectionLevel(level: string): Promise<void> {
@@ -83,7 +132,10 @@ export class QrDialogComponent {
 
   async resetOptions(): Promise<void> {
     if (this.downloadBusy() || this.destroyRef.destroyed || this.isDefault()) return;
-    const needsPreview = !this.includeLogo() || this.correctionLevel() !== "H" || this.quietZone() !== 4;
+    const needsPreview = !this.includeLogo() || this.logoSource() !== "uvh" || this.correctionLevel() !== "H" || this.quietZone() !== 4;
+    this.invalidateLogoLoad();
+    this.customLogo.set(null);
+    this.logoSource.set("uvh");
     this.downloadSize.set(2048);
     this.includeLogo.set(true);
     this.correctionLevel.set("H");
@@ -96,11 +148,12 @@ export class QrDialogComponent {
   }
 
   private renderOptions(width: number): QrCodeRenderOptions {
-    return { width, includeLogo: this.includeLogo(), errorCorrectionLevel: this.correctionLevel(), margin: this.quietZone() };
+    const customLogo = this.includeLogo() && this.logoSource() === "custom" ? this.customLogo()?.canvas : undefined;
+    return { width, includeLogo: this.includeLogo(), errorCorrectionLevel: this.correctionLevel(), margin: this.quietZone(), ...(customLogo ? { customLogo } : {}) };
   }
 
   async download(): Promise<void> {
-    if (!this.dataUrl() || this.previewBusy() || this.downloadBusy() || this.destroyRef.destroyed) return;
+    if (!this.dataUrl() || this.previewBusy() || this.logoBusy() || this.needsCustomLogo() || this.downloadBusy() || this.destroyRef.destroyed) return;
     const options = this.renderOptions(this.downloadSize());
     this.downloadBusy.set(true);
     this.error.set(null);
@@ -129,6 +182,12 @@ export class QrDialogComponent {
 
   private async generate(): Promise<void> {
     const revision = ++this.previewRevision;
+    if (this.needsCustomLogo()) {
+      this.dataUrl.set(null);
+      this.previewBusy.set(false);
+      this.error.set(null);
+      return;
+    }
     const current = () => !this.destroyRef.destroyed && revision === this.previewRevision;
     const options = this.renderOptions(480);
     this.previewBusy.set(true);
