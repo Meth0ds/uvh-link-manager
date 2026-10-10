@@ -1,0 +1,144 @@
+# Adapted from Mailu 2024.06's official Compose template. The release imports
+# and verifies every image; no build or registry pull is allowed on this VPS.
+name: uvh-upcloud-mail
+
+x-mail: &mail
+  restart: unless-stopped
+  pull_policy: never
+  platform: linux/amd64
+  env_file:
+    - ${UVH_MAIL_ENV_FILE:-/etc/uvh/mailu.env}
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 128
+  dns:
+    - 172.31.0.254
+
+services:
+  redis:
+    <<: *mail
+    image: ${UVH_MAIL_REDIS_IMAGE:?Verified mail Redis image required}
+    mem_limit: 64m
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "32mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/redis:/data
+
+  front:
+    <<: *mail
+    image: ${UVH_MAIL_FRONT_IMAGE:?Verified Mailu nginx image required}
+    mem_limit: 96m
+    ports:
+      - "87.58.157.156:25:25"
+      - "87.58.157.156:465:465"
+      - "87.58.157.156:587:587"
+      - "87.58.157.156:993:993"
+    volumes:
+      - ${UVH_MAIL_TLS_DIR:-/etc/uvh/mail-tls}:/certs:ro
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/overrides/nginx:/overrides:ro
+    networks:
+      default:
+      webmail:
+      uvh-front:
+        ipv4_address: 172.29.0.4
+        aliases:
+          - mail-front
+    depends_on:
+      - resolver
+
+  resolver:
+    <<: *mail
+    image: ${UVH_MAIL_RESOLVER_IMAGE:?Verified Mailu Unbound image required}
+    mem_limit: 64m
+    # The recursive resolver uses the Docker-provided DNS bootstrap.
+    dns: []
+    networks:
+      default:
+        ipv4_address: 172.31.0.254
+
+  admin:
+    <<: *mail
+    image: ${UVH_MAIL_ADMIN_IMAGE:?Verified Mailu admin image required}
+    mem_limit: 256m
+    volumes:
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/data:/data
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/dkim:/dkim
+    depends_on:
+      - redis
+      - resolver
+
+  imap:
+    <<: *mail
+    image: ${UVH_MAIL_IMAP_IMAGE:?Verified Mailu Dovecot image required}
+    mem_limit: 256m
+    volumes:
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/mail:/mail
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/overrides/dovecot:/overrides:ro
+    depends_on:
+      - front
+      - resolver
+
+  smtp:
+    <<: *mail
+    image: ${UVH_MAIL_SMTP_IMAGE:?Verified Mailu Postfix image required}
+    mem_limit: 192m
+    volumes:
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/mailqueue:/queue
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/overrides/postfix:/overrides:ro
+    depends_on:
+      - front
+      - resolver
+
+  antispam:
+    <<: *mail
+    image: ${UVH_MAIL_ANTISPAM_IMAGE:?Verified Mailu Rspamd image required}
+    hostname: antispam
+    mem_limit: 320m
+    networks:
+      - default
+      - clamav
+    volumes:
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/filter:/var/lib/rspamd
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/overrides/rspamd:/overrides:ro
+    depends_on:
+      - front
+      - redis
+      - antivirus
+      - resolver
+
+  antivirus:
+    <<: *mail
+    image: ${UVH_MAIL_ANTIVIRUS_IMAGE:?Verified ClamAV image required}
+    mem_limit: 1408m
+    networks:
+      - clamav
+    volumes:
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/clamav:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 $$(cat /tmp/clamd.pid) && kill -0 $$(cat /tmp/freshclam.pid)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+  webmail:
+    <<: *mail
+    image: ${UVH_MAIL_WEBMAIL_IMAGE:?Verified Mailu Roundcube image required}
+    mem_limit: 256m
+    volumes:
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/webmail:/data
+      - ${UVH_MAIL_ROOT:-/var/lib/uvh/mailu}/overrides/roundcube:/overrides:ro
+    networks:
+      - webmail
+    depends_on:
+      - front
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+  webmail:
+  clamav:
+  uvh-front:
+    external: true
+    name: uvh-upcloud-front

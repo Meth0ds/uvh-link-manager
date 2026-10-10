@@ -1,0 +1,64 @@
+{
+	email {$ACME_EMAIL}
+	admin 127.0.0.1:2019
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+		trusted_proxies static {$UVH_CLOUDFLARE_CIDRS}
+		trusted_proxies_strict
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+(origin_tls) {
+	tls {
+		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+		client_auth {
+			mode require_and_verify
+			trust_pool file {
+				pem_file /etc/uvh-origin/client-ca.pem
+			}
+		}
+	}
+	# Avoid logging URL paths or query strings containing bearer credentials.
+	# Application/nginx metrics retain request IDs and operational signals.
+	import /etc/uvh-origin/access.caddy
+}
+
+(uvh_proxy) {
+	reverse_proxy nginx:8080 {
+		header_up -CF-Connecting-IP
+		header_up -CF-IPCountry
+		header_up -Forwarded
+		header_up X-Forwarded-For {client_ip}
+		header_up X-Forwarded-Proto https
+		header_up X-Real-IP {client_ip}
+	}
+}
+
+https://uvh.es, https://app.uvh.es {
+	import origin_tls
+	import uvh_proxy
+}
+
+https://www.uvh.es {
+	import origin_tls
+	redir https://uvh.es{uri} permanent
+}
+
+https://webmail.uvh.es {
+	import origin_tls
+	reverse_proxy mail-front:80 {
+		header_up -Forwarded
+		header_up -CF-Connecting-IP
+		header_up X-Forwarded-For {client_ip}
+		header_up X-Forwarded-Proto https
+		header_up X-Real-IP {client_ip}
+	}
+}
+
+# No wildcard, on-demand certificates or catch-all proxy. Only these hosts
+# can redirect on HTTP; arbitrary Host/SNI values have no application route.
+http://uvh.es, http://app.uvh.es, http://www.uvh.es, http://webmail.uvh.es {
+	redir https://{host}{uri} permanent
+}

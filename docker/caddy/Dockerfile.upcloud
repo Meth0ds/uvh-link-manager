@@ -1,0 +1,15 @@
+FROM caddy:2.11.4-builder-alpine@sha256:0aa610043dab5da82ad0a0268e46bb852785e6f5160f12f1c6fe3f42903d7e1b AS builder
+RUN xcaddy build v2.11.4 \
+    --with github.com/caddy-dns/cloudflare@a8737d095ad5a48ca031cea6ab704057dbc2d250
+
+FROM caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+COPY --chmod=755 docker/caddy/upcloud-entrypoint.sh /usr/local/bin/uvh-caddy-entrypoint
+COPY docker/caddy/Caddyfile.upcloud /etc/caddy/Caddyfile
+COPY docker/caddy/access-operator.caddy.example /etc/caddy/access-operator.caddy
+RUN addgroup -S -g 10001 uvh \
+    && adduser -S -D -u 10001 -G uvh uvh \
+    && chown -R uvh:uvh /data /config
+USER 10001:10001
+ENTRYPOINT ["/usr/local/bin/uvh-caddy-entrypoint"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

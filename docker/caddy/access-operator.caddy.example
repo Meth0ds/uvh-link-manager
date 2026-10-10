@@ -1,0 +1,5 @@
+# Install as /etc/uvh/origin/access.caddy before acceptance. Set the actual
+# operator addresses in UVH_OPERATOR_CIDRS (space-separated, never 0.0.0.0/0).
+# The client IP has already been restored from a trusted Cloudflare proxy.
+@outside_operator not client_ip {$UVH_OPERATOR_CIDRS}
+respond @outside_operator "Acceso en preparación" 503

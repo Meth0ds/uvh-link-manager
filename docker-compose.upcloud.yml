@@ -1,0 +1,460 @@
+# UpCloud single-host UVH application stack. Images are imported and verified
+# outside this manifest; no service may build or pull at startup.
+# The mail stack is delivered separately on the shared uvh-upcloud-front network.
+name: uvh-upcloud
+
+x-php-service: &php-service
+  image: ${UVH_API_IMAGE:?Verified API image ID required}
+  pull_policy: never
+  platform: linux/amd64
+  mem_limit: 192m
+  pids_limit: 128
+  env_file:
+    - ${UVH_ENV_FILE:-/etc/uvh/app.env}
+  environment: &php-environment
+    APP_KEY_FILE: /run/secrets/uvh_app_key
+    APP_SECRET_FILE: /run/secrets/uvh_app_secret
+    DB_PASSWORD_FILE: /run/secrets/uvh_db_password
+    DB_SSLROOTCERT: /run/secrets/uvh_db_ca
+    REDIS_PASSWORD_FILE: /run/secrets/uvh_redis_password
+    HCAPTCHA_SECRET_FILE: /run/secrets/uvh_hcaptcha_secret
+    HCAPTCHA_PUBLIC_SECRET_FILE: /run/secrets/uvh_hcaptcha_public_secret
+    RESEND_API_KEY_FILE: /run/secrets/uvh_resend_api_key
+    EDGE_ASK_SECRET_FILE: /run/secrets/uvh_edge_ask_secret
+    METRICS_BEARER_TOKEN_FILE: /run/secrets/uvh_metrics_token
+    DB_HOST: postgres
+    DB_USERNAME: uvh_app
+    DB_DATABASE: uvh
+    DB_SSLMODE: verify-full
+    TRUSTED_PROXIES: 172.29.0.2/32,172.30.0.3/32
+    EDGE_INTERNAL_CIDRS: 172.29.0.2/32
+    # This file declares the Redis service and requires its password secret, so
+    # it also pins the settings that consume it. `environment` wins over
+    # `env_file`, which keeps a deployer's env file left at the template values
+    # from silently pointing cache, rate limits, locks and queues back at
+    # PostgreSQL while the Redis service sits unused — a topology whose boot
+    # contract would then never be the one exercised by `npm run release:boot`.
+    CACHE_STORE: redis
+    CACHE_LIMITER: failover
+    CACHE_FAILOVER_STORES: redis,database
+    # Credential limiters count on their own single store, never the chain
+    # above: for them a second backend is a second, empty window rather than a
+    # fallback. Production refuses an empty value, Redis and failover here.
+    CACHE_LIMITER_SECURITY: database
+    QUEUE_CONNECTION: redis
+    REDIS_CLIENT: phpredis
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    REDIS_DB: "0"
+    REDIS_CACHE_DB: "1"
+    # The Redis queue driver does not inherit DB_QUEUE_RETRY_AFTER, and the
+    # framework default (90 s) is below the longest worker timeout in this file
+    # (180 s). A worker would then be able to claim a job another one is still
+    # running, so the value is stated here rather than left to a default.
+    REDIS_QUEUE_RETRY_AFTER: "900"
+  secrets:
+    - uvh_app_key
+    - uvh_app_secret
+    - uvh_db_password
+    - uvh_db_ca
+    - uvh_redis_password
+    - uvh_hcaptcha_secret
+    - uvh_hcaptcha_public_secret
+    - uvh_resend_api_key
+    - uvh_edge_ask_secret
+    - uvh_metrics_token
+  restart: unless-stopped
+  init: true
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  volumes:
+    - uvh-storage:/var/www/html/storage
+  tmpfs:
+    - /tmp:size=32m,noexec,nosuid,nodev,mode=1777
+  networks:
+    - uvh-private
+  # Cache, rate limits, locks and the queues live in Redis. Waiting for its
+  # health here keeps workers from crash-looping through the first seconds of a
+  # deployment without changing the product: a Redis that goes down later is
+  # handled by the limiter's failover store and by failing locks closed.
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+# Each queue class has an independent worker and heartbeat. Long exports or
+# DNS/TLS calls therefore cannot starve account mail or webhook delivery.
+x-queue-service: &queue-service
+  <<: *php-service
+  volumes:
+    - uvh-storage:/var/www/html/storage
+    - ./docker/php/uvh-upcloud-worker.ini:/usr/local/etc/php/conf.d/zzz-upcloud-worker.ini:ro
+  stop_grace_period: 190s
+  healthcheck:
+    test: ["CMD-SHELL", "php artisan uvh:healthcheck queue-$${UVH_QUEUE_POOL}"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 90s
+
+services:
+  postgres:
+    image: ${UVH_POSTGRES_IMAGE:?Verified PostgreSQL image ID required}
+    pull_policy: never
+    platform: linux/amd64
+    restart: unless-stopped
+    mem_limit: 640m
+    pids_limit: 128
+    shm_size: 128m
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_DB: uvh
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/uvh_db_admin_password
+      POSTGRES_INITDB_ARGS: --auth-local=peer --auth-host=scram-sha-256
+    secrets:
+      - uvh_db_admin_password
+      - uvh_db_password
+      - uvh_db_migration_password
+      - uvh_db_backup_password
+    volumes:
+      - uvh-postgres-data:/var/lib/postgresql/data
+      - ${UVH_POSTGRES_TLS_DIR:-/etc/uvh/postgres-tls}:/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d uvh"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.2
+
+  app:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.4
+    <<: *php-service
+    mem_limit: 768m
+    volumes:
+      - uvh-storage:/var/www/html/storage
+      - ./docker/php/uvh-upcloud-fpm.conf:/usr/local/etc/php-fpm.d/zz-uvh-upcloud.conf:ro
+    expose:
+      - "9000"
+    healthcheck:
+      test: ["CMD", "php", "artisan", "uvh:healthcheck", "app"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  queue-mail:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.5
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: mail
+    command: ["php", "artisan", "queue:work", "--queue=mail", "--sleep=1", "--tries=3", "--timeout=120", "--max-time=3600"]
+
+  queue-webhooks:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.6
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: webhooks
+    command: ["php", "artisan", "queue:work", "--queue=webhooks", "--sleep=1", "--tries=3", "--timeout=60", "--max-time=3600"]
+
+  queue-domains:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.7
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: domains
+    command: ["php", "artisan", "queue:work", "--queue=domains", "--sleep=1", "--tries=3", "--timeout=90", "--max-time=3600"]
+
+  queue-exports:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.8
+    <<: *queue-service
+    mem_limit: 384m
+    volumes:
+      - uvh-storage:/var/www/html/storage
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: exports
+    command: ["php", "artisan", "queue:work", "--queue=exports", "--sleep=1", "--tries=3", "--timeout=660", "--max-time=3600"]
+
+  queue-analytics:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.9
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: analytics
+    command: ["php", "artisan", "queue:work", "--queue=analytics", "--sleep=1", "--tries=5", "--timeout=45", "--max-time=3600"]
+
+  # Destination-reputation checks call a third party with a hard timeout, so
+  # they get their own pool: a slow or unreachable provider cannot delay mail,
+  # webhooks, analytics or anything else. With no provider configured the check
+  # is still dispatched, records an `unknown` verdict and returns.
+  queue-security:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.10
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: security
+    # 90 s, not 60: the sweep job that continues a destination sweep declares its
+    # own 60 s budget, and the job's timeout has to fire before the worker's so it
+    # can release its lease and report the failure instead of being killed
+    # mid-write. Both stay under REDIS_QUEUE_RETRY_AFTER (900 s).
+    # `QueueTimeoutContractTest` holds the three values together.
+    command: ["php", "artisan", "queue:work", "--queue=security", "--sleep=1", "--tries=3", "--timeout=90", "--max-time=3600"]
+
+  # Drain pre-deployment jobs that were serialized onto Laravel's default
+  # queue. New application code never targets this compatibility pool.
+  queue-legacy:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.11
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: legacy
+    command: ["php", "artisan", "queue:work", "--queue=default", "--sleep=2", "--tries=3", "--timeout=180", "--max-time=3600"]
+
+  scheduler:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.12
+    <<: *php-service
+    volumes:
+      - uvh-storage:/var/www/html/storage
+      - ./docker/php/uvh-upcloud-worker.ini:/usr/local/etc/php/conf.d/zzz-upcloud-worker.ini:ro
+    command: ["php", "artisan", "schedule:work"]
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "php", "artisan", "uvh:healthcheck", "scheduler"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # Cache, rate limits, distributed locks and the queues.
+  #
+  # No published port: only this deployment talks to it, and Redis has no
+  # authorization model beyond its password. `appendonly yes` keeps queued work
+  # across a restart. `maxmemory-policy noeviction` is deliberate — an eviction
+  # would silently drop a queued job or release a lock that is still held, so
+  # Redis refuses the write instead and the operator is alerted by the
+  # `CacheFailedOver`/error signal rather than by lost work.
+  redis:
+    image: ${UVH_REDIS_IMAGE:?Verified Redis image ID required}
+    pull_policy: never
+    platform: linux/amd64
+    mem_limit: 288m
+    pids_limit: 64
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --appendonly yes
+        --appendfsync everysec
+        --maxmemory 192mb
+        --maxmemory-policy noeviction
+        --requirepass "$$(cat /run/secrets/uvh_redis_password)"
+    secrets:
+      - uvh_redis_password
+    volumes:
+      - uvh-redis-data:/data
+    healthcheck:
+      # The client must authenticate, so this also verifies the secret the
+      # application will use is the one the server accepts.
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/uvh_redis_password)\" ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.13
+
+  nginx:
+    image: ${UVH_WEB_IMAGE:?Verified web image ID required}
+    pull_policy: never
+    platform: linux/amd64
+    mem_limit: 128m
+    pids_limit: 128
+    env_file:
+      - ${UVH_ENV_FILE:-/etc/uvh/app.env}
+    environment:
+      # Every `${...}` the Nginx template uses must be listed here, or the
+      # container starts with a literal placeholder in its configuration. The
+      # EDGE_* values themselves come from the deployment file (`env_file`
+      # above) and fall back to the entrypoint's documented defaults.
+      TRUSTED_PROXIES: 172.29.0.2/32,172.30.0.3/32
+      NGINX_ENVSUBST_FILTER: "^(APP_HOST|PUBLIC_HOST|EDGE_ASK_SECRET|METRICS_BEARER_TOKEN|EDGE_PUBLIC_RATE|EDGE_APP_RATE|EDGE_BURST|EDGE_CONN|EDGE_DRY_RUN)$"
+      EDGE_ASK_SECRET_FILE: /run/secrets/uvh_edge_ask_secret
+      METRICS_BEARER_TOKEN_FILE: /run/secrets/uvh_metrics_token
+    secrets:
+      - uvh_edge_ask_secret
+      - uvh_metrics_token
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      app:
+        condition: service_healthy
+    expose:
+      - "8080"
+      - "8081"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null --header='Host: '$${APP_HOST} http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev,mode=1777
+      - /etc/nginx/conf.d:size=1m,noexec,nosuid,nodev,mode=1777
+      - /var/cache/nginx:size=16m,noexec,nosuid,nodev,mode=1777
+      - /var/run:size=1m,noexec,nosuid,nodev,mode=1777
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.3
+      uvh-front:
+        ipv4_address: 172.29.0.3
+
+  edge:
+    image: ${UVH_CADDY_IMAGE:?Verified Caddy image ID required}
+    pull_policy: never
+    platform: linux/amd64
+    mem_limit: 192m
+    pids_limit: 128
+    secrets:
+      - uvh_cloudflare_dns_token
+    env_file:
+      - ${UVH_ENV_FILE:-/etc/uvh/app.env}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    depends_on:
+      nginx:
+        condition: service_healthy
+    ports:
+      - "${UVH_EDGE_HTTP_PORT:-80}:80"
+      - "${UVH_EDGE_HTTPS_PORT:-443}:443"
+    volumes:
+      - ${UVH_ORIGIN_DIR:-/etc/uvh/origin}:/etc/uvh-origin:ro
+      - uvh-caddy-data:/data
+      - uvh-caddy-config:/config
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      uvh-front:
+        ipv4_address: 172.29.0.2
+
+  migrate:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.20
+    <<: *php-service
+    mem_limit: 384m
+    environment:
+      <<: *php-environment
+      DB_USERNAME: uvh_migrator
+      DB_PASSWORD_FILE: /run/secrets/uvh_db_migration_password
+    secrets:
+      - uvh_app_key
+      - uvh_app_secret
+      - uvh_db_migration_password
+      - uvh_db_ca
+      - uvh_redis_password
+      - uvh_hcaptcha_secret
+      - uvh_hcaptcha_public_secret
+      - uvh_resend_api_key
+      - uvh_edge_ask_secret
+      - uvh_metrics_token
+    profiles: ["tools"]
+    restart: "no"
+    command: ["php", "artisan", "migrate", "--force", "--no-interaction"]
+
+volumes:
+  uvh-postgres-data:
+  uvh-storage:
+  uvh-redis-data:
+  uvh-caddy-data:
+  uvh-caddy-config:
+
+secrets:
+  uvh_db_admin_password:
+    file: ${UVH_DB_ADMIN_PASSWORD_FILE:?Define UVH_DB_ADMIN_PASSWORD_FILE}
+  uvh_db_migration_password:
+    file: ${UVH_DB_MIGRATION_PASSWORD_FILE:?Define UVH_DB_MIGRATION_PASSWORD_FILE}
+  uvh_db_backup_password:
+    file: ${UVH_DB_BACKUP_PASSWORD_FILE:?Define UVH_DB_BACKUP_PASSWORD_FILE}
+  uvh_cloudflare_dns_token:
+    file: ${UVH_CLOUDFLARE_DNS_TOKEN_FILE:?Define UVH_CLOUDFLARE_DNS_TOKEN_FILE}
+  uvh_app_key:
+    file: ${UVH_APP_KEY_FILE:?Define UVH_APP_KEY_FILE}
+  uvh_app_secret:
+    file: ${UVH_APP_SECRET_FILE:?Define UVH_APP_SECRET_FILE}
+  uvh_db_password:
+    file: ${UVH_DB_PASSWORD_FILE:?Define UVH_DB_PASSWORD_FILE}
+  uvh_db_ca:
+    file: ${UVH_DB_CA_FILE:?Define UVH_DB_CA_FILE}
+  uvh_hcaptcha_secret:
+    file: ${UVH_HCAPTCHA_SECRET_FILE:?Define UVH_HCAPTCHA_SECRET_FILE}
+  uvh_hcaptcha_public_secret:
+    file: ${UVH_HCAPTCHA_PUBLIC_SECRET_FILE:?Define UVH_HCAPTCHA_PUBLIC_SECRET_FILE}
+  uvh_resend_api_key:
+    file: ${UVH_RESEND_API_KEY_FILE:?Define UVH_RESEND_API_KEY_FILE}
+  uvh_edge_ask_secret:
+    file: ${UVH_EDGE_ASK_SECRET_FILE:?Define UVH_EDGE_ASK_SECRET_FILE}
+  uvh_metrics_token:
+    file: ${UVH_METRICS_TOKEN_FILE:?Define UVH_METRICS_TOKEN_FILE}
+  # Authenticates every client of the internal Redis. Generate it like the
+  # other secrets: 32+ random bytes, stored outside the repository.
+  uvh_redis_password:
+    file: ${UVH_REDIS_PASSWORD_FILE:?Define UVH_REDIS_PASSWORD_FILE}
+
+networks:
+  uvh-private:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  uvh-front:
+    name: uvh-upcloud-front
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
