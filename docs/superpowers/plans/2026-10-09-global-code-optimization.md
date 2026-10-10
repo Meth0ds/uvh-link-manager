@@ -157,7 +157,7 @@ Verificación final: **1.828/1.828 tests frontend**, build/lint/tipos/diff check
 | O84: Ajustes | Separar activación de lecturas según Perfil/Seguridad/Avisos/Privacidad/Cierre; mantener las cinco secciones montadas | Perfil6→1 GET de Ajustes; observación global de exportación conservada; rutas, retorno, retry, actor y escritura tardía | Implementado/verificado O84 |
 | O85: Dependencia QR | Medir grafo de Settings y QrDialog de lista/detalle; diferir el generador opcional si reduce bytes por flujo | Grafo/requests en frío, QR MFA/enlace/descarga, fallo de import/clave manual, owner/destroy; logo añadido por petición del usuario | Implementado/verificado O85 |
 | Render restante | Derivaciones/recreación/OnPush por componente, empezando por las tareas con coste observado | Perfiles equivalentes y actualización de señales/formularios/callbacks, sin acumulación al navegar | Pendiente |
-| Laravel | Elegir una responsabilidad concreta de Admin/Workspace/Account/Domain; extracción separada del trabajo SQL | Contrato exacto, ruta/autorización/locks/transacción/outbox, PHPUnit/Pint/PHPStan | Pendiente |
+| Laravel (primer lote O89 cerrado; resto pendiente) | Elegir una responsabilidad concreta de Admin/Workspace/Account/Domain; extracción separada del trabajo SQL | Contrato exacto, ruta/autorización/locks/transacción/outbox, PHPUnit/Pint/PHPStan | Pendiente |
 | Consultas y jobs | Pila propia, datasets por volumen; medir primero listados/overview/302/export/housekeeping | Plan SQL/filas/locks/memoria/colas antes y después, idempotencia y recuperación | Pendiente |
 
 La optimización de red de Ajustes distingue sus **seis GET** del tráfico de arranque del shell/identidad. La política actual de exportaciones ya observadas debe continuar tras un salto de sección; la primera observación diferida necesita una decisión explícita en el contrato. `AuthService` y los controladores de auth ya separados siguen como fronteras; no volver a mezclar sus responsabilidades.
@@ -179,3 +179,63 @@ Por petición expresa se integra el wordmark UVH en el PNG, con revisión tras r
 Ahorro raw de JS estático por ruta22.800/23.648/23.682 bytes (Ajustes/lista/detalle).1.856 pruebas frontend,build/lint/tipos/diff0;35 casos de navegador/655 checks;72 decodificaciones exactas.389 fuentes/138 build congelados intactos, procesos propios terminales. Plan `2026-10-09-lazy-qr.md`; evidencia `.uvh-runtime/o85-lazy-qr/verification-summary.json`. Optimización global sigue en curso: backend/SQL/jobs y demás fases pendientes.
 
 Próximo candidato leído: la normalización estricta de positivos en paginación Admin/Workspace es semánticamente equivalente, con defaults y límites específicos de cada superficie. Evaluar extracción pequeña compartida con pruebas de entradas inválidas/overflow y contratos HTTP en DB test propia, sin tocar autorización/locks/outbox; no equivale a separar por completo esos controladores ni demuestra ahorro SQL.
+
+## O89 — Normalización de paginación y regresión backend
+
+Admin/Workspace comparten un normalizador decimal estricto con defaults/límites propios. Link/Privacy tienen políticas distintas y las conservan.26.016 comparaciones puras/0 diferencias,32 proyecciones de paginación y186 rutas iguales;31/387 baseline previa,84/722 dirigidas finales. Beneficio de mantenibilidad:2 implementaciones equivalentes→1, sin atribuir ahorro SQL/latencia.
+
+La suite final2794/23039 termina exit0,2793 pasan y1 caso de hostname público se omite por falta de DNS exterior en la red interna. Formato524 y PHPStan level6 app sin errores/nuevos ignores con fuentes actuales iguales. Tres fixtures reparados tras diagnóstico de la suite (mailer propio, claves CAPTCHA del padre y logger debug propio); políticas productivas intactas. Inventario regenerado521 archivos/2509 funciones nombradas/1371 callbacks/3 firmas,0 fallback provisional; asignación no equivale a revisión exhaustiva.522 hashes de fuentes y521 de inventario íntegros. Recursos O89 cerrados/retirados; no deploy.
+
+Siguiente faseSQL O90: perfil real porautor en Adminusers/AccountExportDocument; memberships ya tiene índiceuser_id. Plan previo2026-10-09-link-author-query-profiling.md. Ningún índice nuevo ni beneficio SQL adoptado hasta comparar planes, resultados y coste de escritura.
+
+## O90 — Primer lote SQL cerrado
+
+Tres volúmenes y alternativas completo/parcial/cobertura, con tamaño y coste de escritura medidos. Se adoptó índice completo porautor/id y página derivada antes de contadores; exportador permanece cursor y conserva borrados. Implementación real:27 respuestas/9 streams exactos, loops grande300→100 y página vacía pequeña100→0. Costes y límites en planO90 y `docs/link-author-index-runbook.md`; no extrapolar las medianas SQL a latencia de web/capacidad productiva.
+
+Migración up/down/up ensayada sin afectar otros168 índices.2797/23135 suitefinal exit0,2796 pasan/1skipDNSexterno confirmado; dirigidos296/2803 y3/96, Pint526, PHPStanlevel6 app sin errores. Freeze524/inventario521 válidos; recursosO90 retirados. No deploy/DBcompartida. Objetivo global en curso: resto de faseSQL/jobs y demás fases/lectura exhaustiva pendientes.
+
+Siguiente lote O91: `AnalyticsController::buildOverview` hace dos agregados de mismo scope/rango para clics y visitantes. Candidato a medir: ambos en un SELECT, manteniendo snapshot, NULL/vacío, privacidad, UTC, cache, series y dimensiones. Plan previo2026-10-09-analytics-total-query-profiling.md; todavía sin adoptar ese cambio.
+
+## O91 — Totales de analítica verificados
+
+Un SELECT para ambos totales;108cuerpos/cabeceras/totales/status exactos en tres volúmenes y96casos válidos con SELECT10→9.147dirigidos/1122assertions;2798tests/23148assertions integrales,2797pass/1skipDNS,0errors/failures, Pint526/PHPStanlevel6. Recursos propios retirados tras IDs/labels/fuente524 verificados. Medianas y variaciones/spill documentados en planO91, sin extrapolar a producción.
+
+O92 en curso: fecha/fracciones y cache explícita reproducidas por HTTP, con pérdida adicional en productor/binding/schema0.32contratos nuevos antes del último caso de scope; regresión completa pendiente. No cerrar objetivo global por este lote.
+
+Nueva prioridad expresa: optimizar código global por lectura, no dedicar siguientes lotes sólo a bugs. Hallazgos trazados en `2026-10-09-global-optimization-code-findings.md`:8oportunidades frontend/SQL/jobs y descartes razonados. O93 plan previo `2026-10-09-link-collection-loading.md`; index/trash omiten collection y DTO la busca por fila. Pendiente reproducción cuantitativa después de terminarO92; todavía no aplicado.
+
+O92 cerrado:33contratos nuevos/177assertions,198dirigidos/1419,108respuestas no afectadas exactas;2831integrales/23325assertions terminalexit0,2830pass/1skipDNS. Freeze526/inventario521/Pint/PHPStan y recursoscerrados. O93 siguiente con foco código/rendimiento, global activo.
+
+## Lectura global ampliada y lote O93
+
+Informe de código: [18 oportunidades priorizadas](2026-10-09-global-optimization-code-findings.md), con fuentes, coste, cambio candidato y condiciones de conservación. O92 cerrado; O93 precarga colección por página: 104→5SELECT con100enlaces shared,84→5mixed, sin cambio en63respuestas.309dirigidos y calidad pasan; suite integral2848pass/1DNSskip/0failures, recursos propios cerrados. Siguiente lote propuesto [O94: lecturas auxiliares y artefactos](2026-10-09-owned-frontend-reads.md), después grafo de modales y SQL/jobs. La revisión y las nueve fases permanecen en progreso.
+
+## O94 cerrado; siguiente medición de dependencias
+
+Clasificación del turno anterior: progreso (implementación real,21 casos nuevos y QA terminal). Revalidación actual:47 dirigidos/1.891 integrales, tipos/lint/build exit0,406 hashes de fuente y521 de inventario intactos. GET Blob cancelable, opciones auxiliares guardadas y coalescencia sólo simultánea; generaciones reactivas cubren A→B→A. Procesos propios terminales, puerto9984 libre, sin contenedores ni DB creada. Evidencia runtime preservada. No se extrapola a CPU/latencia backend. Objetivo global activo; siguen grafo/render, SQL/jobs, arquitectura/infra y cierre funcional de nueve fases.
+
+## O95 cerrado; objetivo global activo
+
+Turno clasificado progreso: cierre O94 revalidado y O95 implementado/verificado. Editor diferido desde seis llamadas con dueño/contexto, URL pendiente conservada, carga fallida recuperable.34 casos nuevos/55 dirigidos/1.925 frontend integrales, tipos/lint/build exit0;408 hashes/521 inventario válidos y recursos propios cerrados. JS estático reducido222.344bytes panel,225.771 dashboard,90.096 biblioteca,99.750 detalle; cierres incluyen dependencias compartidas y no se suman. Inicial860,93→860,94kB prácticamente igual, Admin+265bytes por redistribución; sin claimLCP/latencia. Tres integraciones reales verifican forms/save/version/foco. Evidencia runtime preservada.
+
+O96 plan previo2026-10-10-mail-outbox-projection.md: enqueue sólo necesita existencia/id de fila bloqueada pero trae envelope completo. Sin cambio backend ni benchmark O96 todavía. Resto de modales/render, SQL/jobs, arquitectura/infra y matriz de nueve fases continúa pendiente; no se reduce el objetivo a estos lotes.
+
+## O96 en regresión integral; siguiente lectura global
+
+Turno anterior clasificado progreso: O95 cerrado con fuente/grafo/tests terminales, no un mero plan. O96 actual: proyección id manteniendo FOR UPDATE,36 estados/retornos/jobs/SQL restantes equivalentes;20→1 columnas y eliminación de envelope sintético hasta2.796.353bytes.19 contratos/95assertions y99 dirigidos/625assertions, Pint y PHPStanlevel6 pasan. Dos procesos verifican espera real en pg_stat_activity y un único dispatch con commit/rollback del primer claim. Fixture de fechas reparado por sufijo UTC, no producto. QA propio63417 vivo; full-final.log sobreuvh_test propia sigue en curso. PG00d049d4..., redf1df67d1..., volumenuvh-o96-postgres-data yPHPuvh-o96-php, labelo96-mail-projection; no editar producto/tests hasta terminal ni retirar recursos todavía.
+
+Informe fuente ampliado22 hallazgos; cuatro nuevos sobre exactitud/gap de edad Redis y lectura/tamaño de archivo CSV, todavía sin reproducción/cambio. Contrato targetWorkspace acepta retorno A→B→A intencionalmente según test existente: no cambiar ese helper como si fuera LatestRequest ni presentar su semántica como fallo demostrado. Plan O97 escrito para perfilar counts operativos frente a índices y edades separadas; aún no ejecutado. Global activo con todas sus nueve fases.
+
+## Cierre O96 recuperado tras interrupción
+
+Turno anterior: progreso (producto,19 contratos/36 equivalencias y lectura ampliada), no mero wait. Handle63417 faltaba; contenedor1af4f03bc20b vivo confirmado con docker top/PGactividad y freeze540 sin cambios. Dockerwait42360 observado terminal0; JUnit completo2868/33338,2867pass/1DNSskip,0errors/failures. Log original truncado porque murió cliente host; no repetir suite por ello. Sonda90268 SSRF5/62 confirmaDNSskip. Cleanup54364 terminal0 tras IDs/labels/mounts/catálogo/hashes verificados; PG/red/volumenO96 eliminados.99dirigidos/625,19nuevos/95,Pint532/PHPStanlevel6/inventario521. globalactivo.
+
+Siguiente avance: lectura CSV acotada y vigente (lote O98), con plan previo2026-10-10-csv-file-read-ownership.md. Prioridad memoria/coherencia cliente; O97perfilado de recuentos conserva su plan pendiente, sin descartar resto SQL/Redis/render/modales/infra/matriz de nueve fases.
+
+### O98/O100 — lectura CSV y carga inicial, 10/10
+
+O98: archivos acotados antes de File.text, UTF-8/preflight/BOM, contexto y reintentos vigentes, cierre/frescura biblioteca;44 nuevos/57 dirigidos/1969 integrales y calidad. O100: provider español de paginator en inyector lazy privado;7 nuevos/11 dirigidos/1976 integrales/calidad. Inicial860,94→522,15kB, landing−142256bytes JS medidos por unión de outputs. Contratos/copy/aria/paginación conservados, CSSglobal idéntico. PrivateLinks/Admin no se declaran más pequeños: +548/+403bytes. Ambos lotes frontend verificados e inventario frontend actual; PHPglobal/O99, infraestructura/SQL/jobs y matrizfinal siguenpendientes.
+
+O99 cerrado:37capturas equivalentes;100pause814→517 SQL(admisión300→3),100tags1321→824 con200counts eliminados;31nuevos/286assertions,188dirigidos/1825,2899integrales/33624(2898pass/1DNSskip), Pint534/PHPStanlevel6. QA56601 ycleanup79431terminal0.542hashesbackend/522inventario válidos,0propietariosprovisionales; recursos Docker propios retirados. Globalactivo:25oportunidades fuente registradas, incluidas renderChart(O101) y dueño de lecturas/confirmacionesDashboard/Detail; no marcar demásfasescerradas.
+
+O103 cerrado: cinco lecturas Dashboard/LinkDetail comparten contexto de cuenta/sesión/workspace/revisión/rol y detalle incorpora revisión de ruta. Se cancelan GET antiguos y se rechazan success/error/finally tardíos.43nuevos/90dirigidos/2046integrales, tipos/lint/build/diff exit0; red35fallos/8controles, green90pass.417frontendhashes/542backend/inventario522(2529named/1384anonymous/0provisional)verificados; QA2550terminal0 y9996libre. IDinválido no consulta analítica global ni actividad null. Opportunity25 cerrada para estas dos superficies; demás sistemas y fases pendientes.

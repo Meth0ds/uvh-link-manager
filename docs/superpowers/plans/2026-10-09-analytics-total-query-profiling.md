@@ -1,0 +1,34 @@
+# O91 — Clics y visitantes en una consulta de agregación
+
+Siguiente lote de fase5, después de cerrar la suite y los recursos O90. No modificar producto mientras QA propia esté activa ni ejecutar benchmark durante la suite. Lectura directa: `AnalyticsController::buildOverview` calcula count de todos los eventos y count distinto de visitor_hash no nulo en dos consultas que comparten joins, workspace, enlace opcional y rango. El candidato es un agregado con ambos contadores, manteniendo el resto de consultas sin cambios. No hay mejora demostrada todavía.
+
+## Contrato que conservar
+
+Eventos originales como fuente; rango inclusivo, UTC, privacidad `daily_pseudonyms`, links borrados incluidos como ahora y límites temporales existentes. COUNT distinto ignora NULL, pero no debe eliminar los clics sin hash del total de clics ni tratar un hash vacío como NULL. Mantener snapshot REPEATABLE READ READ ONLY, secciones, dimensionTotals, top-eight, autorizaciones, API token/workspace/enlace, CSV protegido y caché/fallback/TTL. No introducir rollups diarios para sustituir visitantes del rango, nuevos índices, cachear identidad, datos de visitante en respuestas ni cambios de orden de otras secciones.
+
+## Pasos
+
+- [x] Capturar consultas y respuestas desde consumidores actuales en entorno propio `_test`, red interna, proveedores ficticios y reloj fijo, después de retirar O90. Leer índices reales de click_events; congelar app/tests/config/routes/migrations.
+- [x] Semillas pequeñas/medianas/grandes de eventos con enlaces/autores/workspaces propios, hashes repetidos y distintos, NULL/vacío, días y límites UTC, enlaces borrados, rango vacío y scope extranjero. Ensayar workspace completo y enlace individual; cuerpo y CSV/JSON equivalentes, sin hashes expuestos.
+- [x] Medir ambos SELECT actuales y candidato mediante EXPLAIN ANALYZE BUFFERS y muestras repetidas, separando primera muestra, dispersión y spill. Medir también el overview completo sin caché y su número de consultas: no atribuir ahorro a una caché ya caliente. Evitar cargas propias simultáneas y planes forzados.
+- [x] Adoptar sólo si reduce trabajo/coste suficiente en los volúmenes medidos; registrar cualquier regresión. No cambiar series, topLinks, dimensiones, reglas de auth, snapshot ni política de caché. Ensayar invariantes de contadores contra consultas independientes sobre la misma semilla.
+- [x] Contratos de AnalyticsExportTest, ApiParityTest y autoridad de API token; concurrencia de ingestion/snapshot, caché/TTL/scope/error y ceros/límites. El listener existente de snapshot identifica `count(*)` con comparación sensible a mayúsculas: preservar la prueba semántica de commit entre consultas y hacerla robusta si cambia la capitalización, sin quitar el commit ni sus assertions.
+- [x] Pint/PHPStan, suite backend integral y comparación final desde la implementación real; hashes intactos y cierre de recursos. Decisión implementada/descartada, evidencia y límites; objetivo global aún necesita el resto de consultas, jobs y fases.
+
+Este plan es una oportunidad localizada por lectura de código, no evidencia de una optimización terminada. Evitar otra extracción masiva de AnalyticsController en el mismo lote.
+
+## O91 implementado, suite completa pendiente
+
+O90 cerrado y recursos retirados antes de iniciar PostgreSQL propio O91. DBuvh_o91_test, red interna, mismos pinnedPHP8.4.25/PG16.15, fsync+synchronous_commiton,shared_buffers128MB/work_mem4MB/parallel2. Catálogo169 índices: click_events conserva cuatro índices (pk/event_uuid/link_time/time); no se añadió ni forzó índice. Fuentes524 y copias propias verificadas antes de cargas.
+
+Semillas1.000/50.000/500.000 eventos,102 enlaces/dos workspaces,50%concentración, dispersos/foreign/deleted, NULL/vacío/hashes repetidos y distintos, UTC/periodos/rango vacío.36 capturas porvolumen desde overview,publicOverview,CSV/JSON; contextos sintéticos explícitos, no claims de timingHTTP/auth. Primitiveprofile4scopes×8muestras, primera separada+7repetidas, clics/visitantes/combined/combinedFiltered. Ambos candidatos conservan totales; combinado simple elegido: menor SQL, una consulta menos, mejora sobre suma en todos los scopes/volúmenes. FILTER adicional no redujo buffers/spill en los planes y sus tiempos fueron mixtos; no se adoptó. Grande/workspace: suma mediana502.025ms→461.207ms; buffers finales1449+11555→11555; spill3343 frente3324bloques de la consulta visitantes, incremento documentado.
+
+Implementación real combina ambos agregados, conserva casts y usa primera fila obligatoria (COUNT siempre devuelve fila, incluso vacío).108 casos finales mantienen parámetros/status/cuerpo/bytes/cabeceras/totales;96casos200 pasan10→9 SELECTs,12casos404 conservan consulta de existencia. Los demás SELECT y políticas permanecen iguales. Nuevo contrato13 assertions para anónimos, vacío, repetidos, borrados y foreign;147/1122 baseline y final pasan. Snapshotlistener no cambió: count(*) minúscula sigue disparando el commit del competidor.
+
+Invocación completa sin caché4scopes×8muestras porvolumen: workspace medianas small10.088→7.014ms/medium190.814→159.376/large1510.008→1334.451; hotlarge763.254→711.528. Rango vacío grande3.396→3.614ms, rangos2.991–5.123/2.923–5.336 solapados; variación al alza registrada, no se oculta ni se extrapola mejora uniforme. Pico del allocador25.165.824bytes en estas invocaciones. VMlocalcompartida, reloj fijo y cache desactivada; primera no significa físicamente fría y son7muestras repetidas, no capacidad productiva ni percentiles de cola.
+
+Pint526/PHPStanlevel6app sin errores e inventario521/0fallback. Suite final2798 vive en qa-final.py/sesión39843; último checkbox abierto hasta resultado/hash/cleanup. Fuente524intacta. Resourceruntime/resources.json autoritativo; no DB compartida/deploy. Error de primer parserexperimental esperaba alias aggregate sin comillas; captura real mostró quotedalias. Diagnóstico guardado; sólo se corrigió el parser de benchmark y se retomó pequeño desde captura válida, sin editar producto ni reiniciar un proceso vivo.
+
+Lectura adicional: parseRange pierde fracciones pese a aceptar ISO con1–6dígitos; prueba pura muestra .000001/.999999 convertidos al mismo segundo, y fecha-only termina23:59:59sin micro. Otra prueba sinDB invoca cachedOverview real con cache/clock falsos y confirma misma clave para dos rangos custom distintos cerca del reloj: se infieren como rolling por la hora, no por origen. O92 debe tratar precisión y contexto del rango después del cierre O91; no se mezclaron esos cambios con esta optimización.
+
+Cierre: suite final terminal exit0,2.798tests/23.148assertions;2.797pass,1skipDNS,0errors/failures. Pint526/PHPStanlevel6app/inventario y fuente524 congelada verificados. PG/volumen/red O91 eliminados tras comprobar IDs/labels/montajes y ausencia de PHP. Evidencia conservada; siguiente O92, objetivo global activo.

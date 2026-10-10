@@ -20,3 +20,5 @@ Decoder independiente90/90 sobre tres longitudes de URL,480/2048,marca/H y clás
 Capturas desktop con/sin logo y mobile claro/oscuro inspeccionadas. Escritorio633px: control resolución termina477.6px y footer empieza517.6px. Móvil conserva acciones fijas y scroll dentro del contenido.391 hashes fuente/138 build intactos; procesos propios terminales.
 
 Coste raw autorizado por nueva función:7.080/7.093bytes de cierre estático Links/Detail, Settings sin delta; engine sigue diferido con26.565bytes(+296). Margen4 mantiene el camino original; sólo márgenes ampliados con marca calculan módulos con API pública adicional para evitar tapar más datos. Sin promesas de mejora global de latencia. Límites de remuestreo extremo O86 conservados; no universalizar lectura física. Evidencia runtime O88/verification-summary.json. No deploy/DB/proveedores ni cierre global.
+
+Revalidación de la petición QR: lectura del contrato y fuentes actuales, 75 pruebas dirigidas de renderer/servicio/modal/MFA, todas correctas; proceso terminal exit0. Registro `.uvh-runtime/o88-qr-options/recheck-latest-request.log`. No se han añadido cambios redundantes al producto.

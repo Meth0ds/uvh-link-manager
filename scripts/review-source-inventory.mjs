@@ -19,6 +19,13 @@ for (const row of coverage.split('\n')) {
 
 function proposedSystem(path, name = '') {
   const file = basename(path);
+  if (file === 'csv-import-limits.ts') return { system: 'S04', basis: 'CSV dialog file preflight and UTF-8 payload checks; LinkCsvController limit reconciled O98' };
+  if (file === 'BoundedPositiveInteger.php') return { system: 'S13', basis: 'shared numeric normalization; S03 Workspace and S11 Admin callers reviewed; Link/Privacy retain distinct policies' };
+  if (file === 'LegalIdentity.php') return { system: 'S12', basis: 'public legal projection; S13 release gates share validation' };
+  if (file === 'RegistrationGate.php') return { system: 'S01', basis: 'registration admission flag; S11 writes and S12 public status share its audited/cache contract' };
+  if (file === 'legal-documents.ts') return { system: 'S12', basis: 'published document versions; S01 registration/activation consumers share the version contract' };
+  if (['copy-feedback.service.ts', 'copy-feedback-icon.component.ts'].includes(file)) return { system: 'S12', basis: 'copy feedback and scoped UI lifetime; S04 links and S09 dashboard consumers' };
+  if (['qr-code.service.ts', 'qr-renderer.ts', 'qr-brand.ts'].includes(file)) return { system: 'S04', basis: 'shared QR renderer/import/brand; S01 MFA and S04 link preview/export consumers verified O85–O88' };
   if (file === 'read-deadline.ts') return { system: 'S13', basis: 'owned read-expiry scheduling; S01 security and Settings consumers require reconciliation' };
   if (file === 'session-agent-label.ts') return { system: 'S01', basis: 'session presentation shared by Settings and security center; not identity authority' };
   if (['auth-entry.service.ts', 'registration.service.ts', 'auth-session-contracts.ts'].includes(file)) return { system: 'S01', basis: 'entry/registration transport and wire types; facade state and callers require review' };
