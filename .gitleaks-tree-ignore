@@ -1,0 +1,26 @@
+# Exact working-tree false positives reviewed 2026-10-10.
+# Only synthetic tests and public documentation examples; no whole-file exclusions.
+# Reviewed fixture/prose at docs/superpowers/plans/2026-10-03-authenticated-password-change.md:36; not an operational credential.
+docs/superpowers/plans/2026-10-03-authenticated-password-change.md:generic-api-key:36
+# Reviewed fixture/prose at docs/superpowers/plans/2026-10-04-mfa-setup-response-contract.md:26; not an operational credential.
+docs/superpowers/plans/2026-10-04-mfa-setup-response-contract.md:generic-api-key:26
+# Reviewed fixture/prose at frontend/src/app/auth/account-recovery-completion-identity.spec.ts:9; not an operational credential.
+frontend/src/app/auth/account-recovery-completion-identity.spec.ts:generic-api-key:9
+# Reviewed fixture/prose at frontend/src/app/auth/email-action-response.spec.ts:42; not an operational credential.
+frontend/src/app/auth/email-action-response.spec.ts:generic-api-key:42
+# Reviewed fixture/prose at frontend/src/app/auth/email-action-response.spec.ts:43; not an operational credential.
+frontend/src/app/auth/email-action-response.spec.ts:generic-api-key:43
+# Reviewed fixture/prose at docs/project-completion-audit-2026-09-30.md:531; not an operational credential.
+docs/project-completion-audit-2026-09-30.md:generic-api-key:531
+# Reviewed fixture/prose at frontend/src/app/auth/auth-bearer.spec.ts:21; not an operational credential.
+frontend/src/app/auth/auth-bearer.spec.ts:generic-api-key:21
+# Reviewed fixture/prose at frontend/src/app/core/services/auth-response-decoders.spec.ts:147; not an operational credential.
+frontend/src/app/core/services/auth-response-decoders.spec.ts:generic-api-key:147
+# Reviewed fixture/prose at frontend/src/app/core/services/data-export-response-contract.spec.ts:72; not an operational credential.
+frontend/src/app/core/services/data-export-response-contract.spec.ts:generic-api-key:72
+# Reviewed fixture/prose at frontend/src/app/core/services/mfa-setup-contract.spec.ts:12; not an operational credential.
+frontend/src/app/core/services/mfa-setup-contract.spec.ts:generic-api-key:12
+# Reviewed fixture/prose at frontend/src/app/panel/settings/mfa-settlement.spec.ts:17; not an operational credential.
+frontend/src/app/panel/settings/mfa-settlement.spec.ts:generic-api-key:17
+# Reviewed fixture/prose at frontend/src/app/panel/settings/mfa-settlement.spec.ts:182; not an operational credential.
+frontend/src/app/panel/settings/mfa-settlement.spec.ts:generic-api-key:182

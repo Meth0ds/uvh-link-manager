@@ -28,3 +28,39 @@ ee799b99f33ab7bd6b6cf94cd44170cb67966fcf:backend/tests/api.test.ts:generic-api-k
 # almacenamiento, no un secreto. Falso positivo de la heurística de entropía.
 308674d60d9435891cbf8f07f1b36dc6923e40d9:frontend/src/app/core/services/pending-invitation.service.ts:generic-api-key:3
 6a73c51078f10db56ddcf3c7fc254e94ec09d5ad:frontend/src/app/core/services/pending-invitation.service.spec.ts:generic-api-key:4
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+921df9a4680bbaf4f1c9ea3e8a0082324c07bafe:docs/superpowers/plans/2026-10-04-mfa-setup-response-contract.md:generic-api-key:26
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+921df9a4680bbaf4f1c9ea3e8a0082324c07bafe:frontend/src/app/core/services/auth-response-decoders.spec.ts:generic-api-key:147
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+921df9a4680bbaf4f1c9ea3e8a0082324c07bafe:frontend/src/app/core/services/data-export-response-contract.spec.ts:generic-api-key:72
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+921df9a4680bbaf4f1c9ea3e8a0082324c07bafe:frontend/src/app/core/services/mfa-setup-contract.spec.ts:generic-api-key:12
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+921df9a4680bbaf4f1c9ea3e8a0082324c07bafe:frontend/src/app/panel/settings/mfa-settlement.spec.ts:generic-api-key:15
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+921df9a4680bbaf4f1c9ea3e8a0082324c07bafe:frontend/src/app/panel/settings/mfa-settlement.spec.ts:generic-api-key:69
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+4f80756abba3ded4791c7c8125062e208aec9b5f:docs/superpowers/plans/2026-10-03-authenticated-password-change.md:generic-api-key:36
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+4f80756abba3ded4791c7c8125062e208aec9b5f:frontend/src/app/auth/account-recovery-completion-identity.spec.ts:generic-api-key:9
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+0a7bcbb074fa9918ce325f85497089f07b002d2b:frontend/src/app/auth/email-action-response.spec.ts:generic-api-key:42
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+0a7bcbb074fa9918ce325f85497089f07b002d2b:frontend/src/app/auth/email-action-response.spec.ts:generic-api-key:43
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+0a7bcbb074fa9918ce325f85497089f07b002d2b:docs/project-completion-audit-2026-09-30.md:generic-api-key:531
+
+# Reviewed historical synthetic fixture or public documentation example; matches the working-tree fixture review.
+8ff0aed8a5b127874d939d2c101027858df38f2c:frontend/src/app/auth/auth-bearer.spec.ts:generic-api-key:12

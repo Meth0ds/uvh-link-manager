@@ -123,8 +123,9 @@ jobs:
           docker run --rm \
             -v "$PWD:/repo" -w /repo \
             "$GITLEAKS_IMAGE" \
-            dir /repo \
+            dir . \
               --config /repo/.gitleaks.toml \
+              --gitleaks-ignore-path /repo/.gitleaks-tree-ignore \
               --redact --no-banner --verbose \
               --report-format json --report-path gitleaks-tree.json
 

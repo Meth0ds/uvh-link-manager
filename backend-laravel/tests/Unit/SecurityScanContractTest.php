@@ -577,7 +577,9 @@ class SecurityScanContractTest extends TestCase
 
         // Gitleaks: the working tree on every event, the whole history when the
         // run is the scheduled or a manual one.
-        $this->assertStringContainsString('dir /repo', $workflow);
+        $this->assertStringContainsString('dir .', $workflow);
+        $this->assertStringContainsString('-w /repo', $workflow);
+        $this->assertStringContainsString('--gitleaks-ignore-path /repo/.gitleaks-tree-ignore', $workflow);
         $this->assertStringContainsString('git /repo', $workflow);
         $this->assertStringContainsString('--log-opts=--all', $workflow);
         $this->assertStringContainsString("github.event_name == 'schedule'", $workflow);

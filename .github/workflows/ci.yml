@@ -42,7 +42,18 @@ jobs:
 
       - name: Audit locked dependency tree
         working-directory: frontend
-        run: npm audit --audit-level=moderate
+        run: |
+          npm run audit:policy:test
+          npm run audit:policy -- ../frontend-audit.json
+
+      - name: Preserve the complete npm audit report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: frontend-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: frontend-audit.json*
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Lint TypeScript and Angular templates
         working-directory: frontend

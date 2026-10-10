@@ -89,7 +89,7 @@ const steps = [
     half: "frontend",
     name: "Frontend / audit de dependencias",
     command: "npm",
-    args: ["audit", "--audit-level=moderate"],
+    args: ["run", "audit:policy"],
     cwd: join(root, "frontend"),
   },
   {

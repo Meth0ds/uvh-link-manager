@@ -17,7 +17,9 @@
     "e2e:backup": "node e2e/backup-restore.mjs",
     "e2e:install": "playwright install chromium",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "audit:policy": "node ../scripts/npm-audit-policy.mjs",
+    "audit:policy:test": "node --test ../scripts/npm-audit-policy.test.mjs"
   },
   "dependencies": {
     "@angular/animations": "~22.2.1",
@@ -63,6 +65,7 @@
   "overrides": {
     "fast-uri": "3.1.8",
     "less": "4.9.1",
-    "qs": "6.16.0"
+    "qs": "6.16.0",
+    "source-map-js": "1.2.2"
   }
 }
