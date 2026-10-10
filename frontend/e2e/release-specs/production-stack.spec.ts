@@ -5,7 +5,7 @@ test("production images serve app and public SPA routes through Caddy and Nginx"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const appResponse = await page.goto("https://app.uvh.localhost:8443/auth");
   expect(appResponse?.status()).toBe(200);
-  await expect(page.getByRole("heading", { name: "Vuelve a tus enlaces.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Iniciar sesión en UVH", exact: true })).toBeVisible();
 
   // An empty app-root can exist even when the JS bundle fails to bootstrap.
   // Route-specific content proves that Angular actually rendered each page.

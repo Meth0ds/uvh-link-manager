@@ -22,7 +22,7 @@ test("registro, verificación por email y login crean una sesión real", async (
   await expect(page.getByRole("heading", { name: "Email verificado" })).toBeVisible();
 
   await page.getByRole("link", { name: "Iniciar sesión", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Vuelve a tus enlaces." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Iniciar sesión en UVH" })).toBeVisible();
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Entrar en mi panel" }).click();
@@ -44,7 +44,7 @@ test("un registro pendiente no abre sesión ni reto MFA y el reenvío vive en un
   // esa frontera la fija el contrato del backend (ApiParityTest), no este spec.
   await expect(page).toHaveURL(/\/auth$/);
   await expect(page.getByRole("heading", { name: "Confirma que eres tú" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Tu siguiente paso está en el correo." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Confirma tu email" })).toBeVisible();
 
   // El reenvío vive en una entrada propia de esa pantalla: nunca se dispara
   // solo, se solicita a mano y el resultado se anuncia sin más.
@@ -65,6 +65,6 @@ test("registro duplicado conserva la respuesta anti-enumeración", async ({ page
   await registerFromBrowser(page, email);
   const response = await duplicateResponse;
   expect(response.status()).toBe(201);
-  await expect(page.getByRole("heading", { name: "Tu siguiente paso está en el correo." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Confirma tu email" })).toBeVisible();
   await expect(page).toHaveURL(/\/auth\?mode=register$/);
 });

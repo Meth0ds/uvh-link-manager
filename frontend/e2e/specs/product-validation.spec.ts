@@ -380,18 +380,23 @@ test("estado público falla cerrado sin monitor y conserva accesibilidad", async
   expect((await refreshedStatus).status()).toBe(503);
   await expect(page.getByRole("heading", { name: "Estado desconocido" })).toBeVisible();
 
-  // Backwards from the refresh control: the public theme switch sits between it
-  // and the header links, and the header links to "Ayuda" ("Ayuda técnica" is
-  // the name of the help page itself, not of this link).
+  // Follow the current public shell backwards from the refresh control:
+  // account entry, theme, five navigation links, brand and skip link.
   await page.getByRole("button", { name: "Actualizar" }).focus();
   await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("banner").getByRole("link", { name: "Entrar", exact: true })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("switch", { name: "Modo oscuro" })).toBeFocused();
+  for (const name of ["Denunciar enlace", "Privacidad", "Términos", "Estado del servicio", "Ayuda"]) {
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByRole("navigation", { name: "Navegación pública", exact: true }).getByRole("link", { name, exact: true })).toBeFocused();
+  }
   await page.keyboard.press("Shift+Tab");
-  await expect(page.getByRole("link", { name: "Iniciar sesión" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "UVH, volver a la página principal", exact: true })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
-  await expect(page.getByRole("navigation", { name: "Navegación pública" }).getByRole("link", { name: "Ayuda", exact: true })).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
-  await expect(page.getByRole("link", { name: "UVH, inicio" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Ir al contenido", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#public-content")).toBeFocused();
   await expectNoWcagAAIssues(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();

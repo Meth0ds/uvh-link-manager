@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 test("una ruta privada devuelve al login sin crear una sesión", async ({ page }) => {
   await page.goto("/app/settings");
   await expect(page).toHaveURL(/\/auth\?returnTo=%2Fapp%2Fsettings$/);
-  await expect(page.getByRole("heading", { name: "Vuelve a tus enlaces." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Iniciar sesión en UVH" })).toBeVisible();
 });
 
 test("recuperar contraseña invalida la anterior y permite la nueva", async ({ page }) => {
@@ -53,7 +53,7 @@ test("un enlace de verificación consumido no puede reutilizarse", async ({ page
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Confirmar mi email" }).click();
   expect((await responsePromise).status()).toBe(400);
-  await expect(page.getByRole("status")).toContainText(/no es válido|caducado|utilizado/i);
+  await expect(page.getByRole("alert")).toContainText(/no es válido|caducado|utilizado/i);
   await expect(page.getByRole("heading", { name: "Email verificado" })).toHaveCount(0);
 });
 

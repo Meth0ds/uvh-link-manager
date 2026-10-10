@@ -140,19 +140,24 @@ test("el registro contesta igual sea libre, ocupada o verificada la dirección",
   const mover = `mover-${stamp}@example.test`;
   expect((await api(request, csrf, "/api/v1/auth/register", registerBody(mover, ATTACKER_PASSWORD))).status()).toBe(201);
   const corrections: APIResponse[] = [];
+  let currentEmail = mover;
   for (const newEmail of [verifiedEmail, `mudado-${stamp}@example.test`]) {
     corrections.push(
       await api(request, csrf, "/api/v1/auth/change-registration-email", {
-        currentEmail: mover,
+        currentEmail,
         newEmail,
         captchaToken: CAPTCHA_TOKEN,
       }),
     );
+    // Every acknowledgement moves this browser's context and rotates its
+    // witness, including an occupied destination. Follow the issued cookie
+    // and the requested address rather than replaying the spent generation.
+    currentEmail = newEmail;
   }
   await expectSameAnswers(corrections, 200);
 });
 
-test("el login y el reenvío de verificación no revelan si la cuenta existe", async ({ request }) => {
+test("el login y el reenvío de verificación no revelan si la cuenta existe", async ({ request, playwright, baseURL }) => {
   const csrf = await openApi(request);
   const stamp = Date.now();
   const existing = `existente-${stamp}@example.test`;
@@ -160,27 +165,42 @@ test("el login y el reenvío de verificación no revelan si la cuenta existe", a
   expect((await api(request, csrf, "/api/v1/auth/register", registerBody(existing, E2E_PASSWORD))).status()).toBe(201);
   await verifyThroughMail(request, csrf, existing);
 
-  // Dirección inexistente y contraseña equivocada contestan exactamente igual…
-  await expectSameAnswers(
-    [
-      await api(request, csrf, "/api/v1/auth/login", { email: unknown, password: E2E_PASSWORD, captchaToken: CAPTCHA_TOKEN }),
-      await api(request, csrf, "/api/v1/auth/login", {
-        email: existing,
-        password: ATTACKER_PASSWORD,
-        captchaToken: CAPTCHA_TOKEN,
-      }),
-    ],
-    401,
-  );
+  // A browser that owns an edit witness receives its own lifecycle screen,
+  // even after activation. Test the public oracle from a separate cookie jar
+  // that has never registered either address, as an anonymous observer does.
+  const ownedAnswer = await api(request, csrf, "/api/v1/auth/login", {
+    email: existing, password: ATTACKER_PASSWORD, captchaToken: CAPTCHA_TOKEN,
+  });
+  expect(ownedAnswer.status()).toBe(403);
+  expect(await ownedAnswer.json()).toMatchObject({ reason: "pending_registration" });
+  const observer = await playwright.request.newContext({ baseURL });
+  try {
+    const observerCsrf = await openApi(observer);
 
-  // …y las superficies públicas de recuperación también.
-  await expectSameAnswers(
-    [
-      await api(request, csrf, "/api/v1/auth/resend-verification", { email: unknown, captchaToken: CAPTCHA_TOKEN }),
-      await api(request, csrf, "/api/v1/auth/resend-verification", { email: existing, captchaToken: CAPTCHA_TOKEN }),
-    ],
-    200,
-  );
+    // Dirección inexistente y contraseña equivocada contestan exactamente igual…
+    await expectSameAnswers(
+      [
+        await api(observer, observerCsrf, "/api/v1/auth/login", { email: unknown, password: E2E_PASSWORD, captchaToken: CAPTCHA_TOKEN }),
+        await api(observer, observerCsrf, "/api/v1/auth/login", {
+          email: existing,
+          password: ATTACKER_PASSWORD,
+          captchaToken: CAPTCHA_TOKEN,
+        }),
+      ],
+      401,
+    );
+
+    // …y las superficies públicas de recuperación también.
+    await expectSameAnswers(
+      [
+        await api(observer, observerCsrf, "/api/v1/auth/resend-verification", { email: unknown, captchaToken: CAPTCHA_TOKEN }),
+        await api(observer, observerCsrf, "/api/v1/auth/resend-verification", { email: existing, captchaToken: CAPTCHA_TOKEN }),
+      ],
+      200,
+    );
+  } finally {
+    await observer.dispose();
+  }
 });
 
 test("la pre-ocupación termina en el buzón del dueño, sin atajos para el que la montó", async ({ page }) => {
@@ -218,6 +238,12 @@ test("la pre-ocupación termina en el buzón del dueño, sin atajos para el que 
 
   // Las credenciales sustituidas ya no abren la cuenta.
   await logoutFromBrowser(page);
+  await loginFromBrowser(page, email, ATTACKER_PASSWORD);
+  await expect(page.getByRole("heading", { name: "Confirma tu email", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/auth$/);
+  // Without this browser's registration witness, the same invalid password
+  // has the public generic answer and still cannot open the account.
+  await page.context().clearCookies();
   await loginFromBrowser(page, email, ATTACKER_PASSWORD);
   await expect(page.getByRole("alert")).toContainText("Credenciales incorrectas");
 });
