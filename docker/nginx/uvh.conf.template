@@ -81,7 +81,7 @@ server {
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     # The SPA may frame only its own isolated hCaptcha wrapper. The wrapper's
     # separate CSP is the sole document allowed to contact/frame hCaptcha.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types angular angular#bundler" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types angular angular#bundler uvh#qr-worker" always;
     # The panel is a SPA: one page load fires several calls and a shared NAT
     # presents dozens of users as one address. Only the two API surfaces below
     # are capped here — never the static shell, and never the health probe.
@@ -169,7 +169,7 @@ server {
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     # Legal/report pages may frame only the isolated same-site hCaptcha
     # wrapper. Vendor code never runs in the Angular document itself.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types angular angular#bundler" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types angular angular#bundler uvh#qr-worker" always;
 
     location ^~ /internal/ { return 404; }
     location = / { try_files /index.html =404; expires -1; }

@@ -88,6 +88,24 @@ describe("LinksComponent bulk idempotency", () => {
     expect(download).not.toHaveBeenCalled();
   });
 
+  it("keeps the workspace selection across pages and clears it on a context change", async () => {
+    component.links.set([row(1), row(2)]); component.toggleSelectPage(true);
+    component.onPage({ pageIndex: 1, pageSize: 20, length: 40 }); await fixture.whenStable();
+    expect([...component.selected()]).toEqual([1, 2]);
+    component.links.set([row(3)]); component.toggleSelected(3);
+    expect([...component.selected()]).toEqual([1, 2, 3]);
+    (TestBed.inject(WorkspaceService).currentId as ReturnType<typeof signal<number>>).set(2); fixture.detectChanges(); await fixture.whenStable();
+    expect(component.selected().size).toBe(0);
+  });
+
+  it("removes a deleted row from the selection without losing the other pages", async () => {
+    component.selected.set(new Set([1, 2]));
+    (TestBed.inject(ActionDialogService).confirm as jasmine.Spy).and.resolveTo(true);
+    api.delete.and.resolveTo({ ok: true });
+    await component.remove(row(1));
+    expect([...component.selected()]).toEqual([2]);
+  });
+
   it("sends the selection with one key and reuses it only while the outcome is unknown", async () => {
     component.toggleSelected(1);
     component.toggleSelected(2);

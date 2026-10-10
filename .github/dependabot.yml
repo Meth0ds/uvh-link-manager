@@ -133,6 +133,34 @@ updates:
     commit-message:
       prefix: deps(images)
 
+  - package-ecosystem: docker
+    directory: /docker/caddy
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps(images)
+
+  - package-ecosystem: docker
+    directory: /docker/postgres
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps(images)
+
   # También mantiene los SHA fijados de las acciones. Las revisiones siguen
   # mostrando de forma explícita qué código externo cambiará.
   - package-ecosystem: github-actions

@@ -140,3 +140,5 @@
     }
   </div>
 }
+
+@if (link(); as currentLink) { <app-qr-campaign-panel [linkId]="currentLink.id" [url]="currentLink.shortUrl" /> }

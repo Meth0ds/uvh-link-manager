@@ -1,3 +1,5 @@
+import type { QrRasterLogo } from "./qr-design";
+
 export interface QrCustomLogo {
   readonly canvas: HTMLCanvasElement;
   readonly preview: string;
@@ -82,4 +84,26 @@ export async function prepareQrCustomLogo(file: File): Promise<QrCustomLogo> {
   } finally {
     bitmap.close();
   }
+}
+
+/** Private server assets are PNGs; validate their bounds before allocating a bitmap. */
+export async function prepareSavedQrLogo(blob: Blob, name: string): Promise<QrCustomLogo> {
+  if (blob.type !== "image/png" || blob.size < 24 || blob.size > 8 * 1024 * 1024) throw new Error("El logo guardado no es válido.");
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const size = dimensions(bytes);
+  if (bytes[0] !== 137 || size.width < 1 || size.height < 1 || size.width > OUTPUT_SIDE || size.height > OUTPUT_SIDE) throw new Error("El logo guardado no es válido.");
+  const bitmap = await createImageBitmap(blob);
+  try {
+    if (bitmap.width !== size.width || bitmap.height !== size.height) throw new Error("El logo guardado no es válido.");
+    const canvas = document.createElement("canvas"); canvas.width = size.width; canvas.height = size.height;
+    const context = canvas.getContext("2d"); if (!context) throw new Error("No se pudo preparar el logo.");
+    context.drawImage(bitmap, 0, 0);
+    return { canvas, preview: canvas.toDataURL("image/png"), name };
+  } finally { bitmap.close(); }
+}
+
+export async function qrLogoRaster(canvas: HTMLCanvasElement): Promise<QrRasterLogo> {
+  if (canvas.width < 1 || canvas.height < 1 || canvas.width > OUTPUT_SIDE || canvas.height > OUTPUT_SIDE) throw new Error("El logo normalizado no es válido.");
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("No se pudo codificar el logo.")), "image/png"));
+  return { png: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height };
 }

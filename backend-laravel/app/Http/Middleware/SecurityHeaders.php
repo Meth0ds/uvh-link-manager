@@ -55,7 +55,7 @@ class SecurityHeaders
                 "base-uri 'self'",
                 "form-action 'self'",
                 "require-trusted-types-for 'script'",
-                'trusted-types angular angular#bundler',
+                'trusted-types angular angular#bundler uvh#qr-worker',
             ]),
         );
 

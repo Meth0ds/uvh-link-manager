@@ -1,4 +1,4 @@
-import { prepareQrCustomLogo } from "./qr-custom-logo";
+import { prepareQrCustomLogo, prepareSavedQrLogo, qrLogoRaster } from "./qr-custom-logo";
 
 async function raster(type = "image/png", transparent = false): Promise<File> {
   const canvas = document.createElement("canvas");
@@ -90,4 +90,25 @@ describe("Local QR logo preparation", () => {
     const logo = await prepareQrCustomLogo(new File([blob], "wide.png"));
     expect(logo.canvas.width).toBe(1024); expect(logo.canvas.height).toBe(512);
   });
+  it("validates private logo bounds before decoding and retains normalized dimensions", async () => {
+    const png = await raster();
+    const saved = await prepareSavedQrLogo(png, "Guardado");
+    expect(saved.canvas.width).toBe(200); expect(saved.canvas.height).toBe(100);
+    const bytes = new Uint8Array(24); bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
+    const view = new DataView(bytes.buffer); view.setUint32(8, 13); view.setUint32(12, 0x49484452); view.setUint32(16, 4096); view.setUint32(20, 4096);
+    const decode = spyOn(window, "createImageBitmap").and.callThrough();
+    await expectAsync(prepareSavedQrLogo(new Blob([bytes], { type: "image/png" }), "Bomb")).toBeRejectedWithError(/no es válido/);
+    await expectAsync(prepareSavedQrLogo(new Blob(["<svg onload=alert(1) />"], { type: "image/png" }), "Falso")).toBeRejected();
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("serializes local logo pixels without fetching a data URL", async () => {
+    const logo = await prepareQrCustomLogo(await raster());
+    const fetch = spyOn(window, "fetch").and.callThrough();
+    const data = await qrLogoRaster(logo.canvas);
+    expect([...data.png.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(data.width).toBe(160); expect(data.height).toBe(80);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
 });

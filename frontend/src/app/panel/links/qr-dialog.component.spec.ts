@@ -1,24 +1,59 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MAT_DIALOG_DATA } from "@angular/material/dialog";
 import QRCode from "qrcode";
+import { SessionContextService } from "../../core/services/session-context.service";
+import { provideHttpClient } from "@angular/common/http";
 import { QrDialogComponent } from "./qr-dialog.component";
-import { QR_CODE_IMPORT, type QrCodeGenerator } from "../../core/services/qr-code.service";
+import { QrCodeService, QR_CODE_IMPORT, type QrCodeGenerator } from "../../core/services/qr-code.service";
+import { QrLibraryService, type QrVariant } from "../../core/services/qr-library.service";
+import { DEFAULT_QR_DESIGN } from "../../core/services/qr-design";
 
 describe("QrDialogComponent", () => {
   let fixture: ComponentFixture<QrDialogComponent>;
+  let exportQr: jasmine.Spy;
   afterEach(() => fixture?.destroy());
 
   async function create(importer: () => Promise<QrCodeGenerator> = () => Promise.resolve(QRCode)): Promise<QrDialogComponent> {
     await TestBed.configureTestingModule({
       imports: [QrDialogComponent],
       providers: [
+        provideHttpClient(),
         { provide: MAT_DIALOG_DATA, useValue: "https://uvh.test/a?name=bad%0Aname" },
         { provide: QR_CODE_IMPORT, useValue: importer },
       ],
     }).overrideComponent(QrDialogComponent, { set: { template: "", imports: [] } }).compileComponents();
+    exportQr = spyOn(TestBed.inject(QrCodeService), "export").and.resolveTo(new Blob(["fixture PNG"], { type: "image/png" }));
+    spyOn(URL, "createObjectURL").and.returnValue("blob:qr-fixture");
     fixture = TestBed.createComponent(QrDialogComponent);
     return fixture.componentInstance;
   }
+
+  it("applies the confirmed campaign design before allowing an export", async () => {
+    const render = jasmine.createSpy("render").and.resolveTo("data:image/png;base64,preview");
+    const component = await create(() => Promise.resolve({ toDataURL: render }));
+    await fixture.whenStable(); component.campaignMode.set(true);
+    component.caption.set("  Café  ");
+    const variant: QrVariant = { id: 1, linkId: 1, publicId: "a".repeat(32), name: "Carta", spec: { ...DEFAULT_QR_DESIGN, frame: "caption", caption: "Café" }, version: 1, archived: false, createdAt: "2026-10-10", updatedAt: "2026-10-10" };
+    await component.campaignSaved(variant);
+    expect(component.caption()).toBe("Café"); expect(component.campaignReady()).toBeTrue();
+    expect(new URL(component.url).searchParams.get("qr")).toBe(variant.publicId);
+    expect(component.canonicalBusy()).toBeFalse();
+  });
+
+  it("retries the saved campaign logo without another campaign mutation", async () => {
+    const render = jasmine.createSpy("render").and.resolveTo("data:image/png;base64,preview");
+    const component = await create(() => Promise.resolve({ toDataURL: render }));
+    await fixture.whenStable(); component.campaignMode.set(true);
+    const library = TestBed.inject(QrLibraryService), prepared = spyOn(library, "preparedLogo").and.rejectWith(new Error("Unavailable"));
+    const createVariant = spyOn(library, "createVariant"), updateVariant = spyOn(library, "updateVariant");
+    const variant: QrVariant = { id: 1, linkId: 1, publicId: "a".repeat(32), name: "Carta", spec: { ...DEFAULT_QR_DESIGN, logo: { kind: "custom", assetId: 3 } }, version: 1, archived: false, createdAt: "2026-10-10", updatedAt: "2026-10-10" };
+    await component.campaignSaved(variant); expect(component.dataUrl()).toBeNull();
+    prepared.and.resolveTo({ canvas: document.createElement("canvas"), preview: "", name: "Logo" });
+    await component.retryPreview();
+    expect(prepared).toHaveBeenCalledTimes(2); expect(component.customLogo()).not.toBeNull();
+    expect(component.campaignReady()).toBeTrue(); expect(component.error()).toBeNull();
+    expect(createVariant).not.toHaveBeenCalled(); expect(updateVariant).not.toHaveBeenCalled();
+  });
 
   it("leaves the spinner state and exposes a controlled error when generation fails", async () => {
     const generator = spyOn(QRCode, "toDataURL") as jasmine.Spy;
@@ -95,22 +130,20 @@ describe("QrDialogComponent", () => {
     expect(render.calls.mostRecent().args[1].width).toBe(480);
     const click = spyOn(HTMLAnchorElement.prototype, "click");
     await component.download();
-    expect(render).toHaveBeenCalledTimes(2);
-    expect(render.calls.mostRecent().args).toEqual([component.url, { width: 2048, includeLogo: true, errorCorrectionLevel: "H", margin: 4 }]);
-    expect((click.calls.mostRecent().object as HTMLAnchorElement).href).toBe("data:image/png;base64,fixture-2048");
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(exportQr).toHaveBeenCalledOnceWith(component.url, component.design(), "png", jasmine.objectContaining({ pixels: 2048 }));
+    expect((click.calls.mostRecent().object as HTMLAnchorElement).href).toBe("blob:qr-fixture");
     expect(component.dataUrl()).toBe("data:image/png;base64,fixture-480");
   });
 
   it("does not duplicate a pending export or initiate a download after closure", async () => {
-    let resolve!: (value: string) => void;
-    const pending = new Promise<string>(done => resolve = done);
-    const render = jasmine.createSpy("render").and.callFake((_text: string, options: { width: number }) => {
-      if (options.width === 2048) return pending;
-      return Promise.resolve("data:image/png;base64,preview");
-    });
+    let resolve!: (value: Blob) => void;
+    const pending = new Promise<Blob>(done => resolve = done);
+    const render = jasmine.createSpy("render").and.resolveTo("data:image/png;base64,preview");
     const component = await create(() => Promise.resolve({ toDataURL: render }));
     await fixture.whenStable();
     const click = spyOn(HTMLAnchorElement.prototype, "click");
+    exportQr.and.returnValue(pending);
     const first = component.download(), second = component.download();
     component.selectDownloadSize(512);
     component.setIncludeLogo(false);
@@ -121,9 +154,9 @@ describe("QrDialogComponent", () => {
     expect(component.quietZone()).toBe(4);
     await Promise.resolve();
     await Promise.resolve();
-    expect(render).toHaveBeenCalledTimes(2);
+    expect(render).toHaveBeenCalledTimes(1); expect(exportQr).toHaveBeenCalledTimes(1);
     fixture.destroy();
-    resolve("data:image/png;base64,export");
+    resolve(new Blob(["export"], { type: "image/png" }));
     await Promise.all([first, second]);
     expect(click).not.toHaveBeenCalled();
     expect(component.error()).toBeNull();
@@ -144,8 +177,9 @@ describe("QrDialogComponent", () => {
       expect(component.downloadSize()).toBe(size);
       expect(render.calls.count()).toBe(calls);
       await component.download();
-      expect(render.calls.mostRecent().args).toEqual([component.url, { width: size, includeLogo: true, errorCorrectionLevel: "H", margin: 4 }]);
-      expect((click.calls.mostRecent().object as HTMLAnchorElement).href).toBe(`data:image/png;base64,fixture-${size}`);
+      expect(exportQr.calls.mostRecent().args).toEqual([component.url, component.design(), "png", jasmine.objectContaining({ pixels: size })]);
+      expect((click.calls.mostRecent().object as HTMLAnchorElement).href).toBe("blob:qr-fixture");
+      expect(render.calls.count()).toBe(calls);
       expect(component.dataUrl()).toBe("data:image/png;base64,fixture-480");
     }
   });
@@ -163,17 +197,17 @@ describe("QrDialogComponent", () => {
     component.selectQuietZone(0);
     component.selectDownloadSize(1024);
     await fixture.whenStable();
-    expect(render.calls.mostRecent().args).toEqual([component.url, { width: 480, includeLogo: false, errorCorrectionLevel: "L", margin: 8 }]);
+    expect(render.calls.mostRecent().args).toEqual([component.url, { width: 480, includeLogo: false, errorCorrectionLevel: "L", margin: 8, design: component.design() }]);
     const click = spyOn(HTMLAnchorElement.prototype, "click");
     await component.download();
     expect(click).toHaveBeenCalledTimes(1);
-    expect(render.calls.mostRecent().args).toEqual([component.url, { width: 1024, includeLogo: false, errorCorrectionLevel: "L", margin: 8 }]);
+    expect(exportQr.calls.mostRecent().args).toEqual([component.url, component.design(), "png", jasmine.objectContaining({ pixels: 1024 })]);
     component.setIncludeLogo(true);
     expect(component.correctionLevel()).toBe("H");
     await component.resetOptions();
     await fixture.whenStable();
     expect(component.isDefault()).toBeTrue();
-    expect(render.calls.mostRecent().args).toEqual([component.url, { width: 480, includeLogo: true, errorCorrectionLevel: "H", margin: 4 }]);
+    expect(render.calls.mostRecent().args).toEqual([component.url, { width: 480, includeLogo: true, errorCorrectionLevel: "H", margin: 4, design: component.design() }]);
   });
 
   for (const outcome of ["success", "failure"] as const) {
@@ -224,24 +258,34 @@ describe("QrDialogComponent", () => {
   });
 
   it("keeps a valid preview after export failure and retries only on a new download action", async () => {
-    let attempts = 0;
-    const render = jasmine.createSpy("render").and.callFake((_text: string, options: { width: number }) => {
-      if (options.width === 480) return Promise.resolve("data:image/png;base64,preview");
-      return ++attempts === 1 ? Promise.reject(new Error("Fixture export")) : Promise.resolve("data:image/png;base64,export");
-    });
+    const render = jasmine.createSpy("render").and.resolveTo("data:image/png;base64,preview");
     const component = await create(() => Promise.resolve({ toDataURL: render }));
     await fixture.whenStable();
+    exportQr.and.rejectWith(new Error("Fixture export"));
     const click = spyOn(HTMLAnchorElement.prototype, "click");
     await component.download();
     expect(component.dataUrl()).toBe("data:image/png;base64,preview");
     expect(component.error()).toContain("PNG");
     expect(click).not.toHaveBeenCalled();
-    expect(render).toHaveBeenCalledTimes(2);
+    expect(exportQr).toHaveBeenCalledTimes(1);
+    exportQr.and.resolveTo(new Blob(["PNG"]));
     await component.download();
-    expect(render).toHaveBeenCalledTimes(3);
+    expect(exportQr).toHaveBeenCalledTimes(2);
+    expect(render).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
     expect(component.error()).toBeNull();
   });
+  it("cancels a pending PNG export without downloading a late result", async () => {
+    const component = await create(); await fixture.whenStable();
+    let resolve!: (value: Blob) => void;
+    exportQr.and.returnValue(new Promise<Blob>(done => resolve = done));
+    const click = spyOn(HTMLAnchorElement.prototype, "click");
+    const pending = component.download(); await Promise.resolve(); await Promise.resolve();
+    component.cancelExport(); resolve(new Blob(["late PNG"])); await pending;
+    expect(click).not.toHaveBeenCalled(); expect(component.downloadBusy()).toBeFalse();
+    expect(component.confirmation()).toContain("cancelada");
+  });
+
   async function logoFile(): Promise<File> {
     const canvas = document.createElement("canvas");
     canvas.width = 120; canvas.height = 60;
@@ -267,7 +311,8 @@ describe("QrDialogComponent", () => {
     const canvas = component.customLogo()!.canvas;
     expect(render.calls.mostRecent().args[1].customLogo).toBe(canvas);
     await component.download();
-    expect(render.calls.mostRecent().args[1]).toEqual({ width: 2048, includeLogo: true, errorCorrectionLevel: "H", margin: 4, customLogo: canvas });
+    expect(exportQr.calls.mostRecent().args[1]).toEqual(component.design());
+    expect(exportQr.calls.mostRecent().args[3]).toEqual(jasmine.objectContaining({ pixels: 2048, logo: jasmine.objectContaining({ width: canvas.width, height: canvas.height, png: jasmine.any(Uint8Array) }) }));
     expect(click).toHaveBeenCalledTimes(1);
     await component.setIncludeLogo(false);
     expect(render.calls.mostRecent().args[1].customLogo).toBeUndefined();
@@ -308,5 +353,17 @@ describe("QrDialogComponent", () => {
       expect(component.customLogo()).toBe(current); expect(component.dataUrl()).toBe(preview); expect(component.logoError()).toBeNull();
     });
   }
+
+  it("invalidates a late vector result as soon as the session changes", async () => {
+    const component = await create(() => Promise.resolve({ toDataURL: () => Promise.resolve("data:image/png;base64,preview") }));
+    await fixture.whenStable(); component.format.set("svg");
+    let resolve!: (value: Blob) => void;
+    const exportSpy = exportQr.and.returnValue(new Promise<Blob>(done => resolve = done));
+    const click = spyOn(HTMLAnchorElement.prototype, "click");
+    const pending = component.downloadVectorOrPrint(); await Promise.resolve(); await Promise.resolve();
+    expect(exportSpy).toHaveBeenCalled(); TestBed.inject(SessionContextService).advance();
+    resolve(new Blob(["<svg/>"], { type: "image/svg+xml" })); await pending;
+    expect(click).not.toHaveBeenCalled();
+  });
 
 });

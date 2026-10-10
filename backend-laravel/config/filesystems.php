@@ -30,6 +30,14 @@ return [
 
     'disks' => [
 
+        'qr-private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/qr-assets'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

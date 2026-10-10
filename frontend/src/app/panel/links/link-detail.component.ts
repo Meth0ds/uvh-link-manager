@@ -14,6 +14,7 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
 import { LinkDialogService } from "./link-dialog.service";
+import { QrCampaignPanelComponent } from "./qr-campaign-panel.component";
 import { QrDialogComponent } from "./qr-dialog.component";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { parseRouteId } from "../../core/strict-wire";
@@ -38,7 +39,7 @@ import { linkAppealStatusLabel } from "../../core/link-appeal-status";
   selector: "app-link-detail",
   standalone: true,
   providers: [CopyFeedbackService],
-  imports: [
+  imports: [QrCampaignPanelComponent,
     CopyFeedbackIconComponent,
     RouterLink,
     MatButtonModule,
@@ -308,7 +309,7 @@ export class LinkDetailComponent {
 
   showQr(): void {
     const l = this.link();
-    if (l) this.dialog.open(QrDialogComponent, { data: l.shortUrl, width: "760px", maxWidth: "calc(100vw - 32px)" });
+    if (l) this.dialog.open(QrDialogComponent, { data: { url: l.shortUrl, linkId: l.id }, width: "760px", maxWidth: "calc(100vw - 32px)" });
   }
 
   edit(): void {

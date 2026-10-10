@@ -6,8 +6,8 @@ FROM composer:2@sha256:aaeab4b6b031e0a88efb907f0f26b563532a644fc2f4ea0d000ecf865
 
 WORKDIR /build
 COPY backend-laravel/composer.json backend-laravel/composer.lock ./
-# `ext-intl` is deliberately exempted here, and only here: the composer base is an
-# Alpine PHP build without intl and without a toolchain to compile it, while the
+# `ext-intl` and `ext-gd` are exempted only in this dependency-install stage:
+# the composer base lacks these extensions and their compiler toolchain, while the
 # runtime image below does compile it and the entrypoint refuses to boot when it
 # is missing. Without this exemption the lockfile cannot be installed at all — the
 # stage aborted with "requires PHP extension ext-intl * but it is missing", and
@@ -15,7 +15,7 @@ COPY backend-laravel/composer.json backend-laravel/composer.lock ./
 # The gate that matters is the entrypoint's extension assertion, which runs
 # before the framework serves anything.
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts \
-        --ignore-platform-req=ext-intl
+        --ignore-platform-req=ext-intl --ignore-platform-req=ext-gd
 COPY backend-laravel ./
 RUN APP_ENV=local \
     APP_DEBUG=false \
@@ -31,14 +31,19 @@ FROM php:8.4-fpm-bookworm@sha256:a6d6f0b794dfd212886d3278498f8dc37f66890eddfa428
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libcurl4-openssl-dev \
         libicu-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
         libonig-dev \
         libpq-dev \
         libzip-dev \
         $PHPIZE_DEPS \
+    && docker-php-ext-configure gd --with-jpeg --with-freetype \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
         curl \
         intl \
+        gd \
         mbstring \
         opcache \
         pcntl \

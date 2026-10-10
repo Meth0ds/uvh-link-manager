@@ -30,7 +30,7 @@ class RecordClickAnalyticsJob implements ShouldQueue
     public array $backoff = [5, 30, 120, 300];
 
     /**
-     * @param  array{country: ?string, device: ?string, browser: ?string, os: ?string, referrer_domain: ?string, campaign: ?string, visitor_hash: ?string}  $meta
+     * @param  array{country: ?string, device: ?string, browser: ?string, os: ?string, referrer_domain: ?string, campaign: ?string, visitor_hash: ?string, qr_variant_id?: ?int}  $meta
      */
     public function __construct(
         public readonly string $eventId,

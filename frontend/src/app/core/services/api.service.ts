@@ -263,6 +263,16 @@ export class ApiService {
     }), decoder);
   }
 
+  /** Let the browser supply the multipart boundary; retain the same CSRF and context guards. */
+  async upload<T>(path: string, body: FormData, decoder?: ApiDecoder<T>, extraHeaders?: Record<string, string>): Promise<T> {
+    this.assertApiPath(path);
+    return this.mutate(path, () => {
+      const headers = { ...this.headers(true), ...extraHeaders };
+      delete headers["Content-Type"];
+      return this.http.post<T>(path, body, { headers });
+    }, decoder);
+  }
+
   /** POST returning a private binary artifact while preserving JSON errors. */
   async postBlob(path: string, body?: unknown): Promise<Blob> {
     this.assertApiPath(path);

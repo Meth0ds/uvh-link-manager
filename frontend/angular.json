@@ -15,20 +15,44 @@
             "outputPath": "dist/uvh",
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": ["zone.js"],
+            "polyfills": [
+              "zone.js"
+            ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
-              { "glob": "**/*", "input": "public" }
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
             ],
-            "styles": ["src/styles.scss"],
+            "styles": [
+              "src/styles.scss"
+            ],
             "scripts": [],
-            "allowedCommonJsDependencies": ["qrcode"]
+            "allowedCommonJsDependencies": [
+              "qrcode",
+              "pako"
+            ],
+            "webWorkerTsConfig": "tsconfig.worker.json"
           },
           "configurations": {
             "production": {
+              "optimization": {
+                "scripts": true,
+                "styles": { "minify": true, "inlineCritical": false },
+                "fonts": { "inline": false }
+              },
               "budgets": [
-                { "type": "initial", "maximumWarning": "1mb", "maximumError": "3mb" },
-                { "type": "anyComponentStyle", "maximumWarning": "52kb", "maximumError": "72kb" }
+                {
+                  "type": "initial",
+                  "maximumWarning": "1mb",
+                  "maximumError": "3mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "52kb",
+                  "maximumError": "72kb"
+                }
               ],
               "outputHashing": "all"
             },
@@ -51,9 +75,16 @@
         "serve": {
           "builder": "@angular/build:dev-server",
           "configurations": {
-            "production": { "buildTarget": "uvh:build:production" },
-            "design-preview": { "buildTarget": "uvh:build:design-preview", "proxyConfig": "design-preview/proxy.json" },
-            "development": { "buildTarget": "uvh:build:development" }
+            "production": {
+              "buildTarget": "uvh:build:production"
+            },
+            "design-preview": {
+              "buildTarget": "uvh:build:design-preview",
+              "proxyConfig": "design-preview/proxy.json"
+            },
+            "development": {
+              "buildTarget": "uvh:build:development"
+            }
           },
           "defaultConfiguration": "development",
           "options": {
@@ -65,7 +96,10 @@
           "builder": "@angular/build:karma",
           "options": {
             "tsConfig": "tsconfig.spec.json",
-            "polyfills": ["zone.js", "zone.js/testing"]
+            "polyfills": [
+              "zone.js",
+              "zone.js/testing"
+            ]
           }
         }
       }

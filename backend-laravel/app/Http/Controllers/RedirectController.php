@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\RecordClickAnalyticsJob;
 use App\Models\Link;
 use App\Support\OperationalMetrics;
+use App\Support\QrAttribution;
 use App\Support\RedirectService;
 use App\Support\SignedToken;
 use App\Support\Ua;
@@ -46,6 +47,7 @@ class RedirectController
             'ip' => $request->ip(),
             'country' => $this->countryFromHeaders($request),
             'unlock_token' => $request->cookies->get(RedirectService::UNLOCK_COOKIE),
+            'qr_public_id' => QrAttribution::fromRequest($request),
         ];
 
         $outcome = RedirectService::resolve($ctx);
@@ -68,7 +70,7 @@ class RedirectController
         }
 
         if ($outcome['kind'] === 'redirect') {
-            $this->recordClick($outcome['link_id'], $ctx, $outcome['campaign'] ?? null);
+            $this->recordClick($outcome['link_id'], $ctx, $outcome['campaign'] ?? null, $outcome['qr_variant_id'] ?? null);
 
             return response('', 302, [
                 'Location' => $outcome['location'],
@@ -201,7 +203,7 @@ class RedirectController
         return null;
     }
 
-    private function recordClick(int $linkId, array $ctx, ?string $campaign): void
+    private function recordClick(int $linkId, array $ctx, ?string $campaign, ?int $qrVariantId = null): void
     {
         $ua = Ua::parse($ctx['user_agent'] ?? null);
         try {
@@ -213,6 +215,7 @@ class RedirectController
                 'referrer_domain' => RedirectService::referrerDomain($ctx['referrer'] ?? null),
                 'campaign' => $campaign,
                 'visitor_hash' => $this->visitorHash($ctx['ip'] ?? null, $ctx['user_agent'] ?? null),
+                'qr_variant_id' => $qrVariantId,
             ];
             // Queue only privacy-reduced dimensions. Redirect availability is
             // deliberately higher priority than optional analytics admission;

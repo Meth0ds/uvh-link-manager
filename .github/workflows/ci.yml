@@ -119,7 +119,7 @@ jobs:
           # behaviour of an unreachable backend (the rate limiter's fallback),
           # so a live one would remove what they assert. The stack that runs on a
           # real Redis is the asynchronous contract job below.
-          extensions: bcmath, curl, intl, mbstring, pdo_pgsql, pgsql, redis, zip
+          extensions: bcmath, curl, gd, intl, mbstring, pdo_pgsql, pgsql, redis, zip
           coverage: none
           tools: composer:v2
 

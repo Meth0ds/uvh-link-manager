@@ -21,6 +21,7 @@ import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { LinkDialogService } from "./link-dialog.service";
+import { QrLibraryService } from "../../core/services/qr-library.service";
 import { QrDialogComponent } from "./qr-dialog.component";
 import { ActionDialogService } from "../action-dialog.service";
 import { PendingLinkIntentService } from "../../core/services/pending-link-intent.service";
@@ -88,6 +89,9 @@ export class LinksComponent {
   private actions = inject(ActionDialogService);
   private intents = inject(PendingLinkIntentService);
   private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly qrLibrary = inject(QrLibraryService);
+  private readonly qrRequests = new LatestRequest(inject(DestroyRef));
+  readonly qrSnapshotBusy = signal(false);
   private readonly exports = new LatestRequest(inject(DestroyRef));
   private readonly domainRequests = new LatestRequest(inject(DestroyRef));
   private readonly collectionRequests = new LatestRequest(inject(DestroyRef));
@@ -184,6 +188,7 @@ export class LinksComponent {
       const context = this.viewContext();
       if (context === this.loadedContext) return;
       this.loadedContext = context;
+      this.qrRequests.invalidate(); this.qrSnapshotBusy.set(false);
       this.exports.invalidate();
       this.exporting.set(false);
       this.requests.invalidate();
@@ -236,9 +241,8 @@ export class LinksComponent {
       return;
     }
     const request = this.requests.begin(this.viewContext());
-    // La selección pertenece a la página visible: un cambio de filas no puede
-    // arrastrar ids que ya no están delante del usuario.
-    this.clearSelection();
+    // Selection belongs to the workspace, including links on other pages.
+    // Context changes and successful bulk mutations clear it explicitly.
     const page = this.page() + 1;
     const perPage = this.pageSize();
     this.loading.set(true);
@@ -272,6 +276,7 @@ export class LinksComponent {
   }
 
   clearFilters(): void {
+    this.clearSelection();
     this.q.set("");
     this.state.set("");
     this.tag.set("");
@@ -538,8 +543,24 @@ export class LinksComponent {
 
   copy(url: string): void { this.copyFeedback.copy(url, this.copyScope); }
 
-  showQr(url: string): void {
-    this.dialog.open(QrDialogComponent, { data: url, width: "760px", maxWidth: "calc(100vw - 32px)" });
+  showQr(url: string, linkId?: number): void {
+    this.dialog.open(QrDialogComponent, { data: { url, linkId }, width: "760px", maxWidth: "calc(100vw - 32px)" });
+  }
+
+  openQrDesigns(): void {
+    this.dialog.open(QrDialogComponent, { data: { url: this.links()[0]?.shortUrl ?? "https://uvh.es/", library: true }, width: "820px", maxWidth: "calc(100vw - 24px)" });
+  }
+  async exportSelectedQr(): Promise<void> {
+    if (this.qrSnapshotBusy()) return;
+    const ids = [...this.selected()];
+    if (!ids.length || ids.length > 100) { this.error.set("Selecciona entre 1 y 100 enlaces para exportar sus QR."); return; }
+    const request = this.qrRequests.begin(this.viewContext()); this.qrSnapshotBusy.set(true);
+    try {
+      const links = await this.qrLibrary.snapshot(ids, { signal: request.signal });
+      if (!this.qrRequests.isCurrent(request, this.viewContext())) return;
+      this.dialog.open(QrDialogComponent, { data: { url: links[0].shortUrl, links }, width: "820px", maxWidth: "calc(100vw - 24px)" });
+    } catch (error) { if (this.qrRequests.isCurrent(request, this.viewContext())) this.error.set(error instanceof Error ? error.message : "No se pudo preparar la selección."); }
+    finally { if (this.qrRequests.isCurrent(request, this.viewContext())) this.qrSnapshotBusy.set(false); }
   }
 
   create(): void {
@@ -606,6 +627,7 @@ export class LinksComponent {
       await this.api.delete(`/api/v1/links/${link.id}`);
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
+      this.selected.update(ids => { const next = new Set(ids); next.delete(link.id); return next; });
       void this.reload();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;

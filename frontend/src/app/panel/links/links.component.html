@@ -82,20 +82,19 @@
     </mat-form-field>
   </div>
   <div class="scale-toolbar">
-    @if (canWrite()) {
-      <mat-checkbox
+    <mat-checkbox
         [checked]="allOnPage()"
         [indeterminate]="someOnPage()"
         [disabled]="loading() || !links().length || actionId() !== null"
         (change)="toggleSelectPage($event.checked)"
         aria-label="Seleccionar todos los enlaces de la página"
       >Seleccionar página</mat-checkbox>
-    }
     <div class="scale-tools">
       <div class="tool-group" role="group" aria-label="Organizar enlaces">
         <button mat-button type="button" (click)="openTags()"><mat-icon aria-hidden="true">sell</mat-icon> Etiquetas</button>
         <button mat-button type="button" (click)="openCollections()"><mat-icon aria-hidden="true">folder</mat-icon> Colecciones</button>
       </div>
+      <button mat-stroked-button type="button" (click)="openQrDesigns()"><mat-icon aria-hidden="true">palette</mat-icon>Diseños QR</button>
       <button mat-stroked-button type="button" [matMenuTriggerFor]="csvMenu" aria-label="Importar o exportar enlaces en CSV"><mat-icon aria-hidden="true">import_export</mat-icon> CSV<mat-icon iconPositionEnd aria-hidden="true">expand_more</mat-icon></button>
       <mat-menu #csvMenu="matMenu">
         @if (canWrite()) { <button mat-menu-item type="button" (click)="importCsv()"><mat-icon aria-hidden="true">upload</mat-icon> Importar CSV</button> }
@@ -105,11 +104,13 @@
   </div>
 </section>
 
-@if (selected().size > 0 && canWrite()) {
+@if (selected().size > 0) {
   <section class="bulk-bar" aria-label="Acciones sobre los enlaces seleccionados">
     <div class="bulk-line">
       <div class="bulk-selection"><b class="tnum">{{ selected().size }} {{ selected().size === 1 ? 'enlace seleccionado' : 'enlaces seleccionados' }}</b><button mat-button type="button" (click)="clearSelection()" [disabled]="actionId() !== null">Cancelar selección</button></div>
       <div class="bulk-tools" role="group" aria-label="Herramientas de la selección">
+        <button mat-stroked-button type="button" (click)="exportSelectedQr()" [disabled]="qrSnapshotBusy() || selected().size > 100"><mat-icon>qr_code_2</mat-icon>{{ qrSnapshotBusy() ? 'Preparando selección…' : 'Exportar QR' }}</button>
+        @if (canWrite()) {
         <button mat-stroked-button type="button" (click)="openBulkPanel('tag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'tag'"><mat-icon aria-hidden="true">sell</mat-icon> Etiquetar</button>
         <button mat-stroked-button type="button" (click)="openBulkPanel('move')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'move'"><mat-icon aria-hidden="true">drive_file_move</mat-icon> Mover</button>
         <button mat-stroked-button type="button" [matMenuTriggerFor]="bulkMenu" [disabled]="actionId() !== null" aria-label="Más acciones sobre los enlaces seleccionados"><mat-icon aria-hidden="true">more_horiz</mat-icon> Más acciones</button>
@@ -123,6 +124,7 @@
           <mat-divider></mat-divider>
           <button mat-menu-item type="button" class="danger" (click)="bulkTrash()" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> Eliminar</button>
         </mat-menu>
+        }
       </div>
     </div>
     @if (actionId() !== null) { <p class="bulk-status" role="status">Aplicando cambios a la selección…</p> }
@@ -181,15 +183,13 @@
 @if (!loading() && (!error() || links().length)) {
   <div class="link-list">
     @for (link of links(); track trackByLink($index, link)) {
-      <article class="link-row" [class.selected]="selected().has(link.id)" [class.selectable]="canWrite()">
-        @if (canWrite()) {
-          <mat-checkbox
+      <article class="link-row selectable" [class.selected]="selected().has(link.id)">
+        <mat-checkbox
             class="link-check"
             [checked]="selected().has(link.id)"
             (change)="toggleSelected(link.id)"
             [aria-label]="'Seleccionar enlace ' + displayUrl(link.shortUrl)"
           ></mat-checkbox>
-        }
         <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span>
         <div class="link-main">
           <div class="link-top">
@@ -219,7 +219,7 @@
           <button mat-icon-button [matTooltip]="copyFeedback.phase(link.shortUrl, copyScope) === 'copied' ? 'Copiado' : 'Copiar'" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(link.shortUrl, copyScope) === 'copying'" (click)="$event.stopPropagation(); copy(link.shortUrl)" [attr.aria-label]="'Copiar enlace ' + displayUrl(link.shortUrl)">
             <app-copy-feedback-icon [phase]="copyFeedback.phase(link.shortUrl, copyScope)" />
           </button>
-          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr(link.shortUrl)" [attr.aria-label]="'Generar QR para ' + displayUrl(link.shortUrl)">
+          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr(link.shortUrl, link.id)" [attr.aria-label]="'Generar QR para ' + displayUrl(link.shortUrl)">
             <mat-icon>qr_code_2</mat-icon>
           </button>
           @if (canWrite()) {
@@ -231,7 +231,7 @@
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">
-            <button mat-menu-item (click)="showQr(link.shortUrl)"><mat-icon>qr_code_2</mat-icon> QR</button>
+            <button mat-menu-item (click)="showQr(link.shortUrl, link.id)"><mat-icon>qr_code_2</mat-icon> QR</button>
             <button mat-menu-item [disabled]="copyFeedback.busy()" (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar URL</button>
             <a mat-menu-item [routerLink]="['/app/links', link.id]"><mat-icon>query_stats</mat-icon> Analítica</a>
             @if (canWrite()) {

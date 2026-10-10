@@ -27,6 +27,7 @@ use App\Support\MailOutboxDispatcher;
 use App\Support\OperationalMetrics;
 use App\Support\OperationalNotices;
 use App\Support\PrivateArtifactCleanup;
+use App\Support\QrAssetCleanup;
 use App\Support\ReputationVerdict;
 use App\Support\UvhCrypto;
 use App\Support\WebhookService;
@@ -149,6 +150,7 @@ class UvhHousekeeping extends Command
         });
 
         $run('mail_outbox', fn () => $this->recoverAndQueueMailOutbox());
+        $run('qr_asset_cleanup', fn () => QrAssetCleanup::run());
         $run('invitation_budget_retention', fn () => InvitationMailBudget::purgeExpired());
 
         $heavyDue = false;
@@ -529,6 +531,7 @@ class UvhHousekeeping extends Command
             $retentionCutoff = $cutoff(WorkspaceLimits::analyticsRetentionDays());
             $this->purgeInBatches('click_events', 'id', 'occurred_at < ?', [$retentionCutoff], $batch);
             $this->purgeInBatches('metric_rollups', 'id', 'day < ?', [$retentionCutoff], $batch);
+            $this->purgeInBatches('qr_daily_counts', 'id', 'day < ?', [$retentionCutoff], $batch);
             DB::delete('DELETE FROM metric_unique_visitors WHERE day < ?', [substr($retentionCutoff, 0, 10)]);
             if (Cache::put('uvh:retention:analytics', [
                 'completed_at' => time(),

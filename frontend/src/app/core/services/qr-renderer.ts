@@ -1,9 +1,22 @@
 import QRCode from "qrcode";
 import type { QrCodeRenderOptions } from "./qr-code.service";
 import { paintQrBrand } from "./qr-brand";
+import { qrLogoRaster } from "./qr-custom-logo";
 
 /** This module and the generator are loaded together only on a QR action. */
 export async function renderQr(text: string, options: QrCodeRenderOptions): Promise<string> {
+  if (options.design) {
+    const { exportQr } = await import("./qr-exporter");
+    const custom = options.customLogo;
+    const logo = custom ? await qrLogoRaster(custom) : undefined;
+    const blob = await exportQr(text, options.design, "png", { pixels: options.width, logo });
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("No se pudo preparar la vista previa."));
+      reader.readAsDataURL(blob);
+    });
+  }
   const { includeLogo = true, customLogo, ...qrOptions } = options;
   const margin = Number.isFinite(qrOptions.margin) ? Math.min(8, Math.max(4, Math.floor(qrOptions.margin!))) : 4;
   const canvas = document.createElement("canvas");

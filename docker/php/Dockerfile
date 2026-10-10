@@ -18,14 +18,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         libcurl4-openssl-dev \
         libicu-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
         libonig-dev \
         libpq-dev \
         libzip-dev \
         $PHPIZE_DEPS \
+    && docker-php-ext-configure gd --with-jpeg --with-freetype \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
         curl \
         intl \
+        gd \
         mbstring \
         opcache \
         pdo_pgsql \

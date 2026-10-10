@@ -30,7 +30,7 @@ unset secret_name secret_file
 
 # Fail before framework boot if a custom/rebuilt image omitted a runtime
 # capability on which authentication, SSRF controls or PostgreSQL depend.
-php -r '$required=["curl","intl","mbstring","openssl","pcntl","pdo_pgsql","redis"]; $missing=array_values(array_filter($required, fn($ext) => !extension_loaded($ext))); if ($missing !== []) { fwrite(STDERR, "Missing required PHP extensions: ".implode(",", $missing).PHP_EOL); exit(1); }'
+php -r '$required=["curl","gd","intl","mbstring","openssl","pcntl","pdo_pgsql","redis"]; $missing=array_values(array_filter($required, fn($ext) => !extension_loaded($ext))); if ($missing !== []) { fwrite(STDERR, "Missing required PHP extensions: ".implode(",", $missing).PHP_EOL); exit(1); }'
 
 # Build configuration from runtime secrets on every fresh container. The
 # command boots the application, so ProductionSecurity aborts startup before a

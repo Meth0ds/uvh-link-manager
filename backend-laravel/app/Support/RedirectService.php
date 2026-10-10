@@ -111,7 +111,7 @@ class RedirectService
     }
 
     /**
-     * @param  array{host: string, alias: string, user_agent?: ?string, accept_language?: ?string, referrer?: ?string, ip?: ?string, country?: ?string, unlock_token?: ?string}  $ctx
+     * @param  array{host?: string, alias?: string, user_agent?: ?string, accept_language?: ?string, referrer?: ?string, ip?: ?string, country?: ?string, unlock_token?: ?string, qr_public_id?: ?string}  $ctx
      * @return array<string, mixed>
      */
     public static function resolve(array $ctx): array
@@ -216,7 +216,7 @@ class RedirectService
             $retry = false;
             $bumpClick = false;
 
-            DB::transaction(function () use ($id, $domainId, $alias, $host, $unlock, $now, $ua, $referrer, $country, $languages, $campaignFromReferrer, $exclusive, &$outcome, &$retry, &$bumpClick) {
+            DB::transaction(function () use ($ctx, $id, $domainId, $alias, $host, $unlock, $now, $ua, $referrer, $country, $languages, $campaignFromReferrer, $exclusive, &$outcome, &$retry, &$bumpClick) {
                 // A shared lock is compatible with itself, so redirects of the
                 // same alias run in parallel; it still conflicts with the
                 // exclusive lock every state change takes.
@@ -388,6 +388,7 @@ class RedirectService
                     'location' => $destination,
                     'link_id' => $id,
                     'campaign' => $fresh->utm_campaign ?? $campaignFromReferrer,
+                    'qr_variant_id' => QrAttribution::resolve($id, $ctx['qr_public_id'] ?? null),
                 ];
             });
 

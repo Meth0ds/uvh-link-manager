@@ -780,17 +780,7 @@ parameters:
 			count: 1
 			path: app/Support/PasswordStrength.php
 
-		-
-			message: '#^Offset ''alias'' on array\{host\: string, alias\: string, user_agent\?\: string\|null, accept_language\?\: string\|null, referrer\?\: string\|null, ip\?\: string\|null, country\?\: string\|null, unlock_token\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Support/RedirectService.php
 
-		-
-			message: '#^Offset ''host'' on array\{host\: string, alias\: string, user_agent\?\: string\|null, accept_language\?\: string\|null, referrer\?\: string\|null, ip\?\: string\|null, country\?\: string\|null, unlock_token\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: app/Support/RedirectService.php
 
 		-
 			message: '#^Strict comparison using \=\=\= between int\<0, max\> and null will always evaluate to false\.$#'

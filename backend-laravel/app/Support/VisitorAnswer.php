@@ -84,7 +84,7 @@ final class VisitorAnswer
     public static function unlocked(Request $request, string $alias, Cookie $cookie): Response
     {
         $response = self::wantsPage($request)
-            ? response(VisitorPage::handoff($alias), 200)
+            ? response(VisitorPage::handoff($alias, QrAttribution::fromRequest($request)), 200)
             : response()->json(['ok' => true]);
 
         return $response->withCookie($cookie);
@@ -165,7 +165,7 @@ final class VisitorAnswer
             $cookie = new Cookie((string) config('uvh.csrf_cookie'), $token, 0, '/', null, (bool) config('uvh.cookie_secure'), false, false, 'lax');
         }
 
-        $response = response(VisitorPage::gate($alias, (string) $token, $error), $status);
+        $response = response(VisitorPage::gate($alias, (string) $token, $error, QrAttribution::fromRequest($request)), $status);
 
         return $cookie ? $response->withCookie($cookie) : $response;
     }

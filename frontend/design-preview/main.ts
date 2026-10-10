@@ -91,7 +91,7 @@ void bootstrapApplication(DesignPreviewRootComponent, {
       { path: "**", redirectTo: "app/dashboard" },
     ]),
     { provide: AuthService, useValue: { user: signal({ id: 900001, name: "Persona de ejemplo", email: "preview@example.invalid", isAdmin: false, emailVerified: true, mfaEnabled: false }), logout: blocked, refreshWorkspaces: blocked } },
-    { provide: WorkspaceService, useValue: { currentId, currentRole: () => currentId() === 1 ? "owner" : "viewer", list: signal([{ id: 1, name: "Estudio Norte", role: "owner" }, { id: 2, name: "Archivo editorial", role: "viewer" }]), select: (id: number) => currentId.set(id) } },
+    { provide: WorkspaceService, useValue: { currentId, selectionGeneration: () => currentId(), currentRole: () => currentId() === 1 ? "owner" : "viewer", list: signal([{ id: 1, name: "Estudio Norte", role: "owner" }, { id: 2, name: "Archivo editorial", role: "viewer" }]), select: (id: number) => currentId.set(id) } },
     { provide: ApiService, useValue: { get: fixtureRead, post: blocked, patch: blocked, delete: blocked } },
     { provide: LinkDialogService, useValue: { openCreate: () => of(null) } },
   ],

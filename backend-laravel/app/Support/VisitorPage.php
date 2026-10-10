@@ -34,7 +34,7 @@ final class VisitorPage
      * La puerta: pide la contraseña del enlace y, si el intento anterior falló,
      * explica por qué sin cambiar de pantalla.
      */
-    public static function gate(string $alias, string $csrfToken, ?string $error = null): string
+    public static function gate(string $alias, string $csrfToken, ?string $error = null, ?string $qrPublicId = null): string
     {
         // El campo describe el aviso de error además de la ayuda: es la única
         // forma determinista de que un lector anuncie el motivo al enfocar, ya
@@ -59,6 +59,7 @@ final class VisitorPage
                 : '')
             .'<p class="hint" id="gate-hint">Hasta 72 caracteres. Te la habrá compartido quien te envió el enlace.</p>'
             .'<input type="hidden" name="_csrf" value="'.self::escape($csrfToken).'">'
+            .($qrPublicId !== null ? '<input type="hidden" name="qr" value="'.self::escape($qrPublicId).'">' : '')
             .'<button type="submit"><span class="label">Continuar</span><span class="pending" aria-hidden="true">Comprobando…</span></button>'
             .'</form>'
             .'<p class="foot">Si no conoces la contraseña, pídesela a quien te envió este enlace.</p>'
@@ -81,9 +82,9 @@ final class VisitorPage
      * dentro del propio origen y continúa con una navegación normal, que no pasa
      * por esa comprobación.
      */
-    public static function handoff(string $alias): string
+    public static function handoff(string $alias, ?string $qrPublicId = null): string
     {
-        $target = '/r/'.rawurlencode($alias);
+        $target = '/r/'.rawurlencode($alias).($qrPublicId !== null ? '?qr='.rawurlencode($qrPublicId) : '');
 
         $body = '<main class="plate">'
             .'<p class="brand">'.self::escape(self::BRAND).'</p>'

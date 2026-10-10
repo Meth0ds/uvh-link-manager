@@ -23,6 +23,10 @@ use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PendingHandoffController;
 use App\Http\Controllers\PrivacyRightsController;
 use App\Http\Controllers\PublicController;
+use App\Http\Controllers\QrAssetController;
+use App\Http\Controllers\QrDesignController;
+use App\Http\Controllers\QrSnapshotController;
+use App\Http\Controllers\QrVariantController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SecurityIncidentController;
 use App\Http\Controllers\TagController;
@@ -154,6 +158,11 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
 
     // Links.
     Route::prefix('links')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
+        Route::get('qr-export', [QrSnapshotController::class, 'index'])->middleware('uvh.workspace:viewer');
+        Route::get('{linkId}/qr-variants/comparison', [QrVariantController::class, 'comparison'])->middleware(['uvh.workspace:viewer', 'throttle:uvh-analytics'])->whereNumber('linkId');
+        Route::get('{linkId}/qr-variants', [QrVariantController::class, 'index'])->middleware('uvh.workspace:viewer')->whereNumber('linkId');
+        Route::post('{linkId}/qr-variants', [QrVariantController::class, 'store'])->middleware('uvh.workspace:editor')->whereNumber('linkId');
+        Route::patch('{linkId}/qr-variants/{id}', [QrVariantController::class, 'update'])->middleware('uvh.workspace:editor')->whereNumber(['linkId', 'id']);
         Route::get('trash', [LinkController::class, 'trash'])->middleware('uvh.workspace:viewer');
         Route::get('/', [LinkController::class, 'index'])->middleware('uvh.workspace:viewer');
         Route::post('check-alias', [LinkController::class, 'checkAlias'])->middleware(['uvh.workspace:viewer', 'throttle:uvh-link-create']);
@@ -192,6 +201,17 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     });
 
     // Plantillas de enlace (F7): valores por defecto, nunca un alias.
+    Route::prefix('qr-designs')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
+        Route::get('/', [QrDesignController::class, 'index'])->middleware('uvh.workspace:viewer');
+        Route::post('/', [QrDesignController::class, 'store'])->middleware('uvh.workspace:editor');
+        Route::patch('{id}', [QrDesignController::class, 'update'])->middleware('uvh.workspace:editor')->whereNumber('id');
+        Route::delete('{id}', [QrDesignController::class, 'destroy'])->middleware('uvh.workspace:editor')->whereNumber('id');
+    });
+    Route::prefix('qr-assets')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
+        Route::get('{id}', [QrAssetController::class, 'show'])->middleware('uvh.workspace:viewer')->whereNumber('id');
+        Route::post('/', [QrAssetController::class, 'store'])->middleware(['uvh.workspace:editor', 'throttle:uvh-link-create']);
+    });
+
     Route::prefix('link-templates')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
         Route::get('/', [LinkTemplateController::class, 'index'])->middleware('uvh.workspace:viewer');
         Route::post('/', [LinkTemplateController::class, 'store'])->middleware('uvh.workspace:editor');

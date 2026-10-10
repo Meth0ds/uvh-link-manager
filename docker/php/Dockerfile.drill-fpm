@@ -23,12 +23,17 @@ WORKDIR /app
 # (IDN hosts), not just by the drill.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libicu-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
         libpq-dev \
         libzip-dev \
         $PHPIZE_DEPS \
+    && docker-php-ext-configure gd --with-jpeg --with-freetype \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
         intl \
+        gd \
         opcache \
         pdo_pgsql \
         pgsql \

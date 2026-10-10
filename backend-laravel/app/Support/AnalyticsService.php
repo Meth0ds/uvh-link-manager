@@ -38,7 +38,7 @@ class AnalyticsService
     private const MAX_MAP_KEYS_CEILING = 5000;
 
     /**
-     * @param  array{country: ?string, device: ?string, browser: ?string, os: ?string, referrer_domain: ?string, campaign: ?string, visitor_hash: ?string}  $meta
+     * @param  array{country: ?string, device: ?string, browser: ?string, os: ?string, referrer_domain: ?string, campaign: ?string, visitor_hash: ?string, qr_variant_id?: ?int}  $meta
      */
     public static function recordClick(int $linkId, array $meta, ?string $eventId = null, ?string $occurredAt = null): void
     {
@@ -66,6 +66,19 @@ class AnalyticsService
                 // Database-backed queues use at-least-once delivery. A retry
                 // after commit must not increment either event or rollup twice.
                 return;
+            }
+
+            $variantId = null;
+            $requestedVariant = $meta['qr_variant_id'] ?? null;
+            if (is_int($requestedVariant) && $requestedVariant > 0) {
+                // The event's link FK already holds a key-share lock. Resolve
+                // attribution under that lock, so cascade deletion cannot
+                // race between checking a variant and storing its reference.
+                $variant = DB::table('qr_variants')->where('id', $requestedVariant)->where('link_id', $linkId)->sharedLock()->first();
+                if ($variant) {
+                    $variantId = (int) $variant->id;
+                    DB::table('click_events')->where('event_id', $eventId)->update(['qr_variant_id' => $variantId]);
+                }
             }
 
             $isNewVisitor = false;
@@ -96,6 +109,10 @@ class AnalyticsService
                 'referrers' => self::bump($rollup->referrers, $meta['referrer_domain'] ?? null),
                 'campaigns' => self::bump($rollup->campaigns, $meta['campaign'] ?? null),
             ]);
+            if ($variantId !== null) {
+                DB::table('qr_daily_counts')->insertOrIgnore(['variant_id' => $variantId, 'day' => $day, 'visits' => 0]);
+                DB::table('qr_daily_counts')->where('variant_id', $variantId)->where('day', $day)->increment('visits');
+            }
         });
     }
 

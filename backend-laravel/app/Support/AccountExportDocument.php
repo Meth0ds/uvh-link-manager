@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\LegalAcceptance;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * El documento de «Descarga de cuenta»: JSON construido por fragmentos, con la
@@ -39,6 +40,10 @@ final class AccountExportDocument
     private const SECTIONS = [
         'memberships',
         'createdLinks',
+        'qrDesigns',
+        'qrVariants',
+        'qrAggregateAnalytics',
+        'qrLogoMetadata',
         'redirectRules',
         'linkTags',
         'aggregateAnalytics',
@@ -181,6 +186,14 @@ final class AccountExportDocument
                 ->where('links.created_by', $userId)
                 ->orderBy('link_tags.link_id')->orderBy('tags.id')
                 ->select(['link_tags.link_id', 'tags.name'])->cursor(),
+            'qrDesigns' => static fn (): iterable => DB::table('qr_designs')->where('created_by', $userId)->orderBy('id')
+                ->select(['id', 'workspace_id', 'name', 'spec', 'version', 'created_at', 'updated_at'])->cursor(),
+            'qrVariants' => static fn (): iterable => DB::table('qr_variants')->where('created_by', $userId)->orderBy('id')
+                ->select(['id', 'link_id', 'workspace_id', 'name', 'public_id', 'spec', 'version', 'archived_at', 'created_at', 'updated_at'])->cursor(),
+            'qrAggregateAnalytics' => static fn (): iterable => DB::table('qr_daily_counts')
+                ->join('qr_variants', 'qr_variants.id', '=', 'qr_daily_counts.variant_id')->where('qr_variants.created_by', $userId)
+                ->orderBy('qr_daily_counts.day')->orderBy('qr_daily_counts.variant_id')->select(['variant_id', 'day', 'visits'])->cursor(),
+            'qrLogoMetadata' => static fn (): iterable => self::qrLogoRows($userId),
             'apiTokenMetadata' => static fn (): iterable => DB::table('api_tokens')->where('created_by', $userId)->orderBy('id')
                 ->select([
                     'id', 'workspace_id', 'name', 'scopes', 'last_used_at', 'expires_at', 'revoked_at', 'created_at',
@@ -207,6 +220,25 @@ final class AccountExportDocument
             'privacyRightsMessages' => static fn (): iterable => self::privacyMessageRows($userId),
             'legalAcceptances' => static fn (): iterable => self::legalAcceptanceRows($userId),
         ];
+    }
+
+    /** @return iterable<int, object> */
+    private static function qrLogoRows(int $userId): iterable
+    {
+        $rows = DB::table('qr_assets')->where('status', 'ready')
+            ->where(function ($query) use ($userId): void {
+                $query->where('created_by', $userId)
+                    ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('qr_designs')->whereColumn('qr_designs.asset_id', 'qr_assets.id')->where('qr_designs.created_by', $userId))
+                    ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('qr_variants')->whereColumn('qr_variants.asset_id', 'qr_assets.id')->where('qr_variants.created_by', $userId));
+            })->orderBy('id')->select(['id', 'workspace_id', 'path', 'width', 'height', 'bytes', 'created_at'])->cursor();
+        foreach ($rows as $row) {
+            $png = Storage::disk('qr-private')->get($row->path);
+            $row->mediaType = 'image/png';
+            $row->contentBase64 = $png === null ? null : base64_encode($png);
+            $row->contentUnavailable = $png === null;
+            unset($row->path);
+            yield $row;
+        }
     }
 
     /** @return iterable<int, object> */
@@ -378,6 +410,7 @@ final class AccountExportDocument
         return [
             'account data and memberships',
             'links created by the account, including rules, tags and aggregate analytics',
+            'QR designs, campaign variants, aggregate visits and normalized logos used by the account',
             'API token metadata without token hashes or bearer secrets',
             'domain and webhook configuration for owned workspaces without verification/signing secrets',
             'account audit action metadata without IP-derived identifiers',
