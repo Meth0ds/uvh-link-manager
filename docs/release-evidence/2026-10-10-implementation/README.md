@@ -11,6 +11,8 @@ Se publicó el trabajo local antes de transferir la aplicación a la VPS. Commit
 - Contrato actualizado de escáneres: **11 tests, 319 aserciones** contra la configuración actual, código 0; Pint del fichero modificado también pasó.
 - Gitleaks: árbol público completo sin secretos detectados. Historial completo (165 commits en ese momento) sin resultados pendientes después de revisar fingerprints exactos de valores sintéticos y ejemplos. No se añaden exclusiones generales de carpetas de tests.
 
+La [validación posterior desde copia limpia](../2026-10-10-production-preparation/README.md) completó toda la suite con `uvh_test`: 2899 aprobados / 33643 aserciones, sin modificar esos guards. También recoge los nuevos ensayos operativos. Los resultados anteriores se conservan como evidencia histórica.
+
 Los logs completos permanecen en el directorio local ignorado `.uvh-runtime/upcloud-implementation-20261010/evidence-*`. Sus [hashes SHA-256](local-log-sha256.json) permiten contrastarlos; los hashes no sustituyen acceso a esos logs ni constituyen prueba de despliegue. Se conservan los fallos históricos separados.
 
 ## Límites

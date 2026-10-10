@@ -1,0 +1,86 @@
+{
+  "sourceCommit": "d3d5f18efc26530cc8cc34c73d0d84832b5e2b07",
+  "note": "Backend clean published snapshot; operational tree changes checked separately. Full logs retained locally, not uploaded.",
+  "files": [
+    {
+      "file": ".uvh-runtime/production-validation-d3d5f18/evidence/backend-install.log",
+      "bytes": 5538,
+      "sha256": "aba6e626de6310be40c4208cf40c193f1534f107390cccfcf54eca88149204f0"
+    },
+    {
+      "file": ".uvh-runtime/production-validation-d3d5f18/evidence/backend-validate.log",
+      "bytes": 371,
+      "sha256": "f22587bdb0668fc0787080962fa4054c3b2844efaba200bdb7443813cd77b110"
+    },
+    {
+      "file": ".uvh-runtime/production-validation-d3d5f18/evidence/backend-audit.log",
+      "bytes": 390,
+      "sha256": "fd6d8089c8b8bc8852a8c92990fbb53b8004a8baee609d7b24df347e59be9428"
+    },
+    {
+      "file": ".uvh-runtime/production-validation-d3d5f18/evidence/backend-quality.log",
+      "bytes": 1343,
+      "sha256": "a5bdf8c489fdbcf002cbe474260dd850d8cb45314571e3f509b1c1d70e960020"
+    },
+    {
+      "file": ".uvh-runtime/production-validation-d3d5f18/evidence/backend-schema.log",
+      "bytes": 6107,
+      "sha256": "3e9d920534ea9c2f292567e9685bdf1053cb04ad0fcb4ce86a618dfbf9880453"
+    },
+    {
+      "file": ".uvh-runtime/production-validation-d3d5f18/evidence/backend-tests.log",
+      "bytes": 409199,
+      "sha256": "1b24581ee95864129cee7d2efe43826c33fb8b79908c5d0701c0ccb0e7604a08"
+    },
+    {
+      "file": ".uvh-runtime/production-validation-d3d5f18/evidence/backend-cleanup.log",
+      "bytes": 522,
+      "sha256": "814f3a7eac8b13e6e631dcd03f58d1f944add640a9c173cb2f9100f3dba993cf"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-postgres-drill-final.log",
+      "bytes": 269,
+      "sha256": "169d307b7b07e7fc7d9a8de36db0cf51602dbd49de1d4cdf6db92f37698a5802"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-caddy-build.log",
+      "bytes": 2486,
+      "sha256": "ad61f177c51e65581cb0addd18dc1b3aa33d61a854b5dd55a858f8a73c97cb7a"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-caddy-drill.log",
+      "bytes": 294,
+      "sha256": "c90a3d11b61ae91b42be5bbf77cb2809303f44223de5c11bea7dab43e3f99653"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-audit-regressions.log",
+      "bytes": 1737,
+      "sha256": "38dbaa6e1180f72adb966103539b1b954e402d94a1e9eddf077264612c2b5e52"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-digests.log",
+      "bytes": 1958,
+      "sha256": "9d85f677ac00f1ce21c2684526285d446ba2480fd20c20fc7d94ceeb5791ced4"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-iac/iac.json",
+      "bytes": 2534,
+      "sha256": "3de3cd5a6d7bfc1ba9d8b028db604d86bbc07098aa678ed90dbae2314d30bf79"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-iac/scan.log",
+      "bytes": 756,
+      "sha256": "2a722b3672cf9a0de67d1b48b5f645a9f35e5e05a9405d4f08165de256f31ced"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-gitleaks.log",
+      "bytes": 133,
+      "sha256": "4e17ade77242291b154dcae54e4214a5cf598095748340e24a7ef6006a630320"
+    },
+    {
+      "file": ".uvh-runtime/upcloud-gitleaks.json",
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    }
+  ]
+}
