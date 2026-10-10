@@ -96,6 +96,53 @@ final class AnalyticsExportTest extends TestCase
         }
     }
 
+    public function test_totals_keep_anonymous_clicks_empty_hashes_and_deleted_links_in_scope(): void
+    {
+        config(['uvh.analytics.overview_cache_seconds' => 0]);
+        $occurredAt = now()->subMinute()->toIso8601String();
+        foreach (['same-hash', 'same-hash', null, null, ''] as $hash) {
+            DB::table('click_events')->insert([
+                'event_id' => (string) Str::uuid(), 'link_id' => $this->linkId,
+                'occurred_at' => $occurredAt, 'visitor_hash' => $hash, 'password_ok' => true,
+            ]);
+        }
+        DB::table('click_events')->insert([
+            'event_id' => (string) Str::uuid(), 'link_id' => $this->linkId,
+            'occurred_at' => now()->subDays(8)->toIso8601String(), 'visitor_hash' => 'outside-range', 'password_ok' => true,
+        ]);
+        $deletedLink = DB::table('links')->insertGetId([
+            'workspace_id' => $this->workspace->id, 'created_by' => $this->owner->id,
+            'alias' => 'deleted-'.Ids::randomToken(8), 'destination' => 'https://example.test/deleted',
+            'state' => 'deleted', 'state_before_delete' => 'active', 'deleted_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $other = User::factory()->create();
+        $foreignWorkspace = Workspace::forceCreate([
+            'owner_user_id' => $other->id, 'name' => 'Foreign', 'slug' => 'foreign-'.Ids::randomToken(8),
+        ]);
+        $foreignLink = DB::table('links')->insertGetId([
+            'workspace_id' => $foreignWorkspace->id, 'created_by' => $other->id,
+            'alias' => 'foreign-'.Ids::randomToken(8), 'destination' => 'https://example.test/foreign',
+            'state' => 'active', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        foreach ([$deletedLink, $foreignLink] as $linkId) {
+            DB::table('click_events')->insert([
+                'event_id' => (string) Str::uuid(), 'link_id' => $linkId,
+                'occurred_at' => $occurredAt, 'visitor_hash' => 'other-hash', 'password_ok' => true,
+            ]);
+        }
+
+        $this->getJson('/api/v1/analytics/overview')->assertOk()
+            ->assertJsonPath('totals.clicks', 6)->assertJsonPath('totals.visitors', 3);
+        $this->getJson('/api/v1/analytics/overview?linkId='.$this->linkId)->assertOk()
+            ->assertJsonPath('totals.clicks', 5)->assertJsonPath('totals.visitors', 2);
+        $this->getJson('/api/v1/analytics/overview?linkId='.$deletedLink)->assertOk()
+            ->assertJsonPath('totals.clicks', 1)->assertJsonPath('totals.visitors', 1);
+        $this->getJson('/api/v1/analytics/overview?linkId='.$foreignLink)->assertNotFound();
+        $this->getJson('/api/v1/analytics/overview?period=custom&from='.now()->addDays(30)->toDateString().'&to='.now()->addDays(31)->toDateString())->assertOk()
+            ->assertJsonPath('totals.clicks', 0)->assertJsonPath('totals.visitors', 0);
+    }
+
     public function test_the_csv_export_carries_only_aggregates_and_guards_formulas(): void
     {
         // Dos personas reales detrás de tres clics: los hashes son material

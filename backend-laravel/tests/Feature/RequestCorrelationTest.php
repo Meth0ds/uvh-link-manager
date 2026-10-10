@@ -8,12 +8,26 @@ use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Monolog\Handler\NullHandler;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 final class RequestCorrelationTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // The assertions include info events even when the launcher filters
+        // them from its normal channel. Keep the fixture logger test-owned.
+        config(['logging.channels.correlation-fixture' => [
+            'driver' => 'monolog',
+            'handler' => NullHandler::class,
+            'level' => 'debug',
+        ]]);
+        Log::setDefaultDriver('correlation-fixture');
+    }
+
     public static function exceptionSources(): array
     {
         return [['route'], ['global middleware']];

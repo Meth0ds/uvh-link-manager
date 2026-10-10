@@ -24,7 +24,13 @@ final class RecoveryMailDeliveryTest extends TestCase
         parent::setUp();
         DB::statement('TRUNCATE users, mail_outbox, audit_events, audit_outbox RESTART IDENTITY CASCADE');
         Queue::fake();
-        config(['mail.driver' => null]);
+        // Exercise the swapped ArrayTransport, rather than the development
+        // shortcut selected by the launcher's default mailer.
+        config([
+            'mail.driver' => null,
+            'mail.default' => 'recovery-fixture',
+            'mail.mailers.recovery-fixture' => ['transport' => 'smtp'],
+        ]);
         $this->transport = new ArrayTransport;
         $mailer = new Mailer('recovery-fixture', $this->app['view'], $this->transport, $this->app['events']);
         $mailer->alwaysFrom('sender@example.test');

@@ -28,17 +28,25 @@ class WebhookService
      */
     public static function dispatch(int $workspaceId, string $event, array $data, ?string $eventUuid = null): void
     {
+        self::dispatchMany($workspaceId, [['event' => $event, 'data' => $data, 'eventUuid' => $eventUuid]]);
+    }
+
+    /**
+     * Admit a business operation's events under one workspace backlog lock.
+     * The caller owns the transaction: failure rolls back the entire operation.
+     * No subscription or capacity snapshot survives this call.
+     *
+     * @param  list<array{event: string, data: array<string, mixed>, eventUuid?: ?string}>  $events
+     */
+    public static function dispatchMany(int $workspaceId, array $events): void
+    {
         if (DB::transactionLevel() < 1) {
             throw new WebhookAdmissionUnavailable('Webhook events must be admitted inside the business transaction');
         }
-        $eventId = $eventUuid ?? self::uuid();
-        $payload = [
-            'event' => $event,
-            'event_id' => $eventId,
-            'timestamp' => now()->toIso8601String(),
-            'data' => $data,
-        ];
-        $deliveryIds = self::reserveWorkspaceDeliveries($workspaceId, function (int $pending) use ($workspaceId, $event, $eventId, $payload): array {
+        if ($events === []) {
+            return;
+        }
+        $deliveryIds = self::reserveWorkspaceDeliveries($workspaceId, function (int $pending) use ($workspaceId, $events): array {
             $webhooks = Webhook::where('workspace_id', $workspaceId)->where('active', true)
                 ->where(function ($query) {
                     $query->whereNull('created_by')->orWhereExists(function ($activeCreator) {
@@ -52,26 +60,41 @@ class WebhookService
                                     ->whereIn('memberships.role', ['owner', 'admin', 'editor']);
                             });
                     });
-                })->get();
+                })->get(['id', 'config_version', 'events']);
             $ids = [];
-            foreach ($webhooks as $webhook) {
-                if (! in_array($event, $webhook->events ?? [], true)) {
-                    continue;
-                }
-                if ($pending >= self::MAX_PENDING_DELIVERIES_PER_WORKSPACE) {
-                    throw new WebhookAdmissionUnavailable('Workspace webhook backlog is full');
-                }
-                $delivery = WebhookDelivery::create([
-                    'webhook_id' => $webhook->id,
-                    'config_version' => $webhook->config_version,
-                    'event' => $event,
+            foreach ($events as $event) {
+                $eventId = $event['eventUuid'] ?? self::uuid();
+                $payload = [
+                    'event' => $event['event'],
                     'event_id' => $eventId,
-                    'payload' => $payload,
-                    'status' => 'pending',
-                    'next_attempt_at' => now(),
-                ]);
-                $ids[] = (int) $delivery->id;
-                $pending++;
+                    'timestamp' => now()->toIso8601String(),
+                    'data' => $event['data'],
+                ];
+                foreach ($webhooks as $webhook) {
+                    if (! in_array($event['event'], $webhook->events ?? [], true)) {
+                        continue;
+                    }
+                    if ($pending >= self::MAX_PENDING_DELIVERIES_PER_WORKSPACE) {
+                        // Workers can finish deliveries while this transaction
+                        // owns admission. Refresh only at the boundary so a
+                        // released slot is usable without recounting per event.
+                        $pending = self::pendingWorkspaceDeliveries($workspaceId);
+                        if ($pending >= self::MAX_PENDING_DELIVERIES_PER_WORKSPACE) {
+                            throw new WebhookAdmissionUnavailable('Workspace webhook backlog is full');
+                        }
+                    }
+                    $delivery = WebhookDelivery::create([
+                        'webhook_id' => $webhook->id,
+                        'config_version' => $webhook->config_version,
+                        'event' => $event['event'],
+                        'event_id' => $eventId,
+                        'payload' => $payload,
+                        'status' => 'pending',
+                        'next_attempt_at' => now(),
+                    ]);
+                    $ids[] = (int) $delivery->id;
+                    $pending++;
+                }
             }
 
             return $ids;

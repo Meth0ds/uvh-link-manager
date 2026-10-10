@@ -50,7 +50,9 @@ class AnalyticsService
             $inserted = DB::table('click_events')->insertOrIgnore([
                 'event_id' => $eventId,
                 'link_id' => $linkId,
-                'occurred_at' => $now,
+                // Query-builder DateTime bindings use the grammar's seconds
+                // format. Bind the UTC instant explicitly to retain fractions.
+                'occurred_at' => $now->format('Y-m-d H:i:s.uP'),
                 'country' => $meta['country'] ?? null,
                 'device' => $meta['device'] ?? null,
                 'browser' => $meta['browser'] ?? null,

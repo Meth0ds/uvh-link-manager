@@ -261,6 +261,10 @@ final class RegistrationEditConcurrencyTest extends TestCase
             'SESSION_DRIVER' => 'array',
             'PUBLIC_HOST' => (string) config('uvh.public_host'),
             'APP_HOST' => (string) config('uvh.app_host'),
+            // Child processes must use the same credentials as the parent
+            // fixture; Http::fake does not bypass missing configuration.
+            'HCAPTCHA_SITE_KEY' => (string) config('uvh.hcaptcha.site_key'),
+            'HCAPTCHA_SECRET' => (string) config('uvh.hcaptcha.secret'),
         ];
     }
 

@@ -122,10 +122,8 @@ class AdminController
             return response()->json(['error' => 'Filtro de usuario inválido'], 422);
         }
 
-        $query = DB::table('users as u')
-            ->selectRaw('u.id, u.email, u.name, u.is_admin, u.email_verified_at, u.mfa_enabled, u.created_at, u.deleted_at,
-                (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id) AS workspaces,
-                (SELECT COUNT(*) FROM links l WHERE l.created_by = u.id AND l.deleted_at IS NULL) AS links');
+        $columns = ['u.id', 'u.email', 'u.name', 'u.is_admin', 'u.email_verified_at', 'u.mfa_enabled', 'u.created_at', 'u.deleted_at'];
+        $query = DB::table('users as u')->select($columns);
 
         if ($search !== '') {
             $query->where(fn ($q) => $q->where('u.email', 'ilike', $search)->orWhere('u.name', 'ilike', $search));
@@ -143,9 +141,15 @@ class AdminController
         // Deterministic tiebreaker: rows created in the same second must not
         // reorder between pages, or a page boundary would repeat one and skip
         // another.
-        $rows = $query->orderByDesc('u.created_at')->orderByDesc('u.id')
+        $userPage = $query->orderByDesc('u.created_at')->orderByDesc('u.id')
             ->offset(($page - 1) * $perPage)
-            ->limit($perPage)
+            ->limit($perPage);
+        // Resolve the page before counting. Counts in the inner projection
+        // would also run for every user skipped by OFFSET, even on empty pages.
+        $rows = DB::query()->fromSub($userPage, 'u')->select($columns)
+            ->selectRaw('(SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id) AS workspaces,
+                (SELECT COUNT(*) FROM links l WHERE l.created_by = u.id AND l.deleted_at IS NULL) AS links')
+            ->orderByDesc('u.created_at')->orderByDesc('u.id')
             ->get();
 
         return response()->json([

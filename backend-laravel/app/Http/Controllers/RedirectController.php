@@ -217,7 +217,7 @@ class RedirectController
             // Queue only privacy-reduced dimensions. Redirect availability is
             // deliberately higher priority than optional analytics admission;
             // failure is counted and never weakens click limits/single-use.
-            RecordClickAnalyticsJob::dispatch((string) Str::uuid(), $linkId, now()->utc()->toIso8601String(), $meta);
+            RecordClickAnalyticsJob::dispatch((string) Str::uuid(), $linkId, now()->utc()->format('Y-m-d\TH:i:s.uP'), $meta);
         } catch (\Throwable $e) {
             // Redirect availability takes priority over analytics. The event is
             // observable by operators without leaking requester identifiers.

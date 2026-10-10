@@ -18,7 +18,7 @@ final class MailOutboxDispatcher
                     ->where('status', 'pending')
                     ->where('available_at', '<=', now())
                     ->lockForUpdate()
-                    ->first();
+                    ->first(['id']);
                 if (! $row) {
                     return false;
                 }

@@ -46,7 +46,7 @@ class LinkController
         $perPage = $this->positiveQueryInteger($request->query('perPage'), 20, 100);
         $retentionDays = max(1, (int) config('uvh.housekeeping.link_trash_days', 30));
 
-        $query = Link::withTrashed()->with(['domain', 'tags'])
+        $query = Link::withTrashed()->with(['domain', 'tags', 'collection'])
             ->where('workspace_id', $workspaceId)->whereNotNull('deleted_at');
         if ($search !== '') {
             $query->where(fn ($q) => $q->where('alias', 'ilike', $search)->orWhere('destination', 'ilike', $search));
@@ -90,7 +90,7 @@ class LinkController
             return response()->json(['error' => 'Filtro de dominio inválido'], 422);
         }
 
-        $query = Link::with(['domain', 'tags'])
+        $query = Link::with(['domain', 'tags', 'collection'])
             ->where('workspace_id', $workspaceId)
             ->whereNull('deleted_at');
 

@@ -131,7 +131,9 @@ class LinkBulkController
                     throw new LinkException('Colección no encontrada', 422);
                 }
 
-                $applied = $this->apply($workspaceId, $user, $action, $ids, $tags ?? [], $collectionId, is_int($domainId) ? $domainId : null);
+                $changes = $this->apply($workspaceId, $user, $action, $ids, $tags ?? [], $collectionId, is_int($domainId) ? $domainId : null);
+                WebhookService::dispatchMany($workspaceId, $changes['events']);
+                $applied = $changes['applied'];
 
                 $body = ['ok' => true, 'action' => $action, 'applied' => $applied];
                 Audit::write($user->id, 'link.bulk', 'link', null, [
@@ -165,14 +167,16 @@ class LinkBulkController
     }
 
     /**
-     * Aplica la acción a todos los enlaces o a ninguno. Devuelve cuántos
-     * cambiaron realmente (un enlace ya en el estado pedido no cuenta).
+     * Aplica la acción a todos los enlaces o a ninguno. Devuelve los cambios
+     * reales y sus eventos para admitirlos juntos antes de confirmar el efecto.
      *
      * @param  list<int>  $ids
      * @param  list<mixed>  $tags
+     * @return array{applied: int, events: list<array{event: string, data: array<string, mixed>}>}
      */
-    private function apply(int $workspaceId, User $user, string $action, array $ids, array $tags, mixed $collectionId, ?int $domainId): int
+    private function apply(int $workspaceId, User $user, string $action, array $ids, array $tags, mixed $collectionId, ?int $domainId): array
     {
+        $events = [];
         // Link usa SoftDeletes: sin withTrashed() el alcance global metería
         // su propio whereNull('deleted_at') y la restauración nunca vería la
         // papelera. Los filtros explícitos son los que deciden aquí.
@@ -210,15 +214,15 @@ class LinkBulkController
                     continue;
                 }
                 $link->update(['state' => $target, 'version' => (int) $link->version + 1, 'updated_at' => now()]);
-                WebhookService::dispatch($workspaceId, 'link.updated', [
+                $events[] = ['event' => 'link.updated', 'data' => [
                     'linkId' => (int) $link->id,
                     'alias' => (string) $link->alias,
                     'state' => $target,
-                ]);
+                ]];
                 $applied++;
             }
 
-            return $applied;
+            return ['applied' => $applied, 'events' => $events];
         }
 
         if ($action === 'trash') {
@@ -235,10 +239,10 @@ class LinkBulkController
                     'version' => (int) $link->version + 1,
                     'updated_at' => now(),
                 ]);
-                WebhookService::dispatch($workspaceId, 'link.deleted', ['linkId' => (int) $link->id]);
+                $events[] = ['event' => 'link.deleted', 'data' => ['linkId' => (int) $link->id]];
             }
 
-            return count($ids);
+            return ['applied' => count($ids), 'events' => $events];
         }
 
         if ($action === 'restore') {
@@ -266,14 +270,14 @@ class LinkBulkController
                     'version' => (int) $link->version + 1,
                     'updated_at' => now(),
                 ]);
-                WebhookService::dispatch($workspaceId, 'link.updated', [
+                $events[] = ['event' => 'link.updated', 'data' => [
                     'linkId' => (int) $link->id,
                     'alias' => (string) $link->alias,
                     'state' => $next,
-                ]);
+                ]];
             }
 
-            return count($ids);
+            return ['applied' => count($ids), 'events' => $events];
         }
 
         if ($action === 'tag' || $action === 'untag') {
@@ -283,9 +287,8 @@ class LinkBulkController
             $applied = 0;
             foreach ($found as $link) {
                 if ($action === 'tag') {
-                    $before = $link->tags()->count();
-                    $link->tags()->syncWithoutDetaching($tagIds);
-                    $changed = $link->tags()->count() !== $before;
+                    $changes = $link->tags()->syncWithoutDetaching($tagIds);
+                    $changed = $changes['attached'] !== [];
                 } else {
                     // Exacto: `detach` devuelve las adhesiones realmente
                     // retiradas. Un enlace que no llevaba esas etiquetas no
@@ -297,14 +300,14 @@ class LinkBulkController
                     continue;
                 }
                 $link->update(['version' => (int) $link->version + 1, 'updated_at' => now()]);
-                WebhookService::dispatch($workspaceId, 'link.updated', [
+                $events[] = ['event' => 'link.updated', 'data' => [
                     'linkId' => (int) $link->id,
                     'alias' => (string) $link->alias,
-                ]);
+                ]];
                 $applied++;
             }
 
-            return $applied;
+            return ['applied' => $applied, 'events' => $events];
         }
 
         if ($action === 'set-domain') {
@@ -358,14 +361,14 @@ class LinkBulkController
                     'version' => (int) $link->version + 1,
                     'updated_at' => now(),
                 ]);
-                WebhookService::dispatch($workspaceId, 'link.updated', [
+                $events[] = ['event' => 'link.updated', 'data' => [
                     'linkId' => (int) $link->id,
                     'alias' => (string) $link->alias,
-                ]);
+                ]];
                 $applied++;
             }
 
-            return $applied;
+            return ['applied' => $applied, 'events' => $events];
         }
 
         // move: agrupa o desagrupa, nunca borra la colección.
@@ -379,14 +382,14 @@ class LinkBulkController
                 'version' => (int) $link->version + 1,
                 'updated_at' => now(),
             ]);
-            WebhookService::dispatch($workspaceId, 'link.updated', [
+            $events[] = ['event' => 'link.updated', 'data' => [
                 'linkId' => (int) $link->id,
                 'alias' => (string) $link->alias,
-            ]);
+            ]];
             $applied++;
         }
 
-        return $applied;
+        return ['applied' => $applied, 'events' => $events];
     }
 
     /**

@@ -43,7 +43,7 @@ class AnalyticsController
             }
         }
 
-        return response()->json($this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end']));
+        return response()->json($this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end'], $range['rolling']));
     }
 
     public function publicOverview(Request $request)
@@ -72,7 +72,7 @@ class AnalyticsController
             }
         }
 
-        return response()->json($this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end']));
+        return response()->json($this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end'], $range['rolling']));
     }
 
     /**
@@ -112,7 +112,7 @@ class AnalyticsController
             }
         }
 
-        $overview = $this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end']);
+        $overview = $this->cachedOverview($workspaceId, $linkId, $range['start'], $range['end'], $range['rolling']);
         $filename = 'uvh-analytics-'.now()->format('Ymd').'.'.$format;
 
         if ($format === 'json') {
@@ -145,7 +145,7 @@ class AnalyticsController
     }
 
     /**
-     * @return array{ok: bool, error?: string, start?: string, end?: string}
+     * @return array{ok: bool, error?: string, start?: string, end?: string, rolling?: bool}
      */
     private function parseRange(string $period, ?string $from, ?string $to): array
     {
@@ -178,30 +178,34 @@ class AnalyticsController
         if ($start->gt($end)) {
             return ['ok' => false, 'error' => 'from debe ser anterior o igual a to'];
         }
-        // Carbon 3 returns signed differences by default. Timestamps make the
-        // limit an explicit elapsed-time boundary, including partial days and
-        // values carrying different UTC offsets, after order was validated.
-        $rangeSeconds = $end->getTimestamp() - $start->getTimestamp();
-        if ($rangeSeconds > self::MAX_RANGE_DAYS * 24 * 60 * 60) {
+        // Compare instants without dropping fractions or applying calendar-day
+        // arithmetic across different offsets. Do not mutate either bound.
+        $latestEnd = $start->copy()->utc()->addSeconds(self::MAX_RANGE_DAYS * 24 * 60 * 60);
+        if ($end->gt($latestEnd)) {
             return ['ok' => false, 'error' => 'El rango solicitado supera el máximo de 180 días'];
         }
 
-        return ['ok' => true, 'start' => $start->toIso8601String(), 'end' => $end->toIso8601String()];
+        return [
+            'ok' => true,
+            'start' => $start->format('Y-m-d\TH:i:s.uP'),
+            'end' => $end->format('Y-m-d\TH:i:s.uP'),
+            'rolling' => $from === null && $to === null,
+        ];
     }
 
     /** @return array<string, mixed> */
-    private function cachedOverview(int $workspaceId, ?int $linkId, string $start, string $end): array
+    private function cachedOverview(int $workspaceId, ?int $linkId, string $start, string $end, bool $rolling): array
     {
         $ttl = max(0, min(60, (int) config('uvh.analytics.overview_cache_seconds', 30)));
         if ($ttl === 0) {
             return $this->buildOverview($workspaceId, $linkId, $start, $end);
         }
         // Rolling periods advance every request. A 30-second bucket makes their
-        // cache reusable while bounding staleness; custom ranges retain exact bounds.
-        $rolling = abs((IsoDate::parse($end)?->getTimestamp() ?? 0) - time()) < 2;
+        // cache reusable while bounding staleness. Any explicit bound remains
+        // exact, even if it is close to now or overrides a preset period.
         $keyStart = $rolling ? intdiv(IsoDate::parse($start)->getTimestamp(), $ttl) : $start;
         $keyEnd = $rolling ? intdiv(IsoDate::parse($end)->getTimestamp(), $ttl) : $end;
-        $key = 'uvh:analytics:overview:v1:'.hash('sha256', json_encode([$workspaceId, $linkId, $keyStart, $keyEnd], JSON_THROW_ON_ERROR));
+        $key = 'uvh:analytics:overview:v2:'.hash('sha256', json_encode([$workspaceId, $linkId, $rolling, $keyStart, $keyEnd], JSON_THROW_ON_ERROR));
         try {
             $cached = Cache::get($key);
             if (is_array($cached)) {
@@ -241,8 +245,13 @@ class AnalyticsController
         if ($linkId !== null) {
             $events->where('e.link_id', $linkId);
         }
-        $totalClicks = (int) (clone $events)->count();
-        $totalVisitors = (int) (clone $events)->whereNotNull('e.visitor_hash')->distinct()->count('e.visitor_hash');
+        // COUNT(DISTINCT) ignores NULL hashes without excluding anonymous clicks
+        // from the click total. Both totals share one scan of the same snapshot.
+        $totals = (clone $events)
+            ->selectRaw('count(*) AS clicks, count(DISTINCT e.visitor_hash) AS visitors')
+            ->firstOrFail();
+        $totalClicks = (int) $totals->clicks;
+        $totalVisitors = (int) $totals->visitors;
 
         $seriesQuery = (clone $events)
             // Group in UTC explicitly so database-session timezone cannot move
