@@ -49,6 +49,7 @@ interface DashboardPeriodOption {
 })
 export class DashboardComponent {
   private api = inject(ApiService);
+  private readonly dialogOwner = inject(DestroyRef);
   readonly router = inject(Router);
   private linkDialog = inject(LinkDialogService);
   private auth = inject(AuthService);
@@ -83,12 +84,20 @@ export class DashboardComponent {
 
   private readonly numberFormatter = new Intl.NumberFormat("es-ES");
 
-  private loadedWorkspaceId: number | null | undefined;
+  private loadedContext: string | null | undefined;
+
+  private currentContext(): string | null {
+    const actorId = this.auth.user()?.id;
+    const workspaceId = this.workspaces.currentId();
+    if (actorId === undefined || workspaceId === null) return null;
+    return JSON.stringify([actorId, this.auth.sessionGeneration(), workspaceId,
+      this.workspaces.selectionGeneration(), this.workspaces.currentRole()]);
+  }
   constructor() {
     effect(() => {
-      const workspaceId = this.workspaces.currentId();
-      if (workspaceId === this.loadedWorkspaceId) return;
-      this.loadedWorkspaceId = workspaceId;
+      const context = this.currentContext();
+      if (context === this.loadedContext) return;
+      this.loadedContext = context;
       this.analyticsRequests.invalidate();
       this.recentRequests.invalidate();
       this.overview.set(null);
@@ -96,9 +105,9 @@ export class DashboardComponent {
       this.recentLoaded.set(false);
       this.analyticsError.set(null);
       this.recentError.set(null);
-      this.analyticsLoading.set(workspaceId !== null);
-      this.recentLoading.set(workspaceId !== null);
-      if (workspaceId !== null) void this.load();
+      this.analyticsLoading.set(context !== null);
+      this.recentLoading.set(context !== null);
+      if (context !== null) void this.load();
     });
   }
 
@@ -109,9 +118,9 @@ export class DashboardComponent {
   }
 
   async loadAnalytics(): Promise<void> {
-    const workspaceId = this.workspaces.currentId();
-    const request = this.analyticsRequests.begin(workspaceId);
-    if (workspaceId === null) {
+    const context = this.currentContext();
+    const request = this.analyticsRequests.begin(context);
+    if (context === null) {
       this.overview.set(null);
       this.analyticsError.set(null);
       this.analyticsLoading.set(false);
@@ -123,19 +132,19 @@ export class DashboardComponent {
     try {
       const overview = await this.api.get<AnalyticsOverview>("/api/v1/analytics/overview", { period },
         decodeAnalyticsOverview, { signal: request.signal });
-      if (this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) this.overview.set(overview);
+      if (this.analyticsRequests.isCurrent(request, this.currentContext())) this.overview.set(overview);
     } catch (error) {
-      if (!this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.analyticsRequests.isCurrent(request, this.currentContext())) return;
       this.analyticsError.set(error instanceof ApiRequestError ? error.message : "No se pudo cargar la actividad del periodo.");
     } finally {
-      if (this.analyticsRequests.isCurrent(request, this.workspaces.currentId())) this.analyticsLoading.set(false);
+      if (this.analyticsRequests.isCurrent(request, this.currentContext())) this.analyticsLoading.set(false);
     }
   }
 
   async loadRecent(): Promise<void> {
-    const workspaceId = this.workspaces.currentId();
-    const request = this.recentRequests.begin(workspaceId);
-    if (workspaceId === null) {
+    const context = this.currentContext();
+    const request = this.recentRequests.begin(context);
+    if (context === null) {
       this.recent.set([]);
       this.recentLoaded.set(false);
       this.recentError.set(null);
@@ -147,14 +156,14 @@ export class DashboardComponent {
     try {
       const links = await this.api.get<LinksResponse>("/api/v1/links", { sort: "created_at_desc", perPage: 5 },
         (value) => decodeLinksResponse(value, { page: 1, perPage: 5 }), { signal: request.signal });
-      if (!this.recentRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.recentRequests.isCurrent(request, this.currentContext())) return;
       this.recent.set(links.links);
       this.recentLoaded.set(true);
     } catch (error) {
-      if (!this.recentRequests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.recentRequests.isCurrent(request, this.currentContext())) return;
       this.recentError.set(error instanceof ApiRequestError ? error.message : "No se pudieron cargar los enlaces recientes.");
     } finally {
-      if (this.recentRequests.isCurrent(request, this.workspaces.currentId())) this.recentLoading.set(false);
+      if (this.recentRequests.isCurrent(request, this.currentContext())) this.recentLoading.set(false);
     }
   }
 
@@ -172,7 +181,7 @@ export class DashboardComponent {
     // UI capability only: the API remains authoritative. Unknown/viewer roles
     // should not be invited into a form they cannot submit successfully.
     if (!this.canCreate()) return;
-    this.linkDialog.openCreate().subscribe((created) => {
+    this.linkDialog.openCreate("", this.dialogOwner).subscribe((created) => {
       if (created) void this.router.navigate(["/app/links", created.id]);
     });
   }

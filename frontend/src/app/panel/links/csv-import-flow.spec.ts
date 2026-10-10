@@ -14,7 +14,7 @@ describe("CSV check and confirm flow", () => {
     api.post.and.resolveTo({ dryRun: true, valid: 1, created: 0, failed: 0, errors: [], truncated: false });
     await TestBed.configureTestingModule({ imports: [CsvImportDialogComponent], providers: [
       { provide: ApiService, useValue: api },
-      { provide: WorkspaceService, useValue: { currentId: signal(1) } },
+      { provide: WorkspaceService, useValue: { currentId: signal(1), selectionGeneration: () => 0, currentRole: () => "owner" } },
       { provide: MatDialogRef, useValue: { close: jasmine.createSpy("close") } },
     ] }).compileComponents();
     fixture = TestBed.createComponent(CsvImportDialogComponent); fixture.detectChanges(); await fixture.whenStable();

@@ -37,8 +37,8 @@ describe("DashboardComponent period selection", () => {
       providers: [
         provideRouter([]),
         { provide: ApiService, useValue: api },
-        { provide: AuthService, useValue: { user: signal({ name: "Ana", email: "ana@example.test" }) } },
-        { provide: WorkspaceService, useValue: { currentId: signal(1), list: signal([{ id: 1, name: "Operaciones" }]) } },
+        { provide: AuthService, useValue: { user: signal({ id: 10, name: "Ana", email: "ana@example.test" }), sessionGeneration: signal(0) } },
+        { provide: WorkspaceService, useValue: { currentId: signal(1), selectionGeneration: signal(0), currentRole: signal("owner"), list: signal([{ id: 1, name: "Operaciones" }]) } },
         { provide: LinkDialogService, useValue: { openCreate: jasmine.createSpy("openCreate") } },
         { provide: MatSnackBar, useValue: { open: jasmine.createSpy("open") } },
       ],

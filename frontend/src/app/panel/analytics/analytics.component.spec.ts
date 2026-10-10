@@ -28,7 +28,7 @@ describe("AnalyticsComponent request isolation", () => {
       providers: [
         provideRouter([]),
         { provide: ApiService, useValue: api },
-        { provide: WorkspaceService, useValue: { currentId: workspaceId } },
+        { provide: WorkspaceService, useValue: { selectionGeneration: () => 0, currentId: workspaceId } },
       ],
     }).overrideComponent(AnalyticsComponent, { set: { template: "", imports: [] } }).compileComponents();
   });

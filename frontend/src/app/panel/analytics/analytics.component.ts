@@ -65,13 +65,19 @@ export class AnalyticsComponent {
     ? "La fecha inicial debe ser anterior o igual a la final."
     : null);
 
-  private loadedWorkspaceId: number | null | undefined;
+  private loadedContext: string | undefined;
+
+  private viewContext(): string {
+    return JSON.stringify([this.auth.sessionGeneration(), this.workspaces.currentId(),
+      this.workspaces.selectionGeneration()]);
+  }
 
   constructor() {
     effect(() => {
       const workspaceId = this.workspaces.currentId();
-      if (workspaceId === this.loadedWorkspaceId) return;
-      this.loadedWorkspaceId = workspaceId;
+      const context = this.viewContext();
+      if (context === this.loadedContext) return;
+      this.loadedContext = context;
       this.exports.invalidate();
       this.exporting.set(false);
       // Never retain metrics from the previous authorization context.
@@ -102,7 +108,7 @@ export class AnalyticsComponent {
       this.loading.set(false);
       return;
     }
-    const request = this.requests.begin(workspaceId);
+    const request = this.requests.begin(this.viewContext());
     this.loading.set(true);
     this.error.set(null);
     try {
@@ -112,13 +118,13 @@ export class AnalyticsComponent {
         decodeAnalyticsOverview,
         { signal: request.signal },
       );
-      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.requests.isCurrent(request, this.viewContext())) return;
       this.overview.set(a);
     } catch (err) {
-      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.requests.isCurrent(request, this.viewContext())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las métricas");
     } finally {
-      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
+      if (this.requests.isCurrent(request, this.viewContext())) this.loading.set(false);
     }
   }
 
@@ -177,13 +183,11 @@ export class AnalyticsComponent {
     if (this.exporting() || this.awaitingCustomRange() || this.customRangeError() !== null) return;
     const workspaceId = this.workspaces.currentId();
     if (workspaceId === null) return;
-    const generation = this.auth.sessionGeneration();
-    const request = this.exports.begin(workspaceId);
-    const current = (): boolean => this.exports.isCurrent(request, this.workspaces.currentId())
-      && generation === this.auth.sessionGeneration();
+    const request = this.exports.begin(this.viewContext());
+    const current = (): boolean => this.exports.isCurrent(request, this.viewContext());
     this.exporting.set(true);
     try {
-      const blob = await this.api.getBlob("/api/v1/analytics/export", { ...this.query(), format });
+      const blob = await this.api.getBlob("/api/v1/analytics/export", { ...this.query(), format }, { signal: request.signal });
       if (!current()) return;
       const stamp = new Date().toISOString().slice(0, 10);
       if (!downloadBlob(blob, `uvh-analytics-${stamp}.${format}`)) {

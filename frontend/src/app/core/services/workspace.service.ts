@@ -10,11 +10,11 @@ export class WorkspaceService {
   /** The currently selected workspace id used for the X-Workspace-Id header. */
   readonly currentId = signal<number | null>(this.readStored());
 
-  private selectionRevision = 0;
+  private readonly selectionRevision = signal(0);
 
   /** Distinguishes a returned workspace from an uninterrupted selection. */
   selectionGeneration(): number {
-    return this.selectionRevision;
+    return this.selectionRevision();
   }
 
   private readStored(): number | null {
@@ -39,7 +39,7 @@ export class WorkspaceService {
     // This value becomes an authorization-context header. Reject fractional,
     // negative and unsafe IDs even when a caller bypasses the workspace list.
     const selected = id !== null && Number.isSafeInteger(id) && id > 0 ? id : null;
-    if (this.currentId() !== selected) this.selectionRevision += 1;
+    if (this.currentId() !== selected) this.selectionRevision.update(revision => revision + 1);
     this.currentId.set(selected);
     try {
       if (selected === null) localStorage.removeItem(STORAGE_KEY);

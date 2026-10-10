@@ -1,4 +1,5 @@
 import { WorkspaceService } from "./workspace.service";
+import { computed } from "@angular/core";
 
 const STORAGE_KEY = "uvh.workspaceId";
 
@@ -27,5 +28,17 @@ describe("WorkspaceService", () => {
     service.select(42);
     expect(service.currentId()).toBe(42);
     expect(localStorage.getItem(STORAGE_KEY)).toBe("42");
+  });
+
+  it("invalidates reactive context through A to B to A without changing repeated selections", () => {
+    const service = new WorkspaceService();
+    service.select(1);
+    const generation = computed(() => service.selectionGeneration());
+    const original = generation();
+    service.select(2);
+    service.select(1);
+    expect(generation()).toBe(original + 2);
+    service.select(1);
+    expect(generation()).toBe(original + 2);
   });
 });

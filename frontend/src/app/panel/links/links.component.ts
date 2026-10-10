@@ -1,4 +1,5 @@
 import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { DatePipe } from "@angular/common";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 
@@ -75,6 +76,7 @@ type StateFilter = "" | LinkState;
 })
 export class LinksComponent {
   private api = inject(ApiService);
+  private readonly dialogOwner = inject(DestroyRef);
   private route = inject(ActivatedRoute);
   readonly router = inject(Router);
   private dialog = inject(MatDialog);
@@ -87,6 +89,9 @@ export class LinksComponent {
   private intents = inject(PendingLinkIntentService);
   private readonly requests = new LatestRequest(inject(DestroyRef));
   private readonly exports = new LatestRequest(inject(DestroyRef));
+  private readonly domainRequests = new LatestRequest(inject(DestroyRef));
+  private readonly collectionRequests = new LatestRequest(inject(DestroyRef));
+  private collectionLoad: { context: string; promise: Promise<void> } | null = null;
   private readonly auth = inject(AuthService);
 
   readonly links = signal<LinkDto[]>([]);
@@ -157,7 +162,12 @@ export class LinksComponent {
 
   readonly stateLabel = linkStateLabel;
 
-  private loadedWorkspaceId: number | null | undefined;
+  private loadedContext: string | undefined;
+
+  private viewContext(): string {
+    return JSON.stringify([this.auth.sessionGeneration(), this.workspaces.currentId(),
+      this.workspaces.selectionGeneration(), this.workspaces.currentRole()]);
+  }
 
   constructor() {
     if (this.legacyDestination) {
@@ -171,11 +181,19 @@ export class LinksComponent {
     }
     effect(() => {
       const workspaceId = this.workspaces.currentId();
-      if (workspaceId === this.loadedWorkspaceId) return;
-      this.loadedWorkspaceId = workspaceId;
+      const context = this.viewContext();
+      if (context === this.loadedContext) return;
+      this.loadedContext = context;
       this.exports.invalidate();
       this.exporting.set(false);
       this.requests.invalidate();
+      this.domainRequests.invalidate();
+      this.collectionRequests.invalidate();
+      this.collectionLoad = null;
+      this.collections.set([]);
+      this.bulkCollectionId.set(null);
+      this.bulkDomainId.set(null);
+      this.clearSelection();
       // Link titles and destinations are workspace-confidential; clear them
       // synchronously instead of waiting for the next HTTP response.
       this.links.set([]);
@@ -217,7 +235,7 @@ export class LinksComponent {
       this.loading.set(false);
       return;
     }
-    const request = this.requests.begin(workspaceId);
+    const request = this.requests.begin(this.viewContext());
     // La selección pertenece a la página visible: un cambio de filas no puede
     // arrastrar ids que ya no están delante del usuario.
     this.clearSelection();
@@ -235,15 +253,15 @@ export class LinksComponent {
         page,
         perPage,
       }, (value) => decodeLinksResponse(value, { page, perPage }), { signal: request.signal });
-      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.requests.isCurrent(request, this.viewContext())) return;
       this.links.set(res.links);
       this.total.set(res.total);
       void this.openPendingLink();
     } catch (err) {
-      if (!this.requests.isCurrent(request, this.workspaces.currentId())) return;
+      if (!this.requests.isCurrent(request, this.viewContext())) return;
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los enlaces");
     } finally {
-      if (this.requests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
+      if (this.requests.isCurrent(request, this.viewContext())) this.loading.set(false);
     }
   }
 
@@ -276,12 +294,15 @@ export class LinksComponent {
 
   /** Opciones del filtro por dominio; sólo necesitan id y nombre. */
   private async loadDomainOptions(): Promise<void> {
+    if (this.workspaces.currentId() === null) return;
+    const request = this.domainRequests.begin(this.viewContext());
     try {
-      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse);
+      const { domains } = await this.api.get<{ domains: DomainDto[] }>("/api/v1/domains", undefined, decodeDomainsResponse, { signal: request.signal });
+      if (!this.domainRequests.isCurrent(request, this.viewContext())) return;
       this.domainOptions.set(domains);
     } catch {
       // El filtro queda sin opciones, nunca a medias.
-      this.domainOptions.set([]);
+      if (this.domainRequests.isCurrent(request, this.viewContext())) this.domainOptions.set([]);
     }
   }
 
@@ -444,13 +465,11 @@ export class LinksComponent {
     if (this.exporting()) return;
     const workspaceId = this.workspaces.currentId();
     if (workspaceId === null) return;
-    const generation = this.auth.sessionGeneration();
-    const request = this.exports.begin(workspaceId);
-    const current = (): boolean => this.exports.isCurrent(request, this.workspaces.currentId())
-      && generation === this.auth.sessionGeneration();
+    const request = this.exports.begin(this.viewContext());
+    const current = (): boolean => this.exports.isCurrent(request, this.viewContext());
     this.exporting.set(true);
     try {
-      const blob = await this.api.getBlob("/api/v1/links/export.csv");
+      const blob = await this.api.getBlob("/api/v1/links/export.csv", undefined, { signal: request.signal });
       if (!current()) return;
       const stamp = new Date().toISOString().slice(0, 10);
       if (!downloadBlob(blob, `uvh-links-${stamp}.csv`)) {
@@ -467,10 +486,15 @@ export class LinksComponent {
   }
 
   importCsv(): void {
+    const context = this.viewContext();
     this.dialog.open(CsvImportDialogComponent, { width: "min(720px, 94vw)", maxWidth: "94vw" })
       .afterClosed()
+      .pipe(takeUntilDestroyed(this.dialogOwner))
       .subscribe((imported: unknown) => {
-        if (typeof imported === "number" && imported > 0) void this.reload();
+        if (this.viewContext() !== context) return;
+        // Backdrop/navigation closes carry no count. Refresh conservatively:
+        // a completed import must not leave the library stale in that case.
+        if (imported === undefined || (typeof imported === "number" && imported > 0)) void this.reload();
       });
   }
 
@@ -491,12 +515,24 @@ export class LinksComponent {
   }
 
   private async loadCollections(): Promise<void> {
+    if (this.workspaces.currentId() === null) return;
+    const context = this.viewContext();
+    if (this.collectionLoad?.context === context) return this.collectionLoad.promise;
+    const request = this.collectionRequests.begin(context);
+    const promise = (async () => {
+      try {
+        const res = await this.api.get("/api/v1/collections", undefined, decodeCollectionsResponse, { signal: request.signal });
+        if (this.collectionRequests.isCurrent(request, this.viewContext())) this.collections.set(res.collections);
+      } catch {
+        if (this.collectionRequests.isCurrent(request, this.viewContext())) this.collections.set([]);
+      }
+    })();
+    this.collectionLoad = { context, promise };
     try {
-      const res = await this.api.get("/api/v1/collections", undefined, decodeCollectionsResponse);
-      this.collections.set(res.collections);
-    } catch {
-      // El selector queda vacío y se puede reintentar abriéndolo de nuevo:
-      // mejor vacío que una lista a medias.
+      await promise;
+    } finally {
+      // An old completion must not release a new context's pending read.
+      if (this.collectionLoad?.promise === promise) this.collectionLoad = null;
     }
   }
 
@@ -507,7 +543,7 @@ export class LinksComponent {
   }
 
   create(): void {
-    this.linkDialog.openCreate().subscribe((created) => {
+    this.linkDialog.openCreate("", this.dialogOwner).subscribe((created) => {
       if (created) void this.router.navigate(["/app/links", created.id]);
     });
   }
@@ -529,7 +565,7 @@ export class LinksComponent {
   }
 
   edit(link: LinkDto): void {
-    this.linkDialog.openEdit(link).subscribe((updated) => {
+    this.linkDialog.openEdit(link, this.dialogOwner).subscribe((updated) => {
       if (updated) void this.reload();
     });
   }
@@ -608,19 +644,21 @@ export class LinksComponent {
     if (!this.canWrite() || this.pendingClaimInFlight || this.pendingDialogOpen || (!force && this.pendingAutoHandled)) return;
     if (!this.pendingLink()) return;
 
+    const context = this.viewContext();
     this.pendingAutoHandled = true;
     this.pendingClaimInFlight = true;
     try {
       const pending = await this.intents.claim();
-      if (!pending) return;
+      if (!pending || this.dialogOwner.destroyed || context !== this.viewContext()) return;
       this.pendingDialogOpen = true;
-      this.linkDialog.openCreate(pending.destination).subscribe((created) => {
+      this.linkDialog.openCreate(pending.destination, this.dialogOwner).subscribe((created) => {
         this.pendingDialogOpen = false;
-        if (!created) return;
+        if (!created || this.dialogOwner.destroyed || context !== this.viewContext()) return;
         void this.intents.complete();
         void this.router.navigate(["/app/links", created.id]);
       });
     } catch (err) {
+      if (this.dialogOwner.destroyed || context !== this.viewContext()) return;
       this.snackbar.open(
         err instanceof ApiRequestError ? err.message : "No se pudo recuperar la URL guardada",
         "Cerrar",

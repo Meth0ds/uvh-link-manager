@@ -2,9 +2,7 @@ import { ApplicationConfig, inject, provideAppInitializer } from "@angular/core"
 import { provideRouter, RouteReuseStrategy, withComponentInputBinding, withInMemoryScrolling, type RouterFeatures, type Routes } from "@angular/router";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
-import { MatPaginatorIntl } from "@angular/material/paginator";
 import { apiInterceptor } from "./core/interceptors/api.interceptor";
-import { SpanishPaginatorIntl } from "./core/paginator-intl";
 import { PendingHandoffService } from "./core/services/pending-handoff.service";
 import { AuthRouteReuseStrategy } from "./core/auth-route-reuse";
 
@@ -88,9 +86,6 @@ export const appConfig: ApplicationConfig = {
     { provide: RouteReuseStrategy, useClass: AuthRouteReuseStrategy },
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),
     provideAnimationsAsync(),
-    // Material ships the paginator in English; the panel is in Spanish, so its
-    // labels are replaced once instead of per screen.
-    { provide: MatPaginatorIntl, useClass: SpanishPaginatorIntl },
     // Ask which handoffs this browser is holding, once, before the first route
     // renders. The promise is deliberately not returned: a slow or unreachable
     // answer must not delay the first paint, and a screen that has not heard

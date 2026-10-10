@@ -26,7 +26,7 @@ describe("Library filter and destination labels", () => {
     await TestBed.configureTestingModule({
       imports: [LinksComponent], providers: [provideRouter([]),
         { provide: ApiService, useValue: api },
-        { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: signal("owner") } },
+        { provide: WorkspaceService, useValue: { selectionGeneration: () => 0, currentId: signal(1), currentRole: signal("owner") } },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(LinksComponent);

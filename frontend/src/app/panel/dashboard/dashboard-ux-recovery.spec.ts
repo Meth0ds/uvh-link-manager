@@ -1,4 +1,4 @@
-import { signal } from "@angular/core";
+import { computed, signal } from "@angular/core";
 import { TestBed, type ComponentFixture } from "@angular/core/testing";
 import { provideRouter } from "@angular/router";
 import { MatSnackBar } from "@angular/material/snack-bar";
@@ -44,8 +44,8 @@ async function setup<T>(component: typeof DashboardComponent | typeof GettingSta
     ? { ...facts, workspaceId: selected() } : path.includes("analytics") ? overview : links) as R));
   api.patch.and.resolveTo({ ok: true, dismissedAt: null });
   await TestBed.configureTestingModule({ imports: [component], providers: [provideRouter([]),
-    { provide: ApiService, useValue: api }, { provide: AuthService, useValue: { user: identity } },
-    { provide: WorkspaceService, useValue: { currentId: selected, list } },
+    { provide: ApiService, useValue: api }, { provide: AuthService, useValue: { user: identity, sessionGeneration: signal(0) } },
+    { provide: WorkspaceService, useValue: { currentId: selected, list, selectionGeneration: signal(0), currentRole: computed(() => list().find(ws => ws.id === selected())?.role ?? null) } },
     { provide: LinkDialogService, useValue: { openCreate: jasmine.createSpy("openCreate") } },
     { provide: MatSnackBar, useValue: { open: jasmine.createSpy("open") } },
   ] }).compileComponents();

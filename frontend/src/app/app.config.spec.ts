@@ -34,11 +34,16 @@ describe("application routes", () => {
     expect(routes.find((route) => route.path === "app")?.loadChildren).toBeDefined();
   });
 
-  it("replaces Material's English paginator copy for the whole application", () => {
+  it("keeps Spanish pagination in the lazy panel without importing it through appConfig", async () => {
     const provider = appConfig.providers.find(
       (entry) => (entry as { provide?: unknown })?.provide === MatPaginatorIntl,
     ) as { useClass?: unknown } | undefined;
-    expect(provider?.useClass).toBe(SpanishPaginatorIntl);
+    expect(provider).toBeUndefined();
+    const { panelRoutes } = await import("./panel/panel.routes");
+    const panelProvider = panelRoutes[0].providers?.find(
+      (entry) => (entry as { provide?: unknown })?.provide === MatPaginatorIntl,
+    ) as { useClass?: unknown } | undefined;
+    expect(panelProvider?.useClass).toBe(SpanishPaginatorIntl);
   });
 });
 

@@ -12,6 +12,7 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { ApiService, ApiRequestError } from "../../core/services/api.service";
+import { AuthService } from "../../core/services/auth.service";
 import { LinkDialogService } from "./link-dialog.service";
 import { QrDialogComponent } from "./qr-dialog.component";
 import { WorkspaceService } from "../../core/services/workspace.service";
@@ -23,7 +24,6 @@ import type { LinkDetailResponse, AnalyticsOverview, AuditEvent, LinkAppeal, Lin
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { LatestRequest } from "../../core/services/latest-request";
 import { OwnedMutations } from "../../core/services/owned-mutations";
-import { targetWorkspace } from "../../core/services/workspace-target";
 import {
   decodeAnalyticsOverview,
   decodeLinkActivityResponse,
@@ -59,6 +59,8 @@ import { linkAppealStatusLabel } from "../../core/link-appeal-status";
 })
 export class LinkDetailComponent {
   private api = inject(ApiService);
+  private readonly auth = inject(AuthService);
+  private readonly dialogOwner = inject(DestroyRef);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private snackbar = inject(MatSnackBar);
@@ -120,19 +122,19 @@ export class LinkDetailComponent {
   private readonly linkId = signal(this.paramId());
   private readonly copyRouteRevision = signal(0);
 
-  /** `workspace:link` the current view belongs to; null while unresolved. */
-  private loadedContext: string | null = null;
+  /** Security context and route revision the current view belongs to. */
+  private loadedContext: string | null | undefined;
 
   constructor() {
+    this.dialogOwner.onDestroy(() => this.mutations.reset());
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => {
       this.copyRouteRevision.update(revision => revision + 1);
       this.linkId.set(this.paramId());
     });
 
     effect(() => {
-      const workspaceId = this.workspaces.currentId();
       const linkId = this.linkId();
-      const context = workspaceId === null ? null : `${workspaceId}:${linkId}`;
+      const context = this.currentContext();
       if (context === this.loadedContext) return;
       this.loadedContext = context;
       this.loadRequests.invalidate();
@@ -158,7 +160,7 @@ export class LinkDetailComponent {
         this.loading.set(false);
         return;
       }
-      if (workspaceId === null) {
+      if (context === null) {
         this.loading.set(false);
         return;
       }
@@ -171,9 +173,9 @@ export class LinkDetailComponent {
   }
 
   async load(): Promise<void> {
-    const workspaceId = this.workspaces.currentId();
+    const context = this.currentContext();
     const linkId = this.linkId();
-    if (workspaceId === null || linkId === null) {
+    if (context === null || linkId === null) {
       this.loadRequests.invalidate();
       this.link.set(null);
       this.rules.set([]);
@@ -182,7 +184,6 @@ export class LinkDetailComponent {
       this.loading.set(false);
       return;
     }
-    const context = `${workspaceId}:${linkId}`;
     const request = this.loadRequests.begin(context);
     this.loading.set(true);
     this.error.set(null);
@@ -208,14 +209,14 @@ export class LinkDetailComponent {
   }
 
   async loadAnalytics(): Promise<void> {
-    const workspaceId = this.workspaces.currentId();
+    const context = this.currentContext();
     const linkId = this.linkId();
-    if (workspaceId === null) {
+    if (context === null || linkId === null) {
       this.analyticsRequests.invalidate();
       this.analytics.set(null);
+      this.analyticsError.set(null);
       return;
     }
-    const context = `${workspaceId}:${linkId}`;
     const request = this.analyticsRequests.begin(context);
     this.analyticsError.set(null);
     try {
@@ -233,19 +234,20 @@ export class LinkDetailComponent {
   }
 
   async loadActivity(): Promise<void> {
-    const workspaceId = this.workspaces.currentId();
-    if (workspaceId === null) {
+    const context = this.currentContext();
+    const linkId = this.linkId();
+    if (context === null || linkId === null) {
       this.activityRequests.invalidate();
       this.activity.set([]);
+      this.activityError.set(null);
       this.activityTruncated.set(false);
       return;
     }
-    const context = `${workspaceId}:${this.linkId()}`;
     const request = this.activityRequests.begin(context);
     this.activityError.set(null);
     try {
       const { events, truncated } = await this.api.get<{ events: AuditEvent[]; truncated: boolean }>(
-        `/api/v1/links/${this.linkId()}/activity`,
+        `/api/v1/links/${linkId}/activity`,
         undefined,
         decodeLinkActivityResponse,
         { signal: request.signal },
@@ -263,8 +265,30 @@ export class LinkDetailComponent {
 
   /** The identity a request must still match to be applied to this view. */
   private currentContext(): string | null {
+    const actorId = this.auth.user()?.id;
     const workspaceId = this.workspaces.currentId();
-    return workspaceId === null ? null : `${workspaceId}:${this.linkId()}`;
+    if (actorId === undefined || workspaceId === null) return null;
+    return JSON.stringify([actorId, this.auth.sessionGeneration(), workspaceId,
+      this.workspaces.selectionGeneration(), this.workspaces.currentRole(), this.copyRouteRevision(), this.linkId()]);
+  }
+
+  /** A decision names the shown link and the exact context that asked for it. */
+  private decisionContext(): string {
+    return JSON.stringify([this.currentContext(), this.link()?.shortUrl]);
+  }
+
+  private targetLink(): { linkId: number; isCurrent(): boolean } | null {
+    const link = this.link();
+    const context = this.currentContext();
+    if (!link || !this.auth.user() || context === null || link.id !== this.linkId()
+      || this.loadedContext !== context || !this.canWrite() || this.dialogOwner.destroyed) return null;
+    const linkId = link.id;
+    const decision = this.decisionContext();
+    return {
+      linkId,
+      isCurrent: () => !this.dialogOwner.destroyed && decision === this.decisionContext()
+        && this.linkId() === linkId && this.link()?.id === linkId && this.canWrite(),
+    };
   }
 
   retryAnalytics(): void {
@@ -289,21 +313,20 @@ export class LinkDetailComponent {
 
   edit(): void {
     const l = this.link();
-    if (!l || !this.canWrite()) return;
-    this.linkDialog.openEdit(l).subscribe((updated) => {
-      if (updated) void this.load();
+    const target = this.targetLink();
+    if (!l || !target) return;
+    this.linkDialog.openEdit(l, this.dialogOwner).subscribe((updated) => {
+      if (updated && target.isCurrent()) void this.load();
     });
   }
 
   async setState(state: "active" | "paused" | "archived"): Promise<void> {
     if (!this.canWrite() || this.actionBusy()) return;
-    // The state transition names a link of one workspace; its id means nothing
-    // in another one.
-    const target = targetWorkspace(this.workspaces);
-    if (target.workspaceId === null) return;
+    const target = this.targetLink();
+    if (!target) return;
     const action = this.mutations.begin(0);
     try {
-      await this.api.post(`/api/v1/links/${this.linkId()}/state`, { state });
+      await this.api.post(`/api/v1/links/${target.linkId}/state`, { state });
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
       void this.load();
@@ -318,9 +341,8 @@ export class LinkDetailComponent {
   async remove(): Promise<void> {
     const l = this.link();
     if (!l || !this.canWrite()) return;
-    // The dialog names a link from one workspace. Never apply its answer to a
-    // newer selection, or the delete would land on another tenant's row.
-    const target = targetWorkspace(this.workspaces);
+    const target = this.targetLink();
+    if (!target) return;
     const confirmed = await this.actions.confirm({
       title: "Eliminar enlace",
       message: `¿Quieres eliminar ${l.shortUrl}? Dejará de estar disponible de inmediato.`,
@@ -330,7 +352,7 @@ export class LinkDetailComponent {
     if (!confirmed || this.actionBusy() || !target.isCurrent()) return;
     const action = this.mutations.begin(0);
     try {
-      await this.api.delete(`/api/v1/links/${this.linkId()}`);
+      await this.api.delete(`/api/v1/links/${target.linkId}`);
       // Quién publica el resultado es la operación que lo consiguió: una
       // operación vieja que llega tarde no navega fuera de la pantalla nueva.
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
@@ -368,8 +390,8 @@ export class LinkDetailComponent {
    */
   async requestReview(): Promise<void> {
     if (!this.canWrite() || this.actionBusy()) return;
-    const target = targetWorkspace(this.workspaces);
-    if (target.workspaceId === null) return;
+    const target = this.targetLink();
+    if (!target) return;
     const message = await this.actions.prompt({
       title: "Solicitar revisión del bloqueo",
       message: "Cuenta por qué crees que el bloqueo es un error. La revisión la resuelve la administración de la plataforma.",
@@ -384,7 +406,7 @@ export class LinkDetailComponent {
     if (message === null || !target.isCurrent() || this.actionBusy()) return;
     const action = this.mutations.begin(0);
     try {
-      await this.api.post(`/api/v1/links/${this.linkId()}/appeal`, { message: message.trim() });
+      await this.api.post(`/api/v1/links/${target.linkId}/appeal`, { message: message.trim() });
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open("Solicitud enviada. La revisión la resuelve la administración.", "Cerrar", { duration: 3500 });
       await this.load();

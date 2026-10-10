@@ -116,7 +116,7 @@ export class TokensComponent {
 
   private renderedContext: string | null = null;
 
-  /** Read live: selection generations and DestroyRef are not signals. */
+  /** Read live: destruction and selection/session generations delimit the view. */
   private contextKey(): string {
     const user = this.user();
     return JSON.stringify([this.workspaces.currentId(), this.workspaces.selectionGeneration(),

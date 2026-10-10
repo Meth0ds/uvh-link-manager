@@ -1,4 +1,6 @@
 import type { Routes } from "@angular/router";
+import { MatPaginatorIntl } from "@angular/material/paginator";
+import { SpanishPaginatorIntl } from "../core/paginator-intl";
 import { authGuard, adminGuard } from "../core/guards/auth.guard";
 
 /** Persistent settings views; section routes name which task to open. */
@@ -7,6 +9,9 @@ const settings = () => import("./settings/settings.component").then((m) => m.Set
 export const panelRoutes: Routes = [
   {
     path: "",
+    // One translation instance for every private paginator. Keep Material's
+    // pagination dependencies behind this existing lazy route boundary.
+    providers: [{ provide: MatPaginatorIntl, useClass: SpanishPaginatorIntl }],
     canActivate: [authGuard],
     loadComponent: () => import("./panel.component").then((m) => m.PanelComponent),
     children: [

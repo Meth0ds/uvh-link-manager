@@ -57,7 +57,7 @@ describe("LinksComponent one-shot domain filter from the URL", () => {
           },
         },
         { provide: ApiService, useValue: api },
-        { provide: WorkspaceService, useValue: { currentId: workspace, currentRole: signal("owner") } },
+        { provide: WorkspaceService, useValue: { selectionGeneration: () => 0, currentId: workspace, currentRole: signal("owner") } },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(LinksComponent);

@@ -1,4 +1,4 @@
-import { Component, computed, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
+import { DestroyRef, Component, computed, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { BreakpointObserver } from "@angular/cdk/layout";
 import { filter, map, startWith } from "rxjs";
@@ -63,6 +63,7 @@ interface NavGroup {
 })
 export class PanelComponent {
   private auth = inject(AuthService);
+  private readonly dialogOwner = inject(DestroyRef);
   private router = inject(Router);
   private dialog = inject(LinkDialogService);
   private materialDialog = inject(MatDialog);
@@ -213,7 +214,7 @@ export class PanelComponent {
 
   newLink(): void {
     if (!this.canCreate()) return;
-    this.dialog.openCreate().subscribe((created) => {
+    this.dialog.openCreate("", this.dialogOwner).subscribe((created) => {
       if (created) void this.router.navigate(["/app/links", created.id]);
     });
   }

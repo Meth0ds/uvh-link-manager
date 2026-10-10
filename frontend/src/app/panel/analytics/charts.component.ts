@@ -7,7 +7,7 @@ import type { AnalyticsOverview } from "../../core/models";
   standalone: true,
   imports: [],
   templateUrl: "./charts.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./charts.component.scss",
 })
 export class ChartsComponent {

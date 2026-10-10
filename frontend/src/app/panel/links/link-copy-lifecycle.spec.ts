@@ -4,6 +4,7 @@ import { provideRouter } from "@angular/router";
 import { RouterTestingHarness } from "@angular/router/testing";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { ApiService } from "../../core/services/api.service";
+import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { LinkDetailComponent } from "./link-detail.component";
 
@@ -18,6 +19,7 @@ describe("Link detail clipboard route ownership", () => {
       await TestBed.configureTestingModule({
         providers: [provideRouter([{ path: "links/:id", component: LinkDetailComponent }]),
           { provide: MatSnackBar, useValue: snack },
+          { provide: AuthService, useValue: { user: signal({ id: 10 }), sessionGeneration: signal(0) } },
           { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: () => "owner", selectionGeneration: () => 0 } },
           { provide: ApiService, useValue: { get: (path: string) => Promise.resolve(
             /\/links\/\d+$/.test(path)

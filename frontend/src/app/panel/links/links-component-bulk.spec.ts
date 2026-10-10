@@ -53,7 +53,7 @@ describe("LinksComponent bulk idempotency", () => {
         provideNoopAnimations(),
         provideRouter([]),
         { provide: ApiService, useValue: api },
-        { provide: WorkspaceService, useValue: { currentId: signal(1), currentRole: signal("owner") } },
+        { provide: WorkspaceService, useValue: { selectionGeneration: () => 0, currentId: signal(1), currentRole: signal("owner") } },
         { provide: ActionDialogService, useValue: jasmine.createSpyObj("ActionDialogService", ["confirm", "prompt"]) },
         { provide: MatSnackBar, useValue: { open: snackbarOpen } },
       ],

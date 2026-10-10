@@ -8,7 +8,8 @@ import { MatPaginatorIntl } from "@angular/material/paginator";
  * every `<mat-paginator>` (links, trash, team, settings and the admin console)
  * rendered "Items per page:" / "1 – 37 of 37" / "First page" next to Spanish
  * copy, and its controls reached screen readers in English too. Replacing the
- * intl once in `appConfig` keeps a single owner for those strings.
+ * intl once in `panelRoutes` keeps a single owner for those strings without
+ * loading private pagination dependencies on the public website.
  */
 // The decorator is required even without `providedIn`: Angular deprecated
 // inheriting the injectable metadata from a base class, so the class has to own

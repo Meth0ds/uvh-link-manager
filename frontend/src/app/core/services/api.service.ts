@@ -278,7 +278,7 @@ export class ApiService {
   }
 
   /** GET returning a private binary artifact (exports) while preserving JSON errors. */
-  getBlob(path: string, params?: Record<string, string | number | boolean | null | undefined>): Promise<Blob> {
+  getBlob(path: string, params?: Record<string, string | number | boolean | null | undefined>, options?: ApiReadOptions): Promise<Blob> {
     this.assertApiPath(path);
     let hp = new HttpParams();
     if (params) {
@@ -286,13 +286,14 @@ export class ApiService {
         if (v != null && v !== "") hp = hp.set(k, String(v));
       }
     }
-    return this.artifactRequest(this.http.get(path, { headers: this.headers(false), params: hp, responseType: "blob" }));
+    return this.artifactRequest(this.http.get(path, { headers: this.headers(false), params: hp, responseType: "blob" }), options);
   }
 
   /** One artifact request, translating a JSON error envelope returned as a Blob. */
-  private async artifactRequest(source: Observable<Blob>): Promise<Blob> {
+  private async artifactRequest(source: Observable<Blob>, options?: ApiReadOptions): Promise<Blob> {
     try {
-      return await firstValueFrom(source.pipe(timeout({ first: ARTIFACT_TIMEOUT_MS })));
+      const cancellable = options?.signal ? this.cancelOnAbort(source, options.signal) : source;
+      return await firstValueFrom(cancellable.pipe(timeout({ first: boundedTimeout(options?.timeoutMs, ARTIFACT_TIMEOUT_MS) })));
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.error instanceof Blob) {
         try {

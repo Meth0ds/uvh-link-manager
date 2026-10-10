@@ -40,7 +40,7 @@ describe("CsvImportDialogComponent", () => {
         provideNoopAnimations(),
         { provide: ApiService, useValue: api },
         { provide: MatDialogRef, useValue: dialogRef },
-        { provide: WorkspaceService, useValue: { currentId: workspaceId } },
+        { provide: WorkspaceService, useValue: { currentId: workspaceId, selectionGeneration: () => 0, currentRole: () => "owner" } },
       ],
     }).compileComponents();
 
