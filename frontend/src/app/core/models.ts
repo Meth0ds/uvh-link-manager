@@ -1,6 +1,7 @@
 // ---------- TypeScript DTOs matching the UVH backend API ----------
 
 import type { NotificationCategory, NotificationDelivery, NotificationKind } from "./notification-kinds";
+import type { ExpiredPageSpec } from "./link-workflows";
 
 export interface AuthUser {
   id: number;
@@ -67,6 +68,8 @@ export interface LinkUtm {
 }
 
 export interface LinkDto {
+  favorite?: boolean;
+  expiredPage?: ExpiredPageSpec | null;
   id: number;
   alias: string;
   destination: string;

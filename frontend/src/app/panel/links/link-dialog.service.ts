@@ -28,6 +28,8 @@ export class LinkDialogService {
     return this.open({ mode: "create", initialDestination }, owner);
   }
 
+  openDuplicate(link: LinkDto, owner?: DestroyRef): Observable<LinkDto | null> { return this.open({ mode: "duplicate", link }, owner); }
+
   openEdit(link: LinkDto, owner?: DestroyRef): Observable<LinkDto | null> {
     return this.open({ mode: "edit", link }, owner);
   }

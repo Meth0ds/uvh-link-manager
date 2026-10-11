@@ -223,6 +223,26 @@ services:
     # `QueueTimeoutContractTest` holds the three values together.
     command: ["php", "artisan", "queue:work", "--queue=security", "--sleep=1", "--tries=3", "--timeout=90", "--max-time=3600"]
 
+  queue-destinations-a:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.15
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: destinations
+    command: ["php", "artisan", "queue:work", "--queue=destinations", "--sleep=1", "--tries=1", "--timeout=20", "--max-time=3600"]
+
+  queue-destinations-b:
+    networks:
+      uvh-private:
+        ipv4_address: 172.30.0.16
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: destinations
+    command: ["php", "artisan", "queue:work", "--queue=destinations", "--sleep=1", "--tries=1", "--timeout=20", "--max-time=3600"]
+
   # Drain pre-deployment jobs that were serialized onto Laravel's default
   # queue. New application code never targets this compatibility pool.
   queue-legacy:

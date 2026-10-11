@@ -1,0 +1,8 @@
+<?php
+
+return [
+    'enabled' => filter_var(env('UVH_LINK_WORKFLOWS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+    'reminder_hours' => min(168, max(1, (int) env('LINK_REMINDER_HOURS', 24))),
+    'reminder_click_ratio' => min(0.99, max(0.01, (float) env('LINK_REMINDER_CLICK_RATIO', 0.9))),
+    'max_saved_filters' => min(50, max(1, (int) env('LINK_SAVED_FILTERS_LIMIT', 50))),
+];

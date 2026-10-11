@@ -5,6 +5,7 @@ import { RouterTestingHarness } from "@angular/router/testing";
 import type { AnalyticsOverview, AuditEvent, AuthUser, LinkDetailResponse, LinkDto, Workspace } from "../../core/models";
 import { ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
+import { LinkWorkflowService } from "../../core/services/link-workflow.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { DashboardComponent } from "./dashboard.component";
 import { LinkDetailComponent } from "../links/link-detail.component";
@@ -57,6 +58,7 @@ function context() {
 }
 function providers(api: jasmine.SpyObj<ApiService>, owner: ReturnType<typeof context>) {
   return [
+    { provide: LinkWorkflowService, useValue: { enabled: () => false, context: () => "disabled" } },
     { provide: ApiService, useValue: api },
     { provide: AuthService, useValue: { user: owner.user, sessionGeneration: owner.sessionGeneration } },
     { provide: WorkspaceService, useValue: {

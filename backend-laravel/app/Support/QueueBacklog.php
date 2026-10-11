@@ -36,6 +36,8 @@ final class QueueBacklog
             // timeout, so it gets its own pool: a slow provider must not
             // delay mail, webhooks or anything else.
             'security' => 'security',
+            // Manual availability/metadata fetches have bounded independent workers.
+            'destinations' => 'destinations',
             // The legacy worker drains the default queue. The gauge label is
             // part of the published metric surface and must not be renamed.
             'legacy' => 'default',

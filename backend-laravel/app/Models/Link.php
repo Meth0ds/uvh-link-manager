@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $used_at
  * @property Carbon|null $scheduled_at
  * @property Carbon|null $expires_at
+ * @property array<string, mixed>|null $expired_page
  * @property Carbon|null $deleted_at
  */
 class Link extends Model
@@ -50,6 +51,9 @@ class Link extends Model
         'utm_term',
         'utm_content',
         'deleted_at',
+        'expired_page',
+        'expiry_notice_generation',
+        'limit_notice_generation',
     ];
 
     protected $hidden = ['password_hash'];
@@ -57,6 +61,9 @@ class Link extends Model
     protected function casts(): array
     {
         return [
+            'expired_page' => 'array',
+            'expiry_notice_generation' => 'integer',
+            'limit_notice_generation' => 'integer',
             'max_clicks' => 'integer',
             'click_count' => 'integer',
             'password_version' => 'integer',

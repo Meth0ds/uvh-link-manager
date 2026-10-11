@@ -125,6 +125,18 @@ describe("Mutation intent across CSRF waits", () => {
     expect(operation.failure).toEqual(jasmine.objectContaining({ reason: "request_context_changed" }));
   }));
 
+  for (const [method, path] of [["patch", "/api/v1/link-filters/2"], ["post", "/api/v1/destination-previews"]] as const) {
+    it(`does not send ${path} after a workspace change during CSRF bootstrap`, fakeAsync(() => {
+      const operation = start(method, path);
+      const bootstrap = http.expectOne("/api/v1/csrf");
+      workspaces.select(20); workspaces.select(10);
+      cookie = "uvh_csrf=A";
+      bootstrap.flush({ csrfToken: "A" }); flushMicrotasks();
+      unexpectedWrites(path);
+      expect(operation.failure).toEqual(jasmine.objectContaining({ reason: "request_context_changed" }));
+    }));
+  }
+
   it("checks context even when a cookie already existed before the first microtask", fakeAsync(() => {
     cookie = "uvh_csrf=A";
     const operation = start("post", "/api/v1/notifications/read-all");

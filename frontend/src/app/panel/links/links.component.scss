@@ -226,7 +226,7 @@
 .short::after { content: ""; position: absolute; inset: 0; }
 .short:focus-visible { outline: none; }
 .short:focus-visible::after { outline: 2px solid var(--uvh-electric); outline-offset: -2px; }
-.link-check, .link-actions, .meta .tag { position: relative; z-index: 1; }
+.link-check, .link-actions, .favorite-star, .meta .tag { position: relative; z-index: 1; }
 .filter-count { color: var(--uvh-muted); font-size: 12px; }
 
 .short {
@@ -463,3 +463,9 @@
 }
 
 @container (max-width: 760px) { .bulk-bar { position: static; box-shadow: none; } }
+
+.workflow-filters{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:12px}.workflow-filters mat-form-field{width:210px}.favorite-star{flex-shrink:0;color:var(--uvh-muted);transition:color .16s ease,background .16s ease}.favorite-star.is-favorite{color:var(--uvh-electric)}.favorite-star mat-icon{transition:transform .16s ease}.favorite-star.is-favorite mat-icon{transform:scale(1.08)}.favorite-star:focus-visible{outline:2px solid var(--uvh-electric);outline-offset:2px}@media(max-width:620px){.workflow-filters{gap:12px}.workflow-filters mat-form-field{width:100%}.favorite-star{min-width:44px;min-height:44px}}@media(prefers-reduced-motion:reduce){.favorite-star,.favorite-star mat-icon{transition:none;transform:none}}
+
+.workflow-filters[hidden]{display:none}.advanced-filter-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;padding:0 4px;background:var(--uvh-electric);color:var(--accent-ink);border-radius:3px;font-size:11px}.workflow-filters{animation:workflow-filter-reveal .18s ease-out}@keyframes workflow-filter-reveal{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.workflow-filters{animation:none}}
+
+@media(max-width:760px){.link-row.selectable:has(.favorite-star){grid-template-columns:40px 44px minmax(0,1fr)}.link-row.selectable:has(.favorite-star) .link-main{grid-column:3}.link-row.selectable:has(.favorite-star) .link-actions{grid-column:2 / -1}.favorite-star{min-width:44px;min-height:44px}}

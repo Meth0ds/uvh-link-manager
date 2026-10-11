@@ -1,7 +1,7 @@
 <a class="skip-link" href="#panel-content" (click)="skipToContent($event)">Saltar al contenido</a>
-<mat-sidenav-container class="shell" [class.navigation-rail]="mainNavRail()" [class.navigation-pinned]="mainNavPinned()">
-  <mat-sidenav #sidenav id="panel-navigation" [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" (closedStart)="mobileOpen.set(false)" class="side" [class.navigation-expanded]="mainNavExpanded()"
-    (mouseenter)="mainNavHovered.set(true)" (mouseleave)="mainNavHovered.set(false)"
+<mat-sidenav-container class="shell" [class.navigation-rail]="mainNavRail()" [class.navigation-pinned]="mainNavPinned()" (keydown.escape)="onMainNavEscape($event)">
+  <mat-sidenav #sidenav id="panel-navigation" [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" [disableClose]="!isMobile()" (closedStart)="mobileOpen.set(false)" class="side" [class.navigation-expanded]="mainNavExpanded()"
+    (pointerenter)="onMainNavPointerEnter($event)" (pointerleave)="onMainNavPointerLeave()"
     (focusin)="onMainNavFocusIn($event)" (focusout)="onMainNavFocusOut($event)"
     fixedInViewport aria-label="Navegación principal">
     <div class="side-head">
@@ -31,6 +31,7 @@
             (click)="mobileOpen.set(false)"
             class="nav-item"
             [attr.aria-label]="item.label"
+            [matTooltip]="item.label" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350"
             >
             <mat-icon matListItemIcon aria-hidden="true">{{ item.icon }}</mat-icon>
             <span matListItemTitle class="navigation-copy">{{ item.label }}</span>
@@ -43,21 +44,21 @@
     </mat-nav-list>
 
     <div class="side-foot">
-      <a class="help-link" routerLink="/help" aria-label="Ayuda: guías y soluciones"><mat-icon aria-hidden="true">help_outline</mat-icon><span class="navigation-copy">¿Cómo se hace?<small>Guías y soluciones</small></span><mat-icon aria-hidden="true">north_east</mat-icon></a>
-      <button mat-button class="workspace-create" (click)="createWorkspace()" aria-label="Crear workspace"><mat-icon aria-hidden="true">create_new_folder</mat-icon><span class="navigation-copy">Crear workspace</span></button>
-      <a class="side-account" aria-label="Perfil y preferencias" routerLink="/app/settings" (click)="mobileOpen.set(false)"><span class="account-initials" aria-hidden="true">{{ initials() }}</span><span class="navigation-copy"><b>{{ user()?.name || 'Tu cuenta' }}</b><small>Perfil y preferencias</small></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
+      <a class="help-link" routerLink="/help" aria-label="Ayuda: guías y soluciones" matTooltip="Ayuda y guías" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350"><mat-icon aria-hidden="true">help_outline</mat-icon><span class="navigation-copy">¿Cómo se hace?<small>Guías y soluciones</small></span><mat-icon aria-hidden="true">north_east</mat-icon></a>
+      <button mat-button class="workspace-create" (click)="createWorkspace()" aria-label="Crear workspace" matTooltip="Crear workspace" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350"><mat-icon aria-hidden="true">create_new_folder</mat-icon><span class="navigation-copy">Crear workspace</span></button>
+      <a class="side-account" aria-label="Perfil y preferencias" routerLink="/app/settings" (click)="mobileOpen.set(false)" matTooltip="Perfil y preferencias" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350"><span class="account-initials" aria-hidden="true">{{ initials() }}</span><span class="navigation-copy"><b>{{ user()?.name || 'Tu cuenta' }}</b><small>Perfil y preferencias</small></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
     </div>
   </mat-sidenav>
 
   <mat-sidenav-content class="content">
     <mat-toolbar class="topbar" aria-label="Barra de herramientas">
       @if (mainNavRail()) {
-        <button mat-icon-button class="navigation-pin" type="button"
-          (click)="mainNavPinned.set(!mainNavPinned())" [attr.aria-pressed]="mainNavPinned()"
-          [attr.aria-label]="mainNavPinned() ? 'Volver al menú compacto' : 'Mantener el menú principal abierto'"
-          [matTooltip]="mainNavPinned() ? 'Volver al menú compacto' : 'Mantener el menú principal abierto'"
+        <button #mainNavToggle mat-icon-button class="navigation-pin" type="button"
+          (click)="toggleMainNavPinned()" [attr.aria-pressed]="mainNavPinned()" [attr.aria-expanded]="mainNavExpanded()"
+          [attr.aria-label]="mainNavPinned() ? 'Contraer menú principal' : 'Expandir y mantener abierto el menú principal'"
+          [matTooltip]="mainNavPinned() ? 'Contraer menú' : 'Expandir y mantener abierto'"
           aria-controls="panel-navigation">
-          <mat-icon aria-hidden="true">{{ mainNavPinned() ? 'menu_open' : 'push_pin' }}</mat-icon>
+          <mat-icon aria-hidden="true">{{ mainNavPinned() ? 'menu_open' : 'menu' }}</mat-icon>
         </button>
       }
 

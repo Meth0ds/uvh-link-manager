@@ -32,6 +32,9 @@ import {
 } from "../../core/services/link-response-decoders";
 import { CopyFeedbackService } from "../../core/services/copy-feedback.service";
 import { CopyFeedbackIconComponent } from "../copy-feedback-icon.component";
+import { DestinationInspectionComponent } from "./destination-inspection.component";
+import { LinkWorkflowService } from "../../core/services/link-workflow.service";
+import { LinkFavoriteService } from "../../core/services/link-favorite.service";
 import { linkStateLabel } from "../../core/link-state-label";
 import { linkAppealStatusLabel } from "../../core/link-appeal-status";
 
@@ -39,7 +42,7 @@ import { linkAppealStatusLabel } from "../../core/link-appeal-status";
   selector: "app-link-detail",
   standalone: true,
   providers: [CopyFeedbackService],
-  imports: [QrCampaignPanelComponent,
+  imports: [QrCampaignPanelComponent, DestinationInspectionComponent,
     CopyFeedbackIconComponent,
     RouterLink,
     MatButtonModule,
@@ -60,6 +63,8 @@ import { linkAppealStatusLabel } from "../../core/link-appeal-status";
 })
 export class LinkDetailComponent {
   private api = inject(ApiService);
+  readonly workflows = inject(LinkWorkflowService);
+  readonly favorites = inject(LinkFavoriteService);
   private readonly auth = inject(AuthService);
   private readonly dialogOwner = inject(DestroyRef);
   private route = inject(ActivatedRoute);
@@ -122,18 +127,27 @@ export class LinkDetailComponent {
    */
   private readonly linkId = signal(this.paramId());
   private readonly copyRouteRevision = signal(0);
+  private readonly requestedWorkspace = signal<string | null>(this.route.snapshot.queryParamMap?.get("workspaceId") ?? null);
+  private readonly routeWorkspaceError = signal<string | null>(null);
 
   /** Security context and route revision the current view belongs to. */
   private loadedContext: string | null | undefined;
 
   constructor() {
+    effect(() => { const message = this.favorites.error(); if (message) this.snackbar.open(message, "Cerrar", { duration: 4000 }); });
     this.dialogOwner.onDestroy(() => this.mutations.reset());
+    this.route.queryParamMap?.pipe(takeUntilDestroyed()).subscribe(params => {
+      this.requestedWorkspace.set(params.get("workspaceId"));
+      this.routeWorkspaceError.set(null);
+      this.copyRouteRevision.update(revision => revision + 1);
+    });
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => {
       this.copyRouteRevision.update(revision => revision + 1);
       this.linkId.set(this.paramId());
     });
 
     effect(() => {
+      this.resolveRequestedWorkspace();
       const linkId = this.linkId();
       const context = this.currentContext();
       if (context === this.loadedContext) return;
@@ -152,7 +166,7 @@ export class LinkDetailComponent {
       this.blockReason.set(null);
       this.analytics.set(null);
       this.activity.set([]);
-      this.error.set(null);
+      this.error.set(this.routeWorkspaceError());
       this.analyticsError.set(null);
       this.activityError.set(null);
       this.activityTruncated.set(false);
@@ -167,6 +181,22 @@ export class LinkDetailComponent {
       }
       void this.load();
     });
+  }
+
+  private resolveRequestedWorkspace(): void {
+    const raw = this.requestedWorkspace();
+    if (raw === null || !this.auth.user()) return;
+    const id = parseRouteId(raw);
+    // Route parameters only suggest a selection. The authenticated membership
+    // list is authoritative; never send an arbitrary workspace header.
+    const member = id !== null && this.workspaces.list().some(workspace => workspace.id === id);
+    this.requestedWorkspace.set(null);
+    if (!member) {
+      this.routeWorkspaceError.set("No tienes acceso al espacio de este aviso.");
+      return;
+    }
+    this.routeWorkspaceError.set(null);
+    this.workspaces.select(id);
   }
 
   private paramId(): number | null {
@@ -268,7 +298,7 @@ export class LinkDetailComponent {
   private currentContext(): string | null {
     const actorId = this.auth.user()?.id;
     const workspaceId = this.workspaces.currentId();
-    if (actorId === undefined || workspaceId === null) return null;
+    if (actorId === undefined || workspaceId === null || this.requestedWorkspace() !== null || this.routeWorkspaceError() !== null) return null;
     return JSON.stringify([actorId, this.auth.sessionGeneration(), workspaceId,
       this.workspaces.selectionGeneration(), this.workspaces.currentRole(), this.copyRouteRevision(), this.linkId()]);
   }
@@ -319,6 +349,12 @@ export class LinkDetailComponent {
     this.linkDialog.openEdit(l, this.dialogOwner).subscribe((updated) => {
       if (updated && target.isCurrent()) void this.load();
     });
+  }
+
+  duplicate(): void {
+    const link = this.link(), target = this.targetLink();
+    if (!link || !target || !this.workflows.enabled() || link.state === "blocked") return;
+    this.linkDialog.openDuplicate(link, this.dialogOwner).subscribe(created => { if (created && target.isCurrent()) void this.router.navigate(["/app/links", created.id]); });
   }
 
   async setState(state: "active" | "paused" | "archived"): Promise<void> {
@@ -429,6 +465,7 @@ export class LinkDetailComponent {
   actionLabel(action: string): string {
     const map: Record<string, string> = {
       "link.create": "Creación",
+      "link.duplicate": "Duplicación",
       "link.update": "Edición",
       "link.state_change": "Cambio de estado",
       "link.delete": "Eliminación",

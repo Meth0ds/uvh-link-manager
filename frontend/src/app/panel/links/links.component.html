@@ -29,6 +29,10 @@
   <div class="filter-bar">
     <div class="filter-meta"><mat-icon aria-hidden="true">filter_list</mat-icon>Explorar enlaces</div>
     <div class="filter-summary">
+      @if (workflows.enabled()) {
+        <mat-checkbox [checked]="favoritesOnly()" (change)="onFavorites($event.checked)">Solo favoritos</mat-checkbox>
+        <button mat-button type="button" [attr.aria-expanded]="advancedFilters()" aria-controls="advanced-link-filters" (click)="advancedFilters.set(!advancedFilters())"><mat-icon aria-hidden="true">tune</mat-icon>Más filtros@if (advancedFilterCount()) { <span class="advanced-filter-count">{{ advancedFilterCount() }}</span> }</button>
+      }
       @if (tag()) {
         <button
           type="button"
@@ -47,7 +51,7 @@
     <mat-form-field appearance="outline" class="search" subscriptSizing="dynamic">
       <mat-label>Buscar enlaces</mat-label>
       <mat-icon matPrefix aria-hidden="true">search</mat-icon>
-      <input matInput type="search" name="link-search" autocomplete="off" spellcheck="false" aria-label="Buscar enlaces" placeholder="Buscar por alias, destino o notas…" [value]="q()" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
+      <input matInput type="search" name="link-search" autocomplete="off" spellcheck="false" aria-label="Buscar enlaces" placeholder="Buscar por alias, destino o notas…" [value]="q()" maxlength="300" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
       <button mat-icon-button matSuffix type="button" (click)="onSearch(searchInput.value)" aria-label="Ejecutar búsqueda"><mat-icon>arrow_forward</mat-icon></button>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
@@ -81,6 +85,13 @@
       </mat-select>
     </mat-form-field>
   </div>
+  @if (workflows.enabled()) {
+    <div class="workflow-filters" id="advanced-link-filters" [hidden]="!advancedFilters()">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Colección</mat-label><mat-select [canSelectNullableOptions]="true" [value]="collectionId()" (selectionChange)="onCollection($event.value)"><mat-option [value]="null">Todas las colecciones</mat-option>@for (collection of collections(); track collection.id) { <mat-option [value]="collection.id">{{ collection.name }}</mat-option> }</mat-select></mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Campaña UTM</mat-label><input matInput [value]="utmCampaign()" maxlength="100" placeholder="navidad" #campaignInput (keyup.enter)="onCampaign(campaignInput.value)" /><button mat-icon-button matSuffix type="button" aria-label="Filtrar por campaña" (click)="onCampaign(campaignInput.value)"><mat-icon>arrow_forward</mat-icon></button></mat-form-field>
+    </div>
+    <app-saved-link-filters [spec]="filterSpec()" (filterApplied)="applySavedFilter($event)" />
+  }
   <div class="scale-toolbar">
     <mat-checkbox
         [checked]="allOnPage()"
@@ -190,7 +201,9 @@
             (change)="toggleSelected(link.id)"
             [aria-label]="'Seleccionar enlace ' + displayUrl(link.shortUrl)"
           ></mat-checkbox>
-        <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span>
+        @if (workflows.enabled()) {
+          <button mat-icon-button type="button" class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="(favorites.value(link) ? 'Quitar de favoritos: ' : 'Añadir a favoritos: ') + link.alias" [matTooltip]="favorites.value(link) ? 'Quitar de favoritos' : 'Añadir a favoritos'" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button>
+        } @else { <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span> }
         <div class="link-main">
           <div class="link-top">
             <a class="short tnum" [routerLink]="['/app/links', link.id]" [attr.aria-label]="'Abrir enlace ' + displayUrl(link.shortUrl)">{{ displayUrl(link.shortUrl) }}</a>
@@ -235,6 +248,7 @@
             <button mat-menu-item [disabled]="copyFeedback.busy()" (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar URL</button>
             <a mat-menu-item [routerLink]="['/app/links', link.id]"><mat-icon>query_stats</mat-icon> Analítica</a>
             @if (canWrite()) {
+              @if (workflows.enabled() && link.state !== 'blocked') { <button mat-menu-item (click)="duplicate(link)"><mat-icon>library_add</mat-icon>Duplicar enlace</button> }
               <button mat-menu-item (click)="edit(link)" [disabled]="actionId() === link.id"><mat-icon>edit</mat-icon> Editar</button>
               @if (link.state === 'active') {
                 <button mat-menu-item (click)="setState(link, 'paused')" [disabled]="actionId() !== null"><mat-icon>pause</mat-icon> Pausar</button>

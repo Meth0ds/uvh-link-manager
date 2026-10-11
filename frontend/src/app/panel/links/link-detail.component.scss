@@ -453,3 +453,5 @@
     transition: none !important;
   }
 }
+
+.favorite-star{flex-shrink:0;transition:color .16s ease}.favorite-star.is-favorite{color:var(--uvh-electric)}.favorite-star mat-icon{transition:transform .16s ease}.favorite-star.is-favorite mat-icon{transform:scale(1.08)}@media(prefers-reduced-motion:reduce){.favorite-star,.favorite-star mat-icon{transition:none;transform:none}}

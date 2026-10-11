@@ -51,9 +51,11 @@ describe("apiInterceptor context isolation", () => {
     expect((await intercept("/api/v1/admin/overview")).headers.has("X-Workspace-Id")).toBeFalse();
   });
 
-  for (const path of ["/api/v1/tags", "/api/v1/collections", "/api/v1/link-templates", "/api/v1/analytics/export"]) {
+  for (const path of ["/api/v1/tags", "/api/v1/collections", "/api/v1/link-templates", "/api/v1/analytics/export",
+    "/api/v1/link-filters", "/api/v1/link-workflows", "/api/v1/destination-inspections", "/api/v1/destination-previews"]) {
     it(`scopes ${path} and its child routes to the selected workspace`, async () => {
       expect((await intercept(path)).headers.get("X-Workspace-Id")).toBe("42");
+      expect((await intercept(path)).headers.get("X-Uvh-Account-Id")).toBe("1");
       expect((await intercept(`${path}/7?format=csv`)).headers.get("X-Workspace-Id")).toBe("42");
       for (const method of ["POST", "PATCH", "DELETE"]) {
         expect((await intercept(path, undefined, method)).headers.get("X-Workspace-Id")).toBe("42");

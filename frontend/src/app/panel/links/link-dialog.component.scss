@@ -112,3 +112,5 @@ button:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3
   .editor-request-error { flex-shrink: 0; margin: 10px 18px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+
+.duplicate-note,.reminder-help{display:flex;gap:10px;padding:14px 16px;margin-top:16px;border-radius:12px;background:var(--uvh-surface);font-size:12px;line-height:1.7}.duplicate-note p,.reminder-help p{margin:0;min-width:0}.duplicate-note mat-icon,.reminder-help mat-icon{flex-shrink:0;font-size:20px}.reminder-help a{color:inherit;text-decoration:underline;text-underline-offset:3px}.reminder-help a:focus-visible{outline:2px solid currentColor;outline-offset:3px}

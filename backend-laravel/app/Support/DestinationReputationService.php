@@ -103,6 +103,19 @@ final class DestinationReputationService
             }
         }
 
+        $page = $link->expired_page ?? null;
+        if (is_string($page)) {
+            $page = json_decode($page, true);
+        }
+        if (is_array($page) && ($page['enabled'] ?? false) === true) {
+            foreach (['expired', 'exhausted'] as $kind) {
+                $url = $page[$kind]['buttonUrl'] ?? null;
+                if (is_string($url) && $url !== '') {
+                    $destinations[] = $url;
+                }
+            }
+        }
+
         $rules = DB::table('redirect_rules')
             ->where('link_id', $link->id ?? 0)
             ->orderBy('id')

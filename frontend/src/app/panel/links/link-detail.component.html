@@ -20,6 +20,7 @@
           <span class="link-eyebrow">Detalle operativo</span>
           <div class="link-title-line">
             <h1 class="tnum">{{ displayUrl(link.shortUrl) }}</h1>
+            @if (workflows.enabled()) { <button mat-icon-button class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="favorites.value(link) ? 'Quitar de favoritos' : 'Añadir a favoritos'" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button> }
             <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
           </div>
           <p class="dest" [title]="link.destination">{{ link.destination }}</p>
@@ -32,6 +33,7 @@
           <button mat-flat-button color="primary" (click)="edit()" [disabled]="actionBusy()"><mat-icon>edit</mat-icon> Editar</button>
           <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones" [disabled]="actionBusy()"><mat-icon>more_vert</mat-icon></button>
           <mat-menu #menu="matMenu">
+            @if (workflows.enabled() && link.state !== 'blocked') { <button mat-menu-item (click)="duplicate()" [disabled]="actionBusy()"><mat-icon>library_add</mat-icon>Duplicar enlace</button> }
             @if (link.state === 'active') {
               <button mat-menu-item (click)="setState('paused')" [disabled]="actionBusy()"><mat-icon>pause</mat-icon> Pausar</button>
             }
@@ -82,6 +84,7 @@
       </div>
     </section>
   }
+  <app-destination-inspection [link]="link" />
   <div class="period-row">
     <span class="section-title">Analítica</span>
     <mat-form-field appearance="outline" class="period">

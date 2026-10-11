@@ -36,7 +36,9 @@ esta matriz y por las pruebas de `DataExportSnapshotTest`.
 | Clave | Origen | Contenido |
 | --- | --- | --- |
 | `memberships` | `memberships` ⋈ `workspaces` | Membresías de la cuenta: workspace (id, nombre, slug), rol y fecha de alta. |
-| `createdLinks` | `links` (creados por la cuenta) | Enlaces completos: alias, destinos, estado, contadores, uso único, programación, caducidad, notas y UTM; incluye `deleted_at` si fueron borrados. |
+| `createdLinks` | `links` (creados por la cuenta) | Enlaces completos: alias, destinos, estado, contadores, uso único, programación, caducidad, notas, UTM y `expired_page` (configuración de la página de caducidad/agotamiento); incluye `deleted_at` si fueron borrados. |
+| `linkFavorites` | `link_favorites` de la cuenta | Workspace, enlace y fecha de la estrella personal. No incluye preferencias de otros miembros. |
+| `savedLinkFilters` | `saved_link_filters` de la cuenta | Workspace, nombre, criterios versionados, versión de edición y fechas del filtro personal. No guarda resultados ni selección de enlaces. |
 | `redirectRules` | `redirect_rules` ⋈ `links` propios | Reglas de redirección por país, idioma, dispositivo, SO, horario, referrer y campaña. |
 | `linkTags` | `link_tags` ⋈ `links` propios ⋈ `tags` | Etiquetas aplicadas a los enlaces propios (id de enlace + nombre de tag). |
 | `aggregateAnalytics` | `metric_rollups` ⋈ `links` propios | Agregados diarios por enlace: `clicks`, `visitors`, `countries`, `devices`, `browsers`, `os`, `referrers`, `campaigns`. Sin eventos individuales. |
@@ -58,6 +60,8 @@ esta matriz y por las pruebas de `DataExportSnapshotTest`.
 - Eventos de visitante individuales: la analítica sale sólo como agregado
   diario con la definición de `visitors` publicada junto a ella.
 - Datos de otras cuentas, otros workspaces o de la plataforma.
+- Resultados temporales de inspección, URLs de borradores e iconos privados:
+  caducan y se purgan; no forman parte del documento de cuenta.
 
 ## Techo operativo
 

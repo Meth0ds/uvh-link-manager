@@ -11,6 +11,8 @@ import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatInputModule } from "@angular/material/input";
 import { FormsModule } from "@angular/forms";
 import { QrCodeService, type QrCodeRenderOptions } from "../../core/services/qr-code.service";
+import { QrShareService } from "../../core/services/qr-share.service";
+import { LinkWorkflowService } from "../../core/services/link-workflow.service";
 import { prepareQrCustomLogo, qrLogoRaster, type QrCustomLogo } from "../../core/services/qr-custom-logo";
 import { SessionContextService } from "../../core/services/session-context.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
@@ -30,6 +32,8 @@ import { qrContrast, qrPrintLayout, validateQrPhysicalSize, validateQrDesign, ty
 export class QrDialogComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly qrCode = inject(QrCodeService);
+  private readonly qrShare = inject(QrShareService);
+  readonly workflows = inject(LinkWorkflowService);
   private readonly dialogRef = inject(MatDialogRef<QrDialogComponent>, { optional: true });
   readonly logoFile = signal<File | null>(null);
   private readonly assetId = signal<number | null>(null);
@@ -37,7 +41,7 @@ export class QrDialogComponent {
   readonly campaignSaving = signal(false);
   readonly canonicalBusy = signal(false);
   private readonly canonicalFailed = signal(false);
-  readonly designBusy = computed(() => this.libraryBusy() || this.campaignSaving() || this.canonicalBusy());
+  readonly designBusy = computed(() => this.libraryBusy() || this.campaignSaving() || this.canonicalBusy() || this.shareBusy());
   private readonly input = inject<string | { url: string; linkId?: number; links?: readonly QrLinkSnapshot[]; library?: boolean; campaign?: boolean; variant?: QrVariant | null; initialDesign?: QrDesignSpec }>(MAT_DIALOG_DATA);
   private readonly baseUrl = typeof this.input === "string" ? this.input : this.input.url;
   private readonly activeUrl = signal(this.baseUrl);
@@ -75,6 +79,18 @@ export class QrDialogComponent {
   readonly confirmation = signal<string | null>(null);
   readonly copyFallback = signal(false);
   readonly copying = signal(false);
+  readonly sharePreparing = signal(false);
+  readonly shareBusy = signal(false);
+  readonly shareNotice = signal<string | null>(null);
+  readonly shareFallback = signal(false);
+  readonly shareUnavailableReason = this.qrShare.unavailableReason();
+  private readonly shareFile = signal<File | null>(null);
+  private shareAbort: AbortController | null = null;
+  private shareRevision = 0;
+  private preparedShareKey: string | null = null;
+  private preparedShareLogo: QrCustomLogo | null = null;
+  private readonly shareIdentity = computed(() => JSON.stringify([this.url, this.design(), this.downloadSize(), this.context()]));
+  readonly shareReady = computed(() => !!this.shareFile() && !this.sharePreparing() && !this.shareFallback());
   readonly a4Mode = computed(() => this.section() === "print" || (!!this.bulkLinks && this.format() === "pdf"));
   private printOptions() { return { sizeMm: this.sizeMm(), copies: this.bulkLinks?.length ?? (this.fillPage() ? "page" as const : this.copies()), cutMarks: this.cutMarks() }; }
   readonly printLayout = computed(() => {
@@ -139,13 +155,21 @@ export class QrDialogComponent {
   constructor() {
     effect(() => { if (this.context() !== this.originContext) this.closeForContextChange(); });
     effect(() => {
+      const key = this.shareIdentity(), logo = this.customLogo();
+      const eligible = this.workflows.enabled() && this.section() === "file" && !this.bulkLinks && !this.libraryMode && !this.shareUnavailableReason
+        && !!this.dataUrl() && !this.previewBusy() && !this.logoBusy() && !this.needsCustomLogo()
+        && !this.libraryBusy() && !this.campaignSaving() && !this.canonicalBusy() && this.campaignReady() && this.validContext();
+      if (!eligible) { this.invalidateShare(); return; }
+      if (key !== this.preparedShareKey || logo !== this.preparedShareLogo) void this.prepareShare(key, logo);
+    });
+    effect(() => {
       const count = this.printSlots().length;
       const ready = this.a4Mode() && !!this.bulkLinks && !!this.dataUrl() && !this.previewBusy();
       const spec = this.design();
       if (ready && count) void this.generatePrintPreviews(spec, count);
       else { ++this.printRevision; this.printPreviewBusy.set(false); this.printPreviewUrls.set([]); }
     });
-    this.destroyRef.onDestroy(() => this.exportAbort.abort());
+    this.destroyRef.onDestroy(() => { this.exportAbort.abort(); this.invalidateShare(); });
     if (typeof this.input !== "string" && this.input.initialDesign) { this.initialSpec.set(this.input.initialDesign); void this.applyDesign({ spec: this.input.initialDesign, logo: null }); }
     else void this.generate();
   }
@@ -185,7 +209,7 @@ export class QrDialogComponent {
   }
 
   async applyDesign(applied: AppliedQrDesign): Promise<void> {
-    if (this.downloadBusy() || !this.validContext()) return;
+    if (this.downloadBusy() || this.shareBusy() || !this.validContext()) return;
     const spec = applied.spec;
     this.invalidateLogoLoad(); this.foreground.set(spec.foreground); this.background.set(spec.background);
     this.frame.set(spec.frame); this.caption.set(spec.caption); this.correctionLevel.set(spec.correction); this.quietZone.set(spec.quietZone);
@@ -194,7 +218,7 @@ export class QrDialogComponent {
     this.customLogo.set(applied.logo); this.logoFile.set(null);
     await this.generate();
   }
-  closeForContextChange(): void { this.exportAbort.abort(); ++this.previewRevision; this.invalidateLogoLoad(); this.dataUrl.set(null); this.dialogRef?.close(); }
+  closeForContextChange(): void { this.exportAbort.abort(); this.invalidateShare(); ++this.previewRevision; this.invalidateLogoLoad(); this.dataUrl.set(null); this.dialogRef?.close(); }
 
   async changeDesign(field: "foreground" | "background" | "frame" | "caption", value: string): Promise<void> {
     if (this.downloadBusy() || this.designBusy() || !this.validContext()) return;
@@ -204,7 +228,62 @@ export class QrDialogComponent {
     await this.generate();
   }
 
-  setSize(value: number): void { if (!this.downloadBusy()) this.sizeMm.set(Number(value) * (this.unit() === "cm" ? 10 : 1)); }
+  setSize(value: number): void { if (!this.downloadBusy() && !this.shareBusy()) this.sizeMm.set(Number(value) * (this.unit() === "cm" ? 10 : 1)); }
+
+  private invalidateShare(): void {
+    ++this.shareRevision;
+    this.shareAbort?.abort(); this.shareAbort = null;
+    this.preparedShareKey = null; this.preparedShareLogo = null;
+    this.shareFile.set(null); this.sharePreparing.set(false); this.shareBusy.set(false);
+    this.shareNotice.set(null); this.shareFallback.set(false);
+  }
+
+  private async prepareShare(key: string, logo: QrCustomLogo | null): Promise<void> {
+    this.invalidateShare();
+    const revision = this.shareRevision, controller = new AbortController();
+    this.shareAbort = controller; this.preparedShareKey = key; this.preparedShareLogo = logo;
+    const current = () => this.validContext() && this.workflows.enabled() && revision === this.shareRevision && key === this.shareIdentity()
+      && logo === this.customLogo() && this.section() === "file" && !controller.signal.aborted;
+    // Snapshot every render input before the first await. Custom image pixels
+    // are normalized locally; the file never references an external image.
+    const url = this.url, spec = this.design(), pixels = this.downloadSize();
+    const custom = this.includeLogo() && this.logoSource() === "custom" ? logo : null;
+    this.sharePreparing.set(true);
+    try {
+      const raster = custom ? await qrLogoRaster(custom.canvas) : undefined;
+      if (!current()) return;
+      const blob = await this.qrCode.export(url, spec, "png", { pixels, logo: raster, signal: controller.signal });
+      if (!current()) return;
+      const file = this.qrShare.file(blob);
+      if (!this.qrShare.supports(file)) {
+        this.shareFallback.set(true); this.shareNotice.set("Este navegador no permite compartir esta imagen. Descarga el PNG y añádelo a tu aplicación.");
+      } else this.shareFile.set(file);
+    } catch {
+      if (current()) { this.shareFallback.set(true); this.shareNotice.set("No se pudo preparar la imagen para compartir. Puedes intentar descargar el PNG."); }
+    } finally { if (current()) this.sharePreparing.set(false); }
+  }
+
+  shareImage(): void {
+    const file = this.shareFile();
+    if (!this.workflows.enabled() || !file || !this.shareReady() || this.section() !== "file" || this.bulkLinks || this.libraryMode
+      || this.downloadBusy() || this.designBusy() || this.previewBusy() || this.logoBusy() || !this.campaignReady()
+      || !this.validContext() || this.preparedShareKey !== this.shareIdentity() || this.preparedShareLogo !== this.customLogo()) return;
+    const revision = this.shareRevision, key = this.preparedShareKey;
+    this.shareBusy.set(true); this.shareNotice.set(null);
+    // This call opens native UI synchronously within the actual click.
+    const operation = this.qrShare.share(file);
+    void operation.then(outcome => {
+      if (!this.validContext() || !this.workflows.enabled() || revision !== this.shareRevision || key !== this.shareIdentity()) return;
+      if (outcome === "shared") this.shareNotice.set("Acción de compartir completada.");
+      else if (outcome === "cancelled") this.shareNotice.set("Has cerrado el menú de compartir.");
+      else {
+        this.shareFallback.set(true);
+        this.shareNotice.set(outcome === "denied"
+          ? "El navegador no ha permitido compartir la imagen. Revisa sus permisos o descarga el PNG."
+          : "No se pudo abrir el menú para esta imagen. Descarga el PNG y añádelo a tu aplicación.");
+      }
+    }).finally(() => { if (this.validContext() && revision === this.shareRevision) this.shareBusy.set(false); });
+  }
 
   private async exportOptions(): Promise<QrExportOptions> {
     const pixels = this.downloadSize(), sizeMm = this.sizeMm(), signal = this.exportAbort.signal;

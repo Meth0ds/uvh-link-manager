@@ -152,6 +152,12 @@ class LinkService
             }
         }
 
+        try {
+            ExpiredLinkPage::validate($input['expired_page'] ?? null);
+        } catch (LinkException $error) {
+            return ['ok' => false, 'error' => $error->getMessage()];
+        }
+
         return ['ok' => true];
     }
 
@@ -235,6 +241,7 @@ class LinkService
                     'scheduled_at' => self::toDateTime($input['scheduled_at'] ?? null),
                     'expires_at' => self::toDateTime($input['expires_at'] ?? null),
                     'notes' => $input['notes'] ?? null,
+                    'expired_page' => ExpiredLinkPage::canonical($input['expired_page'] ?? null),
                     'utm_source' => $utm['source'] ?? null,
                     'utm_medium' => $utm['medium'] ?? null,
                     'utm_campaign' => $utm['campaign'] ?? null,
@@ -265,7 +272,7 @@ class LinkService
         // wait for that. The denylist half of the decision was applied
         // synchronously in `validate()`, so a refused queue admission cannot
         // change whether the link was allowed — only when it gets re-analysed.
-        DestinationReputationService::dispatchCheck((int) $created['id']);
+        DB::afterCommit(static fn () => DestinationReputationService::dispatchCheck((int) $created['id']));
 
         return $created;
     }
@@ -370,6 +377,9 @@ class LinkService
                     'scheduled_at' => self::toDateTime($input['scheduled_at'] ?? null),
                     'expires_at' => self::toDateTime($input['expires_at'] ?? null),
                     'notes' => $input['notes'] ?? null,
+                    'expired_page' => ExpiredLinkPage::canonical(array_key_exists('expired_page', $input) ? $input['expired_page'] : $link->expired_page),
+                    'expiry_notice_generation' => (int) $link->expiry_notice_generation + (self::iso($link->expires_at) !== self::iso(self::toDateTime($input['expires_at'] ?? null)) ? 1 : 0),
+                    'limit_notice_generation' => (int) $link->limit_notice_generation + ($link->max_clicks !== ($input['max_clicks'] ?? null) ? 1 : 0),
                     'state' => $nextState,
                     'utm_source' => $utm['source'] ?? null,
                     'utm_medium' => $utm['medium'] ?? null,
@@ -417,6 +427,8 @@ class LinkService
 
         return [
             'id' => $link->id,
+            'favorite' => (bool) ($link->getAttribute('is_favorite') ?? false),
+            'expiredPage' => ExpiredLinkPage::canonical($link->expired_page),
             'alias' => $link->alias,
             'destination' => $link->destination,
             'fallbackDestination' => $link->fallback_destination,

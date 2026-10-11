@@ -33,12 +33,18 @@ import {
 } from "../../core/services/scale-response-decoders";
 import { ActionDialogService } from "../action-dialog.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
+import { SessionContextService } from "../../core/services/session-context.service";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { LatestRequest } from "../../core/services/latest-request";
 import { localDateTimeIso, localDateTimeValue, parseLocalDateTime } from "../../core/strict-wire";
+import { RouterLink } from "@angular/router";
+import { LinkWorkflowService } from "../../core/services/link-workflow.service";
+import { DestinationInspectionComponent } from "./destination-inspection.component";
+import { ExpiredPageEditorComponent, validExpiredPage } from "./expired-page-editor.component";
+import { defaultExpiredPage } from "../../core/link-workflows";
 
 export interface LinkDialogData {
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "duplicate";
   link?: LinkDto;
   initialDestination?: string;
 }
@@ -119,7 +125,7 @@ function integerValidator(control: AbstractControl): ValidationErrors | null {
   selector: "app-link-dialog",
   standalone: true,
   imports: [
-    ReactiveFormsModule,
+    ReactiveFormsModule, RouterLink, DestinationInspectionComponent, ExpiredPageEditorComponent,
     MatDialogModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -144,15 +150,24 @@ export class LinkDialogComponent {
   private dialogRef = inject(MatDialogRef<LinkDialogComponent>);
   /** El workspace que abrió el diálogo: guardar o crear plantilla pertenece a ese. */
   private readonly openedIn = targetWorkspace(this.workspaces);
+  private readonly session = inject(SessionContextService);
+  private readonly openedContext = this.securityContext();
   private readonly destroyRef = inject(DestroyRef);
   private readonly domainRequests = new LatestRequest(this.destroyRef);
   private readonly ruleRequests = new LatestRequest(this.destroyRef);
   readonly data = inject<LinkDialogData>(MAT_DIALOG_DATA);
 
   readonly isEdit = this.data.mode === "edit";
+  readonly isDuplicate = this.data.mode === "duplicate";
+  readonly workflows = inject(LinkWorkflowService);
+  readonly expiredPage = signal(structuredClone(this.data.link?.expiredPage ?? defaultExpiredPage()));
+  readonly destinationValue = signal("");
+  private duplicateReceipt: { signature: string; key: string } | null = null;
+  get expiredPageInvalid(): boolean { return this.workflows.enabled() && !validExpiredPage(this.expiredPage()); }
+  get duplicateExpired(): boolean { const iso = this.lifecycleValue("expiresAt", this.form.controls.expiresAt.value); return this.isDuplicate && iso !== null && Date.parse(iso) <= Date.now(); }
   readonly busy = signal(false);
-  readonly loading = signal(this.isEdit);
-  readonly editDetailsLoaded = signal(!this.isEdit);
+  readonly loading = signal(this.isEdit || this.isDuplicate);
+  readonly editDetailsLoaded = signal(!(this.isEdit || this.isDuplicate));
   readonly error = signal<string | null>(null);
   readonly domains = signal<DomainDto[]>([]);
   /**
@@ -172,8 +187,8 @@ export class LinkDialogComponent {
   // The minute input is a projection, not a replacement for a stored instant.
   // A template becomes a new source even when its visible minute is unchanged.
   private readonly lifecycleDates: Record<LifecycleField, { iso: string | null; local: string; fromLink: boolean }> = {
-    scheduledAt: { iso: this.data.link?.scheduledAt ?? null, local: localDateTimeValue(this.data.link?.scheduledAt), fromLink: this.isEdit },
-    expiresAt: { iso: this.data.link?.expiresAt ?? null, local: localDateTimeValue(this.data.link?.expiresAt), fromLink: this.isEdit },
+    scheduledAt: { iso: this.data.link?.scheduledAt ?? null, local: localDateTimeValue(this.data.link?.scheduledAt), fromLink: this.isEdit || this.isDuplicate },
+    expiresAt: { iso: this.data.link?.expiresAt ?? null, local: localDateTimeValue(this.data.link?.expiresAt), fromLink: this.isEdit || this.isDuplicate },
   };
 
   form = this.fb.nonNullable.group({
@@ -192,7 +207,7 @@ export class LinkDialogComponent {
     maxClicks: [null as number | null, [Validators.min(1), Validators.max(10_000_000)]],
     singleUse: [false],
     scheduledAt: ["", [localDateTimeValidator]],
-    expiresAt: ["", [localDateTimeValidator, ...(this.isEdit ? [] : [
+    expiresAt: ["", [localDateTimeValidator, ...(this.isEdit || this.isDuplicate ? [] : [
       (control: AbstractControl) => futureLocalDateTime(this.lifecycleInstant("expiresAt", String(control.value ?? ""))),
     ])]],
     notes: ["", [unicodeMaxLength(1000), noControlCharacters]],
@@ -212,6 +227,7 @@ export class LinkDialogComponent {
   rules = this.fb.array<RuleGroup>([]);
 
   constructor() {
+    this.form.controls.destination.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(value => this.destinationValue.set(value.trim()));
     this.form.controls.alias.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.checkAlias());
     this.form.controls.domainId.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.checkAlias());
     this.destroyRef.onDestroy(() => {
@@ -223,15 +239,25 @@ export class LinkDialogComponent {
     // El selector global sigue usable con el modal abierto: si cambia, el
     // diálogo se cierra en vez de guardar el enlace en otro workspace.
     effect(() => {
-      if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) this.dialogRef.close();
+      if (this.openedIn.workspaceId !== null && !this.isOpeningCurrent()) this.dialogRef.close();
     });
     void this.load();
   }
 
+  private securityContext(): string {
+    return JSON.stringify([this.session.generation(), this.session.user()?.id, this.workspaces.currentId(),
+      this.workspaces.selectionGeneration?.(), this.workspaces.currentRole?.()]);
+  }
+
+  private isOpeningCurrent(): boolean {
+    return this.openedIn.isCurrent() && this.openedContext === this.securityContext();
+  }
+
   private async load(): Promise<void> {
     const requests: Promise<void>[] = [this.loadDomains(), this.loadCollectionsAndTemplates()];
-    if (this.isEdit && this.data.link) {
+    if ((this.isEdit || this.isDuplicate) && this.data.link) {
       this.patchFromLink(this.data.link);
+      if (this.isDuplicate) this.form.controls.alias.setValue(this.data.link.alias.slice(0, 46) + "-copia-" + crypto.randomUUID().slice(0, 6));
       requests.push(this.loadEditRules(this.data.link.id));
     } else {
       this.form.controls.destination.setValue(this.data.initialDestination ?? "");
@@ -262,14 +288,14 @@ export class LinkDialogComponent {
       // nuevo; si no puede servir ahora, el selector lo muestra como no
       // disponible en vez de callarse y caer en la plataforma.
       const preferred = domains.find((d) => d.isDefault) ?? null;
-      const unavailableId = this.isEdit ? currentId : preferred?.id ?? null;
+      const unavailableId = this.isEdit || this.isDuplicate ? currentId : preferred?.id ?? null;
       this.domains.set(eligible);
       this.currentDomainUnavailable.set(
         unavailableId !== null && !eligible.some((e) => e.id === unavailableId)
-          ? { id: unavailableId, domain: (this.isEdit ? current?.domain : preferred?.domain) ?? this.data.link?.domain ?? null }
+          ? { id: unavailableId, domain: (this.isEdit || this.isDuplicate ? current?.domain : preferred?.domain) ?? this.data.link?.domain ?? null }
           : null,
       );
-      if (!this.isEdit && this.form.controls.domainId.pristine) {
+      if (!this.isEdit && !this.isDuplicate && this.form.controls.domainId.pristine) {
         this.form.controls.domainId.setValue(eligible.some((e) => e.isDefault) ? (preferred?.id ?? null) : null);
       }
     } catch {
@@ -340,7 +366,7 @@ export class LinkDialogComponent {
   private lifecyclePatchValue(field: LifecycleField, raw: string): string | null | undefined {
     const source = this.lifecycleDates[field];
     // Omission lets the server retain precision beyond the DTO's milliseconds.
-    if (this.isEdit && source.fromLink && raw === source.local) return undefined;
+    if ((this.isEdit || this.isDuplicate) && source.fromLink && raw === source.local) return undefined;
     return this.lifecycleValue(field, raw);
   }
 
@@ -384,8 +410,11 @@ export class LinkDialogComponent {
 
   private async checkAlias(): Promise<void> {
     const requestId = ++this.aliasRequest;
-    const alias = this.form.value.alias?.trim() ?? "";
-    const sameAsCurrent = this.isEdit && this.data.link?.alias === alias && this.data.link.domainId === this.form.value.domainId;
+    // Child valueChanges fires before the FormGroup recomputes its value.
+    // Read the controls so availability always describes the visible alias.
+    const alias = this.form.controls.alias.value.trim();
+    const domainId = this.form.controls.domainId.value;
+    const sameAsCurrent = this.isEdit && this.data.link?.alias === alias && this.data.link.domainId === domainId;
     if (!alias) {
       this.aliasStatus.set("idle");
       this.aliasStatusText.set("");
@@ -410,7 +439,7 @@ export class LinkDialogComponent {
     try {
       const { available, reason } = await this.api.post<{ available: boolean; reason?: string }>("/api/v1/links/check-alias", {
         alias,
-        domainId: this.form.value.domainId,
+        domainId,
       }, decodeAliasAvailability);
       if (this.destroyRef.destroyed || requestId !== this.aliasRequest) return;
       if (available) {
@@ -498,7 +527,7 @@ export class LinkDialogComponent {
       inputMaxLength: 60,
     });
     if (name === null || this.destroyRef.destroyed) return;
-    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+    if (this.openedIn.workspaceId !== null && !this.isOpeningCurrent()) {
       this.dialogRef.close();
       return;
     }
@@ -592,6 +621,8 @@ export class LinkDialogComponent {
     return out;
   }
 
+  dialogRefClose(): void { this.dialogRef.close(); }
+
   async save(): Promise<void> {
     // The expiry's "future" verdict is time-dependent: an expiry set ahead can
     // lapse while the dialog sits open. Refreshing the control re-judges it
@@ -600,10 +631,10 @@ export class LinkDialogComponent {
     this.form.controls.expiresAt.updateValueAndValidity({ emitEvent: false });
     const aliasUnavailable = ["checking", "taken", "invalid", "reserved"].includes(this.aliasStatus());
     if (this.destroyRef.destroyed || this.form.invalid || this.hasInvalidRules || aliasUnavailable
-      || this.busy() || (this.isEdit && !this.editDetailsLoaded())) return;
+      || this.busy() || this.expiredPageInvalid || ((this.isEdit || this.isDuplicate) && !this.editDetailsLoaded())) return;
     // Comprobación síncrona antes de enviar: el interceptor pone el workspace
     // ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
-    if (this.openedIn.workspaceId !== null && !this.openedIn.isCurrent()) {
+    if (this.openedIn.workspaceId !== null && !this.isOpeningCurrent()) {
       this.dialogRef.close();
       return;
     }
@@ -612,13 +643,16 @@ export class LinkDialogComponent {
     this.error.set(null);
     const v = this.form.value;
     const passwordValue = v.password ?? "";
-    const password = this.isEdit
-      ? (v.clearPassword ? null : passwordValue !== "" ? passwordValue : undefined)
-      : (passwordValue !== "" ? passwordValue : null);
+    const password = this.isDuplicate
+      ? (v.clearPassword || passwordValue === "" ? undefined : passwordValue)
+      : this.isEdit ? (v.clearPassword ? null : passwordValue !== "" ? passwordValue : undefined)
+        : (passwordValue !== "" ? passwordValue : null);
     const payload = {
       // The backend rejects stale writes instead of overwriting a newer edit
       // from another browser. New links intentionally have no version.
       ...(this.isEdit ? { version: this.data.link!.version } : {}),
+      ...(this.isDuplicate ? { sourceVersion: this.data.link!.version, passwordAction: v.clearPassword ? "remove" : passwordValue !== "" ? "replace" : "keep" } : {}),
+      ...(this.workflows.enabled() ? { expiredPage: this.expiredPage() } : {}),
       destination: v.destination?.trim(),
       // The alias identifies the link: emptying it deletes nothing and the
       // server refuses it with 422. Editing omits the key instead (absent →
@@ -654,18 +688,24 @@ export class LinkDialogComponent {
           (value) => decodeLinkResponse(value, expectedLinkId),
         );
         link = res.link;
+      } else if (this.isDuplicate) {
+        const signature = JSON.stringify(payload);
+        const key = this.duplicateReceipt?.signature === signature ? this.duplicateReceipt.key : crypto.randomUUID();
+        this.duplicateReceipt = { signature, key };
+        const res = await this.api.post(`/api/v1/links/${this.data.link!.id}/duplicate`, payload, decodeLinkResponse, { "Idempotency-Key": key });
+        link = res.link;
       } else {
         const res = await this.api.post<{ link: LinkDto }>("/api/v1/links", payload, decodeLinkResponse);
         link = res.link;
       }
-      if (this.destroyRef.destroyed || requestId !== this.saveRequest) return;
+      if (this.destroyRef.destroyed || requestId !== this.saveRequest || (this.openedIn.workspaceId !== null && !this.isOpeningCurrent()) || (this.isDuplicate && !this.workflows.enabled())) return;
       this.dialogRef.close(link);
     } catch (err) {
-      if (!this.destroyRef.destroyed && requestId === this.saveRequest) {
+      if (!this.destroyRef.destroyed && requestId === this.saveRequest && (this.openedIn.workspaceId === null || this.isOpeningCurrent())) {
         this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo guardar el enlace");
       }
     } finally {
-      if (!this.destroyRef.destroyed && requestId === this.saveRequest) this.busy.set(false);
+      if (!this.destroyRef.destroyed && requestId === this.saveRequest && (this.openedIn.workspaceId === null || this.isOpeningCurrent())) this.busy.set(false);
     }
   }
 }

@@ -114,7 +114,8 @@ final class VisitorPage
      * dominio configurado para responder «de marca» no debe anunciar al
      * servicio que hay detrás.
      */
-    public static function notice(string $title, string $body, int $status = 404, ?string $brandHost = null): string
+    /** @param array<string, mixed>|null $button */
+    public static function notice(string $title, string $body, int $status = 404, ?string $brandHost = null, ?array $button = null): string
     {
         $code = $status >= 400 ? (string) $status : null;
         $chip = $status >= 500 ? 'Incidencia del servicio' : ($status >= 400 ? 'Enlace no disponible' : 'Aviso del enlace');
@@ -126,6 +127,8 @@ final class VisitorPage
             .($code !== null ? '<p class="ghost" aria-hidden="true">'.$code.'</p>' : '')
             .'<h1'.($code !== null ? ' class="tight"' : '').'>'.self::escape($title).'</h1>'
             .'<p class="lede">'.self::escape($body).'</p>'
+            .($button !== null && ! empty($button['buttonUrl']) && ! empty($button['buttonLabel'])
+                ? '<p class="handoff"><a class="notice-action" href="'.self::escape($button['buttonUrl']).'" rel="noopener noreferrer nofollow">'.self::escape($button['buttonLabel']).'</a></p>' : '')
             .'<p class="foot">Puedes pedir un enlace nuevo a quien te lo compartió.</p>'
             .'</main>';
 
@@ -173,8 +176,8 @@ final class VisitorPage
         .plate{width:100%;max-width:26rem;padding:28px;border:1px solid var(--line);border-radius:3px;background:var(--raised)}
         .brand{margin:0 0 20px;padding-bottom:14px;border-bottom:1px solid var(--line);color:var(--muted);
                font-family:"Courier New",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
-        h1{margin:0 0 8px;font-size:20px;font-weight:800;letter-spacing:-.03em}
-        .lede{margin:0 0 22px;color:var(--muted);font-size:13.5px}
+        h1{margin:0 0 8px;font-size:20px;font-weight:800;letter-spacing:-.03em;overflow-wrap:anywhere}
+        .lede{margin:0 0 22px;color:var(--muted);font-size:13.5px;white-space:pre-line;overflow-wrap:anywhere}
         label{display:block;margin-bottom:6px;color:var(--muted);font-family:"Courier New",monospace;
               font-size:10px;letter-spacing:.06em;text-transform:uppercase}
         input[type=password]{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:3px;
@@ -198,6 +201,13 @@ final class VisitorPage
         a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
         a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
         .handoff{margin:0;font-size:13.5px}
+        .notice-action{display:flex;align-items:center;justify-content:center;min-height:44px;padding:12px 16px;
+               border:1px solid var(--accent);border-radius:3px;background:var(--accent);color:var(--accent-ink);
+               font-weight:700;text-align:center;text-decoration:none;overflow-wrap:anywhere;
+               transition:background-color .16s,transform .16s}
+        .notice-action:hover{background:color-mix(in srgb,var(--accent) 90%,var(--ink));transform:translateY(-1px)}
+        .notice-action:active{transform:translateY(0)}
+        @media(prefers-reduced-motion:reduce){.notice-action{transition:none}.notice-action:hover{transform:none}}
         /* Retícula editorial compartida con las páginas de estado del panel:
            chip de estado, código fantasma decorativo y marco de acento de 3px. */
         .plate{border-top:3px solid var(--accent)}
@@ -207,7 +217,7 @@ final class VisitorPage
         .ico{width:13px;height:13px;flex:0 0 auto;stroke:currentColor;fill:none;
              stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
         .ghost{margin:0 0 2px;font-size:56px;line-height:.9;font-weight:800;letter-spacing:-.05em;
-               color:color-mix(in srgb,var(--ink) 12%,transparent);user-select:none}
+               color:var(--muted);user-select:none}
         h1.tight{margin-top:-2px}
         @media (max-width:360px){.plate{padding:20px}}
         CSS;

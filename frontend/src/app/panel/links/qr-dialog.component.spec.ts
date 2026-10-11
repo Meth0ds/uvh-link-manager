@@ -1,30 +1,39 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { signal, type WritableSignal } from "@angular/core";
 import { MAT_DIALOG_DATA } from "@angular/material/dialog";
 import QRCode from "qrcode";
 import { SessionContextService } from "../../core/services/session-context.service";
+import { WorkspaceService } from "../../core/services/workspace.service";
 import { provideHttpClient } from "@angular/common/http";
 import { QrDialogComponent } from "./qr-dialog.component";
 import { QrCodeService, QR_CODE_IMPORT, type QrCodeGenerator } from "../../core/services/qr-code.service";
 import { QrLibraryService, type QrVariant } from "../../core/services/qr-library.service";
 import { DEFAULT_QR_DESIGN } from "../../core/services/qr-design";
+import { QR_SHARE_PLATFORM, type QrSharePlatform } from "../../core/services/qr-share.service";
+import { LinkWorkflowService } from "../../core/services/link-workflow.service";
 
 describe("QrDialogComponent", () => {
   let fixture: ComponentFixture<QrDialogComponent>;
   let exportQr: jasmine.Spy;
+  let workflowsEnabled: WritableSignal<boolean>;
   afterEach(() => fixture?.destroy());
 
-  async function create(importer: () => Promise<QrCodeGenerator> = () => Promise.resolve(QRCode)): Promise<QrDialogComponent> {
+  async function create(importer: () => Promise<QrCodeGenerator> = () => Promise.resolve(QRCode), sharePlatform: QrSharePlatform = { secureContext: () => true }, data: unknown = "https://uvh.test/a?name=bad%0Aname"): Promise<QrDialogComponent> {
+    workflowsEnabled = signal(true);
     await TestBed.configureTestingModule({
       imports: [QrDialogComponent],
       providers: [
         provideHttpClient(),
-        { provide: MAT_DIALOG_DATA, useValue: "https://uvh.test/a?name=bad%0Aname" },
+        { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: QR_CODE_IMPORT, useValue: importer },
+        { provide: QR_SHARE_PLATFORM, useValue: sharePlatform },
+        { provide: LinkWorkflowService, useValue: { enabled: workflowsEnabled } },
       ],
     }).overrideComponent(QrDialogComponent, { set: { template: "", imports: [] } }).compileComponents();
     exportQr = spyOn(TestBed.inject(QrCodeService), "export").and.resolveTo(new Blob(["fixture PNG"], { type: "image/png" }));
     spyOn(URL, "createObjectURL").and.returnValue("blob:qr-fixture");
     fixture = TestBed.createComponent(QrDialogComponent);
+    fixture.autoDetectChanges();
     return fixture.componentInstance;
   }
 
@@ -365,5 +374,173 @@ describe("QrDialogComponent", () => {
     resolve(new Blob(["<svg/>"], { type: "image/svg+xml" })); await pending;
     expect(click).not.toHaveBeenCalled();
   });
+
+  function nativeSharing(): QrSharePlatform & { share: jasmine.Spy; canShare: jasmine.Spy } {
+    return { secureContext: () => true, canShare: jasmine.createSpy("canShare").and.returnValue(true), share: jasmine.createSpy("share").and.resolveTo(undefined) };
+  }
+
+  async function shareEffects(): Promise<void> {
+    fixture.detectChanges(); await new Promise<void>(done => setTimeout(done, 0)); fixture.detectChanges();
+  }
+
+  it("prepares one PNG in Archivo and invokes native share immediately from the click", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); expect(exportQr).not.toHaveBeenCalled();
+    component.selectDownloadSize(1024); component.section.set("file"); await fixture.whenStable();
+    expect(component.shareReady()).toBeTrue();
+    expect(exportQr).toHaveBeenCalledOnceWith(component.url, component.design(), "png", jasmine.objectContaining({ pixels: 1024 }));
+    component.format.set("svg"); await fixture.whenStable();
+    expect(exportQr).toHaveBeenCalledTimes(1);
+    component.shareImage();
+    expect(platform.share).toHaveBeenCalledTimes(1); expect(component.shareBusy()).toBeTrue();
+    const data = platform.share.calls.mostRecent().args[0] as ShareData;
+    expect(data.files![0].name).toBe("uvh-qr.png"); expect(data.url).toBeUndefined();
+    await shareEffects();
+    expect(component.shareBusy()).toBeFalse(); expect(component.shareNotice()).toContain("completada");
+    expect(component.shareNotice()).not.toContain("WhatsApp");
+    component.shareImage(); expect(platform.share).toHaveBeenCalledTimes(2); expect(exportQr).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts and discards an obsolete share preparation after a resolution change", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable();
+    let resolve!: (blob: Blob) => void;
+    exportQr.and.returnValue(new Promise<Blob>(done => resolve = done));
+    component.section.set("file"); await shareEffects();
+    const firstSignal = exportQr.calls.mostRecent().args[3].signal as AbortSignal;
+    expect(component.sharePreparing()).toBeTrue();
+    exportQr.and.resolveTo(new Blob(["new PNG"], { type: "image/png" }));
+    component.selectDownloadSize(512); await shareEffects();
+    expect(firstSignal.aborted).toBeTrue(); expect(component.shareReady()).toBeTrue();
+    resolve(new Blob(["obsolete PNG"], { type: "image/png" })); await shareEffects();
+    component.shareImage();
+    expect(await (platform.share.calls.mostRecent().args[0] as ShareData).files![0].text()).toBe("new PNG");
+  });
+
+  it("blocks sharing an old file before reactive invalidation has run", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); component.section.set("file"); await fixture.whenStable();
+    expect(component.shareReady()).toBeTrue();
+    component.selectDownloadSize(512); component.shareImage();
+    expect(platform.share).not.toHaveBeenCalled();
+    await shareEffects(); component.shareImage(); expect(platform.share).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates preparation and native results when the session changes", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable();
+    let resolve!: (blob: Blob) => void;
+    exportQr.and.returnValue(new Promise<Blob>(done => resolve = done));
+    component.section.set("file"); await shareEffects();
+    const signal = exportQr.calls.mostRecent().args[3].signal as AbortSignal;
+    TestBed.inject(SessionContextService).advance(); await shareEffects();
+    resolve(new Blob(["late PNG"], { type: "image/png" })); await shareEffects();
+    component.shareImage();
+    expect(signal.aborted).toBeTrue(); expect(component.shareReady()).toBeFalse(); expect(platform.share).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late native outcome after the dialog closes", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); component.section.set("file"); await fixture.whenStable();
+    let resolve!: () => void;
+    platform.share.and.returnValue(new Promise<void>(done => resolve = done));
+    component.shareImage(); fixture.destroy(); resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(component.shareNotice()).toBeNull(); expect(component.shareReady()).toBeFalse();
+  });
+
+  for (const [error, fallback] of [["AbortError", false], ["NotAllowedError", true]] as const) {
+    it(`handles ${error} without downloading unexpectedly or losing the preview`, async () => {
+      const platform = nativeSharing(), component = await create(undefined, platform);
+      await fixture.whenStable(); component.section.set("file"); await fixture.whenStable();
+      const preview = component.dataUrl(), click = spyOn(HTMLAnchorElement.prototype, "click");
+      platform.share.and.rejectWith(new DOMException("Native fixture", error));
+      component.shareImage(); await shareEffects();
+      expect(component.shareBusy()).toBeFalse(); expect(component.shareFallback()).toBe(fallback);
+      expect(component.error()).toBeNull(); expect(component.dataUrl()).toBe(preview); expect(click).not.toHaveBeenCalled();
+      expect(component.shareNotice()).toContain(fallback ? "permisos" : "cerrado");
+    });
+  }
+
+  it("offers an explicit download for unsupported sharing without preparing an unused file", async () => {
+    const component = await create(); await fixture.whenStable();
+    component.section.set("file"); await fixture.whenStable();
+    expect(component.shareUnavailableReason).toContain("archivos"); expect(exportQr).not.toHaveBeenCalled();
+    const click = spyOn(HTMLAnchorElement.prototype, "click");
+    await component.download(); expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers a download when the actual generated file cannot be shared", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); platform.canShare.and.returnValue(false);
+    component.section.set("file"); await shareEffects();
+    expect(component.shareFallback()).toBeTrue(); expect(component.shareReady()).toBeFalse();
+    expect(component.shareNotice()).toContain("Descarga el PNG");
+    component.shareImage(); expect(platform.share).not.toHaveBeenCalled(); expect(component.error()).toBeNull();
+  });
+
+  it("keeps the preview and offers a download after share generation fails", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); const preview = component.dataUrl();
+    exportQr.and.rejectWith(new Error("Worker unavailable"));
+    component.section.set("file"); await shareEffects();
+    expect(component.shareFallback()).toBeTrue(); expect(component.sharePreparing()).toBeFalse(); expect(component.shareReady()).toBeFalse();
+    expect(component.shareNotice()).toContain("descargar el PNG"); expect(component.dataUrl()).toBe(preview);
+    component.format.set("svg"); await shareEffects(); expect(exportQr).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not share a cached image after a workspace switch, including before effects run", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); component.section.set("file"); await shareEffects();
+    const workspace = TestBed.inject(WorkspaceService), previous = workspace.currentId();
+    try {
+      workspace.select(previous === 321 ? 322 : 321); component.shareImage();
+      expect(platform.share).not.toHaveBeenCalled(); await shareEffects();
+      expect(component.shareReady()).toBeFalse();
+    } finally { workspace.select(previous); }
+  });
+
+  it("gates preparation and invalidates a cached image when workflow activation is withdrawn", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); workflowsEnabled.set(false); component.section.set("file"); await shareEffects();
+    expect(exportQr).not.toHaveBeenCalled();
+    workflowsEnabled.set(true); await shareEffects(); expect(component.shareReady()).toBeTrue();
+    const signal = exportQr.calls.mostRecent().args[3].signal as AbortSignal;
+    workflowsEnabled.set(false); component.shareImage(); expect(platform.share).not.toHaveBeenCalled();
+    await shareEffects(); expect(signal.aborted).toBeTrue(); expect(component.shareReady()).toBeFalse();
+  });
+
+  it("uses the normalized custom logo and selected design for the shared PNG", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); await component.selectLogoSource("custom");
+    await upload(component, await logoFile()); await fixture.whenStable();
+    let exported!: () => void;
+    const started = new Promise<void>(done => exported = done);
+    exportQr.and.callFake(() => { exported(); return Promise.resolve(new Blob(["custom PNG"], { type: "image/png" })); });
+    component.section.set("file"); fixture.detectChanges(); await started; await shareEffects();
+    const canvas = component.customLogo()!.canvas;
+    expect(exportQr.calls.mostRecent().args).toEqual([component.url, component.design(), "png", jasmine.objectContaining({
+      pixels: 2048, logo: jasmine.objectContaining({ width: canvas.width, height: canvas.height, png: jasmine.any(Uint8Array) }),
+    })]);
+    expect(component.shareReady()).toBeTrue();
+  });
+
+  it("shares only the confirmed campaign URL and clears the cached file when its design changes", async () => {
+    const platform = nativeSharing(), component = await create(undefined, platform);
+    await fixture.whenStable(); component.campaignMode.set(true); component.section.set("file");
+    await fixture.whenStable(); expect(exportQr).not.toHaveBeenCalled();
+    const variant: QrVariant = { id: 1, linkId: 1, publicId: "a".repeat(32), name: "Carta", spec: DEFAULT_QR_DESIGN, version: 1, archived: false, createdAt: "2026-10-10", updatedAt: "2026-10-10" };
+    await component.campaignSaved(variant); await fixture.whenStable();
+    expect(component.shareReady()).toBeTrue(); expect(new URL(exportQr.calls.mostRecent().args[0]).searchParams.get("qr")).toBe(variant.publicId);
+    await component.changeDesign("foreground", "#000000"); await fixture.whenStable();
+    expect(component.shareReady()).toBeFalse(); component.shareImage(); expect(platform.share).not.toHaveBeenCalled();
+  });
+
+  for (const data of [{ url: "https://uvh.test/a", library: true }, { url: "https://uvh.test/a", links: [{ id: 1, alias: "a", state: "active", shortUrl: "https://uvh.test/a" }] }]) {
+    it(`does not generate share files for ${"library" in data ? "the design library" : "bulk exports"}`, async () => {
+      const platform = nativeSharing(), component = await create(undefined, platform, data);
+      await fixture.whenStable(); component.section.set("file"); await fixture.whenStable();
+      component.shareImage(); expect(exportQr).not.toHaveBeenCalled(); expect(platform.share).not.toHaveBeenCalled();
+    });
+  }
 
 });

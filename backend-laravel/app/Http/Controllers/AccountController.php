@@ -812,6 +812,9 @@ class AccountController
                     'confirmed_at' => $now,
                 ]);
                 DB::table('sessions')->where('user_id', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
+                // Draft destinations and fetched metadata are ephemeral capabilities;
+                // suspension removes them even when the deletion is later cancelled.
+                DB::table('destination_inspections')->where('user_id', $user->id)->delete();
                 DB::table('api_tokens')->where('created_by', $user->id)->whereNull('revoked_at')->update(['revoked_at' => $now]);
                 // Suspension revokes issued capabilities as well as received
                 // invitations. Cancellation/compensation can restore this user,

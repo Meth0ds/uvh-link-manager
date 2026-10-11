@@ -156,6 +156,17 @@ services:
     # `QueueTimeoutContractTest` holds the three values together.
     command: ["php", "artisan", "queue:work", "--queue=security", "--sleep=1", "--tries=3", "--timeout=90", "--max-time=3600"]
 
+  # Manual destination reads cannot starve threat analysis or mail. Each worker
+  # enforces the job's 15 s ceiling around the 8 s network budget.
+  queue-destinations:
+    <<: *queue-service
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: destinations
+    deploy:
+      replicas: 2
+    command: ["php", "artisan", "queue:work", "--queue=destinations", "--sleep=1", "--tries=1", "--timeout=20", "--max-time=3600"]
+
   # Drain pre-deployment jobs that were serialized onto Laravel's default
   # queue. New application code never targets this compatibility pool.
   queue-legacy:

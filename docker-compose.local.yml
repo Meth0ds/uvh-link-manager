@@ -41,6 +41,7 @@ x-php-service: &php-service
     DB_USERNAME: ${POSTGRES_USER:-uvh_local}
     DB_PASSWORD: ${POSTGRES_PASSWORD:-uvh_local_dev_only}
     QUEUE_CONNECTION: database
+    UVH_LINK_WORKFLOWS_ENABLED: ${UVH_LINK_WORKFLOWS_ENABLED:-false}
     # The PHP development server runs inside Linux but serves files from a
     # Windows bind mount. A small worker pool prevents one cold request from
     # making every local health/API request appear hung.
@@ -137,11 +138,12 @@ services:
       - "127.0.0.1:8000:8000"
     command: ["php", "-d", "opcache.enable_cli=1", "-d", "opcache.validate_timestamps=1", "-S", "0.0.0.0:8000", "-t", "public", "public/index.php"]
 
-  # Local development uses one worker for every application queue. Production
-  # isolates these classes into separate pools so slow exports cannot starve mail.
+  # Local development combines the existing queues; remote destination reads
+  # have their own bounded pool even here. Production isolates all queues.
   queue:
     <<: *php-service
     profiles: ["laravel"]
+    restart: unless-stopped
     environment:
       <<: *php-environment
       # En desarrollo, los correos transaccionales van al buzón local, nunca a
@@ -159,6 +161,20 @@ services:
     # `security` is the pool the reputation checks run on: without it, blocking
     # a destination never reanalyses the links that point at it.
     command: ["php", "artisan", "queue:work", "--queue=mail,webhooks,domains,exports,analytics,security,default", "--timeout=660", "--tries=3"]
+
+  queue-destinations:
+    <<: *php-service
+    profiles: ["laravel"]
+    restart: unless-stopped
+    environment:
+      <<: *php-environment
+      UVH_QUEUE_POOL: destinations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+    command: ["php", "artisan", "queue:work", "--queue=destinations", "--sleep=1", "--tries=1", "--timeout=20"]
 
   # Laravel: scheduler local (php artisan schedule:work).
   schedule:

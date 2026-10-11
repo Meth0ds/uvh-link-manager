@@ -7,6 +7,7 @@ use App\Models\Link;
 use App\Support\Audit;
 use App\Support\IsoDate;
 use App\Support\LinkBlockReason;
+use App\Support\LinkPreferences;
 use App\Support\LinkService;
 use App\Support\MfaAttempts;
 use App\Support\MfaFreshness;
@@ -76,6 +77,9 @@ class LinkController
         $state = UvhRequest::queryString($request, 'state');
         $tag = UvhRequest::queryString($request, 'tag');
         $domainId = UvhRequest::queryString($request, 'domainId');
+        $collectionId = UvhRequest::queryString($request, 'collectionId');
+        $utmCampaign = UvhRequest::queryString($request, 'utmCampaign');
+        $favorites = UvhRequest::queryString($request, 'favorites');
         $sort = UvhRequest::queryString($request, 'sort', 'created_at_desc');
         $page = $this->positiveQueryInteger($request->query('page'), 1, 10_000);
         $perPage = $this->positiveQueryInteger($request->query('perPage'), 20, 100);
@@ -90,9 +94,39 @@ class LinkController
             return response()->json(['error' => 'Filtro de dominio inválido'], 422);
         }
 
+        if ($collectionId !== '' && $this->positiveQueryInteger($collectionId, 0, PHP_INT_MAX) === 0
+            || ! mb_check_encoding($utmCampaign, 'UTF-8') || mb_strlen($utmCampaign) > 100 || preg_match('/[\p{Cc}\p{Cf}]/u', $utmCampaign)
+            || ! in_array($favorites, ['', 'true', 'false', '1', '0'], true)) {
+            return response()->json(['error' => 'Filtro inválido'], 422);
+        }
+        if (config('workflows.enabled')) {
+            $missing = LinkPreferences::missingReferences(['domainId' => $domainId !== '' ? (int) $domainId : null, 'collectionId' => $collectionId !== '' ? (int) $collectionId : null, 'tag' => $tag], $workspaceId);
+            if ($missing !== []) {
+                return response()->json(['error' => 'Una referencia del filtro ya no existe.', 'invalidReferences' => $missing], 422);
+            }
+            $savedId = UvhRequest::queryString($request, 'savedFilterId');
+            if ($savedId !== '') {
+                $saved = DB::table('saved_link_filters')->where('user_id', UvhRequest::user($request)->id)->where('workspace_id', $workspaceId)->where('id', $this->positiveQueryInteger($savedId, 0, PHP_INT_MAX))->first();
+                if (! $saved || ! LinkPreferences::present($saved)['valid']) {
+                    return response()->json(['error' => 'Repara el filtro guardado antes de aplicarlo.'], 422);
+                }
+            }
+        }
         $query = Link::with(['domain', 'tags', 'collection'])
             ->where('workspace_id', $workspaceId)
             ->whereNull('deleted_at');
+        if (config('workflows.enabled')) {
+            $query->select('links.*')->selectSub(DB::table('link_favorites')->selectRaw('TRUE')->whereColumn('link_id', 'links.id')->where('user_id', UvhRequest::user($request)->id)->where('workspace_id', $workspaceId)->limit(1), 'is_favorite');
+            if (in_array($favorites, ['true', '1'], true)) {
+                $query->whereExists(fn ($q) => $q->selectRaw('1')->from('link_favorites')->whereColumn('link_id', 'links.id')->where('user_id', UvhRequest::user($request)->id)->where('workspace_id', $workspaceId));
+            }
+        }
+        if ($collectionId !== '') {
+            $query->where('collection_id', (int) $collectionId);
+        }
+        if ($utmCampaign !== '') {
+            $query->where('utm_campaign', $utmCampaign);
+        }
 
         if ($search !== '') {
             $query->where(fn ($q) => $q
@@ -239,6 +273,10 @@ class LinkController
 
         if (! $link) {
             return response()->json(['error' => 'Enlace no encontrado'], 404);
+        }
+
+        if (config('workflows.enabled')) {
+            $link->setAttribute('is_favorite', DB::table('link_favorites')->where('workspace_id', $workspaceId)->where('user_id', UvhRequest::user($request)->id)->where('link_id', $id)->exists());
         }
 
         $rules = $link->rules()->orderBy('priority')->orderBy('id')->get()->map(fn ($r) => [
@@ -707,12 +745,12 @@ class LinkController
      * @return string|null the error to answer with, or null when every field
      *                     belongs to the write contract
      */
-    private function unsupportedBodyField(Request $request, bool $partial = false): ?string
+    protected function unsupportedBodyField(Request $request, bool $partial = false): ?string
     {
         $supported = [
             'destination', 'alias', 'domainId', 'collectionId', 'fallbackDestination', 'password',
             'maxClicks', 'singleUse', 'scheduledAt', 'expiresAt', 'notes',
-            'utm', 'tags', 'rules',
+            'utm', 'tags', 'rules', 'expiredPage',
         ];
         if ($partial) {
             // The optimistic-concurrency token only exists on edits.
@@ -731,8 +769,11 @@ class LinkController
         return null;
     }
 
-    private function validLinkBody(Request $request, bool $partial = false): bool
+    protected function validLinkBody(Request $request, bool $partial = false): bool
     {
+        if ($request->has('expiredPage') && $request->input('expiredPage') !== null && ! config('workflows.enabled')) {
+            return false;
+        }
         if (! $partial || $request->has('destination')) {
             $destination = $request->input('destination');
             if (! is_string($destination) || $destination === '' || strlen($destination) > 2048) {
@@ -774,7 +815,7 @@ class LinkController
         return true;
     }
 
-    private function inputFromRequest(Request $request, ?Link $current = null): array
+    protected function inputFromRequest(Request $request, ?Link $current = null): array
     {
         $input = [
             'destination' => UvhRequest::inputString($request, 'destination', $current->destination ?? ''),
@@ -789,6 +830,7 @@ class LinkController
             'scheduled_at' => $request->has('scheduledAt') ? $request->input('scheduledAt') : ($current?->scheduled_at?->format('Y-m-d\TH:i:s.uP')),
             'expires_at' => $request->has('expiresAt') ? $request->input('expiresAt') : ($current?->expires_at?->format('Y-m-d\TH:i:s.uP')),
             'notes' => $request->has('notes') ? $request->input('notes') : ($current->notes ?? null),
+            'expired_page' => $request->has('expiredPage') ? $request->input('expiredPage') : ($current?->expired_page),
             'utm' => $request->has('utm')
                 ? $request->input('utm')
                 : [

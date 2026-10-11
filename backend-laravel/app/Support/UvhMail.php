@@ -182,13 +182,19 @@ class UvhMail
             'email_token', $tokenHash, $tokenHash);
     }
 
-    public static function operationalNotice(string $to, string $kind, string $subject): bool
+    public static function operationalNotice(string $to, string $kind, string $subject, ?string $linkUrl = null): bool
     {
         $title = NotificationKinds::all()[$kind]['title'];
 
+        if ($linkUrl !== null && ! UrlUtil::validateDestination($linkUrl)['ok']) {
+            throw new \InvalidArgumentException('Operational action URL must be HTTP/HTTPS.');
+        }
+        $action = $linkUrl !== null ? self::action($linkUrl, 'Revisar enlace').self::fallbackUrl($linkUrl) : '<p>Entra en UVH para revisar este aviso.</p>';
+        $text = $linkUrl !== null ? ' Revisa el enlace en UVH: '.$linkUrl : ' Entra en UVH para revisar este aviso.';
+
         return self::send($kind, $to, $title.' · UVH',
-            self::layout($title, '<p>'.self::esc($subject).'</p><p>Entra en UVH para revisar este aviso.</p>'),
-            $title.'. '.$subject.'. Entra en UVH para revisar este aviso.');
+            self::layout($title, '<p>'.self::esc($subject).'</p>'.$action),
+            $title.'. '.$subject.'.'.$text);
     }
 
     public static function sessionsRevoked(string $to, string $incidentUrl, string $tokenHash, bool $all): bool

@@ -1,4 +1,4 @@
-import { DestroyRef, Component, computed, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
+import { DestroyRef, Component, computed, effect, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { BreakpointObserver } from "@angular/cdk/layout";
 import { filter, map, startWith } from "rxjs";
@@ -36,6 +36,10 @@ interface NavGroup {
   label: string;
   items: NavItem[];
 }
+
+const NAVIGATION_STORAGE_PREFIX = "uvh.navigation.pinned.v1.";
+const NAVIGATION_OPEN_DELAY = 70;
+const NAVIGATION_CLOSE_DELAY = 100;
 
 @Component({
   selector: "app-panel",
@@ -105,17 +109,83 @@ export class PanelComponent {
   readonly panelContent = viewChild.required<ElementRef<HTMLElement>>("panelContent");
   // Reserve a compact main rail throughout the desktop dashboard. Revealing
   // its labels overlays the page; only explicit pinning reserves more space.
-  readonly mainNavPinned = signal(false);
+  readonly mainNavPinned = signal(this.readMainNavPreference(this.user()?.id));
   readonly mainNavHovered = signal(false);
   readonly mainNavFocused = signal(false);
   readonly mainNavRail = computed(() => !this.isMobile());
   readonly mainNavExpanded = computed(() => !this.mainNavRail() ||
     this.mainNavPinned() || this.mainNavHovered() || this.mainNavFocused());
+  readonly mainNavToggle = viewChild("mainNavToggle", { read: ElementRef<HTMLButtonElement> });
+  private mainNavAccount = this.user()?.id;
+  private mainNavOpenTimer?: ReturnType<typeof setTimeout>;
+  private mainNavCloseTimer?: ReturnType<typeof setTimeout>;
+  private mainNavPointerInside = false;
+  private mainNavDismissed = false;
+
+  private readMainNavPreference(userId: number | undefined): boolean {
+    if (!Number.isSafeInteger(userId) || !userId || userId < 1) return false;
+    try { return localStorage.getItem(NAVIGATION_STORAGE_PREFIX + userId) === "true"; }
+    catch { return false; }
+  }
+
+  private clearMainNavTimers(): void {
+    clearTimeout(this.mainNavOpenTimer); clearTimeout(this.mainNavCloseTimer);
+    this.mainNavOpenTimer = undefined; this.mainNavCloseTimer = undefined;
+  }
+
+  private resetMainNavReveal(): void {
+    this.clearMainNavTimers(); this.mainNavPointerInside = false; this.mainNavDismissed = false;
+    this.mainNavHovered.set(false); this.mainNavFocused.set(false);
+  }
+
+  onMainNavPointerEnter(event: PointerEvent): void {
+    if (event.pointerType !== "mouse" || !this.mainNavRail()) return;
+    this.mainNavPointerInside = true;
+    clearTimeout(this.mainNavCloseTimer);
+    if (this.mainNavDismissed || this.mainNavHovered() || this.mainNavOpenTimer !== undefined) return;
+    this.mainNavOpenTimer = setTimeout(() => {
+      this.mainNavOpenTimer = undefined;
+      if (!this.dialogOwner.destroyed && this.mainNavPointerInside && !this.mainNavDismissed && this.mainNavRail()) this.mainNavHovered.set(true);
+    }, NAVIGATION_OPEN_DELAY);
+  }
+
+  onMainNavPointerLeave(): void {
+    this.mainNavPointerInside = false; this.mainNavDismissed = false;
+    clearTimeout(this.mainNavOpenTimer); this.mainNavOpenTimer = undefined;
+    clearTimeout(this.mainNavCloseTimer);
+    this.mainNavCloseTimer = setTimeout(() => {
+      this.mainNavCloseTimer = undefined;
+      if (!this.dialogOwner.destroyed && !this.mainNavPointerInside) this.mainNavHovered.set(false);
+    }, NAVIGATION_CLOSE_DELAY);
+  }
+
+  toggleMainNavPinned(): void {
+    const pinned = !this.mainNavPinned();
+    this.resetMainNavReveal(); this.mainNavPinned.set(pinned);
+    const userId = this.user()?.id;
+    if (Number.isSafeInteger(userId) && userId && userId > 0) {
+      try { localStorage.setItem(NAVIGATION_STORAGE_PREFIX + userId, String(pinned)); }
+      catch { /* Navigation remains usable when browser storage is unavailable. */ }
+    }
+  }
+
+  onMainNavEscape(event: Event): void {
+    if (event.defaultPrevented || !this.mainNavRail() || this.mainNavPinned() || !this.mainNavExpanded()) return;
+    this.clearMainNavTimers(); this.mainNavDismissed = this.mainNavPointerInside;
+    this.mainNavHovered.set(false); this.mainNavFocused.set(false);
+    const shell = event.currentTarget;
+    if (shell instanceof HTMLElement && shell.querySelector("#panel-navigation")?.contains(document.activeElement)) {
+      this.mainNavToggle()?.nativeElement.focus({ preventScroll: true });
+    }
+    event.preventDefault(); event.stopPropagation();
+  }
 
   onMainNavFocusIn(event: FocusEvent): void {
     // Pointer focus must not keep a hover reveal open after the pointer leaves.
     const target = event.target;
-    this.mainNavFocused.set(target instanceof HTMLElement && target.matches(":focus-visible"));
+    const visible = target instanceof HTMLElement && target.matches(":focus-visible");
+    if (visible) this.mainNavDismissed = false;
+    this.mainNavFocused.set(visible);
   }
 
   onMainNavFocusOut(event: FocusEvent): void {
@@ -143,6 +213,14 @@ export class PanelComponent {
     });
 
   constructor() {
+    effect(() => {
+      const userId = this.user()?.id;
+      if (userId !== this.mainNavAccount) {
+        this.mainNavAccount = userId; this.resetMainNavReveal(); this.mainNavPinned.set(this.readMainNavPreference(userId));
+      }
+    });
+    effect(() => { this.isMobile(); this.resetMainNavReveal(); });
+    this.dialogOwner.onDestroy(() => this.clearMainNavTimers());
     void this.notifications.refreshUnread().catch(() => undefined);
   }
 

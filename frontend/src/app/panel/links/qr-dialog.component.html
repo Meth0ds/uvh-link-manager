@@ -145,6 +145,20 @@
         </mat-select>
       </mat-form-field>
       }
+      @if (workflows.enabled() && section() === 'file' && !bulkLinks && !libraryMode) {
+        <section class="qr-share" [class.ready]="shareReady()" [attr.aria-busy]="sharePreparing() || shareBusy()" aria-labelledby="qr-share-title">
+          <div class="share-heading"><mat-icon aria-hidden="true">ios_share</mat-icon><div><h4 id="qr-share-title">Compartir como imagen</h4><p>Envía un PNG de {{ downloadSize() }} px a una aplicación de tu dispositivo.</p></div></div>
+          @if (shareUnavailableReason || shareFallback()) {
+            <p class="share-status" role="status">{{ shareUnavailableReason || shareNotice() }}</p>
+            <button mat-stroked-button type="button" (click)="download()" [disabled]="!campaignReady() || !dataUrl() || previewBusy() || logoBusy() || needsCustomLogo() || downloadBusy() || designBusy()"><mat-icon aria-hidden="true">download</mat-icon>Descargar PNG</button>
+          } @else {
+            <button mat-stroked-button type="button" class="share-action" (click)="shareImage()" [disabled]="!shareReady() || !campaignReady() || previewBusy() || logoBusy() || downloadBusy() || designBusy()" [attr.aria-busy]="sharePreparing() || shareBusy()">
+              <mat-icon aria-hidden="true">{{ sharePreparing() ? 'hourglass_top' : 'ios_share' }}</mat-icon>{{ sharePreparing() ? 'Preparando imagen…' : shareBusy() ? 'Compartiendo…' : 'Compartir imagen' }}
+            </button>
+            <p class="share-status" role="status">{{ shareNotice() || (sharePreparing() ? 'Preparando el diseño actual. Puedes seguir revisando las opciones.' : !campaignReady() ? 'Guarda primero el QR de campaña para compartir su versión definitiva.' : shareReady() ? 'Imagen preparada. Elige una aplicación en el menú de tu dispositivo.' : 'La imagen estará disponible cuando termine la vista previa.') }}</p>
+          }
+        </section>
+      }
       @if (section() === 'print' || (section() === 'file' && format() === 'pdf')) {
         <div class="options-heading"><h3>{{ section() === 'print' ? 'Tu hoja A4' : 'Medidas del QR' }}</h3></div>
         <div class="measure-fields">

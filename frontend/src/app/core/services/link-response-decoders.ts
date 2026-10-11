@@ -1,6 +1,7 @@
 import type { AnalyticsOverview, AuditEvent, LinkAppeal, LinkDetailResponse, LinkDto, LinksResponse, LinkTrashResponse, RedirectRule } from "../models";
 import { LINK_APPEAL_STATUSES } from "../link-appeal-status";
 import { LINK_STATES } from "../link-state-label";
+import { decodeExpiredPage } from "./link-workflow-decoders";
 import {
   boolean,
   boundedArray,
@@ -50,6 +51,8 @@ function link(value: unknown): LinkDto {
   const utmSource = record(source["utm"], "link UTM");
   return {
     id: integer(source["id"], "link", 1),
+    ...(source["favorite"] === undefined ? {} : { favorite: boolean(source["favorite"], "link favorite") }),
+    ...(source["expiredPage"] === undefined ? {} : { expiredPage: source["expiredPage"] === null ? null : decodeExpiredPage(source["expiredPage"]) }),
     alias,
     destination: httpUrl(source["destination"], "link destination"),
     fallbackDestination: source["fallbackDestination"] === null

@@ -83,6 +83,12 @@ class RedirectController
             return VisitorAnswer::passwordRequired($request, $alias);
         }
 
+        if (isset($outcome['page']) && is_array($outcome['page']) && ($outcome['kind'] === 'gone' || ($outcome['kind'] === 'unavailable' && ($outcome['reason'] ?? '') === 'expired'))) {
+            $copy = $outcome['page'];
+
+            return VisitorAnswer::notice($copy['title'], $copy['message'], $outcome['kind'] === 'gone' ? 410 : 404, button: $copy);
+        }
+
         if ($outcome['kind'] === 'gone') {
             return VisitorAnswer::notice('Enlace agotado', 'Este enlace ya no está disponible (límite de clics o uso único alcanzado).', 410);
         }

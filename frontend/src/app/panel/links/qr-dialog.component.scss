@@ -103,6 +103,16 @@ mat-dialog-actions button { min-height: 44px; }
 .qr-options input, .qr-options mat-select, .qr-options button { scroll-margin-block:88px 16px; }
 .footer-close { margin-right:auto; }
 .copy-short { display:none; }
+.qr-share { display:flex; flex-direction:column; gap:12px; padding:16px; border-top:1px solid var(--uvh-border); border-bottom:1px solid var(--uvh-border); min-width:0; }
+.share-heading { display:flex; gap:10px; align-items:flex-start; }
+.share-heading > mat-icon { flex:0 0 19px; width:19px; height:19px; font-size:19px; color:var(--uvh-muted); transition:color 160ms ease; }
+.share-heading h4 { margin:0 0 5px; color:var(--uvh-ink); font-size:12px; font-weight:700; }
+.share-heading p, .share-status { margin:0; color:var(--uvh-muted); font-size:11px; line-height:1.6; overflow-wrap:anywhere; }
+.qr-share button { align-self:flex-start; min-height:44px; max-width:100%; }
+.qr-share.ready .share-heading > mat-icon { color:var(--uvh-electric); }
+.share-action:not(:disabled):active { transform:translateY(1px); }
+.share-action { transition:transform 120ms ease; }
+@media (prefers-reduced-motion:reduce) { .share-heading > mat-icon, .share-action { transition:none; } .share-action:not(:disabled):active { transform:none; } }
 @media (max-width:640px) {
   .qr-dialog-header { padding:16px 18px; gap:8px; }
   .qr-body { max-height:calc(100dvh - 195px); }

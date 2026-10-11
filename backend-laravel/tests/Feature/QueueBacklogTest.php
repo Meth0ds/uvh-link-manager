@@ -28,7 +28,7 @@ final class QueueBacklogTest extends TestCase
         // The label is part of the Prometheus surface: renaming it silently
         // breaks alerts that are keyed on it.
         $this->assertSame(
-            ['mail', 'webhooks', 'domains', 'exports', 'analytics', 'security', 'legacy'],
+            ['mail', 'webhooks', 'domains', 'exports', 'analytics', 'security', 'destinations', 'legacy'],
             array_keys(QueueBacklog::pools()),
         );
         // The legacy worker drains Laravel's default queue.

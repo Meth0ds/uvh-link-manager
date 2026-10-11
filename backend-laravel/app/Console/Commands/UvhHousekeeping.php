@@ -687,6 +687,10 @@ class UvhHousekeeping extends Command
                 DB::table('email_tokens')->where('user_id', $user->id)->delete();
                 DB::table('email_change_requests')->where('user_id', $user->id)->delete();
                 DB::table('memberships')->where('user_id', $user->id)->delete();
+                DB::table('link_favorites')->where('user_id', $user->id)->delete();
+                DB::table('saved_link_filters')->where('user_id', $user->id)->delete();
+                DB::table('link_duplicate_receipts')->where('user_id', $user->id)->delete();
+                DB::table('destination_inspections')->where('user_id', $user->id)->delete();
                 DB::table('api_tokens')->where('created_by', $user->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
                 DB::table('invitations')->where('invited_by', $user->id)->where('status', 'pending')->update(['status' => 'cancelled']);
 

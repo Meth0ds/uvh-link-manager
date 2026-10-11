@@ -40,6 +40,8 @@ final class AccountExportDocument
     private const SECTIONS = [
         'memberships',
         'createdLinks',
+        'linkFavorites',
+        'savedLinkFilters',
         'qrDesigns',
         'qrVariants',
         'qrAggregateAnalytics',
@@ -168,8 +170,12 @@ final class AccountExportDocument
                 ->select([
                     'id', 'workspace_id', 'domain_id', 'alias', 'destination', 'fallback_destination', 'state',
                     'max_clicks', 'click_count', 'single_use', 'used_at', 'scheduled_at', 'expires_at', 'notes',
-                    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'created_at', 'updated_at', 'deleted_at',
+                    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'expired_page', 'created_at', 'updated_at', 'deleted_at',
                 ])->cursor(),
+            'linkFavorites' => static fn (): iterable => DB::table('link_favorites')->where('user_id', $userId)
+                ->orderBy('workspace_id')->orderBy('link_id')->select(['workspace_id', 'link_id', 'created_at'])->cursor(),
+            'savedLinkFilters' => static fn (): iterable => DB::table('saved_link_filters')->where('user_id', $userId)
+                ->orderBy('id')->select(['id', 'workspace_id', 'name', 'spec', 'version', 'created_at', 'updated_at'])->cursor(),
             'redirectRules' => static fn (): iterable => DB::table('redirect_rules')
                 ->join('links', 'links.id', '=', 'redirect_rules.link_id')
                 ->where('links.created_by', $userId)

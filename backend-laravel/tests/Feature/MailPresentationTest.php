@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\NotificationKinds;
 use App\Support\UvhCrypto;
 use App\Support\UvhMail;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +44,27 @@ final class MailPresentationTest extends TestCase
         $this->assertStringContainsString('Cerrar accesos de emergencia', $mail['html']);
         $this->assertStringContainsString($url, $mail['text']);
         $this->assertStringContainsString('Si no reconoces esta acción', $mail['html']);
+    }
+
+    public function test_operational_link_mail_has_an_escaped_action_and_plain_text_without_credentials(): void
+    {
+        $url = 'https://app.example.test/app/links/7?workspaceId=3&source=notice';
+        $this->assertTrue(UvhMail::operationalNotice('recipient@example.test', NotificationKinds::LINK_EXPIRING, '<b>Campaña</b> · Caduca pronto', $url));
+        $mail = $this->envelope(NotificationKinds::LINK_EXPIRING);
+        $this->assertStringContainsString('>Revisar enlace</a>', $mail['html']);
+        $this->assertStringContainsString('&lt;b&gt;Campaña&lt;/b&gt;', $mail['html']);
+        $this->assertStringNotContainsString('<b>Campaña</b>', $mail['html']);
+        $this->assertSame(2, substr_count($mail['html'], 'href="https://app.example.test/app/links/7?workspaceId=3&amp;source=notice"'));
+        $this->assertStringContainsString($url, $mail['text']);
+        $this->assertStringNotContainsString('token=', $mail['html']);
+    }
+
+    public function test_other_operational_mail_keeps_the_generic_review_text(): void
+    {
+        $this->assertTrue(UvhMail::operationalNotice('recipient@example.test', NotificationKinds::API_TOKEN_EXPIRING, 'Token de integración'));
+        $mail = $this->envelope(NotificationKinds::API_TOKEN_EXPIRING);
+        $this->assertStringContainsString('Entra en UVH para revisar este aviso.', $mail['html']);
+        $this->assertStringNotContainsString('>Revisar enlace</a>', $mail['html']);
     }
 
     /** @return array{to: string, subject: string, html: string, text: string} */

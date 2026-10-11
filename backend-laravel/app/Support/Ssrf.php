@@ -118,7 +118,7 @@ final class Ssrf
      *
      * @return array{scheme: string, host: string, port: int, path: string, ips: array<int, string>}
      */
-    public static function assertSafeUrl(string $raw): array
+    public static function assertSafeUrl(string $raw, ?int $dnsTimeoutMs = null): array
     {
         $parts = parse_url($raw);
         if ($parts === false || ! isset($parts['scheme'])) {
@@ -160,7 +160,7 @@ final class Ssrf
         $host = strtolower($host);
         $path = ($parts['path'] ?? '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
 
-        $ips = self::resolveAndValidateHost($host);
+        $ips = self::resolveAndValidateHost($host, $dnsTimeoutMs);
 
         return [
             'scheme' => $scheme,
@@ -307,15 +307,91 @@ final class Ssrf
         // que un atacante con DNS rebinding no puede cambiar el destino entre
         // la validación y la conexión.
         if ($info['ips'] !== []) {
-            $resolve = [];
+            $addresses = [];
             foreach ($info['ips'] as $ip) {
                 $addr = str_contains($ip, ':') ? '['.$ip.']' : $ip;
-                $resolve[] = $info['host'].':'.$info['port'].':'.$addr;
+                $addresses[] = $addr;
             }
-            $opts[CURLOPT_RESOLVE] = $resolve;
+            // One cache entry per host/port: repeated entries replace earlier
+            // ones in libcurl instead of retaining their fallback addresses.
+            $opts[CURLOPT_RESOLVE] = [$info['host'].':'.$info['port'].':'.implode(',', $addresses)];
         }
 
         return $opts;
+    }
+
+    /**
+     * Bounded HEAD/GET only. Redirects are deliberately handled by the caller,
+     * so every hop gets a new DNS validation and pinned connection.
+     *
+     * @return array{status: int, body: string, headers: array<string, string>, truncated: bool}
+     */
+    public static function safeRead(string $url, string $method, int $timeoutMs, int $maxBytes): array
+    {
+        if (! in_array($method, ['HEAD', 'GET'], true)) {
+            throw new \InvalidArgumentException('Unsupported inspection method');
+        }
+        $started = microtime(true);
+        $info = self::assertSafeUrl($url, $timeoutMs);
+        $remaining = $timeoutMs - (int) ((microtime(true) - $started) * 1000);
+        if ($remaining <= 0) {
+            throw new \RuntimeException('inspection_timeout');
+        }
+        $ch = curl_init();
+        if ($ch === false) {
+            throw new \RuntimeException('inspection_transport');
+        }
+        $body = '';
+        $headers = [];
+        $headerBytes = 0;
+        $truncated = false;
+        $maxBytes = max(1, min(524288, $maxBytes));
+        $opts = self::hardenedOptions($info, ['Accept: text/html,image/png,image/jpeg;q=0.8,*/*;q=0.1', 'User-Agent: UVH-Destination-Inspection/1.0'], '', $remaining);
+        $opts[CURLOPT_POST] = false;
+        unset($opts[CURLOPT_POSTFIELDS]);
+        $opts[CURLOPT_CUSTOMREQUEST] = $method;
+        $opts[CURLOPT_NOBODY] = $method === 'HEAD';
+        $opts[CURLOPT_TIMEOUT_MS] = $remaining;
+        $opts[CURLOPT_CONNECTTIMEOUT_MS] = min(3000, $remaining);
+        $opts[CURLOPT_HEADERFUNCTION] = static function ($handle, string $line) use (&$headers, &$headerBytes): int {
+            $headerBytes += strlen($line);
+            if ($headerBytes > 16384) {
+                return 0;
+            }
+            if (str_starts_with($line, 'HTTP/')) {
+                $headers = [];
+            } elseif (str_contains($line, ':')) {
+                [$key, $value] = explode(':', $line, 2);
+                $key = strtolower(trim($key));
+                if (in_array($key, ['location', 'content-type'], true)) {
+                    $headers[$key] = trim($value);
+                }
+            }
+
+            return strlen($line);
+        };
+        $opts[CURLOPT_WRITEFUNCTION] = static function ($handle, string $chunk) use (&$body, &$truncated, $maxBytes): int {
+            $remaining = $maxBytes - strlen($body);
+            if (strlen($chunk) > $remaining) {
+                $body .= substr($chunk, 0, $remaining);
+                $truncated = true;
+
+                return 0;
+            }
+            $body .= $chunk;
+
+            return strlen($chunk);
+        };
+        curl_setopt_array($ch, $opts);
+        $response = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        if (($response === false && ! $truncated) || $status < 100) {
+            // Never include curl's diagnostic: it may contain secret URL parts.
+            throw new \RuntimeException('inspection_network');
+        }
+
+        return ['status' => $status, 'body' => $body, 'headers' => $headers, 'truncated' => $truncated];
     }
 
     /**
@@ -323,7 +399,7 @@ final class Ssrf
      *
      * @return array<int, string>
      */
-    private static function resolveAndValidateHost(string $host): array
+    private static function resolveAndValidateHost(string $host, ?int $dnsTimeoutMs = null): array
     {
         $host = rtrim($host, '.');
         if ($host === '') {
@@ -339,7 +415,8 @@ final class Ssrf
             return [];
         }
 
-        $records = @dns_get_record($host, DNS_A | DNS_AAAA);
+        $records = $dnsTimeoutMs === null ? @dns_get_record($host, DNS_A | DNS_AAAA)
+            : (new BoundedDnsResolver)->resolve($host, $dnsTimeoutMs);
         if ($records === false || $records === []) {
             throw new \RuntimeException('SSRF: no se pudo resolver el host');
         }

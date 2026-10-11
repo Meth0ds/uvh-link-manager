@@ -2,8 +2,8 @@
   <div class="editor-heading">
     <span class="editor-mark" aria-hidden="true"><mat-icon>link</mat-icon></span>
     <div>
-      <h2 mat-dialog-title>{{ isEdit ? 'Editar enlace' : 'Crear enlace' }}</h2>
-      <p>{{ isEdit ? 'Ajusta el destino y cómo funciona tu enlace.' : 'Empieza por el destino. El resto lo decides tú.' }}</p>
+      <h2 mat-dialog-title>{{ isEdit ? 'Editar enlace' : isDuplicate ? 'Duplicar enlace' : 'Crear enlace' }}</h2>
+      <p>{{ isEdit ? 'Ajusta el destino y cómo funciona tu enlace.' : isDuplicate ? 'Los mismos ajustes, una dirección nueva y estadísticas desde cero.' : 'Empieza por el destino. El resto lo decides tú.' }}</p>
     </div>
   </div>
   <button mat-icon-button mat-dialog-close type="button" aria-label="Cerrar editor de enlace" class="editor-close"><mat-icon>close</mat-icon></button>
@@ -49,6 +49,7 @@
                 @if (form.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
                 @if (form.controls.destination.hasError('required')) { <mat-error>Escribe la URL de destino.</mat-error> }
               </mat-form-field>
+              <app-destination-inspection [url]="destinationValue()" [preview]="true" />
               <div class="section-heading secondary"><h3>Tu URL corta</h3><p>Elige una dirección fácil de reconocer y compartir.</p></div>
               <div class="address-fields">
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -86,10 +87,10 @@
               <div class="section-heading"><h3>Quién puede usarlo</h3><p>Añade protección o limita el número de visitas.</p></div>
               <div class="field-pair">
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                  <mat-label>{{ isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña (opcional)' }}</mat-label>
+                  <mat-label>{{ isEdit || isDuplicate ? 'Nueva contraseña (opcional)' : 'Contraseña (opcional)' }}</mat-label>
                   <input matInput formControlName="password" type="password" autocomplete="new-password" maxlength="72" />
                   <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
-                  @if (isEdit && data.link?.passwordProtected) { <mat-hint>Déjala vacía para mantener la contraseña actual.</mat-hint> }
+                  @if ((isEdit || isDuplicate) && data.link?.passwordProtected) { <mat-hint>Déjala vacía para mantener la contraseña actual.</mat-hint> }
                 </mat-form-field>
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
                   <mat-label>Máximo de clics (opcional)</mat-label>
@@ -98,7 +99,7 @@
                 </mat-form-field>
               </div>
               <div class="access-choices">
-                @if (isEdit && data.link?.passwordProtected) { <mat-checkbox formControlName="clearPassword">Quitar la contraseña actual</mat-checkbox> }
+                @if ((isEdit || isDuplicate) && data.link?.passwordProtected) { <mat-checkbox formControlName="clearPassword">Quitar la contraseña actual</mat-checkbox> }
                 <mat-checkbox formControlName="singleUse">Uso único</mat-checkbox>
                 <p>Después del primer clic, el enlace deja de estar disponible.</p>
               </div>
@@ -117,6 +118,11 @@
                 </mat-form-field>
               </div>
               @if (form.hasError('lifecycleOrder')) { <div id="link-window-error" class="editor-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>La expiración debe ser posterior a la activación.</span></div> }
+              @if (isDuplicate) { <div class="duplicate-note" role="status"><mat-icon aria-hidden="true">library_add</mat-icon><p>{{ duplicateExpired ? 'La copia conservará una fecha de caducidad pasada. Cambia esa fecha si quieres que el nuevo enlace esté disponible.' : 'Las fechas y límites se conservan. Los clics y el uso único empiezan desde cero.' }}</p></div> }
+              @if (workflows.enabled()) {
+                <div class="reminder-help"><mat-icon aria-hidden="true">notifications_none</mat-icon><p>UVH avisa {{ workflows.capabilities()?.reminderHours }} horas antes de caducar y al consumir el {{ (workflows.capabilities()?.reminderClickRatio ?? 0.9) * 100 }} % del límite. <a routerLink="/app/settings/notifications" (click)="dialogRefClose()">Configurar mis avisos</a></p></div>
+                <app-expired-page-editor [(spec)]="expiredPage" />
+              }
             </div>
           </mat-tab>
           <mat-tab label="Organizar">
@@ -210,12 +216,12 @@
 
 @if (error()) { <div class="editor-request-error editor-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div> }
 <mat-dialog-actions class="editor-footer">
-  <p>{{ isEdit ? 'Conserva tu enlace. Cambia lo que necesitas.' : 'Solo necesitas una URL para empezar.' }}</p>
+  <p>{{ isEdit ? 'Conserva tu enlace. Cambia lo que necesitas.' : isDuplicate ? 'Revisa los ajustes antes de crear la copia.' : 'Solo necesitas una URL para empezar.' }}</p>
   <div class="footer-buttons">
     <button mat-button mat-dialog-close type="button">Cancelar</button>
-    <button mat-flat-button type="button" (click)="save()" [disabled]="form.invalid || hasInvalidRules || ['checking', 'taken', 'invalid', 'reserved'].includes(aliasStatus()) || busy() || loading() || (isEdit && !editDetailsLoaded())">
+    <button mat-flat-button type="button" (click)="save()" [disabled]="form.invalid || hasInvalidRules || expiredPageInvalid || ['checking', 'taken', 'invalid', 'reserved'].includes(aliasStatus()) || busy() || loading() || ((isEdit || isDuplicate) && !editDetailsLoaded())">
       @if (!busy()) { <mat-icon>{{ isEdit ? 'check' : 'add_link' }}</mat-icon> }
-      {{ busy() ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear enlace' }}
+      {{ busy() ? 'Guardando…' : isEdit ? 'Guardar cambios' : isDuplicate ? 'Crear copia' : 'Crear enlace' }}
     </button>
   </div>
 </mat-dialog-actions>

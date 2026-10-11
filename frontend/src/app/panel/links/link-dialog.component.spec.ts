@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 
 import type { LinkDto } from "../../core/models";
 import { ApiService } from "../../core/services/api.service";
+import { LinkWorkflowService } from "../../core/services/link-workflow.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { LinkDialogComponent } from "./link-dialog.component";
 
@@ -37,6 +38,7 @@ describe("LinkDialogComponent form and async safety", () => {
       imports: [LinkDialogComponent],
       providers: [
         FormBuilder,
+        { provide: LinkWorkflowService, useValue: { enabled: () => false, capabilities: () => null } },
         { provide: ApiService, useValue: api },
         { provide: MatDialogRef, useValue: dialogRef },
         { provide: WorkspaceService, useValue: { currentId: workspaceId } },
@@ -193,6 +195,7 @@ describe("LinkDialogComponent edit-mode alias contract", () => {
       imports: [LinkDialogComponent],
       providers: [
         FormBuilder,
+        { provide: LinkWorkflowService, useValue: { enabled: () => false, capabilities: () => null } },
         { provide: ApiService, useValue: api },
         { provide: MatDialogRef, useValue: dialogRef },
         { provide: MAT_DIALOG_DATA, useValue: { mode: "edit", link } },
@@ -243,6 +246,7 @@ describe("LinkDialogComponent edit-mode alias contract", () => {
       imports: [LinkDialogComponent],
       providers: [
         FormBuilder,
+        { provide: LinkWorkflowService, useValue: { enabled: () => false, capabilities: () => null } },
         { provide: ApiService, useValue: api },
         { provide: MatDialogRef, useValue: dialogRef },
         { provide: MAT_DIALOG_DATA, useValue: { mode: "edit", link } },

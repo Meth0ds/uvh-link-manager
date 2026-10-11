@@ -159,7 +159,7 @@ class RedirectService
             return ['kind' => 'unavailable', 'reason' => 'scheduled'];
         }
         if ($state === 'expired' || ($link->expires_at && $link->expires_at->lte(now()))) {
-            return ['kind' => 'unavailable', 'reason' => 'expired'];
+            return ExpiredLinkPage::decorate(['kind' => 'unavailable', 'reason' => 'expired'], $link, 'expired');
         }
 
         // Parse once, but repeat the authorization decision after locking the
@@ -278,7 +278,7 @@ class RedirectService
                     return;
                 }
                 if ($freshState === 'expired' || ($fresh->expires_at && $fresh->expires_at->lte(now()))) {
-                    $outcome = ['kind' => 'unavailable', 'reason' => 'expired'];
+                    $outcome = ExpiredLinkPage::decorate(['kind' => 'unavailable', 'reason' => 'expired'], $fresh, 'expired');
 
                     return;
                 }
@@ -345,7 +345,7 @@ class RedirectService
                 // lock keeps the selection and consumption one atomic decision.
                 if ($fresh->single_use) {
                     if ($fresh->used_at) {
-                        $outcome = ['kind' => 'gone'];
+                        $outcome = ExpiredLinkPage::decorate(['kind' => 'gone'], $fresh, 'exhausted');
 
                         return;
                     }
@@ -355,7 +355,7 @@ class RedirectService
                         'updated_at' => now(),
                     ]);
                     if ($updated === 0) {
-                        $outcome = ['kind' => 'gone'];
+                        $outcome = ExpiredLinkPage::decorate(['kind' => 'gone'], $fresh, 'exhausted');
 
                         return;
                     }
@@ -365,7 +365,7 @@ class RedirectService
                         'updated_at' => now(),
                     ]);
                     if ($updated === 0) {
-                        $outcome = ['kind' => 'gone'];
+                        $outcome = ExpiredLinkPage::decorate(['kind' => 'gone'], $fresh, 'exhausted');
 
                         return;
                     }

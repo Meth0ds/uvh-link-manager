@@ -91,7 +91,9 @@ final class OperationalNoticesTest extends TestCase
         OperationalNotices::sweep();
         $this->assertSame(1, DB::table('operational_notice_events')->count());
         $this->assertEqualsCanonicalizing([$owner->id, $admin->id], DB::table('notifications')->pluck('user_id')->all());
-        $this->assertSame(['after-notice'], DB::table('notifications')->distinct()->pluck('subject')->all());
+        $subjects = DB::table('notifications')->distinct()->pluck('subject')->all();
+        $this->assertCount(1, $subjects);
+        $this->assertStringStartsWith('after-notice', $subjects[0]);
     }
 
     public function test_invalid_entitlement_is_rejected_instead_of_becoming_unlimited(): void

@@ -1,4 +1,4 @@
-import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, signal, untracked, ChangeDetectionStrategy } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { DatePipe } from "@angular/common";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
@@ -44,6 +44,11 @@ import { TagsDialogComponent } from "./tags-dialog.component";
 import { CollectionsDialogComponent } from "./collections-dialog.component";
 import { CsvImportDialogComponent } from "./csv-import-dialog.component";
 
+import { LinkWorkflowService } from "../../core/services/link-workflow.service";
+import { LinkFavoriteService } from "../../core/services/link-favorite.service";
+import { SavedLinkFiltersComponent } from "./saved-link-filters.component";
+import type { LinkFilterSpec } from "../../core/link-workflows";
+
 type StateFilter = "" | LinkState;
 
 @Component({
@@ -52,6 +57,7 @@ type StateFilter = "" | LinkState;
   providers: [CopyFeedbackService],
   imports: [
     CopyFeedbackIconComponent,
+    SavedLinkFiltersComponent,
     RouterLink,
     FormsModule,
     MatButtonModule,
@@ -77,6 +83,8 @@ type StateFilter = "" | LinkState;
 })
 export class LinksComponent {
   private api = inject(ApiService);
+  readonly workflows = inject(LinkWorkflowService);
+  readonly favorites = inject(LinkFavoriteService);
   private readonly dialogOwner = inject(DestroyRef);
   private route = inject(ActivatedRoute);
   readonly router = inject(Router);
@@ -136,10 +144,17 @@ export class LinksComponent {
   readonly state = signal<StateFilter>("");
   readonly tag = signal("");
   readonly sort = signal("created_at_desc");
+  readonly collectionId = signal<number | null>(null);
+  readonly utmCampaign = signal("");
+  readonly favoritesOnly = signal(false);
+  readonly advancedFilters = signal(false);
+  readonly advancedFilterCount = computed(() => Number(this.collectionId() !== null) + Number(this.utmCampaign() !== ""));
+  private savedFilterId: number | null = null;
+  readonly filterSpec = computed<LinkFilterSpec>(() => ({ version: 1, q: this.q(), state: this.state(), tag: this.tag(), domainId: this.domainId(), collectionId: this.collectionId(), utmCampaign: this.utmCampaign(), favorites: this.favoritesOnly(), sort: this.sort() }));
   /** null es «uvh.es»: los enlaces sin dominio personalizado. */
   readonly domainId = signal<number | null>(null);
   readonly domainOptions = signal<DomainDto[]>([]);
-  readonly hasFilters = computed(() => Boolean(this.q().trim() || this.state() || this.tag() || this.domainId() !== null));
+  readonly hasFilters = computed(() => Boolean(this.q().trim() || this.state() || this.tag() || this.domainId() !== null || this.collectionId() !== null || this.utmCampaign() || this.favoritesOnly()));
   readonly someOnPage = computed(() => this.links().some(link => this.selected().has(link.id)) && !this.allOnPage());
   readonly page = signal(0);
   readonly pageSizeOptions = [20, 50, 100];
@@ -174,6 +189,8 @@ export class LinksComponent {
   }
 
   constructor() {
+    effect(() => { const message = this.favorites.error(); if (message) this.snackbar.open(message, "Cerrar", { duration: 4000 }); });
+    effect(() => { if (this.workflows.enabled()) untracked(() => { void this.loadCollections(); void this.reload(); }); });
     if (this.legacyDestination) {
       void this.router.navigate([], {
         relativeTo: this.route,
@@ -196,6 +213,7 @@ export class LinksComponent {
       this.collectionRequests.invalidate();
       this.collectionLoad = null;
       this.collections.set([]);
+      this.collectionId.set(null); this.utmCampaign.set(""); this.favoritesOnly.set(false); this.savedFilterId = null;
       this.bulkCollectionId.set(null);
       this.bulkDomainId.set(null);
       this.clearSelection();
@@ -254,6 +272,7 @@ export class LinksComponent {
         tag: this.tag(),
         domainId: this.domainId() ?? "",
         sort: this.sort(),
+        ...(this.workflows.enabled() ? { collectionId: this.collectionId() ?? "", utmCampaign: this.utmCampaign(), favorites: this.favoritesOnly(), savedFilterId: this.savedFilterId ?? "" } : {}),
         page,
         perPage,
       }, (value) => decodeLinksResponse(value, { page, perPage }), { signal: request.signal });
@@ -270,12 +289,14 @@ export class LinksComponent {
   }
 
   onSearch(value: string): void {
+    this.savedFilterId = null;
     this.q.set(value.trim());
     this.page.set(0);
     void this.reload();
   }
 
   clearFilters(): void {
+    this.savedFilterId = null; this.collectionId.set(null); this.utmCampaign.set(""); this.favoritesOnly.set(false);
     this.clearSelection();
     this.q.set("");
     this.state.set("");
@@ -286,12 +307,14 @@ export class LinksComponent {
   }
 
   onState(value: StateFilter): void {
+    this.savedFilterId = null;
     this.state.set(value);
     this.page.set(0);
     void this.reload();
   }
 
   onDomain(value: number | null): void {
+    this.savedFilterId = null;
     this.domainId.set(value);
     this.page.set(0);
     void this.reload();
@@ -317,15 +340,28 @@ export class LinksComponent {
    * been sent to the API (and documented there); nothing used to write it.
    */
   toggleTag(name: string): void {
+    this.savedFilterId = null;
     this.tag.set(this.tag() === name ? "" : name);
     this.page.set(0);
     void this.reload();
   }
 
   onSort(value: string): void {
+    this.savedFilterId = null;
     this.sort.set(value);
     this.page.set(0);
     void this.reload();
+  }
+
+  onCollection(value: number | null): void { this.savedFilterId = null; this.collectionId.set(value); this.page.set(0); void this.reload(); }
+  onCampaign(value: string): void { this.savedFilterId = null; this.utmCampaign.set(value.trim()); this.page.set(0); void this.reload(); }
+  onFavorites(value: boolean): void { this.savedFilterId = null; this.favoritesOnly.set(value); this.page.set(0); void this.reload(); }
+  applySavedFilter(value: { spec: LinkFilterSpec; id: number }): void {
+    const s = value.spec; this.savedFilterId = value.id; this.q.set(s.q); this.state.set(s.state); this.tag.set(s.tag); this.domainId.set(s.domainId);
+    this.collectionId.set(s.collectionId); this.utmCampaign.set(s.utmCampaign); this.favoritesOnly.set(s.favorites); this.sort.set(s.sort); this.clearSelection(); this.page.set(0); void this.reload();
+  }
+  duplicate(link: LinkDto): void { if (!this.canWrite() || link.state === "blocked" || !this.workflows.enabled()) return;
+    this.linkDialog.openDuplicate(link, this.dialogOwner).subscribe(created => { if (created) void this.router.navigate(["/app/links", created.id]); });
   }
 
   onPage(e: PageEvent): void {

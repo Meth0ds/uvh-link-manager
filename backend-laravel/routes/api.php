@@ -9,12 +9,16 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CollectionController;
+use App\Http\Controllers\DestinationInspectionController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\LinkBulkController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkCsvController;
+use App\Http\Controllers\LinkDuplicateController;
+use App\Http\Controllers\LinkFavoriteController;
 use App\Http\Controllers\LinkIntentController;
 use App\Http\Controllers\LinkTemplateController;
+use App\Http\Controllers\LinkWorkflowController;
 use App\Http\Controllers\MfaChallengeController;
 use App\Http\Controllers\MfaConfigurationController;
 use App\Http\Controllers\MfaSessionController;
@@ -28,6 +32,7 @@ use App\Http\Controllers\QrDesignController;
 use App\Http\Controllers\QrSnapshotController;
 use App\Http\Controllers\QrVariantController;
 use App\Http\Controllers\RegistrationController;
+use App\Http\Controllers\SavedLinkFilterController;
 use App\Http\Controllers\SecurityIncidentController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TokenController;
@@ -156,8 +161,22 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         ->middleware(['uvh.auth', 'uvh.mfa', 'throttle:uvh-credential']);
     Route::post('auth/mfa/disable', [MfaConfigurationController::class, 'mfaDisable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
 
+    Route::get('link-workflows', [LinkWorkflowController::class, 'show'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer']);
+    Route::prefix('link-filters')->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->group(function () {
+        Route::get('/', [SavedLinkFilterController::class, 'index']);
+        Route::post('/', [SavedLinkFilterController::class, 'store']);
+        Route::patch('{id}', [SavedLinkFilterController::class, 'update'])->whereNumber('id');
+        Route::delete('{id}', [SavedLinkFilterController::class, 'destroy'])->whereNumber('id');
+    });
+    Route::post('destination-previews', [DestinationInspectionController::class, 'preview'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor']);
+    Route::get('destination-inspections/{id}', [DestinationInspectionController::class, 'show'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->whereUuid('id');
+    Route::get('destination-inspections/{id}/icon', [DestinationInspectionController::class, 'icon'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->whereUuid('id');
+
     // Links.
     Route::prefix('links')->middleware(['uvh.auth', 'uvh.auth:verified'])->group(function () {
+        Route::post('{id}/duplicate', [LinkDuplicateController::class, 'duplicate'])->middleware(['uvh.workspace:editor', 'throttle:uvh-link-create'])->whereNumber('id');
+        Route::patch('{id}/favorite', [LinkFavoriteController::class, 'update'])->middleware('uvh.workspace:viewer')->whereNumber('id');
+        Route::post('{id}/destination-inspection', [DestinationInspectionController::class, 'check'])->middleware('uvh.workspace:viewer')->whereNumber('id');
         Route::get('qr-export', [QrSnapshotController::class, 'index'])->middleware('uvh.workspace:viewer');
         Route::get('{linkId}/qr-variants/comparison', [QrVariantController::class, 'comparison'])->middleware(['uvh.workspace:viewer', 'throttle:uvh-analytics'])->whereNumber('linkId');
         Route::get('{linkId}/qr-variants', [QrVariantController::class, 'index'])->middleware('uvh.workspace:viewer')->whereNumber('linkId');

@@ -17,3 +17,5 @@ Schedule::command('uvh:housekeeping')->everyMinute()->withoutOverlapping();
 // autor eligió acumular. Sin solape: una pasada larga no debe montarse sobre
 // la siguiente.
 Schedule::command('uvh:notifications-digest')->dailyAt('08:00')->withoutOverlapping();
+
+Schedule::command('uvh:destination-inspections-prune')->everyFiveMinutes()->withoutOverlapping();

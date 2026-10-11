@@ -130,9 +130,10 @@ final class VisitorAnswer
      * dominio con 404 «de marca» responde como suyo, no como el servicio que
      * hay detrás.
      */
-    public static function notice(string $title, string $body, int $status, ?string $brandHost = null): Response
+    /** @param array<string, mixed>|null $button */
+    public static function notice(string $title, string $body, int $status, ?string $brandHost = null, ?array $button = null): Response
     {
-        return response(VisitorPage::notice($title, $body, $status, $brandHost), $status);
+        return response(VisitorPage::notice($title, $body, $status, $brandHost, $button), $status);
     }
 
     /** Quien pide HTML está mirando la pantalla; cualquier otro es un cliente. */

@@ -110,6 +110,23 @@ final class OperationalMetrics
         // Un job auxiliar que la cola no admite. Distinto de `check_failed`: la
         // comprobación nunca llegó a intentarse.
         'reputation.dispatch_failed',
+        // No host, URL, workspace or account labels: finite inspection outcomes.
+        'destination_inspection.completed',
+        'destination_inspection.job_failed',
+        'destination_inspection.stale',
+        'destination_inspection.cache_hit',
+        'destination_inspection.rate_limited',
+        'destination_inspection.reachable',
+        'destination_inspection.restricted',
+        'destination_inspection.http_error',
+        'destination_inspection.network_error',
+        'destination_inspection.not_checkable',
+        'destination_inspection.duration_ms',
+        'destination_inspection.le_250',
+        'destination_inspection.le_1000',
+        'destination_inspection.le_3000',
+        'destination_inspection.le_8000',
+        'destination_inspection.le_inf',
         // Rate limiting counts on Redis first and falls back to PostgreSQL when
         // it is unreachable, so public traffic keeps being served. The fallback
         // is recorded because a silent one would hide a failing dependency.
