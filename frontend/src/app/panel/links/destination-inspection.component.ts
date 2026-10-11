@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, signal } from "@angular/core";
 import { DatePipe } from "@angular/common";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -28,13 +28,20 @@ import type { LinkDto } from "../../core/models";
             <small>Comprobado {{ info.checkedAt | date:'dd/MM/yyyy HH:mm' }}</small>
           </div>
         </div>
+        @if (preview() && suggestName() && info.title) { <button mat-stroked-button class="use-title" type="button" (click)="useTitle()"><mat-icon aria-hidden="true">label_outline</mat-icon>Usar como nombre</button> }
         <p class="inspection-footnote">{{ info.status === 'restricted' ? 'El sitio puede requerir acceso o limitar las consultas automáticas.' : 'El resultado se reutiliza durante 10 minutos. Describe la respuesta del sitio; no certifica su seguridad.' }}</p>
       }
     </section>
   }`,
-  styles: [`:host{display:block;min-width:0}.destination-inspector{padding:22px 0;border-top:1px solid var(--uvh-border)}.inspection-top{display:flex;align-items:center;justify-content:space-between;gap:20px}h3{margin:0 0 6px;font-size:15px;font-weight:700}p{margin:0;font-size:13px;line-height:1.6;color:var(--uvh-muted)}button{flex-shrink:0;min-height:44px}.inspection-result{display:flex;gap:14px;align-items:center;margin-top:18px;padding:18px;border:1px solid var(--uvh-border);border-radius:16px;background:var(--uvh-surface-raised);animation:inspection-reveal .18s ease-out}.site-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:13px;background:var(--uvh-surface);flex-shrink:0}.site-icon img{object-fit:contain}.site-summary{display:flex;flex-direction:column;gap:5px;min-width:0}.site-summary strong,.site-domain{overflow-wrap:anywhere}.site-summary strong{font-size:14px}.site-domain{font-size:13px;color:var(--uvh-muted)}.status-label{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:650}.http-code{font-size:11px;font-weight:500;color:var(--uvh-muted)}small{font-size:11px;color:var(--uvh-muted)}.inspection-footnote{font-size:12px;margin-top:10px}.inspection-error{color:var(--uvh-danger);margin-top:12px}.reachable .site-icon{color:var(--uvh-success)}.spinning{animation:inspection-spin 1s linear infinite}@keyframes inspection-spin{to{transform:rotate(360deg)}}@keyframes inspection-reveal{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}@media(max-width:600px){.inspection-top{align-items:flex-start;flex-direction:column;gap:12px}.inspection-top button{width:100%}}@media(prefers-reduced-motion:reduce){.inspection-result,.spinning{animation:none}}`],
+  styles: [`:host{display:block;min-width:0}.destination-inspector{padding:22px 0;border-top:1px solid var(--uvh-border)}.inspection-top{display:flex;align-items:center;justify-content:space-between;gap:20px}h3{margin:0 0 6px;font-size:15px;font-weight:700}p{margin:0;font-size:13px;line-height:1.6;color:var(--uvh-muted)}button{flex-shrink:0;min-height:44px}.inspection-result{display:flex;gap:14px;align-items:center;margin-top:18px;padding:18px;border:1px solid var(--uvh-border);border-radius:16px;background:var(--uvh-surface-raised);animation:inspection-reveal .18s ease-out}.site-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:13px;background:var(--uvh-surface);flex-shrink:0}.site-icon img{object-fit:contain}.site-summary{display:flex;flex-direction:column;gap:5px;min-width:0}.site-summary strong,.site-domain{overflow-wrap:anywhere}.site-summary strong{font-size:14px}.site-domain{font-size:13px;color:var(--uvh-muted)}.status-label{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:650}.http-code{font-size:11px;font-weight:500;color:var(--uvh-muted)}small{font-size:11px;color:var(--uvh-muted)}.use-title{margin-top:12px}.inspection-footnote{font-size:12px;margin-top:10px}.inspection-error{color:var(--uvh-danger);margin-top:12px}.reachable .site-icon{color:var(--uvh-success)}.spinning{animation:inspection-spin 1s linear infinite}@keyframes inspection-spin{to{transform:rotate(360deg)}}@keyframes inspection-reveal{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}@media(max-width:600px){.inspection-top{align-items:flex-start;flex-direction:column;gap:12px}.inspection-top button{width:100%}}@media(prefers-reduced-motion:reduce){.inspection-result,.spinning{animation:none}}`],
   changeDetection: ChangeDetectionStrategy.Eager })
 export class DestinationInspectionComponent {
+  readonly suggestName = input(false);
+  readonly nameSuggested = output<{ title: string; url: string }>();
+  useTitle(): void {
+    const title = this.result()?.title;
+    if (title && this.preview() && this.suggestName() && !this.busy()) this.nameSuggested.emit({ title, url: this.url() });
+  }
   readonly url = input(""); readonly link = input<LinkDto | null>(null); readonly preview = input(false);
   readonly workflows = inject(LinkWorkflowService);
   private readonly service = inject(DestinationInspectionService);

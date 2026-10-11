@@ -1,7 +1,7 @@
 import type { DestinationInspection, ExpiredPageSpec, LinkFilterSpec, LinkNoticeContent, LinkWorkflowCapabilities, SavedLinkFilter } from "../link-workflows";
 import { boolean, boundedArray, finiteNumber, httpUrl, integer, invalid, literal, nullableInteger, nullableMultiline, nullableText, record, text } from "./response-decoder-helpers";
 
-const SORTS = new Set(["created_at_desc", "created_at_asc", "clicks_desc", "alias_asc"]);
+const SORTS = new Set(["created_at_desc", "created_at_asc", "clicks_desc", "alias_asc", "name_asc", "name_desc"]);
 function notice(value: unknown): LinkNoticeContent {
   const r = record(value, "link notice");
   const title = text(r["title"], "notice title", 80), message = nullableMultiline(r["message"], "notice message", 500) ?? "";

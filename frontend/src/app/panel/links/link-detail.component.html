@@ -19,10 +19,11 @@
         <div class="link-copy">
           <span class="link-eyebrow">Detalle operativo</span>
           <div class="link-title-line">
-            <h1 class="tnum">{{ displayUrl(link.shortUrl) }}</h1>
+            <h1 class="tnum">{{ link.name || displayUrl(link.shortUrl) }}</h1>
             @if (workflows.enabled()) { <button mat-icon-button class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="favorites.value(link) ? 'Quitar de favoritos' : 'Añadir a favoritos'" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button> }
             <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
           </div>
+          @if (link.name) { <p class="named-short-url tnum">{{ displayUrl(link.shortUrl) }}</p> }
           <p class="dest" [title]="link.destination">{{ link.destination }}</p>
         </div>
       </div>

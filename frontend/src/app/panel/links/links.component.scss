@@ -469,3 +469,5 @@
 .workflow-filters[hidden]{display:none}.advanced-filter-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;padding:0 4px;background:var(--uvh-electric);color:var(--accent-ink);border-radius:3px;font-size:11px}.workflow-filters{animation:workflow-filter-reveal .18s ease-out}@keyframes workflow-filter-reveal{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.workflow-filters{animation:none}}
 
 @media(max-width:760px){.link-row.selectable:has(.favorite-star){grid-template-columns:40px 44px minmax(0,1fr)}.link-row.selectable:has(.favorite-star) .link-main{grid-column:3}.link-row.selectable:has(.favorite-star) .link-actions{grid-column:2 / -1}.favorite-star{min-width:44px;min-height:44px}}
+
+.named-short-url { margin: 5px 0 0; color: var(--uvh-muted); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }

@@ -101,6 +101,10 @@ class LinkService
             return ['ok' => false, 'error' => 'La caducidad debe ser posterior a la fecha de activación'];
         }
 
+        if (! LinkName::valid($input['name'] ?? null)) {
+            return ['ok' => false, 'error' => 'Nombre inválido: usa hasta 120 caracteres sin caracteres de control.'];
+        }
+
         $notes = $input['notes'] ?? null;
         if ($notes !== null && (! is_string($notes) || ! mb_check_encoding($notes, 'UTF-8') || mb_strlen($notes) > 1000 || preg_match('/[\\x00-\\x1f\\x7f]/', $notes))) {
             return ['ok' => false, 'error' => 'Notas inválidas'];
@@ -240,6 +244,7 @@ class LinkService
                     'single_use' => ! empty($input['single_use']),
                     'scheduled_at' => self::toDateTime($input['scheduled_at'] ?? null),
                     'expires_at' => self::toDateTime($input['expires_at'] ?? null),
+                    'name' => LinkName::normalize($input['name'] ?? null),
                     'notes' => $input['notes'] ?? null,
                     'expired_page' => ExpiredLinkPage::canonical($input['expired_page'] ?? null),
                     'utm_source' => $utm['source'] ?? null,
@@ -342,7 +347,8 @@ class LinkService
             if (array_key_exists('alias', $input) && (! is_string($input['alias']) || $input['alias'] === '')) {
                 throw new LinkException('El alias no se puede vaciar; escribe otro alias', 422);
             }
-            $alias = ! empty($input['alias']) ? UrlUtil::normalizeAlias($input['alias']) : $link->alias;
+            $alias = ! empty($input['alias']) && $input['alias'] !== $link->alias
+                ? UrlUtil::normalizeAlias($input['alias']) : $link->alias;
             if (! empty($input['alias'])) {
                 if (UrlUtil::isReservedAlias($alias)) {
                     throw new LinkException('Este alias está reservado', 422);
@@ -376,6 +382,7 @@ class LinkService
                     'single_use' => ! empty($input['single_use']),
                     'scheduled_at' => self::toDateTime($input['scheduled_at'] ?? null),
                     'expires_at' => self::toDateTime($input['expires_at'] ?? null),
+                    'name' => array_key_exists('name', $input) ? LinkName::normalize($input['name']) : $link->name,
                     'notes' => $input['notes'] ?? null,
                     'expired_page' => ExpiredLinkPage::canonical(array_key_exists('expired_page', $input) ? $input['expired_page'] : $link->expired_page),
                     'expiry_notice_generation' => (int) $link->expiry_notice_generation + (self::iso($link->expires_at) !== self::iso(self::toDateTime($input['expires_at'] ?? null)) ? 1 : 0),
@@ -430,6 +437,7 @@ class LinkService
             'favorite' => (bool) ($link->getAttribute('is_favorite') ?? false),
             'expiredPage' => ExpiredLinkPage::canonical($link->expired_page),
             'alias' => $link->alias,
+            'name' => $link->name,
             'destination' => $link->destination,
             'fallbackDestination' => $link->fallback_destination,
             'state' => $link->state,

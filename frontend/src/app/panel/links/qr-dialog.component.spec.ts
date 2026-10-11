@@ -529,7 +529,7 @@ describe("QrDialogComponent", () => {
     await fixture.whenStable(); component.campaignMode.set(true); component.section.set("file");
     await fixture.whenStable(); expect(exportQr).not.toHaveBeenCalled();
     const variant: QrVariant = { id: 1, linkId: 1, publicId: "a".repeat(32), name: "Carta", spec: DEFAULT_QR_DESIGN, version: 1, archived: false, createdAt: "2026-10-10", updatedAt: "2026-10-10" };
-    await component.campaignSaved(variant); await fixture.whenStable();
+    await component.campaignSaved(variant); await fixture.whenStable(); await shareEffects();
     expect(component.shareReady()).toBeTrue(); expect(new URL(exportQr.calls.mostRecent().args[0]).searchParams.get("qr")).toBe(variant.publicId);
     await component.changeDesign("foreground", "#000000"); await fixture.whenStable();
     expect(component.shareReady()).toBeFalse(); component.shareImage(); expect(platform.share).not.toHaveBeenCalled();

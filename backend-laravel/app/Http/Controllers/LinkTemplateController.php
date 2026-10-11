@@ -6,6 +6,7 @@ use App\Exceptions\LinkException;
 use App\Models\Collection;
 use App\Models\LinkTemplate;
 use App\Support\Audit;
+use App\Support\LinkName;
 use App\Support\LinkService;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceLimits;
@@ -23,7 +24,7 @@ use Illuminate\Http\Request;
 class LinkTemplateController
 {
     /** Campos que una plantilla puede guardar; lo demás se rechaza. */
-    private const PAYLOAD_KEYS = ['destination', 'fallback_destination', 'notes', 'tags', 'utm', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'collection_id'];
+    private const PAYLOAD_KEYS = ['destination', 'fallback_destination', 'notes', 'tags', 'utm', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'collection_id', 'name'];
 
     public function index(Request $request): JsonResponse
     {
@@ -100,7 +101,7 @@ class LinkTemplateController
                     'workspace_id' => $workspaceId,
                     'created_by' => (int) $user->id,
                     'name' => $name,
-                    'payload' => $payload,
+                    'payload' => array_key_exists('name', $payload) ? array_replace($payload, ['name' => LinkName::normalize($payload['name'])]) : $payload,
                 ]);
             }, function (LinkTemplate $template) use ($request, $user, $workspaceId, $name): void {
                 Audit::write($user->id, 'link_template.create', 'link_template', (int) $template->id, ['name' => $name], UvhRequest::ip($request), workspaceId: $workspaceId);

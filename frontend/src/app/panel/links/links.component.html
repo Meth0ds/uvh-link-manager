@@ -51,7 +51,7 @@
     <mat-form-field appearance="outline" class="search" subscriptSizing="dynamic">
       <mat-label>Buscar enlaces</mat-label>
       <mat-icon matPrefix aria-hidden="true">search</mat-icon>
-      <input matInput type="search" name="link-search" autocomplete="off" spellcheck="false" aria-label="Buscar enlaces" placeholder="Buscar por alias, destino o notas…" [value]="q()" maxlength="300" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
+      <input matInput type="search" name="link-search" autocomplete="off" spellcheck="false" aria-label="Buscar enlaces" placeholder="Buscar por nombre, alias, destino o notas…" [value]="q()" maxlength="300" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
       <button mat-icon-button matSuffix type="button" (click)="onSearch(searchInput.value)" aria-label="Ejecutar búsqueda"><mat-icon>arrow_forward</mat-icon></button>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
@@ -82,6 +82,8 @@
         <mat-option value="created_at_asc">Más antiguos</mat-option>
         <mat-option value="clicks_desc">Más clics</mat-option>
         <mat-option value="alias_asc">Alias A–Z</mat-option>
+        <mat-option value="name_asc">Nombre A–Z</mat-option>
+        <mat-option value="name_desc">Nombre Z–A</mat-option>
       </mat-select>
     </mat-form-field>
   </div>
@@ -199,19 +201,20 @@
             class="link-check"
             [checked]="selected().has(link.id)"
             (change)="toggleSelected(link.id)"
-            [aria-label]="'Seleccionar enlace ' + displayUrl(link.shortUrl)"
+            [aria-label]="'Seleccionar enlace ' + (link.name || displayUrl(link.shortUrl))"
           ></mat-checkbox>
         @if (workflows.enabled()) {
-          <button mat-icon-button type="button" class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="(favorites.value(link) ? 'Quitar de favoritos: ' : 'Añadir a favoritos: ') + link.alias" [matTooltip]="favorites.value(link) ? 'Quitar de favoritos' : 'Añadir a favoritos'" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button>
+          <button mat-icon-button type="button" class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="(favorites.value(link) ? 'Quitar de favoritos: ' : 'Añadir a favoritos: ') + (link.name || link.alias)" [matTooltip]="favorites.value(link) ? 'Quitar de favoritos' : 'Añadir a favoritos'" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button>
         } @else { <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span> }
         <div class="link-main">
           <div class="link-top">
-            <a class="short tnum" [routerLink]="['/app/links', link.id]" [attr.aria-label]="'Abrir enlace ' + displayUrl(link.shortUrl)">{{ displayUrl(link.shortUrl) }}</a>
+            <a class="short tnum" [routerLink]="['/app/links', link.id]" [attr.aria-label]="'Abrir enlace ' + (link.name || displayUrl(link.shortUrl))">{{ link.name || displayUrl(link.shortUrl) }}</a>
             <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
             @if (link.clickCount > 0) {
               <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ link.clickCount }}</span>
             }
           </div>
+          @if (link.name) { <p class="named-short-url tnum">{{ displayUrl(link.shortUrl) }}</p> }
           <p class="dest" [title]="link.destination">{{ link.destination }}</p>
           @if (link.tags.length) {
             <div class="meta">
@@ -229,18 +232,18 @@
           }
         </div>
         <div class="link-actions">
-          <button mat-icon-button [matTooltip]="copyFeedback.phase(link.shortUrl, copyScope) === 'copied' ? 'Copiado' : 'Copiar'" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(link.shortUrl, copyScope) === 'copying'" (click)="$event.stopPropagation(); copy(link.shortUrl)" [attr.aria-label]="'Copiar enlace ' + displayUrl(link.shortUrl)">
+          <button mat-icon-button [matTooltip]="copyFeedback.phase(link.shortUrl, copyScope) === 'copied' ? 'Copiado' : 'Copiar'" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(link.shortUrl, copyScope) === 'copying'" (click)="$event.stopPropagation(); copy(link.shortUrl)" [attr.aria-label]="'Copiar enlace ' + (link.name || displayUrl(link.shortUrl))">
             <app-copy-feedback-icon [phase]="copyFeedback.phase(link.shortUrl, copyScope)" />
           </button>
-          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr(link.shortUrl, link.id)" [attr.aria-label]="'Generar QR para ' + displayUrl(link.shortUrl)">
+          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr(link.shortUrl, link.id)" [attr.aria-label]="'Generar QR para ' + (link.name || displayUrl(link.shortUrl))">
             <mat-icon>qr_code_2</mat-icon>
           </button>
           @if (canWrite()) {
-            <button mat-icon-button matTooltip="Editar" (click)="$event.stopPropagation(); edit(link)" [attr.aria-label]="'Editar enlace ' + displayUrl(link.shortUrl)" [disabled]="actionId() === link.id">
+            <button mat-icon-button matTooltip="Editar" (click)="$event.stopPropagation(); edit(link)" [attr.aria-label]="'Editar enlace ' + (link.name || displayUrl(link.shortUrl))" [disabled]="actionId() === link.id">
               <mat-icon>edit</mat-icon>
             </button>
           }
-          <button mat-icon-button [matMenuTriggerFor]="menu" (click)="$event.stopPropagation()" [attr.aria-label]="'Más acciones para ' + displayUrl(link.shortUrl)" [disabled]="actionId() === link.id">
+          <button mat-icon-button [matMenuTriggerFor]="menu" (click)="$event.stopPropagation()" [attr.aria-label]="'Más acciones para ' + (link.name || displayUrl(link.shortUrl))" [disabled]="actionId() === link.id">
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">

@@ -12,7 +12,7 @@ import { LinkDialogComponent, type LinkDialogData } from "./link-dialog.componen
 
 function existingLink(overrides: Partial<LinkDto> = {}): LinkDto {
   return {
-    id: 7, alias: "kept-alias", destination: "https://example.test/target",
+    id: 7, name: null, alias: "kept-alias", destination: "https://example.test/target",
     fallbackDestination: null, state: "scheduled", clickCount: 0, maxClicks: null,
     singleUse: false, usedAt: null, scheduledAt: "2030-01-01T12:00:10.123Z",
     expiresAt: "2030-01-01T13:00:50.789Z", notes: null, passwordProtected: false,

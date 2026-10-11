@@ -68,6 +68,8 @@ export interface LinkUtm {
 }
 
 export interface LinkDto {
+  /** Internal workspace label; legacy responses may omit it. */
+  name?: string | null;
   favorite?: boolean;
   expiredPage?: ExpiredPageSpec | null;
   id: number;
@@ -160,6 +162,7 @@ export interface CollectionsResponse {
  * applying one is a plain create input; alias is never part of it.
  */
 export interface LinkTemplatePayload {
+  name?: string | null;
   destination?: string;
   fallback_destination?: string | null;
   notes?: string | null;

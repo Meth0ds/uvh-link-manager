@@ -8,6 +8,7 @@ use App\Support\Audit;
 use App\Support\IsoDate;
 use App\Support\LinkBlockReason;
 use App\Support\LinkPreferences;
+use App\Support\LinkSearch;
 use App\Support\LinkService;
 use App\Support\MfaAttempts;
 use App\Support\MfaFreshness;
@@ -49,9 +50,7 @@ class LinkController
 
         $query = Link::withTrashed()->with(['domain', 'tags', 'collection'])
             ->where('workspace_id', $workspaceId)->whereNotNull('deleted_at');
-        if ($search !== '') {
-            $query->where(fn ($q) => $q->where('alias', 'ilike', $search)->orWhere('destination', 'ilike', $search));
-        }
+        LinkSearch::matching($query, $search);
         $query->orderByDesc('deleted_at')->orderByDesc('id');
         $total = (clone $query)->count();
         $rows = $query->forPage($page, $perPage)->get()->map(function (Link $link) use ($retentionDays): array {
@@ -128,12 +127,7 @@ class LinkController
             $query->where('utm_campaign', $utmCampaign);
         }
 
-        if ($search !== '') {
-            $query->where(fn ($q) => $q
-                ->where('alias', 'ilike', $search)
-                ->orWhere('destination', 'ilike', $search)
-                ->orWhere('notes', 'ilike', $search));
-        }
+        LinkSearch::matching($query, $search);
         if ($state !== '') {
             $query->where('state', $state);
         }
@@ -155,7 +149,12 @@ class LinkController
         // timestamp, most links have zero clicks). Without a deterministic
         // tiebreaker PostgreSQL is free to return them in any order per page,
         // so paging forward could repeat one link and drop another.
-        $query->orderBy($col, $dir)->orderBy('id', $dir);
+        if (in_array($sort, ['name_asc', 'name_desc'], true)) {
+            $nameDirection = $sort === 'name_asc' ? 'asc' : 'desc';
+            $query->orderByRaw(LinkSearch::DISPLAY_NAME_SQL.' '.$nameDirection)->orderBy('id', $nameDirection);
+        } else {
+            $query->orderBy($col, $dir)->orderBy('id', $dir);
+        }
 
         $total = (clone $query)->count();
         $rows = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
@@ -749,7 +748,7 @@ class LinkController
     {
         $supported = [
             'destination', 'alias', 'domainId', 'collectionId', 'fallbackDestination', 'password',
-            'maxClicks', 'singleUse', 'scheduledAt', 'expiresAt', 'notes',
+            'maxClicks', 'singleUse', 'scheduledAt', 'expiresAt', 'notes', 'name',
             'utm', 'tags', 'rules', 'expiredPage',
         ];
         if ($partial) {
@@ -781,7 +780,7 @@ class LinkController
             }
         }
 
-        $stringOrNull = ['alias', 'fallbackDestination', 'scheduledAt', 'expiresAt', 'notes'];
+        $stringOrNull = ['alias', 'fallbackDestination', 'scheduledAt', 'expiresAt', 'notes', 'name'];
         foreach ($stringOrNull as $field) {
             if ($request->has($field) && $request->input($field) !== null && ! is_string($request->input($field))) {
                 return false;
@@ -829,6 +828,7 @@ class LinkController
             'single_use' => $request->has('singleUse') ? (bool) $request->input('singleUse') : (bool) ($current->single_use ?? false),
             'scheduled_at' => $request->has('scheduledAt') ? $request->input('scheduledAt') : ($current?->scheduled_at?->format('Y-m-d\TH:i:s.uP')),
             'expires_at' => $request->has('expiresAt') ? $request->input('expiresAt') : ($current?->expires_at?->format('Y-m-d\TH:i:s.uP')),
+            'name' => $request->has('name') ? $request->input('name') : ($current->name ?? null),
             'notes' => $request->has('notes') ? $request->input('notes') : ($current->notes ?? null),
             'expired_page' => $request->has('expiredPage') ? $request->input('expiredPage') : ($current?->expired_page),
             'utm' => $request->has('utm')

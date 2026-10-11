@@ -1,3 +1,4 @@
+import { decodeLinkName } from "./link-name-decoder";
 import type {
   BulkAction,
   BulkActionResponse,
@@ -115,6 +116,7 @@ function templatePayload(value: unknown): LinkTemplatePayload {
     payload.fallback_destination = source["fallback_destination"] === null
       ? null : httpUrl(source["fallback_destination"], "template fallback destination");
   }
+  if (source["name"] !== undefined) payload.name = decodeLinkName(source["name"]);
   if (source["notes"] !== undefined) payload.notes = nullableMultiline(source["notes"], "template notes", 1000, true);
   if (source["tags"] !== undefined) {
     payload.tags = boundedArray(source["tags"], "template tags", 20).map((tag) => text(tag, "template tag", 40));

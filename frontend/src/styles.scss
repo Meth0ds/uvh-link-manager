@@ -794,3 +794,8 @@ app-panel #panel-content > router-outlet + * {
 @media (max-height: 760px) {
   app-panel .side .mat-drawer-inner-container { overflow-y: auto; overscroll-behavior: contain; }
 }
+
+.uvh-search-dialog .mat-mdc-dialog-surface { border: 1px solid var(--uvh-border); border-radius: 20px; background: var(--uvh-surface); box-shadow: 0 24px 80px rgba(0,0,0,.2); }
+.uvh-search-backdrop { background: rgba(0,0,0,.32); backdrop-filter: blur(3px); }
+@media(max-width:600px) { .uvh-search-dialog { max-width: 100vw !important; max-height: 100dvh !important; } .uvh-search-dialog .mat-mdc-dialog-surface { height: 100%; border: 0; border-radius: 0; } }
+@media(prefers-reduced-motion:reduce) { .uvh-search-backdrop { backdrop-filter: none; } }

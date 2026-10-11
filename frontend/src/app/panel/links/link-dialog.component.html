@@ -49,7 +49,14 @@
                 @if (form.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
                 @if (form.controls.destination.hasError('required')) { <mat-error>Escribe la URL de destino.</mat-error> }
               </mat-form-field>
-              <app-destination-inspection [url]="destinationValue()" [preview]="true" />
+              <mat-form-field appearance="outline" class="full link-name-field" subscriptSizing="dynamic">
+                <mat-label>Nombre del enlace<span class="link-name-optional"> — opcional</span></mat-label>
+                <input matInput formControlName="name" aria-label="Nombre del enlace — opcional" placeholder="Carta restaurante — Octubre 2026" autocomplete="off" />
+                <mat-icon matPrefix aria-hidden="true">label_outline</mat-icon>
+                <mat-hint><span class="link-name-mobile-hint">Opcional. </span>Para reconocerlo en tu biblioteca. No cambia la URL corta.</mat-hint>
+                @if (form.controls.name.invalid) { <mat-error>Usa hasta 120 caracteres sin caracteres de control.</mat-error> }
+              </mat-form-field>
+              <app-destination-inspection [url]="destinationValue()" [preview]="true" [suggestName]="true" (nameSuggested)="applySuggestedName($event)" />
               <div class="section-heading secondary"><h3>Tu URL corta</h3><p>Elige una dirección fácil de reconocer y compartir.</p></div>
               <div class="address-fields">
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">

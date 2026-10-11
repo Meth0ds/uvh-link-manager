@@ -1,0 +1,36 @@
+<section class="search-shell" tabindex="-1" (keydown)="onKey($event)">
+  <header class="search-header">
+    <span class="search-mode-icon" aria-hidden="true"><mat-icon>{{ qrMode() ? 'qr_code_2' : 'search' }}</mat-icon></span>
+    <div class="search-heading"><h1 id="global-search-title">{{ qrMode() ? 'Elegir un enlace para QR' : 'Buscar en UVH' }}</h1><span class="workspace-context"><mat-icon aria-hidden="true">workspaces</mat-icon>{{ workspaceName() }}</span></div>
+    <button mat-icon-button type="button" (click)="close()" [attr.aria-label]="qrMode() ? 'Volver a la búsqueda' : 'Cerrar búsqueda'"><mat-icon aria-hidden="true">{{ qrMode() ? 'arrow_back' : 'close' }}</mat-icon></button>
+  </header>
+  <div class="search-input-wrap">
+    <mat-icon aria-hidden="true">search</mat-icon>
+    <input cdkFocusInitial role="combobox" aria-label="Buscar enlaces, dominios y acciones" aria-autocomplete="list" aria-controls="global-search-options" [attr.aria-expanded]="options().length > 0" [attr.aria-activedescendant]="activeId()" [placeholder]="qrMode() ? 'Buscar enlace por nombre o URL…' : 'Buscar enlaces, dominios, acciones…'" [value]="q()" (input)="onQuery(query.value)" #query type="search" autocomplete="off" autocapitalize="off" spellcheck="false" />
+    @if (q()) { <button mat-icon-button type="button" (click)="onQuery(''); query.focus()" aria-label="Borrar búsqueda"><mat-icon aria-hidden="true">close</mat-icon></button> }
+  </div>
+  <div class="search-progress" [class.loading]="busy()" aria-hidden="true"><span></span></div>
+  <div class="search-results">
+    @if (error()) { <div class="search-error" role="alert"><mat-icon aria-hidden="true">wifi_off</mat-icon><p>{{ error() }}</p><button mat-stroked-button type="button" (click)="load()" [disabled]="busy()">Reintentar</button></div> }
+    <div id="global-search-options" role="listbox" aria-label="Resultados de búsqueda" [attr.aria-busy]="busy()">
+      @for (group of optionGroups(); track group.label; let groupIndex = $index) {
+        <div role="group" [attr.aria-labelledby]="'search-group-' + groupIndex">
+        <h2 class="result-group" role="presentation" [id]="'search-group-' + groupIndex">{{ group.label }}</h2>
+        @for (entry of group.options; track entry.option.key) {
+        @let option = entry.option;
+        @let i = entry.index;
+        <button class="search-option" type="button" role="option" tabindex="-1" [id]="'search-option-' + i" [attr.aria-selected]="active() === i" [class.is-active]="active() === i" (pointermove)="active.set(i)" (mousedown)="$event.preventDefault()" (click)="choose(i)">
+          <span class="option-icon" aria-hidden="true"><mat-icon>{{ option.icon }}</mat-icon></span>
+          <span class="option-copy"><strong><app-search-highlight [text]="option.title" [query]="q()" /></strong><small><app-search-highlight [text]="option.subtitle" [query]="q()" /></small></span>
+          @if (option.state) { <span class="option-state">{{ option.state }}</span> }
+          <mat-icon class="option-enter" aria-hidden="true">{{ active() === i ? 'keyboard_return' : 'chevron_right' }}</mat-icon>
+        </button>
+        }
+        </div>
+      }
+    </div>
+    @if (!busy() && !error() && !results().links.length && !results().domains.length && queryLength() >= 2) { <div class="empty-results"><mat-icon aria-hidden="true">search_off</mat-icon><strong>No encontramos {{ qrMode() ? 'enlaces' : 'enlaces ni dominios' }}</strong><p>Prueba otro nombre, alias o dirección.</p></div> }
+    @if (qrMode() && queryLength() < 2) { <div class="empty-results"><mat-icon aria-hidden="true">qr_code_2</mat-icon><strong>Elige el enlace que quieres compartir</strong><p>Busca por nombre, alias o destino para abrir su editor QR.</p></div> }
+  </div>
+  <footer class="search-footer"><span class="keyboard-hints" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd> mover <kbd>↵</kbd> abrir <kbd>esc</kbd> {{ qrMode() ? 'volver' : 'cerrar' }}</span><span class="search-status" role="status" aria-live="polite">{{ status() }}</span></footer>
+</section>

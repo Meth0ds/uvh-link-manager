@@ -192,6 +192,7 @@ export class LinkDialogComponent {
   };
 
   form = this.fb.nonNullable.group({
+    name: ["", [unicodeMaxLength(120), Validators.pattern(/^[^\p{Cc}\p{Cf}]*$/u)]],
     destination: ["", [Validators.required, Validators.maxLength(2048), httpUrlValidator]],
     // The alias identifies the link: editing can rename it but never clear it.
     alias: ["", [
@@ -385,8 +386,21 @@ export class LinkDialogComponent {
       ?? this.currentDomainUnavailable()?.domain ?? this.data.link?.domain ?? this.platformDomain;
   }
 
+  async applySuggestedName(suggestion: { title: string; url: string }): Promise<void> {
+    if (suggestion.url !== this.destinationValue() || !this.isOpeningCurrent()) return;
+    const name = Array.from(suggestion.title.trim()).slice(0, 120).join("");
+    if (!name || /[\p{Cc}\p{Cf}]/u.test(name)) return;
+    const previous = this.form.controls.name.value;
+    if (previous.trim() && previous.trim() !== name) {
+      const replace = await this.actions.confirm({ title: "¿Sustituir el nombre?", message: "El título del destino reemplazará el nombre que has escrito.", confirmLabel: "Usar título" });
+      if (!replace || this.destroyRef.destroyed || !this.isOpeningCurrent() || suggestion.url !== this.destinationValue() || previous !== this.form.controls.name.value) return;
+    }
+    this.form.controls.name.setValue(name); this.form.controls.name.markAsDirty();
+  }
+
   private patchFromLink(link: LinkDto): void {
     this.form.patchValue({
+      name: link.name ?? "",
       destination: link.destination,
       alias: link.alias,
       domainId: link.domainId,
@@ -487,6 +501,7 @@ export class LinkDialogComponent {
       this.lifecycleDates[field] = { iso, local: localDateTimeValue(iso), fromLink: false };
     }
     this.form.patchValue({
+      name: payload.name ?? "",
       destination: payload.destination ?? "",
       fallbackDestination: payload.fallback_destination ?? "",
       maxClicks: payload.max_clicks ?? null,
@@ -533,6 +548,7 @@ export class LinkDialogComponent {
     }
     const payload: LinkTemplatePayload = {
       destination,
+      name: v.name?.trim() || null,
       fallback_destination: v.fallbackDestination?.trim() || null,
       notes: v.notes?.trim() || null,
       tags: this.tags(),
@@ -653,6 +669,7 @@ export class LinkDialogComponent {
       ...(this.isEdit ? { version: this.data.link!.version } : {}),
       ...(this.isDuplicate ? { sourceVersion: this.data.link!.version, passwordAction: v.clearPassword ? "remove" : passwordValue !== "" ? "replace" : "keep" } : {}),
       ...(this.workflows.enabled() ? { expiredPage: this.expiredPage() } : {}),
+      name: v.name?.trim() || null,
       destination: v.destination?.trim(),
       // The alias identifies the link: emptying it deletes nothing and the
       // server refuses it with 422. Editing omits the key instead (absent →

@@ -168,7 +168,7 @@ final class AccountExportDocument
                 ])->cursor(),
             'createdLinks' => static fn (): iterable => DB::table('links')->where('created_by', $userId)->orderBy('id')
                 ->select([
-                    'id', 'workspace_id', 'domain_id', 'alias', 'destination', 'fallback_destination', 'state',
+                    'id', 'workspace_id', 'domain_id', 'alias', 'name', 'destination', 'fallback_destination', 'state',
                     'max_clicks', 'click_count', 'single_use', 'used_at', 'scheduled_at', 'expires_at', 'notes',
                     'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'expired_page', 'created_at', 'updated_at', 'deleted_at',
                 ])->cursor(),

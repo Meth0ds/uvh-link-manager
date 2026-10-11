@@ -31,6 +31,7 @@ class Link extends Model
         'domain_id',
         'collection_id',
         'alias',
+        'name',
         'destination',
         'fallback_destination',
         'state',

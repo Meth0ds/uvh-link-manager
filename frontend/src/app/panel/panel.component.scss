@@ -221,3 +221,9 @@
     animation: none !important; transition: none !important;
   }
 }
+
+.global-search-trigger { display: flex; align-items: center; min-width: 180px; min-height: 40px; border: 1px solid var(--uvh-border); border-radius: 10px; color: var(--uvh-muted); background: var(--uvh-surface-raised); transition: border-color .14s, background .14s; }
+.global-search-trigger:hover { border-color: var(--uvh-ink); background: var(--uvh-surface); }
+.global-search-trigger kbd { margin-left: 24px; padding: 2px 5px; font: inherit; font-size: 11px; border: 1px solid var(--uvh-border); border-radius: 4px; }
+@media(max-width:1000px) { .global-search-trigger { min-width: 44px; width: 44px; height: 44px; padding: 0; justify-content: center; flex-shrink: 0; } .search-trigger-copy, .global-search-trigger kbd { display: none; } .global-search-trigger mat-icon { margin: 0; } }
+@media(prefers-reduced-motion:reduce) { .global-search-trigger { transition: none; } }

@@ -50,7 +50,7 @@ final class LinkPreferences
             }
         }
         if (! in_array($spec['state'] ?? '', ['', 'active', 'scheduled', 'paused', 'expired', 'archived', 'blocked'], true)
-            || ! in_array($spec['sort'] ?? 'created_at_desc', ['created_at_desc', 'created_at_asc', 'clicks_desc', 'alias_asc'], true)
+            || ! in_array($spec['sort'] ?? 'created_at_desc', ['created_at_desc', 'created_at_asc', 'clicks_desc', 'alias_asc', 'name_asc', 'name_desc'], true)
             || (isset($spec['favorites']) && ! is_bool($spec['favorites']))) {
             throw new LinkException('Filtro inválido.', 422);
         }

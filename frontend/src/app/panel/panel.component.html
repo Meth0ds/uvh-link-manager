@@ -91,6 +91,9 @@
       <div class="route-context" aria-label="Página actual"><span aria-hidden="true">/</span><b>{{ currentPage() }}</b></div>
 
       <span class="spacer"></span>
+      <button mat-button class="global-search-trigger" type="button" (click)="openSearch($event)" [attr.aria-keyshortcuts]="searchShortcut === '⌘ K' ? 'Meta+k' : 'Control+k'" aria-label="Buscar enlaces, dominios y acciones">
+        <mat-icon aria-hidden="true">search</mat-icon><span class="search-trigger-copy">Buscar…</span><kbd aria-hidden="true">{{ searchShortcut }}</kbd>
+      </button>
 
       <a mat-icon-button class="notifications-bell" routerLink="/app/notifications" [attr.aria-label]="unreadNotificationsLabel()">
         <mat-icon aria-hidden="true">notifications</mat-icon>

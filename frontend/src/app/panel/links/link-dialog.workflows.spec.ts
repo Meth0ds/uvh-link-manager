@@ -15,7 +15,7 @@ describe("LinkDialogComponent duplication workflows", () => {
   let fixture: ComponentFixture<LinkDialogComponent>, component: LinkDialogComponent;
   let api: jasmine.SpyObj<ApiService>, dialog: jasmine.SpyObj<MatDialogRef<LinkDialogComponent>>, duplicate: jasmine.Spy;
   const workspace = signal<number | null>(1), enabled = signal(true), selection = signal(0);
-  const source: LinkDto = { id: 7, alias: "navidad", destination: "https://example.test/christmas", fallbackDestination: "https://example.test/backup", state: "paused", clickCount: 99, maxClicks: 100, singleUse: true, usedAt: "2026-09-30T10:00:00Z", scheduledAt: "2026-09-01T08:30:29.123456Z", expiresAt: "2026-10-01T16:40:49.654321Z", notes: "Nota", passwordProtected: true, utm: { source: "email", medium: "qr", campaign: "navidad", term: null, content: null }, domainId: null, domain: null, collectionId: 4, collection: "Campañas", tags: ["navidad"], createdAt: "2026-09-01T08:00:00Z", updatedAt: "2026-09-02T08:00:00Z", version: 42, shortUrl: "https://uvh.test/navidad", expiredPage: defaultExpiredPage() };
+  const source: LinkDto = { id: 7, name: "Carta Navidad", alias: "navidad", destination: "https://example.test/christmas", fallbackDestination: "https://example.test/backup", state: "paused", clickCount: 99, maxClicks: 100, singleUse: true, usedAt: "2026-09-30T10:00:00Z", scheduledAt: "2026-09-01T08:30:29.123456Z", expiresAt: "2026-10-01T16:40:49.654321Z", notes: "Nota", passwordProtected: true, utm: { source: "email", medium: "qr", campaign: "navidad", term: null, content: null }, domainId: null, domain: null, collectionId: 4, collection: "Campañas", tags: ["navidad"], createdAt: "2026-09-01T08:00:00Z", updatedAt: "2026-09-02T08:00:00Z", version: 42, shortUrl: "https://uvh.test/navidad", expiredPage: defaultExpiredPage() };
 
   beforeEach(async () => {
     workspace.set(1); enabled.set(true); selection.set(0); api = jasmine.createSpyObj<ApiService>("API", ["get", "post", "patch"]);
@@ -42,6 +42,26 @@ describe("LinkDialogComponent duplication workflows", () => {
     const body = payload(api); expect(body["passwordAction"]).toBe("keep"); expect(body["password"]).toBeUndefined(); expect(body["sourceVersion"]).toBe(42);
     expect(body["clickCount"]).toBeUndefined(); expect(body["usedAt"]).toBeUndefined(); expect(body["rules"]).toEqual([jasmine.objectContaining({ destination: "https://example.test/es" })]);
     expect(dialog.close).toHaveBeenCalledWith(jasmine.objectContaining({ id: 99, clickCount: 0 }));
+  });
+
+  it("copies the internal name and includes explicit name changes", async () => {
+    expect(component.form.controls.name.value).toBe("Carta Navidad");
+    component.form.controls.name.setValue("Carta duplicada"); await component.save();
+    expect(payload(api)["name"]).toBe("Carta duplicada");
+  });
+
+  it("only applies a confirmed suggestion for the current destination and preserves newer typing", async () => {
+    const actions = TestBed.inject(ActionDialogService) as jasmine.SpyObj<ActionDialogService>;
+    component.form.controls.name.setValue("");
+    await component.applySuggestedName({ title: "Nombre remoto", url: "https://other.test/" });
+    expect(component.form.controls.name.value).toBe("");
+    await component.applySuggestedName({ title: "Nombre remoto", url: component.destinationValue() });
+    expect(component.form.controls.name.value).toBe("Nombre remoto");
+    let resolve!: (value: boolean) => void;
+    actions.confirm.and.returnValue(new Promise<boolean>(done => resolve = done));
+    const pending = component.applySuggestedName({ title: "Título nuevo", url: component.destinationValue() });
+    component.form.controls.name.setValue("Lo que escribo"); resolve(true); await pending;
+    expect(component.form.controls.name.value).toBe("Lo que escribo");
   });
 
   it("checks the visible alias and domain rather than the previous group value", async () => {

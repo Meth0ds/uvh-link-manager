@@ -191,6 +191,10 @@ export class LinksComponent {
   constructor() {
     effect(() => { const message = this.favorites.error(); if (message) this.snackbar.open(message, "Cerrar", { duration: 4000 }); });
     effect(() => { if (this.workflows.enabled()) untracked(() => { void this.loadCollections(); void this.reload(); }); });
+    this.route.queryParamMap?.pipe(takeUntilDestroyed(this.dialogOwner)).subscribe(params => {
+      const query = (params.get("q") ?? "").slice(0, 200);
+      if (query !== this.q()) { this.q.set(query); this.page.set(0); this.clearSelection(); void this.reload(); }
+    });
     if (this.legacyDestination) {
       void this.router.navigate([], {
         relativeTo: this.route,

@@ -282,14 +282,14 @@ Sólo se activa el limitador de volumen `uvh-pending` (escritura) y
 
 | Método | Ruta | Rol | Descripción |
 | ------ | ---- | --- | ----------- |
-| GET | `/` | viewer | Listado con `q, state, tag, sort, page, perPage` → `{ links, total, page, perPage }`. |
-| POST | `/` | editor | Crear enlace (destino, alias, dominio, colección, UTM, notas, programación, expiración, contraseña, máx. clics, uso único, fallback, reglas, tags). Toda clave ajena a ese contrato —incluido `state` y `version`— → `422` nombrándola. |
+| GET | `/` | viewer | Listado con `q, state, tag, sort, page, perPage` (búsqueda también por nombre; orden `name_asc` / `name_desc`, con alias como alternativa) → `{ links, total, page, perPage }`. |
+| POST | `/` | editor | Crear enlace (nombre opcional, destino, alias, dominio, colección, UTM, notas, programación, expiración, contraseña, máx. clics, uso único, fallback, reglas, tags). Toda clave ajena a ese contrato —incluido `state` y `version`— → `422` nombrándola. |
 | POST | `/check-alias` | viewer | `{ alias, domainId }` → `{ available, reason? }`. |
-| GET | `/export.csv` | viewer | Export del workspace en CSV (BOM UTF-8, celdas anti-fórmulas). Máx. 5.000 enlaces: más allá → `409` con el total. Columnas: `id, alias, domain, destination, fallback_destination, state, click_count, max_clicks, single_use, scheduled_at, expires_at, notes, tags_json` (array JSON de nombres, reversible incluso con `;`), `created_at`. El archivo es reimportable tal cual vía `POST /import` (round-trip). Auditoría `link.export`. |
-| POST | `/import` | editor | `{ dryRun, csv }` (texto, máx. 256 KiB / 500 filas). **Round-trip portable**: un `export.csv` de UVH se puede volver a importar tal cual. Columnas de creación: `alias, destination, fallback_destination, notes, tags` (`;`) o `tags_json` (lista JSON), `scheduled_at, expires_at, max_clicks, single_use`; las de sólo lectura del propio export (`id, state, click_count, created_at`) se aceptan y se ignoran, y `domain` se resuelve como hostname dentro del workspace destino (inexistente → error de fila). El guard anti-fórmulas del export se deshace al leer (`'=SUM(1)` entra como `=SUM(1)`). Una columna desconocida → `422` nombrándola. `dryRun: true` no escribe nada y devuelve el mismo informe `{ dryRun, valid, created, failed, errors[{row, error}], truncated }` (máx. 100 errores reportados). Los contadores nunca se solapan: `valid` son las filas que se importaron —o importarían en dry run— y **no** incluye las que fallaron al crear, `created` son los enlaces de verdad creados y `failed` las filas que superaron la validación pero no llegaron a crear su enlace; los motivos de `failed` y los rechazos de validación van juntos en `errors`, cada uno con su fila. La importación real exige cabecera `Idempotency-Key` (scope `links.import`): un reintento reproduce la respuesta original sin duplicar enlaces. Además es **reanudable**: cada fila creada se registra junto a su enlace en la misma transacción, y un reintento tras una caída reproduce las filas ya registradas en vez de duplicarlas. Cada fila se valida con las reglas de creación; una fila inválida se reporta sin frenar al resto. |
+| GET | `/export.csv` | viewer | Export del workspace en CSV (BOM UTF-8, celdas anti-fórmulas). Máx. 5.000 enlaces: más allá → `409` con el total. Columnas: `id, alias, domain, destination, fallback_destination, state, click_count, max_clicks, single_use, scheduled_at, expires_at, notes, tags_json` (array JSON de nombres, reversible incluso con `;`), `created_at, name` (nombre añadido al final). El archivo es reimportable tal cual vía `POST /import` (round-trip). Auditoría `link.export`. |
+| POST | `/import` | editor | `{ dryRun, csv }` (texto, máx. 256 KiB / 500 filas). **Round-trip portable**: un `export.csv` de UVH se puede volver a importar tal cual. Columnas de creación: `name, alias, destination, fallback_destination, notes, tags` (`;`) o `tags_json` (lista JSON), `scheduled_at, expires_at, max_clicks, single_use`; las de sólo lectura del propio export (`id, state, click_count, created_at`) se aceptan y se ignoran, y `domain` se resuelve como hostname dentro del workspace destino (inexistente → error de fila). El guard anti-fórmulas del export se deshace al leer (`'=SUM(1)` entra como `=SUM(1)`). Una columna desconocida → `422` nombrándola. `dryRun: true` no escribe nada y devuelve el mismo informe `{ dryRun, valid, created, failed, errors[{row, error}], truncated }` (máx. 100 errores reportados). Los contadores nunca se solapan: `valid` son las filas que se importaron —o importarían en dry run— y **no** incluye las que fallaron al crear, `created` son los enlaces de verdad creados y `failed` las filas que superaron la validación pero no llegaron a crear su enlace; los motivos de `failed` y los rechazos de validación van juntos en `errors`, cada uno con su fila. La importación real exige cabecera `Idempotency-Key` (scope `links.import`): un reintento reproduce la respuesta original sin duplicar enlaces. Además es **reanudable**: cada fila creada se registra junto a su enlace en la misma transacción, y un reintento tras una caída reproduce las filas ya registradas en vez de duplicarlas. Cada fila se valida con las reglas de creación; una fila inválida se reporta sin frenar al resto. |
 | POST | `/bulk` | editor | Acciones masivas (máx. 100 enlaces) sobre la selección entera o ninguna: `{ action, linkIds[], tags? , collectionId?, domainId? }` con `action` ∈ pause/activate/archive/trash/restore/tag/untag/move/set-domain → `{ ok, action, applied }`. `set-domain` re-apunta la selección al dominio `domainId` (`null` = dominio de plataforma): exige un destino sirviendo (`403` si no), rechaza la operación entera si un alias chocaría en el destino (`409` nombrándolo) y nunca toca enlaces bloqueados (`403`). `applied` es exacto: cuenta sólo los enlaces que de verdad cambiaron —`untag` sobre un enlace que no llevaba la etiqueta no cuenta ni sube su `version`—. Exige cabecera `Idempotency-Key` (scope `links.bulk` por workspace): la respuesta se sella en la misma transacción que el efecto y una repetición responde con `Idempotent-Replay: true` sin volver a aplicar. `404` si algún id no es del workspace, `403` sobre enlaces bloqueados, `409` al activar un enlace programado o caducado, `429` si la cuota no admite la restauración. |
 | GET | `/:id` | viewer | `{ link, rules[], appeal, blockReason }`; `appeal` es `null` o `{ status, createdAt, decidedAt, decisionNote }` de la última apelación —la nota de la decisión es del propietario, que es quien la sufre— y `blockReason` es `null` o el motivo del bloqueo vigente, tomado de la decisión que lo produjo. |
-| PATCH | `/:id` | editor | Editar enlace (`version` obligatoria). Claves admitidas: `destination`, `alias`, `domainId`, `collectionId`, `fallbackDestination`, `password`, `maxClicks`, `singleUse`, `scheduledAt`, `expiresAt`, `notes`, `utm`, `tags`, `rules`, `version`; cualquier otra → `422` nombrándola. `collectionId` sigue semántica PATCH: omitido conserva la colección, `null` explícito desagrupa. `alias` no se puede vaciar (`""`/`null` → `422`); omitirlo conserva el actual. `state` no se acepta aquí: se cambia con `POST /:id/state`. |
+| PATCH | `/:id` | editor | Editar enlace (`version` obligatoria). Claves admitidas: `name`, `destination`, `alias`, `domainId`, `collectionId`, `fallbackDestination`, `password`, `maxClicks`, `singleUse`, `scheduledAt`, `expiresAt`, `notes`, `utm`, `tags`, `rules`, `version`; cualquier otra → `422` nombrándola. `collectionId` sigue semántica PATCH: omitido conserva la colección, `null` explícito desagrupa. `alias` no se puede vaciar (`""`/`null` → `422`); omitirlo conserva el actual. `state` no se acepta aquí: se cambia con `POST /:id/state`. |
 | POST | `/:id/state` | editor | `{ state }` (active/paused/archived). |
 | DELETE | `/:id` | editor | Soft delete. |
 | POST | `/:id/restore` | editor | Restaura. |
@@ -299,6 +299,40 @@ Sólo se activa el limitador de volumen `uvh-pending` (escritura) y
 El CSV es una transferencia de los campos documentados, **no un backup semántico completo**: no transporta colecciones, contraseñas, reglas de redirección ni configuración UTM completa. `id`, `state`, `click_count` y `created_at` son informativos y se ignoran al importar. `tags_json` contiene una lista JSON escapada con las reglas de CSV; la columna antigua `tags` sigue aceptando nombres separados por `;`, pero no puede representar un nombre que contenga ese separador —ese nombre se parte en varias etiquetas—. Las dos columnas se excluyen **sin precedencia**: enviarlas juntas es `422` «Usa tags o tags_json, no ambas columnas», nunca una que gane sobre la otra.
 
 El dry-run comprueba validación, permisos vigentes, disponibilidad de alias (también duplicados del archivo), cuota acumulada y preparación del dominio. Es una comprobación del estado actual, no una reserva ni una garantía frente a cambios posteriores. La importación revalida cada fila y conserva un registro persistido de sus resultados. Renueva su reserva durante el trabajo; un intento desplazado devuelve `409` y el cliente debe repetir **el mismo cuerpo y la misma Idempotency-Key**. El sellado de la respuesta exige conservar la reserva y nunca sustituye un resultado ya sellado. El registro del lote y la reserva extienden juntos su ventana de 24 horas mientras hay actividad.
+
+## Nombre interno y búsqueda global
+
+`LinkDto.name` es texto plano nullable de hasta 120 caracteres Unicode, compartido
+por el workspace. Se recortan espacios exteriores y un valor vacío se almacena
+como `null`; se rechazan caracteres de control y de formato. Se admiten nombres
+repetidos. Omitir `name` en PATCH conserva el nombre; enviar `null` lo elimina.
+La duplicación, las plantillas, el CSV y la descarga de cuenta conservan el campo.
+La API con token admite las mismas reglas de creación y edición. El nombre no
+cambia alias, URL corta, redirección ni estadísticas.
+
+`name_asc` y `name_desc` ordenan por `lower(COALESCE(name, alias))` con desempate
+por identificador, y se admiten en filtros guardados. La búsqueda compartida de
+biblioteca, papelera y paleta considera nombre, alias, destino y notas, escapando
+`%` y `_` como caracteres literales.
+
+`GET /api/v1/search?q=…` exige sesión verificada, membresía viewer o superior del
+workspace seleccionado y el limitador existente `uvh-status`. `q` admite hasta
+200 caracteres, sin controles; con menos de dos caracteres devuelve listas
+vacías. No realiza búsquedas simultáneas en otros workspaces.
+
+Respuesta: `{ version: 1, links, domains, moreLinks, moreDomains }`. Máximo diez
+enlaces `{ id, name, shortUrl, state }` y cinco dominios
+`{ id, hostname, state }`, sin notas, destinos, credenciales ni desafíos DNS.
+Los enlaces eliminados se excluyen; los demás estados siguen visibles. Prioriza
+coincidencias exactas y prefijos de nombre/alias. Los indicadores adicionales
+se calculan recuperando una fila extra, sin recuentos completos ni consultas
+por resultado. La respuesta lleva `Cache-Control: private, no-store`.
+
+La paleta del panel se abre con Ctrl+K / ⌘K o el botón de búsqueda. Reutiliza las
+reglas de navegación y edición del panel, cancela consultas al cambiar contexto
+y valida de nuevo el enlace antes de abrir su QR. Cambiar de workspace requiere
+seleccionarlo explícitamente y lleva a su biblioteca. No admite mutaciones
+directas peligrosas ni persiste consultas o resultados.
 
 ## Etiquetas — `/api/v1/tags` (workspace)
 

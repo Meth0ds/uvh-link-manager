@@ -1,3 +1,4 @@
+import { GlobalSearchDialogService } from "./search/global-search-dialog.service";
 import { Component, signal } from "@angular/core";
 import { TestBed, type ComponentFixture } from "@angular/core/testing";
 import { BreakpointObserver } from "@angular/cdk/layout";
@@ -25,10 +26,11 @@ describe("Panel creation navigation", () => {
     mobile = new BehaviorSubject<{ matches: boolean; breakpoints: Record<string, boolean> }>({ matches: false, breakpoints: {} });
     list = signal<Workspace[]>([{ id: 1, name: "Workspace", slug: "workspace", role: "owner", createdAt: "2026-10-07T00:00:00Z" }]);
     await TestBed.configureTestingModule({ imports: [PanelComponent], providers: [
+      { provide: GlobalSearchDialogService, useValue: { open: jasmine.createSpy("openSearch") } },
       provideRouter([...["app/dashboard", "app/links", "app/links/:id", "app/domains", "app/getting-started"].map(path => ({ path, component: ChildPage })),
         { path: "app", redirectTo: "app/dashboard", pathMatch: "full" }]),
       { provide: AuthService, useValue: { user: signal({ id: 10, name: "Ana", emailVerified: true, isAdmin: false }) } },
-      { provide: WorkspaceService, useValue: { currentId: signal(1), list } },
+      { provide: WorkspaceService, useValue: { currentId: signal(1), list, currentRole: () => list()[0]?.role ?? null } },
       { provide: LinkDialogService, useValue: { openCreate: jasmine.createSpy("openCreate") } },
       { provide: NotificationService, useValue: { unread: signal(0), refreshUnread: () => Promise.resolve(0) } },
       { provide: MatDialog, useValue: {} }, { provide: MatSnackBar, useValue: {} },

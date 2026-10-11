@@ -1,4 +1,4 @@
-import { DestroyRef, Component, computed, effect, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
+import { DestroyRef, Component, computed, effect, HostListener, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { BreakpointObserver } from "@angular/cdk/layout";
 import { filter, map, startWith } from "rxjs";
@@ -22,20 +22,9 @@ import { WorkspaceService } from "../core/services/workspace.service";
 import { isWorkspaceRole, workspaceRoleLabel } from "../core/workspace-role-label";
 import { LinkDialogService } from "./links/link-dialog.service";
 import { WorkspaceDialogComponent, type WorkspaceDialogResult } from "./workspace-dialog.component";
+import { GlobalSearchDialogService } from "./search/global-search-dialog.service";
+import { PANEL_NAVIGATION, visiblePanelNavigation, canEditLinks } from "./panel-navigation";
 import { PublicThemeToggleComponent } from "../core/public-theme-toggle.component";
-
-interface NavItem {
-  path: string;
-  label: string;
-  icon: string;
-  adminOnly?: boolean;
-  workspaceAdminOnly?: boolean;
-}
-
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
 
 const NAVIGATION_STORAGE_PREFIX = "uvh.navigation.pinned.v1.";
 const NAVIGATION_OPEN_DELAY = 70;
@@ -74,6 +63,19 @@ export class PanelComponent {
   private breakpoint = inject(BreakpointObserver);
   private snackbar = inject(MatSnackBar);
 
+  readonly globalSearch = inject(GlobalSearchDialogService);
+  readonly searchShortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
+  openSearch(event?: MouseEvent): void {
+    // Safari does not focus buttons on pointer clicks; give the dialog a stable return target.
+    if (event?.currentTarget instanceof HTMLButtonElement) event.currentTarget.focus({ preventScroll: true });
+    void this.globalSearch.open(this.dialogOwner);
+  }
+  @HostListener("document:keydown", ["$event"])
+  onSearchShortcut(event: KeyboardEvent): void {
+    if (event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.shiftKey || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k" || (this.materialDialog.openDialogs?.length ?? 0) > 0) return;
+    event.preventDefault(); this.openSearch();
+  }
+
   readonly workspaces = inject(WorkspaceService);
   readonly notifications = inject(NotificationService);
   readonly user = this.auth.user;
@@ -83,7 +85,7 @@ export class PanelComponent {
   readonly isAdmin = computed(() => this.user()?.isAdmin === true);
   readonly workspaceName = computed(() => this.workspaces.list().find((workspace) => workspace.id === this.workspaces.currentId())?.name ?? "Sin workspace");
   readonly workspaceRole = computed(() => this.workspaces.list().find(w => w.id === this.workspaces.currentId())?.role);
-  readonly canCreate = computed(() => ["owner", "admin", "editor"].includes(this.workspaceRole() ?? ""));
+  readonly canCreate = computed(() => canEditLinks(this.user(), this.workspaces.currentRole()));
   readonly roleLabel = computed(() => {
     return this.roleLabelFor(this.workspaceRole());
   });
@@ -233,50 +235,9 @@ export class PanelComponent {
       .join("");
   });
 
-  readonly nav: NavGroup[] = [
-    {
-      label: "Trabajo",
-      items: [
-        { path: "/app/dashboard", label: "Panel", icon: "space_dashboard" },
-        { path: "/app/getting-started", label: "Primeros pasos", icon: "checklist" },
-        { path: "/app/links", label: "Enlaces", icon: "link" },
-        { path: "/app/analytics", label: "Analítica", icon: "query_stats" },
-        { path: "/app/usage", label: "Uso y límites", icon: "data_usage" },
-        { path: "/app/activity", label: "Actividad", icon: "history", workspaceAdminOnly: true },
-        { path: "/app/domains", label: "Dominios", icon: "language" },
-      ],
-    },
-    {
-      label: "Integraciones",
-      items: [
-        { path: "/app/tokens", label: "Tokens API", icon: "key" },
-        { path: "/app/webhooks", label: "Webhooks", icon: "webhook" },
-      ],
-    },
-    {
-      label: "Cuenta",
-      items: [
-        { path: "/app/team", label: "Equipo", icon: "group" },
-        { path: "/app/notifications", label: "Notificaciones", icon: "notifications" },
-        { path: "/app/security", label: "Centro de seguridad", icon: "security" },
-        { path: "/app/settings", label: "Ajustes", icon: "settings" },
-      ],
-    },
-    {
-      label: "Sistema",
-      items: [{ path: "/app/admin", label: "Admin", icon: "admin_panel_settings", adminOnly: true }],
-    },
-  ];
+  readonly nav = PANEL_NAVIGATION;
 
-  readonly visibleNav = computed(() => {
-    // Platform administration does not grant another tenant's activity.
-    const role = this.workspaces.list().find((w) => w.id === this.workspaces.currentId())?.role;
-    const workspaceAdmin = this.user()?.emailVerified === true && (role === "owner" || role === "admin");
-    return this.nav
-      .map((g) => ({ ...g, items: g.items.filter((n) => (!n.adminOnly || this.isAdmin())
-        && (!n.workspaceAdminOnly || workspaceAdmin)) }))
-      .filter((g) => g.items.length > 0);
-  });
+  readonly visibleNav = computed(() => visiblePanelNavigation(this.user(), this.workspaces.currentRole()));
 
   onWorkspaceChange(id: number): void {
     this.workspaces.select(id);

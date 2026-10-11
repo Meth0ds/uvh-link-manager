@@ -52,7 +52,7 @@ class LinkCsvController
     private const MAX_REPORTED_ERRORS = 100;
 
     /** Columnas que el archivo puede traer; una desconocida es un error. */
-    private const COLUMNS = ['alias', 'destination', 'fallback_destination', 'notes', 'tags', 'tags_json', 'scheduled_at', 'expires_at', 'max_clicks', 'single_use'];
+    private const COLUMNS = ['alias', 'destination', 'fallback_destination', 'notes', 'tags', 'tags_json', 'scheduled_at', 'expires_at', 'max_clicks', 'single_use', 'name'];
 
     /**
      * Columnas del export que sólo informan: el archivo de UVH vuelve a entrar
@@ -81,7 +81,7 @@ class LinkCsvController
             ->orderBy('id')->get();
 
         // BOM para que Excel lea los acentos como UTF-8.
-        $lines = ["\xEF\xBB\xBF".Csv::line(['id', 'alias', 'domain', 'destination', 'fallback_destination', 'state', 'click_count', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'notes', 'tags_json', 'created_at'])];
+        $lines = ["\xEF\xBB\xBF".Csv::line(['id', 'alias', 'domain', 'destination', 'fallback_destination', 'state', 'click_count', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'notes', 'tags_json', 'created_at', 'name'])];
         foreach ($links as $link) {
             $lines[] = Csv::line([
                 (string) $link->id,
@@ -98,6 +98,7 @@ class LinkCsvController
                 (string) ($link->notes ?? ''),
                 json_encode($link->tags->pluck('name')->sort()->values()->all(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                 (string) ($link->created_at?->toIso8601String() ?? ''),
+                (string) ($link->name ?? ''),
             ]);
         }
 

@@ -1,3 +1,4 @@
+import { decodeLinkName } from "./link-name-decoder";
 import type { AnalyticsOverview, AuditEvent, LinkAppeal, LinkDetailResponse, LinkDto, LinksResponse, LinkTrashResponse, RedirectRule } from "../models";
 import { LINK_APPEAL_STATUSES } from "../link-appeal-status";
 import { LINK_STATES } from "../link-state-label";
@@ -64,6 +65,7 @@ function link(value: unknown): LinkDto {
     usedAt: nullableText(source["usedAt"], "link used timestamp", 64),
     scheduledAt: nullableText(source["scheduledAt"], "link schedule timestamp", 64),
     expiresAt: nullableText(source["expiresAt"], "link expiry timestamp", 64),
+    name: decodeLinkName(source["name"]),
     notes: nullableText(source["notes"], "link notes", 1000, true),
     passwordProtected: boolean(source["passwordProtected"], "link password flag"),
     utm: {

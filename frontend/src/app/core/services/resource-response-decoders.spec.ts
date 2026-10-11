@@ -12,6 +12,7 @@ import {
 } from "./link-response-decoders";
 
 const link: LinkDto = {
+  name: null,
   id: 4,
   alias: "campaign",
   destination: "https://example.test/destination",

@@ -33,6 +33,7 @@ use App\Http\Controllers\QrSnapshotController;
 use App\Http\Controllers\QrVariantController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SavedLinkFilterController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SecurityIncidentController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TokenController;
@@ -160,6 +161,8 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('auth/mfa/recovery-codes/regenerate', [MfaConfigurationController::class, 'mfaRegenerateRecoveryCodes'])
         ->middleware(['uvh.auth', 'uvh.mfa', 'throttle:uvh-credential']);
     Route::post('auth/mfa/disable', [MfaConfigurationController::class, 'mfaDisable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
+
+    Route::get('search', [SearchController::class, 'index'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer', 'throttle:uvh-status']);
 
     Route::get('link-workflows', [LinkWorkflowController::class, 'show'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer']);
     Route::prefix('link-filters')->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->group(function () {

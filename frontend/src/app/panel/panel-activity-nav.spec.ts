@@ -1,3 +1,4 @@
+import { GlobalSearchDialogService } from "./search/global-search-dialog.service";
 import { signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { BreakpointObserver } from "@angular/cdk/layout";
@@ -27,8 +28,9 @@ describe("Panel activity navigation", () => {
     list = signal<Workspace[]>([{ ...workspace }]);
     selected = signal<number | null>(1);
     TestBed.configureTestingModule({ providers: [
+      { provide: GlobalSearchDialogService, useValue: { open: jasmine.createSpy("openSearch") } },
       { provide: AuthService, useValue: { user: identity } },
-      { provide: WorkspaceService, useValue: { list, currentId: selected } },
+      { provide: WorkspaceService, useValue: { list, currentId: selected, currentRole: () => list().find(w => w.id === selected())?.role ?? null } },
       // The panel derives its breadcrumb from the router stream, so the stub
       // has to be a router-shaped object, not `{}`: an empty one failed on
       // `undefined.pipe`, which is what this suite spent its time reporting

@@ -1,3 +1,4 @@
+import { GlobalSearchDialogService } from "./search/global-search-dialog.service";
 import { Component, signal } from "@angular/core";
 import { fakeAsync, tick, TestBed, type ComponentFixture } from "@angular/core/testing";
 import { BreakpointObserver } from "@angular/cdk/layout";
@@ -30,10 +31,11 @@ describe("Panel main navigation rail", () => {
     mobile = new BehaviorSubject<{ matches: boolean; breakpoints: Record<string, boolean> }>({ matches: false, breakpoints: {} });
     list = signal<Workspace[]>([{ id: 1, name: "Workspace", slug: "workspace", role: "owner", createdAt: "2026-10-07T00:00:00Z" }]);
     await TestBed.configureTestingModule({ imports: [PanelComponent], providers: [
+      { provide: GlobalSearchDialogService, useValue: { open: jasmine.createSpy("openSearch") } },
       provideRouter([...["app/dashboard", "app/links", "app/links/:id", "app/domains", "app/getting-started", "app/admin", "app/admin/:section"].map(path => ({ path, component: ChildPage })),
         { path: "app", redirectTo: "app/dashboard", pathMatch: "full" }]),
       { provide: AuthService, useValue: { user } },
-      { provide: WorkspaceService, useValue: { currentId: signal(1), list } },
+      { provide: WorkspaceService, useValue: { currentId: signal(1), list, currentRole: () => list()[0]?.role ?? null } },
       { provide: LinkDialogService, useValue: { openCreate: jasmine.createSpy("openCreate") } },
       { provide: NotificationService, useValue: { unread: signal(0), refreshUnread: () => Promise.resolve(0) } },
       { provide: MatDialog, useValue: {} }, { provide: MatSnackBar, useValue: {} },
@@ -66,6 +68,13 @@ describe("Panel main navigation rail", () => {
     side().dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: fixture.nativeElement.querySelector(".navigation-pin") })); fixture.detectChanges();
     expect(side().classList.contains("navigation-expanded")).toBeFalse();
   }));
+
+  it("focuses the pointer search trigger before opening so Safari can restore it", () => {
+    const trigger = fixture.nativeElement.querySelector(".global-search-trigger") as HTMLButtonElement;
+    trigger.click();
+    expect(document.activeElement).toBe(trigger);
+    expect(TestBed.inject(GlobalSearchDialogService).open).toHaveBeenCalled();
+  });
 
   it("ignores a passing pointer and allows a brief exit without flickering", fakeAsync(() => {
     const enter = () => side().dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
