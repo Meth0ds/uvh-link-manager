@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\SocialAssetCleanup;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -19,3 +20,5 @@ Schedule::command('uvh:housekeeping')->everyMinute()->withoutOverlapping();
 Schedule::command('uvh:notifications-digest')->dailyAt('08:00')->withoutOverlapping();
 
 Schedule::command('uvh:destination-inspections-prune')->everyFiveMinutes()->withoutOverlapping();
+
+Schedule::call(fn () => SocialAssetCleanup::run())->name('social-assets-prune')->hourly()->withoutOverlapping();

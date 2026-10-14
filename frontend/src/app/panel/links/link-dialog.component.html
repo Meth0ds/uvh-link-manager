@@ -2,16 +2,39 @@
   <div class="editor-heading">
     <span class="editor-mark" aria-hidden="true"><mat-icon>link</mat-icon></span>
     <div>
-      <h2 mat-dialog-title>{{ isEdit ? 'Editar enlace' : isDuplicate ? 'Duplicar enlace' : 'Crear enlace' }}</h2>
-      <p>{{ isEdit ? 'Ajusta el destino y cómo funciona tu enlace.' : isDuplicate ? 'Los mismos ajustes, una dirección nueva y estadísticas desde cero.' : 'Empieza por el destino. El resto lo decides tú.' }}</p>
+      <h2 mat-dialog-title>{{ view() === 'success' ? 'Enlace creado' : isEdit ? 'Editar enlace' : isDuplicate ? 'Duplicar enlace' : view() === 'quick' ? 'Crear enlace' : 'Configurar enlace' }}</h2>
+      <p>{{ view() === 'success' ? 'Ya puedes compartirlo o seguir creando enlaces.' : isEdit ? 'Ajusta el destino y cómo funciona tu enlace.' : isDuplicate ? 'Los mismos ajustes, una dirección nueva y estadísticas desde cero.' : view() === 'quick' ? 'Acorta una URL en unos segundos.' : 'Ajusta todos los detalles antes de publicar.' }}</p>
     </div>
   </div>
   <button mat-icon-button mat-dialog-close type="button" aria-label="Cerrar editor de enlace" class="editor-close"><mat-icon>close</mat-icon></button>
-  <div class="mobile-address" aria-label="Vista previa de la URL corta">
-    <mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>
-    <span>{{ previewDomain }}/<b>{{ form.controls.alias.value.trim() || 'alias automático' }}</b></span>
-  </div>
+  @if (view() !== 'success') {
+    <div class="mobile-address" aria-label="Vista previa de la URL corta">
+      <mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>
+      <span>{{ previewDomain }}/<b>{{ form.controls.alias.value.trim() || 'alias automático' }}</b></span>
+    </div>
+  }
 </header>
+
+@if (view() === 'success') {
+  <section class="creation-success" aria-labelledby="creation-success-title">
+    <div class="success-emblem" aria-hidden="true"><mat-icon>check</mat-icon></div>
+    <h3 id="creation-success-title">Tu enlace está listo</h3>
+    <p class="success-intro">Compártelo ahora o sigue trabajando en tu biblioteca.</p>
+    @if (createdLink(); as link) {
+      @if (link.name) { <p class="success-name">{{ link.name }}</p> }
+      <button type="button" class="success-url" (click)="copyCreatedLink()" [attr.aria-label]="'Copiar ' + link.shortUrl">
+        <mat-icon aria-hidden="true">link</mat-icon><span>{{ link.shortUrl }}</span><mat-icon aria-hidden="true">content_copy</mat-icon>
+      </button>
+      <p class="success-destination" [title]="link.destination">{{ link.destination }}</p>
+      <div class="success-actions" role="group" aria-label="Acciones del enlace creado">
+        <button mat-flat-button type="button" (click)="copyCreatedLink()"><mat-icon>content_copy</mat-icon>Copiar enlace</button>
+        <button mat-stroked-button type="button" (click)="openCreatedQr()"><mat-icon>qr_code_2</mat-icon>Crear QR</button>
+        <button mat-stroked-button type="button" (click)="openCreatedDetail()"><mat-icon>open_in_new</mat-icon>Ver detalle</button>
+      </div>
+    }
+    <button mat-button type="button" class="success-repeat" (click)="createAnother()"><mat-icon>add_link</mat-icon>Crear otro enlace</button>
+  </section>
+} @else {
 
 <mat-dialog-content class="editor-body" [attr.aria-busy]="loading()">
   @if (loading()) {
@@ -21,9 +44,9 @@
     </div>
   }
   @if (!loading()) {
-    <div class="editor-layout">
+    <div class="editor-layout" [class.editor-layout-quick]="view() === 'quick'">
       <form [formGroup]="form" class="editor-form">
-        @if (templates().length) {
+        @if (view() === 'advanced' && templates().length) {
           <div class="template-tools">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>Plantilla</mat-label>
@@ -37,6 +60,41 @@
             <button mat-icon-button type="button" (click)="saveAsTemplate()" [disabled]="busy()" aria-label="Guardar como plantilla" matTooltip="Guardar como plantilla"><mat-icon>bookmark_add</mat-icon></button>
           </div>
         }
+        @if (view() === 'quick') {
+          <div class="quick-form" aria-label="Creación rápida">
+            <div class="quick-intro"><span class="quick-kicker">Lo esencial</span><h3>Acorta una URL sin complicaciones</h3><p>Introduce el destino y tendrás un enlace listo para compartir.</p></div>
+            <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
+              <mat-label>URL de destino</mat-label>
+              <input id="link-destination" matInput formControlName="destination" placeholder="https://ejemplo.com/tu-pagina" type="url" autocomplete="url" />
+              <mat-icon matPrefix aria-hidden="true">north_east</mat-icon>
+              <mat-hint>Una dirección http o https, sin usuario ni contraseña.</mat-hint>
+              @if (form.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
+              @if (form.controls.destination.hasError('required')) { <mat-error>Escribe la URL de destino.</mat-error> }
+            </mat-form-field>
+            <div class="quick-address">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Dominio</mat-label>
+                <mat-select formControlName="domainId" [canSelectNullableOptions]="true"><mat-option [value]="null">{{ platformDomain }}</mat-option>@for (d of domains(); track d.id) { <mat-option [value]="d.id">{{ d.domain }}</mat-option> }</mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Alias <span class="optional-label">— opcional</span></mat-label>
+                <input matInput formControlName="alias" placeholder="mi-enlace" autocomplete="off" />
+                @if (aliasStatus() === 'available') { <mat-hint class="success-hint">{{ aliasStatusText() }}</mat-hint> }
+                @if (aliasStatus() === 'checking') { <mat-hint>Comprobando disponibilidad…</mat-hint> }
+                @if (aliasStatus() === 'taken' || aliasStatus() === 'reserved' || aliasStatus() === 'invalid') { <mat-hint class="error-hint">{{ aliasStatusText() }}</mat-hint> }
+                @if (form.controls.alias.hasError('pattern')) { <mat-error>Usa letras, números, guion o guion bajo.</mat-error> }
+              </mat-form-field>
+            </div>
+            <button mat-button type="button" class="quick-customize" (click)="quickPersonalizationOpen.update(value => !value)" [attr.aria-expanded]="quickPersonalizationOpen()"><mat-icon>{{ quickPersonalizationOpen() ? 'expand_less' : 'tune' }}</mat-icon>{{ quickPersonalizationOpen() ? 'Ocultar personalización' : 'Personalizar enlace' }}</button>
+            @if (quickPersonalizationOpen()) {
+              <div class="quick-personalization">
+                <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label>Nombre del enlace <span class="optional-label">— opcional</span></mat-label><input matInput formControlName="name" placeholder="Carta restaurante — Octubre 2026" autocomplete="off" /><mat-icon matPrefix aria-hidden="true">label_outline</mat-icon><mat-hint>Solo sirve para reconocerlo en tu biblioteca.</mat-hint>@if (form.controls.name.invalid) { <mat-error>Usa hasta 120 caracteres sin caracteres de control.</mat-error> }</mat-form-field>
+              </div>
+            }
+            <button mat-stroked-button type="button" class="advanced-link" (click)="showAdvanced()"><mat-icon>tune</mat-icon>Configurar más opciones</button>
+          </div>
+        } @else {
+        <div #advancedHeading class="advanced-mode-heading" tabindex="-1" aria-label="Configuración avanzada"><span class="eyebrow">Configuración avanzada</span><span>Todos los ajustes del enlace</span></div>
         <mat-tab-group animationDuration="0ms" class="editor-tabs">
           <mat-tab label="Destino">
             <div class="editor-section">
@@ -56,7 +114,8 @@
                 <mat-hint><span class="link-name-mobile-hint">Opcional. </span>Para reconocerlo en tu biblioteca. No cambia la URL corta.</mat-hint>
                 @if (form.controls.name.invalid) { <mat-error>Usa hasta 120 caracteres sin caracteres de control.</mat-error> }
               </mat-form-field>
-              <app-destination-inspection [url]="destinationValue()" [preview]="true" [suggestName]="true" (nameSuggested)="applySuggestedName($event)" />
+              <app-destination-inspection [url]="destinationValue()" [preview]="true" [suggestName]="true" (previewResolved)="destinationTitle.set($event)" (nameSuggested)="applySuggestedName($event)" />
+              @if (sharing.socialEnabled()) { <app-social-preview-editor [spec]="socialPreview()" (specChange)="socialPreview.set($event)" [protected]="passwordWillProtect()" [linkName]="form.controls.name.value" [suggestionTitle]="socialTitleSuggestion()" [shortUrl]="data.link?.shortUrl || platformDomain + '/' + (form.controls.alias.value || 'tu-enlace')" (working)="socialBusy.set($event)" /> }
               <div class="section-heading secondary"><h3>Tu URL corta</h3><p>Elige una dirección fácil de reconocer y compartir.</p></div>
               <div class="address-fields">
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -189,21 +248,26 @@
                       <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es o es-ES" maxlength="8" />@if (rule.controls.language.invalid) { <mat-error>Usa un idioma o una variante regional.</mat-error> }</mat-form-field>
                       <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Dispositivo</mat-label><mat-select formControlName="device"><mat-option value="">Cualquiera</mat-option><mat-option value="desktop">Escritorio</mat-option><mat-option value="mobile">Móvil</mat-option><mat-option value="tablet">Tablet</mat-option></mat-select></mat-form-field>
                       <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Sistema operativo</mat-label><input matInput formControlName="os" placeholder="Android" maxlength="80" />@if (rule.controls.os.invalid) { <mat-error>Usa texto de hasta 40 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Desde (HH:mm UTC)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" />@if (rule.controls.timeFrom.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Hasta (HH:mm UTC)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" />@if (rule.controls.timeTo.invalid) { <mat-error>Usa HH:mm entre 00:00 y 23:59.</mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Desde (hora local)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" />@if (rule.controls.timeFrom.invalid || ruleTimeInvalid(rule.controls.timeFrom.value)) { <mat-error>Usa una hora local válida; se guarda en UTC.</mat-error> } @else if (rule.controls.timeFrom.value) { <mat-hint>{{ ruleUtcPreview(rule.controls.timeFrom.value) }} · {{ ruleTimezone }}</mat-hint> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Hasta (hora local)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" />@if (rule.controls.timeTo.invalid || ruleTimeInvalid(rule.controls.timeTo.value)) { <mat-error>Usa una hora local válida; se guarda en UTC.</mat-error> } @else if (rule.controls.timeTo.value) { <mat-hint>{{ ruleUtcPreview(rule.controls.timeTo.value) }} · {{ ruleTimezone }}</mat-hint> }</mat-form-field>
                       <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="ejemplo.com" maxlength="400" />@if (rule.controls.referrer.invalid) { <mat-error>Usa texto de hasta 200 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
                       <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" maxlength="200" />@if (rule.controls.campaign.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
                     </div>
                   </section>
                 }
               </div>
-              <button mat-stroked-button type="button" class="add-rule" (click)="addRule()" [disabled]="ruleForms.length >= 20"><mat-icon>add</mat-icon>Añadir regla</button>
+              <p class="timezone-help"><mat-icon aria-hidden="true">schedule</mat-icon>Las horas se muestran en {{ ruleTimezone }} y se guardan en UTC. El horario de verano puede cambiar la equivalencia.</p>
+              <div class="rule-actions">
+                <button mat-stroked-button type="button" class="add-rule" (click)="addRule()" [disabled]="ruleForms.length >= 20"><mat-icon>add</mat-icon>Añadir regla</button>
+                @if (workflows.ruleSimulatorEnabled()) { <button mat-flat-button type="button" class="simulate-rules" (click)="openRuleSimulator()" [disabled]="form.controls.destination.invalid || hasInvalidRules || busy()"><mat-icon>play_arrow</mat-icon>Probar reglas</button> }
+              </div>
             </div>
           </mat-tab>
         </mat-tab-group>
+        }
         @if (!templates().length) { <button mat-button type="button" class="save-template" (click)="saveAsTemplate()" [disabled]="busy()"><mat-icon>bookmark_add</mat-icon>Guardar como plantilla</button> }
       </form>
-      <aside class="link-preview" aria-label="Vista previa del enlace">
+      @if (view() !== 'quick') { <aside class="link-preview" aria-label="Vista previa del enlace">
         <span class="preview-label">Tu enlace</span>
         <div class="preview-address"><mat-icon aria-hidden="true">link</mat-icon><div><span>{{ previewDomain }}/</span><strong>{{ form.controls.alias.value.trim() || 'Alias automático' }}</strong></div></div>
         <div class="preview-route" aria-hidden="true"><span></span><mat-icon>south</mat-icon></div>
@@ -216,7 +280,7 @@
           @if (form.controls.expiresAt.value) { <span><mat-icon aria-hidden="true">event_busy</mat-icon>Con fecha de expiración</span> }
         </div>
         <p class="preview-note">{{ isEdit ? 'Los cambios se aplican al guardar.' : 'Podrás cambiar el destino después de crearlo.' }}</p>
-      </aside>
+      </aside> }
     </div>
   }
 </mat-dialog-content>
@@ -232,3 +296,4 @@
     </button>
   </div>
 </mat-dialog-actions>
+}

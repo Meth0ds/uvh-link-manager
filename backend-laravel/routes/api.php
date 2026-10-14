@@ -7,6 +7,7 @@ use App\Http\Controllers\AccountRecoveryController;
 use App\Http\Controllers\AccountSessionsController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AnalyticsReportController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\DestinationInspectionController;
@@ -16,7 +17,9 @@ use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkCsvController;
 use App\Http\Controllers\LinkDuplicateController;
 use App\Http\Controllers\LinkFavoriteController;
+use App\Http\Controllers\LinkHistoryController;
 use App\Http\Controllers\LinkIntentController;
+use App\Http\Controllers\LinkRuleSimulationController;
 use App\Http\Controllers\LinkTemplateController;
 use App\Http\Controllers\LinkWorkflowController;
 use App\Http\Controllers\MfaChallengeController;
@@ -35,6 +38,8 @@ use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SavedLinkFilterController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SecurityIncidentController;
+use App\Http\Controllers\SharedReportController;
+use App\Http\Controllers\SocialPreviewAssetController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\WebhookController;
@@ -76,6 +81,18 @@ Route::prefix('v1')->middleware('throttle:uvh-api')->group(function () {
 });
 
 Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
+    Route::post('social-preview-assets', [SocialPreviewAssetController::class, 'store'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor', 'throttle:uvh-analytics']);
+    Route::get('social-preview-assets/{id}', [SocialPreviewAssetController::class, 'show'])->whereNumber('id')->middleware(['uvh.auth:verified', 'uvh.workspace:viewer']);
+    Route::prefix('analytics-reports')->middleware(['uvh.auth:verified', 'uvh.workspace:admin', 'throttle:uvh-analytics'])->group(function () {
+        Route::get('/', [AnalyticsReportController::class, 'index']);
+        Route::post('/', [AnalyticsReportController::class, 'store']);
+        Route::get('{id}', [AnalyticsReportController::class, 'show'])->whereNumber('id');
+        Route::patch('{id}', [AnalyticsReportController::class, 'update'])->whereNumber('id');
+        Route::post('{id}/revoke', [AnalyticsReportController::class, 'revoke'])->whereNumber('id');
+        Route::post('{id}/rotate-access', [AnalyticsReportController::class, 'rotate'])->whereNumber('id');
+    });
+    Route::post('shared-reports/{publicId}/access', [SharedReportController::class, 'access'])->whereUuid('publicId')->middleware('throttle:uvh-report-access');
+    Route::get('shared-reports/{publicId}/overview', [SharedReportController::class, 'overview'])->whereUuid('publicId')->middleware('throttle:uvh-report-read');
     // Public (host-agnostic) endpoints.
     Route::get('csrf', [PublicController::class, 'csrf']);
     Route::get('config', [PublicController::class, 'config']);
@@ -163,6 +180,8 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::post('auth/mfa/disable', [MfaConfigurationController::class, 'mfaDisable'])->middleware(['uvh.auth', 'throttle:uvh-credential']);
 
     Route::get('search', [SearchController::class, 'index'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer', 'throttle:uvh-status']);
+    Route::post('link-rule-simulations', [LinkRuleSimulationController::class, 'store'])
+        ->middleware(['uvh.auth:verified', 'uvh.workspace:viewer', 'throttle:uvh-rule-simulation']);
 
     Route::get('link-workflows', [LinkWorkflowController::class, 'show'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer']);
     Route::prefix('link-filters')->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->group(function () {
@@ -196,6 +215,10 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
         Route::post('import', [LinkCsvController::class, 'import'])->middleware(['uvh.workspace:editor', 'throttle:uvh-link-create']);
         Route::post('bulk', [LinkBulkController::class, 'bulk'])->middleware('uvh.workspace:editor');
         Route::get('{id}/activity', [LinkController::class, 'activity'])->middleware('uvh.workspace:viewer')->where('id', '[0-9]+');
+        Route::get('{id}/history', [LinkHistoryController::class, 'index'])->middleware('uvh.workspace:viewer')->whereNumber('id');
+        Route::get('{id}/history/{revision}', [LinkHistoryController::class, 'show'])->middleware('uvh.workspace:viewer')->whereNumber(['id', 'revision']);
+        Route::get('{id}/history/compare', [LinkHistoryController::class, 'compare'])->middleware('uvh.workspace:viewer')->whereNumber('id');
+        Route::post('{id}/history/{revision}/restore', [LinkHistoryController::class, 'restore'])->middleware('uvh.workspace:editor')->whereNumber(['id', 'revision']);
         Route::get('{id}', [LinkController::class, 'show'])->middleware('uvh.workspace:viewer')->where('id', '[0-9]+');
         Route::patch('{id}', [LinkController::class, 'update'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');
         Route::post('{id}/state', [LinkController::class, 'state'])->middleware('uvh.workspace:editor')->where('id', '[0-9]+');

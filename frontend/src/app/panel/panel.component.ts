@@ -253,9 +253,7 @@ export class PanelComponent {
 
   newLink(): void {
     if (!this.canCreate()) return;
-    this.dialog.openCreate("", this.dialogOwner).subscribe((created) => {
-      if (created) void this.router.navigate(["/app/links", created.id]);
-    });
+    this.dialog.openCreate("", this.dialogOwner).subscribe();
   }
 
   createWorkspace(): void {

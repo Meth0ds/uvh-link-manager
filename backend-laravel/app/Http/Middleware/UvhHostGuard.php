@@ -84,6 +84,7 @@ class UvhHostGuard
     {
         return $path === '/api/v1'
             || str_starts_with($path, '/api/v1/')
+            || str_starts_with($path, '/reports/')
             || $path === '/auth'
             || str_starts_with($path, '/auth/')
             || $path === '/app'
@@ -102,7 +103,8 @@ class UvhHostGuard
         // `/` is deliberately absent: first-party roots are served by the SPA
         // before Laravel, and a custom domain's root is redirect-surface work
         // (its owner's root redirect or not-found mode).
-        return $path === '/help'
+        return str_starts_with($path, '/.well-known/uvh-social/')
+            || $path === '/help'
             || $path === '/status'
             || $path === '/legal'
             || str_starts_with($path, '/legal/')

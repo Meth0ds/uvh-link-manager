@@ -4,6 +4,7 @@ use App\Http\Controllers\EdgeController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\PublicController;
 use App\Http\Controllers\RedirectController;
+use App\Http\Controllers\SocialCardController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [PublicController::class, 'health'])->middleware('throttle:uvh-health');
@@ -11,6 +12,8 @@ Route::get('/internal/caddy/ask', [EdgeController::class, 'caddyAsk']);
 Route::get('/internal/metrics', [OperationsController::class, 'metrics']);
 Route::get('/robots.txt', [PublicController::class, 'robots']);
 Route::get('/sitemap.xml', [PublicController::class, 'sitemap']);
+
+Route::get('/.well-known/uvh-social/{publication}/{assetId}.jpg', [SocialCardController::class, 'image'])->whereUuid('publication')->whereUuid('assetId')->middleware('throttle:uvh-resolve');
 
 Route::get('/r/{alias}', [RedirectController::class, 'resolve'])->middleware('throttle:uvh-resolve');
 // Unlocking a protected link has its own per-host/alias/IP budget. It must

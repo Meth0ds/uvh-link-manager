@@ -1,3 +1,7 @@
+# Shared capability documents must never be cached or indexed.
+map $uri $uvh_report_robots { default ""; ~^/reports/ "noindex, nofollow, noarchive"; }
+map $uri $uvh_report_cache { default ""; ~^/reports/ "no-store"; }
+
 upstream uvh_php {
     server app:9000;
     keepalive 16;
@@ -67,6 +71,8 @@ server {
     listen 8080;
     server_name ${APP_HOST} www.${APP_HOST};
     root /usr/share/nginx/html;
+    add_header X-Robots-Tag $uvh_report_robots always;
+    add_header Cache-Control $uvh_report_cache always;
     index index.html;
     client_max_body_size 2m;
 
@@ -182,6 +188,7 @@ server {
     location = /status { try_files /index.html =404; expires -1; }
     location = /status/ { return 308 /status; }
     location = /health { try_files "" @laravel_public; }
+    location ^~ /.well-known/uvh-social/ { try_files "" @laravel_public; }
     location = /robots.txt { try_files "" @laravel_public; }
     location = /sitemap.xml { try_files "" @laravel_public; }
     location ^~ /api/ { try_files "" @laravel_public; }

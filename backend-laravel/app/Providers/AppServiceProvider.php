@@ -249,6 +249,16 @@ class AppServiceProvider extends ServiceProvider
                 ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de estado.'], 429)->withHeaders($headers));
         });
 
+        RateLimiter::for('uvh-rule-simulation', function (Request $request) {
+            $actor = UvhRequest::user($request);
+            $workspace = (string) (UvhRequest::workspaceId($request) ?? 'none');
+            $identity = $actor ? 'user:'.$actor->id : 'ip:'.$request->ip();
+
+            return Limit::perMinute(max(1, (int) config('uvh.rate_limits.rule_simulation', 30)))
+                ->by('rule-simulation:'.$identity.'|workspace:'.$workspace)
+                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas simulaciones. Espera un momento.'], 429)->withHeaders($headers));
+        });
+
         RateLimiter::for('uvh-health', function (Request $request) {
             return Limit::perMinute(120)
                 ->by('health:'.$request->ip())
@@ -309,6 +319,12 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinutes(60, 60)->by('privacy-admin:'.$session.'|'.$request->ip())
                 ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas operaciones administrativas de privacidad.'], 429)->withHeaders($headers));
         });
+
+        RateLimiter::for('uvh-report-access', fn (Request $request) => [
+            Limit::perMinute(10)->by('report-access:'.$request->ip().'|'.$request->route('publicId')),
+            Limit::perMinute(30)->by('report-access-ip:'.$request->ip()),
+        ]);
+        RateLimiter::for('uvh-report-read', fn (Request $request) => Limit::perMinute(60)->by('report-read:'.$request->ip().'|'.$request->route('publicId')));
 
         RateLimiter::for('uvh-analytics', function (Request $request) {
             $session = UvhRequest::sessionId($request) ?? $request->ip();

@@ -1,3 +1,4 @@
+import { SharingService } from "./core/services/sharing.service";
 import { ApplicationConfig, inject, provideAppInitializer } from "@angular/core";
 import { provideRouter, RouteReuseStrategy, withComponentInputBinding, withInMemoryScrolling, type RouterFeatures, type Routes } from "@angular/router";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
@@ -7,6 +8,7 @@ import { PendingHandoffService } from "./core/services/pending-handoff.service";
 import { AuthRouteReuseStrategy } from "./core/auth-route-reuse";
 
 export const routes: Routes = [
+  { path: "reports/:publicId", title: "Informe compartido · UVH", loadComponent: () => import("./public-report/public-report.component").then(m => m.PublicReportComponent) },
   {
     path: "",
     title: "UVH · Acorta y gestiona tus enlaces",
@@ -91,6 +93,7 @@ export const appConfig: ApplicationConfig = {
     // answer must not delay the first paint, and a screen that has not heard
     // back yet shows the neutral option (no pending handoff) instead of a CTA
     // that may not work.
+    provideAppInitializer(() => { void inject(SharingService).refreshCapabilities(); }),
     provideAppInitializer(() => {
       void inject(PendingHandoffService).refresh();
     }),

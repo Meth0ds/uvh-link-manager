@@ -54,6 +54,9 @@ import { decodePublicActionAcknowledgement } from "../../core/services/public-ac
 import { ReadDeadline } from "../../core/read-deadline";
 import { AsyncPoller } from "../../core/async-poller";
 import { AsyncOperationStatusComponent, type AsyncOperationTone } from "../async-operation-status.component";
+import { SettingsSectionNavComponent, type SettingsSectionNavItem } from "./settings-section-nav.component";
+import { SettingsSectionHeaderComponent } from "./settings-section-header.component";
+import { SettingsPreferenceRowComponent } from "./settings-preference-row.component";
 
 @Component({
   selector: "app-settings",
@@ -74,6 +77,9 @@ import { AsyncOperationStatusComponent, type AsyncOperationTone } from "../async
     PageHeaderComponent,
     PanelSkeletonComponent,
     AsyncOperationStatusComponent,
+    SettingsSectionNavComponent,
+    SettingsSectionHeaderComponent,
+    SettingsPreferenceRowComponent,
   ],
   templateUrl: "./settings.component.html",
   // Hints and validation messages must reserve their real height on narrow screens.
@@ -126,6 +132,13 @@ export class SettingsComponent implements AfterViewInit {
     danger: "/app/settings/danger",
   };
   readonly activeSection = signal(this.initialSection());
+  readonly sectionNavItems = computed<SettingsSectionNavItem[]>(() => [
+    { id: "account", label: "Perfil y apariencia", description: "Nombre, email y tema", icon: "person_outline", status: this.userRefreshRequired() ? "Revisar" : null, statusTone: "attention" },
+    { id: "security", label: "Acceso y seguridad", description: "Contraseña, MFA y sesiones", icon: "lock_outline", status: this.userRefreshRequired() ? "Pendiente" : this.user()?.mfaEnabled ? "Protegido" : "MFA recomendado", statusTone: this.userRefreshRequired() || !this.user()?.mfaEnabled ? "attention" : "success" },
+    { id: "notifications", label: "Notificaciones", description: "Avisos y frecuencia", icon: "notifications", status: this.notificationPrefsBusy() ? "Guardando" : null, statusTone: "quiet" },
+    { id: "privacy", label: "Tus datos", description: "Descargas y solicitudes", icon: "policy", status: this.privacyAction() ? "En curso" : null, statusTone: "quiet" },
+    { id: "danger", label: "Cerrar la cuenta", description: "Requisitos y consecuencias", icon: "warning_amber", status: null, statusTone: "attention" },
+  ]);
   /** Per-view admission of section reads, cleared with the account context. */
   private readonly initializedSections = new Set<string>();
   readonly sessionAgent = sessionAgentLabel;
@@ -186,6 +199,7 @@ export class SettingsComponent implements AfterViewInit {
 
   // ---------------- Profile ----------------
   readonly profileBusy = signal(false);
+  readonly profileSaveState = signal<"idle" | "saved">("idle");
   profileForm = this.fb.nonNullable.group({
     name: [this.user()?.name ?? "", [Validators.required, Validators.minLength(2), Validators.maxLength(80)]],
   });
@@ -376,6 +390,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   constructor() {
+    this.profileForm.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.profileSaveState.set("idle"));
     let identity = this.accountContext();
     effect(() => {
       const nextIdentity = this.accountContext();
@@ -443,6 +458,7 @@ export class SettingsComponent implements AfterViewInit {
     // Session revocation retains its own guard for the intentional current-
     // session logout transition; reads and other commands never own that exit.
     this.profileBusy.set(false);
+    this.profileSaveState.set("idle");
     this.profileRefreshBusy.set(false);
     this.profileForm.reset({ name: this.user()?.name ?? "" });
     this.sessionDeadline.stop();
@@ -512,6 +528,8 @@ export class SettingsComponent implements AfterViewInit {
     try {
       await this.auth.updateProfile(this.profileForm.controls.name.value.trim());
       if (!current()) return;
+      this.profileForm.markAsPristine();
+      this.profileSaveState.set("saved");
       this.snackbar.open("Perfil actualizado", "Cerrar", { duration: 2500 });
     } catch (err) {
       if (!current()) return;
@@ -519,6 +537,15 @@ export class SettingsComponent implements AfterViewInit {
     } finally {
       if (current()) this.profileBusy.set(false);
     }
+  }
+
+  navigateFromSectionNav({ id, event }: { id: string; event: MouseEvent }): void {
+    const section = id === "account" ? this.accountSectionRef()
+      : id === "security" ? this.securitySectionRef()
+        : id === "notifications" ? this.notificationsSectionRef()
+          : id === "privacy" ? this.privacySectionRef()
+            : id === "danger" ? this.dangerSectionRef() : null;
+    if (section) this.goToSection(event, section.nativeElement);
   }
 
   async refreshAccountView(event?: Event): Promise<void> {

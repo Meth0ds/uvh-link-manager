@@ -55,6 +55,8 @@ final class RotateAppSecret extends Command
             $this->rotateColumn('users', 'mfa_secret', $dryRun);
             $this->rotateColumn('users', 'mfa_pending_secret', $dryRun);
             $this->rotateColumn('webhooks', 'secret', $dryRun);
+            $this->rotateColumn('analytics_reports', 'secret_encrypted', $dryRun);
+            $this->rotateReportReceipts($dryRun);
             $this->rotateColumn('mail_outbox', 'encrypted_envelope', $dryRun);
             $this->rotateColumn('privacy_rights_messages', 'encrypted_body', $dryRun);
             $this->rotateExportArtifacts($dryRun);
@@ -80,6 +82,28 @@ final class RotateAppSecret extends Command
                 // result of the data rotation itself.
             }
         }
+    }
+
+    private function rotateReportReceipts(bool $dryRun): void
+    {
+        DB::table('idempotency_keys')->where('scope', 'like', 'analytics-reports:%')->whereNotNull('response_body')->orderBy('id')->chunkById(100, function ($rows) use ($dryRun): void {
+            foreach ($rows as $row) {
+                DB::transaction(function () use ($row, $dryRun): void {
+                    $fresh = DB::table('idempotency_keys')->where('id', $row->id)->lockForUpdate()->first();
+                    if (! $fresh || $fresh->response_body === null) {
+                        return;
+                    }
+                    $body = json_decode($fresh->response_body, true, 64, JSON_THROW_ON_ERROR);
+                    if (! is_string($body['encrypted'] ?? null) || UvhCrypto::encryptedWithCurrentKey($body['encrypted'])) {
+                        return;
+                    }
+                    $plain = UvhCrypto::decryptAtRest($body['encrypted']);
+                    if (! $dryRun) {
+                        DB::table('idempotency_keys')->where('id', $fresh->id)->update(['response_body' => json_encode(['encrypted' => UvhCrypto::encryptAtRest($plain)], JSON_THROW_ON_ERROR)]);
+                    }
+                });
+            }
+        });
     }
 
     private function rotateColumn(string $table, string $column, bool $dryRun): void

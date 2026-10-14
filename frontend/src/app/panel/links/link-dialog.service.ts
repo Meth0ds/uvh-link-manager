@@ -3,7 +3,7 @@ import { MatDialog, type MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { NavigationStart, Router } from "@angular/router";
 import { Observable, type Subscription } from "rxjs";
-import type { LinkDialogComponent, LinkDialogData } from "./link-dialog.component";
+import type { LinkCreationEvent, LinkDialogComponent, LinkDialogData } from "./link-dialog.component";
 import type { LinkDto } from "../../core/models";
 import { SessionContextService } from "../../core/services/session-context.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
@@ -24,14 +24,14 @@ export class LinkDialogService {
   private readonly loadEditor = inject(LINK_EDITOR_LOADER);
   private modulePromise?: Promise<Type<LinkDialogComponent>>;
 
-  openCreate(initialDestination = "", owner?: DestroyRef): Observable<LinkDto | null> {
-    return this.open({ mode: "create", initialDestination }, owner);
+  openCreate(initialDestination = "", owner?: DestroyRef, context: Pick<LinkDialogData, "initialDomainId" | "initialCollectionId"> = {}): Observable<LinkCreationEvent> {
+    return this.open({ mode: "create", initialDestination, ...context }, owner, true) as Observable<LinkCreationEvent>;
   }
 
-  openDuplicate(link: LinkDto, owner?: DestroyRef): Observable<LinkDto | null> { return this.open({ mode: "duplicate", link }, owner); }
+  openDuplicate(link: LinkDto, owner?: DestroyRef): Observable<LinkDto | null> { return this.open({ mode: "duplicate", link }, owner, false) as Observable<LinkDto | null>; }
 
   openEdit(link: LinkDto, owner?: DestroyRef): Observable<LinkDto | null> {
-    return this.open({ mode: "edit", link }, owner);
+    return this.open({ mode: "edit", link }, owner, false) as Observable<LinkDto | null>;
   }
 
   private context(): string {
@@ -47,19 +47,20 @@ export class LinkDialogService {
     });
   }
 
-  private open(data: LinkDialogData, owner?: DestroyRef): Observable<LinkDto | null> {
+  private open(data: LinkDialogData, owner: DestroyRef | undefined, creation: boolean): Observable<LinkDto | null | LinkCreationEvent> {
     const context = this.context();
     return new Observable(subscriber => {
       let disposed = false;
       let settled = false;
       let ref: MatDialogRef<LinkDialogComponent, LinkDto> | undefined;
+      let created: Subscription | undefined;
       let closed: Subscription | undefined;
       let watcher: EffectRef | undefined;
       let unregisterOwner: (() => void) | undefined;
       const current = () => !disposed && !owner?.destroyed && context === this.context();
       const cancel = () => {
         if (disposed) return;
-        subscriber.next(null);
+        subscriber.next(creation ? { type: "closed" } : null);
         subscriber.complete();
       };
       const navigation = this.router.events.subscribe(event => {
@@ -74,14 +75,17 @@ export class LinkDialogService {
           ref = this.dialog.open<LinkDialogComponent, LinkDialogData, LinkDto>(component, {
             data,
             width: "1000px",
-            height: "min(860px, calc(100dvh - 24px))",
             maxWidth: "calc(100vw - 24px)",
             maxHeight: "calc(100dvh - 24px)",
             disableClose: true,
             autoFocus: false,
           });
+          if (creation && ref.componentInstance?.created) created = ref.componentInstance.created.subscribe(link => subscriber.next({ type: "created", link }));
           closed = ref.afterClosed().subscribe({
-            next: link => { settled = true; subscriber.next(current() ? link ?? null : null); },
+            next: link => {
+              settled = true;
+              subscriber.next(current() ? (creation ? (link ? { type: "created", link } : { type: "closed" }) : link ?? null) : (creation ? { type: "closed" } : null));
+            },
             complete: () => subscriber.complete(),
           });
         }).catch(() => {
@@ -95,6 +99,7 @@ export class LinkDialogService {
         navigation.unsubscribe();
         watcher?.destroy();
         unregisterOwner?.();
+        created?.unsubscribe();
         closed?.unsubscribe();
         if (!settled) ref?.close();
       };

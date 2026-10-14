@@ -68,6 +68,7 @@ export interface LinkUtm {
 }
 
 export interface LinkDto {
+  socialPreview?: import("./sharing").SocialPreviewSpec | null;
   /** Internal workspace label; legacy responses may omit it. */
   name?: string | null;
   favorite?: boolean;
@@ -111,6 +112,64 @@ export interface RedirectRule {
   referrer?: string | null;
   campaign?: string | null;
   destination: string;
+}
+
+export interface RuleSimulationInput {
+  linkId?: number;
+  destination: string;
+  fallbackDestination?: string | null;
+  utm?: LinkUtm;
+  rules: RedirectRule[];
+  country?: string | null;
+  device?: "desktop" | "mobile" | "tablet" | null;
+  language?: string | null;
+  os?: string | null;
+  referrer?: string | null;
+  campaign?: string | null;
+  localTime?: string | null;
+  timezone?: string | null;
+}
+
+export interface RuleSimulationResult {
+  source: "rule" | "fallback" | "primary";
+  ruleIndex: number | null;
+  ruleId: number | null;
+  priority: number | null;
+  destination: string;
+  destinationWithUtm: string;
+  evaluatedAtUtc: string;
+  input: Partial<RuleSimulationInput>;
+  warnings: { shadowedRules: number[]; overlappingRules: number[]; duplicateDestinations: number[][]; impossibleRules: number[]; timezoneWarnings: string[] };
+}
+
+export interface LinkHistoryEntry {
+  revision: number;
+  linkVersion: number;
+  source: "create" | "update" | "duplicate" | "restore" | "import" | "bulk";
+  actor: string | null;
+  changedFields: string[];
+  createdAt: string;
+}
+
+export interface LinkHistoryConfiguration {
+  [key: string]: unknown;
+}
+
+export interface LinkHistoryDetail extends LinkHistoryEntry {
+  configuration: LinkHistoryConfiguration;
+}
+
+export interface LinkHistoryResponse {
+  versions: LinkHistoryEntry[];
+  page: number;
+  perPage: number;
+  lastPage: number;
+}
+
+export interface LinkHistoryComparison {
+  from: LinkHistoryEntry;
+  to: LinkHistoryEntry;
+  changes: Array<{ field: string; before: unknown; after: unknown }>;
 }
 
 export interface LinksResponse {
@@ -162,6 +221,7 @@ export interface CollectionsResponse {
  * applying one is a plain create input; alias is never part of it.
  */
 export interface LinkTemplatePayload {
+  social_preview?: import("./sharing").SocialPreviewSpec | null;
   name?: string | null;
   destination?: string;
   fallback_destination?: string | null;

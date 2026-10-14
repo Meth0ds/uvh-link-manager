@@ -10,7 +10,7 @@ const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_SIDE = 4096;
 const OUTPUT_SIDE = 1024;
 
-function dimensions(bytes: Uint8Array): { width: number; height: number } {
+export function dimensions(bytes: Uint8Array): { width: number; height: number } {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (bytes.length >= 24 && [137, 80, 78, 71, 13, 10, 26, 10].every((byte, i) => bytes[i] === byte)
     && view.getUint32(8) === 13 && view.getUint32(12) === 0x49484452) {

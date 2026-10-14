@@ -233,5 +233,6 @@ return [
         'pending' => (int) env('PENDING_LIMIT', 20),
         'pending_read' => (int) env('PENDING_READ_LIMIT', 120),
         'api_token' => (int) env('API_TOKEN_LIMIT', 600),
+        'rule_simulation' => (int) env('RULE_SIMULATION_LIMIT', 30),
     ],
 ];

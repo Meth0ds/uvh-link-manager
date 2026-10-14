@@ -256,6 +256,13 @@ export class ApiService {
   }
 
   /** POST (mutation — requires CSRF). `extraHeaders` carries e.g. an Idempotency-Key. */
+  /** A report capability is independent of the signed-in account/workspace. */
+  async accessSharedReport<T>(path: string, body: unknown, decoder: ApiDecoder<T>): Promise<T> {
+    if (!/^\/api\/v1\/shared-reports\/[a-f0-9-]{36}\/access$/.test(path)) throw new ApiRequestError("Ruta de informe inválida", 0);
+    await this.ensureCsrf();
+    return this.retryOnRejectedCsrf(() => this.request(this.http.post<T>(path, body, { headers: this.headers(true) }), decoder, "mutation"), () => undefined);
+  }
+
   async post<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>, extraHeaders?: Record<string, string>): Promise<T> {
     this.assertApiPath(path);
     return this.mutate(path, () => this.http.post<T>(path, body ?? {}, {
@@ -327,9 +334,9 @@ export class ApiService {
   }
 
   /** PATCH (mutation — requires CSRF). */
-  async patch<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>): Promise<T> {
+  async patch<T>(path: string, body?: unknown, decoder?: ApiDecoder<T>, extraHeaders?: Record<string, string>): Promise<T> {
     this.assertApiPath(path);
-    return this.mutate(path, () => this.http.patch<T>(path, body ?? {}, { headers: this.headers(true) }), decoder);
+    return this.mutate(path, () => this.http.patch<T>(path, body ?? {}, { headers: { ...this.headers(true), ...extraHeaders } }), decoder);
   }
 
   /** DELETE (mutation — requires CSRF). */

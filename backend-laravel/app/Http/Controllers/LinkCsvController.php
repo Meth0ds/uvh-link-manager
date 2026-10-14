@@ -328,7 +328,7 @@ class LinkCsvController
         }
         try {
             $user = UvhRequest::user($request);
-            $made = LinkService::create($workspaceId, (int) $user->id, $input, UvhRequest::apiToken($request), (int) $user->security_version);
+            $made = LinkService::create($workspaceId, (int) $user->id, $input, UvhRequest::apiToken($request), (int) $user->security_version, null, 'import');
 
             return ['row_number' => $row, 'status' => 'created', 'link_id' => (int) $made['id'], 'error' => null];
         } catch (LinkException $e) {

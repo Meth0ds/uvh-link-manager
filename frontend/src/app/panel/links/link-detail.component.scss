@@ -2,6 +2,10 @@
 // title color comes from --uvh-electric, never a hardcoded blue.
 :host { display: block; container-type: inline-size; }
 
+.section-heading-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:26px 0 10px; flex-wrap:wrap; }
+.section-heading-row .section-title { margin:0; }
+@container (max-width: 520px) { .section-heading-row button { width:100%; } }
+
 .alert {
   display: flex;
   align-items: center;

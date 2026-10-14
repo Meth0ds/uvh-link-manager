@@ -51,12 +51,17 @@ describe("Lazy link editor with real Material dialog", () => {
     const opening = firstValueFrom(service.openCreate("https://example.com/saved"));
     const component = await instance();
     expect(component.isEdit).toBeFalse();
+    expect(component.view()).toBe("quick");
     expect(component.form.controls.destination.value).toBe("https://example.com/saved");
     expect(document.querySelector(".editor-heading h2")?.textContent).toContain("Crear enlace");
     await component.save();
-    await expectAsync(opening).toBeResolvedTo(link);
+    await expectAsync(opening).toBeResolvedTo({ type: "created", link });
+    expect(component.view()).toBe("success");
+    expect(component.createdLink()).toBe(link);
     expect(api.post).toHaveBeenCalledTimes(1);
     expect(api.post.calls.mostRecent().args[0]).toBe("/api/v1/links");
+    dialog.openDialogs[0].close();
+    await drain();
     expect(document.activeElement).toBe(trigger);
   });
   it("loads and renders the actual edit form with versioned save", async () => {
@@ -76,11 +81,11 @@ describe("Lazy link editor with real Material dialog", () => {
   it("reopens the actual editor after cancellation without preserving the previous destination", async () => {
     const first = firstValueFrom(service.openCreate("https://example.com/first"));
     await instance(); dialog.openDialogs[0].close();
-    await expectAsync(first).toBeResolvedTo(null);
+    await expectAsync(first).toBeResolvedTo({ type: "closed" });
     const second = firstValueFrom(service.openCreate());
     const component = await instance();
     expect(component.form.controls.destination.value).toBe("");
     dialog.openDialogs[0].close();
-    await expectAsync(second).toBeResolvedTo(null);
+    await expectAsync(second).toBeResolvedTo({ type: "closed" });
   });
 });

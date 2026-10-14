@@ -1,0 +1,40 @@
+<header class="simulator-header">
+  <div class="title"><span class="title-icon" aria-hidden="true"><mat-icon>alt_route</mat-icon></span><div><h2 mat-dialog-title>Probar reglas</h2><p>Simula un visitante sin crear una visita ni consumir usos.</p></div></div>
+  <button mat-icon-button type="button" mat-dialog-close aria-label="Cerrar simulador"><mat-icon>close</mat-icon></button>
+</header>
+<mat-dialog-content class="simulator-content">
+  <div class="simulator-note" role="note"><mat-icon aria-hidden="true">science</mat-icon><span>Resultado ilustrativo; no se ha ejecutado una redirección real.</span></div>
+  <form [formGroup]="form" (ngSubmit)="simulate()" class="simulator-form">
+    <div class="section-heading"><span class="eyebrow">Contexto del visitante</span><h3>¿Qué quieres comprobar?</h3><p>Los campos vacíos representan cualquier valor.</p></div>
+    <div class="field-grid">
+      <mat-form-field appearance="outline"><mat-label>País</mat-label><input matInput formControlName="country" maxlength="2" placeholder="ES" autocomplete="off" /><mat-hint>ISO 3166</mat-hint></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Dispositivo</mat-label><mat-select formControlName="device"><mat-option value="">Cualquiera</mat-option><mat-option value="desktop">Escritorio</mat-option><mat-option value="mobile">Móvil</mat-option><mat-option value="tablet">Tablet</mat-option></mat-select></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" maxlength="8" placeholder="es-ES" autocomplete="off" /></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Sistema operativo</mat-label><input matInput formControlName="os" maxlength="40" placeholder="Android" autocomplete="off" /></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Referente</mat-label><input matInput formControlName="referrer" maxlength="200" placeholder="google.com" autocomplete="off" /></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Campaña</mat-label><input matInput formControlName="campaign" maxlength="100" placeholder="navidad" autocomplete="off" /></mat-form-field>
+      <mat-form-field appearance="outline" class="time-field"><mat-label>Hora local</mat-label><input matInput formControlName="localTime" type="time" /><mat-hint>{{ timezone }} @if (utcPreview(); as utc) { · {{ utc }} }</mat-hint></mat-form-field>
+    </div>
+    <p class="timezone-note"><mat-icon aria-hidden="true">schedule</mat-icon>Las reglas se guardan en UTC. La equivalencia puede cambiar con el horario de verano.</p>
+    <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()"><mat-icon>{{ busy() ? 'hourglass_top' : 'play_arrow' }}</mat-icon>{{ busy() ? 'Probando…' : 'Probar configuración' }}</button>
+  </form>
+  @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Probando reglas" /> }
+  @if (error(); as message) { <div class="error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span><button mat-button type="button" (click)="simulate()">Reintentar</button></div> }
+  @if (result(); as output) {
+    <section class="result-card" aria-live="polite" aria-labelledby="result-title">
+      <div class="result-heading"><div class="result-icon" [class.rule]="output.source === 'rule'"><mat-icon>{{ output.source === 'rule' ? 'alt_route' : output.source === 'fallback' ? 'turn_right' : 'north_east' }}</mat-icon></div><div><span class="eyebrow">Resultado</span><h3 id="result-title">{{ output.source === 'rule' ? 'Coincide una regla' : output.source === 'fallback' ? 'Destino fallback' : 'Destino principal' }}</h3></div></div>
+      @if (output.ruleIndex !== null) { <p class="match-meta">Regla {{ output.ruleIndex + 1 }} · prioridad {{ output.priority }}</p> }
+      <p class="destination" [title]="output.destinationWithUtm">{{ output.destinationWithUtm }}</p>
+      @if (output.warnings.shadowedRules.length || output.warnings.overlappingRules.length || output.warnings.duplicateDestinations.length || output.warnings.impossibleRules.length || output.warnings.timezoneWarnings.length) {
+        <mat-expansion-panel class="warnings"><mat-expansion-panel-header><mat-panel-title><mat-icon aria-hidden="true">warning_amber</mat-icon> Conflictos detectados</mat-panel-title></mat-expansion-panel-header><ul>
+          @if (output.warnings.shadowedRules.length) { <li>Reglas ocultas por anteriores: {{ ruleNumbers(output.warnings.shadowedRules) }}.</li> }
+          @if (output.warnings.overlappingRules.length) { <li>Reglas con condiciones solapadas: {{ ruleNumbers(output.warnings.overlappingRules) }}.</li> }
+          @if (output.warnings.duplicateDestinations.length) { <li>Hay destinos repetidos en {{ output.warnings.duplicateDestinations.length }} grupos.</li> }
+          @if (output.warnings.impossibleRules.length) { <li>Reglas que no pueden coincidir: {{ ruleNumbers(output.warnings.impossibleRules) }}.</li> }
+          @if (output.warnings.timezoneWarnings.length) { <li>La hora local es ambigua por el cambio horario; se ha usado el primer instante válido.</li> }
+        </ul></mat-expansion-panel>
+      } @else { <p class="clean"><mat-icon aria-hidden="true">check_circle</mat-icon>No se han detectado conflictos demostrables.</p> }
+    </section>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end"><button mat-button type="button" (click)="reset()">Limpiar</button><button mat-stroked-button type="button" (click)="close()">Cerrar</button></mat-dialog-actions>

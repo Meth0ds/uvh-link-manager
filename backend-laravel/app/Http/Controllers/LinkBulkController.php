@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\Audit;
 use App\Support\Idempotency;
 use App\Support\LinkService;
+use App\Support\LinkVersioning;
 use App\Support\UvhRequest;
 use App\Support\WebhookService;
 use App\Support\WorkspaceWriteActor;
@@ -300,6 +301,7 @@ class LinkBulkController
                     continue;
                 }
                 $link->update(['version' => (int) $link->version + 1, 'updated_at' => now()]);
+                LinkVersioning::capture($link, (int) $user->id, 'bulk');
                 $events[] = ['event' => 'link.updated', 'data' => [
                     'linkId' => (int) $link->id,
                     'alias' => (string) $link->alias,
@@ -361,6 +363,7 @@ class LinkBulkController
                     'version' => (int) $link->version + 1,
                     'updated_at' => now(),
                 ]);
+                LinkVersioning::capture($link, (int) $user->id, 'bulk');
                 $events[] = ['event' => 'link.updated', 'data' => [
                     'linkId' => (int) $link->id,
                     'alias' => (string) $link->alias,
@@ -382,6 +385,7 @@ class LinkBulkController
                 'version' => (int) $link->version + 1,
                 'updated_at' => now(),
             ]);
+            LinkVersioning::capture($link, (int) $user->id, 'bulk');
             $events[] = ['event' => 'link.updated', 'data' => [
                 'linkId' => (int) $link->id,
                 'alias' => (string) $link->alias,

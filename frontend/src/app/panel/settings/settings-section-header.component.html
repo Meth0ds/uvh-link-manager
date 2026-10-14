@@ -1,0 +1,5 @@
+<header class="settings-section-head" [class.danger-head]="tone() === 'danger'">
+  <span class="section-mark" aria-hidden="true"><mat-icon>{{ icon() }}</mat-icon></span>
+  <div><span class="section-eyebrow">{{ eyebrow() }}</span><h2 [id]="headingId()">{{ title() }}</h2><p>{{ description() }}</p></div>
+  <ng-content />
+</header>

@@ -8,6 +8,7 @@ use App\Support\OperationalMetrics;
 use App\Support\QrAttribution;
 use App\Support\RedirectService;
 use App\Support\SignedToken;
+use App\Support\SocialPreview;
 use App\Support\Ua;
 use App\Support\UrlUtil;
 use App\Support\UvhCrypto;
@@ -38,6 +39,9 @@ class RedirectController
     {
         $alias = $alias ?? (string) $request->route('alias', '');
 
+        if (config('sharing.social_previews') && SocialPreview::isFetcher($request->header('user-agent'))) {
+            return app(SocialCardController::class)->card($request, $alias);
+        }
         $ctx = [
             'host' => $request->getHost(),
             'alias' => $alias,
@@ -147,7 +151,7 @@ class RedirectController
             return VisitorAnswer::noSuchLink($request);
         }
 
-        $query = Link::whereNull('deleted_at')->where('alias', $alias);
+        $query = Link::whereNull('deleted_at')->whereRaw('lower(alias) = ?', [$alias]);
         if ($domainId === null) {
             $query->whereNull('domain_id');
         } else {

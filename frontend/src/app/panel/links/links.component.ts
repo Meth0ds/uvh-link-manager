@@ -1,3 +1,4 @@
+import { SharingService } from "../../core/services/sharing.service";
 import { Component, computed, DestroyRef, effect, inject, signal, untracked, ChangeDetectionStrategy } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { DatePipe } from "@angular/common";
@@ -82,6 +83,16 @@ type StateFilter = "" | LinkState;
   styleUrl: "./links.component.scss",
 })
 export class LinksComponent {
+  readonly sharing = inject(SharingService);
+  readonly reportSnapshotBusy = signal(false);
+  async shareSelectedReport(): Promise<void> {
+    const context = this.sharing.context(); const ids = [...this.selected()];
+    if (this.reportSnapshotBusy() || !this.sharing.canPublish() || !ids.length || ids.length > 100) return;
+    this.reportSnapshotBusy.set(true);
+    try { const links = await this.qrLibrary.snapshot(ids); if (!this.dialogOwner.destroyed && context === this.sharing.context()) await this.sharing.open(links.map(l => ({linkId:l.id,label:l.alias}))); }
+    catch (error) { if (!this.dialogOwner.destroyed && context === this.sharing.context()) this.error.set(error instanceof Error ? error.message : "No se pudo preparar el informe."); }
+    finally { if (!this.dialogOwner.destroyed) this.reportSnapshotBusy.set(false); }
+  }
   private api = inject(ApiService);
   readonly workflows = inject(LinkWorkflowService);
   readonly favorites = inject(LinkFavoriteService);
@@ -604,8 +615,8 @@ export class LinksComponent {
   }
 
   create(): void {
-    this.linkDialog.openCreate("", this.dialogOwner).subscribe((created) => {
-      if (created) void this.router.navigate(["/app/links", created.id]);
+    this.linkDialog.openCreate("", this.dialogOwner, { initialDomainId: this.domainId(), initialCollectionId: this.collectionId() }).subscribe((event) => {
+      if (event.type === "created") void this.reload();
     });
   }
 
@@ -713,11 +724,11 @@ export class LinksComponent {
       const pending = await this.intents.claim();
       if (!pending || this.dialogOwner.destroyed || context !== this.viewContext()) return;
       this.pendingDialogOpen = true;
-      this.linkDialog.openCreate(pending.destination, this.dialogOwner).subscribe((created) => {
-        this.pendingDialogOpen = false;
-        if (!created || this.dialogOwner.destroyed || context !== this.viewContext()) return;
+      this.linkDialog.openCreate(pending.destination, this.dialogOwner).subscribe((event) => {
+        if (event.type === "closed") { this.pendingDialogOpen = false; return; }
+        if (this.dialogOwner.destroyed || context !== this.viewContext()) return;
         void this.intents.complete();
-        void this.router.navigate(["/app/links", created.id]);
+        void this.reload();
       });
     } catch (err) {
       if (this.dialogOwner.destroyed || context !== this.viewContext()) return;

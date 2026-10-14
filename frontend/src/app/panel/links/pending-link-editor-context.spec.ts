@@ -10,6 +10,7 @@ import { SessionContextService } from "../../core/services/session-context.servi
 import { WorkspaceService } from "../../core/services/workspace.service";
 import type { LinkDto, Workspace } from "../../core/models";
 import { LinkDialogService } from "./link-dialog.service";
+import type { LinkCreationEvent } from "./link-dialog.component";
 import { LinksComponent } from "./links.component";
 
 function deferred<T>() {
@@ -27,14 +28,14 @@ describe("Pending link editor context", () => {
   let dialogs: jasmine.SpyObj<LinkDialogService>;
   let snackbar: jasmine.SpyObj<MatSnackBar>;
   let claim: ReturnType<typeof deferred<ClaimedLinkIntent | null>>;
-  let result: Subject<LinkDto | null>;
+  let result: Subject<LinkCreationEvent>;
   let navigate: jasmine.Spy;
   let stored: string | null;
   const destination = "https://example.com/saved";
 
   beforeEach(async () => {
     stored = localStorage.getItem("uvh.workspaceId"); localStorage.removeItem("uvh.workspaceId");
-    claim = deferred<ClaimedLinkIntent | null>(); result = new Subject();
+    claim = deferred<ClaimedLinkIntent | null>(); result = new Subject<LinkCreationEvent>();
     intents = jasmine.createSpyObj<PendingLinkIntentService>("intents", ["claim", "complete"], {
       pending: signal({ expiresAt: "2027-01-01T00:00:00Z" }),
     });
@@ -88,14 +89,14 @@ describe("Pending link editor context", () => {
     expect(args[1]?.destroyed).toBeFalse();
     const destroyed = jasmine.createSpy("ownerDestroyed");
     args[1]?.onDestroy(destroyed);
-    result.next(null); result.complete();
+    result.next({ type: "closed" }); result.complete();
     expect(intents.complete).not.toHaveBeenCalled();
-    result = new Subject(); dialogs.openCreate.and.returnValue(result);
+    result = new Subject<LinkCreationEvent>(); dialogs.openCreate.and.returnValue(result);
     fixture.componentInstance.resumePendingLink(); await drain();
     expect(dialogs.openCreate).toHaveBeenCalledTimes(2);
-    result.next({ id: 42 } as LinkDto); result.complete();
+    result.next({ type: "created", link: { id: 42 } as LinkDto }); result.complete();
     expect(intents.complete).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledOnceWith(["/app/links", 42]);
+    expect(navigate).not.toHaveBeenCalled();
     fixture.destroy();
     expect(destroyed).toHaveBeenCalledTimes(1);
     expect(args[1]?.destroyed).toBeTrue();
@@ -103,7 +104,7 @@ describe("Pending link editor context", () => {
   it("does not consume or navigate for an old dialog result", async () => {
     claim.resolve({ destination, expiresAt: "2027-01-01T00:00:00Z" }); await drain();
     TestBed.inject(SessionContextService).advance();
-    result.next({ id: 42 } as LinkDto); result.complete();
+    result.next({ type: "created", link: { id: 42 } as LinkDto }); result.complete();
     expect(intents.complete).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
   });

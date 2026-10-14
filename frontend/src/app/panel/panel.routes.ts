@@ -45,6 +45,10 @@ export const panelRoutes: Routes = [
         loadComponent: () => import("./usage/usage.component").then((m) => m.UsageComponent),
       },
       {
+        path: "analytics/reports",
+        loadComponent: () => import("./analytics/reports/reports.component").then(m => m.ReportsComponent),
+      },
+      {
         path: "analytics",
         loadComponent: () => import("./analytics/analytics.component").then((m) => m.AnalyticsComponent),
       },

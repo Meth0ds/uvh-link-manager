@@ -70,7 +70,7 @@ export class GlobalSearchDialogService {
     if (!current()) return;
     if (action.kind === "create") {
       if (!this.search.canCreate()) return;
-      this.links.openCreate("", owner).pipe(takeUntilDestroyed(owner)).subscribe(link => { if (link && current()) void this.router.navigate(["/app/links", link.id]); });
+      this.links.openCreate("", owner).pipe(takeUntilDestroyed(owner)).subscribe(() => { /* the editor owns its confirmation state */ });
     } else if (action.kind === "workspace") {
       if (!this.search.workspaces.list().some(workspace => workspace.id === action.id)) return;
       this.search.workspaces.select(action.id); void this.router.navigate(["/app/links"]);

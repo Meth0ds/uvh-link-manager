@@ -68,6 +68,42 @@ describe("LinkDialogComponent form and async safety", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  it("starts in the quick view and keeps the draft while expanding advanced options", () => {
+    component.form.controls.destination.setValue("https://example.test/quick");
+    component.form.controls.alias.setValue("quick-link");
+    expect(component.view()).toBe("quick");
+    component.showAdvanced();
+    expect(component.view()).toBe("advanced");
+    expect(component.form.controls.destination.value).toBe("https://example.test/quick");
+    expect(component.form.controls.alias.value).toBe("quick-link");
+    component.showQuick();
+    expect(component.view()).toBe("quick");
+  });
+
+  it("resets a consecutive creation without carrying secrets or targeting settings", () => {
+    component.form.patchValue({
+      destination: "https://example.test/first", name: "First", alias: "first", domainId: 4, collectionId: 9,
+      password: "secret", maxClicks: 20, singleUse: true, scheduledAt: "2030-01-01T10:00", expiresAt: "2030-01-02T10:00",
+      notes: "private", utm: { source: "mail", medium: "email", campaign: "winter", term: "term", content: "button" },
+    });
+    component.createAnother();
+    expect(component.view()).toBe("quick");
+    expect(component.form.controls.domainId.value).toBe(4);
+    expect(component.form.controls.collectionId.value).toBe(9);
+    expect(component.form.controls.destination.value).toBe("");
+    expect(component.form.controls.password.value).toBe("");
+    expect(component.form.controls.maxClicks.value).toBeNull();
+    expect(component.form.controls.utm.controls.campaign.value).toBe("");
+  });
+
+  it("preserves advanced mode when starting another link", () => {
+    component.showAdvanced();
+    component.form.controls.destination.setValue("https://example.test/first");
+    component.createAnother();
+    expect(component.view()).toBe("advanced");
+    expect(component.form.controls.destination.value).toBe("");
+  });
+
   it("refuses to create a link that would be born expired", async () => {
     component.form.controls.destination.setValue("https://example.test");
     component.form.controls.expiresAt.setValue("2020-01-01T10:00");
@@ -130,6 +166,7 @@ describe("LinkDialogComponent form and async safety", () => {
 
     const payload = api.post.calls.mostRecent().args[1] as { alias: string | null };
     expect(payload.alias).toBeNull();
+    expect(api.post.calls.mostRecent().args[3]).toEqual(jasmine.objectContaining({ "Idempotency-Key": jasmine.any(String) }));
   });
 
   it("enforces the server limits and case-insensitive tag identity", () => {

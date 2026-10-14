@@ -144,11 +144,6 @@ parameters:
 			count: 1
 			path: app/Http/Controllers/AnalyticsController.php
 
-		-
-			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:dimension\(\) has parameter \$events with no type specified\.$#'
-			identifier: missingType.parameter
-			count: 1
-			path: app/Http/Controllers/AnalyticsController.php
 
 		-
 			message: '#^Method App\\Http\\Controllers\\AnalyticsController\:\:overview\(\) has no return type specified\.$#'

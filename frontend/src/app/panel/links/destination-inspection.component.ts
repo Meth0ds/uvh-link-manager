@@ -36,6 +36,7 @@ import type { LinkDto } from "../../core/models";
   styles: [`:host{display:block;min-width:0}.destination-inspector{padding:22px 0;border-top:1px solid var(--uvh-border)}.inspection-top{display:flex;align-items:center;justify-content:space-between;gap:20px}h3{margin:0 0 6px;font-size:15px;font-weight:700}p{margin:0;font-size:13px;line-height:1.6;color:var(--uvh-muted)}button{flex-shrink:0;min-height:44px}.inspection-result{display:flex;gap:14px;align-items:center;margin-top:18px;padding:18px;border:1px solid var(--uvh-border);border-radius:16px;background:var(--uvh-surface-raised);animation:inspection-reveal .18s ease-out}.site-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:13px;background:var(--uvh-surface);flex-shrink:0}.site-icon img{object-fit:contain}.site-summary{display:flex;flex-direction:column;gap:5px;min-width:0}.site-summary strong,.site-domain{overflow-wrap:anywhere}.site-summary strong{font-size:14px}.site-domain{font-size:13px;color:var(--uvh-muted)}.status-label{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:650}.http-code{font-size:11px;font-weight:500;color:var(--uvh-muted)}small{font-size:11px;color:var(--uvh-muted)}.use-title{margin-top:12px}.inspection-footnote{font-size:12px;margin-top:10px}.inspection-error{color:var(--uvh-danger);margin-top:12px}.reachable .site-icon{color:var(--uvh-success)}.spinning{animation:inspection-spin 1s linear infinite}@keyframes inspection-spin{to{transform:rotate(360deg)}}@keyframes inspection-reveal{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}@media(max-width:600px){.inspection-top{align-items:flex-start;flex-direction:column;gap:12px}.inspection-top button{width:100%}}@media(prefers-reduced-motion:reduce){.inspection-result,.spinning{animation:none}}`],
   changeDetection: ChangeDetectionStrategy.Eager })
 export class DestinationInspectionComponent {
+  readonly previewResolved = output<{title:string;url:string}|null>();
   readonly suggestName = input(false);
   readonly nameSuggested = output<{ title: string; url: string }>();
   useTitle(): void {
@@ -50,7 +51,7 @@ export class DestinationInspectionComponent {
   readonly result = signal<DestinationResult | null>(null); readonly busy = signal(false); readonly error = signal<string | null>(null); readonly icon = signal<string | null>(null);
   private loadedContext: string | null = null;
   constructor() {
-    effect(() => { const context = this.context(); if (context === this.loadedContext) return; this.loadedContext = context; this.requests.invalidate(); this.releaseIcon(); this.result.set(null); this.error.set(null); this.busy.set(false); });
+    effect(() => { const context = this.context(); if (context === this.loadedContext) return; this.loadedContext = context; this.requests.invalidate(); this.releaseIcon(); this.result.set(null); this.previewResolved.emit(null); this.error.set(null); this.busy.set(false); });
     this.owner.onDestroy(() => this.releaseIcon());
   }
   private context(): string { return JSON.stringify([this.workflows.context(), this.workflows.enabled(), this.url(), this.link()?.id, this.link()?.version, this.link()?.destination, this.preview()]); }
@@ -64,6 +65,7 @@ export class DestinationInspectionComponent {
       const link = this.link();
       const inspection = await this.service.inspect(link && !this.preview() ? { linkId: link.id, linkVersion: link.version } : { url: this.url() }, request.signal);
       if (!current()) return; this.result.set(inspection.result);
+      if (this.preview() && inspection.result?.title) this.previewResolved.emit({title:inspection.result.title,url:this.url()});
       if (inspection.result?.iconUrl && this.preview()) {
         try { const blob = await this.service.icon(inspection.result.iconUrl, request.signal); if (current()) this.icon.set(URL.createObjectURL(blob)); } catch { /* An unavailable icon never hides the destination result. */ }
       }

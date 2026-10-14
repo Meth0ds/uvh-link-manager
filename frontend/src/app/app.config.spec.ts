@@ -16,6 +16,7 @@ describe("application routes", () => {
   it("registers the public and authenticated route surfaces", () => {
     const paths = routes.map((route) => route.path);
     expect(paths).toEqual([
+      "reports/:publicId",
       "",
       "auth",
       "legal",

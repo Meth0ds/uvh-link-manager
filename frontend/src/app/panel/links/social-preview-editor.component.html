@@ -1,0 +1,251 @@
+<section class="social-editor">
+  <button
+    class="social-toggle"
+    type="button"
+    (click)="expanded.set(!expanded())"
+    [attr.aria-expanded]="open()"
+  >
+    <span class="social-symbol"><mat-icon>preview</mat-icon></span
+    ><span
+      ><strong>Tarjeta al compartir</strong
+      ><small>{{
+        value().enabled
+          ? "Personalización configurada"
+          : "Elige cómo se presenta tu enlace en redes sociales"
+      }}</small></span
+    ><mat-icon>{{ open() ? "expand_less" : "expand_more" }}</mat-icon>
+  </button>
+  @if (open()) {
+    <div class="social-content">
+      <mat-checkbox
+        [checked]="value().enabled"
+        (change)="patch({ enabled: $event.checked })"
+        [disabled]="protected() || busy()"
+        >Personalizar la tarjeta social</mat-checkbox
+      >
+      <p class="publication-note">
+        <mat-icon>public</mat-icon>Este contenido será público al compartir el
+        enlace.
+      </p>
+      @if (protected()) {
+        <p class="protected-note">
+          <mat-icon>lock_outline</mat-icon>Con contraseña UVH responderá con una
+          tarjeta neutra y conservará este borrador. Las redes pueden mantener
+          una tarjeta publicada anteriormente.
+        </p>
+      }
+      <div class="social-layout">
+        <div class="social-fields">
+          <label
+            >Título público<input
+              [ngModel]="value().title"
+              (ngModelChange)="patch({ title: $event })"
+              [ngModelOptions]="{ standalone: true }"
+              maxlength="120"
+              [disabled]="protected() || busy()"
+              placeholder="Una invitación que apetece abrir"
+            /><small>{{ value().title.length }} / 120</small></label
+          >
+          <div class="title-suggestions">
+            @if (linkName()) {
+              <button
+                mat-button
+                type="button"
+                (click)="patch({ title: linkName() })"
+                [disabled]="protected() || busy()"
+              >
+                Usar nombre del enlace
+              </button>
+            }
+            @if (suggestionTitle()) {
+              <button
+                mat-button
+                type="button"
+                (click)="patch({ title: suggestionTitle()! })"
+                [disabled]="protected() || busy()"
+              >
+                Usar título del destino
+              </button>
+            }
+          </div>
+          <label
+            >Descripción <span>Opcional</span
+            ><textarea
+              [ngModel]="value().description ?? ''"
+              (ngModelChange)="patch({ description: $event || null })"
+              [ngModelOptions]="{ standalone: true }"
+              maxlength="240"
+              rows="3"
+              [disabled]="protected() || busy()"
+              placeholder="Añade contexto para quien recibe el enlace."
+            ></textarea
+            ><small>{{ value().description?.length ?? 0 }} / 240</small></label
+          >
+          <input
+            #imageFile
+            type="file"
+            accept="image/png,image/jpeg"
+            hidden
+            (change)="choose(imageFile)"
+          />
+          <div class="image-actions">
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="imageFile.click()"
+              [disabled]="protected() || busy()"
+            >
+              <mat-icon>image</mat-icon
+              >{{ image() ? "Sustituir imagen" : "Elegir imagen" }}
+            </button>
+            @if (value().imageAssetId !== null || pending()) {
+              <button
+                mat-button
+                type="button"
+                (click)="remove()"
+                [disabled]="busy() || protected()"
+              >
+                Quitar
+              </button>
+            }
+          </div>
+          <small>PNG o JPG hasta 2 MB. Formato final: 1200 × 630 px.</small>
+          @if (pending()) {
+            <div class="crop-controls">
+              <h4>Ajusta el encuadre</h4>
+              <label
+                >Posición horizontal<input
+                  type="range"
+                  min="0"
+                  max="100"
+                  [(ngModel)]="x"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="render()"
+                  [disabled]="busy()" /></label
+              ><label
+                >Posición vertical<input
+                  type="range"
+                  min="0"
+                  max="100"
+                  [(ngModel)]="y"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="render()"
+                  [disabled]="busy()" /></label
+              ><label
+                >Acercar<input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.05"
+                  [(ngModel)]="zoom"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="render()"
+                  [disabled]="busy()"
+              /></label>
+              @if (lowResolution()) {
+                <p class="resolution-note">
+                  La imagen puede perder nitidez. Recomendamos al menos 1200 ×
+                  630 px en el recorte.
+                </p>
+              }
+              <div class="crop-actions">
+                <button
+                  mat-flat-button
+                  type="button"
+                  (click)="upload()"
+                  [disabled]="busy()"
+                >
+                  {{ busy() ? "Cargando…" : "Usar este encuadre" }}</button
+                ><button
+                  mat-button
+                  type="button"
+                  (click)="cancel()"
+                  [disabled]="busy()"
+                >
+                  Cancelar recorte
+                </button>
+              </div>
+            </div>
+          }
+          @if (value().imageAssetId !== null) {
+            <label
+              >Descripción de la imagen<input
+                [ngModel]="value().imageAlt ?? ''"
+                (ngModelChange)="patch({ imageAlt: $event || null })"
+                [ngModelOptions]="{ standalone: true }"
+                maxlength="160"
+                [disabled]="protected() || busy()"
+                placeholder="Texto alternativo accesible"
+            /></label>
+          }
+          @if (error()) {
+            <p class="error" role="alert">{{ error() }}</p>
+            @if (value().imageAssetId !== null && !pending()) {
+              <button
+                mat-button
+                type="button"
+                (click)="imageRefresh.update((v) => v + 1)"
+                [disabled]="loadingImage()"
+              >
+                Reintentar imagen
+              </button>
+            }
+          }
+        </div>
+        <aside class="social-card-preview">
+          <span class="preview-label">Vista previa orientativa</span>
+          <div class="social-card">
+            @if (!protected() && image()) {
+              <img
+                [src]="image()"
+                [alt]="value().imageAlt || 'Imagen de la tarjeta social'"
+                width="1200"
+                height="630"
+              />
+            } @else {
+              <div class="image-placeholder">
+                <mat-icon>{{
+                  protected() ? "lock_outline" : "image"
+                }}</mat-icon>
+              </div>
+            }
+            <div>
+              <small>{{ shortUrl() }}</small
+              ><strong>{{
+                protected()
+                  ? "Enlace protegido"
+                  : value().title || "Título de tu tarjeta"
+              }}</strong>
+              <p>
+                {{
+                  protected()
+                    ? "Este enlace requiere una contraseña para continuar."
+                    : value().description ||
+                      "La descripción ayuda a entender adónde lleva el enlace."
+                }}
+              </p>
+            </div>
+          </div>
+          <p>
+            Las redes pueden recortar el contenido o conservar una versión
+            anterior. Guardar no fuerza la actualización de sus cachés.
+          </p>
+          <details>
+            <summary>Comprobar en la plataforma</summary>
+            <a
+              href="https://developers.facebook.com/tools/debug/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Inspector de Facebook</a
+            ><a
+              href="https://www.linkedin.com/post-inspector/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Inspector de LinkedIn</a
+            >
+          </details>
+        </aside>
+      </div>
+    </div>
+  }
+</section>

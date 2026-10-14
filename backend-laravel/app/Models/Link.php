@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $used_at
  * @property Carbon|null $scheduled_at
  * @property Carbon|null $expires_at
+ * @property array<string, mixed>|null $social_preview
  * @property array<string, mixed>|null $expired_page
  * @property Carbon|null $deleted_at
  */
@@ -52,6 +53,8 @@ class Link extends Model
         'utm_term',
         'utm_content',
         'deleted_at',
+        'social_preview',
+        'social_public_id',
         'expired_page',
         'expiry_notice_generation',
         'limit_notice_generation',
@@ -62,6 +65,7 @@ class Link extends Model
     protected function casts(): array
     {
         return [
+            'social_preview' => 'array',
             'expired_page' => 'array',
             'expiry_notice_generation' => 'integer',
             'limit_notice_generation' => 'integer',
@@ -111,5 +115,11 @@ class Link extends Model
     public function rules(): HasMany
     {
         return $this->hasMany(RedirectRule::class);
+    }
+
+    /** @return HasMany<LinkVersion, $this> */
+    public function versions(): HasMany
+    {
+        return $this->hasMany(LinkVersion::class);
     }
 }

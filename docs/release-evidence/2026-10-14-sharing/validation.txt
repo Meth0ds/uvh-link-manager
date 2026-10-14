@@ -1,0 +1,57 @@
+Validation local — 2026-10-14
+
+
+Backend full suite (before final refinements)
+
+  Tests:    3015 passed (35029 assertions)
+  Duration: 1073.33s
+
+
+Frontend final suite
+Chrome Headless 155.0.0.0 (Mac OS 10.15.7): Executed 2254 of 2254 SUCCESS (0 secs / 25.354 secs)
+Chrome Headless 155.0.0.0 (Mac OS 10.15.7): Executed 2254 of 2254 SUCCESS (27.984 secs / 25.354 secs)
+TOTAL: 2254 SUCCESS
+
+Browser integration
+chromium: report creation, anonymous reading, social editing passed
+firefox: unavailable (browserType.launch: Failed to launch the browser process.)
+webkit: report creation, anonymous reading, social editing passed
+
+Composer audit
+No security vulnerability advisories found.
+
+sharing-phpstan.log
+Note: Using configuration file /app/phpstan.neon.dist.
+
+ [OK] No errors
+
+
+
+sharing-pint-test.log
+  ......................................................................
+
+  ──────────────────────────────────────────────────────────────────── Laravel
+    PASS   ......................................................... 602 files
+
+
+
+sharing-final-tests.log
+  ✓ cleanup preserves history references and handles workspace cascade   0.34s
+
+  Tests:    85 passed (578 assertions)
+  Duration: 28.12s
+
+
+
+sharing-final-sharing.log
+  ✓ cleanup preserves history references and handles workspace cascade   0.43s
+
+  Tests:    20 passed (175 assertions)
+  Duration: 9.69s
+
+
+
+Final configuration/schema contracts
+
+  Tests:    13 passed (816 assertions)
+  Duration: 2.82s

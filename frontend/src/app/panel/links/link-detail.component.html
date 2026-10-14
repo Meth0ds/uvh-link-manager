@@ -29,8 +29,11 @@
       </div>
       <div class="actions">
         <button class="copy-action" mat-stroked-button [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(link.shortUrl, copyScope) === 'copying'" (click)="copy(link.shortUrl)"><app-copy-feedback-icon [phase]="copyFeedback.phase(link.shortUrl, copyScope)" /> {{ copyFeedback.phase(link.shortUrl, copyScope) === 'copied' ? 'Copiado' : copyFeedback.phase(link.shortUrl, copyScope) === 'copying' ? 'Copiando…' : 'Copiar' }}</button>
+        @if (sharing.canPublish()) { <button mat-stroked-button type="button" (click)="shareReport()"><mat-icon>insert_chart_outlined</mat-icon>Compartir informe</button> }
         <button mat-stroked-button (click)="showQr()"><mat-icon>qr_code_2</mat-icon> QR</button>
+        @if (workflows.linkHistoryEnabled()) { <button mat-stroked-button type="button" (click)="openHistory()"><mat-icon>history</mat-icon> Historial</button> }
         @if (canWrite()) {
+          @if (sharing.socialEnabled()) { <button mat-stroked-button type="button" (click)="editSocialCard()"><mat-icon>preview</mat-icon>Tarjeta social</button> }
           <button mat-flat-button color="primary" (click)="edit()" [disabled]="actionBusy()"><mat-icon>edit</mat-icon> Editar</button>
           <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones" [disabled]="actionBusy()"><mat-icon>more_vert</mat-icon></button>
           <mat-menu #menu="matMenu">
@@ -106,7 +109,7 @@
   @if (!analytics() && !analyticsError() && !loading()) {
     <div class="empty-state"><mat-icon>query_stats</mat-icon><b>Sin datos de este periodo</b><p>Comparte el enlace para empezar a medir su rendimiento.</p></div>
   }
-  <span class="section-title">Reglas de redirección</span>
+  <div class="section-heading-row"><span class="section-title">Reglas de redirección</span>@if (workflows.ruleSimulatorEnabled()) { <button mat-stroked-button type="button" (click)="openRuleSimulator()"><mat-icon>play_arrow</mat-icon> Probar reglas</button> }</div>
   <div class="rules-block">
     @for (rule of rules(); track rule.id ?? $index; let i = $index) {
       <div class="rule-card">

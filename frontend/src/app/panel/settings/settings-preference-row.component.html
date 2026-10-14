@@ -1,0 +1,4 @@
+<li class="pref-row">
+  <span class="pref-label"><mat-icon aria-hidden="true">{{ icon() }}</mat-icon><b>{{ label() }}</b></span>
+  @if (fixedLabel(); as fixed) { <span class="pref-fixed"><mat-icon aria-hidden="true">lock</mat-icon>{{ fixed }}</span> } @else { <ng-content /> }
+</li>

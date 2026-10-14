@@ -53,7 +53,7 @@ describe("link workflow response contracts", () => {
   });
 
   it("rejects invalid capability thresholds and loose boolean flags", () => {
-    const flags = { enabled: true, reminderHours: 24, reminderClickRatio: 0.9, maxSavedFilters: 50 };
+    const flags = { enabled: true, ruleSimulator: true, linkHistory: true, linkHistoryRestore: true, reminderHours: 24, reminderClickRatio: 0.9, maxSavedFilters: 50 };
     expect(decodeWorkflows(flags)).toEqual(flags);
     for (const change of [{ enabled: "true" }, { reminderHours: 0 }, { reminderClickRatio: 1 }, { maxSavedFilters: 51 }]) expect(() => decodeWorkflows({ ...flags, ...change })).toThrow();
   });

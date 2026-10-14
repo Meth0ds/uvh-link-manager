@@ -7,7 +7,7 @@ module.exports = {
     changeOrigin: true,
     logLevel: "warn",
   },
-  "/r": {
+  "/r/": {
     target: BACKEND,
     secure: false,
     changeOrigin: true,

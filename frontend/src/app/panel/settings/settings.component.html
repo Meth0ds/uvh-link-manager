@@ -3,20 +3,14 @@
 <section class="profile-masthead" aria-label="Tu perfil de cuenta">
   <span class="profile-monogram" aria-hidden="true">{{ userInitials() }}</span>
   <div class="profile-identity"><span class="profile-caption">Perfil personal</span><h2>{{ user()?.name || 'Tu cuenta' }}</h2><p>{{ user()?.email }}</p></div>
-  <div class="profile-access"><mat-icon aria-hidden="true">{{ user()?.emailVerified ? 'mark_email_read' : 'mail_outline' }}</mat-icon><span>{{ user()?.emailVerified ? 'Email verificado' : 'Email sin verificar' }}</span></div>
+  <div class="profile-access"><span class="profile-access-mark"><mat-icon aria-hidden="true">{{ user()?.emailVerified ? 'mark_email_read' : 'mail_outline' }}</mat-icon></span><span><b>{{ user()?.emailVerified ? 'Email verificado' : 'Email sin verificar' }}</b><small>{{ user()?.mfaEnabled ? 'Cuenta protegida con MFA' : 'Añade MFA para reforzarla' }}</small></span></div>
 </section>
 
 <!-- Five persistent views: changing tasks never destroys drafts or one-time data. -->
 <div class="settings-layout">
   <aside class="settings-sidebar" aria-label="Resumen y navegación de ajustes">
     <p class="navigation-caption">Tu cuenta</p>
-    <nav class="settings-nav" aria-label="Secciones de ajustes">
-      <a href="/app/settings/profile" [attr.aria-current]="activeSection() === 'account' ? 'page' : null" (click)="goToSection($event, accountSection)"><mat-icon aria-hidden="true">person_outline</mat-icon><span><b>Perfil y apariencia</b><small>Nombre, email y tema</small></span></a>
-      <a href="/app/settings/security" [attr.aria-current]="activeSection() === 'security' ? 'page' : null" (click)="goToSection($event, securitySection)"><mat-icon aria-hidden="true">lock_outline</mat-icon><span><b>Acceso y seguridad</b><small>Contraseña, MFA y sesiones</small></span></a>
-      <a href="/app/settings/notifications" [attr.aria-current]="activeSection() === 'notifications' ? 'page' : null" (click)="goToSection($event, notificationsSection)"><mat-icon aria-hidden="true">notifications</mat-icon><span><b>Notificaciones</b><small>Avisos y su frecuencia</small></span></a>
-      <a href="/app/settings/privacy" [attr.aria-current]="activeSection() === 'privacy' ? 'page' : null" (click)="goToSection($event, privacySection)"><mat-icon aria-hidden="true">policy</mat-icon><span><b>Tus datos</b><small>Descargas y solicitudes</small></span></a>
-      <a href="/app/settings/danger" [attr.aria-current]="activeSection() === 'danger' ? 'page' : null" (click)="goToSection($event, dangerSection)"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><b>Cerrar la cuenta</b><small>Requisitos y consecuencias</small></span></a>
-    </nav>
+    <app-settings-section-nav [items]="sectionNavItems()" [activeId]="activeSection()" (navigate)="navigateFromSectionNav($event)" />
     <div class="privacy-note">
       <mat-icon aria-hidden="true">contact_support</mat-icon>
       <p><b>¿Necesitas ayuda?</b><span>Las solicitudes sobre tus datos se tramitan y se siguen desde esta misma página.</span></p>
@@ -25,9 +19,7 @@
 
   <div class="settings-content">
     <section #accountSection id="account" tabindex="-1" [hidden]="activeSection() !== 'account'" class="settings-section account-section" aria-labelledby="account-title">
-      <header class="settings-section-head">
-        <div><h2 id="account-title">Perfil y apariencia</h2><p>Los detalles que hacen que esta cuenta sea tuya.</p></div>
-      </header>
+      <app-settings-section-header icon="person_outline" eyebrow="Tu identidad" headingId="account-title" title="Perfil y apariencia" description="Los detalles que hacen que esta cuenta sea tuya." />
 
 <div class="card-block profile-card">
   @if (userRefreshRequired()) {
@@ -48,7 +40,8 @@
     </mat-form-field>
     <div class="row-actions">
       <span class="save-note">Los cambios se aplican al guardar.</span>
-      <button mat-flat-button color="primary" type="submit" [attr.aria-busy]="profileBusy()" [disabled]="profileForm.invalid || profileBusy()"><mat-icon aria-hidden="true">check</mat-icon>{{ profileBusy() ? 'Guardando…' : 'Guardar nombre' }}</button>
+      <span class="draft-indicator" [class.visible]="profileForm.dirty" role="status"><span class="draft-dot" aria-hidden="true"></span>{{ profileForm.dirty ? 'Cambios sin guardar' : profileSaveState() === 'saved' ? 'Todo guardado' : 'Sin cambios pendientes' }}</span>
+      <button mat-flat-button color="primary" type="submit" [class.saved-action]="profileSaveState() === 'saved'" [attr.aria-busy]="profileBusy()" [disabled]="profileForm.invalid || profileBusy() || !profileForm.dirty"><mat-icon aria-hidden="true">{{ profileBusy() ? 'sync' : profileSaveState() === 'saved' ? 'check_circle' : 'check' }}</mat-icon>{{ profileBusy() ? 'Guardando…' : profileSaveState() === 'saved' ? 'Guardado' : 'Guardar nombre' }}</button>
     </div>
   </form>
 
@@ -93,9 +86,7 @@
     </section>
 
     <section #securitySection id="security" tabindex="-1" [hidden]="activeSection() !== 'security'" class="settings-section security-section" aria-labelledby="security-title">
-      <header class="settings-section-head">
-        <div><h2 id="security-title">Acceso y seguridad</h2><p>Credenciales, segundo factor y dispositivos con sesión abierta.</p></div>
-      </header>
+      <app-settings-section-header icon="shield" eyebrow="Protección" headingId="security-title" title="Acceso y seguridad" description="Credenciales, segundo factor y dispositivos con sesión abierta." />
 
 <!-- Password -->
 <div class="card-block password-card">
@@ -249,9 +240,7 @@
     </section>
 
     <section #notificationsSection id="notifications" tabindex="-1" [hidden]="activeSection() !== 'notifications'" class="settings-section notifications-settings-section" aria-labelledby="notifications-title">
-      <header class="settings-section-head">
-        <div><h2 id="notifications-title">Notificaciones</h2><p>Elige cómo quieres recibir los avisos operativos. Los avisos de seguridad de tu cuenta llegan siempre.</p></div>
-      </header>
+      <app-settings-section-header icon="notifications" eyebrow="Cómo te avisamos" headingId="notifications-title" title="Notificaciones" description="Elige cómo quieres recibir los avisos operativos. Los avisos de seguridad de tu cuenta llegan siempre." />
 
       <div class="card-block notification-prefs-card">
         <div class="card-heading"><span class="card-icon"><mat-icon>notifications</mat-icon></span><div><h3>Preferencias de avisos</h3><p>Cada aviso operativo puede llegar al momento, en el resumen diario, sólo en UVH o desactivarse.</p></div></div>
@@ -269,26 +258,20 @@
           <h4 class="prefs-group-title">Avisos de seguridad · siempre activos</h4>
           <ul class="prefs-list">
             @for (pref of mandatoryPreferences(); track pref.kind) {
-              <li class="pref-row">
-                <span class="pref-label"><mat-icon aria-hidden="true">{{ notificationKindIcon(pref.kind) }}</mat-icon><b>{{ notificationKindLabel(pref.kind) }}</b></span>
-                <span class="pref-fixed"><mat-icon aria-hidden="true">lock</mat-icon>Siempre</span>
-              </li>
+              <app-settings-preference-row [icon]="notificationKindIcon(pref.kind)" [label]="notificationKindLabel(pref.kind)" fixedLabel="Siempre" />
             }
           </ul>
           <h4 class="prefs-group-title">Avisos operativos</h4>
           <ul class="prefs-list">
             @for (pref of operationalPreferences(); track pref.kind) {
-              <li class="pref-row">
-                <span class="pref-label"><mat-icon aria-hidden="true">{{ notificationKindIcon(pref.kind) }}</mat-icon><b>{{ notificationKindLabel(pref.kind) }}</b></span>
-                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <app-settings-preference-row [icon]="notificationKindIcon(pref.kind)" [label]="notificationKindLabel(pref.kind)"><mat-form-field appearance="outline" subscriptSizing="dynamic">
                   <mat-label>Frecuencia</mat-label>
                   <mat-select [aria-label]="'Frecuencia de ' + notificationKindLabel(pref.kind)" [value]="pref.delivery" [disabled]="notificationPrefsBusy()" (selectionChange)="setNotificationDelivery(pref, $event.value)">
                     @for (delivery of notificationDeliveries; track delivery) {
                       <mat-option [value]="delivery">{{ notificationDeliveryLabel(delivery) }}</mat-option>
                     }
                   </mat-select>
-                </mat-form-field>
-              </li>
+                </mat-form-field></app-settings-preference-row>
             }
           </ul>
         }
@@ -296,9 +279,7 @@
     </section>
 
     <section #privacySection id="privacy" tabindex="-1" [hidden]="activeSection() !== 'privacy'" class="settings-section privacy-section" aria-labelledby="privacy-title">
-      <header class="settings-section-head">
-        <div><h2 id="privacy-title">Datos y privacidad</h2><p>Descarga tu información y gestiona tus derechos desde un expediente trazable.</p></div>
-      </header>
+      <app-settings-section-header icon="policy" eyebrow="Control de tus datos" headingId="privacy-title" title="Datos y privacidad" description="Descarga tu información y gestiona tus derechos desde un expediente trazable." />
 
 <!-- Data portability -->
 <div class="card-block data-card">
@@ -444,9 +425,7 @@
     </section>
 
     <section #dangerSection id="danger" tabindex="-1" [hidden]="activeSection() !== 'danger'" class="settings-section danger-section" aria-labelledby="danger-title">
-      <header class="settings-section-head danger-section-head">
-        <div><h2 id="danger-title">Cerrar la cuenta</h2><p>Antes de despedirte, revisa qué ocurre con tu acceso, tus datos y tus workspaces.</p></div>
-      </header>
+      <app-settings-section-header icon="warning_amber" eyebrow="Zona sensible" headingId="danger-title" title="Cerrar la cuenta" description="Antes de despedirte, revisa qué ocurre con tu acceso, tus datos y tus workspaces." tone="danger" />
 
 <!-- Account lifecycle -->
 <div class="card-block deletion-card">

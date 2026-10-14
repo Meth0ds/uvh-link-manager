@@ -35,6 +35,10 @@
              exercised at all. The async-e2e stack aligns the same way by
              mounting docker/php/uvh-worker-ceiling.ini; the suite does it here. -->
         <ini name="memory_limit" value="256M"/>
+        <server name="UVH_FEATURE_SHARED_REPORTS" value="false" force="true"/>
+        <server name="UVH_FEATURE_SOCIAL_PREVIEWS" value="false" force="true"/>
+        <env name="UVH_FEATURE_SHARED_REPORTS" value="false" force="true"/>
+        <env name="UVH_FEATURE_SOCIAL_PREVIEWS" value="false" force="true"/>
         <server name="APP_ENV" value="testing" force="true"/>
         <server name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="APP_ENV" value="testing" force="true"/>

@@ -1,0 +1,13 @@
+<nav class="settings-nav" aria-label="Secciones de ajustes">
+  @for (item of items(); track item.id) {
+    <a [href]="'/app/settings/' + (item.id === 'account' ? 'profile' : item.id)"
+      [attr.aria-current]="activeId() === item.id ? 'page' : null"
+      [attr.data-section]="item.id"
+      (click)="select($event, item.id)">
+      <span class="nav-icon" aria-hidden="true"><mat-icon>{{ item.icon }}</mat-icon></span>
+      <span class="nav-copy"><b>{{ item.label }}</b><small>{{ item.description }}</small></span>
+      @if (item.status) { <span class="nav-status" [class]="'tone-' + (item.statusTone ?? 'quiet')">{{ item.status }}</span> }
+      <mat-icon class="nav-arrow" aria-hidden="true">arrow_forward</mat-icon>
+    </a>
+  }
+</nav>

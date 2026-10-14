@@ -40,6 +40,7 @@ final class AccountExportDocument
     private const SECTIONS = [
         'memberships',
         'createdLinks',
+        'linkVersions',
         'linkFavorites',
         'savedLinkFilters',
         'qrDesigns',
@@ -170,12 +171,25 @@ final class AccountExportDocument
                 ->select([
                     'id', 'workspace_id', 'domain_id', 'alias', 'name', 'destination', 'fallback_destination', 'state',
                     'max_clicks', 'click_count', 'single_use', 'used_at', 'scheduled_at', 'expires_at', 'notes',
-                    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'expired_page', 'created_at', 'updated_at', 'deleted_at',
+                    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'expired_page', 'social_preview', 'created_at', 'updated_at', 'deleted_at',
                 ])->cursor(),
+            'analyticsReportLinks' => static fn (): iterable => DB::table('analytics_report_links')->join('analytics_reports', 'analytics_reports.id', '=', 'analytics_report_links.report_id')->where('analytics_reports.created_by', $userId)->orderBy('analytics_report_links.report_id')->orderBy('analytics_report_links.link_id')->select(['report_id', 'link_id', 'public_label'])->cursor(),
+            'analyticsReports' => static fn (): iterable => DB::table('analytics_reports')->where('created_by', $userId)->orderBy('id')->select(['id', 'workspace_id', 'spec', 'expires_at', 'revoked_at', 'version', 'created_at'])->cursor(),
             'linkFavorites' => static fn (): iterable => DB::table('link_favorites')->where('user_id', $userId)
                 ->orderBy('workspace_id')->orderBy('link_id')->select(['workspace_id', 'link_id', 'created_at'])->cursor(),
             'savedLinkFilters' => static fn (): iterable => DB::table('saved_link_filters')->where('user_id', $userId)
                 ->orderBy('id')->select(['id', 'workspace_id', 'name', 'spec', 'version', 'created_at', 'updated_at'])->cursor(),
+            'linkVersions' => static fn (): iterable => DB::table('link_versions')
+                ->join('links', 'links.id', '=', 'link_versions.link_id')
+                ->where('links.created_by', $userId)->orderBy('link_versions.id')
+                ->select('link_versions.link_id', 'link_versions.revision', 'link_versions.link_version', 'link_versions.source', 'link_versions.configuration', 'link_versions.changed_fields', 'link_versions.created_at')
+                ->cursor()->map(static function ($row): array {
+                    $value = (array) $row;
+                    $value['configuration'] = json_decode($value['configuration'], true, 64, JSON_THROW_ON_ERROR);
+                    $value['changed_fields'] = json_decode($value['changed_fields'] ?? '[]', true, 64, JSON_THROW_ON_ERROR);
+
+                    return $value;
+                }),
             'redirectRules' => static fn (): iterable => DB::table('redirect_rules')
                 ->join('links', 'links.id', '=', 'redirect_rules.link_id')
                 ->where('links.created_by', $userId)

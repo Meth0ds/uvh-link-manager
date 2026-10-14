@@ -1,0 +1,11 @@
+:host { display:list-item; list-style:none; }
+.pref-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 12px; border:1px solid var(--uvh-border); border-radius:9px; background:var(--uvh-surface); transition:border-color 180ms ease,background-color 180ms ease; }
+.pref-row:hover { border-color:color-mix(in srgb,var(--uvh-electric) 24%,var(--uvh-border)); background:var(--uvh-surface-raised); }
+.pref-label { display:inline-flex; align-items:center; gap:10px; min-width:0; }
+.pref-label mat-icon { color:var(--uvh-electric); }
+.pref-label b { overflow:hidden; color:var(--uvh-ink); font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+.pref-fixed { display:inline-flex; align-items:center; gap:4px; color:var(--uvh-muted); font:11px/1 "Courier New",monospace; white-space:nowrap; }
+.pref-fixed mat-icon { width:16px; height:16px; font-size:16px; }
+:host ::ng-deep mat-form-field { width:190px; }
+@media (max-width:720px) { .pref-row { flex-wrap:wrap; } :host ::ng-deep mat-form-field { width:100%; } }
+@media (prefers-reduced-motion:reduce) { .pref-row { transition:none; } }

@@ -8,6 +8,7 @@ use App\Models\LinkTemplate;
 use App\Support\Audit;
 use App\Support\LinkName;
 use App\Support\LinkService;
+use App\Support\SocialPreview;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceLimits;
 use App\Support\WorkspaceMutation;
@@ -24,7 +25,7 @@ use Illuminate\Http\Request;
 class LinkTemplateController
 {
     /** Campos que una plantilla puede guardar; lo demás se rechaza. */
-    private const PAYLOAD_KEYS = ['destination', 'fallback_destination', 'notes', 'tags', 'utm', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'collection_id', 'name'];
+    private const PAYLOAD_KEYS = ['destination', 'fallback_destination', 'notes', 'tags', 'utm', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'collection_id', 'name', 'social_preview'];
 
     public function index(Request $request): JsonResponse
     {
@@ -95,6 +96,10 @@ class LinkTemplateController
 
                 if (LinkTemplate::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('templates')) {
                     throw new LinkException('Límite de plantillas alcanzado. Elimina una antes de crear otra.', 409);
+                }
+
+                if (array_key_exists('social_preview', $payload)) {
+                    $payload['social_preview'] = SocialPreview::validate($payload['social_preview'], $workspaceId);
                 }
 
                 return LinkTemplate::create([

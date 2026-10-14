@@ -9,7 +9,7 @@ describe("LinkWorkflowService capability ownership", () => {
   let api: jasmine.SpyObj<ApiService>, service: LinkWorkflowService, workspaces: WorkspaceService;
   const user = signal<{ id: number; name: string } | null>({ id: 1, name: "Ana" });
   const generation = signal(0);
-  const capabilities = { enabled: true, reminderHours: 24, reminderClickRatio: 0.9, maxSavedFilters: 50 };
+  const capabilities = { enabled: true, ruleSimulator: true, linkHistory: true, linkHistoryRestore: true, reminderHours: 24, reminderClickRatio: 0.9, maxSavedFilters: 50 };
   const flush = () => new Promise<void>(done => setTimeout(done, 0));
   beforeEach(async () => {
     user.set({ id: 1, name: "Ana" }); generation.set(0);

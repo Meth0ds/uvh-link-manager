@@ -58,6 +58,20 @@ final class LinkNamesSearchTest extends TestCase
         $this->patchJson('/api/v1/links/'.$id, ['version' => $updated->json('link.version'), 'name' => null])->assertOk()->assertJsonPath('link.name', null);
     }
 
+    public function test_create_idempotency_replays_the_same_link_and_rejects_a_different_body(): void
+    {
+        $payload = ['destination' => 'https://example.org/idempotent', 'name' => 'Una sola vez'];
+        $first = $this->withHeader('Idempotency-Key', 'link-create-replay-1')->postJson('/api/v1/links', $payload)->assertCreated();
+        $second = $this->withHeader('Idempotency-Key', 'link-create-replay-1')->postJson('/api/v1/links', $payload)->assertCreated();
+
+        self::assertSame($first->json('link.id'), $second->json('link.id'));
+        self::assertSame(1, Link::where('workspace_id', $this->workspace->id)->where('destination', $payload['destination'])->count());
+        self::assertArrayNotHasKey('password', $second->json('link'));
+        self::assertArrayNotHasKey('passwordHash', $second->json('link'));
+
+        $this->withHeader('Idempotency-Key', 'link-create-replay-1')->postJson('/api/v1/links', ['destination' => 'https://example.org/other'])->assertStatus(409);
+    }
+
     public function test_invalid_names_are_rejected_and_unicode_limit_counts_characters(): void
     {
         foreach ([123, ['bad'], "bad\nname", "hidden\u{202e}name", str_repeat('é', 121)] as $value) {

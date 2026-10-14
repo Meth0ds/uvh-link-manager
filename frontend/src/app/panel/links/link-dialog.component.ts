@@ -1,5 +1,8 @@
+import { SharingService } from "../../core/services/sharing.service";
+import type { SocialPreviewSpec } from "../../core/sharing";
+import { SocialPreviewEditorComponent } from "./social-preview-editor.component";
 import { unicodeMaxLength } from "../../core/unicode-validators";
-import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
+import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy, ElementRef, viewChild, afterNextRender, Injector } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
   FormBuilder,
@@ -10,7 +13,7 @@ import {
   type AbstractControl,
   type ValidationErrors,
 } from "@angular/forms";
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
+import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
@@ -36,18 +39,27 @@ import { WorkspaceService } from "../../core/services/workspace.service";
 import { SessionContextService } from "../../core/services/session-context.service";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { LatestRequest } from "../../core/services/latest-request";
-import { localDateTimeIso, localDateTimeValue, parseLocalDateTime } from "../../core/strict-wire";
+import { localDateTimeIso, localDateTimeValue, localTimeToUtcTime, parseLocalDateTime, utcTimeToLocalTime } from "../../core/strict-wire";
 import { RouterLink } from "@angular/router";
 import { LinkWorkflowService } from "../../core/services/link-workflow.service";
 import { DestinationInspectionComponent } from "./destination-inspection.component";
 import { ExpiredPageEditorComponent, validExpiredPage } from "./expired-page-editor.component";
 import { defaultExpiredPage } from "../../core/link-workflows";
+import { CopyFeedbackService } from "../../core/services/copy-feedback.service";
+import { Router } from "@angular/router";
+import { Subject } from "rxjs";
+
+export type LinkDialogView = "quick" | "advanced" | "success";
 
 export interface LinkDialogData {
   mode: "create" | "edit" | "duplicate";
   link?: LinkDto;
   initialDestination?: string;
+  initialDomainId?: number | null;
+  initialCollectionId?: number | null;
 }
+
+export type LinkCreationEvent = { type: "created"; link: LinkDto } | { type: "closed" };
 type RuleGroup = FormGroup<{
   priority: FormControl<number>;
   country: FormControl<string>;
@@ -124,7 +136,7 @@ function integerValidator(control: AbstractControl): ValidationErrors | null {
 @Component({
   selector: "app-link-dialog",
   standalone: true,
-  imports: [
+  imports: [SocialPreviewEditorComponent,
     ReactiveFormsModule, RouterLink, DestinationInspectionComponent, ExpiredPageEditorComponent,
     MatDialogModule,
     MatButtonModule,
@@ -138,7 +150,9 @@ function integerValidator(control: AbstractControl): ValidationErrors | null {
     MatProgressBarModule,
     MatTooltipModule
 ],
+  providers: [CopyFeedbackService],
   templateUrl: "./link-dialog.component.html",
+  host: { "[class.quick-view]": "view() === 'quick'", "[class.success-view]": "view() === 'success'" },
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./link-dialog.component.scss",
 })
@@ -146,6 +160,9 @@ export class LinkDialogComponent {
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
   private actions = inject(ActionDialogService);
+  private readonly matDialog = inject(MatDialog);
+  private readonly router = inject(Router);
+  private readonly copyFeedback = inject(CopyFeedbackService);
   private workspaces = inject(WorkspaceService);
   private dialogRef = inject(MatDialogRef<LinkDialogComponent>);
   /** El workspace que abrió el diálogo: guardar o crear plantilla pertenece a ese. */
@@ -153,15 +170,31 @@ export class LinkDialogComponent {
   private readonly session = inject(SessionContextService);
   private readonly openedContext = this.securityContext();
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private readonly domainRequests = new LatestRequest(this.destroyRef);
   private readonly ruleRequests = new LatestRequest(this.destroyRef);
   readonly data = inject<LinkDialogData>(MAT_DIALOG_DATA);
 
   readonly isEdit = this.data.mode === "edit";
   readonly isDuplicate = this.data.mode === "duplicate";
+  readonly view = signal<LinkDialogView>(this.isEdit || this.isDuplicate ? "advanced" : "quick");
+  /** The last editing mode is kept separately because the success screen replaces `view`. */
+  readonly creationMode = signal<LinkDialogView>("quick");
+  readonly quickPersonalizationOpen = signal(false);
+  readonly createdLink = signal<LinkDto | null>(null);
+  readonly created = new Subject<LinkDto>();
+  private creationKey = crypto.randomUUID();
   readonly workflows = inject(LinkWorkflowService);
+  readonly sharing = inject(SharingService);
+  readonly socialPreview = signal<SocialPreviewSpec | null>(structuredClone(this.data.link?.socialPreview ?? null));
+  readonly socialBusy = signal(false);
+  readonly destinationTitle = signal<{title:string;url:string}|null>(null);
+  passwordWillProtect(): boolean { const v=this.form.getRawValue(); return !!v.password || (!!this.data.link?.passwordProtected && !v.clearPassword); }
+  socialTitleSuggestion(): string | null { const s=this.destinationTitle(); return s?.url===this.destinationValue() ? s.title : null; }
   readonly expiredPage = signal(structuredClone(this.data.link?.expiredPage ?? defaultExpiredPage()));
   readonly destinationValue = signal("");
+  readonly ruleTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  private readonly advancedHeading = viewChild<ElementRef<HTMLElement>>("advancedHeading");
   private duplicateReceipt: { signature: string; key: string } | null = null;
   get expiredPageInvalid(): boolean { return this.workflows.enabled() && !validExpiredPage(this.expiredPage()); }
   get duplicateExpired(): boolean { const iso = this.lifecycleValue("expiresAt", this.form.controls.expiresAt.value); return this.isDuplicate && iso !== null && Date.parse(iso) <= Date.now(); }
@@ -262,6 +295,8 @@ export class LinkDialogComponent {
       requests.push(this.loadEditRules(this.data.link.id));
     } else {
       this.form.controls.destination.setValue(this.data.initialDestination ?? "");
+      this.form.controls.domainId.setValue(this.data.initialDomainId ?? null);
+      this.form.controls.collectionId.setValue(this.data.initialCollectionId ?? null);
       this.addRule();
     }
 
@@ -296,7 +331,7 @@ export class LinkDialogComponent {
           ? { id: unavailableId, domain: (this.isEdit || this.isDuplicate ? current?.domain : preferred?.domain) ?? this.data.link?.domain ?? null }
           : null,
       );
-      if (!this.isEdit && !this.isDuplicate && this.form.controls.domainId.pristine) {
+      if (!this.isEdit && !this.isDuplicate && this.data.initialDomainId === undefined && this.form.controls.domainId.pristine) {
         this.form.controls.domainId.setValue(eligible.some((e) => e.isDefault) ? (preferred?.id ?? null) : null);
       }
     } catch {
@@ -496,6 +531,7 @@ export class LinkDialogComponent {
   applyTemplate(template: LinkTemplateDto | null): void {
     if (!template) return;
     const payload = template.payload;
+    this.socialPreview.set(structuredClone(payload.social_preview ?? null));
     for (const field of ["scheduledAt", "expiresAt"] as const) {
       const iso = (field === "scheduledAt" ? payload.scheduled_at : payload.expires_at) ?? null;
       this.lifecycleDates[field] = { iso, local: localDateTimeValue(iso), fromLink: false };
@@ -547,6 +583,7 @@ export class LinkDialogComponent {
       return;
     }
     const payload: LinkTemplatePayload = {
+      ...(this.sharing.socialEnabled() ? {social_preview:this.socialPreview()} : {}),
       destination,
       name: v.name?.trim() || null,
       fallback_destination: v.fallbackDestination?.trim() || null,
@@ -587,7 +624,16 @@ export class LinkDialogComponent {
 
   /** Blank destinations delete rows, so only rules that will be sent can block saving. */
   get hasInvalidRules(): boolean {
-    return this.rules.controls.some((rule) => Boolean(rule.controls.destination.value.trim()) && rule.invalid);
+    return this.rules.controls.some((rule) => Boolean(rule.controls.destination.value.trim()) && (rule.invalid || this.ruleTimeInvalid(rule.controls.timeFrom.value) || this.ruleTimeInvalid(rule.controls.timeTo.value)));
+  }
+
+  ruleTimeInvalid(value: string | null | undefined): boolean {
+    return Boolean(value) && localTimeToUtcTime(value, this.ruleTimezone) === null;
+  }
+
+  ruleUtcPreview(value: string | null | undefined): string {
+    const utc = localTimeToUtcTime(value, this.ruleTimezone);
+    return utc ? `${utc} UTC` : "Hora no disponible por cambio horario";
   }
 
   addRule(initial: Partial<RedirectRule> = {}): void {
@@ -600,8 +646,8 @@ export class LinkDialogComponent {
         language: [initial.language ?? "", [Validators.maxLength(8), Validators.pattern(/^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,4})?$/)]],
         device: [initial.device ?? ""],
         os: [initial.os ?? "", [unicodeMaxLength(40), noControlCharacters]],
-        timeFrom: [initial.timeFrom ?? raw.time_from ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
-        timeTo: [initial.timeTo ?? raw.time_to ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
+        timeFrom: [utcTimeToLocalTime(initial.timeFrom ?? raw.time_from ?? "", this.ruleTimezone) ?? initial.timeFrom ?? raw.time_from ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
+        timeTo: [utcTimeToLocalTime(initial.timeTo ?? raw.time_to ?? "", this.ruleTimezone) ?? initial.timeTo ?? raw.time_to ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
         referrer: [initial.referrer ?? "", [unicodeMaxLength(200), noControlCharacters]],
         campaign: [initial.campaign ?? "", [unicodeMaxLength(100), noControlCharacters]],
         // Empty means delete/omit the row. Non-empty destinations must still
@@ -627,8 +673,8 @@ export class LinkDialogComponent {
         language: v.language?.trim() || null,
         device: (v.device as "desktop" | "mobile" | "tablet" | null) || null,
         os: v.os?.trim() || null,
-        timeFrom: v.timeFrom || null,
-        timeTo: v.timeTo || null,
+        timeFrom: v.timeFrom ? localTimeToUtcTime(v.timeFrom, this.ruleTimezone) : null,
+        timeTo: v.timeTo ? localTimeToUtcTime(v.timeTo, this.ruleTimezone) : null,
         referrer: v.referrer?.trim() || null,
         campaign: v.campaign?.trim() || null,
         destination,
@@ -639,6 +685,95 @@ export class LinkDialogComponent {
 
   dialogRefClose(): void { this.dialogRef.close(); }
 
+  showAdvanced(): void {
+    if (!this.isEdit && !this.isDuplicate) {
+      this.creationMode.set("advanced");
+      this.view.set("advanced");
+      afterNextRender(() => this.advancedHeading()?.nativeElement.focus(), { injector: this.injector });
+    }
+  }
+
+  showQuick(): void {
+    if (!this.isEdit && !this.isDuplicate) {
+      this.creationMode.set("quick");
+      this.view.set("quick");
+    }
+  }
+
+  copyCreatedLink(): void {
+    const link = this.createdLink();
+    if (!link) return;
+    this.copyFeedback.copy(link.shortUrl, () => this.securityContext());
+  }
+
+  openCreatedQr(): void {
+    const link = this.createdLink();
+    if (!link || this.destroyRef.destroyed || !this.isOpeningCurrent()) return;
+    void import("./qr-dialog.component").then(({ QrDialogComponent }) => {
+      if (this.destroyRef.destroyed || !this.isOpeningCurrent()) return;
+      this.matDialog.open(QrDialogComponent, {
+        data: { url: link.shortUrl, linkId: link.id },
+        width: "760px",
+        maxWidth: "calc(100vw - 24px)",
+      });
+    });
+  }
+
+  openRuleSimulator(): void {
+    if (this.destroyRef.destroyed || this.busy() || this.hasInvalidRules) return;
+    const v = this.form.getRawValue();
+    void import("./rule-simulator-dialog.component").then(({ RuleSimulatorDialogComponent }) => {
+      if (this.destroyRef.destroyed) return;
+      this.matDialog.open(RuleSimulatorDialogComponent, {
+        data: {
+          destination: v.destination.trim(),
+          fallbackDestination: v.fallbackDestination.trim() || null,
+          utm: {
+            source: v.utm.source.trim() || null,
+            medium: v.utm.medium.trim() || null,
+            campaign: v.utm.campaign.trim() || null,
+            term: v.utm.term.trim() || null,
+            content: v.utm.content.trim() || null,
+          },
+          rules: this.rulesPayload(),
+        },
+        width: "680px",
+        maxWidth: "calc(100vw - 24px)",
+        autoFocus: "first-tabbable",
+      });
+    });
+  }
+
+  openCreatedDetail(): void {
+    const link = this.createdLink();
+    if (!link || this.destroyRef.destroyed || !this.isOpeningCurrent()) return;
+    this.dialogRef.close();
+    void this.router.navigate(["/app/links", link.id]);
+  }
+
+  createAnother(): void {
+    if (this.isEdit || this.isDuplicate || this.busy()) return;
+    const domainId = this.form.controls.domainId.value;
+    const collectionId = this.form.controls.collectionId.value;
+    this.form.reset({
+      name: "", destination: "", alias: "", domainId, collectionId,
+      fallbackDestination: "", password: "", clearPassword: false, maxClicks: null,
+      singleUse: false, scheduledAt: "", expiresAt: "", notes: "",
+      utm: { source: "", medium: "", campaign: "", term: "", content: "" },
+    });
+    this.tags.set([]);
+    this.rules.clear();
+    this.addRule();
+    this.expiredPage.set(defaultExpiredPage());
+    this.socialPreview.set(null);
+    this.destinationTitle.set(null);
+    this.createdLink.set(null);
+    this.error.set(null);
+    this.creationKey = crypto.randomUUID();
+    this.view.set(this.creationMode());
+    this.quickPersonalizationOpen.set(false);
+  }
+
   async save(): Promise<void> {
     // The expiry's "future" verdict is time-dependent: an expiry set ahead can
     // lapse while the dialog sits open. Refreshing the control re-judges it
@@ -647,7 +782,7 @@ export class LinkDialogComponent {
     this.form.controls.expiresAt.updateValueAndValidity({ emitEvent: false });
     const aliasUnavailable = ["checking", "taken", "invalid", "reserved"].includes(this.aliasStatus());
     if (this.destroyRef.destroyed || this.form.invalid || this.hasInvalidRules || aliasUnavailable
-      || this.busy() || this.expiredPageInvalid || ((this.isEdit || this.isDuplicate) && !this.editDetailsLoaded())) return;
+      || this.busy() || this.socialBusy() || this.expiredPageInvalid || ((this.isEdit || this.isDuplicate) && !this.editDetailsLoaded())) return;
     // Comprobación síncrona antes de enviar: el interceptor pone el workspace
     // ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
     if (this.openedIn.workspaceId !== null && !this.isOpeningCurrent()) {
@@ -669,6 +804,7 @@ export class LinkDialogComponent {
       ...(this.isEdit ? { version: this.data.link!.version } : {}),
       ...(this.isDuplicate ? { sourceVersion: this.data.link!.version, passwordAction: v.clearPassword ? "remove" : passwordValue !== "" ? "replace" : "keep" } : {}),
       ...(this.workflows.enabled() ? { expiredPage: this.expiredPage() } : {}),
+      ...(this.sharing.socialEnabled() ? {socialPreview:this.socialPreview()} : {}),
       name: v.name?.trim() || null,
       destination: v.destination?.trim(),
       // The alias identifies the link: emptying it deletes nothing and the
@@ -712,11 +848,17 @@ export class LinkDialogComponent {
         const res = await this.api.post(`/api/v1/links/${this.data.link!.id}/duplicate`, payload, decodeLinkResponse, { "Idempotency-Key": key });
         link = res.link;
       } else {
-        const res = await this.api.post<{ link: LinkDto }>("/api/v1/links", payload, decodeLinkResponse);
+        const res = await this.api.post<{ link: LinkDto }>("/api/v1/links", payload, decodeLinkResponse, { "Idempotency-Key": this.creationKey });
         link = res.link;
       }
       if (this.destroyRef.destroyed || requestId !== this.saveRequest || (this.openedIn.workspaceId !== null && !this.isOpeningCurrent()) || (this.isDuplicate && !this.workflows.enabled())) return;
-      this.dialogRef.close(link);
+      if (!this.isEdit && !this.isDuplicate) {
+        this.createdLink.set(link);
+        this.view.set("success");
+        this.created.next(link);
+      } else {
+        this.dialogRef.close(link);
+      }
     } catch (err) {
       if (!this.destroyRef.destroyed && requestId === this.saveRequest && (this.openedIn.workspaceId === null || this.isOpeningCurrent())) {
         this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo guardar el enlace");

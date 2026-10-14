@@ -75,7 +75,7 @@ final class LinkDuplicateController extends LinkController
                 if (! $validation['ok']) {
                     throw new LinkException($validation['error'], 422);
                 }
-                $created = LinkService::create($workspaceId, (int) $user->id, $input, UvhRequest::apiToken($request), (int) $user->security_version, WorkspaceWriteActor::fromRequest($request));
+                $created = LinkService::create($workspaceId, (int) $user->id, $input, UvhRequest::apiToken($request), (int) $user->security_version, WorkspaceWriteActor::fromRequest($request), 'duplicate');
                 $copy = Link::findOrFail($created['id']);
                 if (in_array($source->state, ['paused', 'archived'], true)) {
                     $copy->update(['state' => $source->state]);

@@ -4,7 +4,7 @@ namespace App\Support;
 
 use App\Models\CustomDomain;
 use App\Models\Link;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 class RedirectService
@@ -127,7 +127,7 @@ class RedirectService
             return $domainId === null ? ['kind' => 'not_found'] : self::domainFallback(self::domainRow($domainId), $host);
         }
 
-        $query = Link::whereNull('deleted_at')->where('alias', $alias);
+        $query = Link::whereNull('deleted_at')->whereRaw('lower(alias) = ?', [$alias]);
         if ($domainId === null) {
             $query->whereNull('domain_id');
         } else {
@@ -228,7 +228,7 @@ class RedirectService
                 }
 
                 $freshDomainId = $fresh->domain_id !== null ? (int) $fresh->domain_id : null;
-                if ($fresh->alias !== $alias || $freshDomainId !== $domainId) {
+                if (UrlUtil::normalizeAlias($fresh->alias) !== $alias || $freshDomainId !== $domainId) {
                     $outcome = ['kind' => 'not_found'];
 
                     return;
@@ -284,38 +284,24 @@ class RedirectService
                 }
 
                 // Rules: deterministic order by priority then id; first match wins.
-                $rules = $fresh->rules()->orderBy('priority')->orderBy('id')->get();
-                $location = null;
-                foreach ($rules as $rule) {
-                    if ($rule->country && strtolower((string) $rule->country) !== $country) {
-                        continue;
-                    }
-                    if ($rule->language && ! self::languageMatches((string) $rule->language, $languages)) {
-                        continue;
-                    }
-                    if ($rule->device && strtolower((string) $rule->device) !== strtolower((string) ($ua['device'] ?? ''))) {
-                        continue;
-                    }
-                    if ($rule->os && ! str_contains(strtolower((string) ($ua['os'] ?? '')), strtolower((string) $rule->os))) {
-                        continue;
-                    }
-                    if ($rule->referrer && ! str_contains(strtolower((string) ($referrer ?? '')), strtolower((string) $rule->referrer))) {
-                        continue;
-                    }
-                    if ($rule->campaign && strtolower((string) $rule->campaign) !== strtolower((string) ($campaignFromReferrer ?? ''))) {
-                        continue;
-                    }
-                    if (! self::inTimeRange($rule->time_from, $rule->time_to, $now)) {
-                        continue;
-                    }
-                    $location = $rule->destination;
-                    break;
-                }
-                if ($location === null && $fresh->fallback_destination) {
-                    $location = $fresh->fallback_destination;
-                }
+                /** @var array<int, object> $rules */
+                $rules = $fresh->rules()->orderBy('priority')->orderBy('id')->get()->all();
+                $selection = RedirectRuleMatcher::evaluate(
+                    $rules,
+                    (string) $fresh->destination,
+                    $fresh->fallback_destination,
+                    [
+                        'utm_source' => $fresh->utm_source,
+                        'utm_medium' => $fresh->utm_medium,
+                        'utm_campaign' => $fresh->utm_campaign,
+                        'utm_term' => $fresh->utm_term,
+                        'utm_content' => $fresh->utm_content,
+                    ],
+                    ['country' => $country, 'languages' => $languages, 'device' => $ua['device'] ?? null, 'os' => $ua['os'] ?? null, 'referrer' => $referrer, 'campaign' => $campaignFromReferrer],
+                    CarbonImmutable::instance($now),
+                );
 
-                $destination = $location ?? $fresh->destination;
+                $destination = $selection['destination'];
                 $validDestination = UrlUtil::validateDestination($destination);
                 if (! $validDestination['ok']) {
                     $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
@@ -323,13 +309,7 @@ class RedirectService
                     return;
                 }
 
-                $destination = self::withUtmParameters($destination, [
-                    'utm_source' => $fresh->utm_source,
-                    'utm_medium' => $fresh->utm_medium,
-                    'utm_campaign' => $fresh->utm_campaign,
-                    'utm_term' => $fresh->utm_term,
-                    'utm_content' => $fresh->utm_content,
-                ]);
+                $destination = $selection['destinationWithUtm'];
 
                 // Appending campaign data can push an otherwise valid target over
                 // the URL boundary. Revalidate the actual Location before spending
@@ -415,67 +395,6 @@ class RedirectService
     }
 
     /**
-     * Add configured campaign parameters without reserializing unrelated query
-     * bytes. Configured values are authoritative: every exact, percent-decoded
-     * homonym is removed before one RFC 3986-encoded value is appended. Query
-     * names remain case-sensitive and the original fragment stays last.
-     *
-     * @param  array<string, ?string>  $configured
-     */
-    private static function withUtmParameters(string $destination, array $configured): string
-    {
-        $utm = [];
-        foreach ($configured as $name => $value) {
-            if ($value !== null) {
-                $utm[$name] = $value;
-            }
-        }
-        if ($utm === []) {
-            return $destination;
-        }
-
-        $fragment = '';
-        $withoutFragment = $destination;
-        $fragmentPosition = strpos($destination, '#');
-        if ($fragmentPosition !== false) {
-            $fragment = substr($destination, $fragmentPosition);
-            $withoutFragment = substr($destination, 0, $fragmentPosition);
-        }
-
-        $base = $withoutFragment;
-        $existingQuery = '';
-        $queryPosition = strpos($withoutFragment, '?');
-        if ($queryPosition !== false) {
-            $base = substr($withoutFragment, 0, $queryPosition);
-            $existingQuery = substr($withoutFragment, $queryPosition + 1);
-        }
-
-        $keptSegments = [];
-        if ($existingQuery !== '') {
-            foreach (explode('&', $existingQuery) as $segment) {
-                $separatorPosition = strpos($segment, '=');
-                $rawName = $separatorPosition === false ? $segment : substr($segment, 0, $separatorPosition);
-                if (! array_key_exists(rawurldecode($rawName), $utm)) {
-                    $keptSegments[] = $segment;
-                }
-            }
-        }
-
-        $newSegments = [];
-        foreach ($utm as $name => $value) {
-            $newSegments[] = rawurlencode($name).'='.rawurlencode($value);
-        }
-
-        $query = implode('&', $keptSegments);
-        if ($query !== '' && ! str_ends_with($query, '&')) {
-            $query .= '&';
-        }
-        $query .= implode('&', $newSegments);
-
-        return $base.'?'.$query.$fragment;
-    }
-
-    /**
      * Parse a bounded Accept-Language list in preference order. A primary rule
      * such as `es` matches every accepted Spanish variant; a regional rule such
      * as `es-ES` requires that exact tag. Rule priority still decides which of
@@ -518,19 +437,6 @@ class RedirectService
         return array_values(array_unique(array_column($accepted, 'tag')));
     }
 
-    /** @param array<int, string> $accepted */
-    private static function languageMatches(string $ruleLanguage, array $accepted): bool
-    {
-        $rule = strtolower($ruleLanguage);
-        foreach ($accepted as $language) {
-            if ($language === $rule || (! str_contains($rule, '-') && str_starts_with($language, $rule.'-'))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private static function unlockMatches(mixed $unlock, string $alias, string $host, int $linkId, int $passwordVersion): bool
     {
         return is_array($unlock)
@@ -557,28 +463,5 @@ class RedirectService
         }
 
         return $normalized;
-    }
-
-    private static function inTimeRange(?string $from, ?string $to, Carbon $now): bool
-    {
-        if (! $from && ! $to) {
-            return true;
-        }
-        $minutes = ($now->hour * 60) + $now->minute;
-        $toMin = fn (?string $t) => $t ? ((int) explode(':', $t)[0] * 60 + (int) (explode(':', $t)[1] ?? 0)) : null;
-
-        $a = $toMin($from);
-        $b = $toMin($to);
-
-        if ($a !== null && $b !== null) {
-            return $a <= $b
-                ? ($minutes >= $a && $minutes <= $b)
-                : ($minutes >= $a || $minutes <= $b);
-        }
-        if ($a !== null) {
-            return $minutes >= $a;
-        }
-
-        return $minutes <= $b;
     }
 }

@@ -1,3 +1,4 @@
+import { SharingService } from "../../core/services/sharing.service";
 import { Component, DestroyRef, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
@@ -34,6 +35,7 @@ import { downloadBlob } from "../../core/services/browser-download";
   styleUrl: "./analytics.component.scss",
 })
 export class AnalyticsComponent {
+  readonly sharing = inject(SharingService);
   private readonly numberFormatter = new Intl.NumberFormat("es-ES");
   private api = inject(ApiService);
   private workspaces = inject(WorkspaceService);

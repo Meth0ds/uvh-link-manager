@@ -93,6 +93,7 @@ class PublicController
 
         return response()->json([
             'appUrl' => $appUrl,
+            'sharingFeatures' => ['sharedReports' => (bool) config('sharing.reports'), 'socialPreviews' => (bool) config('sharing.social_previews')],
             'publicHost' => config('uvh.public_host'),
             'appHost' => config('uvh.app_host'),
             // Capacidad global, sin PII: el formulario público la usa para

@@ -122,6 +122,7 @@
     <div class="bulk-line">
       <div class="bulk-selection"><b class="tnum">{{ selected().size }} {{ selected().size === 1 ? 'enlace seleccionado' : 'enlaces seleccionados' }}</b><button mat-button type="button" (click)="clearSelection()" [disabled]="actionId() !== null">Cancelar selección</button></div>
       <div class="bulk-tools" role="group" aria-label="Herramientas de la selección">
+        @if (sharing.canPublish()) { <button mat-stroked-button type="button" (click)="shareSelectedReport()" [disabled]="reportSnapshotBusy() || selected().size > 100"><mat-icon>insert_chart_outlined</mat-icon>Compartir informe</button> }
         <button mat-stroked-button type="button" (click)="exportSelectedQr()" [disabled]="qrSnapshotBusy() || selected().size > 100"><mat-icon>qr_code_2</mat-icon>{{ qrSnapshotBusy() ? 'Preparando selección…' : 'Exportar QR' }}</button>
         @if (canWrite()) {
         <button mat-stroked-button type="button" (click)="openBulkPanel('tag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'tag'"><mat-icon aria-hidden="true">sell</mat-icon> Etiquetar</button>

@@ -1,3 +1,4 @@
+import { SharingService } from "../../core/services/sharing.service";
 import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
@@ -37,6 +38,7 @@ import { LinkWorkflowService } from "../../core/services/link-workflow.service";
 import { LinkFavoriteService } from "../../core/services/link-favorite.service";
 import { linkStateLabel } from "../../core/link-state-label";
 import { linkAppealStatusLabel } from "../../core/link-appeal-status";
+import { utcTimeToLocalTime } from "../../core/strict-wire";
 
 @Component({
   selector: "app-link-detail",
@@ -62,6 +64,14 @@ import { linkAppealStatusLabel } from "../../core/link-appeal-status";
   styleUrl: "./link-detail.component.scss",
 })
 export class LinkDetailComponent {
+  readonly sharing = inject(SharingService);
+  async editSocialCard(): Promise<void> {
+    const link=this.link(); const context=this.sharing.context(); if (!link || !this.canWrite()) return;
+    const {SocialPreviewDialogComponent}=await import("./social-preview-dialog.component");
+    if (context!==this.sharing.context() || this.dialogOwner.destroyed) return;
+    this.dialog.open(SocialPreviewDialogComponent,{data:link,width:"820px",maxWidth:"calc(100vw - 24px)",maxHeight:"calc(100dvh - 24px)"}).afterClosed().subscribe(updated=>{if(updated&&context===this.sharing.context()&&!this.dialogOwner.destroyed)void this.load();});
+  }
+  shareReport(): void { const link = this.link(); if (link) void this.sharing.open([{linkId:link.id,label:link.alias}]); }
   private api = inject(ApiService);
   readonly workflows = inject(LinkWorkflowService);
   readonly favorites = inject(LinkFavoriteService);
@@ -107,6 +117,7 @@ export class LinkDetailComponent {
     const role = this.workspaces.currentRole();
     return role === "owner" || role === "admin" || role === "editor";
   });
+  readonly ruleTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
   /**
    * Whether the notice may offer to contest the block.
@@ -342,6 +353,30 @@ export class LinkDetailComponent {
     if (l) this.dialog.open(QrDialogComponent, { data: { url: l.shortUrl, linkId: l.id }, width: "760px", maxWidth: "calc(100vw - 32px)" });
   }
 
+  openRuleSimulator(): void {
+    const link = this.link();
+    if (!link || this.dialogOwner.destroyed || !this.workflows.ruleSimulatorEnabled()) return;
+    void import("./rule-simulator-dialog.component").then(({ RuleSimulatorDialogComponent }) => {
+      if (this.dialogOwner.destroyed || this.link()?.id !== link.id) return;
+      this.dialog.open(RuleSimulatorDialogComponent, {
+        data: { linkId: link.id, destination: link.destination, fallbackDestination: link.fallbackDestination, utm: link.utm, rules: this.rules() },
+        width: "680px", maxWidth: "calc(100vw - 24px)", autoFocus: "first-tabbable",
+      });
+    });
+  }
+
+  openHistory(): void {
+    const link = this.link();
+    if (!link || this.dialogOwner.destroyed || !this.workflows.linkHistoryEnabled()) return;
+    void import("./link-history-dialog.component").then(({ LinkHistoryDialogComponent }) => {
+      if (this.dialogOwner.destroyed || this.link()?.id !== link.id) return;
+      this.dialog.open(LinkHistoryDialogComponent, {
+        data: { linkId: link.id, expectedVersion: link.version, canRestore: this.canWrite() && this.workflows.linkHistoryRestoreEnabled() },
+        width: "900px", maxWidth: "calc(100vw - 24px)", autoFocus: "first-tabbable",
+      }).afterClosed().subscribe((restored: boolean | undefined) => { if (restored && this.link()?.id === link.id) void this.load(); });
+    });
+  }
+
   edit(): void {
     const l = this.link();
     const target = this.targetLink();
@@ -412,7 +447,11 @@ export class LinkDetailComponent {
     if (rule.language) parts.push(`Idioma: ${rule.language}`);
     if (rule.device) parts.push(`Dispositivo: ${rule.device}`);
     if (rule.os) parts.push(`SO: ${rule.os}`);
-    if (timeFrom || timeTo) parts.push(`Horario: ${timeFrom ?? "00:00"}–${timeTo ?? "23:59"} UTC`);
+    if (timeFrom || timeTo) {
+      const localFrom = timeFrom ? utcTimeToLocalTime(timeFrom, this.ruleTimezone) ?? timeFrom : "00:00";
+      const localTo = timeTo ? utcTimeToLocalTime(timeTo, this.ruleTimezone) ?? timeTo : "23:59";
+      parts.push(`Horario: ${localFrom}–${localTo} ${this.ruleTimezone} (${timeFrom ?? "00:00"}–${timeTo ?? "23:59"} UTC)`);
+    }
     if (rule.referrer) parts.push(`Referente: ${rule.referrer}`);
     if (rule.campaign) parts.push(`Campaña: ${rule.campaign}`);
     return parts.length ? parts.join(" · ") : "Sin condición";

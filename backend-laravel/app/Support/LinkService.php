@@ -10,6 +10,7 @@ use App\Models\Tag;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class LinkService
 {
@@ -157,6 +158,7 @@ class LinkService
         }
 
         try {
+            SocialPreview::validate($input['social_preview'] ?? null);
             ExpiredLinkPage::validate($input['expired_page'] ?? null);
         } catch (LinkException $error) {
             return ['ok' => false, 'error' => $error->getMessage()];
@@ -175,6 +177,7 @@ class LinkService
         ?array $apiTokenContext = null,
         ?int $actorSecurityVersion = null,
         ?WorkspaceWriteActor $writeActor = null,
+        string $versionSource = 'create',
     ): array {
         $domainId = $input['domain_id'] ?? null;
         $collectionId = $input['collection_id'] ?? null;
@@ -190,7 +193,7 @@ class LinkService
 
         $utm = $input['utm'] ?? [];
 
-        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $collectionId, $alias, $utm, $input, $apiTokenContext, $actorSecurityVersion, $writeActor) {
+        $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $collectionId, $alias, $utm, $input, $apiTokenContext, $actorSecurityVersion, $writeActor, $versionSource) {
             $membership = $writeActor
                 ? $writeActor->lockMembership($userId, $workspaceId, $actorSecurityVersion)
                 : WorkspaceAccess::getMembershipLocked(
@@ -214,6 +217,7 @@ class LinkService
                 throw new LinkException('Colección no encontrada', 422);
             }
 
+            $social = SocialPreview::validate($input['social_preview'] ?? null, $workspaceId);
             // Quota enforcement inside the transaction (no TOCTOU window). The
             // quota row is locked so concurrent creates serialize per workspace
             // (PostgreSQL read-committed would otherwise allow a race between
@@ -246,6 +250,8 @@ class LinkService
                     'expires_at' => self::toDateTime($input['expires_at'] ?? null),
                     'name' => LinkName::normalize($input['name'] ?? null),
                     'notes' => $input['notes'] ?? null,
+                    'social_preview' => $social,
+                    'social_public_id' => Str::uuid()->toString(),
                     'expired_page' => ExpiredLinkPage::canonical($input['expired_page'] ?? null),
                     'utm_source' => $utm['source'] ?? null,
                     'utm_medium' => $utm['medium'] ?? null,
@@ -262,6 +268,7 @@ class LinkService
 
             self::applyTags($link, $workspaceId, $input['tags'] ?? []);
             self::applyRules($link, $input['rules'] ?? []);
+            LinkVersioning::capture($link, $userId, $versionSource);
             WebhookService::dispatch($workspaceId, 'link.created', [
                 'linkId' => (int) $link->id,
                 'alias' => $alias,
@@ -294,8 +301,9 @@ class LinkService
         ?array $apiTokenContext = null,
         ?int $actorSecurityVersion = null,
         ?WorkspaceWriteActor $writeActor = null,
+        string $versionSource = 'update',
     ): array {
-        $updated = DB::transaction(function () use ($linkId, $workspaceId, $userId, $input, $expectedVersion, $apiTokenContext, $actorSecurityVersion, $writeActor): array {
+        $updated = DB::transaction(function () use ($linkId, $workspaceId, $userId, $input, $expectedVersion, $apiTokenContext, $actorSecurityVersion, $writeActor, $versionSource): array {
             $membership = $writeActor
                 ? $writeActor->lockMembership($userId, $workspaceId, $actorSecurityVersion)
                 : WorkspaceAccess::getMembershipLocked(
@@ -316,6 +324,8 @@ class LinkService
             if ((int) $link->version !== $expectedVersion) {
                 throw new LinkException('Este enlace cambió en otro lugar. Recárgalo antes de guardar.', 409);
             }
+            $previousConfiguration = LinkVersioning::configuration($link);
+            $social = SocialPreview::validate(array_key_exists('social_preview', $input) ? $input['social_preview'] : $link->social_preview, $workspaceId);
 
             $domainId = array_key_exists('domain_id', $input) ? $input['domain_id'] : $link->domain_id;
             // Only *moving* a link to another domain requires that domain to be
@@ -384,6 +394,8 @@ class LinkService
                     'expires_at' => self::toDateTime($input['expires_at'] ?? null),
                     'name' => array_key_exists('name', $input) ? LinkName::normalize($input['name']) : $link->name,
                     'notes' => $input['notes'] ?? null,
+                    'social_preview' => $social,
+                    'social_public_id' => $link->social_public_id ?? Str::uuid()->toString(),
                     'expired_page' => ExpiredLinkPage::canonical(array_key_exists('expired_page', $input) ? $input['expired_page'] : $link->expired_page),
                     'expiry_notice_generation' => (int) $link->expiry_notice_generation + (self::iso($link->expires_at) !== self::iso(self::toDateTime($input['expires_at'] ?? null)) ? 1 : 0),
                     'limit_notice_generation' => (int) $link->limit_notice_generation + ($link->max_clicks !== ($input['max_clicks'] ?? null) ? 1 : 0),
@@ -407,6 +419,7 @@ class LinkService
             if (array_key_exists('rules', $input)) {
                 self::applyRules($link, $input['rules'] ?? []);
             }
+            LinkVersioning::capture($link, $userId, $versionSource, $previousConfiguration);
             WebhookService::dispatch($workspaceId, 'link.updated', [
                 'linkId' => $linkId,
                 'alias' => $alias,
@@ -435,6 +448,7 @@ class LinkService
         return [
             'id' => $link->id,
             'favorite' => (bool) ($link->getAttribute('is_favorite') ?? false),
+            'socialPreview' => $link->social_preview,
             'expiredPage' => ExpiredLinkPage::canonical($link->expired_page),
             'alias' => $link->alias,
             'name' => $link->name,
@@ -504,7 +518,7 @@ class LinkService
     private static function generateUniqueAlias(?int $domainId): string
     {
         for ($i = 0; $i < 10; $i++) {
-            $alias = Ids::randomAlias(8);
+            $alias = UrlUtil::normalizeAlias(Ids::randomAlias(8));
             if (! self::aliasExists($domainId, $alias)) {
                 return $alias;
             }
@@ -515,7 +529,7 @@ class LinkService
     private static function aliasExists(?int $domainId, string $alias, ?int $exceptId = null): bool
     {
         $query = Link::query()
-            ->where('alias', $alias)
+            ->whereRaw('lower(alias) = ?', [UrlUtil::normalizeAlias($alias)])
             ->whereNull('deleted_at');
 
         if ($domainId === null) {

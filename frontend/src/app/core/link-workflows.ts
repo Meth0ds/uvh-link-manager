@@ -7,7 +7,7 @@ export interface LinkFilterSpec {
   collectionId: number | null; utmCampaign: string; favorites: boolean; sort: string;
 }
 export interface SavedLinkFilter { id: number; name: string; spec: LinkFilterSpec; version: number; valid: boolean; invalidReferences: string[] }
-export interface LinkWorkflowCapabilities { enabled: boolean; reminderHours: number; reminderClickRatio: number; maxSavedFilters: number }
+export interface LinkWorkflowCapabilities { enabled: boolean; ruleSimulator: boolean; linkHistory: boolean; linkHistoryRestore: boolean; reminderHours: number; reminderClickRatio: number; maxSavedFilters: number }
 export interface DestinationResult {
   version: 1; status: "reachable" | "restricted" | "http_error" | "network_error" | "not_checkable";
   httpStatus: number | null; title: string | null; domain: string; iconUrl: string | null; checkedAt: string; reason: string | null;

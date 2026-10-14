@@ -1,3 +1,4 @@
+@if (sharing.canPublish()) { <nav class="analytics-tabs" aria-label="Vistas de estadísticas"><a routerLink="/app/analytics" aria-current="page">Resumen</a><a routerLink="/app/analytics/reports">Informes compartidos</a></nav> }
 <app-page-header icon="query_stats" eyebrow="Rendimiento" title="Analítica" description="Consulta clics, procedencia y campañas en el periodo seleccionado.">
   <div class="period-switch" role="group" aria-label="Periodo de la analítica">
     @for (option of periodOptions; track option.value) {

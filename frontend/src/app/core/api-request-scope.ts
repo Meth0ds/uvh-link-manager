@@ -1,5 +1,5 @@
 /** Routes whose authorization context is carried by X-Workspace-Id. */
-const WORKSPACE_SCOPED = /^\/api\/v1\/(?:links|search|domains|tokens|webhooks|tags|collections|link-templates|link-filters|link-workflows|destination-inspections|destination-previews|qr-designs|qr-assets)(?:\/|$)|^\/api\/v1\/analytics\/(?:overview|export)(?:\/|$)/;
+const WORKSPACE_SCOPED = /^\/api\/v1\/(?:analytics-reports|social-preview-assets|links|search|domains|tokens|webhooks|tags|collections|link-templates|link-filters|link-workflows|link-rule-simulations|destination-inspections|destination-previews|qr-designs|qr-assets)(?:\/|$)|^\/api\/v1\/analytics\/(?:overview|export)(?:\/|$)/;
 
 export function apiPathname(url: string): string {
   try {

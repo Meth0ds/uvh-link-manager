@@ -44,6 +44,13 @@ describe("apiInterceptor context isolation", () => {
     return forwarded;
   }
 
+  it("keeps public report access independent of the account and workspace", async () => {
+    const request = await intercept("/api/v1/shared-reports/public-id/overview", new HttpErrorResponse({status:401}));
+    expect(request.headers.has("X-Workspace-Id")).toBeFalse();
+    expect(request.headers.has("X-Uvh-Account-Id")).toBeFalse();
+    expect(auth.sessionExpired).not.toHaveBeenCalled();
+  });
+
   it("adds the workspace only to tenant-aware endpoints", async () => {
     expect((await intercept("/api/v1/links")).headers.get("X-Workspace-Id")).toBe("42");
     expect((await intercept("/api/v1/auth/me")).headers.has("X-Workspace-Id")).toBeFalse();
@@ -51,7 +58,7 @@ describe("apiInterceptor context isolation", () => {
     expect((await intercept("/api/v1/admin/overview")).headers.has("X-Workspace-Id")).toBeFalse();
   });
 
-  for (const path of ["/api/v1/tags", "/api/v1/collections", "/api/v1/link-templates", "/api/v1/analytics/export",
+  for (const path of ["/api/v1/analytics-reports", "/api/v1/social-preview-assets", "/api/v1/tags", "/api/v1/collections", "/api/v1/link-templates", "/api/v1/analytics/export",
     "/api/v1/link-filters", "/api/v1/link-workflows", "/api/v1/destination-inspections", "/api/v1/destination-previews"]) {
     it(`scopes ${path} and its child routes to the selected workspace`, async () => {
       expect((await intercept(path)).headers.get("X-Workspace-Id")).toBe("42");

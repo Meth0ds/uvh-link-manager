@@ -1,0 +1,170 @@
+<app-page-header
+  icon="insert_chart_outlined"
+  title="Informes compartidos"
+  description="Comparte resultados claros con tus clientes y controla quién puede consultarlos."
+>
+  @if (sharing.canPublish()) {
+    <button mat-flat-button type="button" (click)="edit()">
+      <mat-icon>add</mat-icon>Crear informe
+    </button>
+  }
+</app-page-header>
+<nav class="analytics-tabs" aria-label="Vistas de estadísticas">
+  <a routerLink="/app/analytics">Resumen</a
+  ><a routerLink="/app/analytics/reports" aria-current="page"
+    >Informes compartidos</a
+  >
+</nav>
+@if (!sharing.canPublish()) {
+  <section class="empty">
+    <mat-icon>lock_outline</mat-icon>
+    <h2>Publicación controlada</h2>
+    <p>
+      Los propietarios y administradores pueden gestionar los informes cuando la
+      función esté activada.
+    </p>
+  </section>
+} @else {
+  <aside class="sharing-note">
+    <mat-icon>lock_outline</mat-icon>
+    <p>
+      Cada informe incluye solo los enlaces y datos que hayas elegido. Puedes
+      retirar el acceso en cualquier momento.
+    </p>
+  </aside>
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Cargando informes" />
+  }
+  @if (error()) {
+    <div class="report-error" role="alert">
+      <p>{{ error() }}</p>
+      <button mat-button type="button" (click)="load()">Reintentar</button>
+    </div>
+  }
+  <section class="reports-list" aria-label="Informes del workspace">
+    @for (report of reports(); track report.id) {
+      <article>
+        <span class="report-icon"
+          ><mat-icon>insert_chart_outlined</mat-icon></span
+        >
+        <div class="report-body">
+          <div class="report-top">
+            <h2>{{ report.spec.title }}</h2>
+            <span
+              class="report-state"
+              [class.review]="report.state === 'needs_review'"
+              >{{ state(report) }}</span
+            >
+          </div>
+          <p>
+            {{ report.links.length }}
+            {{ report.links.length === 1 ? "enlace" : "enlaces" }} ·
+            {{
+              report.spec.period === "custom"
+                ? "Fechas concretas"
+                : "Últimos " + report.spec.period.slice(0, -1) + " días"
+            }}
+          </p>
+          <small
+            ><mat-icon>{{
+              report.passwordProtected ? "lock" : "link"
+            }}</mat-icon
+            >{{ report.passwordProtected ? "Con contraseña" : "URL secreta"
+            }}<span>{{
+              report.expiresAt
+                ? "Caduca el " + report.expiresAt.slice(0, 10)
+                : "Sin caducidad"
+            }}</span></small
+          >
+          @if (report.state === "needs_review") {
+            <p class="review-hint">
+              Un enlace se ha eliminado o bloqueado. Revisa la selección para
+              volver a publicar.
+            </p>
+          }
+        </div>
+        <div class="report-actions">
+          @if (report.state === "active") {
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="copy.copy(report.shareUrl, context)"
+              [disabled]="copy.busy() || busy() !== null"
+            >
+              <mat-icon>{{
+                copy.phase(report.shareUrl, context) === "copied"
+                  ? "check"
+                  : "content_copy"
+              }}</mat-icon
+              >{{
+                copy.phase(report.shareUrl, context) === "copied"
+                  ? "Copiado"
+                  : "Copiar URL"
+              }}
+            </button>
+          }
+          @if (report.state !== "revoked") {
+            <button
+              mat-button
+              type="button"
+              (click)="edit(report)"
+              [disabled]="busy() !== null"
+            >
+              Editar</button
+            ><button
+              mat-button
+              type="button"
+              (click)="action(report, 'rotate-access')"
+              [disabled]="busy() !== null"
+              aria-label="Cambiar URL de acceso del informe"
+            >
+              Cambiar URL</button
+            ><button
+              class="revoke"
+              mat-button
+              type="button"
+              (click)="action(report, 'revoke')"
+              [disabled]="busy() !== null"
+            >
+              {{ busy() === report.id ? "Aplicando…" : "Revocar" }}
+            </button>
+          }
+        </div>
+      </article>
+    } @empty {
+      @if (!loading() && !error()) {
+        <div class="empty">
+          <mat-icon>insert_chart_outlined</mat-icon>
+          <h2>Resultados listos para compartir</h2>
+          <p>
+            Crea tu primer informe y elige qué podrá ver el cliente, sin darle
+            acceso al workspace.
+          </p>
+          <button mat-flat-button type="button" (click)="edit()">
+            Crear primer informe
+          </button>
+        </div>
+      }
+    }
+  </section>
+  @if (lastPage() > 1) {
+    <nav class="report-pages" aria-label="Páginas de informes">
+      <button
+        mat-button
+        type="button"
+        (click)="changePage(-1)"
+        [disabled]="page() <= 1 || loading()"
+      >
+        Anterior</button
+      ><span>{{ page() }} / {{ lastPage() }}</span
+      ><button
+        mat-button
+        type="button"
+        (click)="changePage(1)"
+        [disabled]="page() >= lastPage() || loading()"
+      >
+        Siguiente
+      </button>
+    </nav>
+  }
+}

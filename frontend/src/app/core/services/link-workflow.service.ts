@@ -16,6 +16,9 @@ export class LinkWorkflowService {
   private capabilityContext: string | null = null;
   private requestedContext: string | null = null;
   readonly enabled = () => this.capabilities()?.enabled === true && this.capabilityContext === this.context();
+  readonly ruleSimulatorEnabled = () => this.capabilities()?.ruleSimulator !== false && this.capabilityContext === this.context();
+  readonly linkHistoryEnabled = () => this.capabilities()?.linkHistory !== false && this.capabilityContext === this.context();
+  readonly linkHistoryRestoreEnabled = () => this.capabilities()?.linkHistoryRestore !== false && this.capabilityContext === this.context();
   constructor() {
     effect(() => {
       const context = this.context();

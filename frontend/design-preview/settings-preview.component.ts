@@ -11,8 +11,11 @@ import { blocked } from "./workspace-fixture";
 const user = signal<AuthUser>({ id: 900001, name: "Marina del Río", email: "marina@example.invalid", isAdmin: false, emailVerified: true, mfaEnabled: true, recoveryCodesRemaining: 8 });
 const previewAuth = {
   user, sessionGeneration: () => 1,
+  authenticated: () => true,
+  userRefreshRequired: signal(false), userMutationUnconfirmed: signal(false), mfaRecoveryIssueUnconfirmed: signal(false),
   listSessions: async (): Promise<SessionList> => ({ truncated: false, sessions: [{ id: "fictional-session", user_agent: "Chrome · Windows · Dispositivo de ejemplo", created_at: "2026-09-14T10:00:00Z", last_used_at: "2026-09-14T10:00:00Z", expires_at: "2099-01-01T00:00:00Z", revoked_at: null, mfa_verified_at: "2026-09-14T10:00:00Z", current: true }] }),
   dataExportStatus: async () => null,
+  dataExportHistory: async () => [],
   accountDeletionImpact: async (): Promise<AccountDeletionImpact> => ({ canDelete: true, isPlatformAdmin: false, ownedWorkspaces: [], blockingPrivacyRequests: [], request: null }),
   updateProfile: blocked, requestEmailChange: blocked, cancelEmailChange: blocked,
   changePassword: blocked, requestDataExport: blocked, cancelDataExport: blocked,

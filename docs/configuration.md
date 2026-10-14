@@ -233,10 +233,17 @@ Cada timeout de job es menor que el de su worker, y éste menor que el
 | `LINK_CREATE_LIMIT` | \* | `30` | 1–300 | creación de enlaces (por IP) |
 | `RESOLVE_LIMIT` | \* | `600` | 60–10 000 | resolución de enlaces (por IP) |
 | `API_TOKEN_LIMIT` | \* | `600` | 60–10 000 | API con token (por token) |
+| `RULE_SIMULATION_LIMIT` | \* | `30` | 1–300 | simulador de reglas (por usuario/sesión y workspace) |
 | `PENDING_LIMIT` | \* | `20` | 1–300 | aparcado de credenciales pendientes, escritura (por IP) |
 | `PENDING_READ_LIMIT` | \* | `120` | 1–1 000 | consulta del aparcadero (por IP) |
 
 Nunca pongas `0` para «desactivar» un límite: no existe ese significado.
+
+Las funciones nuevas se pueden activar por separado durante el despliegue con
+`UVH_FEATURE_RULE_SIMULATOR`, `UVH_FEATURE_LINK_HISTORY` y
+`UVH_FEATURE_LINK_HISTORY_RESTORE`. Sus valores de la plantilla son `true`;
+puedes dejar lectura y comparación activas y mantener la restauración en `false`
+hasta completar la validación operativa.
 
 ### Qué limiter cuenta en qué store
 
@@ -255,6 +262,12 @@ Nunca pongas `0` para «desactivar» un límite: no existe ese significado.
 | `uvh-link-create` | creación | volumen | 1 min · `LINK_CREATE_LIMIT`/IP |
 | `uvh-report` | denuncias | volumen | 1 min · 10/IP |
 | `uvh-status` / `uvh-health` | status y health | volumen | 1 min · 60 / 120 por IP |
+| `uvh-rule-simulation` | simulaciones de reglas | usuario/sesión + workspace | 1 min · `RULE_SIMULATION_LIMIT` (30 por defecto) |
+
+Las activaciones de estas funciones se controlan por separado con
+`UVH_FEATURE_RULE_SIMULATOR`, `UVH_FEATURE_LINK_HISTORY` y
+`UVH_FEATURE_LINK_HISTORY_RESTORE` (activadas por defecto; permiten desplegar
+lectura, comparación y restauración de forma progresiva).
 | `uvh-api` / `uvh-api-token` | API | volumen | 1 min · 120/IP y `API_TOKEN_LIMIT`/token |
 | `uvh-analytics` | analítica | volumen | 1 min · 60/sesión+workspace |
 | `uvh-activity` / `uvh-usage` | actividad y uso | volumen | 1 min · 60 / 30 por actor |
@@ -573,3 +586,18 @@ Lo que **no** acredita ninguna de ellas: que los valores concretos de un
 despliegue real sean los adecuados. Eso se decide en
 [`release-evidence-template.md`](release-evidence-template.md) y en
 [`production-readiness.md`](production-readiness.md).
+
+
+### Informes compartidos y tarjetas sociales
+
+`UVH_FEATURE_SHARED_REPORTS` y `UVH_FEATURE_SOCIAL_PREVIEWS` se activan por separado; por defecto están desactivadas. Migrar el backend antes de publicar el frontend. El entorno local las activa para revisar los flujos.
+
+Los informes usan el origen canónico `FRONTEND_URL` para compartir y comprobar el origen del acceso. Las imágenes sociales usan `PUBLIC_ORIGIN`. Los lectores sociales externos no pueden consultar un localhost.
+
+Las imágenes normalizadas se guardan en el disco privado `local`, bajo `social-previews/`, con cuota de 64 MiB por workspace. El scheduler elimina cargas sin referencias y procesa recibos duraderos de borrado. La retención de un día permite recoger escrituras tardías tras una eliminación.
+
+La rotación de `APP_SECRET` incluye `analytics_reports.secret_encrypted` y los recibos cifrados de idempotencia de informes. Mantener `APP_SECRET_PREVIOUS` durante la ventana de reintentos de 24 horas, además de las ventanas de tokens y jobs del procedimiento de rotación.
+
+`SHARED_REPORTS_LIMIT` fija el máximo de informes no revocados por workspace (50 inicialmente); `SOCIAL_PREVIEW_ASSET_BYTES_PER_WORKSPACE` fija su cuota de imágenes normalizadas (67108864 bytes inicialmente).
+
+La migración `2026_10_14_000003_index_social_asset_references` crea índices concurrentes para la limpieza de imágenes, sin bloquear escrituras en los enlaces. Se ejecuta fuera de una transacción de migración; no envolver manualmente `artisan migrate` en otra transacción. Los recibos de borrado se conservan para recoger cargas que escriban tarde, incluso tras eliminar un workspace.

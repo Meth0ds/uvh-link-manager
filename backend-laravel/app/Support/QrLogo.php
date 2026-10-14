@@ -114,7 +114,7 @@ final class QrLogo
         }
     }
 
-    private static function orientation(string $bytes): int
+    public static function orientation(string $bytes): int
     {
         $length = strlen($bytes);
         $offset = 2;

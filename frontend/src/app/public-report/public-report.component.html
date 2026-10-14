@@ -1,0 +1,250 @@
+<div class="public-report-shell">
+  <header class="report-masthead">
+    <span class="brand" aria-label="UVH">uvh.</span
+    ><span><mat-icon>lock_outline</mat-icon>Informe de solo lectura</span>
+  </header>
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Cargando informe" />
+  }
+  @if (passwordRequired() && !report() && !unavailable()) {
+    <main class="access-panel">
+      <span class="access-icon"><mat-icon>lock_outline</mat-icon></span>
+      <h1>Este informe está protegido</h1>
+      <p>
+        Introduce la contraseña que te ha facilitado quien compartió los
+        resultados.
+      </p>
+      <form (ngSubmit)="access()">
+        <label for="report-password">Contraseña</label
+        ><input
+          id="report-password"
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          autocomplete="current-password"
+          maxlength="72"
+          required
+        /><button mat-flat-button type="submit" [disabled]="loading()">
+          {{ loading() ? "Comprobando…" : "Ver informe" }}
+        </button>
+      </form>
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+    </main>
+  } @else if (report(); as r) {
+    <main class="report-content">
+      <section class="report-heading">
+        <div>
+          <h1>{{ r.title }}</h1>
+          @if (r.description) {
+            <p>{{ r.description }}</p>
+          }
+          <span class="period"
+            ><mat-icon>calendar_today</mat-icon
+            >{{ r.from | date: "d MMM y" : "UTC" }} –
+            {{ r.to | date: "d MMM y" : "UTC" }}<span>UTC</span></span
+          >
+        </div>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="load()"
+          [disabled]="loading()"
+        >
+          <mat-icon>refresh</mat-icon>Actualizar
+        </button>
+      </section>
+      @if (r.sections.includes("visits")) {
+        <section class="visits-summary" aria-label="Total del periodo">
+          <span>Visitas registradas</span
+          ><strong>{{
+            r.visits === null ? "—" : number.format(r.visits)
+          }}</strong>
+          <p>
+            Actividad de {{ r.labels.length }}
+            {{ r.labels.length === 1 ? "enlace" : "enlaces" }} en el periodo
+            compartido.
+          </p>
+        </section>
+      }
+      @if (r.sections.includes("series")) {
+        <section class="report-section">
+          <h2>Evolución diaria</h2>
+          @if (r.series.length) {
+            <div class="chart-wrap">
+              <svg
+                viewBox="0 0 720 230"
+                role="img"
+                aria-label="Gráfico de visitas diarias; valores disponibles en la tabla"
+              >
+                <line
+                  x1="8"
+                  y1="210"
+                  x2="712"
+                  y2="210"
+                  stroke="var(--uvh-border)"
+                />
+                <path
+                  [attr.d]="graph()"
+                  fill="none"
+                  stroke="var(--uvh-electric)"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                @if (onePoint(); as p) {
+                  <circle
+                    cx="360"
+                    [attr.cy]="p.y"
+                    r="4"
+                    fill="var(--uvh-electric)"
+                  />
+                }
+              </svg>
+              <div class="chart-dates">
+                <span>{{
+                  r.series[0].day + "T00:00:00Z" | date: "d MMM" : "UTC"
+                }}</span
+                ><span>{{
+                  r.series[r.series.length - 1].day + "T00:00:00Z"
+                    | date: "d MMM" : "UTC"
+                }}</span>
+              </div>
+            </div>
+            <details>
+              <summary>Consultar valores diarios</summary>
+              <div class="series-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Día</th>
+                      <th scope="col">Visitas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (point of r.series; track point.day) {
+                      <tr>
+                        <th scope="row">
+                          {{
+                            point.day + "T00:00:00Z" | date: "d MMM y" : "UTC"
+                          }}
+                        </th>
+                        <td>
+                          {{
+                            point.available
+                              ? number.format(point.visits)
+                              : "Sin datos disponibles"
+                          }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          } @else {
+            <p class="muted">Todavía no hay actividad en este periodo.</p>
+          }
+        </section>
+      }
+      <div class="breakdowns">
+        @if (r.sections.includes("countries")) {
+          <section class="report-section">
+            <h2>Países</h2>
+            <ol>
+              @for (row of r.countries; track row.key) {
+                <li>
+                  <div>
+                    <span>{{ country(row.key) }}</span
+                    ><b>{{ number.format(row.value) }}</b>
+                  </div>
+                  <span class="bar-track"
+                    ><span [style.width.%]="pct(row.value, r.countries)"></span
+                  ></span>
+                </li>
+              } @empty {
+                <li class="muted">
+                  No hay países registrados en este periodo.
+                </li>
+              }
+            </ol>
+          </section>
+        }
+        @if (r.sections.includes("devices")) {
+          <section class="report-section">
+            <h2>Dispositivos</h2>
+            <ol>
+              @for (row of r.devices; track row.key) {
+                <li>
+                  <div>
+                    <span>{{ device(row.key) }}</span
+                    ><b>{{ number.format(row.value) }}</b>
+                  </div>
+                  <span class="bar-track"
+                    ><span [style.width.%]="pct(row.value, r.devices)"></span
+                  ></span>
+                </li>
+              } @empty {
+                <li class="muted">
+                  No hay dispositivos registrados en este periodo.
+                </li>
+              }
+            </ol>
+          </section>
+        }
+      </div>
+      <details class="included">
+        <summary>
+          {{ r.labels.length }}
+          {{ r.labels.length === 1 ? "enlace incluido" : "enlaces incluidos" }}
+        </summary>
+        <ul>
+          @for (label of r.labels; track $index) {
+            <li>{{ label }}</li>
+          }
+        </ul>
+      </details>
+      @if (r.from < r.retainedFrom) {
+        <p class="retention-note">
+          <mat-icon>info_outline</mat-icon>Parte del periodo queda fuera de la
+          retención disponible. Las fechas sin datos conservados no equivalen a
+          cero visitas.
+        </p>
+      }
+      <p class="metric-note">
+        Las visitas son solicitudes registradas: no equivalen necesariamente a
+        personas distintas ni a escaneos físicos de un QR.
+      </p>
+      <footer class="report-footer">
+        <span
+          >Actualizado
+          {{ r.updatedAt | date: "d MMM y, HH:mm" : "UTC" }} UTC</span
+        ><span>Compartido con UVH</span>
+      </footer>
+    </main>
+  } @else if (unavailable()) {
+    <main class="access-panel">
+      <span class="access-icon"><mat-icon>link_off</mat-icon></span>
+      <h1>Informe no disponible</h1>
+      <p>
+        El acceso puede haber caducado, cambiado o sido retirado. Solicita una
+        URL vigente a quien compartió el informe.
+      </p>
+    </main>
+  } @else if (error()) {
+    <main class="access-panel">
+      <mat-icon>error_outline</mat-icon>
+      <h1>No se pudo abrir el informe</h1>
+      <p class="error" role="alert">{{ error() }}</p>
+      <button mat-stroked-button type="button" (click)="retry()">
+        Reintentar
+      </button>
+    </main>
+  } @else {
+    <main class="access-panel" role="status">
+      <h1>Preparando tu informe</h1>
+      <p>Estamos consultando los resultados compartidos.</p>
+    </main>
+  }
+</div>

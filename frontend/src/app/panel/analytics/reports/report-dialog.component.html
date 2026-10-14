@@ -1,0 +1,372 @@
+<header class="dialog-heading">
+  <div>
+    <span class="heading-icon"><mat-icon>insert_chart_outlined</mat-icon></span>
+    <h2 mat-dialog-title>
+      {{
+        saved()
+          ? "Informe listo para compartir"
+          : data.report
+            ? "Editar informe compartido"
+            : "Compartir resultados"
+      }}
+    </h2>
+    <p>Un informe de solo lectura, con los datos que tú elijas.</p>
+  </div>
+  <button
+    mat-icon-button
+    type="button"
+    aria-label="Cerrar informe"
+    (click)="close()"
+    [disabled]="busy()"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+@if (busy()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Guardando informe" />
+}
+<mat-dialog-content>
+  @if (saved(); as report) {
+    <section class="saved-report" aria-live="polite">
+      <span class="success-icon"><mat-icon>check</mat-icon></span>
+      <h3 #successHeading tabindex="-1">{{ report.spec.title }}</h3>
+      <p>
+        {{ report.links.length }}
+        {{
+          report.links.length === 1 ? "enlace incluido" : "enlaces incluidos"
+        }}
+        ·
+        {{
+          report.passwordProtected
+            ? "Protegido con contraseña"
+            : "Acceso mediante URL secreta"
+        }}
+      </p>
+      <p>
+        {{
+          report.expiresAt
+            ? "Caduca el " + report.expiresAt.slice(0, 10)
+            : "Sin caducidad"
+        }}
+      </p>
+      <div class="sharing-address">
+        <span>URL de acceso</span
+        ><input
+          readonly
+          [value]="report.shareUrl"
+          aria-label="URL secreta del informe"
+        />
+      </div>
+      <p class="private-note">
+        <mat-icon>lock_outline</mat-icon>Quien reciba esta URL podrá consultar
+        los datos publicados.
+      </p>
+      <div class="success-actions">
+        <button
+          mat-flat-button
+          type="button"
+          (click)="copy.copy(report.shareUrl, copyContext)"
+          [disabled]="copy.busy()"
+        >
+          <mat-icon>{{
+            copy.phase(report.shareUrl, copyContext) === "copied"
+              ? "check"
+              : "content_copy"
+          }}</mat-icon
+          >{{
+            copy.phase(report.shareUrl, copyContext) === "copied"
+              ? "URL copiada"
+              : "Copiar URL"
+          }}</button
+        ><a
+          mat-stroked-button
+          [href]="report.shareUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          ><mat-icon>open_in_new</mat-icon>Abrir informe</a
+        >
+      </div>
+    </section>
+  } @else {
+    <div class="report-layout">
+      <form id="report-form" (ngSubmit)="save()" class="report-form">
+        <section>
+          <h3>Contenido</h3>
+          <p>
+            Define qué resultados vas a compartir y cómo reconocerá los enlaces
+            tu cliente.
+          </p>
+          <label
+            >Título del informe<input
+              name="title"
+              [(ngModel)]="spec.title"
+              maxlength="120"
+              required
+              placeholder="Resultados de la campaña de otoño" /></label
+          ><label
+            >Descripción <span>Opcional</span
+            ><textarea
+              name="description"
+              [(ngModel)]="spec.description"
+              maxlength="500"
+              rows="2"
+              placeholder="Contexto para interpretar estos resultados"
+            ></textarea>
+          </label>
+          <div class="selection-heading">
+            <strong>Enlaces incluidos</strong
+            ><span>{{ selection().length }} / 100</span>
+          </div>
+          @if (selection().length) {
+            <div class="selected-links">
+              @for (link of selection(); track link.linkId) {
+                <div>
+                  <input
+                    [value]="link.label"
+                    (input)="label(link.linkId, $any($event.target).value)"
+                    maxlength="120"
+                    [attr.aria-label]="
+                      'Etiqueta pública del enlace ' + link.label
+                    "
+                  /><button
+                    mat-icon-button
+                    type="button"
+                    [attr.aria-label]="'Quitar ' + link.label"
+                    (click)="remove(link.linkId)"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+          <small
+            >Las etiquetas son públicas. Usa un nombre interno solo si quieres
+            mostrarlo al cliente.</small
+          >
+          <label class="search-label"
+            ><mat-icon>search</mat-icon
+            ><input
+              name="search"
+              type="search"
+              [ngModel]="query"
+              (ngModelChange)="onQuery($event)"
+              placeholder="Buscar enlaces para incluir"
+              maxlength="200"
+              aria-label="Buscar enlaces para el informe"
+          /></label>
+          <div class="link-picker" [attr.aria-busy]="searching()">
+            @if (searching()) {
+              <p role="status">Buscando enlaces…</p>
+            } @else if (searchError()) {
+              <p role="alert">{{ searchError() }}</p>
+              <button mat-button type="button" (click)="search()">
+                Reintentar
+              </button>
+            } @else {
+              @for (link of results(); track link.id) {
+                <button
+                  type="button"
+                  [class.chosen]="has(link.id)"
+                  [attr.aria-pressed]="has(link.id)"
+                  (click)="toggle(link)"
+                  [disabled]="!has(link.id) && selection().length >= 100"
+                >
+                  <mat-icon>{{
+                    has(link.id) ? "check_circle" : "add_circle_outline"
+                  }}</mat-icon
+                  ><span
+                    ><strong>{{ link.name || link.alias }}</strong
+                    ><small>{{ link.shortUrl }}</small></span
+                  >
+                </button>
+              } @empty {
+                <p>No hay enlaces disponibles para esta búsqueda.</p>
+              }
+            }
+          </div>
+          <div class="picker-pages">
+            <button
+              mat-button
+              type="button"
+              [disabled]="searchPage <= 1 || searching()"
+              (click)="page(-1)"
+            >
+              Anterior</button
+            ><span>Página {{ searchPage }}</span
+            ><button
+              mat-button
+              type="button"
+              [disabled]="searchPage * 20 >= searchTotal() || searching()"
+              (click)="page(1)"
+            >
+              Siguiente
+            </button>
+          </div>
+        </section>
+        <section>
+          <h3>Datos visibles</h3>
+          <p>
+            El cliente podrá consultar únicamente este periodo y estas
+            secciones.
+          </p>
+          <label
+            >Periodo<select name="period" [(ngModel)]="spec.period">
+              <option value="7d">Últimos 7 días</option>
+              <option value="30d">Últimos 30 días</option>
+              <option value="90d">Últimos 90 días</option>
+              <option value="custom">Fechas concretas</option>
+            </select></label
+          >
+          @if (spec.period === "custom") {
+            <div class="date-pair">
+              <label
+                >Desde<input
+                  type="date"
+                  name="from"
+                  [(ngModel)]="spec.from"
+                  required /></label
+              ><label
+                >Hasta<input
+                  type="date"
+                  name="to"
+                  [(ngModel)]="spec.to"
+                  required
+              /></label>
+            </div>
+          }
+          <div class="section-options">
+            @for (option of sections; track option.key) {
+              <mat-checkbox
+                [checked]="spec.sections.includes(option.key)"
+                (change)="section(option.key, $event.checked)"
+                ><strong>{{ option.title }}</strong
+                ><small>{{ option.hint }}</small></mat-checkbox
+              >
+            }
+          </div>
+        </section>
+        <section>
+          <h3>Acceso</h3>
+          <p>Puedes revocar el informe o cambiar su URL cuando lo necesites.</p>
+          <label
+            >Contraseña<select
+              name="passwordAction"
+              [(ngModel)]="passwordAction"
+            >
+              <option value="keep">
+                {{
+                  data.report?.passwordProtected
+                    ? "Mantener contraseña actual"
+                    : "Sin contraseña"
+                }}
+              </option>
+              <option value="set">
+                {{
+                  data.report?.passwordProtected
+                    ? "Sustituir contraseña"
+                    : "Añadir contraseña"
+                }}
+              </option>
+              @if (data.report?.passwordProtected) {
+                <option value="remove">Quitar contraseña</option>
+              }
+            </select></label
+          >
+          @if (passwordAction === "set") {
+            <label
+              >Nueva contraseña<input
+                type="password"
+                name="password"
+                [(ngModel)]="password"
+                autocomplete="new-password"
+                maxlength="72"
+                required
+              /><small
+                >Mínimo 10 caracteres. Usa una frase larga y única.</small
+              ></label
+            >
+          }
+          <mat-checkbox [(ngModel)]="expiryEnabled" name="expiryEnabled"
+            >Limitar el acceso por fecha</mat-checkbox
+          >
+          @if (expiryEnabled) {
+            <label
+              >Disponible hasta<input
+                type="datetime-local"
+                name="expiry"
+                [(ngModel)]="expiry"
+                required
+              /><small>Hora local de tu dispositivo.</small></label
+            >
+          }
+        </section>
+        @if (error()) {
+          <p class="form-error" role="alert">{{ error() }}</p>
+        }
+      </form>
+      <aside class="report-preview">
+        <span class="preview-label">Vista previa del contenido público</span>
+        <div class="preview-paper">
+          <span class="brand">uvh.</span>
+          <h3>{{ spec.title || "Título del informe" }}</h3>
+          <p>
+            {{
+              spec.description ||
+                "Los resultados que elijas, en una página clara para tu cliente."
+            }}
+          </p>
+          <span class="period-label">{{
+            spec.period === "custom"
+              ? "Periodo seleccionado"
+              : "Últimos " + spec.period.slice(0, -1) + " días"
+          }}</span>
+          @if (spec.sections.includes("visits")) {
+            <div class="preview-metric">
+              <span>Visitas registradas</span><b>—</b>
+            </div>
+          }
+          @if (spec.sections.includes("series")) {
+            <div class="preview-chart">
+              <mat-icon>show_chart</mat-icon><span>Evolución diaria</span>
+            </div>
+          }
+          <div class="preview-categories">
+            @if (spec.sections.includes("countries")) {
+              <span><mat-icon>public</mat-icon>Países</span>
+            }
+            @if (spec.sections.includes("devices")) {
+              <span><mat-icon>devices</mat-icon>Dispositivos</span>
+            }
+          </div>
+          <small>{{ selection().length }} enlaces seleccionados</small>
+        </div>
+        <p>
+          Los datos reales se mostrarán al abrir el informe. Los destinos y las
+          notas permanecerán privados.
+        </p>
+      </aside>
+    </div>
+  }</mat-dialog-content
+><mat-dialog-actions align="end"
+  ><button mat-button type="button" (click)="close()" [disabled]="busy()">
+    {{ saved() ? "Cerrar" : "Cancelar" }}
+  </button>
+  @if (!saved()) {
+    <button
+      mat-flat-button
+      type="submit"
+      form="report-form"
+      [disabled]="busy()"
+    >
+      <mat-icon>{{ busy() ? "hourglass_top" : "share" }}</mat-icon
+      >{{
+        busy()
+          ? "Guardando…"
+          : data.report
+            ? "Guardar cambios"
+            : "Crear informe"
+      }}
+    </button>
+  }
+</mat-dialog-actions>

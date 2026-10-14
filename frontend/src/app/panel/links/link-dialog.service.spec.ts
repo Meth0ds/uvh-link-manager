@@ -7,7 +7,7 @@ import { firstValueFrom, of, Subject } from "rxjs";
 import type { LinkDto, Workspace } from "../../core/models";
 import { SessionContextService } from "../../core/services/session-context.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
-import type { LinkDialogComponent } from "./link-dialog.component";
+import type { LinkCreationEvent, LinkDialogComponent } from "./link-dialog.component";
 import { LINK_EDITOR_LOADER, LinkDialogService } from "./link-dialog.service";
 
 @Component({ template: "" })
@@ -73,17 +73,16 @@ describe("LinkDialogService lazy editor ownership", () => {
   it("returns the created link itself so consumers can navigate with its id", async () => {
     dialog.open.and.returnValue({ afterClosed: () => of(link) } as never);
     const created = await firstValueFrom(service.openCreate("https://example.com"));
-    expect(created).toBe(link);
-    expect(created?.id).toBe(42);
+    expect(created).toEqual({ type: "created", link });
     expect(dialog.open).toHaveBeenCalledOnceWith(editor, {
       data: { mode: "create", initialDestination: "https://example.com" },
-      width: "1000px", height: "min(860px, calc(100dvh - 24px))",
+      width: "1000px",
       maxWidth: "calc(100vw - 24px)", maxHeight: "calc(100dvh - 24px)", disableClose: true, autoFocus: false,
     });
   });
   it("normalizes a cancelled dialog to null", async () => {
     dialog.open.and.returnValue({ afterClosed: () => of(undefined) } as never);
-    await expectAsync(firstValueFrom(service.openCreate())).toBeResolvedTo(null);
+    await expectAsync(firstValueFrom(service.openCreate())).toBeResolvedTo({ type: "closed" });
   });
   it("does not load the editor before an opening is subscribed", async () => {
     const opening = service.openCreate();
@@ -140,7 +139,7 @@ describe("LinkDialogService lazy editor ownership", () => {
         // Completion is intentionally delivered before an effect flush.
         if (completion === "resolve") pending.resolve(editor);
         else pending.reject(new Error("old network failure"));
-        await expectAsync(opening).toBeResolvedTo(null);
+        await expectAsync(opening).toBeResolvedTo({ type: "closed" });
         await drain();
         expect(dialog.open).not.toHaveBeenCalled();
         expect(snackbar.open).not.toHaveBeenCalled();
@@ -152,12 +151,12 @@ describe("LinkDialogService lazy editor ownership", () => {
   it("cancels promptly on a reactive context transition even while the loader is unresolved", async () => {
     const pending = deferred<Type<LinkDialogComponent>>();
     loader.and.returnValue(pending.promise);
-    const values: (LinkDto | null)[] = [];
+    const values: LinkCreationEvent[] = [];
     const sub = service.openCreate().subscribe(value => values.push(value));
     await drain();
     workspaces.select(2); workspaces.select(1);
     TestBed.tick();
-    expect(values).toEqual([null]);
+    expect(values).toEqual([{ type: "closed" }]);
     expect(sub.closed).toBeTrue();
     pending.resolve(editor);
     await drain();
@@ -165,9 +164,9 @@ describe("LinkDialogService lazy editor ownership", () => {
   });
   it("does not load for an already destroyed owner or a stale unsubscribed request", async () => {
     const lifetime = ownerRef(); lifetime.destroy();
-    await expectAsync(firstValueFrom(service.openCreate("", lifetime.owner))).toBeResolvedTo(null);
+    await expectAsync(firstValueFrom(service.openCreate("", lifetime.owner))).toBeResolvedTo({ type: "closed" });
     const stale = service.openCreate(); workspaces.select(2);
-    await expectAsync(firstValueFrom(stale)).toBeResolvedTo(null);
+    await expectAsync(firstValueFrom(stale)).toBeResolvedTo({ type: "closed" });
     expect(loader).not.toHaveBeenCalled();
   });
   it("releases listeners when unsubscribed before loading finishes", async () => {
@@ -185,11 +184,11 @@ describe("LinkDialogService lazy editor ownership", () => {
   });
   it("reports a current loading failure once and permits a fresh attempt", async () => {
     loader.and.rejectWith(new Error("chunk unavailable"));
-    await expectAsync(firstValueFrom(service.openCreate())).toBeResolvedTo(null);
+    await expectAsync(firstValueFrom(service.openCreate())).toBeResolvedTo({ type: "closed" });
     expect(snackbar.open).toHaveBeenCalledOnceWith("No se pudo abrir el editor. Vuelve a intentarlo.", "Cerrar", { duration: 5000 });
     loader.and.resolveTo(editor);
     dialog.open.and.returnValue({ afterClosed: () => of(link) } as never);
-    await expectAsync(firstValueFrom(service.openCreate())).toBeResolvedTo(link);
+    await expectAsync(firstValueFrom(service.openCreate())).toBeResolvedTo({ type: "created", link });
     expect(loader).toHaveBeenCalledTimes(2);
   });
   it("closes a live dialog and suppresses its later result when its owner is destroyed", async () => {

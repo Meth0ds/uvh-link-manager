@@ -80,7 +80,7 @@ final class Idempotency
 
         $lease = Ids::randomToken(24);
         try {
-            DB::table('idempotency_keys')->insert([
+            DB::transaction(fn () => DB::table('idempotency_keys')->insert([
                 'user_id' => $userId,
                 'scope' => $scope,
                 'key' => $key,
@@ -89,7 +89,7 @@ final class Idempotency
                 'lease_token' => $lease,
                 'expires_at' => now()->addHours(self::TTL_HOURS),
                 'created_at' => now(),
-            ]);
+            ]));
         } catch (QueryException $e) {
             if (($e->errorInfo[0] ?? null) !== '23505') {
                 throw $e;

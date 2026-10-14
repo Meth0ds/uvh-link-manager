@@ -115,6 +115,53 @@ export function localDateTimeIso(raw: string | null | undefined): string | null 
   return instant === null ? null : new Date(instant).toISOString();
 }
 
+const TIME_ONLY = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+type ZoneParts = { year: number; month: number; day: number; hour: number; minute: number };
+
+function zoneParts(instant: Date, timezone: string): ZoneParts | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(instant);
+    const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+    const output = { year: value("year"), month: value("month"), day: value("day"), hour: value("hour"), minute: value("minute") };
+    return Object.values(output).every(Number.isInteger) ? output : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Convert a recurring UTC minute to the local wall clock for today's zone offset. */
+export function utcTimeToLocalTime(raw: string | null | undefined, timezone = Intl.DateTimeFormat().resolvedOptions().timeZone, reference = new Date()): string | null {
+  if (!TIME_ONLY.test(raw ?? "")) return null;
+  const parts = zoneParts(reference, timezone);
+  if (!parts) return raw ?? null;
+  const utc = Date.UTC(parts.year, parts.month - 1, parts.day, Number(raw!.slice(0, 2)), Number(raw!.slice(3)));
+  const local = zoneParts(new Date(utc), timezone);
+  return local ? String(local.hour).padStart(2, "0") + ":" + String(local.minute).padStart(2, "0") : raw!;
+}
+
+/** Convert a local recurring minute to UTC; nonexistent DST hours return null. */
+export function localTimeToUtcTime(raw: string | null | undefined, timezone = Intl.DateTimeFormat().resolvedOptions().timeZone, reference = new Date()): string | null {
+  if (!TIME_ONLY.test(raw ?? "")) return null;
+  const date = zoneParts(reference, timezone);
+  if (!date) return raw ?? null;
+  const desired = Date.UTC(date.year, date.month - 1, date.day, Number(raw!.slice(0, 2)), Number(raw!.slice(3)));
+  let instant = desired;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const actual = zoneParts(new Date(instant), timezone);
+    if (!actual) return null;
+    const actualWall = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute);
+    instant += desired - actualWall;
+  }
+  const verified = zoneParts(new Date(instant), timezone);
+  if (!verified || Date.UTC(verified.year, verified.month - 1, verified.day, verified.hour, verified.minute) !== desired) return null;
+  const utc = zoneParts(new Date(instant), "UTC");
+  return utc ? String(utc.hour).padStart(2, "0") + ":" + String(utc.minute).padStart(2, "0") : null;
+}
+
 /** Wire tolerance is a case tolerance only; the canonical names stay fixed. */
 function titleCase(name: string): string {
   return name[0].toUpperCase() + name.slice(1).toLowerCase();

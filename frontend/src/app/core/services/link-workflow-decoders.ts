@@ -39,7 +39,7 @@ export function decodeFavorite(value: unknown): { favorite: boolean } { return {
 export function decodeWorkflows(value: unknown): LinkWorkflowCapabilities {
   const r = record(value, "link workflows");
   const ratio = finiteNumber(r["reminderClickRatio"], "reminder ratio"); if (ratio <= 0 || ratio >= 1) invalid("reminder ratio");
-  return { enabled: boolean(r["enabled"], "workflows enabled"), reminderHours: integer(r["reminderHours"], "reminder hours", 1, 168),
+  return { enabled: boolean(r["enabled"], "workflows enabled"), ruleSimulator: r["ruleSimulator"] === undefined ? true : boolean(r["ruleSimulator"], "rule simulator"), linkHistory: r["linkHistory"] === undefined ? true : boolean(r["linkHistory"], "link history"), linkHistoryRestore: r["linkHistoryRestore"] === undefined ? true : boolean(r["linkHistoryRestore"], "history restore"), reminderHours: integer(r["reminderHours"], "reminder hours", 1, 168),
     reminderClickRatio: ratio, maxSavedFilters: integer(r["maxSavedFilters"], "filter limit", 1, 50) };
 }
 export function decodeInspection(value: unknown): DestinationInspection {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\LinkException;
 use App\Models\Link;
 use App\Support\Audit;
+use App\Support\Idempotency;
 use App\Support\IsoDate;
 use App\Support\LinkBlockReason;
 use App\Support\LinkPreferences;
@@ -199,7 +200,7 @@ class LinkController
             }
         }
 
-        $exists = Link::whereNull('deleted_at')->where('alias', $alias)
+        $exists = Link::whereNull('deleted_at')->whereRaw('lower(alias) = ?', [$alias])
             ->when($domainId === null, fn ($q) => $q->whereNull('domain_id'))
             ->when($domainId !== null, fn ($q) => $q->where('domain_id', $domainId))
             ->exists();
@@ -241,26 +242,71 @@ class LinkController
             return response()->json(['error' => $valid['error']], 422);
         }
 
+        // Browser-created links always carry a replay key. Keeping the guard
+        // optional preserves compatibility with older API clients while making
+        // retries of the new editor safe and deterministic.
+        $idempotencyKey = $request->header('Idempotency-Key');
+        $idempotency = null;
+        if ($idempotencyKey !== null) {
+            $keyCheck = Idempotency::validateKey($idempotencyKey);
+            if (! $keyCheck['ok']) {
+                return response()->json(['error' => $keyCheck['error']], 422);
+            }
+            $scope = 'links.create:'.$workspaceId;
+            $hash = Idempotency::hash($request->getContent());
+            $begin = Idempotency::begin((int) $user->id, $scope, $idempotencyKey, $hash);
+            if ($begin['state'] === 'replay') {
+                return response()->json($begin['body'] ?? [], $begin['status'] ?? 201);
+            }
+            if ($begin['state'] === 'mismatch') {
+                return response()->json(['error' => 'Esta clave de idempotencia corresponde a otra petición.'], 409);
+            }
+            if ($begin['state'] === 'in_progress') {
+                return response()->json(['error' => 'La creación anterior sigue en curso.'], 409);
+            }
+            $idempotency = ['scope' => $scope, 'key' => $idempotencyKey, 'hash' => $hash, 'lease' => $begin['lease']];
+        }
+
         try {
-            $created = LinkService::create(
-                $workspaceId,
-                $user->id,
-                $input,
-                UvhRequest::apiToken($request),
-                (int) $user->security_version,
-                WorkspaceWriteActor::fromRequest($request),
-            );
-        } catch (LinkException $e) {
-            return response()->json(['error' => $e->getMessage()], $e->status);
-        }
+            try {
+                $created = LinkService::create(
+                    $workspaceId,
+                    $user->id,
+                    $input,
+                    UvhRequest::apiToken($request),
+                    (int) $user->security_version,
+                    WorkspaceWriteActor::fromRequest($request),
+                );
+            } catch (LinkException $e) {
+                if ($idempotency !== null) {
+                    Idempotency::release((int) $user->id, $idempotency['scope'], $idempotency['key'], $idempotency['lease']);
+                }
 
-        $link = Link::with(['domain', 'tags'])
-            ->where('id', $created['id'])->where('workspace_id', $workspaceId)->first();
-        if (! $link) {
-            return response()->json(['error' => 'El enlace dejó de estar disponible al finalizar la creación'], 409);
-        }
+                return response()->json(['error' => $e->getMessage()], $e->status);
+            }
 
-        return response()->json(['link' => LinkService::dto($link)], 201);
+            $link = Link::with(['domain', 'tags'])
+                ->where('id', $created['id'])->where('workspace_id', $workspaceId)->first();
+            if (! $link) {
+                if ($idempotency !== null) {
+                    Idempotency::release((int) $user->id, $idempotency['scope'], $idempotency['key'], $idempotency['lease']);
+                }
+
+                return response()->json(['error' => 'El enlace dejó de estar disponible al finalizar la creación'], 409);
+            }
+
+            $body = ['link' => LinkService::dto($link)];
+            if ($idempotency !== null) {
+                Idempotency::commit((int) $user->id, $idempotency['scope'], $idempotency['key'], $idempotency['hash'], 201, $body, $idempotency['lease']);
+            }
+
+            return response()->json($body, 201);
+        } catch (\Throwable $e) {
+            if ($idempotency !== null) {
+                Idempotency::release((int) $user->id, $idempotency['scope'], $idempotency['key'], $idempotency['lease']);
+            }
+            throw $e;
+        }
     }
 
     public function show(Request $request, int $id)
@@ -749,7 +795,7 @@ class LinkController
         $supported = [
             'destination', 'alias', 'domainId', 'collectionId', 'fallbackDestination', 'password',
             'maxClicks', 'singleUse', 'scheduledAt', 'expiresAt', 'notes', 'name',
-            'utm', 'tags', 'rules', 'expiredPage',
+            'utm', 'tags', 'rules', 'expiredPage', 'socialPreview',
         ];
         if ($partial) {
             // The optimistic-concurrency token only exists on edits.
@@ -770,6 +816,9 @@ class LinkController
 
     protected function validLinkBody(Request $request, bool $partial = false): bool
     {
+        if ($request->exists('socialPreview') && $request->input('socialPreview') !== null && ! config('sharing.social_previews')) {
+            return false;
+        }
         if ($request->has('expiredPage') && $request->input('expiredPage') !== null && ! config('workflows.enabled')) {
             return false;
         }
@@ -830,6 +879,7 @@ class LinkController
             'expires_at' => $request->has('expiresAt') ? $request->input('expiresAt') : ($current?->expires_at?->format('Y-m-d\TH:i:s.uP')),
             'name' => $request->has('name') ? $request->input('name') : ($current->name ?? null),
             'notes' => $request->has('notes') ? $request->input('notes') : ($current->notes ?? null),
+            'social_preview' => $request->exists('socialPreview') ? $request->input('socialPreview') : ($current?->social_preview),
             'expired_page' => $request->has('expiredPage') ? $request->input('expiredPage') : ($current?->expired_page),
             'utm' => $request->has('utm')
                 ? $request->input('utm')

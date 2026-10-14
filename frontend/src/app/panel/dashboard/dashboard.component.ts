@@ -181,8 +181,8 @@ export class DashboardComponent {
     // UI capability only: the API remains authoritative. Unknown/viewer roles
     // should not be invited into a form they cannot submit successfully.
     if (!this.canCreate()) return;
-    this.linkDialog.openCreate("", this.dialogOwner).subscribe((created) => {
-      if (created) void this.router.navigate(["/app/links", created.id]);
+    this.linkDialog.openCreate("", this.dialogOwner).subscribe((event) => {
+      if (event.type === "created") void this.loadRecent();
     });
   }
 
