@@ -25,10 +25,10 @@ final class MailPresentationTest extends TestCase
 
         $mail = $this->envelope('verification');
         $this->assertSame('Verifica tu email en UVH', $mail['subject']);
-        $this->assertSame("Verifica tu cuenta en UVH: {$url}", $mail['text']);
+        $this->assertSame("Confirma tu email y completa tu registro en UVH. Elige tu nombre y contraseña al abrir el enlace: {$url}", $mail['text']);
         $this->assertStringContainsString('uvh<span style="color:#b53c20;">.</span>', $mail['html']);
         $this->assertStringContainsString('Enlaces con recorrido.', $mail['html']);
-        $this->assertStringContainsString('>Verificar mi email</a>', $mail['html']);
+        $this->assertStringContainsString('>Completar mi registro</a>', $mail['html']);
         $this->assertSame(2, substr_count($mail['html'], 'href="https://app.example.test/auth/verify-email#token=sample&amp;next=1"'));
         $this->assertStringNotContainsString('#2457F5', $mail['html']);
         $this->assertStringNotContainsString('Si no reconoces esta actividad', $mail['html']);

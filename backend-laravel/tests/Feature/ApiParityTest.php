@@ -1806,17 +1806,10 @@ class ApiParityTest extends TestCase
             'created_at' => now(),
         ]);
 
-        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain))
+        $activation = $this->withCookie('uvh_session', '')->postJson('/api/v1/auth/verify-email', $this->activationPayload($plain))
             ->assertStatus(200)->assertJson(['ok' => true]);
 
-        $login = $this->postJson('/api/v1/auth/login', [
-            'email' => $email,
-            'password' => self::PASSWORD,
-            'captchaToken' => 'test-login-passcode',
-        ]);
-        $login->assertStatus(200);
-
-        return $this->cookieFrom($login, 'uvh_session');
+        return $this->cookieFrom($activation, 'uvh_session');
     }
 
     private function totpCode(string $secret): string

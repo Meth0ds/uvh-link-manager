@@ -53,7 +53,7 @@ describe("AuthComponent registration flow", () => {
 
   function showRegistrationStep(): void {
     component.tabIndex.set(1);
-    setFlow({ kind: "register", mode: "new", stage: 2 });
+    setFlow({ kind: "register", mode: "new" });
     fixture.detectChanges();
   }
 
@@ -147,13 +147,11 @@ describe("AuthComponent registration flow", () => {
     expect(fixture.debugElement.query(By.css("#login-panel"))).toBeNull();
   });
 
-  it("keeps the first step blocked until identity fields are valid", () => {
-    component.registerForm.controls.name.setValue("A");
+  it("blocks invalid email before requesting a registration link", async () => {
+    showRegistrationStep();
     component.registerForm.controls.email.setValue("not-an-email");
-    component.nextRegisterStep();
-
-    expect(component.registerStep()).toBe(1);
-    expect(component.registerForm.controls.name.touched).toBeTrue();
+    await component.onRegister();
+    expect(auth.register).not.toHaveBeenCalled();
     expect(component.registerForm.controls.email.touched).toBeTrue();
   });
 
@@ -196,23 +194,23 @@ describe("AuthComponent registration flow", () => {
     expect(auth.login.calls.mostRecent().args[2]).toBe("uvh-local-captcha-unavailable");
   });
 
-  it("preserves registration consent and the honeypot with the local fallback", async () => {
+  it("preserves the registration honeypot with the local fallback", async () => {
     await enableLocalFallback(null);
     showRegistrationStep();
-    component.registerForm.patchValue({ name: "Ana García", email: "ana@example.com", password: "unique-test-password", confirmPassword: "unique-test-password", acceptTerms: true });
+    component.registerForm.patchValue({ email: "ana@example.com", });
     component.registerForm.controls.company.setValue("bot");
     await component.onRegister();
     expect(auth.register).not.toHaveBeenCalled();
     component.registerForm.controls.company.setValue("");
     await component.onRegister();
-    expect(auth.register).toHaveBeenCalledWith("Ana García", "ana@example.com", "unique-test-password", jasmine.objectContaining({ captchaToken: "uvh-local-captcha-unavailable", acceptTerms: true, website: "" }));
+    expect(auth.register).toHaveBeenCalledWith("ana@example.com", { captchaToken: "uvh-local-captcha-unavailable", website: "" });
     expect(component.step()).toBe("verify-pending");
   });
 
   it("announces the pause and blocks new registrations without spending a CAPTCHA token", async () => {
     showRegistrationStep();
     component.registrationsPaused.set(true);
-    component.registerForm.patchValue({ name: "Ana García", email: "ana@example.com", password: "Strong-password-123!", confirmPassword: "Strong-password-123!", acceptTerms: true, company: "" });
+    component.registerForm.patchValue({ email: "ana@example.com", company: "" });
     fixture.detectChanges();
     await component.onRegister();
     expect(auth.register).not.toHaveBeenCalled();
@@ -226,7 +224,7 @@ describe("AuthComponent registration flow", () => {
     await enableLocalFallback(null);
     showRegistrationStep();
     auth.register.and.rejectWith(new ApiRequestError("Registros temporalmente pausados. Inténtalo de nuevo más tarde.", 503, undefined, undefined, "registration_paused"));
-    component.registerForm.patchValue({ name: "Ana García", email: "ana@example.com", password: "Strong-password-123!", confirmPassword: "Strong-password-123!", acceptTerms: true, company: "" });
+    component.registerForm.patchValue({ email: "ana@example.com", company: "" });
     fixture.detectChanges();
     await component.onRegister();
     fixture.detectChanges();
@@ -239,7 +237,7 @@ describe("AuthComponent registration flow", () => {
 
   it("keeps correcting a pending registration while new ones are paused", async () => {
     component.tabIndex.set(1);
-    setFlow({ kind: "register", stage: 2, mode: "correct-email", originalEmail: "old@example.com" });
+    setFlow({ kind: "register", mode: "correct-email", originalEmail: "old@example.com" });
     component.registrationsPaused.set(true);
     component.registerForm.controls.email.setValue("new@example.com");
     fixture.detectChanges();
@@ -275,11 +273,8 @@ describe("AuthComponent registration flow", () => {
 
   it("loads only the public hCaptcha sitekey for both access modes", async () => {
     component.onTabChange(1);
-    component.registerForm.controls.name.setValue("Ana García");
     component.registerForm.controls.email.setValue("ana@example.com");
-    await component.nextRegisterStep();
 
-    expect(component.registerStep()).toBe(2);
     // The existing cancellation guard now passes an AbortSignal as well as
     // the public decoder; keep the assertion aligned with that safer contract.
     expect(api.get).toHaveBeenCalledWith("/api/v1/config", undefined, jasmine.any(Function), jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
@@ -287,50 +282,21 @@ describe("AuthComponent registration flow", () => {
     expect(JSON.stringify(api.get.calls.mostRecent().returnValue)).not.toContain("HCAPTCHA_SECRET");
   });
 
-  it("requires consent and matching passwords before submitting", async () => {
+  it("requests only the email before mailbox activation", async () => {
     showRegistrationStep();
-    component.registerForm.patchValue({
-      name: "Ana García",
-      email: "ana@example.com",
-      password: "Strong-password-123!",
-      confirmPassword: "different-password",
-    });
-
+    component.registerForm.controls.email.setValue("ana@example.com");
     await component.onRegister();
-
-    expect(auth.register).not.toHaveBeenCalled();
-    expect(component.registerForm.controls.acceptTerms.hasError("required")).toBeTrue();
-    expect(component.registerForm.hasError("mismatch")).toBeTrue();
+    expect(auth.register).toHaveBeenCalledWith("ana@example.com", { captchaToken: "fresh-passcode", website: "" });
   });
 
-  it("submits the CAPTCHA and consent, then shows email verification state", async () => {
+  it("submits the CAPTCHA and email, then explains the activation step", async () => {
     showRegistrationStep();
-    component.registerForm.patchValue({
-      name: "Ana García",
-      email: "ana@example.com",
-      password: "Strong-password-123!",
-      confirmPassword: "Strong-password-123!",
-      acceptTerms: true,
-      company: "",
-    });
-
+    component.registerForm.patchValue({ email: "ANA@example.com", company: "" });
     await component.onRegister();
-
-    expect(auth.register).toHaveBeenCalledWith(
-      "Ana García",
-      "ana@example.com",
-      "Strong-password-123!",
-      {
-        captchaToken: "fresh-passcode",
-        website: "",
-        acceptTerms: true,
-        termsVersion: "2026-10-09",
-        privacyVersion: "2026-10-09",
-      },
-    );
+    expect(auth.register).toHaveBeenCalledWith("ana@example.com", { captchaToken: "fresh-passcode", website: "" });
     expect(component.step()).toBe("verify-pending");
     expect(component.verificationEmail()).toBe("ana@example.com");
-    expect(component.info()).toContain("confirmar tu email");
+    expect(component.info()).toContain("elegir tu nombre y contraseña");
   });
 
   it("does not promise a fresh day for an intent with one minute remaining", async () => {
@@ -341,8 +307,7 @@ describe("AuthComponent registration flow", () => {
     expect(await intents.confirmed()).toBeTrue();
     showRegistrationStep();
     component.registerForm.patchValue({
-      name: "Ana García", email: "ana@example.com", password: "Strong-password-123!",
-      confirmPassword: "Strong-password-123!", acceptTerms: true, company: "",
+      email: "ana@example.com", company: "",
     });
 
     await component.onRegister();
@@ -355,25 +320,27 @@ describe("AuthComponent registration flow", () => {
     expect(fixture.nativeElement.querySelector(".pending-saved-link").textContent).toContain("si sigue disponible");
   });
 
-  it("does not promise retention while the intent park is still unconfirmed", async () => {
+  it("waits for the hero cookie before submitting registration", async () => {
     const park = deferred<{ pending: true; expiresAt: string }>();
     api.post.and.returnValue(park.promise as never);
     const intents = TestBed.inject(PendingLinkIntentService);
     expect(intents.capture("B".repeat(43))).toBeTrue();
     showRegistrationStep();
     component.registerForm.patchValue({
-      name: "Ana García", email: "ana@example.com", password: "Strong-password-123!",
-      confirmPassword: "Strong-password-123!", acceptTerms: true, company: "",
+      email: "ana@example.com", company: "",
     });
 
-    await component.onRegister();
+    const registration = component.onRegister();
+    await Promise.resolve();
+    expect(auth.register).not.toHaveBeenCalled();
+    park.resolve({ pending: true, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    await registration;
     fixture.detectChanges();
 
     expect(component.step()).toBe("verify-pending");
-    expect(component.pendingLink()?.expiresAt).toBeNull();
+    expect(component.pendingLink()?.expiresAt).not.toBeNull();
     expect(component.info()).not.toContain("24 horas");
     expect(fixture.nativeElement.querySelector(".pending-saved-link").textContent).toContain("si sigue disponible");
-    park.resolve({ pending: true, expiresAt: new Date(Date.now() + 60_000).toISOString() });
     expect(await intents.confirmed()).toBeTrue();
   });
 
@@ -382,7 +349,6 @@ describe("AuthComponent registration flow", () => {
 
     component.changeRegistrationEmail();
     expect(component.changeEmailMode()).toBeTrue();
-    expect(component.registerStep()).toBe(1);
     expect(component.registerForm.controls.email.value).toBe("wrong@example.com");
 
     component.closeRegistration();
@@ -395,12 +361,9 @@ describe("AuthComponent registration flow", () => {
     expect(component.registerForm.controls.email.value).toBe("");
   });
 
-  it("corrects a browser-owned pending email despite an abandoned password mismatch", async () => {
+  it("corrects a browser-owned pending email without requesting credentials", async () => {
     component.onTabChange(1);
-    component.registerForm.patchValue({ name: "Ana García", email: "ana@example.com" });
-    await component.nextRegisterStep();
-    component.registerForm.patchValue({ password: "Strong-password-123!", confirmPassword: "different-password" });
-    expect(component.registerForm.hasError("mismatch")).toBeTrue();
+    component.registerForm.patchValue({ email: "ana@example.com" });
     component.onTabChange(0);
     fixture.detectChanges();
     component.loginForm.setValue({ email: "ana@example.com", password: "unused-password" });
@@ -411,7 +374,6 @@ describe("AuthComponent registration flow", () => {
     component.changeRegistrationEmail();
     fixture.detectChanges();
     component.registerForm.controls.email.setValue("correct@example.com");
-    await component.nextRegisterStep();
     fixture.detectChanges();
     const submit = fixture.nativeElement.querySelector('#register-panel button[type="submit"]') as HTMLButtonElement;
     expect(fixture.nativeElement.querySelector('[formControlName="password"]')).toBeNull();
@@ -426,56 +388,37 @@ describe("AuthComponent registration flow", () => {
     expect(component.verificationEmail()).toBe("correct@example.com");
   });
 
-  it("restores password matching and consent when returning from correction to new registration", async () => {
-    component.loginForm.setValue({ email: "ana@example.com", password: "unused-password" });
-    auth.login.and.rejectWith(new ApiRequestError("Revisa la solicitud", 403, undefined, undefined, "pending_registration"));
-    await component.onLogin();
+  it("keeps email validation when returning from correction to new registration", async () => {
+    setFlow({ kind: "verify-pending", email: "ana@example.com", source: "browser-registration" });
     component.changeRegistrationEmail();
-    fixture.detectChanges();
     component.registerForm.controls.email.setValue("correct@example.com");
-    await component.nextRegisterStep();
-    fixture.detectChanges();
-    expect(component.registerForm.valid).toBeTrue();
-
     component.onTabChange(1);
+    component.registerForm.controls.email.setValue("invalid");
     fixture.detectChanges();
-    component.registerForm.patchValue({ name: "Ana García", password: "short", confirmPassword: "different-password" });
-    await component.nextRegisterStep();
-    fixture.detectChanges();
-    const submit = fixture.nativeElement.querySelector('#register-panel button[type="submit"]') as HTMLButtonElement;
-    expect(fixture.nativeElement.querySelector('[formControlName="password"]')).not.toBeNull();
-    expect(component.registerForm.controls.password.hasError("minlength")).toBeTrue();
-    expect(component.registerForm.controls.acceptTerms.hasError("required")).toBeTrue();
-    expect(component.registerForm.hasError("mismatch")).toBeTrue();
-    expect(submit.disabled).toBeTrue();
+    expect(component.registerForm.invalid).toBeTrue();
     await component.onRegister();
     expect(auth.register).not.toHaveBeenCalled();
     expect(auth.changeRegistrationEmail).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('#register-panel [formControlName="password"]')).toBeNull();
   });
 
-  it("keeps the correct original email through back/next and successive corrections", async () => {
+  it("keeps the correct original email through successive corrections", async () => {
     component.onTabChange(1);
-    component.registerForm.patchValue({ name: "Ana García", email: "first@example.com" });
-    await component.nextRegisterStep();
+    component.registerForm.patchValue({ email: "first@example.com" });
     fixture.detectChanges();
-    component.registerForm.patchValue({ password: "Strong-password-123!", confirmPassword: "Strong-password-123!", acceptTerms: true });
     await component.onRegister();
     fixture.detectChanges();
 
     component.changeRegistrationEmail();
     fixture.detectChanges();
     component.registerForm.controls.email.setValue("second@example.com");
-    await component.nextRegisterStep();
-    component.previousRegisterStep();
     expect(component.registerForm.controls.email.value).toBe("second@example.com");
-    await component.nextRegisterStep();
     fixture.detectChanges();
     await component.onRegister();
     fixture.detectChanges();
     component.changeRegistrationEmail();
     fixture.detectChanges();
     component.registerForm.controls.email.setValue("third@example.com");
-    await component.nextRegisterStep();
     fixture.detectChanges();
     await component.onRegister();
     fixture.detectChanges();
@@ -530,11 +473,7 @@ describe("AuthComponent registration flow", () => {
   it("does not submit when the honeypot contains a value", async () => {
     showRegistrationStep();
     component.registerForm.patchValue({
-      name: "Bot",
       email: "bot@example.com",
-      password: "Strong-password-123!",
-      confirmPassword: "Strong-password-123!",
-      acceptTerms: true,
       company: "filled-by-bot",
     });
 
@@ -544,49 +483,13 @@ describe("AuthComponent registration flow", () => {
     expect(component.error()).toBe("No se pudo crear la cuenta");
   });
 
-  it("updates the password meter reactively and penalizes predictable passwords", () => {
-    component.registerForm.patchValue({
-      name: "Ana García",
-      email: "ana@example.com",
-      password: "password1234",
-    });
-    const weakScore = component.passwordScore();
-
-    component.registerForm.controls.password.setValue("Órbita-Mango-Cobre-47!");
-
-    expect(weakScore).toBeLessThan(40);
-    expect(component.passwordScore()).toBeGreaterThan(weakScore);
-    expect(component.passwordStrength()).toBe("Fuerte");
-    expect(component.passwordRequirements().filter((item) => item.met).length).toBe(4);
-  });
-
-  it("does not label a password containing a forbidden word strong", () => {
-    component.registerForm.patchValue({ name: "Ana", email: "ana@example.test", password: "Orbit-Login-Copper-73!" });
-    expect(component.passwordStrength()).toBe("Débil");
-    expect(component.passwordRequirements().find(item => item.label === "Sin datos personales ni patrones")?.met).toBeFalse();
-  });
-
-  it("updates password matching as confirmation changes", () => {
-    component.registerForm.controls.password.setValue("Órbita-Mango-Cobre-47!");
-    component.registerForm.controls.confirmPassword.setValue("otra-clave");
-    expect(component.passwordsMatch()).toBeFalse();
-
-    component.registerForm.controls.confirmPassword.setValue("Órbita-Mango-Cobre-47!");
-    expect(component.passwordsMatch()).toBeTrue();
-  });
-
-  it("renders a visible alert for a diverging confirmation instead of only disabling the button", () => {
-    component.tabIndex.set(1);
-    setFlow({ kind: "register", mode: "new", stage: 2 });
-    component.registerForm.controls.password.setValue("Órbita-Mango-Cobre-47!");
-    component.registerForm.controls.confirmPassword.setValue("otra-clave-distinta");
-    component.registerForm.controls.confirmPassword.markAsTouched();
-    fixture.detectChanges();
-
-    // The mismatch is a group-level error: a <mat-error> bound to the (valid)
-    // confirm control never renders, so the feedback must survive on its own.
-    const alert = fixture.nativeElement.querySelector(".alert.error") as HTMLElement | null;
-    expect(alert?.textContent ?? "").toContain("Las contraseñas no coinciden");
+  it("renders an email-only request without credentials or consent", () => {
+    showRegistrationStep();
+    expect(fixture.nativeElement.querySelector('#register-panel [formControlName="email"]')).not.toBeNull();
+    for (const name of ["name", "password", "confirmPassword", "acceptTerms"]) {
+      expect(fixture.nativeElement.querySelector('#register-panel [formControlName="' + name + '"]')).toBeNull();
+    }
+    expect(fixture.nativeElement.textContent).toContain("Al abrir el correo elegirás tu nombre y contraseña");
   });
 
   it("executes invisible hCaptcha at submit time and sends its fresh login token", async () => {
@@ -1177,8 +1080,7 @@ describe("AuthComponent registration flow", () => {
     auth.register.and.returnValue(response.promise);
     showRegistrationStep();
     component.registerForm.setValue({
-      name: "Ana García", email: "ana@example.com", password: "Strong-password-123!",
-      confirmPassword: "Strong-password-123!", acceptTerms: true, company: "",
+      email: "ana@example.com", company: "",
     });
 
     const registration = component.onRegister();
@@ -1211,7 +1113,6 @@ describe("AuthComponent registration flow", () => {
     const intents = TestBed.inject(PendingLinkIntentService);
     intents.capture("a".repeat(43), new Date(Date.now() + 60_000).toISOString());
     fixture.detectChanges();
-
 
     expect(fixture.nativeElement.textContent).toContain("Continúa con tu URL");
     expect(fixture.nativeElement.textContent).toContain("Accede para retomar el enlace");

@@ -13,14 +13,18 @@ use App\Support\Ids;
 use App\Support\MailAdmissionException;
 use App\Support\PasswordStrength;
 use App\Support\RegistrationEdit;
+use App\Support\RegistrationLinkHandoff;
 use App\Support\UvhMail;
+use Closure;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
  * Registration and mailbox activation own their complete SQL admission.
- * Callers validate request shape, legal versions and anti-abuse requirements;
+ * Callers validate email and anti-abuse requirements at request time and
+ * identity, credentials and legal versions at activation time;
  * this service keeps identity, bearer, workspace, consent and audit in one
  * commit. It does not issue sessions or decide HTTP/cookie responses.
  */
@@ -36,12 +40,12 @@ final class RegistrationAdmission
      *
      * @return RegistrationAttempt The browser context, for every outcome.
      */
-    public static function start(string $email): RegistrationAttempt
+    public static function start(string $email, ?Request $request = null): RegistrationAttempt
     {
         $token = Ids::randomToken(32);
         $tokenHash = Ids::sha256Hex($token);
 
-        return DB::transaction(function () use ($email, $token, $tokenHash): RegistrationAttempt {
+        return DB::transaction(function () use ($email, $token, $tokenHash, $request): RegistrationAttempt {
             $attempt = RegistrationAttempt::create(['email' => $email, 'expires_at' => RegistrationEdit::deadline()]);
             EmailAddressLock::acquire($email);
             $reserved = EmailChangeRequest::whereRaw('lower(new_email) = ?', [$email])
@@ -82,6 +86,10 @@ final class RegistrationAdmission
                 'legacy_security_version' => 1,
             ]);
 
+            if ($request !== null) {
+                RegistrationLinkHandoff::capture($pending, $request);
+            }
+
             EmailToken::create([
                 'id' => $tokenHash,
                 'pending_registration_id' => (int) $pending->id,
@@ -97,8 +105,6 @@ final class RegistrationAdmission
             }
 
             Audit::write(null, 'auth.register', 'pending_registration', (string) $pending->id);
-            Audit::write(null, 'auth.terms_accepted', 'consent', self::TERMS_VERSION);
-            Audit::write(null, 'auth.privacy_notice_acknowledged', 'privacy_notice', self::PRIVACY_VERSION);
 
             return $attempt;
         });
@@ -109,9 +115,11 @@ final class RegistrationAdmission
      * acceptance against the versions above. Live identity strength and all
      * bearer/account state are revalidated under lock. Null means an invalid
      * bearer; -1 means a password rejected against its live mailbox/name;
-     * a positive id means activation committed. No session is created here.
+     * a positive id means activation committed. The optional callback adds
+     * session and hero admission to that same commit, only for a new account.
      */
-    public static function activate(string $token, string $password, string $name): ?int
+    /** @param null|Closure(User, PendingRegistration): void $onCreated */
+    public static function activate(string $token, string $password, string $name, ?Closure $onCreated = null): ?int
     {
         $passwordHash = Hash::make($password);
         $tokenHash = Ids::sha256Hex($token);
@@ -123,7 +131,7 @@ final class RegistrationAdmission
         // closed.
         $userId = null;
         if ($snapshot && $snapshot->pending_registration_id) {
-            $userId = DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name): ?int {
+            $userId = DB::transaction(function () use ($snapshot, $tokenHash, $passwordHash, $password, $name, $onCreated): ?int {
                 RegistrationAttemptContext::lockForPending((int) $snapshot->pending_registration_id);
                 $pending = PendingRegistration::where('id', $snapshot->pending_registration_id)->lockForUpdate()->first();
                 $row = EmailToken::where('id', $tokenHash)
@@ -187,6 +195,9 @@ final class RegistrationAdmission
                 // was kept, so nothing provisional survives either: the pending row
                 // and every bearer it still had die with it, in one cascade.
                 self::acceptRegistrationLegal((int) $user->id, $now);
+                if ($onCreated !== null) {
+                    $onCreated($user, $pending);
+                }
                 $pending->delete();
 
                 return (int) $user->id;

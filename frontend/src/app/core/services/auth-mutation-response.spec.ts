@@ -12,8 +12,8 @@ describe("account mutation confirmation contracts", () => {
 
   const actions = [
     { name: "register", path: "/api/v1/auth/register", success: { user: null }, authenticated: false,
-      invoke: (service: AuthService) => service.register("Owner", "owner@example.test", "fixture-password", {
-        captchaToken: "fixture-token", acceptTerms: true, termsVersion: "fixture", privacyVersion: "fixture",
+      invoke: (service: AuthService) => service.register("owner@example.test", {
+        captchaToken: "fixture-token",
       }) },
     { name: "correct registration email", path: "/api/v1/auth/change-registration-email", success: { ok: true }, authenticated: false,
       invoke: (service: AuthService) => service.changeRegistrationEmail("old@example.test", "new@example.test", { captchaToken: "fixture-token" }) },

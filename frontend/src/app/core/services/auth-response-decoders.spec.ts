@@ -2,6 +2,7 @@ import {
   decodeAccountDeletionImpact,
   decodeAccountDeletionRequest,
   decodeAuthUserResponse,
+  decodeRegistrationActivation,
   decodeDataExportHistoryResponse,
   decodeDataExportStatusResponse,
   decodeLoginOutcome,
@@ -31,6 +32,13 @@ const user = {
 };
 
 describe("authentication response decoders", () => {
+  it("requires a consistent registration session without bypassing MFA", () => {
+    const activation = { ok: true as const, newAccount: true, authenticated: true, user: { ...user, mfaEnabled: false }, pendingLink: true };
+    expect(decodeRegistrationActivation(activation)).toEqual(activation);
+    for (const invalid of [{ ok: true }, { ...activation, user }, { ...activation, user: null }, { ...activation, newAccount: false }, { ...activation, pendingLink: "true" }]) {
+      expect(() => decodeRegistrationActivation(invalid)).toThrow();
+    }
+  });
   it("accepts and reconstructs a valid authenticated identity", () => {
     expect(decodeAuthUserResponse({ user, ignored: "not-published" })).toEqual({ user });
     expect(decodeLoginResponse({ user })).toEqual({ mfaRequired: false, user });

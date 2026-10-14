@@ -2,7 +2,8 @@ import { afterNextRender, Component, computed, DestroyRef, ElementRef, inject, I
 import { DOCUMENT, Location } from "@angular/common";
 
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
-import { ActivatedRoute, RouterLink } from "@angular/router";
+import { toSignal } from "@angular/core/rxjs-interop";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -16,20 +17,17 @@ import { PendingLinkIntentService } from "../core/services/pending-link-intent.s
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { authBearer } from "./auth-bearer";
 import { LatestRequest } from "../core/services/latest-request";
-import { decodePublicActionAcknowledgement } from "../core/services/public-action-response-decoders";
+import { decodeRegistrationActivation } from "../core/services/auth-response-decoders";
+import { AuthService } from "../core/services/auth.service";
+import { assessPassword, passwordStrengthLabel } from "./password-policy";
 
 /**
  * Activation of a pending registration: the email bearer plus the identity,
  * legal acceptance and password typed here, which become the account's own.
  *
- * Nothing provisional survives the activation. The password is never taken
- * from the pending registration, and neither are the name or the contractual
- * acceptance: any anonymous registration writes all three, so honouring them
- * would be the pre-hijack —the attacker registers the victim's address and
- * waits for the click— extended to identity. Whoever opens the mailbox decides
- * the definitive name, accepts the current legal versions explicitly and
- * chooses the password; the workspace generated from the attacker's name is
- * renamed by the backend along the way.
+ * The initial request only supplies an email. Whoever opens its mailbox link
+ * chooses the name and password and accepts the current legal versions here.
+ * No identity, credential or workspace is inherited from an anonymous request.
  */
 @Component({
   selector: "app-verify-email",
@@ -38,14 +36,14 @@ import { decodePublicActionAcknowledgement } from "../core/services/public-actio
   template: `
     <app-auth-shell>
       <div class="card center" aria-labelledby="verify-email-title">
-        <span class="step-kicker">VERIFICACIÓN DE EMAIL</span>
+        <span class="step-kicker">COMPLETAR REGISTRO</span>
         @if (busy()) {
           <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
         }
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="failed() || ((!token || linkRejected()) && done())">
           {{ ok() ? 'verified_user' : (failed() || !token || linkRejected() ? 'error_outline' : 'mark_email_read') }}
         </mat-icon>
-        <h2 id="verify-email-title">{{ ok() ? 'Email verificado' : (!token || linkRejected() ? 'Enlace no disponible' : 'Confirmar email') }}</h2>
+        <h2 id="verify-email-title">{{ ok() ? (newAccount() ? 'Cuenta creada correctamente' : 'Email verificado') : (!token || linkRejected() ? 'Enlace no disponible' : 'Completa tu registro') }}</h2>
         <p class="sub" [attr.role]="failed() ? 'alert' : 'status'">{{ message() }}</p>
         @if (token && !ok() && !linkRejected()) {
           <form #actionForm class="form" [formGroup]="form" (ngSubmit)="verify()" [attr.aria-busy]="busy()">
@@ -61,31 +59,38 @@ import { decodePublicActionAcknowledgement } from "../core/services/public-actio
               <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
                 <mat-icon>{{ hide() ? 'visibility_off' : 'visibility' }}</mat-icon>
               </button>
-              <mat-hint>Es la contraseña definitiva de tu cuenta. Si ya elegiste una al registrarte, puedes repetirla.</mat-hint>
+              <mat-hint>Elige la contraseña con la que iniciarás sesión. Entre 10 y 72 caracteres.</mat-hint>
               @if (form.controls.password.invalid && form.controls.password.touched) { <mat-error>Utiliza entre 10 y 72 caracteres.</mat-error> }
             </mat-form-field>
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>Repite la contraseña</mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
             </mat-form-field>
+            @if (passwordValue()) {
+              <p class="sub" role="status">Fortaleza estimada: {{ passwordStrength() }}. {{ passwordAssessment().feedback }}</p>
+            }
             @if (form.hasError('mismatch') && form.controls.confirm.touched) {
               <div class="alert error" role="alert">Las contraseñas no coinciden. Revisa el segundo campo.</div>
             }
             <mat-checkbox formControlName="acceptTerms" color="primary">
-              Acepto los Términos de servicio y la Política de privacidad vigentes
+              Acepto los <a routerLink="/legal/terminos" target="_blank" rel="noopener" (click)="$event.stopPropagation()">Términos de servicio</a> y confirmo que he leído la <a routerLink="/legal/privacidad" target="_blank" rel="noopener" (click)="$event.stopPropagation()">Política de privacidad</a> vigentes
             </mat-checkbox>
             @if (form.controls.acceptTerms.hasError('required') && form.controls.acceptTerms.touched) {
               <div class="alert error" role="alert">Debes aceptar los términos vigentes para activar la cuenta.</div>
             }
             <button #submitButton mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()">
-              {{ busy() ? 'Confirmando…' : (attempted() ? 'Volver a intentarlo' : 'Confirmar mi email') }}
+              {{ busy() ? 'Creando cuenta…' : (attempted() ? 'Volver a intentarlo' : 'Crear mi cuenta') }}
             </button>
           </form>
         }
         @if (done() && ok()) {
-          <a #nextLink mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">
-            {{ pendingLink() ? 'Iniciar sesión y crear mi enlace' : (pendingInvitation() ? 'Iniciar sesión y revisar invitación' : 'Iniciar sesión') }}
-          </a>
+          @if (signedIn()) {
+            <a #nextLink mat-flat-button color="primary" [routerLink]="continueTo()">{{ hasPendingLink() ? 'Continuar con mi enlace' : (pendingInvitation() ? 'Revisar invitación' : 'Ir al panel') }}</a>
+          } @else if (auth.authenticated()) {
+            <button mat-flat-button color="primary" type="button" (click)="switchAccount()" [disabled]="busy()">Cerrar la sesión actual y entrar con mi cuenta nueva</button>
+          } @else {
+            <a #nextLink mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">Iniciar sesión</a>
+          }
         } @else if (!token || linkRejected()) {
           <a #nextLink mat-flat-button color="primary" routerLink="/auth" [queryParams]="{ mode: 'register' }">Solicitar otro enlace</a>
         }
@@ -97,6 +102,8 @@ import { decodePublicActionAcknowledgement } from "../core/services/public-actio
 })
 export class VerifyEmailComponent {
   private fb = inject(FormBuilder);
+  readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private intents = inject(PendingLinkIntentService);
@@ -116,11 +123,16 @@ export class VerifyEmailComponent {
   readonly failed = signal(false);
   readonly linkRejected = signal(false);
   readonly hide = signal(true);
-  readonly message = signal("Confirma que tú creaste esta cuenta y elige su identidad y contraseña. Si no reconoces este registro, no continúes.");
+  readonly newAccount = signal(false);
+  readonly signedIn = signal(false);
+  private readonly transferredLink = signal(false);
+  readonly message = signal("Elige tu nombre y contraseña para crear la cuenta y confirmar tu email. Si no solicitaste este registro, no continúes.");
   readonly pendingLink = this.intents.pending;
   readonly pendingInvitation = this.invitations.pending;
   readonly token: string;
-  readonly loginQueryParams = computed(() => this.pendingLink()
+  readonly hasPendingLink = computed(() => this.transferredLink() || !!this.pendingLink());
+  readonly continueTo = computed(() => this.hasPendingLink() ? "/app/links" : (this.pendingInvitation() ? "/invitations/accept" : "/app"));
+  readonly loginQueryParams = computed(() => this.hasPendingLink()
     ? { returnTo: "/app/links" }
     : (this.pendingInvitation() ? { returnTo: "/invitations/accept" } : {}));
 
@@ -133,6 +145,11 @@ export class VerifyEmailComponent {
     },
     { validators: (g) => (g.get("password")?.value === g.get("confirm")?.value ? null : { mismatch: true }) },
   );
+
+  readonly passwordValue = toSignal(this.form.controls.password.valueChanges, { initialValue: "" });
+  private readonly nameValue = toSignal(this.form.controls.name.valueChanges, { initialValue: "" });
+  readonly passwordAssessment = computed(() => assessPassword(this.passwordValue(), this.nameValue()));
+  readonly passwordStrength = computed(() => passwordStrengthLabel(this.passwordAssessment().score));
 
   constructor() {
     this.token = authBearer(this.route);
@@ -147,6 +164,7 @@ export class VerifyEmailComponent {
     if (!this.token || this.busy() || this.ok() || this.linkRejected() || this.form.invalid) return;
     const ownedFocus = this.actionForm()?.nativeElement.contains(this.document.activeElement) ?? false;
     const request = this.requests.begin(this.token);
+    const generation = this.auth.sessionGeneration();
     this.busy.set(true);
     this.attempted.set(true);
     this.failed.set(false);
@@ -155,24 +173,33 @@ export class VerifyEmailComponent {
       // installs them at activation and re-stamps the acceptance with this
       // request's timestamp, so nothing the anonymous registration proposed
       // becomes definitive.
-      await this.api.post("/api/v1/auth/verify-email", {
+      const activation = await this.api.post("/api/v1/auth/verify-email", {
         token: this.token,
         password: this.form.controls.password.value,
         name: this.form.controls.name.value.trim(),
         acceptTerms: true,
         termsVersion: TERMS_VERSION,
         privacyVersion: PRIVACY_VERSION,
-      }, decodePublicActionAcknowledgement);
+      }, decodeRegistrationActivation);
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
       this.done.set(true);
+      this.newAccount.set(activation.newAccount);
+      this.transferredLink.set(activation.pendingLink);
       this.form.reset();
+      if (activation.authenticated && activation.user) {
+        const adopted = await this.auth.acceptRegistrationSession(activation.user, generation);
+        if (!this.requests.isCurrent(request, this.token)) return;
+        if (adopted && activation.pendingLink) {
+          await this.intents.refresh();
+          if (!this.requests.isCurrent(request, this.token)) return;
+        }
+        this.signedIn.set(adopted);
+      }
       this.message.set(
-        this.pendingLink()
-          ? "Tu email quedó confirmado. Inicia sesión para crear el enlace que has guardado."
-          : this.pendingInvitation()
-            ? "Tu email quedó confirmado. Inicia sesión para revisar la invitación pendiente."
-            : "Tu email quedó confirmado. Ya puedes iniciar sesión y crear enlaces.",
+        this.signedIn()
+          ? (this.hasPendingLink() ? "Tu cuenta y tu sesión están listas. Continúa para revisar y crear el enlace que has guardado." : "Tu cuenta y tu sesión están listas. Ya puedes entrar al panel.")
+          : (this.auth.authenticated() ? "La cuenta está lista. Este navegador tiene otra cuenta abierta; puedes cerrar esa sesión para entrar con la nueva." : "Tu email quedó confirmado. Inicia sesión para continuar con tu cuenta."),
       );
     } catch (err) {
       if (!this.requests.isCurrent(request, this.token)) return;
@@ -191,6 +218,19 @@ export class VerifyEmailComponent {
           }, { injector: this.injector });
         }
       }
+    }
+  }
+
+  async switchAccount(): Promise<void> {
+    if (this.busy() || !this.ok()) return;
+    this.busy.set(true);
+    try {
+      await this.auth.logout();
+      await this.router.navigate(["/auth"], { queryParams: this.loginQueryParams() });
+    } catch {
+      this.message.set("No se pudo cerrar la sesión actual. Inténtalo de nuevo.");
+    } finally {
+      this.busy.set(false);
     }
   }
 }

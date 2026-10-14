@@ -119,7 +119,7 @@ final class EmailActivationAdmissionTest extends TestCase
     }
 
     #[DataProvider('accountKinds')]
-    public function test_activation_establishes_one_identity_without_opening_a_session(bool $legacy): void
+    public function test_activation_creates_a_session_only_for_new_accounts(bool $legacy): void
     {
         [$owner, $payload] = $this->fixture($legacy);
         if ($legacy) {
@@ -128,7 +128,7 @@ final class EmailActivationAdmissionTest extends TestCase
         $otherToken = Ids::randomToken(32);
         DB::table('email_tokens')->insert(['id' => Ids::sha256Hex($otherToken), $legacy ? 'user_id' : 'pending_registration_id' => $owner->id, 'kind' => 'verify', 'expires_at' => now()->addHour(), 'created_at' => now()]);
 
-        $response = $this->postJson('/api/v1/auth/verify-email', $payload)->assertOk()->assertExactJson(['ok' => true]);
+        $response = $this->postJson('/api/v1/auth/verify-email', $payload)->assertOk()->assertJson(['ok' => true, 'newAccount' => ! $legacy, 'authenticated' => ! $legacy]);
         $user = User::where('email', 'activation@example.test')->firstOrFail();
         $this->assertSame('Mailbox Owner', $user->name);
         $this->assertTrue(Hash::check($payload['password'], $user->password_hash));
@@ -143,8 +143,8 @@ final class EmailActivationAdmissionTest extends TestCase
         foreach (['terms', 'privacy_notice'] as $type) {
             $this->assertDatabaseHas('legal_acceptances', ['user_id' => $user->id, 'document_type' => $type, 'version' => '2026-10-09', 'source' => 'registration']);
         }
-        $this->assertDatabaseCount('sessions', 0);
-        $this->assertCount(0, collect($response->headers->getCookies())->filter(static fn ($cookie) => in_array($cookie->getName(), ['uvh_session', 'uvh_mfa_challenge'], true)));
+        $this->assertDatabaseCount('sessions', $legacy ? 0 : 1);
+        $this->assertCount($legacy ? 0 : 1, collect($response->headers->getCookies())->filter(static fn ($cookie) => in_array($cookie->getName(), ['uvh_session', 'uvh_mfa_challenge'], true)));
         $this->postJson('/api/v1/auth/verify-email', $payload)->assertStatus(400);
         $this->postJson('/api/v1/auth/verify-email', [...$payload, 'token' => $otherToken])->assertStatus(400);
         $this->assertDatabaseCount('users', 1);

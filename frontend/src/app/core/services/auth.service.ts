@@ -318,6 +318,18 @@ export class AuthService {
     }
   }
 
+  /** Adopt only the activation response that still owns this browser's identity. */
+  async acceptRegistrationSession(user: AuthUser, expectedGeneration: number): Promise<boolean> {
+    if (!this.isCurrent(expectedGeneration) || (this.user() !== null && this.user()?.id !== user.id)) return false;
+    const generation = this.nextGeneration();
+    this.clearLocalAuth();
+    this.publishUser(user);
+    this.loaded.set(true);
+    this.probeSettled.set(true);
+    await this.refreshWorkspaces(generation);
+    return this.isCurrent(generation) && this.user()?.id === user.id;
+  }
+
   async verifyMfa(challenge: string, code: string): Promise<void> {
     const generation = this.nextGeneration();
     const res = await this.entry.verifyMfa(challenge, code);
@@ -345,18 +357,13 @@ export class AuthService {
    * never creates a session. The UI then shows the "check your email" step.
    */
   async register(
-    name: string,
     email: string,
-    password: string,
     antiBot: {
       captchaToken: string;
       website?: string;
-      acceptTerms: boolean;
-      termsVersion: string;
-      privacyVersion: string;
     },
   ): Promise<void> {
-    await this.registration.register(name, email, password, antiBot);
+    await this.registration.register(email, antiBot);
   }
 
   async resendVerification(email: string | undefined, captchaToken: string): Promise<void> {

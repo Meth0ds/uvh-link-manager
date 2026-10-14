@@ -310,8 +310,8 @@ describe("Mutation intent across CSRF waits", () => {
   it("allows anonymous registration and its generic decoded response", fakeAsync(() => {
     auth.user.set(null);
     let failure: unknown;
-    void auth.register("User", "user@example.test", "fixture-password", {
-      captchaToken: "fixture-captcha", acceptTerms: true, termsVersion: "v1", privacyVersion: "v1",
+    void auth.register("user@example.test", {
+      captchaToken: "fixture-captcha",
     }).catch((error: unknown) => { failure = error; });
     cookie = "uvh_csrf=anonymous";
     http.expectOne("/api/v1/csrf").flush({ csrfToken: "anonymous" });

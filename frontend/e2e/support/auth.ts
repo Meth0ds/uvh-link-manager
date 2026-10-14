@@ -6,18 +6,14 @@ export const E2E_PASSWORD = "Glass-Falcon_Orbit-742!";
 export async function registerFromBrowser(
   page: Page,
   email: string,
-  name = "Persona E2E",
-  password = E2E_PASSWORD,
 ): Promise<void> {
   await page.goto("/auth?mode=register");
   await expect(page.getByRole("heading", { name: "Crea tu cuenta en UVH" })).toBeVisible();
-  await page.getByLabel("Nombre completo").fill(name);
+  await expect(page.getByLabel("Nombre completo")).toHaveCount(0);
+  await expect(page.getByLabel("Contraseña", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
   await page.getByLabel("Email").fill(email);
-  await page.getByRole("button", { name: "Continuar" }).click();
-  await page.getByLabel("Contraseña", { exact: true }).fill(password);
-  await page.getByLabel("Repite la contraseña").fill(password);
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Crear cuenta" }).click();
+  await page.getByRole("button", { name: "Enviar enlace de registro" }).click();
   await expect(page.getByRole("heading", { name: "Confirma tu email" })).toBeVisible();
 }
 
@@ -56,9 +52,9 @@ export async function registerVerifyAndLogin(
   await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
   await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Confirmar mi email" }).click();
-  await expect(page.getByRole("heading", { name: "Email verificado" })).toBeVisible();
-  await loginFromBrowser(page, email);
+  await page.getByRole("button", { name: "Crear mi cuenta" }).click();
+  await expect(page.getByRole("heading", { name: "Cuenta creada correctamente" })).toBeVisible();
+  await page.getByRole("link", { name: "Ir al panel" }).click();
   await expect(page).toHaveURL(/\/app\/(dashboard|getting-started)$/);
   return { email, verificationUrl };
 }

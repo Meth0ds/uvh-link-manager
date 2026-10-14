@@ -23,8 +23,10 @@ describe("email action response contracts", () => {
 
   function setup(action: Action): void {
     http = jasmine.createSpyObj<HttpClient>("HttpClient", ["get", "post"]);
-    auth = jasmine.createSpyObj<AuthService>("AuthService", ["sessionGeneration", "accountSignedOut"]);
+    auth = jasmine.createSpyObj<AuthService>("AuthService", ["sessionGeneration", "accountSignedOut", "acceptRegistrationSession", "logout"]);
     auth.sessionGeneration.and.returnValue(7);
+    Object.assign(auth, { authenticated: signal(false) });
+    auth.acceptRegistrationSession.and.resolveTo(true);
     TestBed.configureTestingModule({
       imports: [VerifyEmailComponent, ResetPasswordComponent, ConfirmEmailChangeComponent],
       providers: [FormBuilder, provideRouter([]),
@@ -33,7 +35,7 @@ describe("email action response contracts", () => {
         { provide: ActivatedRoute, useValue: { snapshot: { fragment: `token=${"t".repeat(43)}`, queryParamMap: { get: () => null } } } },
         { provide: Location, useValue: { replaceState: jasmine.createSpy("replaceState") } },
         { provide: PendingInvitationService, useValue: { pending: signal(false) } },
-        { provide: PendingLinkIntentService, useValue: { pending: signal(null) } },
+        { provide: PendingLinkIntentService, useValue: { pending: signal(null), refresh: jasmine.createSpy("refresh").and.resolveTo() } },
       ],
     });
     spyOnProperty(document, "cookie", "get").and.returnValue("uvh_csrf=fixture");
@@ -70,7 +72,7 @@ describe("email action response contracts", () => {
 
     it(`${action} can deliberately retry after a transient failure`, async () => {
       setup(action);
-      http.post.and.returnValues(throwError(() => new HttpErrorResponse({ status: 503, error: { error: "Temporal" } })), of(action === "verify" ? { ok: true } : { ok: true, current: false }));
+      http.post.and.returnValues(throwError(() => new HttpErrorResponse({ status: 503, error: { error: "Temporal" } })), of(action === "verify" ? { ok: true, authenticated: false, newAccount: false, user: null, pendingLink: false } : { ok: true, current: false }));
       await perform();
       expect(succeeded()).toBeFalse();
       await perform();
@@ -80,14 +82,58 @@ describe("email action response contracts", () => {
     });
   }
 
+  it("activation explains password strength and offers the legal documents", () => {
+    setup("verify");
+    const activation = component as VerifyEmailComponent;
+    activation.form.controls.password.setValue("password1234");
+    expect(activation.passwordStrength()).toBe("Débil");
+    activation.form.controls.password.setValue("Órbita-Mango-Cobre-47!");
+    expect(activation.passwordStrength()).toBe("Fuerte");
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/legal/terminos"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/legal/privacidad"]')).not.toBeNull();
+  });
+
   it("activation confirms success without authenticating or clearing another identity", async () => {
     setup("verify");
-    http.post.and.returnValue(of({ ok: true }));
+    http.post.and.returnValue(of({ ok: true, authenticated: false, newAccount: false, user: null, pendingLink: false }));
     await perform();
     expect(succeeded()).toBeTrue();
     expect(auth.accountSignedOut).not.toHaveBeenCalled();
     await perform();
     expect(http.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a panel button after adopting a new registration session", async () => {
+    setup("verify");
+    const user = { id: 3, email: "owner@example.test", name: "Owner", isAdmin: false, emailVerified: true, mfaEnabled: false };
+    http.post.and.returnValue(of({ ok: true, authenticated: true, newAccount: true, user, pendingLink: false }));
+    await perform();
+    fixture.detectChanges();
+    expect(auth.acceptRegistrationSession).toHaveBeenCalledOnceWith(user, 7);
+    expect(fixture.nativeElement.textContent).toContain("Cuenta creada correctamente");
+    expect(fixture.nativeElement.querySelector('a[href="/app"]')?.textContent).toContain("Ir al panel");
+  });
+
+  it("restores the hero before offering its continuation button", async () => {
+    setup("verify");
+    const user = { id: 3, email: "owner@example.test", name: "Owner", isAdmin: false, emailVerified: true, mfaEnabled: false };
+    http.post.and.returnValue(of({ ok: true, authenticated: true, newAccount: true, user, pendingLink: true }));
+    await perform();
+    fixture.detectChanges();
+    expect(TestBed.inject(PendingLinkIntentService).refresh).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.querySelector('a[href="/app/links"]')?.textContent).toContain("Continuar con mi enlace");
+  });
+
+  it("preserves an existing account until the visitor explicitly switches", async () => {
+    setup("verify");
+    Object.assign(auth, { authenticated: signal(true) });
+    http.post.and.returnValue(of({ ok: true, authenticated: false, newAccount: true, user: null, pendingLink: true }));
+    await perform();
+    fixture.detectChanges();
+    expect(auth.acceptRegistrationSession).not.toHaveBeenCalled();
+    expect(auth.logout).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain("Cerrar la sesión actual");
   });
 
   for (const action of ["reset", "email"] as const) {

@@ -10,6 +10,25 @@ export function decodeRegistrationResponse(value: unknown): { user: null } {
   return { user: null };
 }
 
+export interface RegistrationActivation {
+  ok: true;
+  newAccount: boolean;
+  authenticated: boolean;
+  user: AuthUser | null;
+  pendingLink: boolean;
+}
+
+export function decodeRegistrationActivation(value: unknown): RegistrationActivation {
+  const source = record(value, "registration activation");
+  if (source["ok"] !== true) invalid("registration activation");
+  const authenticated = boolean(source["authenticated"], "registration activation");
+  const newAccount = boolean(source["newAccount"], "registration activation");
+  const user = authenticated ? authUser(source["user"]) : null;
+  if ((!authenticated && source["user"] !== null)
+    || (authenticated && (!newAccount || !user?.emailVerified || user.mfaEnabled))) invalid("registration activation");
+  return { ok: true, newAccount, authenticated, user, pendingLink: boolean(source["pendingLink"], "registration activation") };
+}
+
 const WORKSPACE_ROLES = new Set<WorkspaceRole>(["owner", "admin", "editor", "viewer"]);
 const EXPORT_STATUSES = new Set<DataExportStatus["status"]>(["processing", "ready", "downloaded", "failed", "cancelled", "expired"]);
 const EXPORT_FAILURES = new Set<DataExportFailureReason>(["automated_size_limit", "generation_error", "stalled"]);

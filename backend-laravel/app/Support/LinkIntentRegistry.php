@@ -52,6 +52,7 @@ class LinkIntentRegistry
 
     public static function forget(string $intentHash): void
     {
+        DB::table('registration_link_handoffs')->where('intent_hash', $intentHash)->delete();
         DB::table('link_intent_claims')->where('intent_hash', $intentHash)->delete();
     }
 
@@ -137,6 +138,8 @@ class LinkIntentRegistry
 
     public static function purgeExpired(): int
     {
+        DB::table('registration_link_handoffs')->where('expires_at', '<=', now())->delete();
+
         return DB::table('link_intent_claims')->where('expires_at', '<=', now())->delete();
     }
 

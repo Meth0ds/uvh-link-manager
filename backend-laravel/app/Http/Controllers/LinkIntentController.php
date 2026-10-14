@@ -7,6 +7,7 @@ use App\Support\LinkIntentLifetime;
 use App\Support\LinkIntentRegistry;
 use App\Support\OperationalMetrics;
 use App\Support\PendingHandoff;
+use App\Support\RegistrationLinkHandoff;
 use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use Illuminate\Http\Request;
@@ -118,6 +119,9 @@ class LinkIntentController
 
         try {
             $record = $this->withLock($intent, function () use ($intent, $user): ?array {
+                if (! RegistrationLinkHandoff::permits(Ids::sha256Hex($intent), $user)) {
+                    return null;
+                }
                 $record = Cache::get($this->cacheKey($intent));
                 if (! $this->validRecord($record)) {
                     return null;

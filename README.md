@@ -116,6 +116,15 @@ El perfil `laravel` levanta la API en `http://127.0.0.1:8000`, el worker
 (`queue:work` sobre las colas `mail,webhooks,domains,exports,analytics`) y el
 scheduler. Angular sirve el panel en `http://127.0.0.1:4200`.
 
+El registro comienza únicamente con el email y la comprobación antiabuso.
+El correo permite completar la cuenta: nombre, contraseña y aceptación de los
+términos se eligen una sola vez al abrir su enlace. Hasta completar ese paso
+no existe una cuenta ni una sesión. Al completar una cuenta nueva se abre su
+sesión y se muestra un botón para ir al panel. Si se preparó una URL en el hero,
+el botón permite retomarla incluso al abrir el correo en otro dispositivo;
+su caducidad original se mantiene y el enlace no se publica automáticamente.
+Una sesión existente de otra cuenta se conserva hasta elegir cambiar de cuenta.
+
 Los ejecutables nativos `dist/uvh-control-windows-x64.exe`,
 `dist/uvh-control-macos-arm64` y `dist/uvh-control-linux-x64` (doble clic o
 terminal) abren un panel Angular Material independiente con identidad UVH,

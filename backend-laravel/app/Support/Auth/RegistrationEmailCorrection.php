@@ -12,6 +12,7 @@ use App\Support\FrontendUrl;
 use App\Support\Ids;
 use App\Support\MailAdmissionException;
 use App\Support\RegistrationEdit;
+use App\Support\RegistrationLinkHandoff;
 use App\Support\UvhMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +66,7 @@ final class RegistrationEmailCorrection
                 'legacy_consumed_at' => now(),
             ]);
             if (! $taken && $pending) {
+                RegistrationLinkHandoff::capture($pending, $request);
                 EmailToken::where('pending_registration_id', $pending->id)->where('kind', 'verify')->whereNull('used_at')->delete();
                 EmailToken::create(['id' => $tokenHash, 'pending_registration_id' => $pending->id, 'kind' => 'verify', 'expires_at' => now()->addDay()]);
             }

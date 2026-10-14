@@ -46,6 +46,7 @@ function sharedProviders(api: jasmine.SpyObj<ApiService>, fragment: string | nul
   return [
     FormBuilder,
     provideRouter([]),
+    { provide: AuthService, useValue: { sessionGeneration: () => 0, authenticated: signal(false) } },
     { provide: ApiService, useValue: api },
     { provide: ActivatedRoute, useValue: route(fragment) },
     { provide: Location, useValue: { replaceState: jasmine.createSpy("replaceState") } },
@@ -100,7 +101,7 @@ describe("public auth views async safety", () => {
     const fixture = TestBed.createComponent(VerifyEmailComponent);
     fixture.detectChanges();
     expect(api.post).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.textContent).toContain("Confirmar mi email");
+    expect(fixture.nativeElement.textContent).toContain("Crear mi cuenta");
     expect(fixture.nativeElement.textContent).not.toContain(TOKEN);
   });
 

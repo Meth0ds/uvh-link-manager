@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\EqualizesPublicMailDuration;
 use App\Http\Controllers\Concerns\ValidatesAuthInput;
 use App\Models\PendingRegistration;
+use App\Models\User;
 use App\Support\Audit;
 use App\Support\Auth\AuthAccountLookup;
 use App\Support\Auth\RegistrationAdmission;
@@ -13,8 +14,11 @@ use App\Support\Auth\RegistrationEmailCorrection;
 use App\Support\Auth\VerificationResend;
 use App\Support\MailAdmissionException;
 use App\Support\PasswordStrength;
+use App\Support\PendingHandoff;
 use App\Support\RegistrationEdit;
 use App\Support\RegistrationGate;
+use App\Support\RegistrationLinkHandoff;
+use App\Support\SessionManager;
 use App\Support\UvhRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -29,25 +33,11 @@ final class RegistrationController
     public function register(Request $request): JsonResponse
     {
         $email = trim(UvhRequest::inputString($request, 'email'));
-        $name = trim(UvhRequest::inputString($request, 'name'));
-        $password = UvhRequest::inputString($request, 'password');
         $captchaToken = UvhRequest::inputString($request, 'captchaToken');
         $honeypot = trim(UvhRequest::inputString($request, 'website'));
-        $termsVersion = UvhRequest::inputString($request, 'termsVersion');
-        $privacyVersion = UvhRequest::inputString($request, 'privacyVersion');
-        $acceptTerms = $request->boolean('acceptTerms');
 
-        if (! $this->validName($name) || ! $this->validEmail($email) || ! $this->validPassword($password)
-            || ! $acceptTerms || ! hash_equals(RegistrationAdmission::TERMS_VERSION, $termsVersion)
-            || ! hash_equals(RegistrationAdmission::PRIVACY_VERSION, $privacyVersion)
-            || $honeypot !== '') {
+        if (! $this->validEmail($email) || $honeypot !== '') {
             return response()->json(['error' => 'Datos inválidos'], 422);
-        }
-        if (! PasswordStrength::isAcceptable($password, $name, $email)) {
-            // Deliberately generic: the client-side meter already explains the
-            // strength rules, and a specific server reason would help an
-            // automated attacker tune guesses.
-            return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
         }
         if ($captchaError = $this->captchaError($request, $captchaToken)) {
             return $captchaError;
@@ -63,27 +53,23 @@ final class RegistrationController
 
         $email = strtolower($email);
 
-        // La inscripción es una PROPUESTA: nombre y contraseña se validan con
-        // el mismo contrato que la activación —el formulario y la API comparten
-        // una sola definición de lo que esta aplicación acepta—, pero NO se
-        // guardan. Nada que acredite identidad o credencial persiste antes de
-        // que el buzón se demuestre: ni fila de usuario, ni workspace, ni
-        // aceptación legal, ni contraseña —la activación decide todo eso con lo
-        // que escribe el que abre el buzón—.
+        // Este paso solo solicita la prueba del buzón. La identidad, la
+        // contraseña y la aceptación legal se piden una sola vez al activar;
+        // no se crea una cuenta ni se instala una credencial antes de verificar.
         //
         // The browser's context is independent of address occupancy. It owns
         // neither an account nor proof of the mailbox, but keeps later login
         // guidance and correction responses uniform across all outcomes.
         try {
             try {
-                $outcome = RegistrationAdmission::start($email);
+                $outcome = RegistrationAdmission::start($email, $request);
             } catch (QueryException $error) {
                 if (($error->errorInfo[0] ?? null) !== '23505') {
                     throw $error;
                 }
                 // Recheck a destination claimed by a non-cooperating writer;
                 // still create a durable context rather than issuing a decoy.
-                $outcome = RegistrationAdmission::start($email);
+                $outcome = RegistrationAdmission::start($email, $request);
             }
         } catch (MailAdmissionException) {
             Audit::write(null, 'auth.email_delivery_failed', 'user', null, ['kind' => 'verify']);
@@ -170,7 +156,7 @@ final class RegistrationController
             return response()->json(['error' => 'La contraseña debe tener entre 10 y 72 caracteres'], 422);
         }
         // Identity and legal acceptance are decided at activation too, with the
-        // same input contract as `register`. An acceptance without the exact
+        // current account input contract. An acceptance without the exact
         // version shown is not evidence of anything.
         if (! $this->validName($name) || ! $acceptTerms
             || ! hash_equals(RegistrationAdmission::TERMS_VERSION, $termsVersion)
@@ -182,7 +168,21 @@ final class RegistrationController
             return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
         }
 
-        $userId = RegistrationAdmission::activate($token, $password, $name);
+        $createdUser = null;
+        $sessionToken = null;
+        $pendingLink = false;
+        $userId = RegistrationAdmission::activate($token, $password, $name, function (User $user, PendingRegistration $pending) use ($request, &$createdUser, &$sessionToken, &$pendingLink): void {
+            $createdUser = $user;
+            // This also supports a link parked before the new transfer schema.
+            RegistrationLinkHandoff::capture($pending, $request);
+            $pendingLink = RegistrationLinkHandoff::bind($pending, $user);
+            // Never replace a browser's existing account. Legacy activations
+            // do not invoke this callback, so they still use the normal MFA login.
+            if (UvhRequest::user($request) === null) {
+                $sessionToken = SessionManager::create($user->id, $request, (int) $user->security_version);
+                Audit::write($user->id, 'auth.login', 'user', $user->id, ['mfa' => false, 'source' => 'registration'], UvhRequest::ip($request));
+            }
+        });
         if ($userId === -1) {
             return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
         }
@@ -190,7 +190,22 @@ final class RegistrationController
             return response()->json(['error' => 'Token inválido o caducado'], 400);
         }
 
-        return response()->json(['ok' => true]);
+        $handoff = $createdUser !== null ? RegistrationLinkHandoff::forUser($createdUser) : null;
+        $response = response()->json([
+            'ok' => true,
+            'newAccount' => $createdUser !== null,
+            'authenticated' => $sessionToken !== null,
+            'user' => $sessionToken !== null && $createdUser !== null ? UvhRequest::publicUser($createdUser) : null,
+            'pendingLink' => $pendingLink && $handoff !== null,
+        ]);
+        if ($sessionToken !== null && $createdUser !== null) {
+            $response->headers->setCookie(SessionManager::cookie($sessionToken));
+            if ($handoff !== null) {
+                $response->headers->setCookie(PendingHandoff::cookie(PendingHandoff::INTENT, $handoff['token'], $handoff['expiresAt']));
+            }
+        }
+
+        return $response;
     }
 
     public function resendVerification(Request $request): JsonResponse

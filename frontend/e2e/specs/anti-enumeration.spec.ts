@@ -209,13 +209,13 @@ test("la pre-ocupación termina en el buzón del dueño, sin atajos para el que 
 
   // Un registro aparcado sobre el email de otra persona, por el formulario real…
   const parkedAnswer = captureRegistration(page);
-  await registerFromBrowser(page, email, "Atacante E2E", ATTACKER_PASSWORD);
+  await registerFromBrowser(page, email);
   const parked = await parkedAnswer;
   expect(parked.status).toBe(201);
 
   // …y el dueño del buzón vive el flujo idéntico y recibe la respuesta idéntica.
   const ownerAnswer = captureRegistration(page);
-  await registerFromBrowser(page, email, "Victima E2E");
+  await registerFromBrowser(page, email);
   const owner = await ownerAnswer;
   expect(owner.status).toBe(201);
   expect(owner.body).toBe(parked.body);
@@ -230,10 +230,9 @@ test("la pre-ocupación termina en el buzón del dueño, sin atajos para el que 
   await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
   await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Confirmar mi email" }).click();
-  await expect(page.getByRole("heading", { name: "Email verificado" })).toBeVisible();
-
-  await loginFromBrowser(page, email);
+  await page.getByRole("button", { name: "Crear mi cuenta" }).click();
+  await expect(page.getByRole("heading", { name: "Cuenta creada correctamente" })).toBeVisible();
+  await page.getByRole("link", { name: "Ir al panel" }).click();
   await expect(page).toHaveURL(/\/app\/(dashboard|getting-started)$/);
 
   // Las credenciales sustituidas ya no abren la cuenta.

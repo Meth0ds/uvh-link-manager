@@ -51,10 +51,10 @@ test("un enlace de verificación consumido no puede reutilizarse", async ({ page
   await page.getByLabel("Contraseña", { exact: true }).fill(E2E_PASSWORD);
   await page.getByLabel("Repite la contraseña").fill(E2E_PASSWORD);
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Confirmar mi email" }).click();
+  await page.getByRole("button", { name: "Crear mi cuenta" }).click();
   expect((await responsePromise).status()).toBe(400);
   await expect(page.getByRole("alert")).toContainText(/no es válido|caducado|utilizado/i);
-  await expect(page.getByRole("heading", { name: "Email verificado" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Cuenta creada correctamente" })).toHaveCount(0);
 });
 
 test("cerrar sesión impide volver a una ruta privada", async ({ page }) => {

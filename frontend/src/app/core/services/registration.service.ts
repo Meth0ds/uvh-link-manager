@@ -9,21 +9,14 @@ export class RegistrationService {
   private readonly api = inject(ApiService);
 
   async register(
-    name: string,
     email: string,
-    password: string,
     antiBot: {
       captchaToken: string;
       website?: string;
-      acceptTerms: boolean;
-      termsVersion: string;
-      privacyVersion: string;
     },
   ): Promise<void> {
     await this.api.post<{ user: null }>("/api/v1/auth/register", {
-      name,
       email,
-      password,
       ...antiBot,
     }, decodeRegistrationResponse);
   }

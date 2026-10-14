@@ -84,10 +84,38 @@ describe("Auth entry and registration transport ownership", () => {
       : kind === "verify" ? auth.verifyMfa(challenge, "123456") : auth.recoverMfa(challenge, "ABCD-EFGH-JKLM-NPQR");
   }
 
+  it("adopts a registration session and loads its own workspace", fakeAsync(() => {
+    auth.sessionContextChanged(auth.sessionGeneration());
+    const newUser = { ...account(2), isAdmin: false, mfaEnabled: false };
+    const result = observe(auth.acceptRegistrationSession(newUser, auth.sessionGeneration()));
+    finishWorkspaces(2);
+    expect(result.value).toBeTrue();
+    expect(auth.user()).toEqual(newUser);
+    expect(auth.loaded()).toBeTrue();
+    expect(workspaces.currentId()).toBe(20);
+  }));
+
+  it("does not replace a newer browser identity with registration's response", fakeAsync(() => {
+    const generation = auth.sessionGeneration();
+    auth.sessionContextChanged(generation);
+    const stale = observe(auth.acceptRegistrationSession({ ...account(2), mfaEnabled: false }, generation));
+    flushMicrotasks();
+    expect(stale.value).toBeFalse();
+    expect(auth.user()).toBeNull();
+  }));
+
+  it("does not silently replace another authenticated account", fakeAsync(() => {
+    const result = observe(auth.acceptRegistrationSession({ ...account(2), mfaEnabled: false }, auth.sessionGeneration()));
+    flushMicrotasks();
+    expect(result.value).toBeFalse();
+    expect(auth.user()).toEqual(account(1));
+    expect(workspaces.currentId()).toBe(10);
+  }));
+
   const registration = [
     { name: "register", path: "/api/v1/auth/register", success: { user: null },
-      body: { name: "Owner", email: "owner@example.test", password: "fixture-password", captchaToken: "captcha", website: "", acceptTerms: true, termsVersion: "fixture-terms", privacyVersion: "fixture-privacy" },
-      invoke: (service: AuthService) => service.register("Owner", "owner@example.test", "fixture-password", { captchaToken: "captcha", website: "", acceptTerms: true, termsVersion: "fixture-terms", privacyVersion: "fixture-privacy" }) },
+      body: { email: "owner@example.test", captchaToken: "captcha", website: "" },
+      invoke: (service: AuthService) => service.register("owner@example.test", { captchaToken: "captcha", website: "" }) },
     { name: "correct email", path: "/api/v1/auth/change-registration-email", success: { ok: true },
       body: { currentEmail: "old@example.test", newEmail: "new@example.test", captchaToken: "captcha", website: "" },
       invoke: (service: AuthService) => service.changeRegistrationEmail("old@example.test", "new@example.test", { captchaToken: "captcha", website: "" }) },

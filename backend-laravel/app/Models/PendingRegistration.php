@@ -13,10 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * la activación, con el token que llega al buzón. Guardarlo aquí sería dejarle
  * a un tercero algo que heredar —el pre-hijack que la separación de esta tabla
  * viene a cerrar—. Ni siquiera queda la propuesta de contraseña de la
- * inscripción: `register` la valida para dar feedback temprano con el mismo
- * contrato que la activación, pero no la persiste, de modo que `login` no puede
+ * inscripción: `register` solo pide el email, de modo que `login` no puede
  * distinguir este registro de una dirección desconocida y ninguna señal de
- * ciclo de vida se filtra por el servidor.
+ * ciclo de vida se filtra por el servidor. El hero se conserva aparte como
+ * bearer cifrado y solo se vincula a un usuario al completar el registro.
  */
 class PendingRegistration extends Model
 {

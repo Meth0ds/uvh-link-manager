@@ -4,19 +4,19 @@ module.exports = {
   "/api": {
     target: BACKEND,
     secure: false,
-    changeOrigin: true,
+    changeOrigin: false,
     logLevel: "warn",
   },
   "/r/": {
     target: BACKEND,
     secure: false,
-    changeOrigin: true,
+    changeOrigin: false,
     logLevel: "warn",
   },
   "/health": {
     target: BACKEND,
     secure: false,
-    changeOrigin: true,
+    changeOrigin: false,
     logLevel: "warn",
   },
 };

@@ -30,7 +30,7 @@ final class RegistrationAdmissionTest extends TestCase
     public static function cases(): array
     {
         $cases = [];
-        foreach (['register' => ['auth.register', 'auth.terms_accepted', 'auth.privacy_notice_acknowledged'], 'duplicate' => ['auth.register_duplicate'], 'change' => ['auth.registration_email_change'], 'conflict' => ['auth.registration_email_change_conflict']] as $operation => $events) {
+        foreach (['register' => ['auth.register'], 'duplicate' => ['auth.register_duplicate'], 'change' => ['auth.registration_email_change'], 'conflict' => ['auth.registration_email_change_conflict']] as $operation => $events) {
             foreach ($events as $event) {
                 foreach ([true, false] as $fail) {
                     $cases[$operation.' '.$event.($fail ? ' admission' : ' history')] = [$operation, $event, $fail];

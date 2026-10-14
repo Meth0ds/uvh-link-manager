@@ -121,14 +121,14 @@ class UvhMail
 
     public static function verification(string $to, string $url, string $tokenHash): bool
     {
-        $link = self::action($url, 'Verificar mi email');
+        $link = self::action($url, 'Completar mi registro');
 
         return self::send(
             'verification',
             $to,
             'Verifica tu email en UVH',
-            self::layout('Verifica tu cuenta', '<p>Confirma tu dirección de correo para continuar con tu cuenta en UVH.</p>'.$link.self::fallbackUrl($url)),
-            "Verifica tu cuenta en UVH: {$url}",
+            self::layout('Completa tu registro', '<p>Abre el enlace para confirmar tu email y crear tu cuenta en UVH. En ese paso elegirás tu nombre y contraseña y aceptarás los términos de servicio.</p><p>Si no solicitaste esta cuenta, ignora este mensaje.</p>'.$link.self::fallbackUrl($url)),
+            "Confirma tu email y completa tu registro en UVH. Elige tu nombre y contraseña al abrir el enlace: {$url}",
             'email_token',
             $tokenHash,
             $tokenHash,

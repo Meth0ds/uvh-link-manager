@@ -12,7 +12,7 @@ use Tests\TestCase;
 /**
  * Server-side password weakness enforcement (report finding H-1): the
  * strength meter is client-side only, so the API must reject weak passwords
- * at register, reset-password and change-password time.
+ * at mailbox activation, reset-password and change-password time.
  */
 class PasswordPolicyTest extends TestCase
 {
@@ -38,45 +38,40 @@ class PasswordPolicyTest extends TestCase
         ];
     }
 
-    public function test_register_rejects_common_password_with_weak_error(): void
+    private function activationPayload(string $email, string $name, string $password): array
     {
-        $this->postJson('/api/v1/auth/register', array_merge([
-            'name' => 'Policy User',
-            'email' => 'weak@example.com',
-            'password' => 'password-123456',
-        ], $this->captchaPayload()))
-            ->assertStatus(422)
-            ->assertExactJson(['error' => 'La contraseña es demasiado débil']);
+        $pending = PendingRegistration::create(['email' => $email, 'security_version' => 1]);
+        $token = Ids::randomToken(32);
+        DB::table('email_tokens')->insert([
+            'id' => Ids::sha256Hex($token), 'pending_registration_id' => $pending->id,
+            'kind' => 'verify', 'expires_at' => now()->addHour(), 'created_at' => now(),
+        ]);
 
-        $this->assertDatabaseMissing('users', ['email' => 'weak@example.com']);
+        return array_merge(['token' => $token, 'name' => $name, 'password' => $password], $this->captchaPayload());
     }
 
-    public function test_register_rejects_password_containing_name_or_email(): void
+    public function test_activation_rejects_common_password_with_weak_error(): void
     {
-        $this->postJson('/api/v1/auth/register', array_merge([
-            'name' => 'Alice',
-            'email' => 'alice@example.com',
-            'password' => 'alice-wonderland-2026',
-        ], $this->captchaPayload()))->assertStatus(422);
+        $payload = $this->activationPayload('weak@example.com', 'Policy User', 'password-123456');
+        $this->postJson('/api/v1/auth/verify-email', $payload)
+            ->assertStatus(422)->assertExactJson(['error' => 'La contraseña es demasiado débil']);
+        $this->assertDatabaseMissing('users', ['email' => 'weak@example.com']);
+        $this->assertDatabaseHas('email_tokens', ['id' => Ids::sha256Hex($payload['token']), 'used_at' => null]);
+    }
 
-        $this->postJson('/api/v1/auth/register', array_merge([
-            'name' => 'Bob Example',
-            'email' => 'bob@example.com',
-            'password' => 'bob-example-secure-99',
-        ], $this->captchaPayload()))->assertStatus(422);
-
+    public function test_activation_rejects_password_containing_name_or_email(): void
+    {
+        foreach ([['Alice', 'alice@example.com', 'alice-wonderland-2026'], ['Bob Example', 'bob@example.com', 'bob-example-secure-99']] as [$name, $email, $password]) {
+            $this->postJson('/api/v1/auth/verify-email', $this->activationPayload($email, $name, $password))->assertStatus(422);
+        }
         $this->assertSame(0, User::count());
     }
 
-    public function test_register_accepts_strong_passphrase(): void
+    public function test_activation_accepts_strong_passphrase(): void
     {
-        $this->postJson('/api/v1/auth/register', array_merge([
-            'name' => 'Policy User',
-            'email' => 'strong@example.com',
-            'password' => 'tiovivo-cobrizo-astilla-42',
-        ], $this->captchaPayload()))
-            ->assertStatus(201)
-            ->assertExactJson(['user' => null]);
+        $this->postJson('/api/v1/auth/verify-email', $this->activationPayload('strong@example.com', 'Policy User', 'tiovivo-cobrizo-astilla-42'))
+            ->assertOk()->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('users', ['email' => 'strong@example.com', 'name' => 'Policy User']);
     }
 
     public function test_reset_password_rejects_weak_password(): void

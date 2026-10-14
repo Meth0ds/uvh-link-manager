@@ -694,7 +694,7 @@ async function frontendSupervisor(nonce, requestedRoot) {
     return openSync(path, 'a', 0o600);
   });
   const cli = join(root, 'frontend/node_modules/@angular/cli/bin/ng.js');
-  const child = spawn(process.execPath, [cli, 'serve', '--host', '127.0.0.1', '--port', '4200'],
+  const child = spawn(process.execPath, [cli, 'serve', '--host', '0.0.0.0', '--port', '4200'],
     { cwd: join(root, 'frontend'), env: { ...process.env, PORT: '4200' }, detached: process.platform !== 'win32',
       stdio: ['ignore', ...fds], windowsHide: true });
   for (const fd of fds) closeSync(fd);

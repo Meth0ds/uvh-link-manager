@@ -155,7 +155,7 @@ final class RegistrationEditConcurrencyTest extends TestCase
         $this->assertSame('corrected@example.test', $attempt->email);
         $this->assertSame('corrected@example.test', PendingRegistration::findOrFail($attempt->pending_registration_id)->email);
         $this->assertDatabaseMissing('email_tokens', ['id' => Ids::sha256Hex($token)]);
-        $this->assertDatabaseCount('sessions', 0);
+        $this->assertDatabaseCount('sessions', $results[0]['kind'] === 'ok' ? 1 : 0);
     }
 
     public function test_retention_rechecks_expiry_after_waiting_for_a_context_renewal(): void

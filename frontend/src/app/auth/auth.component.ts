@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, ViewChild, afterNextRender, computed, effect, inject, isDevMode, signal } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
-import { FormBuilder, ReactiveFormsModule, Validators, type ValidatorFn } from "@angular/forms";
+import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
-import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
@@ -15,16 +13,11 @@ import { decodePublicConfig } from "../core/services/public-response-decoders";
 import { PendingLinkIntentService } from "../core/services/pending-link-intent.service";
 import { PendingInvitationService } from "../core/services/pending-invitation.service";
 import { LatestRequest } from "../core/services/latest-request";
-import { TERMS_VERSION, PRIVACY_VERSION } from "../core/legal-documents";
 import { safeReturnTo } from "../core/guards/auth.guard";
 import { HCaptchaExecutionError, HCaptchaWidgetComponent } from "./hcaptcha-widget.component";
 import { intentBearer } from "./auth-bearer";
 import { OtpCodeInputComponent } from "./otp-code-input.component";
-import type { AuthFlowState, RegisterStep } from "./auth-flow-state";
-
-import { assessPassword, passwordBands, passwordStrengthLabel } from "./password-policy";
-
-export { TERMS_VERSION, PRIVACY_VERSION } from "../core/legal-documents";
+import type { AuthFlowState } from "./auth-flow-state";
 
 interface PublicAuthConfig {
   registrationPaused?: boolean;
@@ -45,7 +38,6 @@ export const REGISTRATION_PAUSED_MESSAGE = "Registros temporalmente pausados. In
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
-    MatCheckboxModule,
     MatFormFieldModule,
     MatInputModule,
     MatIconModule,
@@ -59,28 +51,6 @@ export const REGISTRATION_PAUSED_MESSAGE = "Registros temporalmente pausados. In
   styleUrl: "./auth.component.scss",
 })
 export class AuthComponent {
-  /**
-   * Las reglas de credencial y de contrato del registro, en un solo sitio.
-   *
-   * La corrección de email reutiliza este formulario sin elegir credencial ni
-   * aceptar contratos —la contraseña que deja el registro es una propuesta y la
-   * aceptación es evidencia de quien se registró—, así que esas reglas, incluida
-   * la igualdad de contraseñas, se suspenden al corregir y se reponen al salir. Con
-   * las listas declaradas una vez, suspender y reponer no puede divergir de lo
-   * que el registro exige.
-   */
-  private static readonly PASSWORD_RULES = [Validators.required, Validators.minLength(10), Validators.maxLength(72)];
-
-  private static readonly CONFIRMATION_RULES = [Validators.required, Validators.maxLength(72)];
-
-  private static readonly TERMS_RULES = [Validators.requiredTrue];
-
-  private static readonly PASSWORD_MATCH_RULE: ValidatorFn = (group) => {
-    const password = group.get("password")?.value;
-    const confirmation = group.get("confirmPassword")?.value;
-    return password === confirmation ? null : { mismatch: true };
-  };
-
   @ViewChild("loginCaptcha") private loginCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("registerCaptcha") private registerCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("resendCaptcha") private resendCaptchaWidget?: HCaptchaWidgetComponent;
@@ -107,10 +77,6 @@ export class AuthComponent {
 
   private readonly flow = signal<AuthFlowState>({ kind: "login" });
   readonly step = computed(() => this.flow().kind);
-  readonly registerStep = computed<RegisterStep>(() => {
-    const flow = this.flow();
-    return flow.kind === "register" ? flow.stage : 1;
-  });
   readonly busy = signal(false);
   readonly navigationBusy = signal(false);
   private readonly failedNavigation = signal<{ destination: string; generation: number } | null>(null);
@@ -186,21 +152,11 @@ export class AuthComponent {
     password: ["", [Validators.required, Validators.maxLength(72)]],
   });
 
-  readonly registerForm = this.fb.nonNullable.group(
-    {
-      name: ["", [Validators.required, Validators.minLength(2), Validators.maxLength(80)]],
-      email: ["", [Validators.required, Validators.email, Validators.maxLength(254)]],
-      password: ["", AuthComponent.PASSWORD_RULES],
-      confirmPassword: ["", AuthComponent.CONFIRMATION_RULES],
-      acceptTerms: [false, AuthComponent.TERMS_RULES],
-      // Honeypot: real users never see or fill this field. The server rejects
-      // it, adding a cheap signal against unsophisticated registration bots.
-      company: ["", [Validators.maxLength(120)]],
-    },
-    {
-      validators: AuthComponent.PASSWORD_MATCH_RULE,
-    },
-  );
+  readonly registerForm = this.fb.nonNullable.group({
+    email: ["", [Validators.required, Validators.email, Validators.maxLength(254)]],
+    // Honeypot: kept out of the visible email form.
+    company: ["", [Validators.maxLength(120)]],
+  });
 
   readonly mfaForm = this.fb.nonNullable.group({
     code: ["", [Validators.required, Validators.pattern(/^\d{6}$/)]],
@@ -208,39 +164,6 @@ export class AuthComponent {
 
   readonly recoveryForm = this.fb.nonNullable.group({
     code: ["", [Validators.required, Validators.pattern(/^[A-Za-z2-9\s-]{16,24}$/)]],
-  });
-
-  // Reactive Forms values are Observables, not signals. Converting them is
-  // essential: a computed() that reads control.value directly never updates.
-  private readonly passwordValue = toSignal(this.registerForm.controls.password.valueChanges, {
-    initialValue: this.registerForm.controls.password.value,
-  });
-  private readonly confirmationValue = toSignal(this.registerForm.controls.confirmPassword.valueChanges, {
-    initialValue: this.registerForm.controls.confirmPassword.value,
-  });
-  private readonly nameValue = toSignal(this.registerForm.controls.name.valueChanges, {
-    initialValue: this.registerForm.controls.name.value,
-  });
-  private readonly emailValue = toSignal(this.registerForm.controls.email.valueChanges, {
-    initialValue: this.registerForm.controls.email.value,
-  });
-  readonly passwordAssessment = computed(() => assessPassword(this.passwordValue(), this.nameValue(), this.emailValue()));
-  readonly passwordScore = computed(() => this.passwordAssessment().score);
-  readonly passwordStrength = computed(() => passwordStrengthLabel(this.passwordScore()));
-  readonly passwordClass = computed(() => {
-    const score = this.passwordScore();
-    return score >= passwordBands.strong ? "strong" : score >= passwordBands.good ? "good" : score >= passwordBands.fair ? "fair" : "weak";
-  });
-  readonly passwordsMatch = computed(() => !this.confirmationValue() || this.passwordValue() === this.confirmationValue());
-  readonly passwordRequirements = computed(() => {
-    const password = this.passwordValue();
-    const assessment = this.passwordAssessment();
-    return [
-      { label: "10 o más caracteres", met: password.length >= 10 },
-      { label: "Mayúsculas y minúsculas", met: /[a-z]/.test(password) && /[A-Z]/.test(password) },
-      { label: "Número o símbolo", met: /\d/.test(password) || /[^A-Za-z0-9]/.test(password) },
-      { label: "Sin datos personales ni patrones", met: !!password && !assessment.common && !assessment.personal && !assessment.patterned },
-    ];
   });
 
   constructor() {
@@ -262,7 +185,7 @@ export class AuthComponent {
     }
     if (capturedIntent || registerMode) {
       this.tabIndex.set(1);
-      this.flow.set({ kind: "register", mode: "new", stage: 1 });
+      this.flow.set({ kind: "register", mode: "new" });
     }
     if (this.route.snapshot.queryParamMap.get("reason") === "session-expired") {
       this.info.set("Vuelve a iniciar sesión para continuar de forma segura.");
@@ -278,39 +201,12 @@ export class AuthComponent {
       void this.navigateAuthenticated(this.returnTo());
     });
 
-    // La corrección de email comparte formulario con el registro pero solo
-    // pide la dirección: sus otras reglas se suspenden mientras el modo está
-    // activo. Un `effect` cubre los cuatro caminos que entran y salen del modo
-    // —pestaña, cierre, corrección completada y modo inicial— sin repetir la
-    // llamada en ninguno de ellos.
-    effect(() => this.applyCredentialRules(!this.changeEmailMode()));
-  }
-
-  /**
-   * Suspende o repone las reglas que sólo tienen sentido al crear la cuenta.
-   *
-   * Suspenderlas no relaja el registro: `PASSWORD_RULES`, `CONFIRMATION_RULES`
-   * y `TERMS_RULES` son las mismas listas que el formulario declara, así que el
-   * alta las vuelve a exigir exactamente como estaban.
-   */
-  private applyCredentialRules(required: boolean): void {
-    const { name, password, confirmPassword, acceptTerms } = this.registerForm.controls;
-    name.setValidators(required ? [Validators.required, Validators.minLength(2), Validators.maxLength(80)] : null);
-    password.setValidators(required ? AuthComponent.PASSWORD_RULES : null);
-    confirmPassword.setValidators(required ? AuthComponent.CONFIRMATION_RULES : null);
-    acceptTerms.setValidators(required ? AuthComponent.TERMS_RULES : null);
-    name.updateValueAndValidity();
-    password.updateValueAndValidity();
-    confirmPassword.updateValueAndValidity();
-    acceptTerms.updateValueAndValidity();
-    this.registerForm.setValidators(required ? AuthComponent.PASSWORD_MATCH_RULE : null);
-    this.registerForm.updateValueAndValidity();
   }
 
   onTabChange(index: number): void {
     this.invalidateFlow();
     this.tabIndex.set(index);
-    this.flow.set(index === 0 ? { kind: "login" } : { kind: "register", mode: "new", stage: 1 });
+    this.flow.set(index === 0 ? { kind: "login" } : { kind: "register", mode: "new" });
     this.error.set(null);
     this.info.set(null);
   }
@@ -330,28 +226,6 @@ export class AuthComponent {
     this.onTabChange(nextIndex);
     const tabButtons = (event.currentTarget as HTMLElement | null)?.parentElement?.querySelectorAll<HTMLButtonElement>("[role='tab']");
     tabButtons?.item(nextIndex).focus();
-  }
-
-  async nextRegisterStep(): Promise<void> {
-    const fields = this.changeEmailMode()
-      ? [this.registerForm.controls.email]
-      : [this.registerForm.controls.name, this.registerForm.controls.email];
-    fields.forEach((control) => control.markAsTouched());
-    if (fields.some((control) => control.invalid)) return;
-
-    const flow = this.flow();
-    if (flow.kind !== "register") return;
-    this.error.set(null);
-    this.info.set(null);
-    this.flow.set({ ...flow, stage: 2 });
-  }
-
-  previousRegisterStep(): void {
-    this.invalidateFlow();
-    this.error.set(null);
-    this.info.set(null);
-    const flow = this.flow();
-    if (flow.kind === "register") this.flow.set({ ...flow, stage: 1 });
   }
 
   async onLogin(): Promise<void> {
@@ -387,7 +261,9 @@ export class AuthComponent {
         this.flow.set({ kind: "mfa", challenge: outcome.challenge, recoveryAvailable: outcome.recoveryAvailable });
         this.info.set(null);
       } else {
-        await this.navigateAuthenticated(destination);
+        await this.intents.refresh();
+        if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
+        await this.navigateAuthenticated(destination === "/app" && this.intents.hasPending() ? "/app/links" : destination);
       }
     } catch (err) {
       if (!this.isFlowCurrent(revision) || this.step() !== "login") return;
@@ -564,7 +440,7 @@ export class AuthComponent {
 
   async onRegister(): Promise<void> {
     this.registerForm.markAllAsTouched();
-    if (this.registerStep() !== 2 || this.registerForm.invalid || this.busy()) return;
+    if (this.step() !== "register" || this.registerForm.invalid || this.busy()) return;
     if (this.registerForm.controls.company.value.trim() !== "") {
       this.error.set("No se pudo crear la cuenta");
       return;
@@ -589,7 +465,6 @@ export class AuthComponent {
     const step = this.step();
     const stillCurrent = () => this.isFlowCurrent(revision)
       && this.step() === step
-      && this.registerStep() === 2
       && this.changeEmailMode() === changeEmail
       && this.registerForm.controls.email.value.trim().toLowerCase() === email;
     try {
@@ -611,22 +486,16 @@ export class AuthComponent {
         }
         await this.auth.changeRegistrationEmail(currentEmail, email, antiBot);
       } else {
-        await this.auth.register(
-          this.registerForm.controls.name.value,
-          email,
-          this.registerForm.controls.password.value,
-          {
-            ...antiBot,
-            acceptTerms: this.registerForm.controls.acceptTerms.value,
-            termsVersion: TERMS_VERSION,
-            privacyVersion: PRIVACY_VERSION,
-          },
-        );
+        if (this.intents.hasPending()) {
+          await this.intents.confirmed();
+          if (!stillCurrent()) return;
+        }
+        await this.auth.register(email, antiBot);
       }
       if (!stillCurrent()) return;
       this.flow.set({ kind: "verify-pending", email, source: "browser-registration" });
       this.info.set(
-        "Solicitud registrada. Para continuar debes confirmar tu email. Si ya tienes una cuenta, inicia sesión o recupera tu contraseña.",
+        "Solicitud registrada. Abre el correo para confirmar tu email y elegir tu nombre y contraseña. Si ya tienes una cuenta, inicia sesión o recupera tu contraseña.",
       );
       this.registerCaptchaToken.set("");
     } catch (err) {
@@ -717,7 +586,7 @@ export class AuthComponent {
     const email = flow.email;
     this.invalidateFlow();
     this.tabIndex.set(1);
-    this.flow.set({ kind: "register", mode: "correct-email", stage: 1, originalEmail: email });
+    this.flow.set({ kind: "register", mode: "correct-email", originalEmail: email });
     this.registerForm.controls.email.setValue(email);
     this.registerCaptchaToken.set("");
     this.error.set(null);
@@ -731,11 +600,7 @@ export class AuthComponent {
     this.loginCaptchaToken.set("");
     this.registerCaptchaToken.set("");
     this.registerForm.reset({
-      name: "",
       email: "",
-      password: "",
-      confirmPassword: "",
-      acceptTerms: false,
       company: "",
     });
     this.tabIndex.set(0);
