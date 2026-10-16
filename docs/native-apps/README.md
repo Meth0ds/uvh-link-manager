@@ -6,8 +6,8 @@ UVH ofrece adaptadores HTTPS para Spotify, YouTube, Google Maps y Apple Maps, y 
 
 1. Ejecutar `php artisan migrate --force` antes de desplegar el frontend.
 2. Desplegar Laravel y la configuración Nginx actualizada. Los documentos de asociación y `/a/` deben llegar a Laravel, también en el edge de dominios personalizados.
-3. Desplegar Angular. `UVH_FEATURE_APP_PROVIDERS` y `UVH_FEATURE_NATIVE_APPS` son independientes y están desactivadas por defecto. La API pública de configuración controla la presentación del editor.
-4. Activar proveedores tras las comprobaciones del flujo web. Activar aplicaciones propias únicamente para validar una app firmada con HTTPS público. La publicación de JSON no acredita la integración nativa.
+3. Desplegar Angular. `UVH_FEATURE_APP_PROVIDERS` y `UVH_FEATURE_NATIVE_APPS` son independientes y están activadas por defecto. Asignar `false` permite desactivar una modalidad de forma explícita. La API pública de configuración controla la presentación del editor.
+4. Configurar los perfiles de dominio y validar la integración de cada app firmada con HTTPS público. La función activada permite configurar aplicaciones, pero la publicación de JSON no acredita su integración nativa.
 5. Comprobar errores, latencia y volumen de admisiones mediante los mecanismos operativos existentes. No incluir cuerpos de resolución, contraseñas, comprobantes ni URLs completas en logs, APM o capturas de red compartidas.
 
 Las admisiones se limpian cada cinco minutos mediante el scheduler. Sus destinos están cifrados en reposo y participan en `uvh:rotate-app-secret`. La eliminación del enlace/workspace elimina sus recibos. El rollback operativo consiste en desactivar las dos funciones; no ejecutar la migración descendente mientras existan datos que se quieran conservar.

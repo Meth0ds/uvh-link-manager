@@ -389,8 +389,7 @@ el [modelo de amenazas](docs/threat-model.md).
 
 La referencia completa de variables —obligatoriedad, valores por defecto, qué
 pasa si faltan e interruptores de seguridad— está en
-[docs/configuration.md](docs/configuration.md). Las funciones experimentales
-nacen desactivadas y se activan por entorno:
+[docs/configuration.md](docs/configuration.md). Las funciones se controlan por entorno; los valores iniciales se indican a continuación:
 
 | Variable | Por defecto | Función |
 | --- | --- | --- |
@@ -400,8 +399,8 @@ nacen desactivadas y se activan por entorno:
 | `UVH_LINK_WORKFLOWS_ENABLED` | `false` | Flujos avanzados de enlaces (favoritos, filtros, avisos, duplicación, página personalizada). |
 | `UVH_FEATURE_SHARED_REPORTS` | `false` | Informes compartidos públicos. |
 | `UVH_FEATURE_SOCIAL_PREVIEWS` | `false` | Tarjetas sociales. |
-| `UVH_FEATURE_APP_PROVIDERS` | `false` | Apertura de Spotify/YouTube/Maps. |
-| `UVH_FEATURE_NATIVE_APPS` | `false` | Apps propias vía AASA / Asset Links. |
+| `UVH_FEATURE_APP_PROVIDERS` | `true` | Apertura de Spotify/YouTube/Maps. |
+| `UVH_FEATURE_NATIVE_APPS` | `true` | Apps propias vía AASA / Asset Links. |
 
 Las migraciones de cada función son aditivas y se aplican con
 `php artisan migrate --force` **antes** de desplegar el frontend.

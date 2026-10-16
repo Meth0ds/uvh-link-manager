@@ -53,6 +53,8 @@
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+        <server name="UVH_FEATURE_APP_PROVIDERS" value="false" force="true"/>
+        <server name="UVH_FEATURE_NATIVE_APPS" value="false" force="true"/>
         <env name="UVH_FEATURE_APP_PROVIDERS" value="false" force="true"/>
         <env name="UVH_FEATURE_NATIVE_APPS" value="false" force="true"/>
     </php>

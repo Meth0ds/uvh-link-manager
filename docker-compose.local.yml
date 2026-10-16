@@ -42,6 +42,8 @@ x-php-service: &php-service
     DB_PASSWORD: ${POSTGRES_PASSWORD:-uvh_local_dev_only}
     QUEUE_CONNECTION: database
     UVH_LINK_WORKFLOWS_ENABLED: ${UVH_LINK_WORKFLOWS_ENABLED:-false}
+    UVH_FEATURE_APP_PROVIDERS: ${UVH_FEATURE_APP_PROVIDERS:-true}
+    UVH_FEATURE_NATIVE_APPS: ${UVH_FEATURE_NATIVE_APPS:-true}
     # The PHP development server runs inside Linux but serves files from a
     # Windows bind mount. A small worker pool prevents one cold request from
     # making every local health/API request appear hung.

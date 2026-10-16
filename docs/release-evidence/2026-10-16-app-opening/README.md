@@ -1,6 +1,6 @@
 # Apertura de aplicaciones — revisión de entrega
 
-Implementación de proveedores conocidos y aplicaciones propias, con activación independiente y desactivada por defecto. Esta evidencia describe comprobaciones locales; no acredita integración con aplicaciones firmadas en dispositivos físicos.
+Implementación de proveedores conocidos y aplicaciones propias, con activación independiente. Durante la validación inicial se mantuvieron desactivadas por defecto; por petición posterior del propietario, la configuración del proyecto y las plantillas las habilitan. La integración nativa sigue requiriendo las comprobaciones físicas descritas abajo. Esta evidencia describe comprobaciones locales; no acredita integración con aplicaciones firmadas en dispositivos físicos.
 
 ## Funciones revisadas
 

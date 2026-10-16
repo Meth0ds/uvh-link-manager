@@ -601,3 +601,7 @@ La rotación de `APP_SECRET` incluye `analytics_reports.secret_encrypted` y los 
 `SHARED_REPORTS_LIMIT` fija el máximo de informes no revocados por workspace (50 inicialmente); `SOCIAL_PREVIEW_ASSET_BYTES_PER_WORKSPACE` fija su cuota de imágenes normalizadas (67108864 bytes inicialmente).
 
 La migración `2026_10_14_000003_index_social_asset_references` crea índices concurrentes para la limpieza de imágenes, sin bloquear escrituras en los enlaces. Se ejecuta fuera de una transacción de migración; no envolver manualmente `artisan migrate` en otra transacción. Los recibos de borrado se conservan para recoger cargas que escriban tarde, incluso tras eliminar un workspace.
+
+## Apertura de aplicaciones
+
+`UVH_FEATURE_APP_PROVIDERS=true` habilita los servicios conocidos y `UVH_FEATURE_NATIVE_APPS=true` habilita los perfiles de apps propias. Ambas modalidades están activadas por defecto y pueden desactivarse por separado con `false`. Docker local transmite estas variables a todos los procesos PHP. Si un despliegue existente las fija explícitamente a `false`, hay que actualizar su entorno y regenerar la caché de configuración. Las apps propias requieren igualmente integración nativa firmada y dominio HTTPS. Ver [el protocolo y despliegue](native-apps/README.md).
