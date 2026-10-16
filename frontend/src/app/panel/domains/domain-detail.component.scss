@@ -2,6 +2,27 @@
 // ruled ledgers, warnings are left-ruled bars on token aliases.
 :host { display: block; min-width: 0; container-type: inline-size; }
 
+.setup-guide { display: grid; gap: 16px; margin-block: 24px; padding: 24px; border: 1px solid var(--uvh-border); background: var(--uvh-surface-raised); }
+.setup-guide h2, .setup-guide h3, .setup-guide p { margin: 0; }
+.setup-guide h2 { font-size: 24px; line-height: 1.3; }
+.setup-guide h3, .domain-removal h2 { font-size: 20px; line-height: 1.4; }
+.setup-guide p, .provider-instructions { line-height: 1.7; }
+.setup-progress { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; list-style: none; padding: 0; margin: 0; }
+.setup-progress li { display: flex; align-items: flex-start; gap: 8px; color: var(--uvh-muted); font-size: 13px; }
+.setup-progress mat-icon { flex: 0 0 24px; }
+.setup-progress .complete { color: var(--uvh-success); }
+.provider-choice { display: flex; flex-wrap: wrap; gap: 12px; }
+.provider-choice [aria-pressed="true"] { background: var(--uvh-electric-soft); }
+.setup-advice { padding: 14px; border-left: 3px solid var(--uvh-electric); background: var(--uvh-surface); }
+.setup-guide a { color: var(--uvh-electric); }
+.copy-status:empty { display: none; }
+.advanced-diagnostics { margin-block: 24px; border: 1px solid var(--uvh-border); padding: 20px; }
+.advanced-diagnostics > summary { min-height: 44px; cursor: pointer; font-weight: 700; display: flex; align-items: center; }
+.domain-removal { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; padding: 24px; margin-top: 24px; border: 1px solid var(--uvh-border); }
+.domain-removal p { color: var(--uvh-muted); line-height: 1.6; }
+.domain-removal .danger { --mat-button-outlined-label-text-color: var(--uvh-danger); }
+@container (max-width: 620px) { .setup-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); } .setup-guide, .advanced-diagnostics { padding: 16px; } .domain-removal > button { width: 100%; } }
+
 .back-link {
   display: inline-flex;
   align-items: center;

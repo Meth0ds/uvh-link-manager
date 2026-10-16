@@ -79,6 +79,9 @@
           @if (canEdit() && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying')) {
             <button mat-flat-button type="button" (click)="verify(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon aria-hidden="true">dns</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Comprobar DNS' }}</button>
           }
+          @if (canAdmin() && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying')) {
+            <button mat-stroked-button type="button" class="danger" (click)="remove(d)" [attr.aria-label]="'Eliminar ' + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> Eliminar dominio</button>
+          }
         </div>
         @if (canEdit() && (d.state === 'verified' || d.state === 'active' || d.state === 'disabled' || (d.state === 'provisioning' && canAdmin()))) {
           <details class="domain-management">

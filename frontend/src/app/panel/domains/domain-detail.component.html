@@ -1,5 +1,5 @@
 <a class="back-link" routerLink="/app/domains"><mat-icon>arrow_back</mat-icon> Volver a dominios</a>
-<app-page-header icon="monitor_heart" eyebrow="Diagnóstico individual" title="Diagnóstico del dominio" description="Comprueba propiedad, ruta DNS, HTTPS y el calendario real de revalidación." />
+<app-page-header icon="language" eyebrow="Dominio propio" title="Conecta tu dominio" description="Configura sus registros DNS, comprueba la conexión y sigue la preparación de HTTPS." />
 
 @if (loading() && !domain()) {
   <app-panel-skeleton variant="cards" label="Cargando diagnóstico del dominio" />
@@ -26,6 +26,28 @@
   @if (!canEdit()) {
     <div class="alert permission" role="status">Vista de solo lectura. El desafío TXT de propiedad se oculta por seguridad.</div>
   }
+
+  <section class="setup-guide" aria-labelledby="setup-title">
+    <div><span class="eyebrow">Configuración paso a paso</span><h2 id="setup-title">{{ d.servingReady ? 'Tu dominio está disponible' : 'Prepara la conexión' }}</h2></div>
+    <ol class="setup-progress" aria-label="Progreso de configuración">
+      @for (step of setupSteps(); track step.label) {
+        <li [class.complete]="step.complete"><mat-icon aria-hidden="true">{{ step.complete ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon><span>{{ step.label }}<span class="cdk-visually-hidden">: {{ step.complete ? 'completado' : 'pendiente' }}</span></span></li>
+      }
+    </ol>
+    <p class="setup-advice" role="status">{{ setupAdvice() }}</p>
+    @if (canEdit()) {
+      <h3>1. Añade los registros en tu proveedor DNS</h3>
+      <div class="provider-choice" role="group" aria-label="Proveedor DNS"><button mat-stroked-button type="button" [attr.aria-pressed]="provider() === 'generic'" (click)="provider.set('generic')">Otro proveedor</button><button mat-stroked-button type="button" [attr.aria-pressed]="provider() === 'cloudflare'" (click)="provider.set('cloudflare')">Cloudflare</button></div>
+      @if (provider() === 'cloudflare') {
+        <ol class="provider-instructions"><li>Abre tu zona en Cloudflare y entra en <strong>DNS → Records → Add record</strong>.</li><li>Crea el TXT de propiedad y el CNAME de tráfico con los nombres y valores que aparecen debajo.</li><li>En el CNAME selecciona <strong>DNS only</strong> (nube gris). Este flujo necesita un CNAME directo, sin proxy ni flattening.</li><li>Guarda los registros y vuelve a UVH para comprobar la conexión.</li></ol>
+        <p><a href="https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/" target="_blank" rel="noopener noreferrer">Consultar la documentación oficial de Cloudflare<span class="cdk-visually-hidden"> (se abre en otra pestaña)</span></a></p>
+      } @else {
+        <p>Abre la zona DNS de tu dominio y crea un registro TXT para acreditar la propiedad y un CNAME para dirigir el tráfico. Usa los nombres completos mostrados debajo; revisa si tu proveedor añade automáticamente la zona para no duplicarla.</p>
+      }
+      <p>Conserva ambos registros durante todo el uso del dominio. La propagación depende del proveedor y de las cachés DNS.</p>
+    }
+    <p class="copy-status" role="status" aria-live="polite">{{ copyStatus() }}</p>
+  </section>
 
   <div class="diagnostic-grid">
     <section class="diagnostic-card" aria-labelledby="ownership-title">
@@ -67,6 +89,21 @@
     </section>
   </div>
 
+  @if (canEdit()) {
+    <section class="setup-guide" aria-labelledby="check-title">
+      <h2 id="check-title">2. Comprueba la conexión y prepara HTTPS</h2>
+      <p>UVH comprobará el TXT y el CNAME. Cuando estén correctos, preparará HTTPS automáticamente cuando corresponda. Si un intento anterior quedó pendiente, podrás reintentarlo aquí.</p>
+      <div class="actions"><button mat-flat-button type="button" (click)="startDnsCheck()" [disabled]="actionBusy() || dnsWait() > 0 || d.dnsCheckInProgress || d.tlsStatus === 'provisioning'"><mat-icon aria-hidden="true">dns</mat-icon>{{ d.dnsCheckInProgress ? 'Comprobando conexión…' : 'Comprobar conexión' }}</button>
+        @if (d.state === 'verified' && d.tlsStatus !== 'provisioning') { <button mat-stroked-button type="button" (click)="activate()" [disabled]="actionBusy() || tlsWait() > 0 || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon aria-hidden="true">https</mat-icon>Preparar HTTPS</button> }
+      </div>
+      @if (dnsWait() > 0) { <p role="status">Podrás volver a comprobar DNS en {{ waitLabel(dnsWait()) }}.</p> }
+      @if (tlsWait() > 0) { <p role="status">Podrás reintentar HTTPS en {{ waitLabel(tlsWait()) }}.</p> }
+      <p>Última comprobación: {{ formatDate(d.dnsCheckCompletedAt) }}. @if (d.tlsNextRetryAt) { Próximo reintento HTTPS: {{ formatDate(d.tlsNextRetryAt) }}. }</p>
+    </section>
+  }
+
+  <details class="advanced-diagnostics"><summary>Diagnóstico avanzado, historial y preferencias</summary>
+
   <section class="schedule-card" aria-labelledby="schedule-title">
     <div>
       <span class="eyebrow">Calendario de comprobación</span>
@@ -80,17 +117,6 @@
     </dl>
     @if (dnsErrorLabel(d.dnsError); as dnsMessage) { <p class="warning" role="status">{{ dnsMessage }}</p> }
     @if (graceLabel(); as grace) { <p class="warning degraded" role="status">{{ grace }}</p> }
-    @if (canEdit()) {
-      <div class="actions" role="group" aria-label="Comprobación de DNS y preparación de HTTPS">
-        <button mat-flat-button color="primary" type="button" (click)="startDnsCheck()" [disabled]="actionBusy() || d.dnsCheckInProgress || d.state === 'provisioning'"><mat-icon aria-hidden="true">dns</mat-icon> {{ d.dnsCheckInProgress ? 'Comprobación en curso' : 'Comprobar ahora' }}</button>
-        @if (d.state === 'verified') {
-          <button mat-stroked-button class="neutral-action" type="button" (click)="activate()" [disabled]="actionBusy() || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon aria-hidden="true">https</mat-icon> Preparar HTTPS</button>
-        }
-      </div>
-      @if (d.state === 'verified' && d.dnsCheckInProgress) {
-        <p class="scheduler-note" role="status">Podrás preparar HTTPS cuando termine la comprobación DNS.</p>
-      }
-    }
     <p class="scheduler-note">La fecha indica cuándo el planificador puede admitir el trabajo. La ejecución puede demorarse por cola. Mientras haya una comprobación o una emisión en curso, esta página se actualiza sola.</p>
   </section>
 
@@ -152,4 +178,8 @@
       </dl>
     }
   </section>
+  </details>
+  @if (canAdmin()) {
+    <section class="domain-removal"><div><h2>Eliminar dominio</h2><p>Revisa sus enlaces y los de la papelera antes de confirmar el borrado.</p></div><button mat-stroked-button class="danger" type="button" (click)="remove()" [disabled]="actionBusy()" [attr.aria-label]="'Eliminar ' + d.domain"><mat-icon aria-hidden="true">delete_outline</mat-icon>Eliminar dominio</button></section>
+  }
 }

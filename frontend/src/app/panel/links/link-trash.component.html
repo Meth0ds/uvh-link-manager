@@ -1,5 +1,6 @@
 <a class="back-link" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> Volver a enlaces</a>
 <app-page-header icon="delete_sweep" eyebrow="Retención recuperable" title="Papelera de enlaces" description="Restaura enlaces eliminados antes de que venza su política de conservación." />
+@if (domainId() !== null) { <p role="status">Mostrando la papelera del dominio seleccionado. <button mat-button type="button" (click)="domainId.set(null); search('')">Ver toda la papelera</button></p> }
 @if (retentionDays(); as days) { <div class="retention-note" role="note"><mat-icon>schedule</mat-icon>Los enlaces se purgan automáticamente {{ days }} días después de eliminarlos.</div> }
 <section class="search-card"><mat-form-field appearance="outline"><mat-icon matPrefix>search</mat-icon><input matInput #query [value]="q()" placeholder="Buscar por nombre, alias o destino" (keyup.enter)="search(query.value)" /><button mat-icon-button matSuffix type="button" (click)="search(query.value)" aria-label="Buscar en la papelera"><mat-icon>arrow_forward</mat-icon></button></mat-form-field><b>{{ total() }} eliminados</b></section>
 @if (loading() && !rows().length) { <app-panel-skeleton variant="list" label="Cargando papelera" /> }

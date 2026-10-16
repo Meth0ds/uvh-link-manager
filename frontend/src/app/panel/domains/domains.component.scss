@@ -64,7 +64,7 @@
 .management-risk { margin: 8px -24px 0; padding: 24px 24px 0; border-top: 1px solid var(--uvh-border); background: var(--uvh-surface); }
 .management-risk-heading { display: flex; align-items: center; gap: 8px; color: var(--uvh-muted); font-size: 13px; font-weight: 700; }
 .management-risk-heading mat-icon { width: 19px; height: 19px; font-size: 19px; }
-.management-risk .danger { --mat-button-outlined-label-text-color: var(--uvh-danger); --mat-button-outlined-outline-color: var(--uvh-border); --mat-button-outlined-state-layer-color: var(--uvh-danger); }
+.danger { --mat-button-outlined-label-text-color: var(--uvh-danger); --mat-button-outlined-outline-color: var(--uvh-border); --mat-button-outlined-state-layer-color: var(--uvh-danger); }
 button, .domain-footer a { min-height: 44px; }
 :is(a, button, input, summary):focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
 @container (max-width: 620px) {

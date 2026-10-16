@@ -125,6 +125,33 @@ el botón permite retomarla incluso al abrir el correo en otro dispositivo;
 su caducidad original se mantiene y el enlace no se publica automáticamente.
 Una sesión existente de otra cuenta se conserva hasta elegir cambiar de cuenta.
 
+### Conectar y retirar dominios
+
+Al añadir un subdominio se abre su guía de configuración. Incluye instrucciones
+manuales para Cloudflare y otros proveedores, copia de TXT/CNAME y progreso
+obtenido del servidor. La comprobación explícita de DNS puede iniciar HTTPS;
+abrir la guía o copiar un registro no inicia verificaciones ni emisiones.
+
+«Eliminar dominio» revisa primero sus enlaces de biblioteca y papelera. Un
+propietario o administrador puede seleccionar hasta 100 enlaces, elegir otro
+dominio disponible o el de plataforma, revisar las URL y confirmar su traslado.
+Los conflictos bloquean toda la selección. La papelera conserva estado y fecha
+de purga; los enlaces bloqueados requieren administración de la plataforma.
+Las URL y los QR distribuidos deben actualizarse después de un traslado.
+El borrado se confirma por separado y vuelve a comprobar que no haya enlaces.
+Los registros DNS del proveedor se gestionan manualmente.
+
+La API de sesión añade `GET /api/v1/domains/:id/deletion-preview`,
+`POST /api/v1/domains/:id/reassignment-preview` y
+`POST /api/v1/domains/:id/reassign`. La ejecución exige versiones esperadas e
+`Idempotency-Key`; su auditoría, historial y cambios se admiten juntos.
+La papelera admite el filtro `domainId`. La API pública mantiene sus contratos.
+
+Prueba integrada: `cd frontend && npm run e2e -- e2e/specs/domain-management.spec.ts`.
+Usa una base aislada `_test`; DNS/HTTPS se preparan mediante una fixture, por lo
+que esta prueba no acredita propagación DNS ni emisión ACME públicas. Las pruebas
+`DomainRemovalTest` incluyen peticiones simultáneas y fallos de admisión de auditoría.
+
 Los ejecutables nativos `dist/uvh-control-windows-x64.exe`,
 `dist/uvh-control-macos-arm64` y `dist/uvh-control-linux-x64` (doble clic o
 terminal) abren un panel Angular Material independiente con identidad UVH,

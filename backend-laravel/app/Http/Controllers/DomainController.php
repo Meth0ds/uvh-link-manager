@@ -19,6 +19,7 @@ use App\Support\Ids;
 use App\Support\IsoDate;
 use App\Support\OperationalMetrics;
 use App\Support\ProductionSecurity;
+use App\Support\SecurityContext;
 use App\Support\UrlUtil;
 use App\Support\UvhRequest;
 use App\Support\WorkspaceAccess;
@@ -565,9 +566,15 @@ class DomainController
         $user = UvhRequest::user($request);
         $apiTokenContext = UvhRequest::apiToken($request);
 
-        $result = DB::transaction(function () use ($workspaceId, $user, $id, $apiTokenContext): string {
+        $result = DB::transaction(function () use ($request, $workspaceId, $user, $id, $apiTokenContext): string {
             // Admin, not editor: deletion is the one irreversible act on a
             // domain (the claim is released and the name is back on the market).
+            if ($apiTokenContext === null) {
+                $context = SecurityContext::lock($user, UvhRequest::sessionId($request), requireVerifiedEmail: true);
+                if (! $context || ! WorkspaceAccess::getMembershipForContext($context, $workspaceId, 'admin')) {
+                    return 'forbidden';
+                }
+            }
             if (! WorkspaceAccess::getMembershipLocked(
                 $user->id,
                 $workspaceId,
@@ -604,6 +611,7 @@ class DomainController
             // proves it and claims the name. A gap between the two can only be
             // bridged by publishing the TXT record.
             DomainClaims::release($workspaceId, $domain->domain);
+            Audit::write($user->id, 'domain.delete', 'domain', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
             return 'deleted';
         });
@@ -618,7 +626,6 @@ class DomainController
                 'error' => 'Reasigna los enlaces de este dominio, incluidos los eliminados que quieras conservar, antes de borrarlo',
             ], 409);
         }
-        Audit::write($user->id, 'domain.delete', 'domain', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
         return response()->json(['ok' => true]);
     }

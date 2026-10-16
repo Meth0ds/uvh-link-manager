@@ -12,6 +12,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\DestinationInspectionController;
 use App\Http\Controllers\DomainController;
+use App\Http\Controllers\DomainRemovalController;
 use App\Http\Controllers\LinkBulkController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkCsvController;
@@ -298,6 +299,9 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
 
     // Domains.
     Route::prefix('domains')->middleware('uvh.auth')->group(function () {
+        Route::get('{id}/deletion-preview', [DomainRemovalController::class, 'deletionPreview'])->middleware(['uvh.auth:verified', 'uvh.workspace:admin'])->where('id', '[0-9]+');
+        Route::post('{id}/reassignment-preview', [DomainRemovalController::class, 'preview'])->middleware(['uvh.auth:verified', 'uvh.workspace:admin'])->where('id', '[0-9]+');
+        Route::post('{id}/reassign', [DomainRemovalController::class, 'reassign'])->middleware(['uvh.auth:verified', 'uvh.workspace:admin'])->where('id', '[0-9]+');
         Route::get('/', [DomainController::class, 'index'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer']);
         Route::get('{id}', [DomainController::class, 'show'])->middleware(['uvh.auth:verified', 'uvh.workspace:viewer'])->where('id', '[0-9]+');
         Route::post('/', [DomainController::class, 'store'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor']);

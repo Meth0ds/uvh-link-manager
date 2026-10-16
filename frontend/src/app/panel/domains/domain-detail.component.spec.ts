@@ -7,6 +7,7 @@ import { DomainDetailComponent } from "./domain-detail.component";
 import { ApiService } from "../../core/services/api.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import type { DomainDto } from "../../core/models";
+import { domainSetupAdvice, domainSetupSteps } from "./domain-setup";
 
 function domainDto(overrides: Partial<DomainDto> = {}): DomainDto {
   return {
@@ -151,5 +152,25 @@ describe("DomainDetailComponent speaks the traffic model", () => {
     expect(host.querySelector(".activity-card")?.textContent).toContain("No se pudo cargar la actividad del dominio");
     // The diagnostic grid is still on screen: the timeline is a companion view.
     expect(host.querySelector(".diagnostic-grid")).not.toBeNull();
+  });
+
+  it("provides Cloudflare instructions without starting DNS or TLS", () => {
+    fixture.componentInstance.provider.set("cloudflare"); fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain("DNS only");
+    expect(api.post).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).querySelector("details.advanced-diagnostics")?.hasAttribute("open")).toBeFalse();
+  });
+
+  it("does not infer availability from completed DNS alone", () => {
+    const steps = domainSetupSteps(domainDto({ servingReady: false, tlsReadyAt: null, tlsStatus: "provisioning" }));
+    expect(steps[1].complete).toBeTrue(); expect(steps[2].complete).toBeFalse(); expect(steps[3].complete).toBeFalse();
+    expect(domainSetupAdvice(domainDto({ tlsStatus: "provisioning" }))).toContain("preparando HTTPS");
+  });
+
+  it("explains probable proxies and actionable DNS failures", () => {
+    expect(domainSetupAdvice(domainDto({ routingObservedProxied: true }))).toContain("sugiere");
+    expect(domainSetupAdvice(domainDto({ dnsError: "ownership_missing" }))).toContain("TXT");
+    expect(domainSetupAdvice(domainDto({ dnsError: "routing_missing" }))).toContain("Corrige el CNAME");
+    expect(domainSetupAdvice(domainDto({ caaAllowsIssuer: false }))).toContain("CAA");
   });
 });

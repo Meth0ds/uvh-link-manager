@@ -1,5 +1,5 @@
 import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
-import { RouterLink } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -21,6 +21,8 @@ import { OwnedMutations } from "../../core/services/owned-mutations";
 import { targetWorkspace } from "../../core/services/workspace-target";
 import { countLabel } from "../../core/count-label";
 import { domainStateLabel } from "../../core/domain-state-label";
+import { DomainRemovalDialogService } from "./domain-removal-dialog.service";
+import { SessionContextService } from "../../core/services/session-context.service";
 import {
   decodeCreatedDomainResponse,
   decodeDomainsResponse,
@@ -68,6 +70,10 @@ export class DomainsComponent {
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
   private actions = inject(ActionDialogService);
+  private readonly removal = inject(DomainRemovalDialogService);
+  private readonly router = inject(Router);
+  private readonly session = inject(SessionContextService);
+  private removalAbort?: AbortController;
   private readonly destroyRef = inject(DestroyRef);
   private readonly loadRequests = new LatestRequest(inject(DestroyRef));
   private readonly pollRequests = new LatestRequest(inject(DestroyRef));
@@ -91,7 +97,7 @@ export class DomainsComponent {
     return role === "owner" || role === "admin" || role === "editor";
   };
 
-  /** Desactivar/Eliminar apagan o borran todos los enlaces del dominio: admin+. */
+  /** Desactivar/Eliminar requieren administrador o propietario. */
   readonly canAdmin = (): boolean => {
     const role = this.workspaces.currentRole();
     return role === "owner" || role === "admin";
@@ -146,6 +152,7 @@ export class DomainsComponent {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
       this.loadedWorkspaceId = workspaceId;
+      this.removalAbort?.abort();
       this.loadRequests.invalidate();
       this.pollRequests.invalidate();
       this.domains.set([]);
@@ -213,7 +220,8 @@ export class DomainsComponent {
       // move it into another tenant's list or another operation's result.
       if (!target.isCurrent() || !this.addMutation.isCurrent(action)) return;
       if (this.newDomain().trim() === domain) this.newDomain.set("");
-      this.snackbar.open("Dominio añadido. Abre su configuración para preparar los registros DNS.", "Cerrar", { duration: 4000 });
+      this.snackbar.open("Dominio añadido. Vamos a configurar sus registros DNS.", "Cerrar", { duration: 4000 });
+      void this.router.navigate(["/app/domains", created.id]);
       this.domains.update((d) => [created, ...d]);
     } catch (err) {
       if (!target.isCurrent() || !this.addMutation.isCurrent(action)) return;
@@ -429,25 +437,24 @@ export class DomainsComponent {
   }
 
   async remove(d: DomainDto): Promise<void> {
-    if (!this.canAdmin()) return;
+    if (!this.canAdmin() || this.actionId() !== null) return;
     const target = targetWorkspace(this.workspaces);
-    const confirmed = await this.actions.confirm({
-      title: "Eliminar dominio",
-      message: `¿Quieres eliminar ${d.domain}? Antes debes haber reasignado todos sus enlaces, incluidos los que estén en la papelera.`,
-      confirmLabel: "Eliminar dominio",
-      destructive: true,
-    });
-    if (!confirmed || this.actionId() || !target.isCurrent()) return;
+    const generation = this.session.generation();
     const action = this.mutations.begin(d.id);
+    const lifetime = new AbortController();
+    this.removalAbort = lifetime;
+    const untrack = this.destroyRef.onDestroy(() => lifetime.abort());
     try {
-      await this.api.delete(`/api/v1/domains/${d.id}`);
-      if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Dominio eliminado", "Cerrar", { duration: 2500 });
+      const result = await this.removal.open(d, { signal: lifetime.signal });
+      if (!target.isCurrent() || !this.mutations.isCurrent(action) || this.session.generation() !== generation || !this.canAdmin()) return;
+      if (result?.deleted) this.snackbar.open("Dominio eliminado", "Cerrar", { duration: 2500 });
       void this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
     } finally {
+      untrack();
+      lifetime.abort();
       // Only the operation that still owns the slot may clear it: a stale
       // action landing late must not re-enable the rows of a newer one.
       this.mutations.settle(action);

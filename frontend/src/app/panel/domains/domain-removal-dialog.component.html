@@ -1,0 +1,70 @@
+<h2 mat-dialog-title>Eliminar dominio</h2>
+<mat-dialog-content>
+  <p class="hostname">{{ data.domain }}</p>
+  <p>Primero revisaremos los enlaces asociados. El borrado del dominio se confirma por separado.</p>
+  <p class="status" role="status" aria-live="polite">{{ status() }}</p>
+  @if (loading() || busy()) { <mat-progress-bar mode="indeterminate" aria-label="Revisando el dominio" /> }
+  @if (error(); as message) {
+    <div class="alert error" role="alert" #operationError tabindex="-1"><p>{{ message }}</p>
+      @if (uncertain()) {
+        <p>No hemos podido confirmar el resultado. Conservamos la misma operación para comprobarla sin repetir sus efectos.</p>
+        <p>Puedes reintentar aquí o cerrar y consultar el estado al volver.</p>
+        <button mat-stroked-button type="button" (click)="apply()" [disabled]="busy() !== null">Comprobar resultado y reintentar</button>
+      } @else if (!impact()) {
+        <button mat-stroked-button type="button" (click)="reload()" [disabled]="locked() || loading()">Reintentar revisión</button>
+      }
+    </div>
+  }
+  @if (impact(); as impact) {
+    <h3 #impactHeading tabindex="-1">Enlaces asociados</h3>
+    <dl class="impact"><div><dt>Biblioteca</dt><dd>{{ impact.liveLinks }}</dd></div><div><dt>Papelera</dt><dd>{{ impact.trashedLinks }}</dd></div><div><dt>Bloqueados</dt><dd>{{ impact.blockedLinks }}</dd></div></dl>
+    @if (impact.isDefault) { <p class="alert">Es el dominio predeterminado. Al eliminarlo, los enlaces nuevos usarán el dominio de plataforma hasta que elijas otro.</p> }
+    @if (impact.blockedLinks > 0) { <p class="alert">Hay enlaces bloqueados. Su gestión requiere intervención de la administración de la plataforma.</p> }
+    @if (impact.canDelete) {
+      <div class="delete-review">
+        <h3>Sin enlaces asociados</h3>
+        <p>Eliminarás <strong>{{ impact.domain }}</strong> de este workspace y se liberará su vinculación en UVH. Los registros de tu proveedor DNS permanecerán como están.</p>
+        <mat-checkbox [checked]="deleteConfirmation()" (change)="deleteConfirmation.set($event.checked)" [disabled]="locked()">Confirmo que quiero eliminar {{ impact.domain }}</mat-checkbox>
+        <button mat-flat-button class="danger" type="button" (click)="remove()" [disabled]="locked() || !deleteConfirmation()">Eliminar dominio definitivamente</button>
+      </div>
+    } @else {
+      <p>Quedan {{ impact.totalLinks }} enlaces asociados. Reasígnalos antes de eliminar el dominio, incluidos los de la papelera que quieras conservar.</p>
+      @if (!managing()) { <button mat-flat-button type="button" (click)="startManaging()" [disabled]="locked()">Revisar y reasignar</button> }
+    }
+  }
+  @if (managing() && impact() && !impact()!.canDelete) {
+    <section class="selection" aria-label="Enlaces para reasignar">
+      <h3 #selectionHeading tabindex="-1">1. Selecciona los enlaces</h3>
+      <p>Hasta 100 por operación. La selección se conserva al buscar y cambiar de página.</p>
+      <mat-tab-group [selectedIndex]="tab()" (selectedIndexChange)="changeTab($event)"><mat-tab label="Biblioteca" [disabled]="locked()" /><mat-tab label="Papelera" [disabled]="locked()" /></mat-tab-group>
+      <div class="search"><mat-form-field appearance="outline"><mat-label>Buscar por nombre, alias o destino</mat-label><input matInput #query [value]="q()" (keyup.enter)="search(query.value)" [disabled]="locked()" /></mat-form-field><button mat-stroked-button type="button" (click)="search(query.value)" [disabled]="locked()">Buscar</button></div>
+      @if (rowsLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando enlaces del dominio" /> }
+      @if (rowsError(); as message) { <div class="alert error" role="alert">{{ message }} <button mat-button type="button" (click)="loadRows()" [disabled]="locked()">Reintentar</button></div> }
+      @for (row of rows(); track row.link.id) {
+        <div class="candidate"><mat-checkbox [checked]="selected().has(row.link.id)" (change)="toggle(row, $event.checked)" [disabled]="locked() || row.blocked || (!selected().has(row.link.id) && selected().size >= 100)" [aria-label]="'Seleccionar ' + row.link.alias" />
+          <div><strong>{{ row.link.name || row.link.alias }}</strong><p class="url">{{ row.link.shortUrl }}</p><small>{{ row.blocked ? 'Bloqueado · requiere administración' : stateLabel(row.link.state) }}@if (row.purgeAt) { · Purga prevista: {{ formatDate(row.purgeAt) }} }</small></div>
+        </div>
+      } @empty { @if (!rowsLoading() && !rowsError()) { <p>No hay enlaces en esta vista.</p> } }
+      <mat-paginator [length]="total()" [pageSize]="perPage" [pageIndex]="page()" [disabled]="locked() || rowsLoading()" (page)="paginate($event)" aria-label="Páginas de enlaces del dominio" />
+      <p role="status">{{ selected().size }} enlaces seleccionados de un máximo de 100.</p>
+      <h3>2. Elige el destino y revisa</h3>
+      <mat-form-field appearance="outline" floatLabel="always"><mat-label>Dominio de destino</mat-label><mat-select placeholder="Elige un destino" [value]="targetId() === null ? 'platform' : targetId()" (selectionChange)="changeTarget($event.value === 'platform' ? null : $event.value)" [disabled]="locked()"><mat-option value="platform">Dominio de plataforma</mat-option>@for (domain of targetOptions(); track domain.id) { <mat-option [value]="domain.id">{{ domain.domain }}</mat-option> }</mat-select></mat-form-field>
+      <button mat-stroked-button type="button" (click)="review()" [disabled]="locked() || !selected().size || targetId() === undefined">Revisar cambios</button>
+      <p>Los enlaces de la papelera seguirán eliminados y conservarán su fecha de purga. Su alias volverá a comprobarse al restaurarlos.</p>
+    </section>
+    @if (preview(); as preview) {
+      <section class="preview" aria-label="Vista previa de la reasignación">
+        <h3 #previewHeading tabindex="-1">3. Confirma las nuevas URL</h3>
+        <p class="alert"><strong>Cambiará la URL pública.</strong> Los enlaces y QR ya compartidos conservan la dirección anterior y tendrás que actualizarlos. No se creará una redirección desde la dirección antigua.</p>
+        @for (row of preview.links; track row.linkId) {
+          <article class="preview-row"><strong>{{ row.alias }}</strong><dl><div><dt>Anterior</dt><dd class="url">{{ row.oldUrl }}</dd></div><div><dt>Nueva</dt><dd class="url">{{ row.newUrl }}</dd></div></dl>
+            @if (row.inTrash) { <small>Se conserva en papelera · purga {{ formatDate(row.purgeAt) }}</small> }
+            @if (row.conflict) { <p class="error" role="status">{{ row.conflict === 'blocked' ? 'Bloqueado: requiere administración.' : 'Alias ocupado o repetido en la selección. Elige otro destino o ajusta la selección.' }}</p> }
+          </article>
+        }
+        <button mat-flat-button type="button" (click)="apply()" [disabled]="busy() !== null || !preview.canApply || uncertain()">Confirmar reasignación de {{ preview.links.length }} enlaces</button>
+      </section>
+    }
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end"><button mat-button type="button" (click)="close()" [disabled]="busy() !== null">Cerrar</button></mat-dialog-actions>

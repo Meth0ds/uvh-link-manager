@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
 import { AsyncPoller } from "../../core/async-poller";
+import { RetryCountdown, formatWaitLabel } from "../../core/retry-countdown";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { ActivatedRoute, RouterLink } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -23,6 +24,9 @@ import { targetWorkspace } from "../../core/services/workspace-target";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 import { domainStateLabel } from "../../core/domain-state-label";
+import { SessionContextService } from "../../core/services/session-context.service";
+import { DomainRemovalDialogService } from "./domain-removal-dialog.service";
+import { domainSetupAdvice, domainSetupSteps } from "./domain-setup";
 
 const DNS_ERROR: Record<string, string> = {
   ownership_and_routing_missing: "No encontramos ni el TXT de propiedad ni el CNAME de tráfico.",
@@ -79,9 +83,17 @@ export class DomainDetailComponent {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly workspaces = inject(WorkspaceService);
+  private readonly session = inject(SessionContextService);
+  private readonly removal = inject(DomainRemovalDialogService);
+  private readonly router = inject(Router);
+  private removalAbort?: AbortController;
   private readonly snackbar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
   private readonly requests = new LatestRequest(inject(DestroyRef));
+  private readonly retry = new RetryCountdown(this.destroyRef);
+  readonly dnsWait = computed(() => this.retry.remaining(`${this.currentContext()}:dns`));
+  readonly tlsWait = computed(() => this.retry.remaining(`${this.currentContext()}:tls`));
+  readonly waitLabel = formatWaitLabel;
 
   /**
    * Live diagnostics: while a DNS check or a TLS issuance is in flight the
@@ -104,6 +116,11 @@ export class DomainDetailComponent {
   }
 
   readonly domain = signal<DomainDto | null>(null);
+  readonly provider = signal<"generic" | "cloudflare">("generic");
+  readonly copyStatus = signal("");
+  readonly setupSteps = computed(() => this.domain() ? domainSetupSteps(this.domain()!) : []);
+  readonly setupAdvice = computed(() => this.domain() ? domainSetupAdvice(this.domain()!) : "");
+  readonly canAdmin = computed(() => ["owner", "admin"].includes(this.workspaces.currentRole() ?? ""));
   readonly loading = signal(true);
   /** Historial del dominio: los mismos eventos que las integraciones reciben, proyectados. */
   readonly activity = signal<DomainActivityEvent[]>([]);
@@ -138,15 +155,17 @@ export class DomainDetailComponent {
   private loadedContext: string | null = null;
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.removalAbort?.abort());
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => this.domainId.set(this.paramId()));
 
     effect(() => {
       const workspaceId = this.workspaces.currentId();
       const role = this.workspaces.currentRole();
       const domainId = this.domainId();
-      const context = workspaceId === null || role === null ? null : `${workspaceId}:${role}:${domainId}`;
+      const context = workspaceId === null || role === null ? null : this.currentContext();
       if (context === this.loadedContext) return;
       this.loadedContext = context;
+      this.removalAbort?.abort();
       this.requests.invalidate();
       this.activityRequests.invalidate();
       this.domain.set(null);
@@ -154,6 +173,8 @@ export class DomainDetailComponent {
       this.activity.set([]);
       this.activityError.set(null);
       this.surfaceDirty.set(false);
+      this.provider.set("generic");
+      this.copyStatus.set("");
       // An action still in flight belongs to the context that left the screen;
       // its guarded `finally` will not clear the flag here, so the new context
       // starts unblocked instead of inheriting a stuck busy state.
@@ -179,7 +200,7 @@ export class DomainDetailComponent {
   private currentContext(): string | null {
     const workspaceId = this.workspaces.currentId();
     const role = this.workspaces.currentRole();
-    return workspaceId === null || role === null ? null : `${workspaceId}:${role}:${this.domainId()}`;
+    return workspaceId === null || role === null ? null : `${workspaceId}:${role}:${this.domainId()}:${this.session.user()?.id ?? ""}:${this.session.generation()}`;
   }
 
   async load(silent = false): Promise<void> {
@@ -193,7 +214,7 @@ export class DomainDetailComponent {
       return;
     }
 
-    const request = this.requests.begin(`${workspaceId}:${role}:${domainId}`);
+    const request = this.requests.begin(this.currentContext());
     if (!silent) {
       this.loading.set(true);
       this.error.set(null);
@@ -207,6 +228,9 @@ export class DomainDetailComponent {
       );
       if (!this.requests.isCurrent(request, this.currentContext())) return;
       this.domain.set(response.domain);
+      if (response.domain.tlsNextRetryAt) {
+        this.retry.defer(`${this.currentContext()}:tls`, Math.ceil((Date.parse(response.domain.tlsNextRetryAt) - Date.now()) / 1000));
+      }
       this.syncSurface(response.domain);
       this.error.set(null);
       if (!silent) void this.loadActivity();
@@ -236,7 +260,7 @@ export class DomainDetailComponent {
     const role = this.workspaces.currentRole();
     const domainId = this.domainId();
     if (workspaceId === null || role === null || domainId === null) return;
-    const request = this.activityRequests.begin(`${workspaceId}:${role}:${domainId}`);
+    const request = this.activityRequests.begin(this.currentContext());
     this.activityLoading.set(true);
     try {
       const response = await this.api.get<DomainActivityResponse>(
@@ -259,7 +283,7 @@ export class DomainDetailComponent {
 
   async startDnsCheck(): Promise<void> {
     const current = this.domain();
-    if (!current || !this.canEdit() || this.actionBusy()) return;
+    if (!current || !this.canEdit() || this.actionBusy() || this.dnsWait() > 0 || current.dnsCheckInProgress || current.tlsStatus === "provisioning") return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
     const action = this.mutations.begin(0);
@@ -276,6 +300,7 @@ export class DomainDetailComponent {
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo iniciar la comprobación", "Cerrar", { duration: 5000 });
+      if (err instanceof ApiRequestError && err.status === 429) this.retry.defer(`${this.currentContext()}:dns`, err.retryAfterSeconds);
       // 409 = ya hay una comprobación en vuelo; el estado avanza igualmente y
       // el refresco inmediato lo muestra sin esperar al siguiente sondeo.
       if (err instanceof ApiRequestError && err.status === 409) {
@@ -292,7 +317,7 @@ export class DomainDetailComponent {
     // flight keeps `state` at "verified", but its result could still demote
     // the domain, so preparing HTTPS now would waste an issuance on a row the
     // check is about to change.
-    if (!current || current.state !== "verified" || current.dnsCheckInProgress || !this.canEdit() || this.actionBusy()) return;
+    if (!current || current.state !== "verified" || current.dnsCheckInProgress || !this.canEdit() || this.actionBusy() || this.tlsWait() > 0) return;
     const target = targetWorkspace(this.workspaces);
     if (target.workspaceId === null) return;
     const action = this.mutations.begin(0);
@@ -306,6 +331,7 @@ export class DomainDetailComponent {
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo activar el dominio", "Cerrar", { duration: 5000 });
+      if (err instanceof ApiRequestError && err.status === 429) this.retry.defer(`${this.currentContext()}:tls`, err.retryAfterSeconds);
       // Misma lectura que en la comprobación: un 409 es trabajo en curso.
       if (err instanceof ApiRequestError && err.status === 409) {
         await this.load();
@@ -478,6 +504,27 @@ export class DomainDetailComponent {
       : `${base} — quedan ${days} días.`;
   }
 
+  async remove(): Promise<void> {
+    const domain = this.domain();
+    const context = this.currentContext();
+    if (!domain || !this.canAdmin() || this.actionBusy()) return;
+    const action = this.mutations.begin(domain.id);
+    const lifetime = new AbortController();
+    this.removalAbort = lifetime;
+    try {
+      const result = await this.removal.open(domain, { signal: lifetime.signal });
+      if (this.currentContext() !== context || !this.mutations.isCurrent(action) || !this.canAdmin()) return;
+      if (result?.deleted) {
+        this.snackbar.open("Dominio eliminado", "Cerrar", { duration: 2500 });
+        await this.router.navigate(["/app/domains"]);
+      } else await this.load();
+    } catch (error) {
+      if (this.currentContext() === context && this.mutations.isCurrent(action)) {
+        this.snackbar.open(error instanceof ApiRequestError ? error.message : "No se pudo abrir la revisión del dominio", "Cerrar", { duration: 4000 });
+      }
+    } finally { lifetime.abort(); this.mutations.settle(action); }
+  }
+
   copy(value: string | null, label: string): void {
     if (!value) return;
     const pending = navigator.clipboard?.writeText(value);
@@ -485,9 +532,10 @@ export class DomainDetailComponent {
       this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
       return;
     }
+    const context = this.currentContext();
     void pending.then(
-      () => this.snackbar.open(`${label} copiado`, "Cerrar", { duration: 2000 }),
-      () => this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }),
+      () => { if (this.currentContext() === context && !this.destroyRef.destroyed) { this.copyStatus.set(`${label} copiado`); this.snackbar.open(`${label} copiado`, "Cerrar", { duration: 2000 }); } },
+      () => { if (this.currentContext() === context && !this.destroyRef.destroyed) { this.copyStatus.set("No se pudo copiar"); this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }); } },
     );
   }
 }

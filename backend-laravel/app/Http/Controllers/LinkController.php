@@ -44,6 +44,10 @@ class LinkController
     public function trash(Request $request)
     {
         $workspaceId = UvhRequest::workspaceId($request);
+        $domainId = UvhRequest::queryString($request, 'domainId');
+        if ($domainId !== '' && $this->positiveQueryInteger($domainId, 0, PHP_INT_MAX) === 0) {
+            return response()->json(['error' => 'Dominio inválido'], 422);
+        }
         $search = SearchTerm::contains(UvhRequest::queryString($request, 'q'));
         $page = $this->positiveQueryInteger($request->query('page'), 1, 10_000);
         $perPage = $this->positiveQueryInteger($request->query('perPage'), 20, 100);
@@ -51,6 +55,9 @@ class LinkController
 
         $query = Link::withTrashed()->with(['domain', 'tags', 'collection'])
             ->where('workspace_id', $workspaceId)->whereNotNull('deleted_at');
+        if ($domainId !== '') {
+            $query->where('domain_id', (int) $domainId);
+        }
         LinkSearch::matching($query, $search);
         $query->orderByDesc('deleted_at')->orderByDesc('id');
         $total = (clone $query)->count();

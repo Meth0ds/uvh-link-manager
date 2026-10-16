@@ -1,11 +1,12 @@
 import { signal } from "@angular/core";
 import { flushMicrotasks, fakeAsync, TestBed, tick, type ComponentFixture } from "@angular/core/testing";
 import { provideNoopAnimations } from "@angular/platform-browser/animations";
-import { provideRouter } from "@angular/router";
+import { Router, provideRouter } from "@angular/router";
 import { DomainsComponent } from "./domains.component";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 import { ActionDialogService } from "../action-dialog.service";
+import { DomainRemovalDialogService } from "./domain-removal-dialog.service";
 import type { DomainDto } from "../../core/models";
 
 interface Deferred<T> {
@@ -97,6 +98,7 @@ describe("DomainsComponent create ownership", () => {
         { provide: WorkspaceService, useValue: { currentId: workspace, currentRole: role } },
       ],
     }).compileComponents();
+    spyOn(TestBed.inject(Router), "navigate").and.resolveTo(true);
     fixture = TestBed.createComponent(DomainsComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -172,6 +174,7 @@ describe("DomainsComponent permission guards and resilient follow-up", () => {
         { provide: WorkspaceService, useValue: { currentId: workspace, currentRole: role } },
       ],
     }).compileComponents();
+    spyOn(TestBed.inject(Router), "navigate").and.resolveTo(true);
     fixture = TestBed.createComponent(DomainsComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -256,6 +259,7 @@ describe("DomainsComponent idempotent mutations", () => {
         { provide: WorkspaceService, useValue: { currentId: workspace, currentRole: role } },
       ],
     }).compileComponents();
+    spyOn(TestBed.inject(Router), "navigate").and.resolveTo(true);
     fixture = TestBed.createComponent(DomainsComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -332,6 +336,7 @@ describe("DomainsComponent impact disclosure and destructive confirmation", () =
         { provide: WorkspaceService, useValue: { currentId: workspace, currentRole: role } },
       ],
     }).compileComponents();
+    spyOn(TestBed.inject(Router), "navigate").and.resolveTo(true);
     fixture = TestBed.createComponent(DomainsComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -378,4 +383,49 @@ describe("DomainsComponent impact disclosure and destructive confirmation", () =
     expect(confirm.calls.mostRecent().args[0]?.message).toContain("1 enlace dejará de responder");
     expect(api.post).not.toHaveBeenCalled();
   });
+
+  for (const state of ["pending", "error", "verifying"] as const) {
+    it(`offers deletion for a ${state} domain before DNS is configured`, () => {
+      fixture.componentInstance.domains.set([domainDto({
+        state,
+        linksCount: 0,
+        ownershipVerifiedAt: null,
+        routingVerifiedAt: null,
+        dnsCheckInProgress: state === "verifying",
+      })]);
+      fixture.detectChanges();
+
+      const button = (fixture.nativeElement as HTMLElement)
+        .querySelector<HTMLButtonElement>('button[aria-label="Eliminar go.example.test"]');
+      expect(button).not.toBeNull();
+      expect(button?.disabled).toBeFalse();
+    });
+  }
+
+  it("opens the impact review instead of deleting directly", async () => {
+    const pending = domainDto({ state: "pending", linksCount: 0 });
+    const review = spyOn(TestBed.inject(DomainRemovalDialogService), "open").and.resolveTo({ deleted: false, changed: false });
+    await fixture.componentInstance.remove(pending);
+    expect(review).toHaveBeenCalledOnceWith(pending, jasmine.objectContaining({ signal: jasmine.any(AbortSignal) }));
+    expect(api.delete).not.toHaveBeenCalled();
+  });
+
+  it("reloads after the assistant closes following a reassignment", async () => {
+    spyOn(TestBed.inject(DomainRemovalDialogService), "open").and.resolveTo({ deleted: false, changed: true });
+    api.get.and.resolveTo({ domains: [] });
+    await fixture.componentInstance.remove(domainDto());
+    await fixture.whenStable();
+    expect(fixture.componentInstance.domains()).toEqual([]);
+    expect(api.delete).not.toHaveBeenCalled();
+  });
+
+  for (const currentRole of ["admin", "editor", "viewer"]) {
+    it(`respects ${currentRole} removal permissions`, async () => {
+      role.set(currentRole);
+      const review = spyOn(TestBed.inject(DomainRemovalDialogService), "open").and.resolveTo(undefined);
+      await fixture.componentInstance.remove(domainDto({ state: "pending" }));
+      expect(review).toHaveBeenCalledTimes(currentRole === "admin" ? 1 : 0);
+      expect(api.delete).not.toHaveBeenCalled();
+    });
+  }
 });

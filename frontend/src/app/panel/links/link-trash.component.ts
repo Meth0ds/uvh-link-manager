@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, viewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { RouterLink } from "@angular/router";
+import { ActivatedRoute, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
@@ -9,6 +9,7 @@ import { MatPaginatorModule, type PageEvent } from "@angular/material/paginator"
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { dateTimeMediumLabel } from "../../core/date-time-label";
+import { parseRouteId } from "../../core/strict-wire";
 import type { LinkTrashResponse, TrashLinkDto } from "../../core/models";
 import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import { AuthService } from "../../core/services/auth.service";
@@ -44,6 +45,7 @@ export class LinkTrashComponent {
   readonly pageSizeOptions = [20, 50, 100];
   readonly pageSize = signal(20);
   readonly q = signal("");
+  readonly domainId = signal(parseRouteId(inject(ActivatedRoute).snapshot.queryParamMap.get("domainId")));
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   /** La única mutación en vuelo y su dueño; ver `OwnedMutations`. */
@@ -63,6 +65,7 @@ export class LinkTrashComponent {
     effect(() => {
       const workspaceId = this.workspaces.currentId();
       if (workspaceId === this.loadedWorkspaceId) return;
+      if (this.loadedWorkspaceId !== undefined) this.domainId.set(null);
       this.loadedWorkspaceId = workspaceId;
       this.requests.invalidate();
       // Un purge en vuelo pertenece al workspace que dejó la pantalla: su
@@ -82,18 +85,19 @@ export class LinkTrashComponent {
     if (workspaceId === null) return;
     const page = this.page() + 1;
     const perPage = this.pageSize();
-    const request = this.requests.begin(`${workspaceId}:${page}:${perPage}:${this.q()}`);
+    const key = `${workspaceId}:${page}:${perPage}:${this.q()}:${this.domainId()}`;
+    const request = this.requests.begin(key);
     this.loading.set(true); this.error.set(null);
     try {
-      const response = await this.api.get<LinkTrashResponse>("/api/v1/links/trash", { q: this.q(), page, perPage }, (value) => decodeLinkTrashResponse(value, { page, perPage }), { signal: request.signal });
-      if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}`)) return;
+      const response = await this.api.get<LinkTrashResponse>("/api/v1/links/trash", { q: this.q(), page, perPage, domainId: this.domainId() }, (value) => decodeLinkTrashResponse(value, { page, perPage }), { signal: request.signal });
+      if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}:${this.domainId()}`)) return;
       this.rows.set(response.links); this.total.set(response.total); this.retentionDays.set(response.retentionDays);
     } catch (err) {
-      if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}`)) return;
+      if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}:${this.domainId()}`)) return;
       this.rows.set([]); this.total.set(0);
       this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la papelera");
     } finally {
-      if (this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}`)) this.loading.set(false);
+      if (this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}:${this.domainId()}`)) this.loading.set(false);
     }
   }
 
