@@ -1,3 +1,6 @@
+import { AppOpeningEditorComponent } from "./app-opening-editor.component";
+import { AppOpeningService } from "../../core/services/app-opening.service";
+import { recommendedLinkUrl, type AppOpeningSpec } from "../../core/app-opening";
 import { SharingService } from "../../core/services/sharing.service";
 import type { SocialPreviewSpec } from "../../core/sharing";
 import { SocialPreviewEditorComponent } from "./social-preview-editor.component";
@@ -136,7 +139,7 @@ function integerValidator(control: AbstractControl): ValidationErrors | null {
 @Component({
   selector: "app-link-dialog",
   standalone: true,
-  imports: [SocialPreviewEditorComponent,
+  imports: [AppOpeningEditorComponent, SocialPreviewEditorComponent,
     ReactiveFormsModule, RouterLink, DestinationInspectionComponent, ExpiredPageEditorComponent,
     MatDialogModule,
     MatButtonModule,
@@ -186,8 +189,15 @@ export class LinkDialogComponent {
   private creationKey = crypto.randomUUID();
   readonly workflows = inject(LinkWorkflowService);
   readonly sharing = inject(SharingService);
+  readonly appOpening = signal<AppOpeningSpec | null>(structuredClone(this.data.link?.appOpening ?? null));
+  readonly apps = inject(AppOpeningService);
   readonly socialPreview = signal<SocialPreviewSpec | null>(structuredClone(this.data.link?.socialPreview ?? null));
   readonly socialBusy = signal(false);
+  readonly appOpeningValid = signal(true);
+  appOpeningWritable(): boolean {
+    const spec = this.appOpening();
+    return spec?.kind === "native" ? this.apps.native() : spec?.kind === "provider" ? this.apps.providers() : this.apps.providers() || this.apps.native();
+  }
   readonly destinationTitle = signal<{title:string;url:string}|null>(null);
   passwordWillProtect(): boolean { const v=this.form.getRawValue(); return !!v.password || (!!this.data.link?.passwordProtected && !v.clearPassword); }
   socialTitleSuggestion(): string | null { const s=this.destinationTitle(); return s?.url===this.destinationValue() ? s.title : null; }
@@ -531,6 +541,7 @@ export class LinkDialogComponent {
   applyTemplate(template: LinkTemplateDto | null): void {
     if (!template) return;
     const payload = template.payload;
+    this.appOpening.set(structuredClone(payload.app_opening ?? null));
     this.socialPreview.set(structuredClone(payload.social_preview ?? null));
     for (const field of ["scheduledAt", "expiresAt"] as const) {
       const iso = (field === "scheduledAt" ? payload.scheduled_at : payload.expires_at) ?? null;
@@ -583,6 +594,7 @@ export class LinkDialogComponent {
       return;
     }
     const payload: LinkTemplatePayload = {
+      ...(this.appOpeningWritable() ? {app_opening:this.appOpening()} : {}),
       ...(this.sharing.socialEnabled() ? {social_preview:this.socialPreview()} : {}),
       destination,
       name: v.name?.trim() || null,
@@ -703,7 +715,7 @@ export class LinkDialogComponent {
   copyCreatedLink(): void {
     const link = this.createdLink();
     if (!link) return;
-    this.copyFeedback.copy(link.shortUrl, () => this.securityContext());
+    this.copyFeedback.copy(recommendedLinkUrl(link), () => this.securityContext());
   }
 
   openCreatedQr(): void {
@@ -712,7 +724,7 @@ export class LinkDialogComponent {
     void import("./qr-dialog.component").then(({ QrDialogComponent }) => {
       if (this.destroyRef.destroyed || !this.isOpeningCurrent()) return;
       this.matDialog.open(QrDialogComponent, {
-        data: { url: link.shortUrl, linkId: link.id },
+        data: { url: recommendedLinkUrl(link), linkId: link.id },
         width: "760px",
         maxWidth: "calc(100vw - 24px)",
       });
@@ -726,6 +738,7 @@ export class LinkDialogComponent {
       if (this.destroyRef.destroyed) return;
       this.matDialog.open(RuleSimulatorDialogComponent, {
         data: {
+          appOpeningConfigured: !!this.appOpening(),
           destination: v.destination.trim(),
           fallbackDestination: v.fallbackDestination.trim() || null,
           utm: {
@@ -765,6 +778,7 @@ export class LinkDialogComponent {
     this.rules.clear();
     this.addRule();
     this.expiredPage.set(defaultExpiredPage());
+    this.appOpening.set(null);
     this.socialPreview.set(null);
     this.destinationTitle.set(null);
     this.createdLink.set(null);
@@ -782,7 +796,7 @@ export class LinkDialogComponent {
     this.form.controls.expiresAt.updateValueAndValidity({ emitEvent: false });
     const aliasUnavailable = ["checking", "taken", "invalid", "reserved"].includes(this.aliasStatus());
     if (this.destroyRef.destroyed || this.form.invalid || this.hasInvalidRules || aliasUnavailable
-      || this.busy() || this.socialBusy() || this.expiredPageInvalid || ((this.isEdit || this.isDuplicate) && !this.editDetailsLoaded())) return;
+      || !this.appOpeningValid() || this.busy() || this.socialBusy() || this.expiredPageInvalid || ((this.isEdit || this.isDuplicate) && !this.editDetailsLoaded())) return;
     // Comprobación síncrona antes de enviar: el interceptor pone el workspace
     // ACTUAL en la cabecera, y aquí el actual debe seguir siendo el de apertura.
     if (this.openedIn.workspaceId !== null && !this.isOpeningCurrent()) {
@@ -804,6 +818,7 @@ export class LinkDialogComponent {
       ...(this.isEdit ? { version: this.data.link!.version } : {}),
       ...(this.isDuplicate ? { sourceVersion: this.data.link!.version, passwordAction: v.clearPassword ? "remove" : passwordValue !== "" ? "replace" : "keep" } : {}),
       ...(this.workflows.enabled() ? { expiredPage: this.expiredPage() } : {}),
+      ...(this.appOpeningWritable() ? { appOpening: this.appOpening() } : {}),
       ...(this.sharing.socialEnabled() ? {socialPreview:this.socialPreview()} : {}),
       name: v.name?.trim() || null,
       destination: v.destination?.trim(),

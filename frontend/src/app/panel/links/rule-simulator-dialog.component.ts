@@ -15,6 +15,7 @@ import { AuthService } from "../../core/services/auth.service";
 import { WorkspaceService } from "../../core/services/workspace.service";
 
 export interface RuleSimulatorDialogData {
+  appOpeningConfigured?: boolean;
   linkId?: number;
   destination: string;
   fallbackDestination: string | null;

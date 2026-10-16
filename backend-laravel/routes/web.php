@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\AppAssociationController;
+use App\Http\Controllers\AppOpeningController;
 use App\Http\Controllers\EdgeController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\PublicController;
@@ -14,6 +16,13 @@ Route::get('/robots.txt', [PublicController::class, 'robots']);
 Route::get('/sitemap.xml', [PublicController::class, 'sitemap']);
 
 Route::get('/.well-known/uvh-social/{publication}/{assetId}.jpg', [SocialCardController::class, 'image'])->whereUuid('publication')->whereUuid('assetId')->middleware('throttle:uvh-resolve');
+
+Route::get('/.well-known/{file}', [AppAssociationController::class, 'show'])->where('file', 'apple-app-site-association|assetlinks\.json')->middleware('throttle:uvh-resolve');
+Route::get('/a/{alias}', [AppOpeningController::class, 'launch'])->middleware('throttle:uvh-resolve');
+Route::get('/app-links/continue/{id}/{choice}', [AppOpeningController::class, 'prepared'])->whereUuid('id')->where('choice', 'app|web')->middleware('throttle:uvh-resolve');
+Route::post('/app-links/continue', [AppOpeningController::class, 'continue'])->middleware(['uvh.csrf', 'throttle:uvh-resolve']);
+Route::get('/app-links/manrope-{weight}.woff2', [AppOpeningController::class, 'font'])->where('weight', '400|600');
+Route::get('/app-links/bridge.js', [AppOpeningController::class, 'bridgeScript'])->middleware('throttle:uvh-resolve');
 
 Route::get('/r/{alias}', [RedirectController::class, 'resolve'])->middleware('throttle:uvh-resolve');
 // Unlocking a protected link has its own per-host/alias/IP budget. It must

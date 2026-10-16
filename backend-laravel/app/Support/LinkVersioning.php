@@ -29,6 +29,7 @@ final class LinkVersioning
             'singleUse' => (bool) $link->single_use,
             'scheduledAt' => $link->scheduled_at?->toIso8601String(),
             'expiresAt' => $link->expires_at?->toIso8601String(),
+            'appOpening' => $link->app_opening,
             'socialPreview' => $link->social_preview,
             'expiredPage' => ExpiredLinkPage::canonical($link->expired_page),
             'utm' => ['source' => $link->utm_source, 'medium' => $link->utm_medium, 'campaign' => $link->utm_campaign, 'term' => $link->utm_term, 'content' => $link->utm_content],

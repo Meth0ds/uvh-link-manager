@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Link;
+use App\Support\AppOpening;
 use App\Support\LinkService;
 use App\Support\UvhRequest;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +28,7 @@ final class QrSnapshotController
         if (count(array_unique($ids)) !== count($ids)) {
             return response()->json(['error' => 'Hay enlaces repetidos en la selección.'], 422);
         }
-        $rows = Link::with('domain')->where('workspace_id', UvhRequest::workspaceId($request))->whereNull('deleted_at')->whereIn('id', $ids)->get()->keyBy('id');
+        $rows = Link::with(AppOpening::domainRelation())->where('workspace_id', UvhRequest::workspaceId($request))->whereNull('deleted_at')->whereIn('id', $ids)->get()->keyBy('id');
         if ($rows->count() !== count($ids)) {
             return response()->json(['error' => 'Algún enlace ya no está disponible en este workspace. Actualiza la selección.'], 404);
         }
@@ -35,7 +36,7 @@ final class QrSnapshotController
         return response()->json(['links' => array_map(function (int $id) use ($rows): array {
             $row = $rows[$id];
 
-            return ['id' => $id, 'alias' => $row->alias, 'shortUrl' => LinkService::shortUrl($row->domain?->domain, $row->alias), 'state' => $row->state];
+            return ['id' => $id, 'alias' => $row->alias, 'shortUrl' => LinkService::shortUrl($row->domain?->domain, $row->alias), 'shareUrl' => AppOpening::launchUrl($row, LinkService::shortUrl($row->domain?->domain, $row->alias)) ?? LinkService::shortUrl($row->domain?->domain, $row->alias), 'state' => $row->state];
         }, $ids)])->header('Cache-Control', 'private, no-store');
     }
 }

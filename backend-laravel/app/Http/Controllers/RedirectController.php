@@ -42,7 +42,17 @@ class RedirectController
         if (config('sharing.social_previews') && SocialPreview::isFetcher($request->header('user-agent'))) {
             return app(SocialCardController::class)->card($request, $alias);
         }
-        $ctx = [
+        $ctx = $this->context($request, $alias);
+
+        $outcome = RedirectService::resolve($ctx);
+
+        return $this->answer($request, $alias, $ctx, $outcome);
+    }
+
+    /** @return array<string, mixed> */
+    public function context(Request $request, string $alias): array
+    {
+        return [
             'host' => $request->getHost(),
             'alias' => $alias,
             'user_agent' => $request->header('user-agent'),
@@ -52,11 +62,9 @@ class RedirectController
             'country' => $this->countryFromHeaders($request),
             'unlock_token' => $request->cookies->get(RedirectService::UNLOCK_COOKIE),
             'qr_public_id' => QrAttribution::fromRequest($request),
+            'native_profile' => $request->attributes->get('uvh.native_profile'),
+            'inspect_only' => $request->isMethod('HEAD') || SocialPreview::isFetcher($request->header('user-agent')),
         ];
-
-        $outcome = RedirectService::resolve($ctx);
-
-        return $this->answer($request, $alias, $ctx, $outcome);
     }
 
     /**
@@ -73,8 +81,13 @@ class RedirectController
             ]);
         }
 
+        if ($outcome['kind'] === 'app_opening') {
+            return app(AppOpeningController::class)->page($request, $alias, $ctx, $outcome);
+        }
         if ($outcome['kind'] === 'redirect') {
-            $this->recordClick($outcome['link_id'], $ctx, $outcome['campaign'] ?? null, $outcome['qr_variant_id'] ?? null);
+            if (empty($outcome['analytics_recorded'])) {
+                $this->recordClick($outcome['link_id'], $ctx, $outcome['campaign'] ?? null, $outcome['qr_variant_id'] ?? null);
+            }
 
             return response('', 302, [
                 'Location' => $outcome['location'],

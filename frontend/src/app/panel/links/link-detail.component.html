@@ -27,8 +27,11 @@
           <p class="dest" [title]="link.destination">{{ link.destination }}</p>
         </div>
       </div>
+      @if (link.appOpening; as app) {
+        <div class="app-opening-summary"><mat-icon aria-hidden="true">open_in_new</mat-icon><div><strong>{{ app.kind === 'native' ? 'Aplicación del workspace' : app.provider === 'google_maps' ? 'Google Maps' : app.provider === 'apple_maps' ? 'Apple Maps' : app.provider === 'spotify' ? 'Spotify' : 'YouTube' }}</strong><p>{{ app.kind === 'native' ? app.route : app.url }}</p>@if (link.appLaunchUrl) { <p>Para compartir: <span>{{ link.appLaunchUrl }}</span></p><p>Dirección web compatible: <span>{{ link.shortUrl }}</span></p> }<small>Las reglas y el destino alternativo tienen prioridad. Siempre se conserva la alternativa web.</small></div></div>
+      }
       <div class="actions">
-        <button class="copy-action" mat-stroked-button [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(link.shortUrl, copyScope) === 'copying'" (click)="copy(link.shortUrl)"><app-copy-feedback-icon [phase]="copyFeedback.phase(link.shortUrl, copyScope)" /> {{ copyFeedback.phase(link.shortUrl, copyScope) === 'copied' ? 'Copiado' : copyFeedback.phase(link.shortUrl, copyScope) === 'copying' ? 'Copiando…' : 'Copiar' }}</button>
+        <button class="copy-action" mat-stroked-button [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying'" (click)="copy((link.shareUrl || link.shortUrl))"><app-copy-feedback-icon [phase]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope)" /> {{ copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copied' ? 'Copiado' : copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying' ? 'Copiando…' : 'Copiar' }}</button>
         @if (sharing.canPublish()) { <button mat-stroked-button type="button" (click)="shareReport()"><mat-icon>insert_chart_outlined</mat-icon>Compartir informe</button> }
         <button mat-stroked-button (click)="showQr()"><mat-icon>qr_code_2</mat-icon> QR</button>
         @if (workflows.linkHistoryEnabled()) { <button mat-stroked-button type="button" (click)="openHistory()"><mat-icon>history</mat-icon> Historial</button> }
@@ -148,4 +151,4 @@
   </div>
 }
 
-@if (link(); as currentLink) { <app-qr-campaign-panel [linkId]="currentLink.id" [url]="currentLink.shortUrl" /> }
+@if (link(); as currentLink) { <app-qr-campaign-panel [linkId]="currentLink.id" [url]="currentLink.shareUrl || currentLink.shortUrl" /> }

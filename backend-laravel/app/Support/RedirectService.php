@@ -111,7 +111,7 @@ class RedirectService
     }
 
     /**
-     * @param  array{host?: string, alias?: string, user_agent?: ?string, accept_language?: ?string, referrer?: ?string, ip?: ?string, country?: ?string, unlock_token?: ?string, qr_public_id?: ?string}  $ctx
+     * @param  array{host?: string, alias?: string, user_agent?: ?string, accept_language?: ?string, referrer?: ?string, ip?: ?string, country?: ?string, unlock_token?: ?string, qr_public_id?: ?string, native_profile?: ?string, app_attempt_id?: string, app_grant?: ?string, inspect_only?: bool, native_protocol?: bool}  $ctx
      * @return array<string, mixed>
      */
     public static function resolve(array $ctx): array
@@ -169,7 +169,7 @@ class RedirectService
             ? SignedToken::verify((string) $ctx['unlock_token'], fn ($payload) => json_decode($payload, true))
             : null;
         $host = self::normalizeHost((string) ($ctx['host'] ?? ''));
-        if ($link->password_hash && ! self::unlockMatches($unlock, $alias, $host, $id, (int) $link->password_version)) {
+        if ($link->password_hash && ! self::unlockMatches($unlock, $alias, $host, $id, (int) $link->password_version) && ! AppAdmissions::proof($link, $ctx)) {
             return ['kind' => 'password_required', 'link_id' => $id];
         }
 
@@ -208,7 +208,7 @@ class RedirectService
         // such requests can each wait on the other's shared lock. Retaking the
         // resolution exclusively can only wait on the lock already chosen, so
         // it cannot deadlock.
-        $exclusive = (bool) $link->single_use || $link->max_clicks !== null;
+        $exclusive = (bool) $link->single_use || $link->max_clicks !== null || AppOpening::enabled($link);
         $bumpClick = false;
         $outcome = ['kind' => 'not_found'];
 
@@ -237,7 +237,7 @@ class RedirectService
                 // limit. Re-read that decision under the lock so a concurrent edit
                 // cannot slip an unconditional redirect past a limit, and so a
                 // consumption never runs on the shared lock the read took.
-                if (! $exclusive && ((bool) $fresh->single_use || $fresh->max_clicks !== null)) {
+                if (! $exclusive && ((bool) $fresh->single_use || $fresh->max_clicks !== null || AppOpening::enabled($fresh))) {
                     $retry = true;
                     $outcome = ['kind' => 'retry'];
 
@@ -250,12 +250,15 @@ class RedirectService
                 // unnecessary exclusive-lock bottleneck.
                 if ($freshDomainId !== null && ! CustomDomain::where('id', $freshDomainId)
                     ->where('desired_state', 'enabled')->where('edge_eligible', true)
-                    ->whereNotNull('tls_ready_at')->sharedLock()->first(['id'])) {
+                    ->whereNotNull('tls_ready_at')
+                    ->where('workspace_id', $fresh->workspace_id)
+                    ->whereExists(fn ($claim) => $claim->selectRaw('1')->from('custom_domain_claims')->whereColumn('custom_domain_claims.workspace_id', 'custom_domains.workspace_id')->whereRaw('lower(custom_domain_claims.domain) = lower(custom_domains.domain)'))
+                    ->sharedLock()->first(['id'])) {
                     $outcome = ['kind' => 'unavailable', 'reason' => 'domain'];
 
                     return;
                 }
-                if ($fresh->password_hash && ! self::unlockMatches($unlock, $alias, $host, $id, (int) $fresh->password_version)) {
+                if ($fresh->password_hash && ! self::unlockMatches($unlock, $alias, $host, $id, (int) $fresh->password_version) && ! AppAdmissions::proof($fresh, $ctx)) {
                     $outcome = ['kind' => 'password_required', 'link_id' => $id];
 
                     return;
@@ -281,6 +284,33 @@ class RedirectService
                     $outcome = ExpiredLinkPage::decorate(['kind' => 'unavailable', 'reason' => 'expired'], $fresh, 'expired');
 
                     return;
+                }
+
+                $nativeProfile = null;
+                if (config('app_links.native') && ($fresh->app_opening['kind'] ?? '') === 'native') {
+                    $nativeProfile = AppOpening::profile($fresh->app_opening['profileId'], (int) $fresh->workspace_id, $freshDomainId);
+                    $ctx['app_profile_version'] = $nativeProfile ? (int) $nativeProfile->version : -1;
+                }
+                if (isset($ctx['native_profile'])) {
+                    $spec = $fresh->app_opening;
+                    if (! config('app_links.native') || ($spec['kind'] ?? '') !== 'native' || ($spec['profileId'] ?? '') !== $ctx['native_profile'] || ! $nativeProfile) {
+                        $outcome = ['kind' => 'unavailable', 'reason' => 'app'];
+
+                        return;
+                    }
+                }
+                if (! empty($ctx['app_grant']) && ! AppAdmissions::proof($fresh, $ctx)) {
+                    $outcome = ['kind' => 'unavailable', 'reason' => 'changed'];
+
+                    return;
+                }
+                if ($fresh->app_opening !== null && empty($ctx['inspect_only'])) {
+                    $replay = AppAdmissions::replay($fresh, $ctx);
+                    if ($replay !== null) {
+                        $outcome = $replay;
+
+                        return;
+                    }
                 }
 
                 // Rules: deterministic order by priority then id; first match wins.
@@ -316,6 +346,22 @@ class RedirectService
                 // single-use state or click quota; fail closed on an invalid result.
                 if (! UrlUtil::validateDestination($destination)['ok']) {
                     $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
+
+                    return;
+                }
+
+                $delivery = AppOpening::delivery($fresh, $selection['source'], $nativeProfile);
+                if (empty($ctx['native_protocol']) && ($ua['device'] ?? null) === 'desktop') {
+                    $delivery = null;
+                }
+                if ($fresh->app_opening !== null && DestinationDenylist::reason($destination) !== null) {
+                    $outcome = ['kind' => 'unavailable', 'reason' => 'destination'];
+
+                    return;
+                }
+                if (! empty($ctx['inspect_only'])) {
+                    $outcome = (($fresh->single_use && $fresh->used_at) || ($fresh->max_clicks !== null && $fresh->click_count >= $fresh->max_clicks))
+                        ? ['kind' => 'gone'] : ['kind' => 'redirect', 'location' => $destination, 'link_id' => $id, 'analytics_recorded' => true];
 
                     return;
                 }
@@ -370,6 +416,18 @@ class RedirectService
                     'campaign' => $fresh->utm_campaign ?? $campaignFromReferrer,
                     'qr_variant_id' => QrAttribution::resolve($id, $ctx['qr_public_id'] ?? null),
                 ];
+                if (AppOpening::enabled($fresh)) {
+                    if ($bumpClick) {
+                        Link::where('id', $id)->increment('click_count');
+                        $bumpClick = false;
+                    }
+                    if ($delivery !== null) {
+                        $outcome['kind'] = 'app_opening';
+                        $outcome['app'] = $delivery;
+                    }
+                    $outcome = AppAdmissions::record($fresh, $ctx, $outcome);
+                }
+
             });
 
             if (! $retry) {

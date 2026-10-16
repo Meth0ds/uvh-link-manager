@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\SocialAssetCleanup;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -22,3 +23,5 @@ Schedule::command('uvh:notifications-digest')->dailyAt('08:00')->withoutOverlapp
 Schedule::command('uvh:destination-inspections-prune')->everyFiveMinutes()->withoutOverlapping();
 
 Schedule::call(fn () => SocialAssetCleanup::run())->name('social-assets-prune')->hourly()->withoutOverlapping();
+
+Schedule::call(fn () => DB::table('app_link_admissions')->where('expires_at', '<', now())->delete())->name('app-admissions-prune')->everyFiveMinutes()->withoutOverlapping();

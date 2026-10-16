@@ -56,6 +56,7 @@ final class RotateAppSecret extends Command
             $this->rotateColumn('users', 'mfa_pending_secret', $dryRun);
             $this->rotateColumn('webhooks', 'secret', $dryRun);
             $this->rotateColumn('analytics_reports', 'secret_encrypted', $dryRun);
+            $this->rotateColumn('app_link_admissions', 'outcome_encrypted', $dryRun);
             $this->rotateReportReceipts($dryRun);
             $this->rotateColumn('mail_outbox', 'encrypted_envelope', $dryRun);
             $this->rotateColumn('privacy_rights_messages', 'encrypted_body', $dryRun);

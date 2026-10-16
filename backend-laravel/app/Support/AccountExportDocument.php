@@ -40,6 +40,7 @@ final class AccountExportDocument
     private const SECTIONS = [
         'memberships',
         'createdLinks',
+        'appProfiles',
         'linkVersions',
         'linkFavorites',
         'savedLinkFilters',
@@ -171,8 +172,9 @@ final class AccountExportDocument
                 ->select([
                     'id', 'workspace_id', 'domain_id', 'alias', 'name', 'destination', 'fallback_destination', 'state',
                     'max_clicks', 'click_count', 'single_use', 'used_at', 'scheduled_at', 'expires_at', 'notes',
-                    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'expired_page', 'social_preview', 'created_at', 'updated_at', 'deleted_at',
+                    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'expired_page', 'app_opening', 'social_preview', 'created_at', 'updated_at', 'deleted_at',
                 ])->cursor(),
+            'appProfiles' => static fn (): iterable => DB::table('app_link_profiles')->whereIn('workspace_id', DB::table('memberships')->where('user_id', $userId)->select('workspace_id'))->orderBy('id')->select(['public_id', 'workspace_id', 'domain_id', 'name', 'enabled', 'ios_app_id', 'android_package', 'android_fingerprints', 'route_prefixes', 'version', 'created_at', 'updated_at'])->cursor(),
             'analyticsReportLinks' => static fn (): iterable => DB::table('analytics_report_links')->join('analytics_reports', 'analytics_reports.id', '=', 'analytics_report_links.report_id')->where('analytics_reports.created_by', $userId)->orderBy('analytics_report_links.report_id')->orderBy('analytics_report_links.link_id')->select(['report_id', 'link_id', 'public_label'])->cursor(),
             'analyticsReports' => static fn (): iterable => DB::table('analytics_reports')->where('created_by', $userId)->orderBy('id')->select(['id', 'workspace_id', 'spec', 'expires_at', 'revoked_at', 'version', 'created_at'])->cursor(),
             'linkFavorites' => static fn (): iterable => DB::table('link_favorites')->where('user_id', $userId)

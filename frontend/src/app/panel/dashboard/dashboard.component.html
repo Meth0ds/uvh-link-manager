@@ -63,7 +63,7 @@
           <a class="recent-main" [routerLink]="['/app/links', l.id]" [attr.aria-label]="'Abrir enlace ' + (l.name || displayUrl(l.shortUrl))"><b>{{ l.name || displayUrl(l.shortUrl) }}</b>@if (l.name) { <span>{{ displayUrl(l.shortUrl) }}</span> }<span>{{ l.destination }}</span></a>
           <span class="link-state" [class.is-active]="l.state === 'active'">{{ stateLabel(l.state) }}</span>
           <span class="clicks"><b>{{ formatCount(l.clickCount) }}</b><small>acumulados</small></span>
-          <button mat-icon-button type="button" (click)="copy(l.shortUrl)" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(l.shortUrl, copyScope) === 'copying'" [attr.aria-label]="'Copiar enlace ' + displayUrl(l.shortUrl)"><app-copy-feedback-icon [phase]="copyFeedback.phase(l.shortUrl, copyScope)" /></button>
+          <button mat-icon-button type="button" (click)="copy((l.shareUrl || l.shortUrl))" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase((l.shareUrl || l.shortUrl), copyScope) === 'copying'" [attr.aria-label]="'Copiar enlace ' + displayUrl(l.shortUrl)"><app-copy-feedback-icon [phase]="copyFeedback.phase((l.shareUrl || l.shortUrl), copyScope)" /></button>
         </li>
       }
     </ul>

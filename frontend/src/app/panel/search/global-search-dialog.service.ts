@@ -85,7 +85,7 @@ export class GlobalSearchDialogService {
         const { link } = await this.api.get(`/api/v1/links/${action.id}`, undefined, decodeLinkResponse, { signal: controller.signal });
         if (!current() || this.actionController !== controller || controller.signal.aborted) return;
         const { QrDialogComponent } = await import("../links/qr-dialog.component");
-        if (current() && !controller.signal.aborted && (this.dialogs.openDialogs?.length ?? 0) === 0) this.dialogs.open(QrDialogComponent, { data: { url: link.shortUrl, linkId: link.id }, width: "760px", maxWidth: "calc(100vw - 32px)" });
+        if (current() && !controller.signal.aborted && (this.dialogs.openDialogs?.length ?? 0) === 0) this.dialogs.open(QrDialogComponent, { data: { url: link.shareUrl ?? link.shortUrl, linkId: link.id }, width: "760px", maxWidth: "calc(100vw - 32px)" });
       } catch (error) { if (current() && !controller.signal.aborted) this.snackbar.open(error instanceof Error ? error.message : "No se pudo abrir el QR de este enlace.", "Cerrar", { duration: 5000 }); }
       finally { unregister(); if (this.actionController === controller) { this.actionController = undefined; this.actionContext = undefined; } }
     }

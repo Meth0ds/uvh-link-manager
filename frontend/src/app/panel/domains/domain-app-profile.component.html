@@ -1,0 +1,248 @@
+@if (apps.native()) {
+  <section class="native-profile">
+    <button
+      class="profile-toggle"
+      type="button"
+      [attr.aria-expanded]="expanded()"
+      (click)="expanded.set(!expanded())"
+    >
+      <mat-icon aria-hidden="true">phone_iphone</mat-icon
+      ><span
+        ><strong>Aplicación del dominio</strong
+        ><small>{{
+          profile()?.enabled
+            ? profile()?.name
+            : "Conecta tu app de iPhone o Android"
+        }}</small></span
+      ><mat-icon class="chevron" [class.open]="expanded()" aria-hidden="true"
+        >expand_more</mat-icon
+      >
+    </button>
+    @if (expanded()) {
+      <div class="profile-body">
+        <p class="intro">
+          Asocia una aplicación propia con <strong>{{ domain() }}</strong
+          >. Necesita integración nativa y una comprobación en un dispositivo
+          real.
+        </p>
+        @if (loading()) {
+          <p role="status">Cargando configuración…</p>
+        }
+        @if (error()) {
+          <p class="alert error" role="alert">
+            {{ error() }}
+            <button
+              type="button"
+              mat-button
+              (click)="reload()"
+              [disabled]="busy()"
+            >
+              Recargar
+            </button>
+          </p>
+        }
+        @if (!loading()) {
+          <form (ngSubmit)="save()">
+            <fieldset [disabled]="!canManage() || busy()">
+              <label
+                >Nombre de la aplicación<input
+                  name="appName"
+                  [(ngModel)]="name"
+                  maxlength="120"
+                  placeholder="Mi aplicación"
+                  required
+              /></label>
+              <div class="platform-fields">
+                <div>
+                  <h3>iPhone y iPad</h3>
+                  <label
+                    >Identificador de aplicación Apple<input
+                      name="iosAppId"
+                      [(ngModel)]="iosAppId"
+                      placeholder="ABCDE12345.es.empresa.app"
+                      maxlength="255"
+                      spellcheck="false"
+                  /></label>
+                  <p>
+                    App ID Prefix y Bundle ID reales. Deben coincidir con la app
+                    firmada.
+                  </p>
+                </div>
+                <div>
+                  <h3>Android</h3>
+                  <label
+                    >Nombre del paquete<input
+                      name="androidPackage"
+                      [(ngModel)]="androidPackage"
+                      placeholder="es.empresa.app"
+                      maxlength="255"
+                      spellcheck="false" /></label
+                  ><label
+                    >Huellas SHA-256<textarea
+                      name="fingerprints"
+                      [(ngModel)]="fingerprints"
+                      rows="3"
+                      placeholder="AA:BB:CC:… · una huella por línea"
+                      spellcheck="false"
+                      maxlength="960"
+                    ></textarea>
+                  </label>
+                  <p>
+                    Hasta 10 huellas para rotar firmas. Usa la firma de
+                    distribución; no subas certificados privados.
+                  </p>
+                </div>
+              </div>
+              <label
+                >Prefijos de contenido permitidos<textarea
+                  name="prefixes"
+                  [(ngModel)]="prefixes"
+                  rows="2"
+                  placeholder="/productos/&#10;/ofertas/"
+                  spellcheck="false"
+                  maxlength="4020"
+                ></textarea>
+              </label>
+              <p>
+                Una ruta por línea. Los enlaces solo podrán abrir contenido bajo
+                estos prefijos.
+              </p>
+              <label class="enable"
+                ><input
+                  type="checkbox"
+                  name="enabled"
+                  [(ngModel)]="enabled"
+                  [disabled]="!ready() && !enabled"
+                /><span
+                  ><strong>Publicar la asociación</strong
+                  ><small
+                    >Solo se asociarán las direcciones /a/. El panel y la API
+                    quedan fuera.</small
+                  ></span
+                ></label
+              >
+              @if (!ready()) {
+                <p class="warning">
+                  El dominio debe estar reclamado, activo y con HTTPS operativo
+                  antes de publicar.
+                </p>
+              }
+            </fieldset>
+            @if (canManage()) {
+              <div class="actions">
+                <button
+                  mat-flat-button
+                  type="submit"
+                  [disabled]="busy() || !name.trim()"
+                >
+                  {{ busy() ? "Procesando…" : "Guardar configuración" }}</button
+                ><button
+                  mat-stroked-button
+                  type="button"
+                  (click)="diagnose()"
+                  [disabled]="busy() || !profile()"
+                >
+                  Comprobar publicación</button
+                ><span role="status" class="saved">{{ success() }}</span>
+              </div>
+            }
+          </form>
+          <div class="integration-note">
+            <mat-icon aria-hidden="true">verified_user</mat-icon>
+            <p>
+              La app debe consultar el resolver de UVH antes de mostrar
+              contenido. Publicar estos archivos no acredita esa integración.
+              Los cambios pueden tardar en llegar a los dispositivos.
+            </p>
+          </div>
+          @if (profile(); as p) {
+            <details class="developer-details">
+              <summary>Datos para tu equipo de desarrollo</summary>
+              <label
+                >Resolver de UVH<input
+                  readonly
+                  [value]="apps.resolverUrl()"
+                  aria-label="Endpoint del resolver nativo de UVH"
+              /></label>
+              <p>
+                Fija este origen en la app. No obtengas el servidor de
+                resolución del enlace recibido.
+              </p>
+              <p>
+                La app debe utilizar este identificador y validar el dominio
+                antes de consultar el resolver.
+              </p>
+              <label
+                >Identificador del perfil<input
+                  readonly
+                  [value]="p.id"
+                  aria-label="Identificador del perfil de aplicación" /></label
+              ><button
+                mat-stroked-button
+                type="button"
+                (click)="copyProfileId()"
+                [disabled]="copyFeedback.busy()"
+              >
+                <mat-icon aria-hidden="true">content_copy</mat-icon
+                >{{
+                  copyFeedback.phase(p.id, copyScope) === "copied"
+                    ? "Copiado"
+                    : "Copiar identificador"
+                }}
+              </button>
+              <p>
+                Direcciones de apertura:
+                <code>https://{{ domain() }}/a/alias</code>
+              </p>
+              <div class="association-links">
+                <a
+                  [href]="
+                    'https://' +
+                    domain() +
+                    '/.well-known/apple-app-site-association'
+                  "
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Ver asociación Apple</a
+                ><a
+                  [href]="
+                    'https://' + domain() + '/.well-known/assetlinks.json'
+                  "
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Ver asociación Android</a
+                >
+              </div>
+            </details>
+          }
+          @if (diagnostics(); as d) {
+            <div class="diagnostics" aria-live="polite">
+              <strong>Estado de la integración</strong>
+              <p>
+                {{
+                  d.domainVerified
+                    ? "Dominio verificado y HTTPS operativo"
+                    : "Dominio pendiente de verificación o HTTPS"
+                }}
+              </p>
+              @for (f of d.files; track f.file) {
+                <p>
+                  <code>{{ f.file }}</code
+                  ><span>{{
+                    f.published
+                      ? "Publicado y coincide"
+                      : "Pendiente o no coincide"
+                  }}</span>
+                </p>
+              }
+              <p>
+                Prueba en iPhone y Android:
+                <strong>Pendiente en dispositivo real</strong>
+              </p>
+            </div>
+          }
+        }
+      </div>
+    }
+  </section>
+}

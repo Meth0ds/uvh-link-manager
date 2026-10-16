@@ -11,6 +11,7 @@ use App\Http\Controllers\AnalyticsReportController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\DestinationInspectionController;
+use App\Http\Controllers\DomainAppProfileController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\DomainRemovalController;
 use App\Http\Controllers\LinkBulkController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\LinkWorkflowController;
 use App\Http\Controllers\MfaChallengeController;
 use App\Http\Controllers\MfaConfigurationController;
 use App\Http\Controllers\MfaSessionController;
+use App\Http\Controllers\NativeAppLinkController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PendingHandoffController;
@@ -48,6 +50,7 @@ use App\Http\Controllers\WorkspaceActivityController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Controllers\WorkspaceOnboardingController;
 use App\Http\Controllers\WorkspaceUsageController;
+use App\Http\Middleware\NativeAppPasswordThrottle;
 use Illuminate\Support\Facades\Route;
 
 // Bearer-token integration API. These routes intentionally sit outside the
@@ -81,7 +84,13 @@ Route::prefix('v1')->middleware('throttle:uvh-api')->group(function () {
     });
 });
 
+// Native protocol authenticates explicit signed challenges, never panel cookies.
+Route::post('v1/app-links/resolve', [NativeAppLinkController::class, 'resolve'])->middleware(['throttle:uvh-app-resolve', NativeAppPasswordThrottle::class]);
+
 Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
+    Route::get('domains/{id}/app-profile', [DomainAppProfileController::class, 'show'])->whereNumber('id')->middleware(['uvh.auth:verified', 'uvh.workspace:viewer']);
+    Route::patch('domains/{id}/app-profile', [DomainAppProfileController::class, 'save'])->whereNumber('id')->middleware(['uvh.auth:verified', 'uvh.workspace:admin']);
+    Route::post('domains/{id}/app-profile/diagnose', [DomainAppProfileController::class, 'diagnose'])->whereNumber('id')->middleware(['uvh.auth:verified', 'uvh.workspace:admin', 'throttle:uvh-domain-dns']);
     Route::post('social-preview-assets', [SocialPreviewAssetController::class, 'store'])->middleware(['uvh.auth:verified', 'uvh.workspace:editor', 'throttle:uvh-analytics']);
     Route::get('social-preview-assets/{id}', [SocialPreviewAssetController::class, 'show'])->whereNumber('id')->middleware(['uvh.auth:verified', 'uvh.workspace:viewer']);
     Route::prefix('analytics-reports')->middleware(['uvh.auth:verified', 'uvh.workspace:admin', 'throttle:uvh-analytics'])->group(function () {

@@ -63,6 +63,9 @@ final class LinkDuplicateController extends LinkController
                     throw new LinkException('El enlace original cambió. Recarga antes de duplicarlo.', 409);
                 }
                 $input = $this->inputFromRequest($body, $source);
+                if (! array_key_exists('app_opening', $input)) {
+                    $input['app_opening'] = $source->app_opening;
+                }
                 $input['alias'] = $body->has('alias') ? $body->input('alias') : null;
                 $input['tags'] = $body->has('tags') ? $body->input('tags') : $source->tags->pluck('name')->all();
                 $input['rules'] = $body->has('rules') ? $body->input('rules') : $source->rules->map(fn ($rule) => $rule->only(['priority', 'country', 'language', 'device', 'os', 'time_from', 'time_to', 'referrer', 'campaign', 'destination']))->all();

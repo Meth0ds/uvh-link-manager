@@ -1,3 +1,4 @@
+import { decodeAppOpening } from "../app-opening";
 import { decodeSocialPreview } from "./sharing-decoders";
 import { decodeLinkName } from "./link-name-decoder";
 import type {
@@ -112,6 +113,7 @@ export function decodeCollectionDeleteResponse(value: unknown): { ok: boolean; m
 function templatePayload(value: unknown): LinkTemplatePayload {
   const source = record(value, "link template payload");
   const payload: LinkTemplatePayload = {};
+  if (source["app_opening"] !== undefined) payload.app_opening = decodeAppOpening(source["app_opening"]);
   if (source["social_preview"] !== undefined) payload.social_preview = decodeSocialPreview(source["social_preview"]);
   if (source["destination"] !== undefined) payload.destination = httpUrl(source["destination"], "template destination");
   if (source["fallback_destination"] !== undefined) {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\LinkException;
 use App\Models\Link;
 use App\Models\LinkVersion;
+use App\Support\AppOpening;
 use App\Support\Idempotency;
 use App\Support\IsoDate;
 use App\Support\LinkService;
@@ -139,6 +140,9 @@ final class LinkHistoryController
                 'rules' => $configuration['rules'] ?? [],
                 'lifecycle_dates_changed' => true,
             ];
+            if (array_key_exists('appOpening', $version->configuration ?? [])) {
+                $input['app_opening'] = $version->configuration['appOpening'];
+            }
             if (array_key_exists('socialPreview', $version->configuration ?? [])) {
                 $input['social_preview'] = $version->configuration['socialPreview'];
             }
@@ -153,7 +157,7 @@ final class LinkHistoryController
                     throw new LinkException($valid['error'] ?? 'La configuración ya no es válida', 422);
                 }
                 LinkService::update($id, $workspaceId, (int) $user->id, $input, $expected, UvhRequest::apiToken($request), (int) $user->security_version, $actor, 'restore');
-                $link = Link::with(['domain', 'tags', 'collection'])->where('id', $id)->where('workspace_id', $workspaceId)->firstOrFail();
+                $link = Link::with([AppOpening::domainRelation(), 'tags', 'collection'])->where('id', $id)->where('workspace_id', $workspaceId)->firstOrFail();
                 $actor->auditLink('link.restore_version', $id, ['originRevision' => $revision, 'restoredFields' => array_keys($input)]);
                 $body = ['link' => LinkService::dto($link), 'restoredRevision' => $revision];
                 Idempotency::commit((int) $user->id, $scope, $key, $hash, 200, $body, $begin['lease']);

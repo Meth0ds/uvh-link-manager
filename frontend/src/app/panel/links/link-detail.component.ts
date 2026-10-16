@@ -350,7 +350,7 @@ export class LinkDetailComponent {
 
   showQr(): void {
     const l = this.link();
-    if (l) this.dialog.open(QrDialogComponent, { data: { url: l.shortUrl, linkId: l.id }, width: "760px", maxWidth: "calc(100vw - 32px)" });
+    if (l) this.dialog.open(QrDialogComponent, { data: { url: l.shareUrl ?? l.shortUrl, linkId: l.id }, width: "760px", maxWidth: "calc(100vw - 32px)" });
   }
 
   openRuleSimulator(): void {
@@ -359,7 +359,7 @@ export class LinkDetailComponent {
     void import("./rule-simulator-dialog.component").then(({ RuleSimulatorDialogComponent }) => {
       if (this.dialogOwner.destroyed || this.link()?.id !== link.id) return;
       this.dialog.open(RuleSimulatorDialogComponent, {
-        data: { linkId: link.id, destination: link.destination, fallbackDestination: link.fallbackDestination, utm: link.utm, rules: this.rules() },
+        data: { appOpeningConfigured: !!link.appOpening, linkId: link.id, destination: link.destination, fallbackDestination: link.fallbackDestination, utm: link.utm, rules: this.rules() },
         width: "680px", maxWidth: "calc(100vw - 24px)", autoFocus: "first-tabbable",
       });
     });

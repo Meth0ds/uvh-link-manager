@@ -217,6 +217,7 @@ class LinkService
                 throw new LinkException('Colección no encontrada', 422);
             }
 
+            $appOpening = AppOpening::validate($input['app_opening'] ?? null, $workspaceId, $domainId);
             $social = SocialPreview::validate($input['social_preview'] ?? null, $workspaceId);
             // Quota enforcement inside the transaction (no TOCTOU window). The
             // quota row is locked so concurrent creates serialize per workspace
@@ -250,6 +251,7 @@ class LinkService
                     'expires_at' => self::toDateTime($input['expires_at'] ?? null),
                     'name' => LinkName::normalize($input['name'] ?? null),
                     'notes' => $input['notes'] ?? null,
+                    'app_opening' => $appOpening,
                     'social_preview' => $social,
                     'social_public_id' => Str::uuid()->toString(),
                     'expired_page' => ExpiredLinkPage::canonical($input['expired_page'] ?? null),
@@ -344,6 +346,8 @@ class LinkService
                     throw new LinkException('Dominio no activado o sin acceso', 403);
                 }
             }
+            $appOpening = array_key_exists('app_opening', $input) || $domainId !== $link->domain_id
+                ? AppOpening::validate(array_key_exists('app_opening', $input) ? $input['app_opening'] : $link->app_opening, $workspaceId, $domainId) : $link->app_opening;
             $collectionId = array_key_exists('collection_id', $input) ? $input['collection_id'] : $link->collection_id;
             if ($collectionId !== null && ! Collection::where('id', $collectionId)
                 ->where('workspace_id', $workspaceId)->exists()) {
@@ -394,6 +398,7 @@ class LinkService
                     'expires_at' => self::toDateTime($input['expires_at'] ?? null),
                     'name' => array_key_exists('name', $input) ? LinkName::normalize($input['name']) : $link->name,
                     'notes' => $input['notes'] ?? null,
+                    'app_opening' => $appOpening,
                     'social_preview' => $social,
                     'social_public_id' => $link->social_public_id ?? Str::uuid()->toString(),
                     'expired_page' => ExpiredLinkPage::canonical(array_key_exists('expired_page', $input) ? $input['expired_page'] : $link->expired_page),
@@ -443,11 +448,17 @@ class LinkService
      */
     public static function dto(Link $link): array
     {
-        $link->loadMissing('domain', 'tags', 'collection');
+        $link->loadMissing(AppOpening::domainRelation(), 'tags', 'collection');
+
+        $shortUrl = self::shortUrl($link->domain?->domain, $link->alias);
+        $appLaunchUrl = AppOpening::launchUrl($link, $shortUrl);
 
         return [
             'id' => $link->id,
             'favorite' => (bool) ($link->getAttribute('is_favorite') ?? false),
+            'appOpening' => $link->app_opening,
+            'appLaunchUrl' => $appLaunchUrl,
+            'shareUrl' => $appLaunchUrl ?? $shortUrl,
             'socialPreview' => $link->social_preview,
             'expiredPage' => ExpiredLinkPage::canonical($link->expired_page),
             'alias' => $link->alias,

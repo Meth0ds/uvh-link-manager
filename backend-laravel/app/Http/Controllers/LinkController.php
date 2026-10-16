@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\LinkException;
 use App\Models\Link;
+use App\Support\AppOpening;
 use App\Support\Audit;
 use App\Support\Idempotency;
 use App\Support\IsoDate;
@@ -53,7 +54,7 @@ class LinkController
         $perPage = $this->positiveQueryInteger($request->query('perPage'), 20, 100);
         $retentionDays = max(1, (int) config('uvh.housekeeping.link_trash_days', 30));
 
-        $query = Link::withTrashed()->with(['domain', 'tags', 'collection'])
+        $query = Link::withTrashed()->with([AppOpening::domainRelation(), 'tags', 'collection'])
             ->where('workspace_id', $workspaceId)->whereNotNull('deleted_at');
         if ($domainId !== '') {
             $query->where('domain_id', (int) $domainId);
@@ -119,7 +120,7 @@ class LinkController
                 }
             }
         }
-        $query = Link::with(['domain', 'tags', 'collection'])
+        $query = Link::with([AppOpening::domainRelation(), 'tags', 'collection'])
             ->where('workspace_id', $workspaceId)
             ->whereNull('deleted_at');
         if (config('workflows.enabled')) {
@@ -292,7 +293,7 @@ class LinkController
                 return response()->json(['error' => $e->getMessage()], $e->status);
             }
 
-            $link = Link::with(['domain', 'tags'])
+            $link = Link::with([AppOpening::domainRelation(), 'tags'])
                 ->where('id', $created['id'])->where('workspace_id', $workspaceId)->first();
             if (! $link) {
                 if ($idempotency !== null) {
@@ -319,7 +320,7 @@ class LinkController
     public function show(Request $request, int $id)
     {
         $workspaceId = UvhRequest::workspaceId($request);
-        $link = Link::with(['domain', 'tags'])
+        $link = Link::with([AppOpening::domainRelation(), 'tags'])
             ->where('id', $id)->where('workspace_id', $workspaceId)->whereNull('deleted_at')
             ->first();
 
@@ -447,7 +448,7 @@ class LinkController
             return response()->json(['error' => $e->getMessage()], $e->status);
         }
 
-        $link = Link::with(['domain', 'tags'])
+        $link = Link::with([AppOpening::domainRelation(), 'tags'])
             ->where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $link) {
             return response()->json(['error' => 'El enlace dejó de estar disponible al finalizar la actualización'], 409);
@@ -802,7 +803,7 @@ class LinkController
         $supported = [
             'destination', 'alias', 'domainId', 'collectionId', 'fallbackDestination', 'password',
             'maxClicks', 'singleUse', 'scheduledAt', 'expiresAt', 'notes', 'name',
-            'utm', 'tags', 'rules', 'expiredPage', 'socialPreview',
+            'utm', 'tags', 'rules', 'expiredPage', 'socialPreview', 'appOpening',
         ];
         if ($partial) {
             // The optimistic-concurrency token only exists on edits.
@@ -823,6 +824,12 @@ class LinkController
 
     protected function validLinkBody(Request $request, bool $partial = false): bool
     {
+        if ($request->exists('appOpening') && $request->input('appOpening') !== null) {
+            $app = $request->input('appOpening');
+            if (! is_array($app) || (($app['kind'] ?? '') === 'provider' && ! config('app_links.providers')) || (($app['kind'] ?? '') === 'native' && ! config('app_links.native'))) {
+                return false;
+            }
+        }
         if ($request->exists('socialPreview') && $request->input('socialPreview') !== null && ! config('sharing.social_previews')) {
             return false;
         }
@@ -886,6 +893,7 @@ class LinkController
             'expires_at' => $request->has('expiresAt') ? $request->input('expiresAt') : ($current?->expires_at?->format('Y-m-d\TH:i:s.uP')),
             'name' => $request->has('name') ? $request->input('name') : ($current->name ?? null),
             'notes' => $request->has('notes') ? $request->input('notes') : ($current->notes ?? null),
+            ...($request->exists('appOpening') ? ['app_opening' => $request->input('appOpening')] : []),
             'social_preview' => $request->exists('socialPreview') ? $request->input('socialPreview') : ($current?->social_preview),
             'expired_page' => $request->has('expiredPage') ? $request->input('expiredPage') : ($current?->expired_page),
             'utm' => $request->has('utm')

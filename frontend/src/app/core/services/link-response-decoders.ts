@@ -1,3 +1,4 @@
+import { decodeAppOpening } from "../app-opening";
 import { decodeSocialPreview } from "./sharing-decoders";
 import { decodeLinkName } from "./link-name-decoder";
 import type { AnalyticsOverview, AuditEvent, LinkAppeal, LinkDetailResponse, LinkDto, LinksResponse, LinkTrashResponse, RedirectRule } from "../models";
@@ -53,6 +54,9 @@ function link(value: unknown): LinkDto {
   const utmSource = record(source["utm"], "link UTM");
   return {
     id: integer(source["id"], "link", 1),
+    ...(source["appOpening"] === undefined ? {} : { appOpening: decodeAppOpening(source["appOpening"]) }),
+    ...(source["appLaunchUrl"] === undefined ? {} : { appLaunchUrl: source["appLaunchUrl"] === null ? null : httpUrl(source["appLaunchUrl"], "launch URL") }),
+    ...(source["shareUrl"] === undefined ? {} : { shareUrl: httpUrl(source["shareUrl"], "share URL") }),
     ...(source["socialPreview"] === undefined ? {} : { socialPreview: decodeSocialPreview(source["socialPreview"]) }),
     ...(source["favorite"] === undefined ? {} : { favorite: boolean(source["favorite"], "link favorite") }),
     ...(source["expiredPage"] === undefined ? {} : { expiredPage: source["expiredPage"] === null ? null : decodeExpiredPage(source["expiredPage"]) }),

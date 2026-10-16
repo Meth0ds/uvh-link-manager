@@ -344,6 +344,8 @@ class AppServiceProvider extends ServiceProvider
                 ->response(fn ($request, $headers) => response()->json(['error' => 'Rate limit de API excedido para este token.'], 429)->withHeaders($headers));
         });
 
+        RateLimiter::for('uvh-app-resolve', fn (Request $request) => Limit::perMinute(60)->by('native-resolve:'.$request->ip().'|'.RedirectService::canonicalHost($request->getHost()))->response(fn ($request, $headers) => response()->json(['kind' => 'rate_limited'], 429)->withHeaders($headers)));
+
         RateLimiter::for('uvh-unlock', function (Request $request) {
             // The same alias may legitimately exist on many custom domains.
             // Include the normalized host so one NATed client cannot consume
@@ -355,7 +357,11 @@ class AppServiceProvider extends ServiceProvider
             // it, so `ADV-EXTERNO`, `Adv-Externo` and `adv-externo ` reached the
             // same link while each spelling owned its own budget — measured, ten
             // more attempts per variant. The budget belongs to the link.
-            $key = $request->ip().'|'.RedirectService::canonicalHost($request->getHost()).'|'.UrlUtil::normalizeAlias((string) ($request->route('alias') ?? ''));
+            $native = $request->is('api/v1/app-links/resolve');
+            $nativePath = $native && is_string($request->input('launchUrl')) ? parse_url(substr($request->input('launchUrl'), 0, 2048), PHP_URL_PATH) : '';
+            $alias = $native && is_string($nativePath) ? basename($nativePath) : (string) ($request->route('alias') ?? '');
+            $targetHost = $native && is_string($request->input('launchUrl')) ? parse_url(substr($request->input('launchUrl'), 0, 2048), PHP_URL_HOST) : null;
+            $key = $request->ip().'|'.RedirectService::canonicalHost(is_string($targetHost) ? $targetHost : $request->getHost()).'|'.UrlUtil::normalizeAlias($alias);
 
             return Limit::perMinute(10)
                 ->by($key)
@@ -365,7 +371,7 @@ class AppServiceProvider extends ServiceProvider
                 // siempre. El estado y las cabeceras del limitador no cambian.
                 // El limitador declara el hecho; quién ve qué lo decide
                 // `VisitorAnswer`.
-                ->response(fn (Request $request, array $headers) => VisitorAnswer::tooManyAttempts($request, $headers));
+                ->response(fn (Request $request, array $headers) => $request->is('api/v1/app-links/resolve') ? response()->json(['kind' => 'rate_limited'], 429)->withHeaders($headers) : VisitorAnswer::tooManyAttempts($request, $headers));
         });
 
         RateLimiter::for('uvh-domain-dns', function (Request $request) {

@@ -52,7 +52,7 @@ input[type='datetime-local'] { min-width: 0; }
 .access-choices mat-checkbox { display: block; }
 .access-choices p { margin: 3px 0 0 36px; color: var(--uvh-muted); font-size: 12px; line-height: 1.6; }
 
-.link-preview { position: sticky; top: 0; align-self: stretch; padding: 32px 24px; background: var(--uvh-surface); border-left: 1px solid var(--uvh-border); }
+.link-preview { position: relative; align-self: stretch; padding: 0; background: var(--uvh-surface); border-left: 1px solid var(--uvh-border); }
 .preview-label { color: var(--uvh-muted); font-size: 11px; font-weight: 600; }
 .preview-address { display: flex; align-items: start; gap: 10px; margin-top: 14px; }
 .preview-address > mat-icon { color: var(--uvh-electric); width: 20px; height: 20px; font-size: 20px; flex-shrink: 0; }
@@ -170,3 +170,5 @@ button:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3
 .simulate-rules { margin-left:auto; }
 .timezone-help { display:flex; align-items:center; gap:8px; margin:14px 0 0; color:var(--uvh-muted,#6e7169); font-size:12px; line-height:1.45; }
 .timezone-help mat-icon { flex:none; width:17px; height:17px; font-size:17px; color:var(--uvh-electric); }
+
+.preview-content { position: sticky; top: 0; padding: 32px 24px; }

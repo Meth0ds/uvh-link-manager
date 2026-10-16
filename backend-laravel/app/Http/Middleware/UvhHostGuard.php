@@ -45,6 +45,10 @@ class UvhHostGuard
                 : response('', 404);
         }
 
+        if (in_array($path, ['/api/v1/app-links/resolve', '/.well-known/apple-app-site-association', '/.well-known/assetlinks.json'], true)) {
+            return ! $this->isAppHost($host) ? $next($request) : response('', 404);
+        }
+
         if ($this->isAppPath($path)) {
             return $this->isAppHost($host) ? $next($request) : response('', 404);
         }

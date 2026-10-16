@@ -1,0 +1,238 @@
+@if (apps.providers() || apps.native()) {
+  <section class="app-settings">
+    <button
+      type="button"
+      class="section-toggle"
+      [attr.aria-expanded]="expanded()"
+      (click)="expanded.set(!expanded())"
+    >
+      <span class="section-icon"
+        ><mat-icon aria-hidden="true">open_in_new</mat-icon></span
+      ><span
+        ><strong>Abrir en una aplicación</strong
+        ><small>{{ summary() }}</small></span
+      ><mat-icon class="chevron" [class.open]="expanded()" aria-hidden="true"
+        >expand_more</mat-icon
+      >
+    </button>
+    @if (expanded()) {
+      <div class="app-settings-body">
+        <p class="intro">
+          Lleva al visitante al contenido de una app y conserva siempre una
+          alternativa web.
+        </p>
+        <div class="choices" role="group" aria-label="Tipo de apertura">
+          <button
+            type="button"
+            [class.selected]="!spec()"
+            [attr.aria-pressed]="!spec()"
+            (click)="choose('off')"
+          >
+            Solo web
+          </button>
+          @if (apps.providers()) {
+            <button
+              type="button"
+              [class.selected]="spec()?.kind === 'provider'"
+              [attr.aria-pressed]="spec()?.kind === 'provider'"
+              (click)="choose('provider')"
+            >
+              Servicio conocido
+            </button>
+          }
+          @if (apps.native()) {
+            <button
+              type="button"
+              [class.selected]="spec()?.kind === 'native'"
+              [attr.aria-pressed]="spec()?.kind === 'native'"
+              [disabled]="!profile()"
+              (click)="choose('native')"
+            >
+              App del workspace
+            </button>
+          }
+        </div>
+        @if (apps.native() && !profile() && !loading()) {
+          <p class="hint">
+            Para usar una app propia, selecciona un dominio personalizado con su
+            aplicación publicada en el detalle del dominio.
+          </p>
+        }
+        @if (loading()) {
+          <p role="status" class="hint">Consultando la app del dominio…</p>
+        }
+        @if (error()) {
+          <p role="alert" class="error">
+            {{ error() }}
+            <button type="button" mat-button (click)="retryLoad()">
+              Reintentar
+            </button>
+          </p>
+        }
+        @if (spec()?.kind === "provider" && apps.providers()) {
+          <label
+            >Servicio<select
+              [ngModel]="provider().id"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="setProvider($event)"
+            >
+              @for (p of providers; track p.id) {
+                <option [value]="p.id">{{ p.name }}</option>
+              }
+            </select></label
+          >
+          @if (
+            provider().id === "google_maps" || provider().id === "apple_maps"
+          ) {
+            <div class="choices" role="group" aria-label="Contenido del mapa">
+              <button
+                type="button"
+                [class.selected]="mapDetails().mode === 'place'"
+                [attr.aria-pressed]="mapDetails().mode === 'place'"
+                (click)="updateMap('mode', 'place')"
+              >
+                Un lugar</button
+              ><button
+                type="button"
+                [class.selected]="mapDetails().mode === 'route'"
+                [attr.aria-pressed]="mapDetails().mode === 'route'"
+                (click)="updateMap('mode', 'route')"
+              >
+                Una ruta
+              </button>
+            </div>
+            @if (mapDetails().mode === "route") {
+              <label
+                >Origen — opcional<input
+                  [ngModel]="mapDetails().origin"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="updateMap('origin', $event)"
+                  maxlength="1000"
+                  placeholder="Ubicación actual o una dirección"
+              /></label>
+            }
+            <label
+              >{{
+                mapDetails().mode === "route"
+                  ? "Destino de la ruta"
+                  : "Lugar o dirección"
+              }}<input
+                [ngModel]="mapDetails().destination"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateMap('destination', $event)"
+                maxlength="1000"
+                placeholder="Por ejemplo, Museo del Prado, Madrid"
+            /></label>
+            @if (mapDetails().mode === "route") {
+              <label
+                >Cómo llegar<select
+                  [ngModel]="mapDetails().travel"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="updateMap('travel', $event)"
+                >
+                  <option value="">Elegir en la aplicación</option>
+                  <option
+                    [value]="provider().id === 'apple_maps' ? 'd' : 'driving'"
+                  >
+                    En coche
+                  </option>
+                  <option
+                    [value]="provider().id === 'apple_maps' ? 'w' : 'walking'"
+                  >
+                    A pie
+                  </option>
+                  <option
+                    [value]="provider().id === 'apple_maps' ? 'r' : 'transit'"
+                  >
+                    Transporte público
+                  </option>
+                </select></label
+              >
+            }
+            <p class="hint">
+              Prepararemos el enlace oficial de {{ provider().name }}. No se
+              consultará el proveedor mientras lo configuras.
+            </p>
+          } @else {
+            <label
+              >Contenido en {{ provider().name
+              }}<input
+                type="url"
+                [placeholder]="provider().example"
+                [ngModel]="providerUrl()"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="setUrl($event)"
+                autocomplete="off"
+                maxlength="2048"
+            /></label>
+            <p class="hint">{{ provider().help }} Usa su URL HTTPS oficial.</p>
+          }
+        }
+        @if (spec()?.kind === "native" && apps.native()) {
+          <label
+            >Ruta dentro de la aplicación<input
+              type="text"
+              placeholder="/productos/123"
+              [ngModel]="route()"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="setRoute($event)"
+              maxlength="500"
+              autocomplete="off"
+          /></label>
+          <p class="hint">
+            Prefijos permitidos:
+            {{
+              profile()?.routePrefixes?.join(", ") ||
+                "La app ya no está disponible en este dominio. Revisa la configuración."
+            }}
+          </p>
+          <p class="hint">
+            Dirección de apertura:
+            <strong>{{ domain() }}/a/{{ alias() || "alias-automático" }}</strong
+            >. Los QR nuevos utilizarán esta dirección.
+          </p>
+        }
+        @if (validation()) {
+          <p class="error" role="status">{{ validation() }}</p>
+        }
+        @if (spec()) {
+          <div class="platform-preview">
+            <div class="preview-heading">
+              <strong>Qué verá el visitante</strong>
+              <div role="group" aria-label="Vista previa por plataforma">
+                @for (p of ["ios", "android", "desktop"]; track p) {
+                  <button
+                    type="button"
+                    [attr.aria-pressed]="platform() === p"
+                    [class.active]="platform() === p"
+                    (click)="selectPlatform(p)"
+                  >
+                    {{
+                      p === "ios"
+                        ? "iPhone"
+                        : p === "android"
+                          ? "Android"
+                          : "Escritorio"
+                    }}
+                  </button>
+                }
+              </div>
+            </div>
+            <p>{{ platformCopy() }}</p>
+            <span class="web-caption">Alternativa web</span
+            ><span class="url">{{
+              webUrl() || "La URL de destino del enlace"
+            }}</span>
+          </div>
+          <div class="rule-note">
+            <mat-icon aria-hidden="true">alt_route</mat-icon>
+            <p>
+              Las reglas tienen prioridad. Si coincide una regla o se utiliza el
+              destino alternativo, se mantiene su redirección web.
+            </p>
+          </div>
+        }
+      </div>
+    }
+  </section>
+}

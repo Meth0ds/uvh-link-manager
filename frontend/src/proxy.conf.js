@@ -7,6 +7,8 @@ module.exports = {
     changeOrigin: false,
     logLevel: "warn",
   },
+  "/a/": { target: BACKEND, secure: false, changeOrigin: false },
+  "/app-links/": { target: BACKEND, secure: false, changeOrigin: false },
   "/r/": {
     target: BACKEND,
     secure: false,

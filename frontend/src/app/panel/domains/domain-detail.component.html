@@ -179,6 +179,7 @@
     }
   </section>
   </details>
+  <app-domain-app-profile [domainId]="d.id" [domain]="d.domain" />
   @if (canAdmin()) {
     <section class="domain-removal"><div><h2>Eliminar dominio</h2><p>Revisa sus enlaces y los de la papelera antes de confirmar el borrado.</p></div><button mat-stroked-button class="danger" type="button" (click)="remove()" [disabled]="actionBusy()" [attr.aria-label]="'Eliminar ' + d.domain"><mat-icon aria-hidden="true">delete_outline</mat-icon>Eliminar dominio</button></section>
   }

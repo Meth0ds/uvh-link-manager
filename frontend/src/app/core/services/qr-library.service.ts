@@ -97,7 +97,7 @@ export class QrLibraryService {
       const rows = record(value).links;
       if (!Array.isArray(rows) || rows.length !== ids.length) throw new Error("Selección incompleta");
       return rows.map((value, index) => {
-        const row = record(value), id = positive(row.id), shortUrl = text(row.shortUrl, 4096);
+        const row = record(value), id = positive(row.id), shortUrl = text(row.shareUrl ?? row.shortUrl, 4096);
         if (id !== ids[index] || !["http:", "https:"].includes(new URL(shortUrl).protocol)) throw new Error("Enlace inválido");
         return { id, shortUrl, alias: text(row.alias, 128), state: text(row.state, 32) };
       });

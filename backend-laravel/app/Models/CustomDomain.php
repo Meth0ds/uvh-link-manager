@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -114,6 +115,12 @@ class CustomDomain extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    /** @return HasOne<AppLinkProfile, $this> */
+    public function appProfile(): HasOne
+    {
+        return $this->hasOne(AppLinkProfile::class, 'domain_id');
     }
 
     /** @return HasMany<Link, $this> */

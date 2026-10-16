@@ -22,6 +22,7 @@
   @if (error(); as message) { <div class="error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span><button mat-button type="button" (click)="simulate()">Reintentar</button></div> }
   @if (result(); as output) {
     <section class="result-card" aria-live="polite" aria-labelledby="result-title">
+      @if (data.appOpeningConfigured) { <p class="simulator-note">Cuando la configuración de app esté activa, solo se aplicará al destino principal. La URL de abajo será su alternativa web. Las reglas y el destino alternativo conservan la redirección web.</p> }
       <div class="result-heading"><div class="result-icon" [class.rule]="output.source === 'rule'"><mat-icon>{{ output.source === 'rule' ? 'alt_route' : output.source === 'fallback' ? 'turn_right' : 'north_east' }}</mat-icon></div><div><span class="eyebrow">Resultado</span><h3 id="result-title">{{ output.source === 'rule' ? 'Coincide una regla' : output.source === 'fallback' ? 'Destino fallback' : 'Destino principal' }}</h3></div></div>
       @if (output.ruleIndex !== null) { <p class="match-meta">Regla {{ output.ruleIndex + 1 }} · prioridad {{ output.priority }}</p> }
       <p class="destination" [title]="output.destinationWithUtm">{{ output.destinationWithUtm }}</p>

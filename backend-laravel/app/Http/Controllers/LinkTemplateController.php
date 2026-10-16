@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\LinkException;
 use App\Models\Collection;
 use App\Models\LinkTemplate;
+use App\Support\AppOpening;
 use App\Support\Audit;
 use App\Support\LinkName;
 use App\Support\LinkService;
@@ -15,6 +16,8 @@ use App\Support\WorkspaceMutation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Plantillas de enlace (F7): valores por defecto con los que empezar un
@@ -25,7 +28,7 @@ use Illuminate\Http\Request;
 class LinkTemplateController
 {
     /** Campos que una plantilla puede guardar; lo demás se rechaza. */
-    private const PAYLOAD_KEYS = ['destination', 'fallback_destination', 'notes', 'tags', 'utm', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'collection_id', 'name', 'social_preview'];
+    private const PAYLOAD_KEYS = ['destination', 'fallback_destination', 'notes', 'tags', 'utm', 'max_clicks', 'single_use', 'scheduled_at', 'expires_at', 'collection_id', 'name', 'social_preview', 'app_opening'];
 
     public function index(Request $request): JsonResponse
     {
@@ -98,6 +101,12 @@ class LinkTemplateController
                     throw new LinkException('Límite de plantillas alcanzado. Elimina una antes de crear otra.', 409);
                 }
 
+                if (array_key_exists('app_opening', $payload)) {
+                    $spec = $payload['app_opening'];
+                    $domain = is_array($spec) && ($spec['kind'] ?? '') === 'native' && is_string($spec['profileId'] ?? null) && Str::isUuid($spec['profileId'])
+                        ? DB::table('app_link_profiles')->where('public_id', $spec['profileId'])->where('workspace_id', $workspaceId)->value('domain_id') : null;
+                    $payload['app_opening'] = AppOpening::validate($spec, $workspaceId, $domain === null ? null : (int) $domain);
+                }
                 if (array_key_exists('social_preview', $payload)) {
                     $payload['social_preview'] = SocialPreview::validate($payload['social_preview'], $workspaceId);
                 }

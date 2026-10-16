@@ -233,10 +233,10 @@
           }
         </div>
         <div class="link-actions">
-          <button mat-icon-button [matTooltip]="copyFeedback.phase(link.shortUrl, copyScope) === 'copied' ? 'Copiado' : 'Copiar'" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase(link.shortUrl, copyScope) === 'copying'" (click)="$event.stopPropagation(); copy(link.shortUrl)" [attr.aria-label]="'Copiar enlace ' + (link.name || displayUrl(link.shortUrl))">
-            <app-copy-feedback-icon [phase]="copyFeedback.phase(link.shortUrl, copyScope)" />
+          <button mat-icon-button [matTooltip]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copied' ? 'Copiado' : 'Copiar'" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying'" (click)="$event.stopPropagation(); copy((link.shareUrl || link.shortUrl))" [attr.aria-label]="'Copiar enlace ' + (link.name || displayUrl(link.shortUrl))">
+            <app-copy-feedback-icon [phase]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope)" />
           </button>
-          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr(link.shortUrl, link.id)" [attr.aria-label]="'Generar QR para ' + (link.name || displayUrl(link.shortUrl))">
+          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr((link.shareUrl || link.shortUrl), link.id)" [attr.aria-label]="'Generar QR para ' + (link.name || displayUrl(link.shortUrl))">
             <mat-icon>qr_code_2</mat-icon>
           </button>
           @if (canWrite()) {
@@ -248,8 +248,8 @@
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">
-            <button mat-menu-item (click)="showQr(link.shortUrl, link.id)"><mat-icon>qr_code_2</mat-icon> QR</button>
-            <button mat-menu-item [disabled]="copyFeedback.busy()" (click)="copy(link.shortUrl)"><mat-icon>content_copy</mat-icon> Copiar URL</button>
+            <button mat-menu-item (click)="showQr((link.shareUrl || link.shortUrl), link.id)"><mat-icon>qr_code_2</mat-icon> QR</button>
+            <button mat-menu-item [disabled]="copyFeedback.busy()" (click)="copy((link.shareUrl || link.shortUrl))"><mat-icon>content_copy</mat-icon> Copiar URL</button>
             <a mat-menu-item [routerLink]="['/app/links', link.id]"><mat-icon>query_stats</mat-icon> Analítica</a>
             @if (canWrite()) {
               @if (workflows.enabled() && link.state !== 'blocked') { <button mat-menu-item (click)="duplicate(link)"><mat-icon>library_add</mat-icon>Duplicar enlace</button> }

@@ -22,8 +22,8 @@
     <p class="success-intro">Compártelo ahora o sigue trabajando en tu biblioteca.</p>
     @if (createdLink(); as link) {
       @if (link.name) { <p class="success-name">{{ link.name }}</p> }
-      <button type="button" class="success-url" (click)="copyCreatedLink()" [attr.aria-label]="'Copiar ' + link.shortUrl">
-        <mat-icon aria-hidden="true">link</mat-icon><span>{{ link.shortUrl }}</span><mat-icon aria-hidden="true">content_copy</mat-icon>
+      <button type="button" class="success-url" (click)="copyCreatedLink()" [attr.aria-label]="'Copiar ' + (link.shareUrl || link.shortUrl)">
+        <mat-icon aria-hidden="true">link</mat-icon><span>{{ link.shareUrl || link.shortUrl }}</span><mat-icon aria-hidden="true">content_copy</mat-icon>
       </button>
       <p class="success-destination" [title]="link.destination">{{ link.destination }}</p>
       <div class="success-actions" role="group" aria-label="Acciones del enlace creado">
@@ -115,6 +115,7 @@
                 @if (form.controls.name.invalid) { <mat-error>Usa hasta 120 caracteres sin caracteres de control.</mat-error> }
               </mat-form-field>
               <app-destination-inspection [url]="destinationValue()" [preview]="true" [suggestName]="true" (previewResolved)="destinationTitle.set($event)" (nameSuggested)="applySuggestedName($event)" />
+              <app-app-opening-editor [spec]="appOpening()" (specChange)="appOpening.set($event)" (validity)="appOpeningValid.set($event)" [domainId]="form.controls.domainId.value" [domain]="previewDomain" [alias]="form.controls.alias.value" [webUrl]="form.controls.destination.value" />
               @if (sharing.socialEnabled()) { <app-social-preview-editor [spec]="socialPreview()" (specChange)="socialPreview.set($event)" [protected]="passwordWillProtect()" [linkName]="form.controls.name.value" [suggestionTitle]="socialTitleSuggestion()" [shortUrl]="data.link?.shortUrl || platformDomain + '/' + (form.controls.alias.value || 'tu-enlace')" (working)="socialBusy.set($event)" /> }
               <div class="section-heading secondary"><h3>Tu URL corta</h3><p>Elige una dirección fácil de reconocer y compartir.</p></div>
               <div class="address-fields">
@@ -268,6 +269,7 @@
         @if (!templates().length) { <button mat-button type="button" class="save-template" (click)="saveAsTemplate()" [disabled]="busy()"><mat-icon>bookmark_add</mat-icon>Guardar como plantilla</button> }
       </form>
       @if (view() !== 'quick') { <aside class="link-preview" aria-label="Vista previa del enlace">
+        <div class="preview-content">
         <span class="preview-label">Tu enlace</span>
         <div class="preview-address"><mat-icon aria-hidden="true">link</mat-icon><div><span>{{ previewDomain }}/</span><strong>{{ form.controls.alias.value.trim() || 'Alias automático' }}</strong></div></div>
         <div class="preview-route" aria-hidden="true"><span></span><mat-icon>south</mat-icon></div>
@@ -280,6 +282,7 @@
           @if (form.controls.expiresAt.value) { <span><mat-icon aria-hidden="true">event_busy</mat-icon>Con fecha de expiración</span> }
         </div>
         <p class="preview-note">{{ isEdit ? 'Los cambios se aplican al guardar.' : 'Podrás cambiar el destino después de crearlo.' }}</p>
+      </div>
       </aside> }
     </div>
   }
@@ -290,7 +293,7 @@
   <p>{{ isEdit ? 'Conserva tu enlace. Cambia lo que necesitas.' : isDuplicate ? 'Revisa los ajustes antes de crear la copia.' : 'Solo necesitas una URL para empezar.' }}</p>
   <div class="footer-buttons">
     <button mat-button mat-dialog-close type="button">Cancelar</button>
-    <button mat-flat-button type="button" (click)="save()" [disabled]="form.invalid || hasInvalidRules || expiredPageInvalid || ['checking', 'taken', 'invalid', 'reserved'].includes(aliasStatus()) || busy() || loading() || ((isEdit || isDuplicate) && !editDetailsLoaded())">
+    <button mat-flat-button type="button" (click)="save()" [disabled]="form.invalid || !appOpeningValid() || hasInvalidRules || expiredPageInvalid || ['checking', 'taken', 'invalid', 'reserved'].includes(aliasStatus()) || busy() || loading() || ((isEdit || isDuplicate) && !editDetailsLoaded())">
       @if (!busy()) { <mat-icon>{{ isEdit ? 'check' : 'add_link' }}</mat-icon> }
       {{ busy() ? 'Guardando…' : isEdit ? 'Guardar cambios' : isDuplicate ? 'Crear copia' : 'Crear enlace' }}
     </button>

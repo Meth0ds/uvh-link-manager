@@ -124,9 +124,10 @@ export class LinkHistoryDialogComponent {
   }
 
   sourceLabel(source: LinkHistoryEntry["source"]): string { return ({ create: "Creación", update: "Edición", duplicate: "Duplicación", restore: "Restauración", import: "Importación", bulk: "Edición masiva" })[source]; }
-  fieldLabel(field: string): string { return ({ destination: "Destino", fallbackDestination: "Destino alternativo", rules: "Reglas", utm: "Campaña UTM", name: "Nombre", notes: "Notas", tags: "Etiquetas", collectionId: "Colección", maxClicks: "Límite de clics", singleUse: "Uso único", scheduledAt: "Activación", expiresAt: "Caducidad", expiredPage: "Página de caducidad", socialPreview: "Tarjeta al compartir" })[field] ?? field; }
+  fieldLabel(field: string): string { return ({ destination: "Destino", fallbackDestination: "Destino alternativo", rules: "Reglas", utm: "Campaña UTM", name: "Nombre", notes: "Notas", tags: "Etiquetas", collectionId: "Colección", maxClicks: "Límite de clics", singleUse: "Uso único", scheduledAt: "Activación", expiresAt: "Caducidad", expiredPage: "Página de caducidad", appOpening: "Abrir en una aplicación", socialPreview: "Tarjeta al compartir" })[field] ?? field; }
   fieldGroup(field: string): string {
     if (/^rules(?:\.|\[)/.test(field)) return "Reglas";
+    if (field === "appOpening") return "Destino";
     if (field === "socialPreview") return "Tarjeta social";
     if (["destination", "fallbackDestination"].includes(field)) return "Destino";
     if (["maxClicks", "singleUse"].includes(field)) return "Acceso";

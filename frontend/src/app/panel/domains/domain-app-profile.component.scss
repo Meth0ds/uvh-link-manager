@@ -1,0 +1,247 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.native-profile {
+  margin: 24px 0;
+  border: 1px solid var(--uvh-border);
+  border-radius: 16px;
+  background: var(--uvh-surface);
+  overflow: hidden;
+}
+.profile-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 20px;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--uvh-ink);
+  font: inherit;
+  cursor: pointer;
+  min-height: 64px;
+}
+.profile-toggle strong {
+  font-size: 15px;
+}
+.profile-toggle small {
+  display: block;
+  color: var(--uvh-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.chevron {
+  margin-left: auto;
+  transition: transform 160ms;
+}
+.chevron.open {
+  transform: rotate(180deg);
+}
+.profile-body {
+  padding: 0 24px 24px;
+  animation: reveal 160ms ease-out;
+}
+.intro {
+  max-width: 70ch;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--uvh-muted);
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 18px 0 8px;
+}
+input:not([type="checkbox"]),
+textarea {
+  width: 100%;
+  min-height: 46px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 9px;
+  background: var(--uvh-surface);
+  color: var(--uvh-ink);
+  font: inherit;
+  font-size: 13px;
+}
+textarea {
+  resize: vertical;
+}
+h3 {
+  font-size: 14px;
+  font-weight: 650;
+  margin: 0 0 16px;
+}
+.platform-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin: 22px 0;
+  padding: 22px 0;
+  border-block: 1px solid var(--uvh-border);
+}
+.platform-fields label:first-of-type {
+  margin-top: 0;
+}
+p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--uvh-muted);
+  overflow-wrap: anywhere;
+}
+.enable {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 10px;
+  min-height: 44px;
+}
+.enable input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--uvh-electric);
+}
+.enable small {
+  display: block;
+  font-weight: 400;
+  color: var(--uvh-muted);
+  margin-top: 4px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+.actions button {
+  min-height: 44px;
+}
+.saved {
+  font-size: 12px;
+  color: var(--success, #3b7652);
+}
+.warning {
+  padding: 12px;
+  border: 1px solid var(--uvh-border);
+  border-radius: 9px;
+}
+.integration-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 18px;
+  margin-top: 22px;
+  border-top: 1px solid var(--uvh-border);
+}
+.integration-note mat-icon {
+  flex-shrink: 0;
+  color: var(--uvh-muted);
+}
+.integration-note p {
+  margin: 0;
+  max-width: 80ch;
+}
+.diagnostics {
+  border: 1px solid var(--uvh-border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 18px;
+}
+.diagnostics code {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.diagnostics span {
+  display: block;
+  margin-top: 4px;
+}
+.error {
+  color: var(--danger, #ad3e32);
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--uvh-electric);
+  outline-offset: 3px;
+}
+@media (max-width: 650px) {
+  .platform-fields {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .profile-body {
+    padding: 0 16px 16px;
+  }
+  .profile-toggle {
+    padding: 16px;
+  }
+  .actions {
+    align-items: stretch;
+  }
+  .actions button {
+    flex: 1 0 100%;
+  }
+}
+@keyframes reveal {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.developer-details {
+  margin-top: 20px;
+  border-top: 1px solid var(--uvh-border);
+  padding-top: 8px;
+}
+.developer-details summary {
+  padding: 14px 0;
+  min-height: 44px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.developer-details code {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.association-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+.association-links a {
+  font-size: 12px;
+  color: var(--uvh-electric);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.developer-details summary:focus-visible,
+.association-links a:focus-visible {
+  outline: 2px solid var(--uvh-electric);
+  outline-offset: 3px;
+}

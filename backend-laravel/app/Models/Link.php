@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $used_at
  * @property Carbon|null $scheduled_at
  * @property Carbon|null $expires_at
+ * @property array<string, mixed>|null $app_opening
  * @property array<string, mixed>|null $social_preview
  * @property array<string, mixed>|null $expired_page
  * @property Carbon|null $deleted_at
@@ -53,6 +54,7 @@ class Link extends Model
         'utm_term',
         'utm_content',
         'deleted_at',
+        'app_opening',
         'social_preview',
         'social_public_id',
         'expired_page',
@@ -65,6 +67,7 @@ class Link extends Model
     protected function casts(): array
     {
         return [
+            'app_opening' => 'array',
             'social_preview' => 'array',
             'expired_page' => 'array',
             'expiry_notice_generation' => 'integer',

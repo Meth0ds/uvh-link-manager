@@ -68,6 +68,9 @@ export interface LinkUtm {
 }
 
 export interface LinkDto {
+  appOpening?: import("./app-opening").AppOpeningSpec | null;
+  appLaunchUrl?: string | null;
+  shareUrl?: string;
   socialPreview?: import("./sharing").SocialPreviewSpec | null;
   /** Internal workspace label; legacy responses may omit it. */
   name?: string | null;
@@ -221,6 +224,7 @@ export interface CollectionsResponse {
  * applying one is a plain create input; alias is never part of it.
  */
 export interface LinkTemplatePayload {
+  app_opening?: import("./app-opening").AppOpeningSpec | null;
   social_preview?: import("./sharing").SocialPreviewSpec | null;
   name?: string | null;
   destination?: string;

@@ -12,6 +12,9 @@ class UvhSession
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if ($request->is('api/v1/app-links/resolve')) {
+            return $next($request);
+        }
         $session = SessionManager::hydrate($request);
         if ($session !== null) {
             $request->attributes->set(UvhRequest::USER, $session['user']);

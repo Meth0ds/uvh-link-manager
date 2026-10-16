@@ -93,6 +93,10 @@ server {
     # are capped here — never the static shell, and never the health probe.
     add_header Retry-After $uvh_edge_retry_after always;
 
+    location = /.well-known/apple-app-site-association { return 404; }
+    location = /.well-known/assetlinks.json { return 404; }
+    location ^~ /a/ { return 404; }
+    location ^~ /app-links/ { return 404; }
     location ^~ /internal/ { return 404; }
     location = /health { try_files "" @laravel; }
     location ^~ /api/ {
@@ -188,6 +192,10 @@ server {
     location = /status { try_files /index.html =404; expires -1; }
     location = /status/ { return 308 /status; }
     location = /health { try_files "" @laravel_public; }
+    location = /.well-known/apple-app-site-association { try_files "" @laravel_public; }
+    location = /.well-known/assetlinks.json { try_files "" @laravel_public; }
+    location ^~ /a/ { try_files "" @laravel_public; }
+    location ^~ /app-links/ { try_files "" @laravel_public; }
     location ^~ /.well-known/uvh-social/ { try_files "" @laravel_public; }
     location = /robots.txt { try_files "" @laravel_public; }
     location = /sitemap.xml { try_files "" @laravel_public; }

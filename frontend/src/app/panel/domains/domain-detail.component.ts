@@ -1,3 +1,4 @@
+import { DomainAppProfileComponent } from "./domain-app-profile.component";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
 import { AsyncPoller } from "../../core/async-poller";
 import { RetryCountdown, formatWaitLabel } from "../../core/retry-countdown";
@@ -74,7 +75,7 @@ const TLS_ERROR: Record<string, string> = {
 @Component({
   selector: "app-domain-detail",
   standalone: true,
-  imports: [RouterLink, FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressBarModule, MatSelectModule, MatSnackBarModule, PageHeaderComponent, PanelSkeletonComponent],
+  imports: [DomainAppProfileComponent, RouterLink, FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressBarModule, MatSelectModule, MatSnackBarModule, PageHeaderComponent, PanelSkeletonComponent],
   templateUrl: "./domain-detail.component.html",
   styleUrl: "./domain-detail.component.scss",
   changeDetection: ChangeDetectionStrategy.Eager,

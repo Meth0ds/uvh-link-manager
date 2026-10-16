@@ -93,6 +93,7 @@ class PublicController
 
         return response()->json([
             'appUrl' => $appUrl,
+            'appOpeningFeatures' => ['providers' => (bool) config('app_links.providers'), 'native' => (bool) config('app_links.native'), 'resolverUrl' => rtrim((string) config('uvh.public_origin'), '/').'/api/v1/app-links/resolve'],
             'sharingFeatures' => ['sharedReports' => (bool) config('sharing.reports'), 'socialPreviews' => (bool) config('sharing.social_previews')],
             'publicHost' => config('uvh.public_host'),
             'appHost' => config('uvh.app_host'),
