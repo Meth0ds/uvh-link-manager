@@ -240,7 +240,7 @@ class AuthEmailTokenTest extends TestCase
         ];
 
         $this->postJson('/api/v1/auth/verify-email', $activation)
-            ->assertOk()->assertExactJson(['ok' => true]);
+            ->assertOk()->assertExactJson(['ok' => true, 'authenticated' => false, 'newAccount' => false, 'pendingLink' => false, 'user' => null]);
 
         $user->refresh();
         $this->assertNotNull($user->email_verified_at);
