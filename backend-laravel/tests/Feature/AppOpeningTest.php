@@ -27,7 +27,7 @@ final class AppOpeningTest extends TestCase
         parent::setUp();
         DB::statement('TRUNCATE users, sessions, workspaces, memberships, audit_events RESTART IDENTITY CASCADE');
         Queue::fake();
-        config(['app_links.providers' => true, 'app_links.native' => true, 'workflows.enabled' => true]);
+        config(['app_links.providers' => true, 'app_links.native' => true, 'workflows.enabled' => true, 'uvh.public_origin' => 'https://uvh.es']);
         $this->disableCookieEncryption();
         $this->withCredentials();
         $this->withCookie('uvh_csrf', 'app-csrf')->withHeader('X-CSRF-Token', 'app-csrf');
@@ -69,6 +69,28 @@ final class AppOpeningTest extends TestCase
         $result = $this->postJson('https://apps.example.test/api/v1/app-links/resolve', $body)->assertStatus(202)->assertJsonPath('kind', 'challenge_required');
 
         return $body + ['challenge' => $result->json('challenge')];
+    }
+
+    public function test_domain_reassignment_revokes_native_access_and_preserves_the_web_link(): void
+    {
+        [$link, $body] = $this->native();
+        $body = $this->challenge($body);
+        $grant = $this->postJson('https://apps.example.test/api/v1/app-links/resolve', $body)
+            ->assertOk()->assertJsonPath('kind', 'content')->json('grant');
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/domains/'.$this->domain->id.'/reassign', [
+                'linkIds' => [$link['id']], 'targetDomainId' => null,
+                'expectedVersions' => [['id' => $link['id'], 'version' => $link['version']]],
+            ])->assertOk()->assertJsonPath('applied', 1);
+        $this->postJson('https://apps.example.test/api/v1/app-links/resolve', $body + ['grant' => $grant])
+            ->assertStatus(404)->assertJsonPath('kind', 'unavailable');
+        $current = $this->getJson('/api/v1/links/'.$link['id'])->assertOk()->json('link');
+        $this->assertNull($current['appLaunchUrl']);
+        $this->assertSame($current['shortUrl'], $current['shareUrl']);
+        $this->get($current['shortUrl'])->assertRedirect('https://example.org/fallback');
+        $this->deleteJson('/api/v1/domains/'.$this->domain->id)->assertOk();
+        $this->assertDatabaseMissing('app_link_profiles', ['domain_id' => $this->domain->id]);
+        $this->get($current['shortUrl'])->assertRedirect('https://example.org/fallback');
     }
 
     public function test_provider_page_and_continuation_consume_one_single_use_visit(): void

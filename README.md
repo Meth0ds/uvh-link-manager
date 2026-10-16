@@ -210,6 +210,7 @@ Prueba integrada: `cd frontend && npm run e2e -- e2e/specs/domain-management.spe
 Usa una base aislada `_test`; DNS/HTTPS se preparan mediante una fixture, por lo
 que esta prueba no acredita propagación DNS ni emisión ACME públicas. Las pruebas
 `DomainRemovalTest` incluyen peticiones simultáneas y fallos de admisión de auditoría.
+
 ## Panel de control local (nativo)
 
 Los ejecutables nativos `dist/uvh-control-windows-x64.exe`,

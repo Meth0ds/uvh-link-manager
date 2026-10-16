@@ -16,10 +16,10 @@ Implementación de proveedores conocidos y aplicaciones propias, con activación
 
 ## Comprobaciones técnicas
 
-- Suite backend completa: 3.051 pruebas correctas y 35.353 aserciones.
-- Suite frontend completa: 2.266 pruebas correctas.
-- Suites específicas de apertura, formatos de proveedor y limitadores de seguridad: 31 pruebas, 266 aserciones (repetidas tras ampliar los formatos oficiales).
-- PHPStan, Pint, TypeScript, ESLint y build de producción.
+- Suite backend completa antes de integrar la gestión de dominios `ce1d1de`: 3.051 pruebas correctas y 35.353 aserciones. Tras integrar ese commit, regresión conjunta de apertura y dominios: 53 pruebas y 433 aserciones.
+- Suite frontend completa tras integrar la gestión de dominios: 2.296 pruebas correctas.
+- Suites específicas de apertura, formatos de proveedor y limitadores de seguridad: 32 pruebas, 285 aserciones, incluida la revocación del acceso nativo tras trasladar el enlace y eliminar su dominio anterior.
+- PHPStan (`--memory-limit=512M`), Pint, TypeScript, ESLint y build de producción, repetidos tras la integración. El primer intento de PHPStan con 128 MiB agotó memoria; la repetición con 512 MiB terminó sin errores.
 - Sintaxis de Nginx comprobada con `nginx -t` usando la imagen instalada y configuración temporal con valores ficticios, sin publicar puertos.
 - Requisitos de plataforma Composer comprobados; `symfony/http-foundation` actualizado a 8.1.9 por CVE-2026-108082. Auditoría Composer sin avisos; auditoría npm conforme a la política existente de dependencias de desarrollo.
 - Ejemplo Swift comprobado con `swiftc -swift-version 6 -typecheck`. El ejemplo Kotlin requiere integración y compilación dentro de una app Android real.

@@ -30,6 +30,8 @@ Las reglas y el fallback tienen prioridad y siguen respondiendo mediante web. La
 
 `shortUrl` mantiene la dirección antigua. `appLaunchUrl` incorpora `/a/` para apps propias cuando la función está activa; `shareUrl` es la dirección recomendada para copiar o crear QR nuevos. Los QR ya impresos conservan su URL. Las variantes QR mantienen `?qr=...` en la dirección de apertura.
 
+Trasladar un enlace a otro dominio invalida los comprobantes y la dirección de apertura anterior. La alternativa web sigue funcionando; la app original no se asocia automáticamente al nuevo dominio. Seleccionar y guardar un perfil válido en ese dominio es una acción explícita. Eliminar el dominio anterior elimina su perfil, sin afectar la alternativa web del enlace trasladado.
+
 ## Perfil de aplicación propia
 
 `GET/PATCH /api/v1/domains/{id}/app-profile`. Solo propietarios y administradores pueden modificarlo. `PATCH` requiere `Idempotency-Key` y `version` (0 al crear). Todos los miembros pueden consultar el perfil; los editores pueden usarlo en enlaces del mismo workspace y dominio.
