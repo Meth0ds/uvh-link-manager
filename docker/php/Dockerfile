@@ -6,7 +6,7 @@
 # no puede traer una base distinta a la revisada. Dependabot propone la
 # actualización cuando la etiqueta avanza y `scripts/check-image-digests.mjs`
 # comprueba en CI que el digest sigue resolviendo.
-FROM composer:2@sha256:aaeab4b6b031e0a88efb907f0f26b563532a644fc2f4ea0d000ecf8658f7a2b8 AS composer
+FROM composer:2@sha256:af98f42dfff7c68ba8d53c2164fd9fde1087b7d449514baa38c418b1f6bc4bac AS composer
 
 FROM php:8.4-cli@sha256:a9c8c681304716e000318f590480b6f47f3f3e018794b5f9d65d827f75d3bd00
 
