@@ -24,10 +24,10 @@ final class WorkspaceMutation
             $user = UvhRequest::user($request);
             $workspaceId = UvhRequest::workspaceId($request);
             if (! $user || ! $workspaceId) {
-                throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
             }
             if (! WorkspaceWriteActor::fromRequest($request)->lockMembership((int) $user->id, $workspaceId, (int) $user->security_version)) {
-                throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
             }
 
             $result = $mutation();

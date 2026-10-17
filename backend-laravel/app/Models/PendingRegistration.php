@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class PendingRegistration extends Model
 {
-    protected $fillable = ['email', 'security_version'];
+    protected $fillable = ['email', 'security_version', 'language'];
 
     protected function casts(): array
     {

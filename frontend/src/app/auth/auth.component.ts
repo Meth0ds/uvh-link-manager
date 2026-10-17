@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, ViewChild, afterNextRender, computed, effect, inject, isDevMode, signal } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
@@ -29,7 +30,7 @@ interface PublicAuthConfig {
 }
 
 /** Aviso público de pausa de registros; idéntico al que responde la API con 503. */
-export const REGISTRATION_PAUSED_MESSAGE = "Registros temporalmente pausados. Inténtalo de nuevo más tarde.";
+export const REGISTRATION_PAUSED_MESSAGE = $localize`:@@ui.dc4d5c8cb668e0:Registros temporalmente pausados. Inténtalo de nuevo más tarde.`;
 
 @Component({
   selector: "app-auth",
@@ -51,6 +52,7 @@ export const REGISTRATION_PAUSED_MESSAGE = "Registros temporalmente pausados. In
   styleUrl: "./auth.component.scss",
 })
 export class AuthComponent {
+  readonly uiText = UI_TEXT;
   @ViewChild("loginCaptcha") private loginCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("registerCaptcha") private registerCaptchaWidget?: HCaptchaWidgetComponent;
   @ViewChild("resendCaptcha") private resendCaptchaWidget?: HCaptchaWidgetComponent;
@@ -144,7 +146,7 @@ export class AuthComponent {
   /** Notices produced after registration/resend, excluding the static success copy. */
   readonly pendingNotice = computed(() => {
     const notice = this.info();
-    return notice && !notice.startsWith("Solicitud registrada.") ? notice : null;
+    return notice && !notice.startsWith($localize`:@@ui.279a325b6b8de1:Solicitud registrada.`) ? notice : null;
   });
 
   readonly loginForm = this.fb.nonNullable.group({
@@ -188,7 +190,7 @@ export class AuthComponent {
       this.flow.set({ kind: "register", mode: "new" });
     }
     if (this.route.snapshot.queryParamMap.get("reason") === "session-expired") {
-      this.info.set("Vuelve a iniciar sesión para continuar de forma segura.");
+      this.info.set($localize`:@@ui.2aebb31f9f8ea0:Vuelve a iniciar sesión para continuar de forma segura.`);
     }
 
     effect(() => {
@@ -234,7 +236,7 @@ export class AuthComponent {
       return;
     }
     if (!this.captchaReady()) {
-      this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
+      this.error.set($localize`:@@ui.823bee0ec9cea7:La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.`);
       return;
     }
     const revision = ++this.flowRevision;
@@ -281,7 +283,7 @@ export class AuthComponent {
       this.error.set(
         err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
           ? err.message
-          : "No se pudo iniciar sesión",
+          : $localize`:@@ui.6a91e0f2b9ef61:No se pudo iniciar sesión`,
       );
       this.loginCaptchaToken.set("");
       this.loginCaptchaWidget?.reset();
@@ -385,7 +387,7 @@ export class AuthComponent {
     try {
       const challenge = this.mfaChallenge();
       if (!challenge) {
-        this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
+        this.restartMfaLogin($localize`:@@ui.31100131df8c66:La verificación ha caducado. Introduce de nuevo tus credenciales.`);
         return;
       }
       await this.auth.verifyMfa(challenge, this.mfaForm.controls.code.value);
@@ -393,8 +395,8 @@ export class AuthComponent {
       await this.navigateAuthenticated(destination);
     } catch (err) {
       if (!this.isFlowCurrent(revision) || this.step() !== "mfa") return;
-      const message = err instanceof ApiRequestError ? err.message : "Código incorrecto";
-      if (message === "Sesión MFA caducada") this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
+      const message = err instanceof ApiRequestError ? err.message : $localize`:@@ui.4454e8b15406c0:Código incorrecto`;
+      if (message === "Sesión MFA caducada") this.restartMfaLogin($localize`:@@ui.31100131df8c66:La verificación ha caducado. Introduce de nuevo tus credenciales.`);
       else {
         this.mfaForm.reset();
         this.error.set(message);
@@ -419,7 +421,7 @@ export class AuthComponent {
     try {
       const challenge = this.mfaChallenge();
       if (!challenge) {
-        this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
+        this.restartMfaLogin($localize`:@@ui.31100131df8c66:La verificación ha caducado. Introduce de nuevo tus credenciales.`);
         return;
       }
       await this.auth.recoverMfa(challenge, this.recoveryForm.controls.code.value);
@@ -427,8 +429,8 @@ export class AuthComponent {
       await this.navigateAuthenticated(destination);
     } catch (err) {
       if (!this.isFlowCurrent(revision) || this.step() !== "recovery") return;
-      const message = err instanceof ApiRequestError ? err.message : "Código de recuperación incorrecto";
-      if (message === "Sesión MFA caducada") this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
+      const message = err instanceof ApiRequestError ? err.message : $localize`:@@ui.a02a98ab8ad529:Código de recuperación incorrecto`;
+      if (message === "Sesión MFA caducada") this.restartMfaLogin($localize`:@@ui.31100131df8c66:La verificación ha caducado. Introduce de nuevo tus credenciales.`);
       else this.error.set(message);
     } finally {
       if (!this.destroyRef.destroyed) {
@@ -442,7 +444,7 @@ export class AuthComponent {
     this.registerForm.markAllAsTouched();
     if (this.step() !== "register" || this.registerForm.invalid || this.busy()) return;
     if (this.registerForm.controls.company.value.trim() !== "") {
-      this.error.set("No se pudo crear la cuenta");
+      this.error.set($localize`:@@ui.01cfe567e4e96a:No se pudo crear la cuenta`);
       return;
     }
     // La corrección de un registro pendiente no es un registro nuevo y sigue
@@ -452,7 +454,7 @@ export class AuthComponent {
       return;
     }
     if (!this.captchaReady()) {
-      this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
+      this.error.set($localize`:@@ui.823bee0ec9cea7:La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.`);
       return;
     }
 
@@ -477,11 +479,11 @@ export class AuthComponent {
       };
       if (changeEmail) {
         if (!currentEmail) {
-          if (stillCurrent()) this.error.set("No hay un registro pendiente que actualizar");
+          if (stillCurrent()) this.error.set($localize`:@@ui.754d84e79fe782:No hay un registro pendiente que actualizar`);
           return;
         }
         if (currentEmail.toLowerCase() === email) {
-          this.error.set("Introduce una dirección de email distinta");
+          this.error.set($localize`:@@ui.244bf4a90b0fdf:Introduce una dirección de email distinta`);
           return;
         }
         await this.auth.changeRegistrationEmail(currentEmail, email, antiBot);
@@ -495,7 +497,7 @@ export class AuthComponent {
       if (!stillCurrent()) return;
       this.flow.set({ kind: "verify-pending", email, source: "browser-registration" });
       this.info.set(
-        "Solicitud registrada. Abre el correo para confirmar tu email y elegir tu nombre y contraseña. Si ya tienes una cuenta, inicia sesión o recupera tu contraseña.",
+        $localize`:@@ui.51f75f7d7585f0:Solicitud registrada. Abre el correo para confirmar tu email y elegir tu nombre y contraseña. Si ya tienes una cuenta, inicia sesión o recupera tu contraseña.`,
       );
       this.registerCaptchaToken.set("");
     } catch (err) {
@@ -509,7 +511,7 @@ export class AuthComponent {
         this.error.set(
           err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
             ? err.message
-            : "No se pudo crear la cuenta",
+            : $localize`:@@ui.01cfe567e4e96a:No se pudo crear la cuenta`,
         );
       }
       // hCaptcha tokens are short-lived and single-use. Never reuse one after
@@ -529,11 +531,11 @@ export class AuthComponent {
     // its single-use result cannot be redeemed by two requests.
     if (this.verificationBusy() || this.busy()) return;
     if (!email) {
-      this.error.set("Escribe tu email para reenviar la verificación.");
+      this.error.set($localize`:@@ui.3ac5e34d2f1d28:Escribe tu email para reenviar la verificación.`);
       return;
     }
     if (!this.captchaReady()) {
-      this.error.set("La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.");
+      this.error.set($localize`:@@ui.823bee0ec9cea7:La protección antiabuso todavía no está preparada. Reinténtalo en unos segundos.`);
       return;
     }
     const revision = ++this.verificationRevision;
@@ -544,13 +546,13 @@ export class AuthComponent {
       if (!this.isVerificationCurrent(revision, pendingStep, email)) return;
       await this.auth.resendVerification(email, captchaToken);
       if (!this.isVerificationCurrent(revision, pendingStep, email)) return;
-      this.info.set("Si la cuenta necesita verificación, recibirás un nuevo correo en breve. Revisa también spam.");
+      this.info.set($localize`:@@ui.b0f8a59e930a73:Si la cuenta necesita verificación, recibirás un nuevo correo en breve. Revisa también spam.`);
     } catch (err) {
       if (this.isVerificationCurrent(revision, pendingStep, email)) {
         this.error.set(
           err instanceof ApiRequestError || err instanceof HCaptchaExecutionError
             ? err.message
-            : "No se pudo reenviar el correo",
+            : $localize`:@@ui.21e2ee9fae28e7:No se pudo reenviar el correo`,
         );
       }
     } finally {
@@ -590,7 +592,7 @@ export class AuthComponent {
     this.registerForm.controls.email.setValue(email);
     this.registerCaptchaToken.set("");
     this.error.set(null);
-    this.info.set("Indica la dirección correcta. Si puede completar el registro, recibirás una verificación para elegir tu contraseña.");
+    this.info.set($localize`:@@ui.cffc859402d5fe:Indica la dirección correcta. Si puede completar el registro, recibirás una verificación para elegir tu contraseña.`);
   }
 
   closeRegistration(): void {
@@ -606,7 +608,7 @@ export class AuthComponent {
     this.tabIndex.set(0);
     this.flow.set({ kind: "login" });
     this.error.set(null);
-    this.info.set("Has cerrado el registro pendiente. Puedes volver cuando quieras.");
+    this.info.set($localize`:@@ui.8affd7544101e1:Has cerrado el registro pendiente. Puedes volver cuando quieras.`);
   }
 
   goForgot(): void {
@@ -628,7 +630,7 @@ export class AuthComponent {
     if (this.busy()) return;
     const flow = this.flow();
     if ((flow.kind !== "mfa" && flow.kind !== "recovery") || !flow.challenge) {
-      this.restartMfaLogin("La verificación ha caducado. Introduce de nuevo tus credenciales.");
+      this.restartMfaLogin($localize`:@@ui.31100131df8c66:La verificación ha caducado. Introduce de nuevo tus credenciales.`);
       return;
     }
     this.invalidateFlow();
@@ -690,13 +692,13 @@ export class AuthComponent {
   private async executeCaptcha(widget?: HCaptchaWidgetComponent): Promise<string> {
     try {
       if (!widget || !this.hcaptchaSiteKey()) {
-        throw new HCaptchaExecutionError("La protección antiabuso no está disponible.");
+        throw new HCaptchaExecutionError($localize`:@@ui.7dccf6dadbf316:La protección antiabuso no está disponible.`);
       }
       // Do not make local developers wait for a second timeout when the
       // visible widget has already reported an outage. Other environments
       // still execute the normal retry and require a fresh provider token.
       if (this.developmentCaptchaFallback() && widget.state() === "error") {
-        throw new HCaptchaExecutionError("hCaptcha no se pudo cargar.");
+        throw new HCaptchaExecutionError($localize`:@@ui.c5fac267cf6503:hCaptcha no se pudo cargar.`);
       }
       return await widget.execute();
     } catch (error) {
@@ -728,14 +730,14 @@ export class AuthComponent {
       const siteKey = config.hcaptcha?.enabled ? config.hcaptcha.siteKey : null;
       const fallback = config.hcaptcha?.developmentFallback === true;
       if ((!siteKey && !fallback) || (siteKey && !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey))) {
-        throw new Error("hCaptcha no está configurado");
+        throw new Error($localize`:@@ui.39e75d7eb57a06:hCaptcha no está configurado`);
       }
       this.hcaptchaSiteKey.set(siteKey ?? "");
       this.developmentCaptchaFallback.set(fallback);
     } catch {
       if (this.captchaConfigRequests.isCurrent(request, "hcaptcha-config")) {
         this.hcaptchaSiteKey.set("");
-        this.captchaConfigError.set("No se pudo cargar hCaptcha.");
+        this.captchaConfigError.set($localize`:@@ui.f818e9091c2c63:No se pudo cargar hCaptcha.`);
       }
     } finally {
       if (this.captchaConfigRequests.isCurrent(request, "hcaptcha-config")) this.captchaConfigBusy.set(false);

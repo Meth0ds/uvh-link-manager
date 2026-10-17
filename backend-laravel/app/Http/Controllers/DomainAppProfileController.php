@@ -43,15 +43,15 @@ final class DomainAppProfileController
                 $workspace = UvhRequest::workspaceId($request);
                 $context = SecurityContext::lock($user, UvhRequest::sessionId($request), requireVerifiedEmail: true);
                 if (! $context || ! WorkspaceAccess::getMembershipForContext($context, $workspace, 'admin')) {
-                    throw new LinkException('Solo propietarios y administradores pueden configurar aplicaciones.', 403);
+                    throw new LinkException(__('messages.error_c75c21b9f3066d'), 403);
                 }
                 $key = $request->header('Idempotency-Key');
                 if (! Idempotency::validateKey($key)['ok']) {
-                    throw new LinkException('Falta una clave de idempotencia válida.', 422);
+                    throw new LinkException(__('messages.error_02a33307f17e7f'), 422);
                 }
                 $domain = DB::table('custom_domains')->where('id', $id)->where('workspace_id', $workspace)->lockForUpdate()->first();
                 if (! $domain) {
-                    throw new LinkException('Dominio no encontrado.', 404);
+                    throw new LinkException(__('messages.error_9c404451a4d01d'), 404);
                 }
                 $scope = 'app-profile:'.$workspace.':'.$id;
                 $hash = hash('sha256', json_encode($request->all(), JSON_THROW_ON_ERROR));
@@ -60,15 +60,15 @@ final class DomainAppProfileController
                     return $begin['body'];
                 }
                 if ($begin['state'] !== 'fresh') {
-                    throw new LinkException('Esta petición está en curso o corresponde a otros datos.', 409);
+                    throw new LinkException(__('messages.error_072c46480b07c4'), 409);
                 }
                 $row = DB::table('app_link_profiles')->where('domain_id', $id)->lockForUpdate()->first();
                 if ($request->input('version') !== ($row ? (int) $row->version : 0)) {
-                    throw new LinkException('La configuración cambió. Recarga antes de guardar.', 409);
+                    throw new LinkException(__('messages.error_36919233a5a313'), 409);
                 }
                 $values = $this->validate($request);
                 if ($values['enabled'] && RedirectService::resolveDomainId($domain->domain) !== $id) {
-                    throw new LinkException('Activa y verifica el dominio con HTTPS antes de publicar su app.', 422);
+                    throw new LinkException(__('messages.error_70ef695852baec'), 422);
                 }
                 $values += ['version' => ($row ? (int) $row->version : 0) + 1, 'updated_at' => now()];
                 if ($row) {
@@ -94,29 +94,29 @@ final class DomainAppProfileController
     {
         $v = $request->all();
         if (array_diff(array_keys($v), ['version', 'name', 'enabled', 'iosAppId', 'androidPackage', 'androidFingerprints', 'routePrefixes']) || ! is_bool($v['enabled'] ?? null) || ! is_string($v['name'] ?? null) || trim($v['name']) === '' || mb_strlen($v['name']) > 120 || preg_match('/[\p{Cc}\p{Cf}<>]/u', $v['name'])) {
-            throw new LinkException('Revisa el nombre y los campos de la aplicación.', 422);
+            throw new LinkException(__('messages.error_824effbb05271f'), 422);
         }
         $ios = $v['iosAppId'] ?? null;
         $android = $v['androidPackage'] ?? null;
         $fingerprints = $v['androidFingerprints'] ?? [];
         $prefixes = $v['routePrefixes'] ?? [];
         if (($ios !== null && (! is_string($ios) || preg_match('/^[A-Z0-9]{10}\.[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/D', $ios) !== 1)) || ($android !== null && (! is_string($android) || strlen($android) > 255 || preg_match('/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/D', $android) !== 1)) || ($ios === null && $android === null)) {
-            throw new LinkException('Introduce un identificador Apple o un paquete Android válido.', 422);
+            throw new LinkException(__('messages.error_5db1a9da658758'), 422);
         }
         if (! is_array($fingerprints) || ! array_is_list($fingerprints) || count($fingerprints) > 10 || ($android !== null && count($fingerprints) === 0)) {
-            throw new LinkException('Android necesita entre 1 y 10 huellas SHA-256.', 422);
+            throw new LinkException(__('messages.error_c8247cd168346d'), 422);
         }
         foreach ($fingerprints as $fingerprint) {
             if (! is_string($fingerprint) || ! preg_match('/^(?:[A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2}$/D', $fingerprint)) {
-                throw new LinkException('Una huella SHA-256 no tiene el formato correcto.', 422);
+                throw new LinkException(__('messages.error_89422458b6fe7b'), 422);
             }
         }
         if (! is_array($prefixes) || ! array_is_list($prefixes) || count($prefixes) < 1 || count($prefixes) > 20) {
-            throw new LinkException('Indica entre 1 y 20 prefijos de contenido.', 422);
+            throw new LinkException(__('messages.error_face15ad93bff4'), 422);
         }
         foreach ($prefixes as $prefix) {
             if (! is_string($prefix) || strlen($prefix) > 200 || ! str_ends_with($prefix, '/') || ! AppOpening::routeAllowed($prefix, ['/'])) {
-                throw new LinkException('Usa rutas como /productos/, sin parámetros ni caracteres especiales.', 422);
+                throw new LinkException(__('messages.error_ed3fd3a24a7046'), 422);
             }
         }
 

@@ -1,21 +1,21 @@
 <div class="public-report-shell">
   <header class="report-masthead">
-    <span class="brand" aria-label="UVH">uvh.</span
-    ><span><mat-icon>lock_outline</mat-icon>Informe de solo lectura</span>
+    <span class="brand" aria-label="UVH" i18n-aria-label="@@ui.34dd405d36b75d"><ng-container i18n="@@ui.d4f8ff6686bef2">uvh.</ng-container></span
+    ><span><mat-icon>lock_outline</mat-icon><ng-container i18n="@@ui.96121919dd1c89">Informe de solo lectura</ng-container></span>
   </header>
   @if (loading()) {
-    <mat-progress-bar mode="indeterminate" aria-label="Cargando informe" />
+    <mat-progress-bar mode="indeterminate" aria-label="Cargando informe"  i18n-aria-label="@@ui.53951deeb4608e"/>
   }
   @if (passwordRequired() && !report() && !unavailable()) {
     <main class="access-panel">
       <span class="access-icon"><mat-icon>lock_outline</mat-icon></span>
-      <h1>Este informe está protegido</h1>
+      <h1><ng-container i18n="@@ui.3e4b99021f7ff2">Este informe está protegido</ng-container></h1>
       <p>
-        Introduce la contraseña que te ha facilitado quien compartió los
+        <ng-container i18n="@@ui.5860a62311e750">Introduce la contraseña que te ha facilitado quien compartió los
         resultados.
-      </p>
+      </ng-container></p>
       <form (ngSubmit)="access()">
-        <label for="report-password">Contraseña</label
+        <label for="report-password"><ng-container i18n="@@ui.a389a638dec325">Contraseña</ng-container></label
         ><input
           id="report-password"
           type="password"
@@ -25,7 +25,7 @@
           maxlength="72"
           required
         /><button mat-flat-button type="submit" [disabled]="loading()">
-          {{ loading() ? "Comprobando…" : "Ver informe" }}
+          {{ loading() ? uiText.ui_d2a7094a2bfccb : uiText.ui_850f0847542c5a }}
         </button>
       </form>
       @if (error()) {
@@ -43,7 +43,7 @@
           <span class="period"
             ><mat-icon>calendar_today</mat-icon
             >{{ r.from | date: "d MMM y" : "UTC" }} –
-            {{ r.to | date: "d MMM y" : "UTC" }}<span>UTC</span></span
+            {{ r.to | date: "d MMM y" : "UTC" }}<span><ng-container i18n="@@ui.7e5f76c94a635c">UTC</ng-container></span></span
           >
         </div>
         <button
@@ -52,32 +52,32 @@
           (click)="load()"
           [disabled]="loading()"
         >
-          <mat-icon>refresh</mat-icon>Actualizar
-        </button>
+          <mat-icon>refresh</mat-icon><ng-container i18n="@@ui.2a2b91c5db553d">Actualizar
+        </ng-container></button>
       </section>
       @if (r.sections.includes("visits")) {
-        <section class="visits-summary" aria-label="Total del periodo">
-          <span>Visitas registradas</span
+        <section class="visits-summary" aria-label="Total del periodo" i18n-aria-label="@@ui.0c3fa888cdc825">
+          <span><ng-container i18n="@@ui.f1fb0d49848123">Visitas registradas</ng-container></span
           ><strong>{{
             r.visits === null ? "—" : number.format(r.visits)
           }}</strong>
           <p>
-            Actividad de {{ r.labels.length }}
-            {{ r.labels.length === 1 ? "enlace" : "enlaces" }} en el periodo
+            <ng-container i18n="@@ui.958ce9060e57c9">Actividad de {{ r.labels.length }}
+            {{ r.labels.length === 1 ? uiText.ui_902ee7f27eee59 : uiText.ui_41b0ae1f3fe239 }} en el periodo
             compartido.
-          </p>
+          </ng-container></p>
         </section>
       }
       @if (r.sections.includes("series")) {
         <section class="report-section">
-          <h2>Evolución diaria</h2>
+          <h2><ng-container i18n="@@ui.4f60a7900f7ea1">Evolución diaria</ng-container></h2>
           @if (r.series.length) {
             <div class="chart-wrap">
               <svg
                 viewBox="0 0 720 230"
                 role="img"
                 aria-label="Gráfico de visitas diarias; valores disponibles en la tabla"
-              >
+               i18n-aria-label="@@ui.6b4a8f03c8ab18">
                 <line
                   x1="8"
                   y1="210"
@@ -104,22 +104,22 @@
               </svg>
               <div class="chart-dates">
                 <span>{{
-                  r.series[0].day + "T00:00:00Z" | date: "d MMM" : "UTC"
+                  r.series[0].day + 'T00:00:00Z' | date: "d MMM" : "UTC"
                 }}</span
                 ><span>{{
-                  r.series[r.series.length - 1].day + "T00:00:00Z"
+                  r.series[r.series.length - 1].day + 'T00:00:00Z'
                     | date: "d MMM" : "UTC"
                 }}</span>
               </div>
             </div>
             <details>
-              <summary>Consultar valores diarios</summary>
+              <summary><ng-container i18n="@@ui.f0b2bcc02d6e8f">Consultar valores diarios</ng-container></summary>
               <div class="series-table">
                 <table>
                   <thead>
                     <tr>
-                      <th scope="col">Día</th>
-                      <th scope="col">Visitas</th>
+                      <th scope="col"><ng-container i18n="@@ui.ffd6f24b18b1a9">Día</ng-container></th>
+                      <th scope="col"><ng-container i18n="@@ui.c6e253ffde95f8">Visitas</ng-container></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -127,14 +127,14 @@
                       <tr>
                         <th scope="row">
                           {{
-                            point.day + "T00:00:00Z" | date: "d MMM y" : "UTC"
+                            point.day + 'T00:00:00Z' | date: "d MMM y" : "UTC"
                           }}
                         </th>
                         <td>
                           {{
                             point.available
                               ? number.format(point.visits)
-                              : "Sin datos disponibles"
+                              : uiText.ui_03b9a940519401
                           }}
                         </td>
                       </tr>
@@ -144,14 +144,14 @@
               </div>
             </details>
           } @else {
-            <p class="muted">Todavía no hay actividad en este periodo.</p>
+            <p class="muted"><ng-container i18n="@@ui.d604464b9c3843">Todavía no hay actividad en este periodo.</ng-container></p>
           }
         </section>
       }
       <div class="breakdowns">
         @if (r.sections.includes("countries")) {
           <section class="report-section">
-            <h2>Países</h2>
+            <h2><ng-container i18n="@@ui.993af13e12d377">Países</ng-container></h2>
             <ol>
               @for (row of r.countries; track row.key) {
                 <li>
@@ -165,15 +165,15 @@
                 </li>
               } @empty {
                 <li class="muted">
-                  No hay países registrados en este periodo.
-                </li>
+                  <ng-container i18n="@@ui.d65ab01b716937">No hay países registrados en este periodo.
+                </ng-container></li>
               }
             </ol>
           </section>
         }
         @if (r.sections.includes("devices")) {
           <section class="report-section">
-            <h2>Dispositivos</h2>
+            <h2><ng-container i18n="@@ui.a70a1e62833434">Dispositivos</ng-container></h2>
             <ol>
               @for (row of r.devices; track row.key) {
                 <li>
@@ -187,8 +187,8 @@
                 </li>
               } @empty {
                 <li class="muted">
-                  No hay dispositivos registrados en este periodo.
-                </li>
+                  <ng-container i18n="@@ui.a242f609b07624">No hay dispositivos registrados en este periodo.
+                </ng-container></li>
               }
             </ol>
           </section>
@@ -197,7 +197,7 @@
       <details class="included">
         <summary>
           {{ r.labels.length }}
-          {{ r.labels.length === 1 ? "enlace incluido" : "enlaces incluidos" }}
+          {{ r.labels.length === 1 ? uiText.ui_902a3c046e67e7 : uiText.ui_5cbb3cda530cf0 }}
         </summary>
         <ul>
           @for (label of r.labels; track $index) {
@@ -207,44 +207,44 @@
       </details>
       @if (r.from < r.retainedFrom) {
         <p class="retention-note">
-          <mat-icon>info_outline</mat-icon>Parte del periodo queda fuera de la
+          <mat-icon>info_outline</mat-icon><ng-container i18n="@@ui.d169e1f1880fbc">Parte del periodo queda fuera de la
           retención disponible. Las fechas sin datos conservados no equivalen a
           cero visitas.
-        </p>
+        </ng-container></p>
       }
       <p class="metric-note">
-        Las visitas son solicitudes registradas: no equivalen necesariamente a
+        <ng-container i18n="@@ui.42664397b0de37">Las visitas son solicitudes registradas: no equivalen necesariamente a
         personas distintas ni a escaneos físicos de un QR.
-      </p>
+      </ng-container></p>
       <footer class="report-footer">
         <span
-          >Actualizado
-          {{ r.updatedAt | date: "d MMM y, HH:mm" : "UTC" }} UTC</span
-        ><span>Compartido con UVH</span>
+          ><ng-container i18n="@@ui.2223ae8d226b12">Actualizado
+          {{ r.updatedAt | date: "d MMM y, HH:mm" : "UTC" }} UTC</ng-container></span
+        ><span><ng-container i18n="@@ui.ba960dfcfd6c71">Compartido con UVH</ng-container></span>
       </footer>
     </main>
   } @else if (unavailable()) {
     <main class="access-panel">
       <span class="access-icon"><mat-icon>link_off</mat-icon></span>
-      <h1>Informe no disponible</h1>
+      <h1><ng-container i18n="@@ui.6b5167bc4d2677">Informe no disponible</ng-container></h1>
       <p>
-        El acceso puede haber caducado, cambiado o sido retirado. Solicita una
+        <ng-container i18n="@@ui.0ffa701a8b7a7f">El acceso puede haber caducado, cambiado o sido retirado. Solicita una
         URL vigente a quien compartió el informe.
-      </p>
+      </ng-container></p>
     </main>
   } @else if (error()) {
     <main class="access-panel">
       <mat-icon>error_outline</mat-icon>
-      <h1>No se pudo abrir el informe</h1>
+      <h1><ng-container i18n="@@ui.610677bf70b09c">No se pudo abrir el informe</ng-container></h1>
       <p class="error" role="alert">{{ error() }}</p>
       <button mat-stroked-button type="button" (click)="retry()">
-        Reintentar
-      </button>
+        <ng-container i18n="@@ui.dae540c9ed0e80">Reintentar
+      </ng-container></button>
     </main>
   } @else {
     <main class="access-panel" role="status">
-      <h1>Preparando tu informe</h1>
-      <p>Estamos consultando los resultados compartidos.</p>
+      <h1><ng-container i18n="@@ui.2d0899e56493d3">Preparando tu informe</ng-container></h1>
+      <p><ng-container i18n="@@ui.1735b1debf20b7">Estamos consultando los resultados compartidos.</ng-container></p>
     </main>
   }
 </div>

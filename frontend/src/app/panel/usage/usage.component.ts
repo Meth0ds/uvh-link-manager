@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { DatePipe } from "@angular/common";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from "@angular/core";
 import { RouterLink } from "@angular/router";
@@ -30,12 +31,12 @@ interface UsageCard {
 }
 
 const RESOURCE_COPY: Record<ResourceKey, Omit<UsageCard, "key" | "quota" | "percent" | "guidance"> & { release: string }> = {
-  links: { label: "Enlaces", icon: "link", route: "/app/links", action: "Gestionar enlaces", release: "Mueve a la papelera enlaces que ya no necesites." },
-  domains: { label: "Dominios", icon: "language", route: "/app/domains", action: "Gestionar dominios", release: "Elimina dominios que ya no pertenezcan al workspace." },
-  members: { label: "Miembros", icon: "group", route: "/app/team", action: "Ver equipo", release: "Revisa el equipo y retira accesos que ya no correspondan." },
-  tokens: { label: "Tokens API", icon: "key", route: "/app/tokens", action: "Gestionar tokens", release: "Revoca tokens activos que ya no utilicen las integraciones." },
-  webhooks: { label: "Webhooks", icon: "webhook", route: "/app/webhooks", action: "Gestionar webhooks", release: "Elimina webhooks que ya no deban recibir eventos." },
-  invitations: { label: "Invitaciones pendientes", icon: "forward_to_inbox", route: "/app/team", action: "Gestionar invitaciones", release: "Cancela invitaciones pendientes que ya no sean necesarias." },
+  links: { label: $localize`:@@ui.f1a5125bb4f0ad:Enlaces`, icon: "link", route: "/app/links", action: $localize`:@@ui.578708dfd25fb0:Gestionar enlaces`, release: $localize`:@@ui.679f792484f341:Mueve a la papelera enlaces que ya no necesites.` },
+  domains: { label: $localize`:@@ui.3facb8d257990f:Dominios`, icon: "language", route: "/app/domains", action: $localize`:@@ui.8d5ef78befeaf6:Gestionar dominios`, release: $localize`:@@ui.bd7a7f35490e84:Elimina dominios que ya no pertenezcan al workspace.` },
+  members: { label: $localize`:@@ui.0d00d93befb181:Miembros`, icon: "group", route: "/app/team", action: $localize`:@@ui.bc41cab78281cf:Ver equipo`, release: $localize`:@@ui.372148054c6267:Revisa el equipo y retira accesos que ya no correspondan.` },
+  tokens: { label: $localize`:@@ui.f6d9f8f2874f90:Tokens API`, icon: "key", route: "/app/tokens", action: $localize`:@@ui.1e32fc173e5c82:Gestionar tokens`, release: $localize`:@@ui.8bd99d4fc536fe:Revoca tokens activos que ya no utilicen las integraciones.` },
+  webhooks: { label: $localize`:@@ui.45808d75bf8911:Webhooks`, icon: "webhook", route: "/app/webhooks", action: $localize`:@@ui.6d9a6ec45e13bc:Gestionar webhooks`, release: $localize`:@@ui.fbfb2ab34c4ae1:Elimina webhooks que ya no deban recibir eventos.` },
+  invitations: { label: $localize`:@@ui.d571030922e4d1:Invitaciones pendientes`, icon: "forward_to_inbox", route: "/app/team", action: $localize`:@@ui.4b2901ee9871dc:Gestionar invitaciones`, release: $localize`:@@ui.29ff3e9afb994f:Cancela invitaciones pendientes que ya no sean necesarias.` },
 };
 
 @Component({
@@ -47,6 +48,7 @@ const RESOURCE_COPY: Record<ResourceKey, Omit<UsageCard, "key" | "quota" | "perc
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UsageComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly workspaces = inject(WorkspaceService);
@@ -79,7 +81,7 @@ export class UsageComponent {
    */
   readonly error = computed(() => {
     const wait = this.waitSeconds();
-    return wait > 0 ? `Espera ${wait} segundos antes de volver a consultar.` : this.current()?.error ?? null;
+    return wait > 0 ? $localize`:@@ui.e845f88f253166:Espera ${wait} segundos antes de volver a consultar.` : this.current()?.error ?? null;
   });
   readonly cards = computed<UsageCard[]>(() => {
     const data = this.data();
@@ -90,12 +92,12 @@ export class UsageComponent {
       const copy = RESOURCE_COPY[key];
       const percent = quota.limit === null ? null : Math.min(100, quota.limit === 0 ? 100 : Math.round((quota.used / quota.limit) * 100));
       const guidance = quota.policy === "unavailable"
-        ? "La configuración de esta cuota no está disponible. No se asume capacidad libre."
+        ? $localize`:@@ui.42026634dd04df:La configuración de esta cuota no está disponible. No se asume capacidad libre.`
         : quota.policy === "not_configured"
-          ? "No existe un límite configurado; este recuento es informativo."
+          ? $localize`:@@ui.dce274cebc44b5:No existe un límite configurado; este recuento es informativo.`
           : quota.reached
-            ? quota.canManage ? copy.release : "Se alcanzó el límite. Pide a un rol con permisos que libere capacidad."
-            : quota.canManage ? copy.release : "Puedes consultar el consumo; la gestión requiere un rol con más permisos.";
+            ? quota.canManage ? copy.release : $localize`:@@ui.2481704c5f0f1c:Se alcanzó el límite. Pide a un rol con permisos que libere capacidad.`
+            : quota.canManage ? copy.release : $localize`:@@ui.7c0500e3b43d03:Puedes consultar el consumo; la gestión requiere un rol con más permisos.`;
       return [{ key, ...copy, quota, guidance, percent }];
     });
   });
@@ -142,10 +144,10 @@ export class UsageComponent {
         this.waits.defer(String(context.userId), error instanceof ApiRequestError ? error.retryAfterSeconds : undefined);
       }
       fail(status === 401 || status === 403
-        ? "Ya no tienes acceso al uso de este workspace. Comprueba tu sesión y tus permisos."
+        ? $localize`:@@ui.d0f4d405f749c3:Ya no tienes acceso al uso de este workspace. Comprueba tu sesión y tus permisos.`
         : status === 429
-          ? "Se ha alcanzado el límite de consultas. Espera antes de actualizar."
-          : "No se pudo consultar el uso. Puedes volver a intentarlo más tarde.");
+          ? $localize`:@@ui.9c12a63e4cb78b:Se ha alcanzado el límite de consultas. Espera antes de actualizar.`
+          : $localize`:@@ui.8f90c937844ff3:No se pudo consultar el uso. Puedes volver a intentarlo más tarde.`);
     }
   }
 }

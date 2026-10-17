@@ -21,17 +21,17 @@ final class SocialPreviewAssetController
     {
         try {
             if (! config('sharing.social_previews')) {
-                throw new LinkException('Esta función todavía no está disponible.', 404);
+                throw new LinkException(__('messages.error_3f80b725d8fbb6'), 404);
             }
             $file = $request->file('image');
             $key = $request->header('Idempotency-Key');
             if (! $file instanceof UploadedFile || ! Idempotency::validateKey($key)['ok']) {
-                throw new LinkException('Elige una imagen y reintenta la carga.', 422);
+                throw new LinkException(__('messages.error_d06b75904e0966'), 422);
             }
             $rawCrop = $request->input('crop');
             $crop = $rawCrop === null ? null : (is_string($rawCrop) ? json_decode($rawCrop, true, 8) : $rawCrop);
             if ($rawCrop !== null && $crop === null) {
-                throw new LinkException('Recorte inválido.', 422);
+                throw new LinkException(__('messages.error_233b44ff680999'), 422);
             }
             $image = SocialImage::normalize($file, $crop);
             $workspace = UvhRequest::workspaceId($request);
@@ -39,13 +39,13 @@ final class SocialPreviewAssetController
                 $old = DB::table('social_preview_assets')->where('workspace_id', $workspace)->where('request_key', $key)->first();
                 if ($old) {
                     if (! hash_equals($old->input_hash, $image['inputHash'])) {
-                        throw new LinkException('La clave de carga corresponde a otra imagen.', 409);
+                        throw new LinkException(__('messages.error_5ca7cc128a3469'), 409);
                     }
 
                     return $old;
                 }
                 if (DB::table('social_preview_assets')->where('workspace_id', $workspace)->sum('bytes') + strlen($image['jpeg']) > (int) config('sharing.asset_bytes')) {
-                    throw new LinkException('El workspace ha alcanzado el límite de espacio para tarjetas.', 409);
+                    throw new LinkException(__('messages.error_43c38f82a21882'), 409);
                 }
                 $public = Str::uuid()->toString();
                 $id = DB::table('social_preview_assets')->insertGetId(['workspace_id' => $workspace, 'public_id' => $public, 'request_key' => $key, 'input_hash' => $image['inputHash'], 'path' => 'social-previews/'.$workspace.'/'.$public.'.jpg', 'bytes' => strlen($image['jpeg']), 'created_at' => now(), 'updated_at' => now()]);
@@ -54,12 +54,12 @@ final class SocialPreviewAssetController
             });
             if ($row->status !== 'ready') {
                 if (! Storage::disk('local')->put($row->path, $image['jpeg'])) {
-                    throw new LinkException('No se pudo guardar la imagen. Reintenta más tarde.', 503);
+                    throw new LinkException(__('messages.error_1e34cac3c43e9b'), 503);
                 }
                 WorkspaceMutation::run($request, function () use ($row, $workspace): void {
                     $fresh = DB::table('social_preview_assets')->where('workspace_id', $workspace)->where('id', $row->id)->lockForUpdate()->first();
                     if (! $fresh) {
-                        throw new LinkException('Esta carga ya no está disponible.', 409);
+                        throw new LinkException(__('messages.error_38fe4ab0ebb64e'), 409);
                     }
                     DB::table('social_preview_assets')->where('id', $row->id)->update(['status' => 'ready', 'updated_at' => now()]);
                 });

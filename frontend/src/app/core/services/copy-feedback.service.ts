@@ -54,20 +54,20 @@ export class CopyFeedbackService {
       this.clearTimer();
       if (!this.current(attempt)) { this.attempt.set(null); return; }
       this.attempt.set({ ...attempt, phase });
-      this.snack.open(message, "Cerrar", { duration: phase === "copied" ? 2000 : 3000 });
+      this.snack.open(message, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: phase === "copied" ? 2000 : 3000 });
       this.timer = setTimeout(() => { if (revision === this.revision) this.attempt.set(null); this.timer = undefined; }, 2400);
     };
     try {
       const clipboard = this.document.defaultView?.navigator.clipboard;
-      if (!clipboard) { finish("error", "El navegador no permite copiar automáticamente"); return; }
+      if (!clipboard) { finish("error", $localize`:@@ui.b2b3a94dcbea08:El navegador no permite copiar automáticamente`); return; }
       // Call directly in the click stack to retain browser user activation.
       const write = clipboard.writeText(url);
       this.timer = setTimeout(() => {
-        finish("error", "No se pudo confirmar la copia. Puedes volver a intentarlo.");
+        finish("error", $localize`:@@ui.6a4a60957a758f:No se pudo confirmar la copia. Puedes volver a intentarlo.`);
       }, 20000);
-      void write.then(() => finish("copied", "Enlace copiado"), () => finish("error", "No se pudo copiar. Puedes volver a intentarlo."));
+      void write.then(() => finish("copied", $localize`:@@ui.f7aa761caa6b3d:Enlace copiado`), () => finish("error", $localize`:@@ui.1747efac94adc8:No se pudo copiar. Puedes volver a intentarlo.`));
     } catch {
-      finish("error", "No se pudo copiar. Puedes volver a intentarlo.");
+      finish("error", $localize`:@@ui.1747efac94adc8:No se pudo copiar. Puedes volver a intentarlo.`);
     }
   }
 

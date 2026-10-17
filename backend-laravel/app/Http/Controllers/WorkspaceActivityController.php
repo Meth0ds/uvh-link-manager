@@ -22,7 +22,7 @@ final class WorkspaceActivityController
             // ConvertEmptyStringsToNull preserves key presence. Reject an
             // explicitly empty cursor instead of treating it as a fresh page.
             || ($cursorProvided && (! is_string($cursor) || $cursor === '' || strlen($cursor) > 2048))) {
-            return response()->json(['error' => 'Paginación inválida'], 422);
+            return response()->json(['error' => __('messages.error_7efa41a49e5290')], 422);
         }
         try {
             return DB::transaction(function () use ($id, $user, $cursor, $limit) {
@@ -33,12 +33,12 @@ final class WorkspaceActivityController
                 // Re-check authority under the same parent lock used by role
                 // changes/removal. A cursor cannot preserve revoked permission.
                 if (! WorkspaceAccess::getMembershipLocked($user->id, $id, 'admin', expectedSecurityVersion: (int) $user->security_version)) {
-                    return response()->json(['error' => 'Sin acceso a la actividad de este workspace'], 403);
+                    return response()->json(['error' => __('messages.error_553ee25e1631ed')], 403);
                 }
                 try {
                     $position = $cursor === null ? null : WorkspaceActivityCursor::read($cursor, $id, $user->id, (int) $user->security_version);
                 } catch (\InvalidArgumentException) {
-                    return response()->json(['error' => 'La paginación ha caducado o no es válida. Actualiza la actividad.'], 422);
+                    return response()->json(['error' => __('messages.error_1d672851fe01ea')], 422);
                 }
                 $expiresAt = $position['expiresAt'] ?? now()->timestamp + WorkspaceActivityCursor::TTL;
                 $query = DB::table('audit_events as a')
@@ -80,10 +80,10 @@ final class WorkspaceActivityController
                         ? $row->resource_id : null;
 
                     return [
-                        'id' => (string) $row->id, 'action' => $row->action, 'label' => $label,
+                        'id' => (string) $row->id, 'action' => $row->action, 'label' => WorkspaceActivityCatalog::label($row->action),
                         'outcome' => $outcome === 'dns' ? $row->dns_outcome : $outcome,
-                        'actor' => ['id' => $actorId, 'label' => $moderation ? 'Moderación'
-                            : ($actorId === null ? 'Actor no disponible' : ($actorId === (string) $user->id ? 'Tú' : 'Miembro #'.$actorId))],
+                        'actor' => ['id' => $actorId, 'label' => $moderation ? __('activity.actor_moderation')
+                            : ($actorId === null ? __('activity.actor_missing') : ($actorId === (string) $user->id ? __('activity.actor_you') : __('activity.actor_member', ['id' => $actorId])))],
                         'resource' => ['type' => $row->resource_type, 'id' => $resourceId],
                         'createdAt' => Carbon::parse($row->created_at)->utc()->format('Y-m-d\TH:i:s.uP'),
                     ];
@@ -98,7 +98,7 @@ final class WorkspaceActivityController
         } catch (\Throwable) {
             // Includes missing 000033 and infrastructure failures. No SQL or
             // cursor plaintext reaches the browser, and no fallback mixes tenants.
-            return response()->json(['error' => 'No se pudo consultar la actividad. Inténtalo más tarde.'], 503);
+            return response()->json(['error' => __('messages.error_876cab13f7e8e2')], 503);
         }
     }
 }

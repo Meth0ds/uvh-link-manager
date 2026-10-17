@@ -80,7 +80,11 @@ final class OperationalNotices
                     $recipients = $users->filter(static fn (User $user): bool => ! $user->deleted_at && $user->email_verified_at !== null
                         && in_array($user->id, $memberIds, true));
                     $label = $subject !== null ? (string) $resource->{$subject} : 'Revisa los recursos de tu workspace';
+                    $subjectData = $subject === null ? ['version' => 1, 'type' => 'review', 'label' => ''] : null;
                     if ($table === 'links' && config('workflows.enabled')) {
+                        $subjectData = ['version' => 1, 'label' => $label] + ($kind === NotificationKinds::LINK_EXPIRING
+                            ? ['type' => 'expiry', 'expiresAt' => Carbon::parse($resource->expires_at)->utc()->toIso8601String()]
+                            : ['type' => 'remaining', 'remaining' => max(0, (int) $resource->max_clicks - (int) $resource->click_count)]);
                         $label .= $kind === NotificationKinds::LINK_EXPIRING
                             ? ' · Caduca el '.Carbon::parse($resource->expires_at)->utc()->format('d/m/Y H:i').' UTC'
                             : ' · '.max(0, (int) $resource->max_clicks - (int) $resource->click_count).' clics disponibles';
@@ -89,8 +93,11 @@ final class OperationalNotices
                         ? '/app/links/'.$row->id.'?workspaceId='.$workspaceId : null;
                     foreach ($recipients as $user) {
                         $dedupe = hash('sha256', $kind.':'.$row->id.':'.$row->notice_generation);
-                        $delivery = NotificationInbox::record((int) $user->id, $kind, $workspaceId, $label, $dedupe, $route);
-                        if ($delivery === 'immediate' && ! UvhMail::operationalNotice($user->email, $kind, $label, $route !== null ? FrontendUrl::base().$route : null)) {
+                        $delivery = NotificationInbox::record((int) $user->id, $kind, $workspaceId, $label, $dedupe, $route, $subjectData);
+                        if ($delivery === 'immediate' && ! MailLanguage::render($user->email, static fn (): bool => UvhMail::operationalNotice(
+                            $user->email, $kind, NotificationSubject::render($label, $subjectData) ?? '',
+                            $route !== null ? FrontendUrl::base().$route : null, Language::current(),
+                        ))) {
                             throw new MailAdmissionException('Operational reminder admission failed');
                         }
                     }

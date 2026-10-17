@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -30,52 +31,53 @@ import type { TagDto } from "../../core/models";
   template: `
     <h2 mat-dialog-title>
       <span class="title-mark" aria-hidden="true"><mat-icon>sell</mat-icon></span>
-      <span><small>Organiza tus enlaces</small><b>Etiquetas</b></span>
+      <span><small><ng-container i18n="@@ui.2192653950bdd0">Organiza tus enlaces</ng-container></small><b><ng-container i18n="@@ui.137cb944c52673">Etiquetas</ng-container></b></span>
     </h2>
     <mat-dialog-content class="manager-content">
-      <p class="message">Encuentra enlaces por tema. Renombrar una etiqueta actualiza todos los enlaces que la usan.</p>
-      @if (loading()) { <p class="manager-status" role="status">Cargando etiquetas…</p> }
+      <p class="message"><ng-container i18n="@@ui.3546cf86628748">Encuentra enlaces por tema. Renombrar una etiqueta actualiza todos los enlaces que la usan.</ng-container></p>
+      @if (loading()) { <p class="manager-status" role="status"><ng-container i18n="@@ui.8367db6bd3d48d">Cargando etiquetas…</ng-container></p> }
       @if (loadError()) {
-        <div class="error manager-error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="reload()" [disabled]="loading() || busy()">Reintentar</button></div>
+        <div class="error manager-error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="reload()" [disabled]="loading() || busy()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
       }
       @if (!loading() && !loadError() && !tags().length) {
-        <div class="manager-empty"><mat-icon aria-hidden="true">sell</mat-icon><h3>Todavía no hay etiquetas</h3><p>{{ canWrite() ? 'Añádelas al crear o editar un enlace. Después podrás renombrarlas o fusionarlas aquí.' : 'Aquí aparecerán las etiquetas que utilice el equipo.' }}</p></div>
+        <div class="manager-empty"><mat-icon aria-hidden="true">sell</mat-icon><h3><ng-container i18n="@@ui.253555527f4ac0">Todavía no hay etiquetas</ng-container></h3><p>{{ canWrite() ? uiText.ui_15545453e88feb : uiText.ui_ae209111092c39 }}</p></div>
       }
       @if (tags().length) {
-        <div class="manager-summary"><h3>Tus etiquetas</h3><span>{{ tags().length }} en este espacio</span></div>
-        @if (canWrite()) { <p class="manager-hint">Selecciona dos o más etiquetas para fusionarlas en otra.</p> }
-        <ul class="row-list manager-list" [attr.aria-busy]="loading() || busy()" aria-label="Etiquetas del espacio">
+        <div class="manager-summary"><h3><ng-container i18n="@@ui.a1b84a803eb87e">Tus etiquetas</ng-container></h3><span><ng-container i18n="@@ui.4e21c6f4453f87">{{ tags().length }} en este espacio</ng-container></span></div>
+        @if (canWrite()) { <p class="manager-hint"><ng-container i18n="@@ui.c1662e83279465">Selecciona dos o más etiquetas para fusionarlas en otra.</ng-container></p> }
+        <ul class="row-list manager-list" [attr.aria-busy]="loading() || busy()" aria-label="Etiquetas del espacio" i18n-aria-label="@@ui.43eca70456f8ba">
           @for (tag of tags(); track tag.id) {
             <li class="row-item">
-              @if (canWrite()) { <mat-checkbox [checked]="selected().has(tag.id)" (change)="toggle(tag.id)" [disabled]="busy()" [aria-label]="'Seleccionar la etiqueta ' + tag.name"></mat-checkbox> }
-              <div class="row-copy"><span class="name">#{{ tag.name }}</span><span class="count">{{ tag.links }} {{ tag.links === 1 ? 'enlace' : 'enlaces' }}</span></div>
-              @if (canWrite()) { <button mat-button type="button" (click)="rename(tag)" [disabled]="busy()" [attr.aria-label]="'Renombrar etiqueta ' + tag.name">Renombrar</button> }
+              @if (canWrite()) { <mat-checkbox [checked]="selected().has(tag.id)" (change)="toggle(tag.id)" [disabled]="busy()" [aria-label]="uiText.ui_2ffe4f9362336a + tag.name"></mat-checkbox> }
+              <div class="row-copy"><span class="name">#{{ tag.name }}</span><span class="count">{{ tag.links }} {{ tag.links === 1 ? uiText.ui_902ee7f27eee59 : uiText.ui_41b0ae1f3fe239 }}</span></div>
+              @if (canWrite()) { <button mat-button type="button" (click)="rename(tag)" [disabled]="busy()" [attr.aria-label]="uiText.ui_ebe9256d601747 + tag.name"><ng-container i18n="@@ui.c89723ac88fde6">Renombrar</ng-container></button> }
             </li>
           }
         </ul>
         @if (canWrite() && selected().size > 1) {
-          <section class="manager-merge" aria-label="Fusionar etiquetas seleccionadas">
-            <h3>{{ selected().size }} etiquetas seleccionadas</h3><p>Los enlaces pasarán a usar la etiqueta de destino. Las seleccionadas desaparecerán.</p>
-            @if (!mergeTargets().length) { <p class="manager-hint" role="status">Deja al menos una etiqueta sin seleccionar para usarla como destino.</p> }
+          <section class="manager-merge" aria-label="Fusionar etiquetas seleccionadas" i18n-aria-label="@@ui.f0276df6dc568a">
+            <h3><ng-container i18n="@@ui.f5ab3275f14d6b">{{ selected().size }} etiquetas seleccionadas</ng-container></h3><p><ng-container i18n="@@ui.7d285d82e9e9bd">Los enlaces pasarán a usar la etiqueta de destino. Las seleccionadas desaparecerán.</ng-container></p>
+            @if (!mergeTargets().length) { <p class="manager-hint" role="status"><ng-container i18n="@@ui.1ffa8c5c5de392">Deja al menos una etiqueta sin seleccionar para usarla como destino.</ng-container></p> }
             <div class="merge-bar">
-              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Etiqueta de destino</mat-label><mat-select [value]="mergeTargetId()" (selectionChange)="mergeTargetId.set($event.value)" [disabled]="busy() || !mergeTargets().length">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.aa6345f1682c6d">Etiqueta de destino</ng-container></mat-label><mat-select [value]="mergeTargetId()" (selectionChange)="mergeTargetId.set($event.value)" [disabled]="busy() || !mergeTargets().length">
                 @for (tag of mergeTargets(); track tag.id) { <mat-option [value]="tag.id">#{{ tag.name }}</mat-option> }
               </mat-select></mat-form-field>
-              <button mat-flat-button type="button" (click)="merge()" [disabled]="busy() || mergeTargetId() === null">Fusionar etiquetas</button>
+              <button mat-flat-button type="button" (click)="merge()" [disabled]="busy() || mergeTargetId() === null"><ng-container i18n="@@ui.2d513e875881af">Fusionar etiquetas</ng-container></button>
             </div>
           </section>
         }
       }
-      @if (busy()) { <p class="manager-status" role="status">Guardando cambios…</p> }
+      @if (busy()) { <p class="manager-status" role="status"><ng-container i18n="@@ui.abb094d0948814">Guardando cambios…</ng-container></p> }
       @if (error() && !loadError()) { <div class="error" role="alert">{{ error() }}</div> }
-      <p class="note">Los recuentos no incluyen enlaces de la papelera.</p>
+      <p class="note"><ng-container i18n="@@ui.2dd5bdacc5fdcf">Los recuentos no incluyen enlaces de la papelera.</ng-container></p>
     </mat-dialog-content>
-    <mat-dialog-actions align="end"><button mat-stroked-button type="button" (click)="close()">Cerrar</button></mat-dialog-actions>
+    <mat-dialog-actions align="end"><button mat-stroked-button type="button" (click)="close()"><ng-container i18n="@@ui.aeccae342e4bd0">Cerrar</ng-container></button></mat-dialog-actions>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["../dialog-identity.scss", "../scale-dialog.scss"],
 })
 export class TagsDialogComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly destroyRef = inject(DestroyRef);
   private active = true;
@@ -132,10 +134,10 @@ export class TagsDialogComponent {
 
   async rename(tag: TagDto): Promise<void> {
     const name = await this.actions.prompt({
-      title: "Renombrar etiqueta",
-      message: `El nuevo nombre se aplicará a #${tag.name} en todos tus enlaces.`,
-      confirmLabel: "Renombrar",
-      inputLabel: "Nombre",
+      title: $localize`:@@ui.10f94ec9021c2f:Renombrar etiqueta`,
+      message: $localize`:@@ui.c5496318469be3:El nuevo nombre se aplicará a #${tag.name} en todos tus enlaces.`,
+      confirmLabel: $localize`:@@ui.c89723ac88fde6:Renombrar`,
+      inputLabel: $localize`:@@ui.562bb15757a8b5:Nombre`,
       inputRequired: true,
       inputMinLength: 1,
       inputMaxLength: 40,
@@ -154,7 +156,7 @@ export class TagsDialogComponent {
       this.changed = true;
     } catch (err) {
       if (!this.isCurrent()) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo renombrar la etiqueta");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.26d396e8d6b8c2:No se pudo renombrar la etiqueta`);
     } finally {
       if (this.isCurrent()) this.busy.set(false);
     }
@@ -166,9 +168,9 @@ export class TagsDialogComponent {
     if (targetId === null || sourceIds.length < 2) return;
     const target = this.tags().find((tag) => tag.id === targetId);
     const confirmed = await this.actions.confirm({
-      title: "Fusionar etiquetas",
-      message: `Las etiquetas seleccionadas se fusionarán en #${target?.name ?? ""} y dejarán de existir.`,
-      confirmLabel: "Fusionar",
+      title: $localize`:@@ui.2d513e875881af:Fusionar etiquetas`,
+      message: $localize`:@@ui.965a0115b06d34:Las etiquetas seleccionadas se fusionarán en #${target?.name ?? ""} y dejarán de existir.`,
+      confirmLabel: $localize`:@@ui.02ec9686c39944:Fusionar`,
       destructive: true,
     });
     if (!confirmed) return;
@@ -187,7 +189,7 @@ export class TagsDialogComponent {
       await this.reload();
     } catch (err) {
       if (!this.isCurrent()) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron fusionar las etiquetas");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.5094d7943c7032:No se pudieron fusionar las etiquetas`);
     } finally {
       if (this.isCurrent()) this.busy.set(false);
     }
@@ -212,7 +214,7 @@ export class TagsDialogComponent {
       if (!this.isCurrent()) return;
       this.loading.set(false);
       this.loadError.set(true);
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las etiquetas");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.919ad9648edc33:No se pudieron cargar las etiquetas`);
     }
   }
 }

@@ -8,6 +8,7 @@ use App\Support\AppOpening;
 use App\Support\Audit;
 use App\Support\Idempotency;
 use App\Support\IsoDate;
+use App\Support\Language;
 use App\Support\LinkBlockReason;
 use App\Support\LinkPreferences;
 use App\Support\LinkSearch;
@@ -47,7 +48,7 @@ class LinkController
         $workspaceId = UvhRequest::workspaceId($request);
         $domainId = UvhRequest::queryString($request, 'domainId');
         if ($domainId !== '' && $this->positiveQueryInteger($domainId, 0, PHP_INT_MAX) === 0) {
-            return response()->json(['error' => 'Dominio inválido'], 422);
+            return response()->json(['error' => __('messages.error_0487a66badd687')], 422);
         }
         $search = SearchTerm::contains(UvhRequest::queryString($request, 'q'));
         $page = $this->positiveQueryInteger($request->query('page'), 1, 10_000);
@@ -93,30 +94,30 @@ class LinkController
         $perPage = $this->positiveQueryInteger($request->query('perPage'), 20, 100);
 
         if ($state !== '' && ! in_array($state, ['scheduled', 'active', 'paused', 'expired', 'archived', 'blocked'], true)) {
-            return response()->json(['error' => 'Filtro de estado inválido'], 422);
+            return response()->json(['error' => __('messages.error_e72e07dd6527bb')], 422);
         }
         if ($tag !== '' && (! mb_check_encoding($tag, 'UTF-8') || mb_strlen($tag) > 40 || preg_match('/[\x00-\x1f\x7f]/', $tag))) {
-            return response()->json(['error' => 'Filtro de etiqueta inválido'], 422);
+            return response()->json(['error' => __('messages.error_fe906c2dffaf56')], 422);
         }
         if ($domainId !== '' && $this->positiveQueryInteger($domainId, 0, PHP_INT_MAX) === 0) {
-            return response()->json(['error' => 'Filtro de dominio inválido'], 422);
+            return response()->json(['error' => __('messages.error_43be4a350ae514')], 422);
         }
 
         if ($collectionId !== '' && $this->positiveQueryInteger($collectionId, 0, PHP_INT_MAX) === 0
             || ! mb_check_encoding($utmCampaign, 'UTF-8') || mb_strlen($utmCampaign) > 100 || preg_match('/[\p{Cc}\p{Cf}]/u', $utmCampaign)
             || ! in_array($favorites, ['', 'true', 'false', '1', '0'], true)) {
-            return response()->json(['error' => 'Filtro inválido'], 422);
+            return response()->json(['error' => __('messages.error_5bf4f60d0374bb')], 422);
         }
         if (config('workflows.enabled')) {
             $missing = LinkPreferences::missingReferences(['domainId' => $domainId !== '' ? (int) $domainId : null, 'collectionId' => $collectionId !== '' ? (int) $collectionId : null, 'tag' => $tag], $workspaceId);
             if ($missing !== []) {
-                return response()->json(['error' => 'Una referencia del filtro ya no existe.', 'invalidReferences' => $missing], 422);
+                return response()->json(['error' => __('messages.error_36ef7b5bacf707'), 'invalidReferences' => $missing], 422);
             }
             $savedId = UvhRequest::queryString($request, 'savedFilterId');
             if ($savedId !== '') {
                 $saved = DB::table('saved_link_filters')->where('user_id', UvhRequest::user($request)->id)->where('workspace_id', $workspaceId)->where('id', $this->positiveQueryInteger($savedId, 0, PHP_INT_MAX))->first();
                 if (! $saved || ! LinkPreferences::present($saved)['valid']) {
-                    return response()->json(['error' => 'Repara el filtro guardado antes de aplicarlo.'], 422);
+                    return response()->json(['error' => __('messages.error_c4646a0884b36e')], 422);
                 }
             }
         }
@@ -183,11 +184,11 @@ class LinkController
         $domainId = $request->input('domainId');
 
         if ($alias === '' || mb_strlen($alias) > 64) {
-            return response()->json(['error' => 'Alias inválido'], 422);
+            return response()->json(['error' => __('messages.error_daed9d000a21b4')], 422);
         }
 
         $alias = UrlUtil::normalizeAlias($alias);
-        if (UrlUtil::isReservedAlias($alias)) {
+        if (UrlUtil::isReservedAlias($alias) || Language::reservesPublicAlias($alias, $domainId)) {
             return response()->json(['available' => false, 'reason' => 'reserved']);
         }
         if (! UrlUtil::isValidCustomAlias($alias)) {
@@ -195,7 +196,7 @@ class LinkController
         }
 
         if ($domainId !== null && (! is_int($domainId) || $domainId < 1)) {
-            return response()->json(['error' => 'Dominio inválido'], 422);
+            return response()->json(['error' => __('messages.error_0487a66badd687')], 422);
         }
         if ($domainId !== null) {
             $dom = DB::table('custom_domains')
@@ -226,7 +227,7 @@ class LinkController
             return response()->json(['error' => $unsupported], 422);
         }
         if (! $this->validLinkBody($request)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         $input = $this->inputFromRequest($request);
 
@@ -237,7 +238,7 @@ class LinkController
                 ->where('desired_state', 'enabled')
                 ->exists();
             if (! $dom) {
-                return response()->json(['error' => 'Dominio no activado o sin acceso'], 403);
+                return response()->json(['error' => __('messages.error_1834ced0e9edbe')], 403);
             }
         }
 
@@ -267,10 +268,10 @@ class LinkController
                 return response()->json($begin['body'] ?? [], $begin['status'] ?? 201);
             }
             if ($begin['state'] === 'mismatch') {
-                return response()->json(['error' => 'Esta clave de idempotencia corresponde a otra petición.'], 409);
+                return response()->json(['error' => __('messages.error_f3fd78912f50a8')], 409);
             }
             if ($begin['state'] === 'in_progress') {
-                return response()->json(['error' => 'La creación anterior sigue en curso.'], 409);
+                return response()->json(['error' => __('messages.error_f562f2cb38f96d')], 409);
             }
             $idempotency = ['scope' => $scope, 'key' => $idempotencyKey, 'hash' => $hash, 'lease' => $begin['lease']];
         }
@@ -300,7 +301,7 @@ class LinkController
                     Idempotency::release((int) $user->id, $idempotency['scope'], $idempotency['key'], $idempotency['lease']);
                 }
 
-                return response()->json(['error' => 'El enlace dejó de estar disponible al finalizar la creación'], 409);
+                return response()->json(['error' => __('messages.error_76ca36508d5cd2')], 409);
             }
 
             $body = ['link' => LinkService::dto($link)];
@@ -325,7 +326,7 @@ class LinkController
             ->first();
 
         if (! $link) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
 
         if (config('workflows.enabled')) {
@@ -385,7 +386,7 @@ class LinkController
 
         $current = Link::where('id', $id)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->first();
         if (! $current) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
 
         $unsupported = $this->unsupportedBodyField($request, true);
@@ -393,11 +394,11 @@ class LinkController
             return response()->json(['error' => $unsupported], 422);
         }
         if (! $this->validLinkBody($request, true)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         $expectedVersion = $request->input('version');
         if (! is_int($expectedVersion) || $expectedVersion < 1) {
-            return response()->json(['error' => 'Falta la versión actual del enlace. Recárgalo e inténtalo de nuevo.'], 428);
+            return response()->json(['error' => __('messages.error_93769ce6b7ccf9')], 428);
         }
         $input = $this->inputFromRequest($request, $current);
         // `inputFromRequest` omits collection keys on PATCH unless the client
@@ -417,7 +418,7 @@ class LinkController
                 ->where('desired_state', 'enabled')
                 ->exists();
             if (! $dom) {
-                return response()->json(['error' => 'Dominio no activado o sin acceso'], 403);
+                return response()->json(['error' => __('messages.error_1834ced0e9edbe')], 403);
             }
         }
 
@@ -451,7 +452,7 @@ class LinkController
         $link = Link::with([AppOpening::domainRelation(), 'tags'])
             ->where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $link) {
-            return response()->json(['error' => 'El enlace dejó de estar disponible al finalizar la actualización'], 409);
+            return response()->json(['error' => __('messages.error_3c2bdda7555a51')], 409);
         }
 
         return response()->json(['link' => LinkService::dto($link)]);
@@ -467,32 +468,32 @@ class LinkController
         $allowed = ['active', 'paused', 'archived'];
 
         if (! is_string($state) || ! in_array($state, $allowed, true)) {
-            return response()->json(['error' => 'Estado inválido'], 422);
+            return response()->json(['error' => __('messages.error_f49ab2eaafd27a')], 422);
         }
 
         if ($reason !== null && (! is_string($reason) || ! mb_check_encoding($reason, 'UTF-8') || mb_strlen($reason) > 500 || preg_match('/[\x00-\x1f\x7f]/', $reason))) {
-            return response()->json(['error' => 'Motivo inválido'], 422);
+            return response()->json(['error' => __('messages.error_0ede0ba917077f')], 422);
         }
 
         try {
             $writeActor = WorkspaceWriteActor::fromRequest($request);
             $transition = DB::transaction(function () use ($workspaceId, $user, $id, $state, $reason, $writeActor): array {
                 if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
-                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                    throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
                 }
                 $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
                     ->whereNull('deleted_at')->lockForUpdate()->first();
                 if (! $link) {
-                    throw new LinkException('Enlace no encontrado', 404);
+                    throw new LinkException(__('messages.error_56cb73fa20e635'), 404);
                 }
                 if ($link->state === 'blocked') {
-                    throw new LinkException('El bloqueo de enlaces solo se gestiona desde la administración de la plataforma', 403);
+                    throw new LinkException(__('messages.error_3645ed80ba468c'), 403);
                 }
                 if ($state === 'active' && $link->scheduled_at && $link->scheduled_at->isFuture()) {
-                    throw new LinkException('El enlace sigue programado. Modifica su fecha de activación antes de activarlo.', 409);
+                    throw new LinkException(__('messages.error_93fade526e41b9'), 409);
                 }
                 if ($state === 'active' && $link->expires_at && $link->expires_at->lte(now())) {
-                    throw new LinkException('El enlace ya ha caducado. Amplía su fecha de caducidad antes de activarlo.', 409);
+                    throw new LinkException(__('messages.error_ecf8bb5fd752b0'), 409);
                 }
                 $from = $link->state;
                 if ($from !== $state) {
@@ -535,22 +536,22 @@ class LinkController
         $message = $request->input('message');
         if ($message !== null && (! is_string($message) || ! mb_check_encoding($message, 'UTF-8')
             || mb_strlen($message) > 2000 || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $message))) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         try {
             $writeActor = WorkspaceWriteActor::fromRequest($request);
             $appealId = DB::transaction(function () use ($workspaceId, $user, $id, $message, $writeActor): int {
                 if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
-                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                    throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
                 }
                 $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
                     ->whereNull('deleted_at')->lockForUpdate()->first();
                 if (! $link) {
-                    throw new LinkException('Enlace no encontrado', 404);
+                    throw new LinkException(__('messages.error_56cb73fa20e635'), 404);
                 }
                 if ((string) $link->state !== 'blocked') {
-                    throw new LinkException('Este enlace no está bloqueado', 409);
+                    throw new LinkException(__('messages.error_9e7be34bb2188a'), 409);
                 }
                 $inserted = DB::table('link_appeals')->insertOrIgnore([
                     'link_id' => $id,
@@ -562,7 +563,7 @@ class LinkController
                     'updated_at' => now(),
                 ]);
                 if ($inserted !== 1) {
-                    throw new LinkException('Ya hay una apelación abierta para este enlace', 409);
+                    throw new LinkException(__('messages.error_e5998e0c668d17'), 409);
                 }
 
                 $appealId = (int) DB::table('link_appeals')
@@ -589,15 +590,15 @@ class LinkController
             $writeActor = WorkspaceWriteActor::fromRequest($request);
             DB::transaction(function () use ($workspaceId, $user, $id, $writeActor): void {
                 if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
-                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                    throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
                 }
                 $link = Link::where('id', $id)->where('workspace_id', $workspaceId)
                     ->whereNull('deleted_at')->lockForUpdate()->first();
                 if (! $link) {
-                    throw new LinkException('Enlace no encontrado', 404);
+                    throw new LinkException(__('messages.error_56cb73fa20e635'), 404);
                 }
                 if ($link->state === 'blocked' && ! $user->is_admin) {
-                    throw new LinkException('Un enlace bloqueado solo puede eliminarlo un administrador de la plataforma', 403);
+                    throw new LinkException(__('messages.error_2c2f1e3b50d618'), 403);
                 }
                 $link->update([
                     'state_before_delete' => $link->state,
@@ -625,21 +626,21 @@ class LinkController
             $writeActor = WorkspaceWriteActor::fromRequest($request);
             DB::transaction(function () use ($id, $workspaceId, $user, $writeActor): void {
                 if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
-                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                    throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
                 }
                 $link = Link::withTrashed()->where('id', $id)->where('workspace_id', $workspaceId)
                     ->whereNotNull('deleted_at')->lockForUpdate()->first();
                 if (! $link) {
-                    throw new LinkException('Enlace no encontrado', 404);
+                    throw new LinkException(__('messages.error_56cb73fa20e635'), 404);
                 }
                 if ($link->state_before_delete === 'blocked' && ! $user->is_admin) {
-                    throw new LinkException('Un enlace bloqueado solo puede restaurarlo un administrador de la plataforma', 403);
+                    throw new LinkException(__('messages.error_623126facbcb5d'), 403);
                 }
 
                 $quota = DB::table('quotas')->where('workspace_id', $workspaceId)->lockForUpdate()->value('links_limit');
                 $used = Link::where('workspace_id', $workspaceId)->whereNull('deleted_at')->count();
                 if ($quota !== null && $used >= (int) $quota) {
-                    throw new LinkException('Cuota de enlaces alcanzada. Elimina otro enlace antes de restaurar este.', 429);
+                    throw new LinkException(__('messages.error_50662907c595a3'), 429);
                 }
 
                 // Expiry wins over scheduling, in the same order as
@@ -668,7 +669,7 @@ class LinkController
             return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'No se puede restaurar: el alias ya está en uso'], 409);
+                return response()->json(['error' => __('messages.error_0b63ba41165483')], 409);
             }
             throw $e;
         }
@@ -686,7 +687,7 @@ class LinkController
         $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
         $confirmation = UvhRequest::inputString($request, 'confirmation');
         if ($password === '' || strlen($password) > 72 || strlen($factorCode) > 24 || mb_strlen($confirmation) > 100) {
-            return response()->json(['error' => 'Datos de confirmación inválidos'], 422);
+            return response()->json(['error' => __('messages.error_d185daaacba0fb')], 422);
         }
 
         try {
@@ -727,7 +728,7 @@ class LinkController
         } catch (MfaInfrastructureUnavailable $error) {
             report($error);
 
-            return response()->json(['error' => 'La verificación MFA no está disponible. No se eliminó el enlace.'], 503);
+            return response()->json(['error' => __('messages.error_55e6b3ab2e98fc')], 503);
         }
 
         if ($result['status'] === 'locked') {
@@ -737,12 +738,12 @@ class LinkController
             return MfaFreshness::reauthenticationRequired();
         }
         $error = match ($result['status']) {
-            'stale' => ['La sesión cambió. Vuelve a iniciar sesión.', 409],
-            'forbidden' => ['Sólo propietarios y administradores pueden borrar definitivamente.', 403],
-            'not_found' => ['Enlace no encontrado en la papelera', 404],
-            'confirmation' => ['La frase de confirmación no coincide con el alias actual', 422],
-            'password' => ['Contraseña incorrecta', 403],
-            'factor' => ['El código de autenticación o recuperación es incorrecto', 403],
+            'stale' => [__('display.display_02fab54cff9aba'), 409],
+            'forbidden' => [__('display.display_7ea0ad3fe1fcde'), 403],
+            'not_found' => [__('display.display_d31d5688afe915'), 404],
+            'confirmation' => [__('display.display_ca67b998d32666'), 422],
+            'password' => [__('display.display_30124a1d7f08a4'), 403],
+            'factor' => [__('display.display_94f7173a80a9cb'), 403],
             default => null,
         };
         if ($error !== null) {
@@ -758,7 +759,7 @@ class LinkController
 
         $link = Link::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $link) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
 
         // One row past the bound is what tells a full page from a truncated
@@ -815,7 +816,7 @@ class LinkController
             }
 
             return $field === 'state'
-                ? 'El estado no se cambia con esta petición: usa POST /api/v1/links/{id}/state'
+                ? __('display.display_0c38484a0c9501')
                 : 'Campo no admitido: '.(string) $field;
         }
 

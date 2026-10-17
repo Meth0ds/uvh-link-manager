@@ -1,0 +1,27 @@
+<div class="nf-page">
+  <a class="nf-skip" href="#not-found-content" (click)="focusMain(content)"><ng-container i18n="@@ui.fdab69210d5cda">Saltar al contenido</ng-container></a>
+  <header class="nf-header">
+    <a class="nf-brand" href="/" aria-label="UVH, inicio" i18n-aria-label="@@ui.8afc7c79bbbb0d"><ng-container i18n="@@ui.3e4f24607f6041">uvh</ng-container><span>.</span></a>
+    <div class="nf-header-tools"><a class="nf-header-link" href="/help"><ng-container i18n="@@ui.84f8f373fa1a0c">¿Necesitas ayuda?</ng-container></a><app-language-selector /><app-public-theme-toggle /></div>
+  </header>
+  <main #content id="not-found-content" class="nf-main" tabindex="-1">
+    <section class="nf-copy" aria-labelledby="not-found-title">
+      <p class="nf-eyebrow"><span>404</span> <ng-container i18n="@@ui.db9f09f71266e3">Un camino por encontrar</ng-container></p>
+      <h1 id="not-found-title"><ng-container i18n="@@ui.a6aa0a25c3e55f">No encontramos esta página</ng-container><span aria-hidden="true">.</span></h1>
+      <p class="nf-lead"><ng-container i18n="@@ui.749c8198475e25">Puede que la dirección esté incompleta o que la página ya no exista. Desde aquí puedes volver a empezar.</ng-container></p>
+      <div class="nf-actions">
+        <a class="nf-button nf-button-primary" href="/"><ng-container i18n="@@ui.cf2f09a2ce5e45">Volver al inicio </ng-container><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 12h15m-6-6 6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <a class="nf-button" href="/app/dashboard"><ng-container i18n="@@ui.3bc27cd067f366">Ir al panel</ng-container></a>
+      </div>
+      <p class="nf-help"><ng-container i18n="@@ui.ed4d808f0325e5">¿Esperabas encontrar otra cosa? </ng-container><a href="/help"><ng-container i18n="@@ui.c20a2e9d18dc20">Te ayudamos</ng-container></a></p>
+    </section>
+    <figure class="nf-scene" aria-labelledby="puzzle-caption">
+      <figcaption class="nf-scene-caption" id="puzzle-caption"><ng-container i18n="@@ui.25ed2aa99e7acb">Mientras estás aquí, ¿conectamos el camino?</ng-container></figcaption>
+      <div class="nf-figure"><span class="nf-digit" aria-hidden="true">4</span>
+        <div #puzzle class="nf-game" data-route-puzzle><img class="nf-fallback" src="/visitor-assets/puzzle-static.v1.svg" width="270" height="270" alt="Un camino interrumpido entre dos extremos" i18n-alt="@@ui.e8d1092b529bdf"/><p class="nf-static-help"><ng-container i18n="@@ui.7c090afc32c41e">Puedes volver al inicio con los botones de esta página.</ng-container></p></div>
+        <span class="nf-digit" aria-hidden="true">4</span>
+      </div>
+    </figure>
+  </main>
+  <footer class="nf-footer"><p class="nf-footer-note"><ng-container i18n="@@ui.03f2d9dc8e261e">uvh. Siempre hay otro camino.</ng-container></p><nav class="nf-footer-links" aria-label="Enlaces de ayuda" i18n-aria-label="@@ui.3d7599a479180c"><a href="/help"><ng-container i18n="@@ui.32b40035b08043">Ayuda</ng-container></a><a href="/legal/privacidad"><ng-container i18n="@@ui.52233e2c4d6b2e">Privacidad</ng-container></a></nav></footer>
+</div>

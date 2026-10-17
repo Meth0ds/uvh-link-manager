@@ -799,3 +799,13 @@ app-panel #panel-content > router-outlet + * {
 .uvh-search-backdrop { background: rgba(0,0,0,.32); backdrop-filter: blur(3px); }
 @media(max-width:600px) { .uvh-search-dialog { max-width: 100vw !important; max-height: 100dvh !important; } .uvh-search-dialog .mat-mdc-dialog-surface { height: 100%; border: 0; border-radius: 0; } }
 @media(prefers-reduced-motion:reduce) { .uvh-search-backdrop { backdrop-filter: none; } }
+
+// Locale controls share the UVH menu surface, with a stable selected marker.
+.uvh-language-menu.mat-mdc-menu-panel { min-width: 200px; max-width: calc(100vw - 32px); }
+.uvh-language-menu .mat-mdc-menu-content { padding: 5px; }
+.uvh-language-menu .mat-mdc-menu-item { min-height: 46px; border-radius: 3px; font: 600 13px/1.4 Manrope, sans-serif; }
+.uvh-language-menu .mat-mdc-menu-item-text { width: 100%; }
+.uvh-language-menu .language-option { display: grid; grid-template-columns: 1fr 24px 18px; align-items: center; gap: 12px; width: 100%; }
+.uvh-language-menu .language-option-code { font-size: 10px; font-weight: 600; color: var(--uvh-muted); }
+.uvh-language-menu .language-option svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.uvh-language-menu .language-selected { color: var(--uvh-electric); background: var(--uvh-surface); }

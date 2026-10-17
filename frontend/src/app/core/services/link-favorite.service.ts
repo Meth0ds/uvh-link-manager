@@ -46,7 +46,7 @@ export class LinkFavoriteService {
         intent.confirmed = reply.favorite;
       } while (intent.desired !== intent.confirmed);
     } catch {
-      if (current()) { intent.desired = intent.confirmed; this.publish(id, intent.confirmed); this.error.set("No se pudo guardar el favorito. Vuelve a intentarlo."); }
+      if (current()) { intent.desired = intent.confirmed; this.publish(id, intent.confirmed); this.error.set($localize`:@@ui.7a83f8d3a19da4:No se pudo guardar el favorito. Vuelve a intentarlo.`); }
     } finally {
       if (current()) { intent.running = false; this.pending.update(ids => { const next = new Set(ids); next.delete(id); return next; }); }
     }

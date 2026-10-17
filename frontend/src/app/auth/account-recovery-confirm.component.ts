@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { DOCUMENT, Location } from "@angular/common";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, inject, signal, viewChild } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -17,21 +18,21 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
   template: `
     <app-auth-shell>
       <section class="card center" aria-labelledby="account-recovery-confirm-title">
-        <span class="step-kicker">RECUPERACIÓN / CONFIRMAR SOLICITUD</span>
-        @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Confirmando solicitud" /> }
+        <span class="step-kicker"><ng-container i18n="@@ui.cb8ea5f355df6e">RECUPERACIÓN / CONFIRMAR SOLICITUD</ng-container></span>
+        @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Confirmando solicitud"  i18n-aria-label="@@ui.5f6bf3c814c0a4"/> }
         <mat-icon class="icon" [class.ok]="ok()" [class.bad]="done() && !ok()" aria-hidden="true">
           {{ ok() ? 'task_alt' : (done() ? 'error_outline' : 'fact_check') }}
         </mat-icon>
-        <h2 id="account-recovery-confirm-title">{{ ok() ? 'Expediente abierto' : (!token ? 'Enlace no disponible' : (done() ? 'No se pudo confirmar' : 'Confirmar recuperación')) }}</h2>
+        <h2 id="account-recovery-confirm-title">{{ ok() ? uiText.ui_dae25bf0b02cf3 : (!token ? uiText.ui_11e385a1023bde : (done() ? uiText.ui_0e44a67c2e7662 : uiText.ui_b7f104249fb265)) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
         @if (!done() || retryable()) {
-          <div class="alert info">Este paso sólo acredita el acceso al email. No inicia sesión, no cambia la contraseña y no desactiva MFA.</div>
+          <div class="alert info"><ng-container i18n="@@ui.2f393e2df4b3bb">Este paso sólo acredita el acceso al email. No inicia sesión, no cambia la contraseña y no desactiva MFA.</ng-container></div>
           <button #confirmButton mat-flat-button color="primary" class="submit" type="button" (click)="confirm()" [disabled]="busy() || !token">
-            {{ busy() ? 'Confirmando…' : (retryable() ? 'Reintentar confirmación' : 'Confirmar y abrir expediente') }}
+            {{ busy() ? uiText.ui_923b438a98a7e0 : (retryable() ? uiText.ui_536ca3adeeb621 : uiText.ui_c2e97d1ad1d805) }}
           </button>
-          <a class="back" routerLink="/auth">No continuar</a>
+          <a class="back" routerLink="/auth"><ng-container i18n="@@ui.398d77ac3e135b">No continuar</ng-container></a>
         } @else {
-          <a #accessLink mat-flat-button color="primary" routerLink="/auth">Volver al acceso</a>
+          <a #accessLink mat-flat-button color="primary" routerLink="/auth"><ng-container i18n="@@ui.7c60b6892ea0a1">Volver al acceso</ng-container></a>
         }
       </section>
     </app-auth-shell>
@@ -40,6 +41,7 @@ import { decodePublicActionMessage } from "../core/services/public-action-respon
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AccountRecoveryConfirmComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly location = inject(Location);
@@ -54,13 +56,13 @@ export class AccountRecoveryConfirmComponent {
   readonly done = signal(false);
   readonly ok = signal(false);
   readonly retryable = signal(false);
-  readonly message = signal("Confirma que tú solicitaste recuperar una cuenta sin sus factores de acceso.");
+  readonly message = signal($localize`:@@ui.cacb67e73627a3:Confirma que tú solicitaste recuperar una cuenta sin sus factores de acceso.`);
 
   constructor() {
     this.location.replaceState("/auth/account-recovery/confirm");
     if (!this.token) {
       this.done.set(true);
-      this.message.set("Falta el código de confirmación. Inicia una solicitud nueva.");
+      this.message.set($localize`:@@ui.bf01bbe4192fe9:Falta el código de confirmación. Inicia una solicitud nueva.`);
     }
   }
 
@@ -84,7 +86,7 @@ export class AccountRecoveryConfirmComponent {
       if (this.requests.isCurrent(request, this.token)) {
         this.ok.set(false);
         this.retryable.set(!(error instanceof ApiRequestError) || error.status === 0 || error.status === 429 || error.status >= 500);
-        this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo conectar con el servidor. Inténtalo de nuevo.");
+        this.message.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.75ea5152f1621d:No se pudo conectar con el servidor. Inténtalo de nuevo.`);
       }
     } finally {
       if (this.requests.isCurrent(request, this.token)) {

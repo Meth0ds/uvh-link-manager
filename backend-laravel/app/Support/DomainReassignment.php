@@ -18,7 +18,7 @@ final class DomainReassignment
         $user = UvhRequest::user($request);
         $context = SecurityContext::lock($user, UvhRequest::sessionId($request), requireVerifiedEmail: true);
         if (! $context || ! WorkspaceAccess::getMembershipForContext($context, UvhRequest::workspaceId($request), 'admin')) {
-            throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+            throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
         }
 
         return $context->user;
@@ -28,15 +28,15 @@ final class DomainReassignment
     public static function linkIds(mixed $value): array
     {
         if (! is_array($value) || ! array_is_list($value) || count($value) < 1 || count($value) > 100) {
-            throw new LinkException('Selecciona entre 1 y 100 enlaces.', 422);
+            throw new LinkException(__('messages.error_6e8d2b02559e60'), 422);
         }
         foreach ($value as $id) {
             if (! is_int($id) || $id < 1) {
-                throw new LinkException('Selección de enlaces inválida.', 422);
+                throw new LinkException(__('messages.error_bc32a92b40f30d'), 422);
             }
         }
         if (count(array_unique($value)) !== count($value)) {
-            throw new LinkException('La selección contiene enlaces repetidos.', 422);
+            throw new LinkException(__('messages.error_4209720f812c30'), 422);
         }
         sort($value, SORT_NUMERIC);
 
@@ -50,13 +50,13 @@ final class DomainReassignment
     public static function versions(mixed $value, array $ids): array
     {
         if (! is_array($value) || ! array_is_list($value) || count($value) !== count($ids)) {
-            throw new LinkException('Vuelve a revisar los enlaces antes de confirmar.', 422);
+            throw new LinkException(__('messages.error_64c9e4e0dfc799'), 422);
         }
         $versions = [];
         foreach ($value as $item) {
             if (! is_array($item) || ! is_int($item['id'] ?? null) || ! in_array($item['id'], $ids, true)
                 || ! is_int($item['version'] ?? null) || $item['version'] < 1 || isset($versions[$item['id']])) {
-                throw new LinkException('Versiones de enlaces inválidas.', 422);
+                throw new LinkException(__('messages.error_7e69915fbcda03'), 422);
             }
             $versions[$item['id']] = $item['version'];
         }
@@ -68,7 +68,7 @@ final class DomainReassignment
     {
         $domain = CustomDomain::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
         if (! $domain) {
-            throw new LinkException('Dominio no encontrado.', 404);
+            throw new LinkException(__('messages.error_9c404451a4d01d'), 404);
         }
 
         return $domain;
@@ -98,7 +98,7 @@ final class DomainReassignment
     public static function prepare(int $workspaceId, int $sourceId, array $ids, ?int $targetId, ?array $versions = null): array
     {
         if ($targetId === $sourceId) {
-            throw new LinkException('Elige un dominio de destino diferente.', 422);
+            throw new LinkException(__('messages.error_b11f9cf710cee5'), 422);
         }
         // All browser link writers serialize on the workspace parent first.
         // Domain locks are additionally ordered to match concurrent batches.
@@ -112,16 +112,16 @@ final class DomainReassignment
             ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
         $source = $domains->get($sourceId);
         if (! $source || ($targetId !== null && ! $domains->has($targetId))) {
-            throw new LinkException('Dominio no encontrado.', 404);
+            throw new LinkException(__('messages.error_9c404451a4d01d'), 404);
         }
         $target = $targetId === null ? null : $domains->get($targetId);
         if ($target && ! DomainStatus::servingReady($target)) {
-            throw new LinkException('El dominio de destino no está disponible. Revisa su conexión.', 409);
+            throw new LinkException(__('messages.error_9d7b19842bc6aa'), 409);
         }
         $links = Link::withTrashed()->where('workspace_id', $workspaceId)->where('domain_id', $sourceId)
             ->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
         if ($links->count() !== count($ids)) {
-            throw new LinkException('La selección cambió o contiene enlaces que no pertenecen a este dominio. Recarga y vuelve a revisarla.', 409);
+            throw new LinkException(__('messages.error_5f4c5642508a2f'), 409);
         }
         $aliases = $links->map(fn (Link $link) => strtolower($link->alias))->all();
         $duplicates = array_count_values($aliases);
@@ -134,7 +134,7 @@ final class DomainReassignment
         $rows = [];
         foreach ($links as $link) {
             if ($versions !== null && ($versions[(int) $link->id] ?? null) !== (int) $link->version) {
-                throw new LinkException('Un enlace cambió desde la revisión. Revisa de nuevo antes de confirmar.', 409);
+                throw new LinkException(__('messages.error_164d4d469e4362'), 409);
             }
             $alias = strtolower($link->alias);
             $blocked = $link->state === 'blocked' || $link->state_before_delete === 'blocked';

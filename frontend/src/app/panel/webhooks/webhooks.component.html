@@ -1,37 +1,37 @@
-<app-page-header icon="webhook" eyebrow="Automatización" title="Webhooks" description="Recibe eventos de tus enlaces en tu propio servidor, firmados con HMAC.">
+<app-page-header icon="webhook" eyebrow="Automatización" title="Webhooks" description="Recibe eventos de tus enlaces en tu propio servidor, firmados con HMAC." i18n-title="@@ui.45808d75bf8911" i18n-description="@@ui.38cd7c89470c8d" i18n-eyebrow="@@ui.2f7b761b1a404a">
   @if (!showForm() && canEdit()) {
     <button mat-flat-button color="primary" (click)="startCreate()">
-      <mat-icon>add</mat-icon> Nuevo webhook
-    </button>
+      <mat-icon>add</mat-icon> <ng-container i18n="@@ui.b0887e36bfe9e1">Nuevo webhook
+    </ng-container></button>
   }
 </app-page-header>
 
-@if (!canEdit()) { <p class="permission-note"><mat-icon aria-hidden="true">visibility</mat-icon>Solo lectura. Puedes consultar destinos y entregas; la configuración requiere rol editor, administrador o propietario.</p> }
+@if (!canEdit()) { <p class="permission-note"><mat-icon aria-hidden="true">visibility</mat-icon><ng-container i18n="@@ui.94d2ec12c416ca">Solo lectura. Puedes consultar destinos y entregas; la configuración requiere rol editor, administrador o propietario.</ng-container></p> }
 
 @if (loading() && webhooks().length) {
-  <mat-progress-bar mode="indeterminate" aria-label="Cargando webhooks" />
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando webhooks"  i18n-aria-label="@@ui.f9f492e18b0071"/>
 }
 @if (error()) {
-  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
 }
 
 @if (loading() && !webhooks().length) {
-  <app-panel-skeleton variant="list" label="Cargando webhooks" />
+  <app-panel-skeleton variant="list" label="Cargando webhooks"  i18n-label="@@ui.f9f492e18b0071"/>
 }
 
 @if (showForm() && canEdit()) {
   <form class="create-card" (ngSubmit)="save()" aria-labelledby="webhook-form-title">
     <div class="card-intro">
       <span class="card-icon" aria-hidden="true"><mat-icon>{{ editId() ? "edit_notifications" : "add_circle" }}</mat-icon></span>
-      <div><h2 id="webhook-form-title">{{ editId() ? "Editar webhook" : "Conecta tu receptor" }}</h2><p>Elige dónde recibir los eventos y qué cambios te interesan. Tu servidor debe verificar la firma antes de procesarlos.</p></div>
+      <div><h2 id="webhook-form-title">{{ editId() ? uiText.ui_f0ec20db5432b2 : uiText.ui_a0ab59a44b19c4 }}</h2><p><ng-container i18n="@@ui.a251fe1b599eee">Elige dónde recibir los eventos y qué cambios te interesan. Tu servidor debe verificar la firma antes de procesarlos.</ng-container></p></div>
     </div>
     <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-      <mat-label>URL del receptor</mat-label>
+      <mat-label><ng-container i18n="@@ui.c8694ccec8a33b">URL del receptor</ng-container></mat-label>
       <mat-icon matPrefix>http</mat-icon>
-      <input matInput name="receiverUrl" type="url" required maxlength="2048" autocomplete="url" placeholder="https://tu-servidor.com/hooks/uvh" [(ngModel)]="url" [disabled]="saving()" />
-      <mat-hint>Dirección del endpoint que recibe las notificaciones.</mat-hint>
+      <input matInput name="receiverUrl" type="url" required maxlength="2048" autocomplete="url" placeholder="https://tu-servidor.com/hooks/uvh" [(ngModel)]="url" [disabled]="saving()"  i18n-placeholder="@@ui.2e6219c6a14009"/>
+      <mat-hint><ng-container i18n="@@ui.8b7656602d582b">Dirección del endpoint que recibe las notificaciones.</ng-container></mat-hint>
     </mat-form-field>
-    <fieldset class="events" [disabled]="saving()"><legend>Qué eventos quieres recibir</legend><p class="events-hint">Selecciona al menos uno. Cada evento mantiene su nombre técnico en el payload.</p><div class="event-options">
+    <fieldset class="events" [disabled]="saving()"><legend><ng-container i18n="@@ui.da7cf42ae35525">Qué eventos quieres recibir</ng-container></legend><p class="events-hint"><ng-container i18n="@@ui.dc9075b28d3922">Selecciona al menos uno. Cada evento mantiene su nombre técnico en el payload.</ng-container></p><div class="event-options">
       @for (e of eventOptions; track e) {
         <mat-checkbox
           color="primary"
@@ -44,14 +44,14 @@
       }
     </div></fieldset>
     <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-      <mat-label>{{ editId() ? 'Nuevo secreto (opcional)' : 'Secreto de firma (opcional)' }}</mat-label>
-      <input matInput name="signingSecret" type="password" minlength="16" maxlength="128" autocomplete="new-password" placeholder="Entre 16 y 128 caracteres" [(ngModel)]="secret" [disabled]="saving()" />
-      <mat-hint>{{ editId() ? 'Vacío conserva el secreto actual. Si lo cambias, actualiza también el receptor.' : 'Vacío genera un secreto automáticamente. Se mostrará una sola vez al crear.' }}</mat-hint>
+      <mat-label>{{ editId() ? uiText.ui_5a46d04f4624a5 : uiText.ui_dcdca386fd33db }}</mat-label>
+      <input matInput name="signingSecret" type="password" minlength="16" maxlength="128" autocomplete="new-password" placeholder="Entre 16 y 128 caracteres" [(ngModel)]="secret" [disabled]="saving()"  i18n-placeholder="@@ui.b6f0cd0063c61f"/>
+      <mat-hint>{{ editId() ? uiText.ui_2c725511622a3a : uiText.ui_e4e77892911a61 }}</mat-hint>
     </mat-form-field>
     <div class="form-actions">
-      <button mat-button type="button" (click)="resetForm()" [disabled]="saving()">Cancelar</button>
+      <button mat-button type="button" (click)="resetForm()" [disabled]="saving()"><ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button>
       <button mat-flat-button color="primary" type="submit" [attr.aria-busy]="saving()" [disabled]="!url().trim() || !selectedEvents().length || saving() || (!!secret() && (secret().length < 16 || secret().length > 128))">
-        {{ saving() ? "Guardando…" : editId() ? "Guardar cambios" : "Crear webhook" }}
+        {{ saving() ? uiText.ui_3c8dc4dc7a83dd : editId() ? uiText.ui_14bdfaf2face3a : uiText.ui_50c340efc039c1 }}
       </button>
     </div>
   </form>
@@ -59,56 +59,56 @@
 
 @if (plainSecret(); as secretValue) {
   <!-- Announce availability without reading a signing credential aloud. -->
-  <p class="secret-announcement" role="status">Webhook creado. El secreto está disponible para guardarlo ahora.</p>
-  <section class="secret-box" aria-label="Secreto de firma de un solo uso">
+  <p class="secret-announcement" role="status"><ng-container i18n="@@ui.cc572b9b8a460d">Webhook creado. El secreto está disponible para guardarlo ahora.</ng-container></p>
+  <section class="secret-box" aria-label="Secreto de firma de un solo uso" i18n-aria-label="@@ui.15f21467502267">
     <div class="secret-copy">
       <mat-icon>key</mat-icon>
-      <div><b>Secreto del webhook</b><p>Guárdalo ahora. UVH no puede volver a mostrarlo después de cerrar este aviso.</p></div>
+      <div><b><ng-container i18n="@@ui.9b92a9a2b57f35">Secreto del webhook</ng-container></b><p><ng-container i18n="@@ui.c4e218a5e157e8">Guárdalo ahora. UVH no puede volver a mostrarlo después de cerrar este aviso.</ng-container></p></div>
     </div>
-    <div class="secret-value"><code>{{ secretValue }}</code><button mat-icon-button type="button" (click)="copySecret()" aria-label="Copiar secreto"><mat-icon>content_copy</mat-icon></button></div>
-    <button mat-button type="button" (click)="clearSecret()">Ocultar secreto</button>
+    <div class="secret-value"><code>{{ secretValue }}</code><button mat-icon-button type="button" (click)="copySecret()" aria-label="Copiar secreto" i18n-aria-label="@@ui.803eb92cf36a43"><mat-icon>content_copy</mat-icon></button></div>
+    <button mat-button type="button" (click)="clearSecret()"><ng-container i18n="@@ui.79762b8e57cd63">Ocultar secreto</ng-container></button>
   </section>
 }
 
 @if (!loading() && (!error() || webhooks().length)) {
   <div class="wh-list">
-    <header class="list-heading"><div><h2>Receptores configurados</h2><p>Consulta el estado de cada receptor. Su configuración e historial completo están en el detalle.</p></div><span>{{ webhooks().length }} {{ webhooks().length === 1 ? 'receptor' : 'receptores' }}</span></header>
+    <header class="list-heading"><div><h2><ng-container i18n="@@ui.3afab066f71aef">Receptores configurados</ng-container></h2><p><ng-container i18n="@@ui.7d721d4efe2560">Consulta el estado de cada receptor. Su configuración e historial completo están en el detalle.</ng-container></p></div><span>{{ webhooks().length }} {{ webhooks().length === 1 ? uiText.ui_23ebe61c2e21d1 : uiText.ui_f741797ec7950c }}</span></header>
     @for (w of webhooks(); track trackByWebhook($index, w)) {
-      <article class="wh-card" [attr.aria-label]="'Receptor ' + w.url">
-        <header class="receiver-heading"><span class="wh-icon" aria-hidden="true"><mat-icon>webhook</mat-icon></span><div><a class="wh-url" [routerLink]="['/app/webhooks', w.id]">{{ w.url }}</a><p>{{ w.events.length }} {{ w.events.length === 1 ? 'evento suscrito' : 'eventos suscritos' }} · {{ w.hasSecret ? 'Firma configurada' : 'Sin secreto configurado' }}</p></div><span class="state-chip" [class.on]="w.active">{{ stateLabel(w.active) }}</span></header>
-        <p class="signature-note">{{ w.active ? 'Recibe nuevos eventos. Consulta las entregas para comprobar si el receptor los acepta.' : 'Pausado para nuevos eventos.' }}</p>
-        <div class="event-chips" aria-label="Eventos suscritos">@for (e of w.events; track e) { <span class="event-chip"><code>{{ e }}</code></span> }</div>
+      <article class="wh-card" [attr.aria-label]="uiText.ui_034960dd014681 + w.url">
+        <header class="receiver-heading"><span class="wh-icon" aria-hidden="true"><mat-icon>webhook</mat-icon></span><div><a class="wh-url" [routerLink]="['/app/webhooks', w.id]">{{ w.url }}</a><p>{{ w.events.length }} {{ w.events.length === 1 ? uiText.ui_6d0e28e5af0dfa : uiText.ui_2ec08f9f45c18b }} · {{ w.hasSecret ? uiText.ui_03b8cf1a455263 : uiText.ui_4664e2528f0b9e }}</p></div><span class="state-chip" [class.on]="w.active">{{ stateLabel(w.active) }}</span></header>
+        <p class="signature-note">{{ w.active ? uiText.ui_1eef2cd22e4195 : uiText.ui_7e94d1e4196297 }}</p>
+        <div class="event-chips" aria-label="Eventos suscritos" i18n-aria-label="@@ui.e19ec825da6213">@for (e of w.events; track e) { <span class="event-chip"><code>{{ e }}</code></span> }</div>
         <div class="wh-actions">
-          <a mat-stroked-button [routerLink]="['/app/webhooks', w.id]"><mat-icon>manage_search</mat-icon> Configuración y entregas</a>
+          <a mat-stroked-button [routerLink]="['/app/webhooks', w.id]"><mat-icon>manage_search</mat-icon> <ng-container i18n="@@ui.62856a82f89cf0">Configuración y entregas</ng-container></a>
           @if (canEdit()) {
-            <button mat-button type="button" (click)="startEdit(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="'Editar receptor ' + w.url"><mat-icon>edit</mat-icon>Editar</button>
-            <button mat-button type="button" (click)="toggleActive(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="(w.active ? 'Pausar receptor ' : 'Activar receptor ') + w.url">{{ w.active ? 'Pausar' : 'Activar' }}</button>
-            <button mat-button type="button" (click)="test(w)" [disabled]="actionId() !== null || saving() || !!error() || !w.active" [matTooltip]="w.active ? 'Añade una prueba a la cola de entregas' : 'Activa el webhook antes de probarlo'" [attr.aria-label]="'Enviar ping a ' + w.url"><mat-icon>send</mat-icon>Enviar ping</button>
-            <button mat-icon-button type="button" class="danger" (click)="remove(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="'Eliminar receptor ' + w.url"><mat-icon>delete</mat-icon></button>
+            <button mat-button type="button" (click)="startEdit(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="uiText.ui_1bd4c21e6543e2 + w.url"><mat-icon>edit</mat-icon><ng-container i18n="@@ui.2eba946b2e1ee4">Editar</ng-container></button>
+            <button mat-button type="button" (click)="toggleActive(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="(w.active ? uiText.ui_bdf2e1cb9f61c1 : uiText.ui_921a7ab060daf4) + w.url">{{ w.active ? uiText.ui_cd25ee5b1db8f5 : uiText.ui_8e38c2571d87f6 }}</button>
+            <button mat-button type="button" (click)="test(w)" [disabled]="actionId() !== null || saving() || !!error() || !w.active" [matTooltip]="w.active ? uiText.ui_f248f58cb72259 : uiText.ui_ba8f02f526d324" [attr.aria-label]="uiText.ui_a1fe177c28fee8 + w.url"><mat-icon>send</mat-icon><ng-container i18n="@@ui.9a57226cc968fc">Enviar ping</ng-container></button>
+            <button mat-icon-button type="button" class="danger" (click)="remove(w)" [disabled]="actionId() !== null || saving() || !!error()" [attr.aria-label]="uiText.ui_8aef375913c258 + w.url"><mat-icon>delete</mat-icon></button>
           }
         </div>
         <details class="delivery-history" (toggle)="onDeliveriesToggle($event, w)">
-          <summary>Últimas entregas<span>Hasta 20 registros</span><mat-icon aria-hidden="true">expand_more</mat-icon></summary>
-          @if (deliveriesLoading()[w.id]) { <mat-progress-bar mode="indeterminate" aria-label="Cargando entregas" /> }
-          <div class="history-actions"><button mat-button type="button" (click)="loadDeliveries(w, true)" [disabled]="deliveriesLoading()[w.id]"><mat-icon>refresh</mat-icon>Actualizar entregas</button><a [routerLink]="['/app/webhooks', w.id]">Abrir historial completo</a></div>
-          @if (deliveriesError()[w.id]; as message) { <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadDeliveries(w)">Reintentar</button></div> }
+          <summary><ng-container i18n="@@ui.0a90e92faffd76">Últimas entregas</ng-container><span><ng-container i18n="@@ui.2892980a5a612c">Hasta 20 registros</ng-container></span><mat-icon aria-hidden="true">expand_more</mat-icon></summary>
+          @if (deliveriesLoading()[w.id]) { <mat-progress-bar mode="indeterminate" aria-label="Cargando entregas"  i18n-aria-label="@@ui.989e8118929494"/> }
+          <div class="history-actions"><button mat-button type="button" (click)="loadDeliveries(w, true)" [disabled]="deliveriesLoading()[w.id]"><mat-icon>refresh</mat-icon><ng-container i18n="@@ui.50f5d95d13acf3">Actualizar entregas</ng-container></button><a [routerLink]="['/app/webhooks', w.id]"><ng-container i18n="@@ui.ced26ce02278d3">Abrir historial completo</ng-container></a></div>
+          @if (deliveriesError()[w.id]; as message) { <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="loadDeliveries(w)"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div> }
           @for (d of deliveries()[w.id] ?? []; track d.id) {
             <div class="delivery">
-              <div class="delivery-summary"><span class="del-status" [class]="'st-' + d.status">{{ deliveryLabel(d.status) }}</span><span class="del-event"><code>{{ d.event }}</code></span><span class="del-meta">{{ d.attempts }} {{ d.attempts === 1 ? 'intento' : 'intentos' }} · <time [attr.datetime]="d.created_at">{{ formatDate(d.created_at) }}</time></span>
-                @if (canEdit() && d.status === 'failed') { <button mat-icon-button type="button" (click)="resend(w, d.id)" [attr.aria-label]="'Reenviar evento ' + d.event_id" [disabled]="actionId() !== null || saving() || !!error() || deliveriesLoading()[w.id] || !!deliveriesError()[w.id]"><mat-icon>refresh</mat-icon></button> }
+              <div class="delivery-summary"><span class="del-status" [class]="'st-' + d.status">{{ deliveryLabel(d.status) }}</span><span class="del-event"><code>{{ d.event }}</code></span><span class="del-meta">{{ d.attempts }} {{ d.attempts === 1 ? uiText.ui_f7fecfeceaf4e1 : uiText.ui_59675592e33dd0 }} · <time [attr.datetime]="d.created_at">{{ formatDate(d.created_at) }}</time></span>
+                @if (canEdit() && d.status === 'failed') { <button mat-icon-button type="button" (click)="resend(w, d.id)" [attr.aria-label]="uiText.ui_c91c68d6eeabd5 + d.event_id" [disabled]="actionId() !== null || saving() || !!error() || deliveriesLoading()[w.id] || !!deliveriesError()[w.id]"><mat-icon>refresh</mat-icon></button> }
               </div>
-              @if (d.error; as deliveryError) { <details class="delivery-error"><summary>Ver motivo del fallo</summary><p><code>{{ deliveryError.code }}</code> {{ deliveryError.message }}</p></details> }
+              @if (d.error; as deliveryError) { <details class="delivery-error"><summary><ng-container i18n="@@ui.ef752886d5e89d">Ver motivo del fallo</ng-container></summary><p><code>{{ deliveryError.code }}</code> {{ deliveryError.message }}</p></details> }
             </div>
           }
-          @if (!(deliveries()[w.id] ?? []).length && !deliveriesLoading()[w.id] && !deliveriesError()[w.id]) { <p class="none">Sin entregas todavía.</p> }
+          @if (!(deliveries()[w.id] ?? []).length && !deliveriesLoading()[w.id] && !deliveriesError()[w.id]) { <p class="none"><ng-container i18n="@@ui.51815d7f019681">Sin entregas todavía.</ng-container></p> }
         </details>
       </article>
     }
     @if (!webhooks().length && !error()) {
       <div class="empty-state">
         <mat-icon>webhook</mat-icon>
-        <h3>Tus eventos, en tu servidor</h3>
-        <p>{{ canEdit() ? 'Conecta un receptor para reaccionar a enlaces creados, cambios y dominios verificados. No necesitas webhooks para utilizar el panel.' : 'Este workspace aún no tiene receptores. Un editor, administrador o propietario puede configurar uno.' }}</p>
+        <h3><ng-container i18n="@@ui.34ca51895a18ed">Tus eventos, en tu servidor</ng-container></h3>
+        <p>{{ canEdit() ? uiText.ui_9e2ff3900da193 : uiText.ui_d1e58d1d35fbee }}</p>
       </div>
     }
   </div>

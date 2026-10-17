@@ -21,7 +21,7 @@ final class WorkspaceUsageController
                 $membership = WorkspaceAccess::getMembershipLocked($user->id, $id, 'viewer',
                     expectedSecurityVersion: (int) $user->security_version);
                 if (! $membership) {
-                    return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+                    return response()->json(['error' => __('messages.error_d9a2380a9ab989')], 403);
                 }
 
                 $editor = WorkspaceAccess::roleAtLeast($membership->role, 'editor');
@@ -78,7 +78,7 @@ final class WorkspaceUsageController
         } catch (\Throwable) {
             // No zero-filled fallback: a missing schema or timeout must never
             // look like an empty tenant with available capacity.
-            return response()->json(['error' => 'No se pudo consultar el uso. Inténtalo más tarde.'], 503);
+            return response()->json(['error' => __('messages.error_bf02d2615f1389')], 503);
         }
     }
 

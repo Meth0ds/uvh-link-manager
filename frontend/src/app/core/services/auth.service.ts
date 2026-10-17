@@ -28,7 +28,7 @@ type MfaConfigurationOperation = "setup" | "replace-setup" | "enable" | "cancel"
 /** Internal control-flow error: a newer auth transition owns the UI state. */
 export class AuthOperationSupersededError extends Error {
   constructor() {
-    super("La operación de autenticación fue reemplazada por otra más reciente");
+    super($localize`:@@ui.a7d71ccc88bbb2:La operación de autenticación fue reemplazada por otra más reciente`);
     this.name = "AuthOperationSupersededError";
   }
 }

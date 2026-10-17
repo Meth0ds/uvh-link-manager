@@ -33,6 +33,7 @@ class UvhMail
                 'html' => $html,
                 'text' => $text,
                 'correlation_id' => RequestTrace::current(),
+                'language' => Language::current(),
             ], JSON_THROW_ON_ERROR));
             $idempotencyKey = self::idempotencyKey($kind, $resourceType, $resourceId, $resourceGeneration);
             DB::table('mail_outbox')->insertOrIgnore([
@@ -119,52 +120,61 @@ class UvhMail
         }
     }
 
-    public static function verification(string $to, string $url, string $tokenHash): bool
+    public static function verification(string $to, string $url, string $tokenHash, ?string $language = null): bool
     {
-        $link = self::action($url, 'Completar mi registro');
+        return MailLanguage::render($to, function () use ($to, $url, $tokenHash): bool {
+            $url = FrontendUrl::localiseExistingPage($url);
+            $link = self::action($url, __('mail.bd86c8e460acaf'));
 
-        return self::send(
-            'verification',
-            $to,
-            'Verifica tu email en UVH',
-            self::layout('Completa tu registro', '<p>Abre el enlace para confirmar tu email y crear tu cuenta en UVH. En ese paso elegirás tu nombre y contraseña y aceptarás los términos de servicio.</p><p>Si no solicitaste esta cuenta, ignora este mensaje.</p>'.$link.self::fallbackUrl($url)),
-            "Confirma tu email y completa tu registro en UVH. Elige tu nombre y contraseña al abrir el enlace: {$url}",
-            'email_token',
-            $tokenHash,
-            $tokenHash,
-        );
+            return self::send(
+                'verification',
+                $to,
+                __('mail.11d99283383ab7'),
+                self::layout(__('mail.fb38b0e95c59d6'), __('mail.ebf5c152761273', ['value0' => $link, 'value1' => self::fallbackUrl($url)])),
+                __('mail.ff2c064b5529d0', ['value0' => $url]),
+                'email_token',
+                $tokenHash,
+                $tokenHash,
+            );
+        }, $language);
     }
 
-    public static function resetPassword(string $to, string $url, string $tokenHash): bool
+    public static function resetPassword(string $to, string $url, string $tokenHash, ?string $language = null): bool
     {
-        $link = self::action($url, 'Restablecer contraseña');
+        return MailLanguage::render($to, function () use ($to, $url, $tokenHash): bool {
+            $url = FrontendUrl::localiseExistingPage($url);
+            $link = self::action($url, __('mail.eb82890e469c8e'));
 
-        return self::send(
-            'password_reset',
-            $to,
-            'Restablece tu contraseña en UVH',
-            self::layout('Restablecer contraseña', '<p>Recibimos una solicitud para restablecer tu contraseña. El enlace caduca en 60 minutos.</p>'.$link),
-            "Restablece tu contraseña en UVH: {$url}",
-            'email_token',
-            $tokenHash,
-            $tokenHash,
-        );
+            return self::send(
+                'password_reset',
+                $to,
+                __('mail.61f18be46ba65c'),
+                self::layout(__('mail.eb82890e469c8e'), __('mail.c958f6c265d939', ['value0' => $link])),
+                __('mail.69872333831cce', ['value0' => $url]),
+                'email_token',
+                $tokenHash,
+                $tokenHash,
+            );
+        }, $language);
     }
 
-    public static function passwordChanged(string $to, string $incidentUrl, string $tokenHash): bool
+    public static function passwordChanged(string $to, string $incidentUrl, string $tokenHash, ?string $language = null): bool
     {
-        $link = self::action($incidentUrl, 'Cerrar accesos de emergencia', true);
+        return MailLanguage::render($to, function () use ($to, $incidentUrl, $tokenHash): bool {
+            $incidentUrl = FrontendUrl::localiseExistingPage($incidentUrl);
+            $link = self::action($incidentUrl, __('mail.e41afec51f17a8'), true);
 
-        return self::send(
-            'password_changed',
-            $to,
-            'Contraseña actualizada en UVH',
-            self::layout('Contraseña actualizada', '<p>La contraseña de tu cuenta se ha actualizado y el resto de sesiones han quedado cerradas.</p><p>Si no reconoces esta acción, usa el control de emergencia durante las próximas 24 horas. Revocará sesiones, tokens API y cambios pendientes, pero no iniciará sesión ni desactivará MFA.</p>'.$link),
-            "La contraseña de tu cuenta UVH se ha actualizado. Si no reconoces la acción, revoca los accesos durante las próximas 24 horas: {$incidentUrl}",
-            'email_token',
-            $tokenHash,
-            $tokenHash,
-        );
+            return self::send(
+                'password_changed',
+                $to,
+                __('mail.4574133828e2a9'),
+                self::layout(__('mail.f29a5970a4ab27'), __('mail.b565385a34f726', ['value0' => $link])),
+                __('mail.17638bd9e27c9a', ['value0' => $incidentUrl]),
+                'email_token',
+                $tokenHash,
+                $tokenHash,
+            );
+        }, $language);
     }
 
     /**
@@ -172,133 +182,156 @@ class UvhMail
      * de contraseña: si no reconoces el cierre, el mismo control de emergencia
      * sigue disponible durante las próximas 24 horas.
      */
-    public static function sessionRevoked(string $to, string $incidentUrl, string $tokenHash): bool
+    public static function sessionRevoked(string $to, string $incidentUrl, string $tokenHash, ?string $language = null): bool
     {
-        $body = '<p>Se ha revocado el acceso de un dispositivo a tu cuenta.</p><p>Si no reconoces esta acción, revisa tus sesiones y utiliza el control de emergencia.</p>';
+        return MailLanguage::render($to, function () use ($to, $incidentUrl, $tokenHash): bool {
+            $incidentUrl = FrontendUrl::localiseExistingPage($incidentUrl);
+            $body = __('mail.d96948311e4e36');
 
-        return self::send('session_revoked', $to, 'Sesión revocada en UVH',
-            self::layout('Sesión revocada', $body.self::action($incidentUrl, 'Revisar el incidente', true)),
-            'Se ha revocado una sesión de tu cuenta UVH. Control de emergencia: '.$incidentUrl,
-            'email_token', $tokenHash, $tokenHash);
+            return self::send('session_revoked', $to, __('mail.1c9a409e18d9db'),
+                self::layout(__('mail.eef3d770790a42'), $body.self::action($incidentUrl, __('mail.4baad953428ea8'), true)),
+                __('mail.3fd60c0c932664', ['value0' => $incidentUrl]),
+                'email_token', $tokenHash, $tokenHash);
+        }, $language);
     }
 
-    public static function operationalNotice(string $to, string $kind, string $subject, ?string $linkUrl = null): bool
+    public static function operationalNotice(string $to, string $kind, string $subject, ?string $linkUrl = null, ?string $language = null): bool
     {
-        $title = NotificationKinds::all()[$kind]['title'];
+        return MailLanguage::render($to, function () use ($to, $kind, $subject, $linkUrl): bool {
+            $linkUrl = $linkUrl !== null ? FrontendUrl::localiseExistingPage($linkUrl) : null;
+            $title = NotificationKinds::all()[$kind]['title'];
 
-        if ($linkUrl !== null && ! UrlUtil::validateDestination($linkUrl)['ok']) {
-            throw new \InvalidArgumentException('Operational action URL must be HTTP/HTTPS.');
-        }
-        $action = $linkUrl !== null ? self::action($linkUrl, 'Revisar enlace').self::fallbackUrl($linkUrl) : '<p>Entra en UVH para revisar este aviso.</p>';
-        $text = $linkUrl !== null ? ' Revisa el enlace en UVH: '.$linkUrl : ' Entra en UVH para revisar este aviso.';
+            if ($linkUrl !== null && ! UrlUtil::validateDestination($linkUrl)['ok']) {
+                throw new \InvalidArgumentException('Operational action URL must be HTTP/HTTPS.');
+            }
+            $action = $linkUrl !== null ? self::action($linkUrl, __('mail.9526f43fc9a3d4')).self::fallbackUrl($linkUrl) : __('mail.e33539abb6796c');
+            $text = $linkUrl !== null ? __('mail.ef89117e39ea17', ['value0' => $linkUrl]) : __('mail.22b24cb6241352');
 
-        return self::send($kind, $to, $title.' · UVH',
-            self::layout($title, '<p>'.self::esc($subject).'</p>'.$action),
-            $title.'. '.$subject.'.'.$text);
+            return self::send($kind, $to, __('mail.b4aa6ccb87493f', ['value0' => $title]),
+                self::layout($title, '<p>'.self::esc($subject).'</p>'.$action),
+                $title.'. '.$subject.'.'.$text);
+        }, $language);
     }
 
-    public static function sessionsRevoked(string $to, string $incidentUrl, string $tokenHash, bool $all): bool
+    public static function sessionsRevoked(string $to, string $incidentUrl, string $tokenHash, bool $all, ?string $language = null): bool
     {
-        $link = self::action($incidentUrl, 'Cerrar accesos de emergencia', true);
-        $body = $all
-            ? '<p>Se han cerrado todas las sesiones abiertas de tu cuenta, incluida la desde la que se realizó la acción. Tendrás que iniciar sesión de nuevo en cada dispositivo.</p>'
-            : '<p>Se han cerrado las demás sesiones abiertas de tu cuenta. La sesión desde la que se realizó la acción permanece activa.</p>';
+        return MailLanguage::render($to, function () use ($to, $incidentUrl, $tokenHash, $all): bool {
+            $incidentUrl = FrontendUrl::localiseExistingPage($incidentUrl);
+            $link = self::action($incidentUrl, __('mail.e41afec51f17a8'), true);
+            $body = $all
+                ? __('mail.c8f57c78673200')
+                : __('mail.120af8c3965030');
 
-        return self::send(
-            $all ? 'sessions_revoked_all' : 'sessions_revoked_others',
-            $to,
-            $all ? 'Todas las sesiones cerradas en UVH' : 'Sesiones cerradas en UVH',
-            self::layout(
-                $all ? 'Todas las sesiones cerradas' : 'Sesiones cerradas',
-                $body.'<p>Si no reconoces esta acción, usa el control de emergencia durante las próximas 24 horas. Revocará sesiones, tokens API y cambios pendientes, pero no iniciará sesión ni desactivará MFA.</p>'.$link,
-            ),
-            ($all ? 'Se han cerrado todas las sesiones de tu cuenta UVH.' : 'Se han cerrado las demás sesiones abiertas de tu cuenta UVH.')
-                .' Si no reconoces la acción, revoca los accesos durante las próximas 24 horas: '.$incidentUrl,
-            'email_token',
-            $tokenHash,
-            $tokenHash,
-        );
+            return self::send(
+                $all ? 'sessions_revoked_all' : 'sessions_revoked_others',
+                $to,
+                $all ? __('mail.15a753cbed744f') : __('mail.6582ed0540836d'),
+                self::layout(
+                    $all ? __('mail.79abbc7f0fe148') : __('mail.18a8b6f741d954'),
+                    __('mail.4d50412690a50f', ['value0' => $body, 'value1' => $link]),
+                ),
+                __('mail.1cf1b241f15370', ['value0' => $all ? __('mail.5c129c53fa9334') : __('mail.ef7cb61e928c5c'), 'value1' => $incidentUrl]),
+                'email_token',
+                $tokenHash,
+                $tokenHash,
+            );
+        }, $language);
     }
 
-    public static function accountRecoveryConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
+    public static function accountRecoveryConfirmation(string $to, string $url, int $requestId, string $generationHash, ?string $language = null): bool
     {
-        $link = self::action($url, 'Confirmar solicitud');
+        return MailLanguage::render($to, function () use ($to, $url, $requestId, $generationHash): bool {
+            $url = FrontendUrl::localiseExistingPage($url);
+            $link = self::action($url, __('mail.59819917352318'));
 
-        return self::send(
-            'account_recovery_confirmation',
-            $to,
-            'Confirma tu solicitud de recuperación UVH',
-            self::layout('Recuperación reforzada', '<p>Se ha solicitado recuperar una cuenta sin acceso al autenticador ni a sus códigos de recuperación.</p><p>Confirmar el email sólo abre un expediente: no inicia sesión ni desactiva MFA. Dos administradores distintos deberán verificar la identidad por el procedimiento de soporte.</p>'.$link),
-            "Confirma la solicitud de recuperación reforzada UVH durante la próxima hora: {$url}",
-            'account_recovery',
-            $requestId,
-            $generationHash,
-        );
+            return self::send(
+                'account_recovery_confirmation',
+                $to,
+                __('mail.23a62af0311141'),
+                self::layout(__('mail.5e04be35224e3a'), __('mail.a6c260d5226cd3', ['value0' => $link])),
+                __('mail.1767656536baf0', ['value0' => $url]),
+                'account_recovery',
+                $requestId,
+                $generationHash,
+            );
+        }, $language);
     }
 
-    public static function accountRecoveryApproved(string $to, string $url, int $requestId, string $generationHash): bool
+    public static function accountRecoveryApproved(string $to, string $url, int $requestId, string $generationHash, ?string $language = null): bool
     {
-        $link = self::action($url, 'Finalizar recuperación');
+        return MailLanguage::render($to, function () use ($to, $url, $requestId, $generationHash): bool {
+            $url = FrontendUrl::localiseExistingPage($url);
+            $link = self::action($url, __('mail.15f917088f1f12'));
 
-        return self::send(
-            'account_recovery_approved',
-            $to,
-            'Tu recuperación reforzada UVH ha sido aprobada',
-            self::layout('Recuperación aprobada', '<p>Dos administradores distintos han aprobado el expediente después de verificar la identidad por el procedimiento de soporte.</p><p>El enlace caduca en 30 minutos, funciona una sola vez y exige establecer una contraseña nueva. Al completarlo se cerrarán accesos y se retirará el MFA perdido.</p>'.$link),
-            "Finaliza la recuperación reforzada UVH durante los próximos 30 minutos: {$url}",
-            'account_recovery',
-            $requestId,
-            $generationHash,
-        );
+            return self::send(
+                'account_recovery_approved',
+                $to,
+                __('mail.d5b22c919fdfa9'),
+                self::layout(__('mail.ffe678fe89a37e'), __('mail.e94dbd1b620e68', ['value0' => $link])),
+                __('mail.f8d85239ff3672', ['value0' => $url]),
+                'account_recovery',
+                $requestId,
+                $generationHash,
+            );
+        }, $language);
     }
 
-    public static function accountRecoveryRejected(string $to): bool
+    public static function accountRecoveryRejected(string $to, ?string $language = null): bool
     {
-        return self::send(
-            'account_recovery_rejected',
-            $to,
-            'La solicitud de recuperación UVH no ha sido aprobada',
-            self::layout('Solicitud no aprobada', '<p>El expediente de recuperación reforzada se ha cerrado porque no pudo completarse la verificación de identidad.</p><p>Si necesitas continuar, contacta con soporte y abre una solicitud nueva. El acceso y MFA de la cuenta no se han modificado.</p>'),
-            'La solicitud de recuperación reforzada UVH no ha sido aprobada. El acceso y MFA no se han modificado.',
-        );
+        return MailLanguage::render($to, function () use ($to): bool {
+            return self::send(
+                'account_recovery_rejected',
+                $to,
+                __('mail.77603f74528737'),
+                self::layout(__('mail.38cae3981dd477'), __('mail.1d3546469c1155')),
+                __('mail.948f6fd7d93e58'),
+            );
+        }, $language);
     }
 
-    public static function emailChangeVerification(string $to, string $url, string $tokenHash): bool
+    public static function emailChangeVerification(string $to, string $url, string $tokenHash, ?string $language = null): bool
     {
-        $link = self::action($url, 'Confirmar nuevo email');
+        return MailLanguage::render($to, function () use ($to, $url, $tokenHash): bool {
+            $url = FrontendUrl::localiseExistingPage($url);
+            $link = self::action($url, __('mail.f55fa997596b2c'));
 
-        return self::send(
-            'email_change_verification',
-            $to,
-            'Confirma tu nuevo email en UVH',
-            self::layout('Confirma tu nuevo email', '<p>Se ha solicitado usar esta dirección en una cuenta de UVH. Confírmala durante la próxima hora para completar el cambio.</p>'.$link.self::fallbackUrl($url)),
-            "Confirma tu nuevo email en UVH durante la próxima hora: {$url}",
-            'email_change',
-            $tokenHash,
-            $tokenHash,
-        );
+            return self::send(
+                'email_change_verification',
+                $to,
+                __('mail.c07d65bd598d0a'),
+                self::layout(__('mail.b03dea5d65bc4f'), __('mail.883a3de43930f6', ['value0' => $link, 'value1' => self::fallbackUrl($url)])),
+                __('mail.f6ee3e64fdc10d', ['value0' => $url]),
+                'email_change',
+                $tokenHash,
+                $tokenHash,
+            );
+        }, $language);
     }
 
-    public static function emailChangeRequested(string $to): bool
+    public static function emailChangeRequested(string $to, ?string $language = null): bool
     {
-        return self::send(
-            'email_change_requested',
-            $to,
-            'Solicitud de cambio de email en UVH',
-            self::layout('Solicitud de cambio de email', '<p>Se ha solicitado cambiar la dirección de correo de tu cuenta. El cambio no se completará hasta confirmar el nuevo buzón.</p><p>Si no reconoces esta acción, cambia tu contraseña, revisa tus sesiones y contacta con soporte.</p>'),
-            'Se ha solicitado cambiar el email de tu cuenta UVH. Si no fuiste tú, cambia tu contraseña, revisa tus sesiones y contacta con soporte.',
-        );
+        return MailLanguage::render($to, function () use ($to): bool {
+            return self::send(
+                'email_change_requested',
+                $to,
+                __('mail.c61bc09d661b66'),
+                self::layout(__('mail.9a841a4a6d15ca'), __('mail.070afb5b7038b8')),
+                __('mail.2fc58aa9a9b258'),
+            );
+        }, $language);
     }
 
-    public static function emailChanged(string $to): bool
+    public static function emailChanged(string $to, ?string $language = null): bool
     {
-        return self::send(
-            'email_changed',
-            $to,
-            'Email de acceso actualizado en UVH',
-            self::layout('Email actualizado', '<p>La dirección de acceso de tu cuenta se ha actualizado correctamente. Todas las sesiones anteriores se han cerrado.</p><p>Si no reconoces esta acción, contacta con soporte de inmediato.</p>'),
-            'El email de acceso de tu cuenta UVH se ha actualizado y todas las sesiones anteriores se han cerrado. Si no reconoces esta acción, contacta con soporte.',
-        );
+        return MailLanguage::render($to, function () use ($to): bool {
+            return self::send(
+                'email_changed',
+                $to,
+                __('mail.eac698eb4b8ec9'),
+                self::layout(__('mail.83c1c60c444173'), __('mail.df154033470cbf')),
+                __('mail.37779bbe61e79d'),
+            );
+        }, $language);
     }
 
     /**
@@ -307,174 +340,201 @@ class UvhMail
      * exportaciones. `$generationHash` identifica la generación anunciada para
      * que el outbox descarte avisos de una exportación que ya no está viva.
      */
-    public static function dataExportReady(string $to, string $url, string $expiresOn, int $requestId, string $generationHash): bool
+    public static function dataExportReady(string $to, string $url, string $expiresOn, int $requestId, string $generationHash, ?string $language = null): bool
     {
-        $link = self::action($url, 'Ir a mis exportaciones');
+        return MailLanguage::render($to, function () use ($to, $url, $expiresOn, $requestId, $generationHash): bool {
+            $url = FrontendUrl::localiseExistingPage($url);
+            $link = self::action($url, __('mail.d3ad2c4ad7fe6e'));
 
-        return self::send(
-            'data_export_ready',
-            $to,
-            'Tu exportación de datos UVH está lista',
-            self::layout('Exportación lista', '<p>Tu archivo cifrado ya está preparado en tu sección de exportaciones.</p>'.$link.'<p>Descárgalo antes del '.self::esc($expiresOn).'; después el archivo se elimina automáticamente. Al descargarlo te pediremos la contraseña de la cuenta y, si está activo, el segundo factor.</p>'),
-            "Tu exportación UVH está lista. Abre {$url} e inicia sesión para descargarla antes del {$expiresOn}.",
-            'data_export',
-            $requestId,
-            $generationHash,
-        );
+            return self::send(
+                'data_export_ready',
+                $to,
+                __('mail.f6d74f577ff3cf'),
+                self::layout(__('mail.dc77749fc2ab7c'), __('mail.1098283fc4827e', ['value0' => $link, 'value1' => self::esc($expiresOn)])),
+                __('mail.020e8c0eb33121', ['value0' => $url, 'value1' => $expiresOn]),
+                'data_export',
+                $requestId,
+                $generationHash,
+            );
+        }, $language);
     }
 
-    public static function accountDeletionConfirmation(string $to, string $url, int $requestId, string $generationHash): bool
+    public static function accountDeletionConfirmation(string $to, string $url, int $requestId, string $generationHash, ?string $language = null): bool
     {
-        $link = self::action($url, 'Revisar eliminación', true);
+        return MailLanguage::render($to, function () use ($to, $url, $requestId, $generationHash): bool {
+            $url = FrontendUrl::localiseExistingPage($url);
+            $link = self::action($url, __('mail.518476549fddc8'), true);
 
-        return self::send(
-            'account_deletion_confirmation',
-            $to,
-            'Confirma la eliminación de tu cuenta UVH',
-            self::layout('Solicitud de eliminación', '<p>Se ha solicitado eliminar tu cuenta. Abre el enlace durante la próxima hora y confirma de nuevo para programar la eliminación.</p>'.$link.'<p>No se borrará nada si no completas ese segundo paso.</p>'),
-            "Revisa y confirma la eliminación de tu cuenta UVH durante la próxima hora: {$url}",
-            'account_deletion',
-            $requestId,
-            $generationHash,
-        );
+            return self::send(
+                'account_deletion_confirmation',
+                $to,
+                __('mail.0b81e3d8c4eed8'),
+                self::layout(__('mail.ced39e05c91ed7'), __('mail.bdaa091b7aa788', ['value0' => $link])),
+                __('mail.aae9c0bbe67868', ['value0' => $url]),
+                'account_deletion',
+                $requestId,
+                $generationHash,
+            );
+        }, $language);
     }
 
-    public static function accountDeletionScheduled(string $to, string $cancelUrl, string $executeAt, int $requestId, string $generationHash): bool
+    public static function accountDeletionScheduled(string $to, string $cancelUrl, string $executeAt, int $requestId, string $generationHash, ?string $language = null): bool
     {
-        $link = self::action($cancelUrl, 'Cancelar eliminación');
+        return MailLanguage::render($to, function () use ($to, $cancelUrl, $executeAt, $requestId, $generationHash): bool {
+            $cancelUrl = FrontendUrl::localiseExistingPage($cancelUrl);
+            $link = self::action($cancelUrl, __('mail.c5a8f91a675f5c'));
 
-        return self::send(
-            'account_deletion_scheduled',
-            $to,
-            'Tu cuenta UVH está programada para eliminación',
-            self::layout('Eliminación programada', '<p>El acceso se ha cerrado y la cuenta se anonimizará a partir de <strong>'.self::esc($executeAt).'</strong>.</p>'.$link.'<p>El enlace de cancelación funciona hasta que empiece la ejecución.</p>'),
-            "Tu cuenta UVH se eliminará a partir de {$executeAt}. Puedes cancelarlo antes desde: {$cancelUrl}",
-            'account_deletion',
-            $requestId,
-            $generationHash,
-        );
+            return self::send(
+                'account_deletion_scheduled',
+                $to,
+                __('mail.bde50519c1d670'),
+                self::layout(__('mail.336f99f7165207'), __('mail.386ec9fa5a67a8', ['value0' => self::esc($executeAt), 'value1' => $link])),
+                __('mail.67cdfe3f24e5a4', ['value0' => $executeAt, 'value1' => $cancelUrl]),
+                'account_deletion',
+                $requestId,
+                $generationHash,
+            );
+        }, $language);
     }
 
-    public static function accountDeletionCancelled(string $to): bool
+    public static function accountDeletionCancelled(string $to, ?string $language = null): bool
     {
-        return self::send(
-            'account_deletion_cancelled',
-            $to,
-            'Eliminación de cuenta cancelada en UVH',
-            self::layout('Eliminación cancelada', '<p>La cuenta vuelve a estar activa. Por seguridad, tendrás que iniciar sesión de nuevo y los tokens API revocados no se restaurarán.</p>'),
-            'La eliminación de tu cuenta UVH se ha cancelado. Inicia sesión de nuevo; los tokens API revocados no se restaurarán.',
-        );
+        return MailLanguage::render($to, function () use ($to): bool {
+            return self::send(
+                'account_deletion_cancelled',
+                $to,
+                __('mail.0a3a9eaff1ccf3'),
+                self::layout(__('mail.dc871d829e4a71'), __('mail.86a8d447e71543')),
+                __('mail.c22e0532618fa8'),
+            );
+        }, $language);
     }
 
-    public static function privacyRequestReceived(string $to, int $requestId, string $generationHash): bool
+    public static function privacyRequestReceived(string $to, int $requestId, string $generationHash, ?string $language = null): bool
     {
-        return self::send(
-            'privacy_request_received',
-            $to,
-            'Solicitud de privacidad registrada en UVH',
-            self::layout('Solicitud registrada', '<p>Hemos registrado tu solicitud de ejercicio de derechos. Puedes consultar su estado y responder a peticiones de información desde Ajustes.</p><p>El plazo ordinario de respuesta es de un mes. Si la complejidad exige ampliarlo, recibirás una notificación motivada.</p>'),
-            'Tu solicitud de ejercicio de derechos se ha registrado en UVH. Puedes seguirla desde Ajustes.',
-            'privacy_right',
-            $requestId,
-            $generationHash,
-        );
+        return MailLanguage::render($to, function () use ($to, $requestId, $generationHash): bool {
+            return self::send(
+                'privacy_request_received',
+                $to,
+                __('mail.6c331346dbe491'),
+                self::layout(__('mail.73685e69a162a2'), __('mail.6c57826a09b817')),
+                __('mail.c191d2b8ba7790'),
+                'privacy_right',
+                $requestId,
+                $generationHash,
+            );
+        }, $language);
     }
 
-    public static function privacyRequestUpdated(string $to, int $requestId, string $status, string $generationHash): bool
+    public static function privacyRequestUpdated(string $to, int $requestId, string $status, string $generationHash, ?string $language = null): bool
     {
-        $copy = match ($status) {
-            'in_progress' => ['Solicitud en revisión', 'Tu solicitud ha entrado en revisión.'],
-            'waiting_user' => ['Necesitamos información', 'Hay una petición de información en tu expediente. Revísala y responde desde Ajustes.'],
-            'completed' => ['Solicitud resuelta', 'Tu solicitud ha sido resuelta. La respuesta está disponible en Ajustes.'],
-            'rejected' => ['Solicitud cerrada', 'La solicitud se ha cerrado con una respuesta motivada disponible en Ajustes.'],
-            'cancelled' => ['Solicitud cancelada', 'La cancelación de tu solicitud ha quedado registrada.'],
-            'extended' => ['Plazo ampliado', 'El plazo de respuesta se ha ampliado por complejidad o volumen. La motivación y la nueva fecha están disponibles en Ajustes.'],
-            default => ['Solicitud actualizada', 'El estado de tu solicitud de privacidad ha cambiado.'],
-        };
+        return MailLanguage::render($to, function () use ($to, $requestId, $status, $generationHash): bool {
+            $copy = match ($status) {
+                'in_progress' => [__('mail.485cf5e4b2d570'), __('mail.76df87bc3335c0')],
+                'waiting_user' => [__('mail.54564ec8257a68'), __('mail.bce3b3f47adabb')],
+                'completed' => [__('mail.d11bb343abe15d'), __('mail.44c469d372a0d0')],
+                'rejected' => [__('mail.b43b6bc7f752d4'), __('mail.91f800c9f7e1ab')],
+                'cancelled' => [__('mail.e075f56997a31c'), __('mail.3d9bb9204818a6')],
+                'extended' => [__('mail.8a664f5866bb54'), __('mail.ff6e079c828c2a')],
+                default => [__('mail.0ccc7f803e3d3f'), __('mail.f41f23c5ae5371')],
+            };
 
-        return self::send(
-            'privacy_request_updated',
-            $to,
-            'Solicitud de privacidad actualizada en UVH',
-            self::layout($copy[0], '<p>'.self::esc($copy[1]).'</p><p>No respondas a este correo con documentación personal; utiliza el expediente dentro de UVH.</p>'),
-            $copy[1].' Consulta el expediente desde Ajustes de UVH.',
-            'privacy_right',
-            $requestId,
-            $generationHash,
-        );
+            return self::send(
+                'privacy_request_updated',
+                $to,
+                __('mail.3f5b6194c4165c'),
+                self::layout($copy[0], __('mail.5684e9ddb485e6', ['value0' => self::esc($copy[1])])),
+                __('mail.7a998618af243b', ['value0' => $copy[1]]),
+                'privacy_right',
+                $requestId,
+                $generationHash,
+            );
+        }, $language);
     }
 
-    public static function workspaceOwnershipTransferred(string $to, string $workspace): bool
+    public static function workspaceOwnershipTransferred(string $to, string $workspace, ?string $language = null): bool
     {
-        return self::send(
-            'workspace_ownership_transfer',
-            $to,
-            'Propiedad de workspace actualizada en UVH',
-            self::layout('Propiedad actualizada', '<p>La propiedad del workspace <strong>'.self::esc($workspace).'</strong> ha cambiado. Revisa los miembros y accesos si no reconoces esta operación.</p>'),
-            "La propiedad del workspace {$workspace} ha cambiado en UVH. Revisa los miembros y accesos si no reconoces esta operación.",
-        );
+        return MailLanguage::render($to, function () use ($to, $workspace): bool {
+            return self::send(
+                'workspace_ownership_transfer',
+                $to,
+                __('mail.3a40bee4075817'),
+                self::layout(__('mail.267302ff0ad847'), __('mail.8fe322333c8973', ['value0' => self::esc($workspace)])),
+                __('mail.5eba5472eed7dc', ['value0' => $workspace]),
+            );
+        }, $language);
     }
 
-    public static function mfaEnabled(string $to, bool $reconfigured): bool
+    public static function mfaEnabled(string $to, bool $reconfigured, ?string $language = null): bool
     {
-        $title = $reconfigured ? 'Autenticador sustituido' : 'Verificación en dos pasos activada';
-        $body = $reconfigured
-            ? '<p>La aplicación autenticadora de tu cuenta se ha sustituido y los códigos de recuperación anteriores ya no son válidos.</p>'
-            : '<p>La verificación en dos pasos ya está activa. Los próximos accesos requerirán tu aplicación autenticadora o un código de recuperación.</p>';
+        return MailLanguage::render($to, function () use ($to, $reconfigured): bool {
+            $title = $reconfigured ? __('mail.1192453cc0516f') : __('mail.a85a84667a9d34');
+            $body = $reconfigured
+                ? __('mail.0611521766cdf9')
+                : __('mail.71a8124ccfba0f');
 
-        return self::send(
-            $reconfigured ? 'mfa_reconfigured' : 'mfa_enabled',
-            $to,
-            $reconfigured ? 'Autenticador MFA actualizado en UVH' : 'MFA activado en UVH',
-            self::layout($title, $body.'<p>Si no reconoces este cambio, inicia una recuperación de cuenta y contacta con soporte.</p>'),
-            $reconfigured
-                ? 'La aplicación autenticadora de tu cuenta UVH se ha sustituido. Si no reconoces el cambio, recupera la cuenta y contacta con soporte.'
-                : 'La verificación en dos pasos se ha activado en tu cuenta UVH. Si no reconoces el cambio, recupera la cuenta y contacta con soporte.',
-        );
+            return self::send(
+                $reconfigured ? 'mfa_reconfigured' : 'mfa_enabled',
+                $to,
+                $reconfigured ? __('mail.4dae83809c3036') : __('mail.9df17d944f8c3d'),
+                self::layout($title, __('mail.f30a72a4b41e32', ['value0' => $body])),
+                $reconfigured
+                    ? __('mail.68c8e23781dae3')
+                    : __('mail.41b81f625dda2c'),
+            );
+        }, $language);
     }
 
-    public static function mfaRecoveryCodesRegenerated(string $to): bool
+    public static function mfaRecoveryCodesRegenerated(string $to, ?string $language = null): bool
     {
-        return self::send(
-            'mfa_recovery_codes_regenerated',
-            $to,
-            'Códigos de recuperación MFA renovados en UVH',
-            self::layout('Códigos de recuperación renovados', '<p>Se ha generado un nuevo juego de códigos de recuperación. Todos los anteriores han dejado de funcionar y las demás sesiones se han cerrado.</p><p>Si no reconoces este cambio, inicia una recuperación de cuenta y contacta con soporte.</p>'),
-            'Los códigos de recuperación MFA de tu cuenta UVH se han renovado y los anteriores ya no funcionan. Si no reconoces el cambio, recupera la cuenta y contacta con soporte.',
-        );
+        return MailLanguage::render($to, function () use ($to): bool {
+            return self::send(
+                'mfa_recovery_codes_regenerated',
+                $to,
+                __('mail.18b29580a38bcf'),
+                self::layout(__('mail.57d7454459fc34'), __('mail.803cbe1e4307d6')),
+                __('mail.cc0ec898b7e91f'),
+            );
+        }, $language);
     }
 
-    public static function mfaDisabled(string $to): bool
+    public static function mfaDisabled(string $to, ?string $language = null): bool
     {
-        return self::send(
-            'mfa_disabled',
-            $to,
-            'MFA desactivado en UVH',
-            self::layout('Verificación en dos pasos desactivada', '<p>La verificación en dos pasos se ha desactivado y las demás sesiones se han cerrado.</p><p>Si no reconoces este cambio, cambia tu contraseña y contacta con soporte de inmediato.</p>'),
-            'La verificación en dos pasos se ha desactivado en tu cuenta UVH. Si no reconoces el cambio, cambia tu contraseña y contacta con soporte.',
-        );
+        return MailLanguage::render($to, function () use ($to): bool {
+            return self::send(
+                'mfa_disabled',
+                $to,
+                __('mail.eae9b8e56bf305'),
+                self::layout(__('mail.621729cd57ee73'), __('mail.b222de2b9f3bfb')),
+                __('mail.e36e02a7553366'),
+            );
+        }, $language);
     }
 
-    public static function apiTokenCreated(string $to, string $name): bool
+    public static function apiTokenCreated(string $to, string $name, ?string $language = null): bool
     {
-        return self::send(
-            'api_token_created',
-            $to,
-            'Nuevo token API creado en UVH',
-            self::layout('Nuevo token API', '<p>Se ha creado la credencial <strong>'.self::esc($name).'</strong>. El valor secreto no se incluye en este correo.</p><p>Si no reconoces esta operación, revoca el token y revisa tus sesiones.</p>'),
-            "Se ha creado el token API {$name} en UVH. Si no reconoces la operación, revócalo y revisa tus sesiones.",
-        );
+        return MailLanguage::render($to, function () use ($to, $name): bool {
+            return self::send(
+                'api_token_created',
+                $to,
+                __('mail.13a644d0deead0'),
+                self::layout(__('mail.9fa4142dbbb660'), __('mail.055e08669d0239', ['value0' => self::esc($name)])),
+                __('mail.1d396be470de4f', ['value0' => $name]),
+            );
+        }, $language);
     }
 
-    public static function workspaceDeleted(string $to, string $workspace): bool
+    public static function workspaceDeleted(string $to, string $workspace, ?string $language = null): bool
     {
-        return self::send(
-            'workspace_deleted',
-            $to,
-            'Workspace eliminado en UVH',
-            self::layout('Workspace eliminado', '<p>El workspace <strong>'.self::esc($workspace).'</strong> y sus recursos asociados se han eliminado.</p><p>Si no reconoces esta operación, contacta con soporte de inmediato.</p>'),
-            "El workspace {$workspace} se ha eliminado en UVH. Si no reconoces la operación, contacta con soporte de inmediato.",
-        );
+        return MailLanguage::render($to, function () use ($to, $workspace): bool {
+            return self::send(
+                'workspace_deleted',
+                $to,
+                __('mail.411ea6531075c5'),
+                self::layout(__('mail.126bbfe013a993'), __('mail.f8d0b288f8b3a1', ['value0' => self::esc($workspace)])),
+                __('mail.8edc14194721ac', ['value0' => $workspace]),
+            );
+        }, $language);
     }
 
     /**
@@ -491,63 +551,65 @@ class UvhMail
         int $domainId,
         string $reason,
         int $userId,
-        string $eventGeneration,
-    ): bool {
-        [$subject, $title, $body, $text] = match ($kind) {
-            'domain_offline' => [
-                'Tu dominio '.$domain.' dejó de servir enlaces en UVH',
-                'Dominio fuera de servicio',
-                '<p>El dominio <strong>'.self::esc($domain).'</strong> ha dejado de servir sus enlaces.</p><p>Motivo: '.self::esc($reason).'</p><p>Los enlaces no se han eliminado: revisa la configuración DNS del dominio y vuelve a activarlo desde el panel.</p>',
-                "El dominio {$domain} ha dejado de servir enlaces en UVH ({$reason}). Los enlaces siguen existiendo; revisa la configuración DNS y vuelve a activarlo desde el panel.",
-            ],
-            'domain_dns_degraded' => [
-                'La configuración DNS de '.$domain.' está fallando',
-                'Dominio degradado',
-                '<p>La comprobación periódica del dominio <strong>'.self::esc($domain).'</strong> ha fallado.</p><p>Motivo: '.self::esc($reason).'</p><p>El dominio sigue sirviendo durante un periodo de gracia. Corrige la configuración DNS para evitar que deje de servir enlaces.</p>',
-                "La comprobación del dominio {$domain} ha fallado ({$reason}). El dominio sigue sirviendo durante un periodo de gracia; corrige la configuración DNS.",
-            ],
-            'domain_recovered' => [
-                'Tu dominio '.$domain.' se recuperó',
-                'Dominio recuperado',
-                '<p>El dominio <strong>'.self::esc($domain).'</strong> vuelve a servir sus enlaces con normalidad.</p>',
-                "El dominio {$domain} vuelve a servir sus enlaces con normalidad.",
-            ],
-            'domain_tls_failed' => [
-                'No se pudo preparar el HTTPS de '.$domain,
-                'HTTPS no disponible',
-                '<p>No pudimos mantener el certificado HTTPS del dominio <strong>'.self::esc($domain).'</strong>.</p><p>Motivo: '.self::esc($reason).'</p><p>El dominio deja de servir enlaces hasta que el certificado vuelva a estar disponible.</p>',
-                "No pudimos mantener el certificado HTTPS del dominio {$domain} ({$reason}). El dominio deja de servir enlaces hasta que el certificado vuelva a estar disponible.",
-            ],
-            'domain_tls_expiring' => [
-                'El certificado de '.$domain.' está por caducar',
-                'Certificado por caducar',
-                '<p>El certificado HTTPS del dominio <strong>'.self::esc($domain).'</strong> está cerca de caducar.</p><p>UVH renueva los certificados automáticamente; si este mensaje se repite, revisa la configuración DNS y los registros CAA del dominio.</p>',
-                "El certificado HTTPS del dominio {$domain} está cerca de caducar. La renovación es automática; si este mensaje se repite, revisa la configuración DNS y los registros CAA.",
-            ],
-            'domain_claim_transferred' => [
-                'La propiedad de '.$domain.' cambió de workspace',
-                'Propiedad de dominio transferida',
-                '<p>Otro workspace ha probado el control del dominio <strong>'.self::esc($domain).'</strong> y ahora le pertenece.</p><p>Motivo: '.self::esc($reason).'</p><p>El dominio queda desactivado en tu workspace; los enlaces que usaban ese dominio dejan de responder hasta que los asignes a otro.</p>',
-                "Otro workspace ha probado el control del dominio {$domain} y ahora le pertenece ({$reason}). El dominio queda desactivado en tu workspace.",
-            ],
-            default => [
-                'Aviso de dominio en UVH',
-                'Aviso de dominio',
-                '<p>Hay una novedad sobre el dominio <strong>'.self::esc($domain).'</strong>.</p>',
-                "Hay una novedad sobre el dominio {$domain}.",
-            ],
-        };
+        string $eventGeneration, ?string $language = null): bool
+    {
+        return MailLanguage::render($to, function () use ($to, $kind, $domain, $domainId, $reason, $userId, $eventGeneration): bool {
+            [$subject, $title, $body, $text] = match ($kind) {
+                'domain_offline' => [
+                    __('mail.db5c1455a7787d', ['value0' => $domain]),
+                    __('mail.7650a8f8c6220f'),
+                    __('mail.5cb9f509272edd', ['value0' => self::esc($domain), 'value1' => self::esc($reason)]),
+                    __('mail.1caad5834accfb', ['value0' => $domain, 'value1' => $reason]),
+                ],
+                'domain_dns_degraded' => [
+                    __('mail.9bce2752d9aca6', ['value0' => $domain]),
+                    __('mail.db7894c61e9112'),
+                    __('mail.5d5f89abf3e2e6', ['value0' => self::esc($domain), 'value1' => self::esc($reason)]),
+                    __('mail.e48e301ed6712b', ['value0' => $domain, 'value1' => $reason]),
+                ],
+                'domain_recovered' => [
+                    __('mail.cde46764a34283', ['value0' => $domain]),
+                    __('mail.f1e87a40563426'),
+                    __('mail.583d11573e2c56', ['value0' => self::esc($domain)]),
+                    __('mail.a3ff902ee428ff', ['value0' => $domain]),
+                ],
+                'domain_tls_failed' => [
+                    __('mail.568332979fef0c', ['value0' => $domain]),
+                    __('mail.bdf3f906994c91'),
+                    __('mail.799538bf210656', ['value0' => self::esc($domain), 'value1' => self::esc($reason)]),
+                    __('mail.0f7504c016bb36', ['value0' => $domain, 'value1' => $reason]),
+                ],
+                'domain_tls_expiring' => [
+                    __('mail.a4091b127bb368', ['value0' => $domain]),
+                    __('mail.f06cec03c33d18'),
+                    __('mail.e22ddc98535504', ['value0' => self::esc($domain)]),
+                    __('mail.9a2ce6f1d44e26', ['value0' => $domain]),
+                ],
+                'domain_claim_transferred' => [
+                    __('mail.fdc144158ff0f1', ['value0' => $domain]),
+                    __('mail.50e3299d0fe024'),
+                    __('mail.05e72d039bcde7', ['value0' => self::esc($domain), 'value1' => self::esc($reason)]),
+                    __('mail.8059de355f1c58', ['value0' => $domain, 'value1' => $reason]),
+                ],
+                default => [
+                    __('mail.4674994e3cfa13'),
+                    __('mail.73dba5683a7590'),
+                    __('mail.aedc75d9c9c0f1', ['value0' => self::esc($domain)]),
+                    __('mail.4e67aa03e089a3', ['value0' => $domain]),
+                ],
+            };
 
-        return self::send(
-            $kind,
-            $to,
-            $subject,
-            self::layout($title, $body),
-            $text,
-            'domain',
-            $domainId,
-            $userId.':'.$eventGeneration,
-        );
+            return self::send(
+                $kind,
+                $to,
+                $subject,
+                self::layout($title, $body),
+                $text,
+                'domain',
+                $domainId,
+                $userId.':'.$eventGeneration,
+            );
+        }, $language);
     }
 
     /**
@@ -555,21 +617,23 @@ class UvhMail
      * un aviso de la propia cuenta, siempre vigente, que sólo lista títulos y
      * rutas internas — nunca secretos, URLs bearer ni contenido ajeno.
      */
-    public static function notificationDigest(string $to, string $summaryHtml, string $summaryText, int $userId, string $generation): bool
+    public static function notificationDigest(string $to, string $summaryHtml, string $summaryText, int $userId, string $generation, ?string $language = null): bool
     {
-        // Identidad de lifecycle determinista (cuenta + claim exacto): el mismo
-        // resumen reintentado tras un crash choca en la misma clave del outbox
-        // y se descarta en vez de duplicar el correo.
-        return self::send(
-            'notification_digest',
-            $to,
-            'Tu resumen de notificaciones de UVH',
-            self::layout('Resumen de notificaciones', $summaryHtml),
-            $summaryText,
-            'notification',
-            $userId,
-            $generation,
-        );
+        return MailLanguage::render($to, function () use ($to, $summaryHtml, $summaryText, $userId, $generation): bool {
+            // Identidad de lifecycle determinista (cuenta + claim exacto): el mismo
+            // resumen reintentado tras un crash choca en la misma clave del outbox
+            // y se descarta en vez de duplicar el correo.
+            return self::send(
+                'notification_digest',
+                $to,
+                __('mail.8964b11eccc7a5'),
+                self::layout(__('mail.28bd330404f2f1'), $summaryHtml),
+                $summaryText,
+                'notification',
+                $userId,
+                $generation,
+            );
+        }, $language);
     }
 
     public static function invitation(
@@ -578,32 +642,39 @@ class UvhMail
         string $workspace,
         string $role,
         int $invitationId,
-        string $generationHash,
-    ): bool {
-        $link = self::action($url, 'Aceptar invitación');
+        string $generationHash, ?string $language = null): bool
+    {
+        return MailLanguage::render($to, function () use ($to, $url, $workspace, $role, $invitationId, $generationHash): bool {
+            $url = FrontendUrl::localiseExistingPage($url);
+            $link = self::action($url, __('mail.fc34097a035972'));
 
-        return self::send(
-            'invitation',
-            $to,
-            'Tienes una invitación de equipo en UVH',
-            self::layout('Invitación de equipo', '<p>Has sido invitado a <strong>'.self::esc($workspace).'</strong> con rol <strong>'.self::esc($role).'</strong>.</p>'.$link),
-            "Te invitaron a {$workspace} (rol {$role}) en UVH: {$url}",
-            'invitation',
-            $invitationId,
-            $generationHash,
-        );
+            return self::send(
+                'invitation',
+                $to,
+                __('mail.b6dcdb3919b17a'),
+                self::layout(__('mail.5f18ddf367ff1a'), __('mail.8602d806c7283c', ['value0' => self::esc($workspace), 'value1' => self::esc($role), 'value2' => $link])),
+                __('mail.07e928f19503bd', ['value0' => $workspace, 'value1' => $role, 'value2' => $url]),
+                'invitation',
+                $invitationId,
+                $generationHash,
+            );
+        }, $language);
     }
 
     private static function layout(string $title, string $body): string
     {
         $safeTitle = self::esc($title);
-        $helpUrl = self::esc(FrontendUrl::base().'/help');
+        $helpUrl = self::esc(FrontendUrl::page('/help'));
+        $language = Language::current() === 'en' ? 'en-GB' : 'es-ES';
+        $tagline = self::esc(__('mail.layout_tagline'));
+        $footer = self::esc(__('mail.layout_footer'));
+        $helpLabel = self::esc(__('mail.layout_help'));
 
         // Tables and inline styles keep the hierarchy intact in Gmail, Apple
         // Mail and Outlook. No remote fonts or images are needed to read it.
         return <<<HTML
             <!doctype html>
-            <html lang="es">
+            <html lang="{$language}">
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -629,7 +700,7 @@ class UvhMail
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
                         <tr>
                           <td valign="bottom" style="color:#262821;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:35px;line-height:1;font-weight:800;letter-spacing:-2.5px;">uvh<span style="color:#b53c20;">.</span></td>
-                          <td align="right" valign="bottom" style="color:#626357;font-family:Georgia,serif;font-size:13px;font-style:italic;line-height:1.4;">Enlaces con recorrido.</td>
+                          <td align="right" valign="bottom" style="color:#626357;font-family:Georgia,serif;font-size:13px;font-style:italic;line-height:1.4;">{$tagline}</td>
                         </tr>
                       </table>
                     </td></tr>
@@ -641,11 +712,11 @@ class UvhMail
                           <div class="uvh-mail-copy" style="color:#44483e;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:15px;line-height:1.7;">{$body}</div>
                         </td></tr>
                         <tr><td class="uvh-mail-footer" style="padding:22px 42px 25px;border-top:1px solid #cecec0;color:#626357;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;">
-                          Este correo se envió por una acción relacionada con UVH. Si necesitas ayuda, visita <a href="{$helpUrl}" style="color:#b53c20;text-decoration:underline;">el centro de ayuda</a>.
+                          {$footer} <a href="{$helpUrl}" style="color:#b53c20;text-decoration:underline;">{$helpLabel}</a>.
                         </td></tr>
                       </table>
                     </td></tr>
-                    <tr><td style="padding:20px 2px 0;color:#626357;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:11px;line-height:1.5;">UVH / Enlaces con recorrido.</td></tr>
+                    <tr><td style="padding:20px 2px 0;color:#626357;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:11px;line-height:1.5;">UVH / {$tagline}</td></tr>
                   </table>
                   <!--[if mso]></td></tr></table><![endif]-->
                 </td></tr>
@@ -672,7 +743,7 @@ class UvhMail
     {
         $safeUrl = self::esc($url);
 
-        return '<p style="margin:0;color:#626357;font-size:12px;line-height:1.6;">Si el botón no funciona, copia este enlace:<br><a href="'.$safeUrl.'" style="color:#b53c20;text-decoration:underline;overflow-wrap:anywhere;word-break:break-all;">'.$safeUrl.'</a></p>';
+        return __('mail.dcc3dc0e2e794c', ['value0' => $safeUrl, 'value1' => $safeUrl]);
     }
 
     private static function esc(string $v): string

@@ -31,7 +31,7 @@ final class AccountRecoveryController
         $email = trim(UvhRequest::inputString($request, 'email'));
         $captchaToken = UvhRequest::inputString($request, 'captchaToken');
         if (! $this->validEmail($email)) {
-            return response()->json(['error' => 'Email inválido'], 422);
+            return response()->json(['error' => __('messages.error_833766bf690458')], 422);
         }
         if ($captchaError = $this->captchaError($request, $captchaToken)) {
             return $captchaError;
@@ -49,7 +49,7 @@ final class AccountRecoveryController
 
         return response()->json([
             'ok' => true,
-            'message' => 'Si la cuenta existe, está verificada y tiene MFA, recibirás un enlace para abrir el expediente.',
+            'message' => __('messages.error_a4a6f6521cee24'),
         ], 202);
     }
 
@@ -58,19 +58,19 @@ final class AccountRecoveryController
     {
         $token = UvhRequest::inputString($request, 'token');
         if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1) {
-            return response()->json(['error' => 'La confirmación no es válida o ya se ha utilizado'], 400);
+            return response()->json(['error' => __('messages.error_b2b9e4edb53545')], 400);
         }
         $tokenHash = Ids::sha256Hex($token);
         $snapshot = AccountRecoveryRequest::where('confirmation_token_hash', $tokenHash)
             ->where('status', 'requested')->first(['id', 'user_id']);
         $result = $snapshot ? AccountRecoveryAdmission::confirm($snapshot, $tokenHash) : null;
         if (! $result) {
-            return response()->json(['error' => 'La confirmación no es válida o ya se ha utilizado'], 400);
+            return response()->json(['error' => __('messages.error_b2b9e4edb53545')], 400);
         }
 
         return response()->json([
             'ok' => true,
-            'message' => 'El expediente está abierto. Soporte debe verificar tu identidad y dos administradores distintos deben aprobarlo.',
+            'message' => __('messages.error_5e847f5dc05a97'),
         ]);
     }
 
@@ -83,7 +83,7 @@ final class AccountRecoveryController
         if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1
             || ! hash_equals('RECUPERAR MI CUENTA', $confirmation)
             || ! $this->validPassword($password)) {
-            return response()->json(['error' => 'Datos de recuperación inválidos'], 422);
+            return response()->json(['error' => __('messages.error_51871ed3c70180')], 422);
         }
 
         $snapshot = AccountRecoveryRequest::with('user')
@@ -110,16 +110,16 @@ final class AccountRecoveryController
         } catch (MailAdmissionException) {
             Audit::write((int) $snapshot->user_id, 'auth.email_delivery_failed', 'account_recovery', $snapshot->id, ['kind' => 'password_changed']);
 
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. La recuperación no se completó. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_34ec21d0c5d7f1')], 503);
         }
         if ($result['status'] === 'weak') {
-            return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
+            return response()->json(['error' => __('messages.error_637cd115d3504c')], 422);
         }
         if ($result['status'] === 'invalid') {
-            return response()->json(['error' => 'El enlace no es válido o ha caducado'], 400);
+            return response()->json(['error' => __('messages.error_e0e072e9083faa')], 400);
         }
         if ($result['status'] === 'approval_changed') {
-            return response()->json(['error' => 'La aprobación de seguridad ha cambiado. Soporte debe revisar de nuevo el expediente'], 409);
+            return response()->json(['error' => __('messages.error_61c3f064e7f9be')], 409);
         }
         foreach ($result['artifacts'] as $artifact) {
             PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
@@ -127,7 +127,7 @@ final class AccountRecoveryController
         LinkIntentRegistry::afterCommit($result['user_id']);
 
         return CredentialChangeResponse::forUser($request, $result['user_id'], [
-            'message' => 'La cuenta se ha recuperado. Inicia sesión con la contraseña nueva y configura MFA de nuevo.',
+            'message' => __('messages.error_7427374a3d8575'),
         ]);
     }
 }

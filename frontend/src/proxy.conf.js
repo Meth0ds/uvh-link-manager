@@ -8,6 +8,7 @@ module.exports = {
     logLevel: "warn",
   },
   "/a/": { target: BACKEND, secure: false, changeOrigin: false },
+  "/visitor-assets/": { target: BACKEND, secure: false, changeOrigin: false },
   "/app-links/": { target: BACKEND, secure: false, changeOrigin: false },
   "/r/": {
     target: BACKEND,

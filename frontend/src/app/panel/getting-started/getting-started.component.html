@@ -1,55 +1,55 @@
 @if (!compact()) {
   <app-page-header icon="checklist" eyebrow="Guía opcional" title="Primeros pasos"
-    [description]="context() ? context()!.name + ' · Guía para crear un enlace, comprobar una redirección y activar MFA.' : 'Selecciona un workspace para consultar su guía.'">
-    <a mat-stroked-button routerLink="/app/dashboard">Volver al panel</a>
+    [description]="context() ? context()!.name + uiText.ui_82a9108e8cba7b : uiText.ui_4b300f4550259e" i18n-title="@@ui.62f909f1b76248" i18n-eyebrow="@@ui.298f1f90c763fc">
+    <a mat-stroked-button routerLink="/app/dashboard"><ng-container i18n="@@ui.834f03046a7776">Volver al panel</ng-container></a>
   </app-page-header>
 }
 
 @if (context(); as workspace) {
   @if (!compact() || (!hidden() && !complete())) {
-    <section class="guide" [class.compact]="compact()" [attr.aria-label]="'Primeros pasos de ' + workspace.name" [attr.aria-busy]="loading() && !hidden()">
+    <section class="guide" [class.compact]="compact()" [attr.aria-label]="uiText.ui_5161a0ec8f6805 + workspace.name" [attr.aria-busy]="loading() && !hidden()">
       @if (hidden()) {
-        <span class="eyebrow">Guía omitida</span><h2>Has omitido esta guía</h2>
-        <p>No se han cambiado tus recursos ni tu configuración de seguridad. Puedes retomarla cuando quieras.</p>
-        <button mat-flat-button type="button" [disabled]="preferenceBusy()" (click)="resume()">Reanudar guía</button>
+        <span class="eyebrow"><ng-container i18n="@@ui.4f7bbe7feef61b">Guía omitida</ng-container></span><h2><ng-container i18n="@@ui.be90970ea93875">Has omitido esta guía</ng-container></h2>
+        <p><ng-container i18n="@@ui.dd16a842750259">No se han cambiado tus recursos ni tu configuración de seguridad. Puedes retomarla cuando quieras.</ng-container></p>
+        <button mat-flat-button type="button" [disabled]="preferenceBusy()" (click)="resume()"><ng-container i18n="@@ui.02e0c9222e3b72">Reanudar guía</ng-container></button>
       } @else if (loading()) {
-        <span class="eyebrow">Consultando tu workspace</span><p role="status">Comprobando el estado real de {{ workspace.name }}…</p>
-        <mat-progress-bar mode="indeterminate" aria-label="Cargando primeros pasos" />
-        <button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()">Omitir por ahora</button>
+        <span class="eyebrow"><ng-container i18n="@@ui.3f5a0e3ce33e5e">Consultando tu workspace</ng-container></span><p role="status"><ng-container i18n="@@ui.3614ed2db568b3">Comprobando el estado real de {{ workspace.name }}…</ng-container></p>
+        <mat-progress-bar mode="indeterminate" aria-label="Cargando primeros pasos"  i18n-aria-label="@@ui.a5a2f06990f681"/>
+        <button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()"><ng-container i18n="@@ui.311ea48a48279b">Omitir por ahora</ng-container></button>
       } @else if (error(); as message) {
         <div class="guide-message" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><p>{{ message }}</p></div>
-        <button mat-stroked-button type="button" (click)="reload()">Reintentar comprobación</button>
-        <button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()">Omitir por ahora</button>
+        <button mat-stroked-button type="button" (click)="reload()"><ng-container i18n="@@ui.6416f7f1035d2a">Reintentar comprobación</ng-container></button>
+        <button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()"><ng-container i18n="@@ui.311ea48a48279b">Omitir por ahora</ng-container></button>
       } @else if (complete() && !reviewing()) {
-        <span class="eyebrow">Comprobaciones iniciales</span><div class="guide-message"><mat-icon aria-hidden="true">check_circle</mat-icon><h2>Se han observado las tres comprobaciones iniciales</h2></div>
-        <p>La sugerencia deja de aparecer en el panel. Esto no certifica la llegada al destino ni la preparación para producción.</p>
-        <button mat-stroked-button type="button" [disabled]="preferenceBusy()" (click)="resume()">Revisar guía y opciones</button>
+        <span class="eyebrow"><ng-container i18n="@@ui.05b7e0ec8f85c7">Comprobaciones iniciales</ng-container></span><div class="guide-message"><mat-icon aria-hidden="true">check_circle</mat-icon><h2><ng-container i18n="@@ui.8472c7037c4cb1">Se han observado las tres comprobaciones iniciales</ng-container></h2></div>
+        <p><ng-container i18n="@@ui.f621b486c5eb67">La sugerencia deja de aparecer en el panel. Esto no certifica la llegada al destino ni la preparación para producción.</ng-container></p>
+        <button mat-stroked-button type="button" [disabled]="preferenceBusy()" (click)="resume()"><ng-container i18n="@@ui.77bab11bcc43e8">Revisar guía y opciones</ng-container></button>
       } @else if (data()) {
         <div class="guide-heading">
-          <div><span class="eyebrow">{{ compact() ? 'Guía de configuración' : 'Configuración inicial' }}</span><h2>{{ compact() ? 'Configura tu workspace' : 'Configurar enlaces y seguridad' }}</h2><p>{{ observed() }} de 3 comprobaciones observadas. Dominio y equipo son opcionales.</p></div>
+          <div><span class="eyebrow">{{ compact() ? uiText.ui_3fdb6574606453 : uiText.ui_c2dd607b212263 }}</span><h2>{{ compact() ? uiText.ui_8eba9cf90d7223 : uiText.ui_b0219dbce9c0ae }}</h2><p><ng-container i18n="@@ui.cfa8dab5a5abd0">{{ observed() }} de 3 comprobaciones observadas. Dominio y equipo son opcionales.</ng-container></p></div>
           <span class="progress-count" aria-hidden="true"><b>{{ observed() }}</b><span>/ 3</span></span>
         </div>
         @if (compact()) {
-          <div class="guide-actions"><a mat-stroked-button routerLink="/app/getting-started">Abrir guía <mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></a><button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()">Omitir por ahora</button></div>
+          <div class="guide-actions"><a mat-stroked-button routerLink="/app/getting-started"><ng-container i18n="@@ui.aed445dd91b488">Abrir guía </ng-container><mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></a><button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()"><ng-container i18n="@@ui.311ea48a48279b">Omitir por ahora</ng-container></button></div>
         } @else {
           <ol class="steps">
             @for (step of steps(); track step.id; let i = $index) {
               <li [class.observed]="step.observed" [class.optional]="step.optional" [attr.data-step]="step.id">
                 <span class="step-number" aria-hidden="true">0{{ i + 1 }}</span>
-                <div class="step-copy"><div class="step-topline"><span class="step-kind">{{ step.optional ? 'Si lo necesitas' : 'Lo esencial' }}</span><span class="step-state"><mat-icon aria-hidden="true">{{ step.observed ? 'check' : 'remove' }}</mat-icon>{{ step.observed ? 'Observado' : 'Todavía no observado' }}{{ step.optional ? ' · Opcional' : '' }}</span></div><h3>{{ step.title }}</h3><p>{{ step.description }}</p></div>
+                <div class="step-copy"><div class="step-topline"><span class="step-kind">{{ step.optional ? uiText.ui_6abd51576201be : uiText.ui_b1e5f0cde20951 }}</span><span class="step-state"><mat-icon aria-hidden="true">{{ step.observed ? 'check' : 'remove' }}</mat-icon>{{ step.observed ? uiText.ui_90166d3ae5b0e0 : uiText.ui_6acf6c7ad8a516 }}{{ step.optional ? uiText.ui_ff0745761c2bd2 : '' }}</span></div><h3>{{ step.title }}</h3><p>{{ step.description }}</p></div>
                 <a mat-stroked-button [routerLink]="step.route" [fragment]="step.fragment">{{ step.action }}</a>
               </li>
             }
           </ol>
-          <div class="guide-actions"><button mat-flat-button type="button" (click)="reload()">Actualizar estado</button><button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()">Omitir por ahora</button></div>
-          <aside class="guide-note"><mat-icon aria-hidden="true">info_outline</mat-icon><div><b>La guía no realiza acciones por ti.</b><p>Sólo abrimos pantallas internas. Ningún enlace se visita ni se envía correo automáticamente. Puedes reanudar la guía desde «Primeros pasos» en el menú.</p></div></aside>
+          <div class="guide-actions"><button mat-flat-button type="button" (click)="reload()"><ng-container i18n="@@ui.d266f6697dc3a5">Actualizar estado</ng-container></button><button mat-button type="button" [disabled]="preferenceBusy()" (click)="dismiss()"><ng-container i18n="@@ui.311ea48a48279b">Omitir por ahora</ng-container></button></div>
+          <aside class="guide-note"><mat-icon aria-hidden="true">info_outline</mat-icon><div><b><ng-container i18n="@@ui.a3cdcb9571619a">La guía no realiza acciones por ti.</ng-container></b><p><ng-container i18n="@@ui.c6e0a3e033fd62">Sólo abrimos pantallas internas. Ningún enlace se visita ni se envía correo automáticamente. Puedes reanudar la guía desde «Primeros pasos» en el menú.</ng-container></p></div></aside>
         }
       }
       @if (preferenceError()) {
-        <p class="guide-note" role="status">No se pudo guardar tu preferencia; al volver podría mostrarse la guía de nuevo.</p>
+        <p class="guide-note" role="status"><ng-container i18n="@@ui.b67732d189449f">No se pudo guardar tu preferencia; al volver podría mostrarse la guía de nuevo.</ng-container></p>
       }
     </section>
   }
 } @else if (!compact()) {
-  <div class="guide empty-state"><mat-icon aria-hidden="true">workspaces</mat-icon><h2>Sin workspace seleccionado</h2><p>Selecciona o crea uno desde la barra superior. No necesitas invitar a nadie para usarlo.</p></div>
+  <div class="guide empty-state"><mat-icon aria-hidden="true">workspaces</mat-icon><h2><ng-container i18n="@@ui.2814df48c70878">Sin workspace seleccionado</ng-container></h2><p><ng-container i18n="@@ui.6454d2053d353f">Selecciona o crea uno desde la barra superior. No necesitas invitar a nadie para usarlo.</ng-container></p></div>
 }

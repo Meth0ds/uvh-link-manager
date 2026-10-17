@@ -92,10 +92,10 @@ export class ApiService {
 
     this.csrfRequest = this.request(this.http.get<{ csrfToken: string }>("/api/v1/csrf"))
       .then(() => {
-        if (!this.csrfToken()) throw new ApiRequestError("No se pudo establecer la protección CSRF", 0);
+        if (!this.csrfToken()) throw new ApiRequestError($localize`:@@ui.0e4bd1b7937f8c:No se pudo establecer la protección CSRF`, 0);
       })
       .catch((err) => {
-        throw err instanceof ApiRequestError ? err : new ApiRequestError("No se pudo establecer la protección CSRF", 0);
+        throw err instanceof ApiRequestError ? err : new ApiRequestError($localize`:@@ui.0e4bd1b7937f8c:No se pudo establecer la protección CSRF`, 0);
       })
       .finally(() => {
         this.csrfRequest = undefined;
@@ -125,7 +125,7 @@ export class ApiService {
         // The fresh token was rejected too: retrying again would only repeat a
         // write the server keeps refusing, so say what the user must do instead.
         throw retryErr instanceof ApiRequestError && retryErr.reason === CSRF_REJECTED
-          ? new ApiRequestError("No se pudo confirmar la protección de la sesión. Recarga la página e inténtalo de nuevo.", 403)
+          ? new ApiRequestError($localize`:@@ui.477aeaa0549d86:No se pudo confirmar la protección de la sesión. Recarga la página e inténtalo de nuevo.`, 403)
           : retryErr;
       }
     }
@@ -142,7 +142,7 @@ export class ApiService {
       if (generation !== this.sessionContext.generation()
         || account !== (this.sessionContext.user()?.id ?? null)
         || (scoped && (workspace !== this.workspaces.currentId() || selection !== this.workspaces.selectionGeneration()))) {
-        throw new ApiRequestError("La sesión o el workspace cambió. Revisa el estado actual antes de continuar.",
+        throw new ApiRequestError($localize`:@@ui.ab2af243281ef9:La sesión o el workspace cambió. Revisa el estado actual antes de continuar.`,
           409, { reason: "request_context_changed" }, undefined, "request_context_changed");
       }
     };
@@ -160,7 +160,7 @@ export class ApiService {
 
   private assertApiPath(path: string): void {
     if (!path.startsWith("/api/") || path.startsWith("//") || /[\u0000-\u001f\u007f]/.test(path)) {
-      throw new ApiRequestError("Ruta API no permitida", 0);
+      throw new ApiRequestError($localize`:@@ui.0e9532669c456a:Ruta API no permitida`, 0);
     }
   }
 
@@ -183,8 +183,8 @@ export class ApiService {
     const message = serverMessage !== ""
       ? serverMessage
       : err.status === 0
-        ? "No se pudo conectar con el servidor"
-        : `El servidor devolvió un error inesperado (HTTP ${err.status}). Reinténtalo en unos segundos.`;
+        ? $localize`:@@ui.f08caaf56da4ca:No se pudo conectar con el servidor`
+        : $localize`:@@ui.7ed2b5e58b3727:El servidor devolvió un error inesperado (HTTP ${err.status}). Reinténtalo en unos segundos.`;
     return new ApiRequestError(
       message,
       err.status,
@@ -202,7 +202,7 @@ export class ApiService {
       if (error instanceof ApiRequestError) throw error;
       // Do not attach the untrusted body or decoder details: either may contain
       // secrets and neither is useful to the end user.
-      throw new ApiRequestError("El servidor devolvió una respuesta no válida", 502);
+      throw new ApiRequestError($localize`:@@ui.adb83df5536e4f:El servidor devolvió una respuesta no válida`, 502);
     }
   }
 
@@ -219,8 +219,8 @@ export class ApiService {
       .then((value) => this.decodeResponse(value, decoder)).catch((err: unknown) => {
       if (err instanceof TimeoutError) {
         const message = policy === "mutation"
-          ? "No se pudo confirmar el resultado a tiempo. Comprueba el estado antes de reintentar."
-          : "La lectura tardó demasiado. Comprueba tu conexión e inténtalo de nuevo.";
+          ? $localize`:@@ui.097328a4e03713:No se pudo confirmar el resultado a tiempo. Comprueba el estado antes de reintentar.`
+          : $localize`:@@ui.0e2099c9aacd45:La lectura tardó demasiado. Comprueba tu conexión e inténtalo de nuevo.`;
         throw new ApiRequestError(message, 0, { reason: "timeout" });
       }
       throw err instanceof HttpErrorResponse ? this.errorOf(err) : err;
@@ -230,10 +230,10 @@ export class ApiService {
   private cancelOnAbort<T>(source: Observable<T>, signal: AbortSignal): Observable<T> {
     return new Observable<T>((subscriber) => {
       if (signal.aborted) {
-        subscriber.error(new ApiRequestError("Lectura cancelada", 0, { reason: "cancelled" }));
+        subscriber.error(new ApiRequestError($localize`:@@ui.92a2872d72edba:Lectura cancelada`, 0, { reason: "cancelled" }));
         return;
       }
-      const abort = () => subscriber.error(new ApiRequestError("Lectura cancelada", 0, { reason: "cancelled" }));
+      const abort = () => subscriber.error(new ApiRequestError($localize`:@@ui.92a2872d72edba:Lectura cancelada`, 0, { reason: "cancelled" }));
       signal.addEventListener("abort", abort, { once: true });
       const subscription = source.subscribe(subscriber);
       return () => {
@@ -258,7 +258,7 @@ export class ApiService {
   /** POST (mutation — requires CSRF). `extraHeaders` carries e.g. an Idempotency-Key. */
   /** A report capability is independent of the signed-in account/workspace. */
   async accessSharedReport<T>(path: string, body: unknown, decoder: ApiDecoder<T>): Promise<T> {
-    if (!/^\/api\/v1\/shared-reports\/[a-f0-9-]{36}\/access$/.test(path)) throw new ApiRequestError("Ruta de informe inválida", 0);
+    if (!/^\/api\/v1\/shared-reports\/[a-f0-9-]{36}\/access$/.test(path)) throw new ApiRequestError($localize`:@@ui.1968f4005e9084:Ruta de informe inválida`, 0);
     await this.ensureCsrf();
     return this.retryOnRejectedCsrf(() => this.request(this.http.post<T>(path, body, { headers: this.headers(true) }), decoder, "mutation"), () => undefined);
   }
@@ -316,7 +316,7 @@ export class ApiService {
         try {
           const parsed = JSON.parse(await error.error.text()) as ApiError;
           throw new ApiRequestError(
-            typeof parsed.error === "string" ? parsed.error : "Error del servidor",
+            typeof parsed.error === "string" ? parsed.error : $localize`:@@ui.30690609f7e948:Error del servidor`,
             error.status,
             parsed.details,
             retryAfterSeconds(error.headers.get("Retry-After")),
@@ -327,7 +327,7 @@ export class ApiService {
         }
       }
       if (error instanceof TimeoutError) {
-        throw new ApiRequestError("La descarga no respondió a tiempo. Comprueba su estado antes de solicitar otra.", 0, { reason: "timeout" });
+        throw new ApiRequestError($localize`:@@ui.737f48b78c6654:La descarga no respondió a tiempo. Comprueba su estado antes de solicitar otra.`, 0, { reason: "timeout" });
       }
       throw error instanceof HttpErrorResponse ? this.errorOf(error) : error;
     }
@@ -361,7 +361,7 @@ export class ApiService {
       timeout({ first: timeoutMs }),
       map((value) => this.decodeResponse(value, decoder)),
       catchError((err: unknown) => throwError(() => err instanceof TimeoutError
-        ? new ApiRequestError("La lectura tardó demasiado. Comprueba tu conexión e inténtalo de nuevo.", 0, { reason: "timeout" })
+        ? new ApiRequestError($localize`:@@ui.0e2099c9aacd45:La lectura tardó demasiado. Comprueba tu conexión e inténtalo de nuevo.`, 0, { reason: "timeout" })
         : err instanceof HttpErrorResponse ? this.errorOf(err) : err)),
     );
   }

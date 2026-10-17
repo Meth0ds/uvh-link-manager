@@ -1,29 +1,29 @@
-<app-page-header icon="key" eyebrow="Acceso programático" title="Tokens de API" description="Gestiona las credenciales que conectan otras aplicaciones con tu workspace.">
+<app-page-header icon="key" eyebrow="Acceso programático" title="Tokens de API" description="Gestiona las credenciales que conectan otras aplicaciones con tu workspace." i18n-title="@@ui.fc205e3e22fa37" i18n-description="@@ui.85c13661f85f77" i18n-eyebrow="@@ui.bd129e5783a97b">
   @if (canManage()) {
     <button #createButton mat-flat-button type="button" (click)="openCreate($event)" [disabled]="formOpen() || mutationBusy() || !!plainToken() || creationUnconfirmed()" [attr.aria-expanded]="formOpen()" aria-controls="token-create-panel">
-      <mat-icon aria-hidden="true">add</mat-icon> Crear token
-    </button>
+      <mat-icon aria-hidden="true">add</mat-icon> <ng-container i18n="@@ui.4a8835e5a1edc9">Crear token
+    </ng-container></button>
   }
 </app-page-header>
 
 @if (!canManage()) {
   <section class="access-notice" aria-labelledby="token-access-title">
     <mat-icon aria-hidden="true">lock_outline</mat-icon>
-    <div><h2 id="token-access-title">Acceso a las credenciales</h2><p>{{ user() ? 'Necesitas permisos de edición y una cuenta verificada para consultar o gestionar los tokens de este workspace.' : 'Inicia sesión para gestionar las credenciales de un workspace.' }}</p></div>
+    <div><h2 id="token-access-title"><ng-container i18n="@@ui.52531e1094a099">Acceso a las credenciales</ng-container></h2><p>{{ user() ? uiText.ui_464777841221ed : uiText.ui_a49c139cf07289 }}</p></div>
   </section>
 } @else {
   @if (plainToken(); as pt) {
-    <p class="issued-notice" role="status">Token generado. Guarda el secreto que se muestra a continuación.</p>
+    <p class="issued-notice" role="status"><ng-container i18n="@@ui.e8e43540ff5c94">Token generado. Guarda el secreto que se muestra a continuación.</ng-container></p>
     <!-- The live region announces availability only, never the credential. -->
     <section #issuedSection class="plain-box" tabindex="-1" aria-labelledby="token-issued-title">
-      <div class="issued-heading"><mat-icon aria-hidden="true">key</mat-icon><div><h2 id="token-issued-title">Guarda el token de {{ issuedName() }}</h2><p>Es la única vez que podrás ver este secreto. Guárdalo en el gestor de secretos de tu integración.</p></div></div>
+      <div class="issued-heading"><mat-icon aria-hidden="true">key</mat-icon><div><h2 id="token-issued-title"><ng-container i18n="@@ui.cef471e137c26f">Guarda el token de {{ issuedName() }}</ng-container></h2><p><ng-container i18n="@@ui.0935546d50dca0">Es la única vez que podrás ver este secreto. Guárdalo en el gestor de secretos de tu integración.</ng-container></p></div></div>
       <code class="plain-value tnum">{{ pt }}</code>
       <div class="plain-actions">
-        <button mat-stroked-button type="button" (click)="copyPlain()" [disabled]="copyBusy()" [attr.aria-busy]="copyBusy()"><mat-icon aria-hidden="true">{{ copyFeedback() === 'Token copiado' ? 'check' : 'content_copy' }}</mat-icon>{{ copyBusy() ? 'Copiando…' : copyFeedback() === 'Token copiado' ? 'Token copiado' : 'Copiar token' }}</button>
-        <button mat-flat-button type="button" (click)="finishIssued($event)"><mat-icon aria-hidden="true">done</mat-icon> Ya lo he guardado</button>
+        <button mat-stroked-button type="button" (click)="copyPlain()" [disabled]="copyBusy()" [attr.aria-busy]="copyBusy()"><mat-icon aria-hidden="true">{{ copyFeedback() === 'Token copiado' ? 'check' : 'content_copy' }}</mat-icon>{{ copyBusy() ? uiText.ui_1d37b4eba1772a : copyFeedback() === 'Token copiado' ? uiText.ui_5f0c0661360dcc : uiText.ui_e424e6f0022599 }}</button>
+        <button mat-flat-button type="button" (click)="finishIssued($event)"><mat-icon aria-hidden="true">done</mat-icon> <ng-container i18n="@@ui.adec558b01a7a0">Ya lo he guardado</ng-container></button>
       </div>
       @if (copyFeedback()) { <p class="copy-feedback" role="status">{{ copyFeedback() }}</p> }
-      <p class="secret-note">Al confirmar, el secreto se ocultará. Podrás revocar el token desde el registro.</p>
+      <p class="secret-note"><ng-container i18n="@@ui.dd7ed5973d29f7">Al confirmar, el secreto se ocultará. Podrás revocar el token desde el registro.</ng-container></p>
     </section>
   }
 
@@ -32,8 +32,8 @@
       <p>{{ issueError() }}</p>
       @if (creationUnconfirmed()) {
         <div class="uncertain-actions">
-          <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || mutationBusy()">Actualizar registro</button>
-          <button mat-stroked-button type="button" (click)="acknowledgeUnconfirmed()" [disabled]="loading() || !!error() || mutationBusy() || !creationReviewed()">He revisado el registro</button>
+          <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || mutationBusy()"><ng-container i18n="@@ui.10744e329e635c">Actualizar registro</ng-container></button>
+          <button mat-stroked-button type="button" (click)="acknowledgeUnconfirmed()" [disabled]="loading() || !!error() || mutationBusy() || !creationReviewed()"><ng-container i18n="@@ui.44142e85593fc3">He revisado el registro</ng-container></button>
         </div>
       }
     </section>
@@ -41,61 +41,61 @@
 
   @if (formOpen()) {
     <form id="token-create-panel" class="create-card" (ngSubmit)="create()" aria-labelledby="token-create-title">
-      <div class="create-heading"><div><h2 id="token-create-title">Una credencial para tu integración</h2><p>Define qué podrá hacer y hasta cuándo tendrá acceso.</p></div><button mat-button type="button" (click)="cancelCreate($event)" [disabled]="mutationBusy()">Cancelar</button></div>
+      <div class="create-heading"><div><h2 id="token-create-title"><ng-container i18n="@@ui.3c6a54ca12e4e1">Una credencial para tu integración</ng-container></h2><p><ng-container i18n="@@ui.c6bd88ef9791ee">Define qué podrá hacer y hasta cuándo tendrá acceso.</ng-container></p></div><button mat-button type="button" (click)="cancelCreate($event)" [disabled]="mutationBusy()"><ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button></div>
       <div class="create-fields">
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Nombre de la integración</mat-label>
-          <input #nameInput matInput placeholder="Por ejemplo, informes de marketing" [(ngModel)]="name" name="tokenName" maxlength="80" [attr.aria-invalid]="nameInvalid() || null" />
-          @if (nameInvalid()) { <mat-hint class="err-hint">Utiliza entre 2 y 80 caracteres, sin caracteres de control.</mat-hint> }
+          <mat-label><ng-container i18n="@@ui.64290fea2c4aa6">Nombre de la integración</ng-container></mat-label>
+          <input #nameInput matInput placeholder="Por ejemplo, informes de marketing" [(ngModel)]="name" name="tokenName" maxlength="80" [attr.aria-invalid]="nameInvalid() || null"  i18n-placeholder="@@ui.deec56e0a52b8b"/>
+          @if (nameInvalid()) { <mat-hint class="err-hint"><ng-container i18n="@@ui.edce35285a5cef">Utiliza entre 2 y 80 caracteres, sin caracteres de control.</ng-container></mat-hint> }
         </mat-form-field>
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Caducidad opcional</mat-label>
+          <mat-label><ng-container i18n="@@ui.9e8b9a03faaee0">Caducidad opcional</ng-container></mat-label>
           <input matInput type="datetime-local" [(ngModel)]="expiresAt" name="expiry" [attr.aria-invalid]="!!expiryError() || null" />
-          <mat-hint [class.err-hint]="expiryError()">{{ expiryError() || 'Sin fecha, mantiene el acceso hasta que lo revoques.' }}</mat-hint>
+          <mat-hint [class.err-hint]="expiryError()">{{ expiryError() || uiText.ui_3d14b4ae2f2ba0 }}</mat-hint>
         </mat-form-field>
       </div>
-      <p class="form-timezone">La caducidad usa tu zona horaria: {{ timeZone }}.</p>
+      <p class="form-timezone"><ng-container i18n="@@ui.5eeb7ee3bde437">La caducidad usa tu zona horaria: {{ timeZone }}.</ng-container></p>
       <fieldset class="scopes">
-        <legend>¿Qué necesita hacer esta integración?</legend>
+        <legend><ng-container i18n="@@ui.44e1caee5dfdc5">¿Qué necesita hacer esta integración?</ng-container></legend>
         @for (s of scopeOptions; track s.value) {
           <mat-checkbox [checked]="selectedScopes().includes(s.value)" (change)="toggleScope(s.value)">
             <span class="scope-copy"><span>{{ s.label }}</span><small>{{ s.description }}</small><code>{{ s.value }}</code></span>
           </mat-checkbox>
         }
       </fieldset>
-      <p class="scope-note">Selecciona sólo los permisos necesarios. {{ selectedScopes().length ? selectedScopes().length + ' seleccionados.' : 'Aún no has seleccionado ninguno.' }}</p>
+      <p class="scope-note"><ng-container i18n="@@ui.a24f92df6a3616">Selecciona sólo los permisos necesarios. {{ selectedScopes().length ? selectedScopes().length + uiText.ui_fa5c5c891c8bda : uiText.ui_c9527e4337700f }}</ng-container></p>
       <section class="identity-check" aria-labelledby="token-identity-title">
-        <div><h3 id="token-identity-title">Confirma tu identidad</h3><p>Esta credencial permite operar fuera de tu sesión.</p></div>
+        <div><h3 id="token-identity-title"><ng-container i18n="@@ui.3f172652cda9be">Confirma tu identidad</ng-container></h3><p><ng-container i18n="@@ui.1ca6be9ba32da6">Esta credencial permite operar fuera de tu sesión.</ng-container></p></div>
         <div class="credential-fields">
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Contraseña actual</mat-label>
+            <mat-label><ng-container i18n="@@ui.14a433147337bb">Contraseña actual</ng-container></mat-label>
             <input matInput type="password" [(ngModel)]="password" name="password" autocomplete="current-password" maxlength="72" [disabled]="creating()" />
             <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
           </mat-form-field>
           @if (user()?.mfaEnabled) {
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Segundo factor</mat-label>
+              <mat-label><ng-container i18n="@@ui.918073072dca10">Segundo factor</ng-container></mat-label>
               <input matInput [(ngModel)]="factorCode" name="factor" autocomplete="one-time-code" maxlength="24" [disabled]="creating()" />
               <mat-icon matPrefix aria-hidden="true">key</mat-icon>
-              <mat-hint>Código del autenticador o de recuperación.</mat-hint>
+              <mat-hint><ng-container i18n="@@ui.0f8e90b7f24c22">Código del autenticador o de recuperación.</ng-container></mat-hint>
             </mat-form-field>
           }
         </div>
       </section>
-      <div class="issue-actions"><p>El secreto se mostrará una sola vez. No lo incluyas en el código ni en los registros de tu aplicación.</p><button mat-flat-button type="submit" [disabled]="!canCreate()" [attr.aria-busy]="creating()"><mat-icon aria-hidden="true">{{ creating() ? 'hourglass_empty' : 'key' }}</mat-icon>{{ creating() ? 'Generando token…' : 'Generar token' }}</button></div>
+      <div class="issue-actions"><p><ng-container i18n="@@ui.8bfddbf421c689">El secreto se mostrará una sola vez. No lo incluyas en el código ni en los registros de tu aplicación.</ng-container></p><button mat-flat-button type="submit" [disabled]="!canCreate()" [attr.aria-busy]="creating()"><mat-icon aria-hidden="true">{{ creating() ? 'hourglass_empty' : 'key' }}</mat-icon>{{ creating() ? uiText.ui_aae547c6835f4d : uiText.ui_5367ef770c2616 }}</button></div>
     </form>
   }
 
   <section class="registry" aria-labelledby="token-registry-title">
-    <div class="registry-heading"><div><h2 id="token-registry-title">Registro de tokens</h2><p>Revocar un token interrumpe las integraciones que lo usan.</p></div><button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || mutationBusy()" [attr.aria-busy]="loading()"><mat-icon aria-hidden="true">refresh</mat-icon>{{ loading() ? 'Actualizando…' : 'Actualizar' }}</button></div>
-    <p class="registry-timezone">Fechas en tu zona horaria: {{ timeZone }}.</p>
+    <div class="registry-heading"><div><h2 id="token-registry-title"><ng-container i18n="@@ui.a7a2be771a2589">Registro de tokens</ng-container></h2><p><ng-container i18n="@@ui.dfd36263f0ecaa">Revocar un token interrumpe las integraciones que lo usan.</ng-container></p></div><button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || mutationBusy()" [attr.aria-busy]="loading()"><mat-icon aria-hidden="true">refresh</mat-icon>{{ loading() ? uiText.ui_211b1c37458e30 : uiText.ui_fe5f6628c7b56b }}</button></div>
+    <p class="registry-timezone"><ng-container i18n="@@ui.761eb289f2762b">Fechas en tu zona horaria: {{ timeZone }}.</ng-container></p>
     @if (loading() && tokens().length) {
-      <mat-progress-bar mode="indeterminate" aria-label="Actualizando tokens" />
-      <p class="read-notice" role="status">Se muestra la última lectura mientras se actualiza el registro. Espera a que termine para revocar un token.</p>
+      <mat-progress-bar mode="indeterminate" aria-label="Actualizando tokens"  i18n-aria-label="@@ui.2b7267fa3c364a"/>
+      <p class="read-notice" role="status"><ng-container i18n="@@ui.65e58219b63337">Se muestra la última lectura mientras se actualiza el registro. Espera a que termine para revocar un token.</ng-container></p>
     }
-    @if (registryNeedsRefresh() && !loading()) { <p class="read-notice" role="status">El registro necesita una lectura actualizada. Comprueba el estado de las credenciales antes de revocar.</p> }
-    @if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()" [disabled]="loading()">Reintentar</button></div> }
-    @if (loading() && !tokens().length) { <app-panel-skeleton variant="list" label="Cargando tokens" /> }
+    @if (registryNeedsRefresh() && !loading()) { <p class="read-notice" role="status"><ng-container i18n="@@ui.da58b24f78938e">El registro necesita una lectura actualizada. Comprueba el estado de las credenciales antes de revocar.</ng-container></p> }
+    @if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()" [disabled]="loading()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div> }
+    @if (loading() && !tokens().length) { <app-panel-skeleton variant="list" label="Cargando tokens"  i18n-label="@@ui.0125a9de3ab62f"/> }
     <div class="token-list">
       @for (t of tokens(); track trackByToken($index, t)) {
         <article class="token-row">
@@ -103,16 +103,16 @@
           <div class="token-main">
             <div class="token-title"><b>{{ t.name }}</b><span class="state-chip" [class.st-disabled]="state(t) === 'revoked'" [class.st-active]="state(t) === 'active'" [class.st-expired]="state(t) === 'expired'">{{ stateLabel(t) }}</span></div>
             <div class="scope-chips">@for (s of t.scopes; track s) { <span class="scope-chip"><code>{{ s }}</code></span> }</div>
-            <span class="meta tnum">Creado <time [attr.datetime]="t.createdAt">{{ formatDate(t.createdAt) }}</time>
-              @if (t.lastUsedAt) { · Último uso <time [attr.datetime]="t.lastUsedAt">{{ formatDate(t.lastUsedAt) }}</time> } @else { · Sin usar }
-              @if (t.expiresAt) { · {{ state(t) === 'expired' ? 'Caducó' : 'Caduca' }} <time [attr.datetime]="t.expiresAt">{{ formatDate(t.expiresAt) }}</time> } @else { · Sin caducidad }
+            <span class="meta tnum"><ng-container i18n="@@ui.1161af00d5c4cb">Creado </ng-container><time [attr.datetime]="t.createdAt">{{ formatDate(t.createdAt) }}</time>
+              @if (t.lastUsedAt) { <ng-container i18n="@@ui.bd880e93ae401f">· Último uso </ng-container><time [attr.datetime]="t.lastUsedAt">{{ formatDate(t.lastUsedAt) }}</time> } @else { <ng-container i18n="@@ui.ddf9e66863a030">· Sin usar </ng-container>}
+              @if (t.expiresAt) { · {{ state(t) === 'expired' ? uiText.ui_8af8fb69e628fa : uiText.ui_704b31ddcdd03f }} <time [attr.datetime]="t.expiresAt">{{ formatDate(t.expiresAt) }}</time> } @else { <ng-container i18n="@@ui.a987b378b659e9">· Sin caducidad </ng-container>}
             </span>
           </div>
-          <div class="token-actions"><button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="isRevoked(t) || mutationBusy() || loading() || registryNeedsRefresh() || !!error()" [attr.aria-label]="actionAriaLabel(t)" [attr.aria-busy]="revokingId() === t.id"><mat-icon aria-hidden="true">block</mat-icon>{{ revokingId() === t.id ? 'Revocando…' : actionLabel(t) }}</button></div>
+          <div class="token-actions"><button mat-stroked-button class="danger" type="button" (click)="revoke(t)" [disabled]="isRevoked(t) || mutationBusy() || loading() || registryNeedsRefresh() || !!error()" [attr.aria-label]="actionAriaLabel(t)" [attr.aria-busy]="revokingId() === t.id"><mat-icon aria-hidden="true">block</mat-icon>{{ revokingId() === t.id ? uiText.ui_60973b18d3c7e5 : actionLabel(t) }}</button></div>
         </article>
       }
-      @if (truncated()) { <p class="registry-window">Se muestran los 100 tokens más recientes, incluidos los revocados. Este registro no incluye todas las credenciales emitidas por el workspace.</p> }
-      @if (!loading() && !tokens().length && !error()) { <div class="empty-state"><mat-icon aria-hidden="true">key_off</mat-icon><b>Aún no hay tokens</b><p>Para conectar una aplicación, utiliza «Crear token». No necesitas una credencial API para usar el panel.</p></div> }
+      @if (truncated()) { <p class="registry-window"><ng-container i18n="@@ui.02551241eebfa8">Se muestran los 100 tokens más recientes, incluidos los revocados. Este registro no incluye todas las credenciales emitidas por el workspace.</ng-container></p> }
+      @if (!loading() && !tokens().length && !error()) { <div class="empty-state"><mat-icon aria-hidden="true">key_off</mat-icon><b><ng-container i18n="@@ui.c5ff7bb56ef9ab">Aún no hay tokens</ng-container></b><p><ng-container i18n="@@ui.4c6c8b58ffc819">Para conectar una aplicación, utiliza «Crear token». No necesitas una credencial API para usar el panel.</ng-container></p></div> }
     </div>
   </section>
 }

@@ -1,3 +1,5 @@
+import { LocaleLinkDirective } from "../../core/localisation/locale-link.directive";
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import {
   Component,
   DestroyRef,
@@ -31,17 +33,18 @@ const EMPTY: SocialPreviewSpec = {
 @Component({
   selector: "app-social-preview-editor",
   standalone: true,
-  imports: [FormsModule, MatButtonModule, MatIconModule, MatCheckboxModule],
+  imports: [LocaleLinkDirective, FormsModule, MatButtonModule, MatIconModule, MatCheckboxModule],
   templateUrl: "./social-preview-editor.component.html",
   styleUrl: "./social-preview-editor.component.scss",
 })
 export class SocialPreviewEditorComponent {
+  readonly uiText = UI_TEXT;
   readonly initiallyOpen = input(false);
   readonly spec = model<SocialPreviewSpec | null>(null);
   readonly protected = input(false);
   readonly linkName = input("");
   readonly suggestionTitle = input<string | null>(null);
-  readonly shortUrl = input("uvh.es/tu-enlace");
+  readonly shortUrl = input($localize`:@@ui.233d48976bfaaf:uvh.es/tu-enlace`);
   readonly working = output<boolean>();
   readonly value = computed(() => this.spec() ?? EMPTY);
   readonly expanded = signal(false);
@@ -116,7 +119,7 @@ export class SocialPreviewEditorComponent {
             ) {
               this.loadingImage.set(false);
               this.error.set(
-                "No se pudo cargar la imagen guardada. Puedes volver a intentarlo.",
+                $localize`:@@ui.3aac2e6d261153:No se pudo cargar la imagen guardada. Puedes volver a intentarlo.`,
               );
             }
           });
@@ -142,7 +145,7 @@ export class SocialPreviewEditorComponent {
     this.working.emit(true);
     try {
       if (file.size > 2 * 1024 * 1024 || file.size < 12)
-        throw new Error("Elige un PNG o JPG de hasta 2 MB.");
+        throw new Error($localize`:@@ui.936ea853e27965:Elige un PNG o JPG de hasta 2 MB.`);
       const bytes = new Uint8Array(await file.arrayBuffer());
       const size = dimensions(bytes);
       if (
@@ -151,7 +154,7 @@ export class SocialPreviewEditorComponent {
         size.width > 4096 ||
         size.height > 4096
       )
-        throw new Error("La imagen debe medir como máximo 4096 px por lado.");
+        throw new Error($localize`:@@ui.39e66bd4c5cf43:La imagen debe medir como máximo 4096 px por lado.`);
       const bitmap = await createImageBitmap(
         new Blob([bytes], {
           type: bytes[0] === 137 ? "image/png" : "image/jpeg",
@@ -177,7 +180,7 @@ export class SocialPreviewEditorComponent {
     } catch (e) {
       if (context === this.sharing.context() && !this.destroy.destroyed)
         this.error.set(
-          e instanceof Error ? e.message : "No se pudo leer la imagen.",
+          e instanceof Error ? e.message : $localize`:@@ui.502e1e3756200d:No se pudo leer la imagen.`,
         );
     } finally {
       if (!this.destroy.destroyed && revision === this.revision) {
@@ -210,7 +213,7 @@ export class SocialPreviewEditorComponent {
     canvas.height = 630;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      this.error.set("No se pudo preparar la imagen.");
+      this.error.set($localize`:@@ui.126f899c470ec9:No se pudo preparar la imagen.`);
       return;
     }
     ctx.fillStyle = "#ffffff";
@@ -251,7 +254,7 @@ export class SocialPreviewEditorComponent {
         this.error.set(
           e instanceof Error
             ? e.message
-            : "No se pudo cargar la imagen. Puedes reintentar.",
+            : $localize`:@@ui.12e776f5f69172:No se pudo cargar la imagen. Puedes reintentar.`,
         );
     } finally {
       if (!this.destroy.destroyed) {

@@ -1,100 +1,100 @@
 <app-legal-shell>
   <header class="report-hero" aria-labelledby="report-title">
-    <h1 id="report-title">Denunciar un enlace</h1>
-    <p>Comunica un posible abuso en un enlace de UVH o de un dominio personalizado. Indica la dirección y el motivo para que podamos revisarlo.</p>
-    <div class="report-promises"><span><mat-icon aria-hidden="true">person_off</mat-icon>No necesitas una cuenta</span><span><mat-icon aria-hidden="true">alternate_email</mat-icon>Email opcional</span><span><mat-icon aria-hidden="true">open_in_new_off</mat-icon>No necesitas abrir el destino</span></div>
+    <h1 id="report-title"><ng-container i18n="@@ui.f6b9c77fff38ae">Denunciar un enlace</ng-container></h1>
+    <p><ng-container i18n="@@ui.96985dc6a971fb">Comunica un posible abuso en un enlace de UVH o de un dominio personalizado. Indica la dirección y el motivo para que podamos revisarlo.</ng-container></p>
+    <div class="report-promises"><span><mat-icon aria-hidden="true">person_off</mat-icon><ng-container i18n="@@ui.7a63aefd622509">No necesitas una cuenta</ng-container></span><span><mat-icon aria-hidden="true">alternate_email</mat-icon><ng-container i18n="@@ui.81e51b096f3417">Email opcional</ng-container></span><span><mat-icon aria-hidden="true">open_in_new_off</mat-icon><ng-container i18n="@@ui.75a5ced81ef2fe">No necesitas abrir el destino</ng-container></span></div>
   </header>
 
   <section class="report-workspace" aria-labelledby="report-form-title">
 
     <form class="report-card" [formGroup]="form" (ngSubmit)="submit()" aria-labelledby="report-form-title" [attr.aria-busy]="busy()" novalidate>
-      @if (busy()) { <mat-progress-bar mode="indeterminate" class="report-progress" aria-label="Enviando denuncia" /> }
-      <header class="form-header"><h2 id="report-form-title">Datos de la denuncia</h2><p>El enlace, el motivo y la comprobación antiabuso son obligatorios.</p></header>
+      @if (busy()) { <mat-progress-bar mode="indeterminate" class="report-progress" aria-label="Enviando denuncia"  i18n-aria-label="@@ui.6be1e2faeeb6e2"/> }
+      <header class="form-header"><h2 id="report-form-title"><ng-container i18n="@@ui.2877843d21e753">Datos de la denuncia</ng-container></h2><p><ng-container i18n="@@ui.440ee209b33dce">El enlace, el motivo y la comprobación antiabuso son obligatorios.</ng-container></p></header>
 
       @if (done()) {
         <section class="report-receipt" tabindex="-1" aria-labelledby="receipt-title" role="status" animate.enter="report-enter">
-          <svg class="receipt-check" viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="21" /><path d="m14 24 7 7 13-14" /></svg><h2 id="receipt-title">Denuncia recibida</h2><p>Revisaremos el enlace junto con la información disponible. El envío no garantiza su retirada y no siempre podremos responder individualmente.</p>
-          @if (receivedReference(); as reference) { <div class="receipt-reference"><span>Enlace comunicado</span><b>{{ reference }}</b></div> }
-          <p>No necesitas repetir esta denuncia.</p>
-          <div class="receipt-actions"><button class="report-another" mat-flat-button type="button" (click)="startAnotherReport()">Enviar otra denuncia</button><a routerLink="/">Volver al inicio<mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
+          <svg class="receipt-check" viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="21" /><path d="m14 24 7 7 13-14" /></svg><h2 id="receipt-title"><ng-container i18n="@@ui.ad1c591b3640e1">Denuncia recibida</ng-container></h2><p><ng-container i18n="@@ui.ab8e6c53478002">Revisaremos el enlace junto con la información disponible. El envío no garantiza su retirada y no siempre podremos responder individualmente.</ng-container></p>
+          @if (receivedReference(); as reference) { <div class="receipt-reference"><span><ng-container i18n="@@ui.eee2f21d831af5">Enlace comunicado</ng-container></span><b>{{ reference }}</b></div> }
+          <p><ng-container i18n="@@ui.bf7e709749b177">No necesitas repetir esta denuncia.</ng-container></p>
+          <div class="receipt-actions"><button class="report-another" mat-flat-button type="button" (click)="startAnotherReport()"><ng-container i18n="@@ui.c454724c4d5fb8">Enviar otra denuncia</ng-container></button><a routerLink="/"><ng-container i18n="@@ui.3906c387259faf">Volver al inicio</ng-container><mat-icon aria-hidden="true">arrow_forward</mat-icon></a></div>
         </section>
       } @else {
 
-      <div class="form-part"><span>01</span><div><h3>Enlace y motivo</h3><p>¿Qué enlace es y qué problema has detectado?</p></div></div>
+      <div class="form-part"><span>01</span><div><h3><ng-container i18n="@@ui.2ff6b3f74dc983">Enlace y motivo</ng-container></h3><p><ng-container i18n="@@ui.00bd7913ea3d78">¿Qué enlace es y qué problema has detectado?</ng-container></p></div></div>
       <div class="field-block">
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Enlace corto o alias</mat-label>
-          <input matInput formControlName="link" placeholder="https://uvh.es/ejemplo" maxlength="2048" autocomplete="off" autocapitalize="none" [spellcheck]="false" aria-label="Enlace corto o alias" />
+          <mat-label><ng-container i18n="@@ui.ac246999a80ed6">Enlace corto o alias</ng-container></mat-label>
+          <input matInput formControlName="link" placeholder="https://uvh.es/ejemplo" maxlength="2048" autocomplete="off" autocapitalize="none" [spellcheck]="false" aria-label="Enlace corto o alias"  i18n-aria-label="@@ui.ac246999a80ed6" i18n-placeholder="@@ui.79657788813321"/>
           <mat-icon matPrefix aria-hidden="true">link</mat-icon>
-          <mat-hint>Pega el enlace de UVH o de su dominio personalizado, no la URL del destino sospechoso.</mat-hint>
-          @if (form.controls.link.hasError('required')) { <mat-error>Introduce el enlace o alias que quieres denunciar.</mat-error> }
-          @if (form.controls.link.hasError('maxlength')) { <mat-error>La referencia no puede superar 2.048 caracteres.</mat-error> }
-          @if (form.controls.link.hasError('reportReference')) { <mat-error>Usa un alias o una URL http(s) con un único alias.</mat-error> }
+          <mat-hint><ng-container i18n="@@ui.a2578a2fff7557">Pega el enlace de UVH o de su dominio personalizado, no la URL del destino sospechoso.</ng-container></mat-hint>
+          @if (form.controls.link.hasError('required')) { <mat-error><ng-container i18n="@@ui.8e5a44bed80a8c">Introduce el enlace o alias que quieres denunciar.</ng-container></mat-error> }
+          @if (form.controls.link.hasError('maxlength')) { <mat-error><ng-container i18n="@@ui.1da3b7a896bc5e">La referencia no puede superar 2.048 caracteres.</ng-container></mat-error> }
+          @if (form.controls.link.hasError('reportReference')) { <mat-error><ng-container i18n="@@ui.dbc7a3350f9df8">Usa un alias o una URL http(s) con un único alias.</ng-container></mat-error> }
         </mat-form-field>
       </div>
       <div class="field-block">
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Motivo de la denuncia</mat-label>
-          <mat-select formControlName="reason" aria-label="Motivo de la denuncia" panelClass="uvh-public-select-panel" aria-describedby="reason-guidance">
-            @for (reason of reasons; track reason) { <mat-option [value]="reason">{{ reason }}</mat-option> }
+          <mat-label><ng-container i18n="@@ui.d3097d09f5af43">Motivo de la denuncia</ng-container></mat-label>
+          <mat-select formControlName="reason" aria-label="Motivo de la denuncia" panelClass="uvh-public-select-panel" aria-describedby="reason-guidance" i18n-aria-label="@@ui.d3097d09f5af43">
+            @for (reason of reasons; track reason) { <mat-option [value]="reason">{{ reasonLabels[reason] }}</mat-option> }
           </mat-select>
           <mat-icon matPrefix aria-hidden="true">flag</mat-icon>
-          @if (form.controls.reason.hasError('required')) { <mat-error>Selecciona un motivo.</mat-error> }
+          @if (form.controls.reason.hasError('required')) { <mat-error><ng-container i18n="@@ui.394a4e5a62ae6f">Selecciona un motivo.</ng-container></mat-error> }
         </mat-form-field>
         <p class="reason-guidance" id="reason-guidance" role="status">{{ selectedReasonHint }}</p>
       </div>
 
-      <div class="form-part optional-part"><span>02</span><div><h3>Información adicional</h3><p>Estos dos campos son opcionales. Puedes dejarlos vacíos.</p></div></div>
+      <div class="form-part optional-part"><span>02</span><div><h3><ng-container i18n="@@ui.a18123343e8a2c">Información adicional</ng-container></h3><p><ng-container i18n="@@ui.a2cc398e123445">Estos dos campos son opcionales. Puedes dejarlos vacíos.</ng-container></p></div></div>
       <div class="field-block">
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Qué has observado (opcional)</mat-label>
-          <textarea matInput formControlName="details" rows="4" maxlength="2000" placeholder="Por ejemplo: dónde recibiste el enlace y qué solicitaba el mensaje." aria-label="Detalles de la denuncia"></textarea>
-          <mat-hint>No incluyas contraseñas, documentos de identidad ni otros datos innecesarios.</mat-hint><mat-hint align="end" class="details-count">{{ form.controls.details.value.length }} / 2.000</mat-hint>
-          @if (form.controls.details.hasError('maxlength')) { <mat-error>El contexto no puede superar 2.000 caracteres.</mat-error> }
+          <mat-label><ng-container i18n="@@ui.2dc949079d3791">Qué has observado (opcional)</ng-container></mat-label>
+          <textarea matInput formControlName="details" rows="4" maxlength="2000" placeholder="Por ejemplo: dónde recibiste el enlace y qué solicitaba el mensaje." aria-label="Detalles de la denuncia" i18n-aria-label="@@ui.a793e13f148796" i18n-placeholder="@@ui.d15fbec1920bd6"></textarea>
+          <mat-hint><ng-container i18n="@@ui.d20b1f6aecd18f">No incluyas contraseñas, documentos de identidad ni otros datos innecesarios.</ng-container></mat-hint><mat-hint align="end" class="details-count">{{ form.controls.details.value.length }} / 2.000</mat-hint>
+          @if (form.controls.details.hasError('maxlength')) { <mat-error><ng-container i18n="@@ui.6b6f0b351229a9">El contexto no puede superar 2.000 caracteres.</ng-container></mat-error> }
         </mat-form-field>
       </div>
       <div class="field-block">
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Email de contacto (opcional)</mat-label>
-          <input matInput type="email" formControlName="email" maxlength="254" autocomplete="email" aria-label="Tu email opcional" />
+          <mat-label><ng-container i18n="@@ui.a8f809201efe31">Email de contacto (opcional)</ng-container></mat-label>
+          <input matInput type="email" formControlName="email" maxlength="254" autocomplete="email" aria-label="Tu email opcional"  i18n-aria-label="@@ui.f3baac93cb400e"/>
           <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
-          <mat-hint>Solo si podemos escribirte para pedir contexto adicional.</mat-hint>
-          @if (form.controls.email.hasError('email')) { <mat-error>Introduce un email válido.</mat-error> }
-          @if (form.controls.email.hasError('maxlength')) { <mat-error>El email es demasiado largo.</mat-error> }
+          <mat-hint><ng-container i18n="@@ui.3f8ef4edf004c8">Solo si podemos escribirte para pedir contexto adicional.</ng-container></mat-hint>
+          @if (form.controls.email.hasError('email')) { <mat-error><ng-container i18n="@@ui.dad41e5a7f6695">Introduce un email válido.</ng-container></mat-error> }
+          @if (form.controls.email.hasError('maxlength')) { <mat-error><ng-container i18n="@@ui.59c6bb0a6edfb8">El email es demasiado largo.</ng-container></mat-error> }
         </mat-form-field>
       </div>
 
-      <div class="form-part"><span>03</span><div><h3>Comprobación antiabuso</h3><p>Protege este canal frente a envíos automatizados.</p></div></div>
+      <div class="form-part"><span>03</span><div><h3><ng-container i18n="@@ui.554353338d5d94">Comprobación antiabuso</ng-container></h3><p><ng-container i18n="@@ui.dab8c9ecce7ff4">Protege este canal frente a envíos automatizados.</ng-container></p></div></div>
       <div class="field-block captcha-block" [attr.inert]="busy() ? '' : null">
         <div class="captcha-stage">
           @if (captchaConfigBusy()) {
-            <div class="captcha-loading" role="status"><span>Cargando comprobación…</span><mat-progress-bar mode="indeterminate" /></div>
+            <div class="captcha-loading" role="status"><span><ng-container i18n="@@ui.17ee76e18c3249">Cargando comprobación…</ng-container></span><mat-progress-bar mode="indeterminate" /></div>
           } @else if (hcaptchaSiteKey(); as siteKey) {
             <app-hcaptcha-widget #reportCaptcha [siteKey]="siteKey" (tokenChange)="onCaptchaToken($event)" />
           } @else {
-            <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="loadCaptchaConfiguration()">Reintentar</button></div>
-            <p class="captcha-explanation">El envío seguirá bloqueado hasta que cargue la protección. Los datos del formulario no se borran al reintentar.</p>
+            <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="loadCaptchaConfiguration()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
+            <p class="captcha-explanation"><ng-container i18n="@@ui.2f1c7e955c2532">El envío seguirá bloqueado hasta que cargue la protección. Los datos del formulario no se borran al reintentar.</ng-container></p>
           }
         </div>
       </div>
-      @if (error()) { <div class="report-alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><div><b>No pudimos confirmar el envío</b><span>{{ error() }}</span></div></div> }
-      <div class="form-submit"><p>Cómo tratamos la información que nos envías: <a routerLink="/legal/privacidad">Política de privacidad</a>.</p><button mat-flat-button color="primary" type="submit" [disabled]="busy() || captchaConfigBusy() || !captchaToken()"><span>{{ busy() ? 'Enviando…' : 'Enviar denuncia' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon></button></div>
+      @if (error()) { <div class="report-alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><div><b><ng-container i18n="@@ui.078970237fc73c">No pudimos confirmar el envío</ng-container></b><span>{{ error() }}</span></div></div> }
+      <div class="form-submit"><p><ng-container i18n="@@ui.1d6cb6a62e1cc7">Cómo tratamos la información que nos envías: </ng-container><a routerLink="/legal/privacidad"><ng-container i18n="@@ui.298dfe180a7fba">Política de privacidad</ng-container></a>.</p><button mat-flat-button color="primary" type="submit" [disabled]="busy() || captchaConfigBusy() || !captchaToken()"><span>{{ busy() ? uiText.ui_9415ac2416c571 : uiText.ui_eaed0e1a48ba25 }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon></button></div>
       }
     </form>
     <aside class="report-process">
-      <h2>Cómo revisamos una denuncia</h2>
-      <p class="process-lead">No bloqueamos un enlace solo porque alguien lo denuncie. Revisamos el contexto disponible antes de decidir.</p>
-      <ol><li><span>01</span><div><b>Identificamos el enlace</b><p>Localizamos la referencia dentro de UVH o de sus dominios personalizados.</p></div></li><li><span>02</span><div><b>Revisamos lo que nos cuentas</b><p>El motivo y el contexto nos ayudan a valorar el riesgo.</p></div></li><li><span>03</span><div><b>Decidimos qué procede</b><p>Podemos aplicar medidas sobre el enlace o descartar la denuncia. El envío no garantiza su retirada.</p></div></li></ol>
-      <div class="safety-tip"><mat-icon aria-hidden="true">gpp_good</mat-icon><div><b>No te expongas para conseguir pruebas.</b><p>Copia la dirección desde el mensaje donde la encontraste. No introduzcas contraseñas ni descargues archivos.</p></div></div>
-      <div class="urgent-card"><mat-icon aria-hidden="true">emergency</mat-icon><div><h3>No es un canal de atención urgente</h3><p>Ante peligro inmediato, contacta con los servicios de emergencia o las autoridades de tu país.</p></div></div>
-      <a class="process-help" routerLink="/help" fragment="troubleshooting">¿El problema es con tu cuenta? <span aria-hidden="true">↗</span></a>
+      <h2><ng-container i18n="@@ui.990058a9a0537b">Cómo revisamos una denuncia</ng-container></h2>
+      <p class="process-lead"><ng-container i18n="@@ui.fe50bfef2d0ba8">No bloqueamos un enlace solo porque alguien lo denuncie. Revisamos el contexto disponible antes de decidir.</ng-container></p>
+      <ol><li><span>01</span><div><b><ng-container i18n="@@ui.8b24810623e159">Identificamos el enlace</ng-container></b><p><ng-container i18n="@@ui.7a3e06939b0ea8">Localizamos la referencia dentro de UVH o de sus dominios personalizados.</ng-container></p></div></li><li><span>02</span><div><b><ng-container i18n="@@ui.5be0c19bc3ba42">Revisamos lo que nos cuentas</ng-container></b><p><ng-container i18n="@@ui.9c2bf7ce268c68">El motivo y el contexto nos ayudan a valorar el riesgo.</ng-container></p></div></li><li><span>03</span><div><b><ng-container i18n="@@ui.beaf002d495edd">Decidimos qué procede</ng-container></b><p><ng-container i18n="@@ui.7aa04755612e23">Podemos aplicar medidas sobre el enlace o descartar la denuncia. El envío no garantiza su retirada.</ng-container></p></div></li></ol>
+      <div class="safety-tip"><mat-icon aria-hidden="true">gpp_good</mat-icon><div><b><ng-container i18n="@@ui.c5d37bab9f87ec">No te expongas para conseguir pruebas.</ng-container></b><p><ng-container i18n="@@ui.48f66cf140da71">Copia la dirección desde el mensaje donde la encontraste. No introduzcas contraseñas ni descargues archivos.</ng-container></p></div></div>
+      <div class="urgent-card"><mat-icon aria-hidden="true">emergency</mat-icon><div><h3><ng-container i18n="@@ui.a0ca0fe296ad04">No es un canal de atención urgente</ng-container></h3><p><ng-container i18n="@@ui.0c05fc322f3d82">Ante peligro inmediato, contacta con los servicios de emergencia o las autoridades de tu país.</ng-container></p></div></div>
+      <a class="process-help" routerLink="/help" fragment="troubleshooting"><ng-container i18n="@@ui.292d5706711e94">¿El problema es con tu cuenta? </ng-container><span aria-hidden="true">↗</span></a>
     </aside>
 
   </section>
 
   <section class="report-types" aria-labelledby="report-types-title">
-    <div class="section-intro"><h2 id="report-types-title">Motivos de denuncia</h2></div>
+    <div class="section-intro"><h2 id="report-types-title"><ng-container i18n="@@ui.3b55d1cd6673d4">Motivos de denuncia</ng-container></h2></div>
     <div class="report-type-grid">@for (type of reportTypes; track type.title) { <article><span><mat-icon aria-hidden="true">{{ type.icon }}</mat-icon></span><h3>{{ type.title }}</h3><p>{{ type.text }}</p></article> }</div>
   </section>
-  <section class="report-contact" aria-labelledby="report-contact-title"><h2 id="report-contact-title">Otros canales de contacto</h2><div><article><mat-icon aria-hidden="true">manage_accounts</mat-icon><div><b>Problemas con tu cuenta</b><a routerLink="/help" fragment="troubleshooting">Consultar la ayuda</a></div></article><article><mat-icon aria-hidden="true">policy</mat-icon><div><b>Privacidad y derechos</b><a href="mailto:privacidad@uvh.es">privacidad&#64;uvh.es</a></div></article><article><mat-icon aria-hidden="true">gavel</mat-icon><div><b>Notificaciones formales</b><a href="mailto:abuse@uvh.es">abuse&#64;uvh.es</a><p>Consulta los datos y la declaración necesarios en los <a routerLink="/legal/terminos" fragment="notificaciones-formales">Términos del servicio</a>.</p></div></article></div></section>
+  <section class="report-contact" aria-labelledby="report-contact-title"><h2 id="report-contact-title"><ng-container i18n="@@ui.24cd736419b30a">Otros canales de contacto</ng-container></h2><div><article><mat-icon aria-hidden="true">manage_accounts</mat-icon><div><b><ng-container i18n="@@ui.0893b54cefb867">Problemas con tu cuenta</ng-container></b><a routerLink="/help" fragment="troubleshooting"><ng-container i18n="@@ui.df122740056841">Consultar la ayuda</ng-container></a></div></article><article><mat-icon aria-hidden="true">policy</mat-icon><div><b><ng-container i18n="@@ui.afe80952ea6a2e">Privacidad y derechos</ng-container></b><a href="mailto:privacidad@uvh.es"><ng-container i18n="@@ui.8dd655b6847874">privacidad&#64;uvh.es</ng-container></a></div></article><article><mat-icon aria-hidden="true">gavel</mat-icon><div><b><ng-container i18n="@@ui.f0f27bd1b6c4ac">Notificaciones formales</ng-container></b><a href="mailto:abuse@uvh.es"><ng-container i18n="@@ui.a8ec21dbf26dd3">abuse&#64;uvh.es</ng-container></a><p><ng-container i18n="@@ui.ec8334e5059d7b">Consulta los datos y la declaración necesarios en los </ng-container><a routerLink="/legal/terminos" fragment="notificaciones-formales"><ng-container i18n="@@ui.206f4cc40d6744">Términos del servicio</ng-container></a>.</p></div></article></div></section>
 </app-legal-shell>

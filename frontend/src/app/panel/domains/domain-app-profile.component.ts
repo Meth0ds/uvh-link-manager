@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ApiRequestError } from "../../core/services/api.service";
 import { CopyFeedbackService } from "../../core/services/copy-feedback.service";
 import {
@@ -25,6 +26,7 @@ import type { AppProfile } from "../../core/app-opening";
   styleUrl: "./domain-app-profile.component.scss",
 })
 export class DomainAppProfileComponent {
+  readonly uiText = UI_TEXT;
   readonly domainId = input.required<number>();
   readonly domain = input.required<string>();
   readonly apps = inject(AppOpeningService);
@@ -119,7 +121,7 @@ export class DomainAppProfileComponent {
                 ]),
               )
             )
-              this.error.set("No se pudo cargar la configuración.");
+              this.error.set($localize`:@@ui.eb6905aca3a6f4:No se pudo cargar la configuración.`);
           })
           .finally(() => {
             if (
@@ -181,7 +183,7 @@ export class DomainAppProfileComponent {
       this.profile.set(v.profile);
       this.ready.set(v.domainReady);
       this.diagnostics.set(null);
-      this.success.set("Configuración guardada");
+      this.success.set($localize`:@@ui.ac6cc61772f7fd:Configuración guardada`);
       this.key = crypto.randomUUID();
     } catch (e) {
       if (
@@ -192,7 +194,7 @@ export class DomainAppProfileComponent {
         this.error.set(
           e instanceof ApiRequestError
             ? e.message
-            : "No se pudo guardar. Revisa la configuración e inténtalo de nuevo.",
+            : $localize`:@@ui.06acf02b398502:No se pudo guardar. Revisa la configuración e inténtalo de nuevo.`,
         );
     } finally {
       if (
@@ -225,7 +227,7 @@ export class DomainAppProfileComponent {
         id === this.domainId()
       )
         this.error.set(
-          "No se pudo completar la comprobación. Puedes reintentarlo.",
+          $localize`:@@ui.b8d3e0ce772f88:No se pudo completar la comprobación. Puedes reintentarlo.`,
         );
     } finally {
       if (

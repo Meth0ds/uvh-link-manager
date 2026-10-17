@@ -118,7 +118,7 @@ class EmitPasswordPolicy extends Command
           function assess(password, name, email) {
             var value = String(password == null ? "" : password);
             if (value === "") {
-              return { score: 0, common: false, personal: false, patterned: false, feedback: policy.feedback.empty };
+              return { score: 0, common: false, personal: false, patterned: false, feedbackKey: "empty", feedback: policy.feedback.empty };
             }
 
             var lower = fold(value);
@@ -146,14 +146,14 @@ class EmitPasswordPolicy extends Command
             if (chars.length < 10) score = Math.min(score, 24);
             score = Math.max(0, Math.min(100, score));
 
-            var feedback = policy.feedback.default;
-            if (common) feedback = policy.feedback.common;
-            else if (personal) feedback = policy.feedback.personal;
-            else if (patterned) feedback = policy.feedback.patterned;
-            else if (chars.length < policy.minLength) feedback = policy.feedback.short;
-            else if (classes < 3 && chars.length < 16) feedback = policy.feedback.variety;
+            var feedbackKey = "default";
+            if (common) feedbackKey = "common";
+            else if (personal) feedbackKey = "personal";
+            else if (patterned) feedbackKey = "patterned";
+            else if (chars.length < policy.minLength) feedbackKey = "short";
+            else if (classes < 3 && chars.length < 16) feedbackKey = "variety";
 
-            return { score: score, common: common, personal: personal, patterned: patterned, feedback: feedback };
+            return { score: score, common: common, personal: personal, patterned: patterned, feedbackKey: feedbackKey, feedback: policy.feedback[feedbackKey] };
           }
 
           // Mirrors PasswordStrength::isAcceptable() — the server-side gate.

@@ -22,6 +22,7 @@
     try {
       widgetId = window.hcaptcha.render(target, {
         sitekey: settings.siteKey,
+        hl: settings.language,
         theme: settings.theme,
         size: settings.size,
         tabindex: 0,
@@ -54,6 +55,7 @@
       channel = data.channel;
       settings = {
         siteKey: data.siteKey,
+        language: data.language === "en" ? "en" : "es",
         theme: data.theme === "dark" ? "dark" : "light",
         size: data.size === "invisible" ? "invisible" : (data.size === "compact" ? "compact" : "normal"),
       };

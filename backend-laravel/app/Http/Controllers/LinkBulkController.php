@@ -59,22 +59,22 @@ class LinkBulkController
 
         $action = $request->input('action', '');
         if (! is_string($action) || ! in_array($action, self::ACTIONS, true)) {
-            return response()->json(['error' => 'Acción inválida'], 422);
+            return response()->json(['error' => __('messages.error_d2f2cb85499db5')], 422);
         }
 
         $ids = $this->parseLinkIds($request->input('linkIds'));
         if ($ids === null) {
-            return response()->json(['error' => 'Selecciona entre 1 y '.self::MAX_LINKS.' enlaces'], 422);
+            return response()->json(['error' => __('display.bulk_selection', ['limit' => self::MAX_LINKS])], 422);
         }
 
         $tags = $request->input('tags');
         if (in_array($action, ['tag', 'untag'], true)) {
             if (! is_array($tags) || $tags === [] || count($tags) > self::MAX_TAGS) {
-                return response()->json(['error' => 'Etiquetas inválidas'], 422);
+                return response()->json(['error' => __('messages.error_08709c24a1bd71')], 422);
             }
             foreach ($tags as $tag) {
                 if (! is_string($tag) || ! mb_check_encoding($tag, 'UTF-8') || mb_strlen($tag) > 40 || preg_match('/[\x00-\x1f\x7f]/', $tag)) {
-                    return response()->json(['error' => 'Etiquetas inválidas'], 422);
+                    return response()->json(['error' => __('messages.error_08709c24a1bd71')], 422);
                 }
             }
         }
@@ -82,10 +82,10 @@ class LinkBulkController
         $collectionId = $request->input('collectionId');
         if ($action === 'move') {
             if ($collectionId !== null && (! is_int($collectionId) || $collectionId < 1)) {
-                return response()->json(['error' => 'Colección inválida'], 422);
+                return response()->json(['error' => __('messages.error_d5a81f23c4dfd2')], 422);
             }
             if ($collectionId !== null && ! Collection::where('id', $collectionId)->where('workspace_id', $workspaceId)->exists()) {
-                return response()->json(['error' => 'Colección no encontrada'], 422);
+                return response()->json(['error' => __('messages.error_6568a0022eb114')], 422);
             }
         }
 
@@ -95,10 +95,10 @@ class LinkBulkController
         $domainId = $request->input('domainId');
         if ($action === 'set-domain') {
             if ($domainId !== null && (! is_int($domainId) || $domainId < 1)) {
-                return response()->json(['error' => 'Dominio inválido'], 422);
+                return response()->json(['error' => __('messages.error_0487a66badd687')], 422);
             }
             if ($domainId !== null && ! CustomDomain::where('id', $domainId)->where('workspace_id', $workspaceId)->exists()) {
-                return response()->json(['error' => 'Dominio no encontrado'], 422);
+                return response()->json(['error' => __('messages.error_188558b9814e77')], 422);
             }
         }
 
@@ -111,10 +111,10 @@ class LinkBulkController
             return response()->json($begin['body'], $begin['status'])->header('Idempotent-Replay', 'true');
         }
         if ($begin['state'] === 'mismatch') {
-            return response()->json(['error' => 'Esta Idempotency-Key ya se usó con otra petición'], 409);
+            return response()->json(['error' => __('messages.error_696b407ad5767b')], 409);
         }
         if ($begin['state'] === 'in_progress') {
-            return response()->json(['error' => 'Ya hay una operación en curso con esta clave. Espera a que termine.'], 409);
+            return response()->json(['error' => __('messages.error_4d29d4aa9b576d')], 409);
         }
 
         $lease = (string) ($begin['lease'] ?? '');
@@ -122,14 +122,14 @@ class LinkBulkController
         try {
             $body = DB::transaction(function () use ($request, $workspaceId, $user, $action, $ids, $tags, $collectionId, $domainId, $scope, $key, $hash, $lease, $writeActor): array {
                 if (! $writeActor->lockMembership($user->id, $workspaceId, (int) $user->security_version)) {
-                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+                    throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
                 }
 
                 Idempotency::renew((int) $user->id, $scope, $key, $hash, $lease);
 
                 if ($action === 'move' && $collectionId !== null && ! Collection::where('workspace_id', $workspaceId)
                     ->where('id', $collectionId)->lockForUpdate()->first()) {
-                    throw new LinkException('Colección no encontrada', 422);
+                    throw new LinkException(__('messages.error_6568a0022eb114'), 422);
                 }
 
                 $changes = $this->apply($workspaceId, $user, $action, $ids, $tags ?? [], $collectionId, is_int($domainId) ? $domainId : null);
@@ -156,7 +156,7 @@ class LinkBulkController
         } catch (QueryException $e) {
             Idempotency::release((int) $user->id, $scope, $key, $lease);
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'No se puede restaurar: el alias ya está en uso'], 409);
+                return response()->json(['error' => __('messages.error_0b63ba41165483')], 409);
             }
             throw $e;
         } catch (\Throwable $e) {
@@ -192,7 +192,7 @@ class LinkBulkController
 
         foreach ($ids as $id) {
             if (! isset($found[$id])) {
-                throw new LinkException('Enlace no encontrado: #'.$id, 404);
+                throw new LinkException(__('display.bulk_missing', ['id' => $id]), 404);
             }
         }
 
@@ -200,7 +200,7 @@ class LinkBulkController
             $target = self::STATES[$action];
             foreach ($found as $link) {
                 if ($link->state === 'blocked') {
-                    throw new LinkException('El bloqueo de enlaces solo se gestiona desde la administración de la plataforma', 403);
+                    throw new LinkException(__('messages.error_3645ed80ba468c'), 403);
                 }
                 if ($target === 'active' && $link->scheduled_at && $link->scheduled_at->isFuture()) {
                     throw new LinkException("El enlace {$link->alias} sigue programado. Modifica su fecha de activación antes de activarlo.", 409);
@@ -229,7 +229,7 @@ class LinkBulkController
         if ($action === 'trash') {
             foreach ($found as $link) {
                 if ($link->state === 'blocked' && ! $user->is_admin) {
-                    throw new LinkException('Un enlace bloqueado solo puede eliminarlo un administrador de la plataforma', 403);
+                    throw new LinkException(__('messages.error_2c2f1e3b50d618'), 403);
                 }
             }
             foreach ($found as $link) {
@@ -250,11 +250,11 @@ class LinkBulkController
             $quota = DB::table('quotas')->where('workspace_id', $workspaceId)->lockForUpdate()->value('links_limit');
             $used = Link::where('workspace_id', $workspaceId)->whereNull('deleted_at')->count();
             if ($quota !== null && $used + count($ids) > (int) $quota) {
-                throw new LinkException('Cuota de enlaces alcanzada. Elimina otro enlace antes de restaurar.', 429);
+                throw new LinkException(__('messages.error_0d26ea0c5c4abf'), 429);
             }
             foreach ($found as $link) {
                 if ($link->state_before_delete === 'blocked' && ! $user->is_admin) {
-                    throw new LinkException('Un enlace bloqueado solo puede restaurarlo un administrador de la plataforma', 403);
+                    throw new LinkException(__('messages.error_623126facbcb5d'), 403);
                 }
             }
             foreach ($found as $link) {
@@ -320,7 +320,7 @@ class LinkBulkController
                 ->where('workspace_id', $workspaceId)
                 ->where('desired_state', 'enabled')->where('edge_eligible', true)->whereNotNull('tls_ready_at')
                 ->lockForUpdate()->first(['id'])) {
-                throw new LinkException('Dominio no activado o sin acceso', 403);
+                throw new LinkException(__('messages.error_1834ced0e9edbe'), 403);
             }
             $onTarget = static fn (Link $link): bool => $domainId === null
                 ? $link->domain_id === null
@@ -329,7 +329,7 @@ class LinkBulkController
             $moving = $found->filter(fn (Link $link): bool => ! $onTarget($link));
             foreach ($moving as $link) {
                 if ($link->state === 'blocked') {
-                    throw new LinkException('El bloqueo de enlaces solo se gestiona desde la administración de la plataforma', 403);
+                    throw new LinkException(__('messages.error_3645ed80ba468c'), 403);
                 }
             }
             // Una colisión de alias aborta la operación entera: mover media

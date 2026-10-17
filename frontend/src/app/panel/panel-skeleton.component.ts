@@ -76,7 +76,7 @@ export type PanelSkeletonVariant = "dashboard" | "list" | "cards" | "form" | "de
 })
 export class PanelSkeletonComponent {
   readonly variant = input<PanelSkeletonVariant>("list");
-  readonly label = input("Cargando contenido");
+  readonly label = input($localize`:@@ui.1dc176d9ec6f53:Cargando contenido`);
   readonly items = [1, 2, 3, 4] as const;
   readonly rows = [1, 2, 3, 4] as const;
 }

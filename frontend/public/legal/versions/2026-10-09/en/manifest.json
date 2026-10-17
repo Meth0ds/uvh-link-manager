@@ -1,0 +1,62 @@
+{
+  "terms": {
+    "version": "2026-10-09",
+    "language": "en-GB",
+    "sourceLanguage": "es-ES",
+    "sourceSha256": "60c645ddbb7645ce0832431c197a7879d599a378b9653be4c8c488d512c42085",
+    "sha256": "bda8ae27999d27ad46ae1fc670ac8395ab09be39217fb64c33230c9d27a99914",
+    "sections": 20,
+    "anchors": [
+      "alcance",
+      "servicio",
+      "cuentas",
+      "workspaces",
+      "uso-aceptable",
+      "contenido",
+      "medidas",
+      "limites",
+      "datos",
+      "propiedad",
+      "terminacion",
+      "responsabilidad",
+      "cambios",
+      "ley",
+      "integraciones",
+      "notificaciones-formales",
+      "revision",
+      "planes-pago",
+      "consumo",
+      "exportacion"
+    ]
+  },
+  "privacy": {
+    "version": "2026-10-09",
+    "language": "en-GB",
+    "sourceLanguage": "es-ES",
+    "sourceSha256": "ea43c69a76de75fdb26830dfaa42528038c3987c6cf2feb85cc857931d00f3e8",
+    "sha256": "b9c2ead27562347dc7cbd42c5a43bc680bd73903fb18c3c01dab2df4ecba0a3a",
+    "sections": 20,
+    "anchors": [
+      "responsable",
+      "datos-tratados",
+      "finalidades",
+      "analitica",
+      "captcha",
+      "cookies",
+      "destinatarios",
+      "transferencias",
+      "conservacion",
+      "derechos",
+      "seguridad",
+      "terceros",
+      "menores",
+      "cambios-privacidad",
+      "procedencia",
+      "roles-tratamiento",
+      "automatizacion",
+      "preferencias",
+      "correo",
+      "actualizaciones"
+    ]
+  }
+}

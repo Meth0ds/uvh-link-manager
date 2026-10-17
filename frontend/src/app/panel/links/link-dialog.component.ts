@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { AppOpeningEditorComponent } from "./app-opening-editor.component";
 import { AppOpeningService } from "../../core/services/app-opening.service";
 import { recommendedLinkUrl, type AppOpeningSpec } from "../../core/app-opening";
@@ -160,6 +161,7 @@ function integerValidator(control: AbstractControl): ValidationErrors | null {
   styleUrl: "./link-dialog.component.scss",
 })
 export class LinkDialogComponent {
+  readonly uiText = UI_TEXT;
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
   private actions = inject(ActionDialogService);
@@ -386,7 +388,7 @@ export class LinkDialogComponent {
       this.editDetailsLoaded.set(true);
     } catch (err) {
       if (this.ruleRequests.isCurrent(request, linkId)) {
-        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las reglas del enlace");
+        this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.0b5199432e4d5f:No se pudieron cargar las reglas del enlace`);
       }
     }
   }
@@ -437,7 +439,7 @@ export class LinkDialogComponent {
     if (!name || /[\p{Cc}\p{Cf}]/u.test(name)) return;
     const previous = this.form.controls.name.value;
     if (previous.trim() && previous.trim() !== name) {
-      const replace = await this.actions.confirm({ title: "¿Sustituir el nombre?", message: "El título del destino reemplazará el nombre que has escrito.", confirmLabel: "Usar título" });
+      const replace = await this.actions.confirm({ title: $localize`:@@ui.e7722b999b4621:¿Sustituir el nombre?`, message: $localize`:@@ui.0e3f9935f56450:El título del destino reemplazará el nombre que has escrito.`, confirmLabel: $localize`:@@ui.bbc99356358b94:Usar título` });
       if (!replace || this.destroyRef.destroyed || !this.isOpeningCurrent() || suggestion.url !== this.destinationValue() || previous !== this.form.controls.name.value) return;
     }
     this.form.controls.name.setValue(name); this.form.controls.name.markAsDirty();
@@ -481,12 +483,12 @@ export class LinkDialogComponent {
     }
     if (this.form.controls.alias.invalid) {
       this.aliasStatus.set("invalid");
-      this.aliasStatusText.set("Alias inválido");
+      this.aliasStatusText.set($localize`:@@ui.daed9d000a21b4:Alias inválido`);
       return;
     }
     if (sameAsCurrent) {
       this.aliasStatus.set("available");
-      this.aliasStatusText.set("Alias actual");
+      this.aliasStatusText.set($localize`:@@ui.ab60e11c358120:Alias actual`);
       return;
     }
 
@@ -503,11 +505,11 @@ export class LinkDialogComponent {
       if (this.destroyRef.destroyed || requestId !== this.aliasRequest) return;
       if (available) {
         this.aliasStatus.set("available");
-        this.aliasStatusText.set("Alias disponible");
+        this.aliasStatusText.set($localize`:@@ui.ddb92c476524cf:Alias disponible`);
       } else {
         this.aliasStatus.set(reason === "reserved" ? "reserved" : reason === "invalid" ? "invalid" : "taken");
         this.aliasStatusText.set(
-          reason === "reserved" ? "Alias reservado" : reason === "invalid" ? "Alias inválido" : "Este alias ya está en uso",
+          reason === "reserved" ? $localize`:@@ui.6ff564ae4c334c:Alias reservado` : reason === "invalid" ? $localize`:@@ui.daed9d000a21b4:Alias inválido` : $localize`:@@ui.14a54c550a189f:Este alias ya está en uso`,
         );
       }
     } catch {
@@ -576,14 +578,14 @@ export class LinkDialogComponent {
     const expiresAt = this.lifecycleValue("expiresAt", v.expiresAt ?? "");
     const destination = v.destination?.trim();
     if (!destination) {
-      this.error.set("Escribe la URL de destino antes de guardar la plantilla.");
+      this.error.set($localize`:@@ui.a09b483a7124cc:Escribe la URL de destino antes de guardar la plantilla.`);
       return;
     }
     const name = await this.actions.prompt({
-      title: "Guardar como plantilla",
-      message: "La plantilla guarda los valores del formulario, nunca el alias.",
-      confirmLabel: "Guardar plantilla",
-      inputLabel: "Nombre",
+      title: $localize`:@@ui.464357acd4f2c2:Guardar como plantilla`,
+      message: $localize`:@@ui.aaed764d8b1249:La plantilla guarda los valores del formulario, nunca el alias.`,
+      confirmLabel: $localize`:@@ui.5c2f904dfdd30a:Guardar plantilla`,
+      inputLabel: $localize`:@@ui.562bb15757a8b5:Nombre`,
       inputRequired: true,
       inputMinLength: 1,
       inputMaxLength: 60,
@@ -622,7 +624,7 @@ export class LinkDialogComponent {
       this.templates.update((list) => [...list, res.template].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       if (!this.destroyRef.destroyed) {
-        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo guardar la plantilla");
+        this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.85f8f674da13e5:No se pudo guardar la plantilla`);
       }
     } finally {
       if (!this.destroyRef.destroyed) this.busy.set(false);
@@ -645,7 +647,7 @@ export class LinkDialogComponent {
 
   ruleUtcPreview(value: string | null | undefined): string {
     const utc = localTimeToUtcTime(value, this.ruleTimezone);
-    return utc ? `${utc} UTC` : "Hora no disponible por cambio horario";
+    return utc ? `${utc} UTC` : $localize`:@@ui.019cc3e52a6d34:Hora no disponible por cambio horario`;
   }
 
   addRule(initial: Partial<RedirectRule> = {}): void {
@@ -876,7 +878,7 @@ export class LinkDialogComponent {
       }
     } catch (err) {
       if (!this.destroyRef.destroyed && requestId === this.saveRequest && (this.openedIn.workspaceId === null || this.isOpeningCurrent())) {
-        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo guardar el enlace");
+        this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.1d5be8fa5e1863:No se pudo guardar el enlace`);
       }
     } finally {
       if (!this.destroyRef.destroyed && requestId === this.saveRequest && (this.openedIn.workspaceId === null || this.isOpeningCurrent())) this.busy.set(false);

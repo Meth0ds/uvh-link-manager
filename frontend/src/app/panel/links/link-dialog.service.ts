@@ -90,7 +90,7 @@ export class LinkDialogService {
           });
         }).catch(() => {
           if (subscriber.closed) return;
-          if (current()) this.snackbar.open("No se pudo abrir el editor. Vuelve a intentarlo.", "Cerrar", { duration: 5000 });
+          if (current()) this.snackbar.open($localize`:@@ui.3566bca5ca107a:No se pudo abrir el editor. Vuelve a intentarlo.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
           cancel();
         });
       }

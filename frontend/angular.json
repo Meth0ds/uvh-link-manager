@@ -16,6 +16,7 @@
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
+              "@angular/localize/init",
               "zone.js"
             ],
             "tsConfig": "tsconfig.app.json",
@@ -33,14 +34,23 @@
               "qrcode",
               "pako"
             ],
-            "webWorkerTsConfig": "tsconfig.worker.json"
+            "webWorkerTsConfig": "tsconfig.worker.json",
+            "i18nMissingTranslation": "error",
+            "localize": true,
+            "server": "src/main.server.ts",
+            "outputMode": "static"
           },
           "configurations": {
             "production": {
               "optimization": {
                 "scripts": true,
-                "styles": { "minify": true, "inlineCritical": false },
-                "fonts": { "inline": false }
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": {
+                  "inline": false
+                }
               },
               "budgets": [
                 {
@@ -59,7 +69,10 @@
             "development": {
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap": true,
+              "localize": [
+                "es"
+              ]
             },
             "design-preview": {
               "browser": "design-preview/main.ts",
@@ -67,7 +80,33 @@
               "outputPath": "dist/design-preview",
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap": true,
+              "server": false,
+              "localize": false
+            },
+            "es": {
+              "localize": [
+                "es"
+              ]
+            },
+            "en": {
+              "localize": [
+                "en-GB"
+              ]
+            },
+            "development-es": {
+              "server": false,
+              "baseHref": "/es/",
+              "localize": [
+                "es"
+              ]
+            },
+            "development-en": {
+              "server": false,
+              "baseHref": "/en/",
+              "localize": [
+                "en-GB"
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -97,9 +136,29 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "polyfills": [
+              "@angular/localize/init",
               "zone.js",
               "zone.js/testing"
             ]
+          }
+        },
+        "extract-i18n": {
+          "builder": "@angular/build:extract-i18n",
+          "options": {
+            "format": "xlf2",
+            "outputPath": "src/locale"
+          }
+        }
+      },
+      "i18n": {
+        "sourceLocale": {
+          "code": "es",
+          "subPath": "es"
+        },
+        "locales": {
+          "en-GB": {
+            "translation": "src/locale/messages.en-GB.xlf",
+            "subPath": "en"
           }
         }
       }

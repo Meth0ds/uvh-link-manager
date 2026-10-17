@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 
@@ -30,20 +31,20 @@ import {
 } from "../../core/services/domain-response-decoders";
 
 const TLS_ERROR_LABEL: Record<string, string> = {
-  certificate_provisioning_failed: "No se pudo emitir o validar el certificado. Revisa DNS y CAA antes de reintentar.",
-  queue_unavailable: "La emisión no pudo entrar en cola. Vuelve a intentarlo.",
-  provisioning_cancelled: "La emisión del certificado se canceló.",
-  provisioning_timeout: "La emisión superó el tiempo previsto. Revisa DNS y vuelve a intentarlo.",
+  certificate_provisioning_failed: $localize`:@@ui.e75324ddb29e3d:No se pudo emitir o validar el certificado. Revisa DNS y CAA antes de reintentar.`,
+  queue_unavailable: $localize`:@@ui.4df986c4b42f26:La emisión no pudo entrar en cola. Vuelve a intentarlo.`,
+  provisioning_cancelled: $localize`:@@ui.dc5828e07217d8:La emisión del certificado se canceló.`,
+  provisioning_timeout: $localize`:@@ui.5ece2c1660b180:La emisión superó el tiempo previsto. Revisa DNS y vuelve a intentarlo.`,
 };
 
 const DNS_ERROR_LABEL: Record<string, string> = {
-  ownership_and_routing_missing: "No encontramos el TXT de propiedad ni el CNAME de tráfico.",
-  ownership_missing: "No encontramos el TXT de propiedad.",
-  routing_missing: "El CNAME todavía no apunta al destino indicado.",
-  resolver_unavailable: "El resolvedor DNS no respondió. Volveremos a intentarlo.",
-  queue_unavailable: "La comprobación no pudo entrar en cola. Vuelve a intentarlo.",
-  queue_timeout: "La comprobación tardó demasiado. Vuelve a iniciarla.",
-  verification_cancelled: "La comprobación se canceló porque cambiaron tus permisos.",
+  ownership_and_routing_missing: $localize`:@@ui.8ad66f31e46608:No encontramos el TXT de propiedad ni el CNAME de tráfico.`,
+  ownership_missing: $localize`:@@ui.276e3b28e2e0ea:No encontramos el TXT de propiedad.`,
+  routing_missing: $localize`:@@ui.f0294408888968:El CNAME todavía no apunta al destino indicado.`,
+  resolver_unavailable: $localize`:@@ui.ecd99609a338ae:El resolvedor DNS no respondió. Volveremos a intentarlo.`,
+  queue_unavailable: $localize`:@@ui.6d0785de0e5c70:La comprobación no pudo entrar en cola. Vuelve a intentarlo.`,
+  queue_timeout: $localize`:@@ui.66612096c0a25f:La comprobación tardó demasiado. Vuelve a iniciarla.`,
+  verification_cancelled: $localize`:@@ui.bd0c64369deb71:La comprobación se canceló porque cambiaron tus permisos.`,
 };
 
 @Component({
@@ -66,6 +67,7 @@ const DNS_ERROR_LABEL: Record<string, string> = {
   styleUrl: "./domains.component.scss",
 })
 export class DomainsComponent {
+  readonly uiText = UI_TEXT;
   private api = inject(ApiService);
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
@@ -104,14 +106,14 @@ export class DomainsComponent {
   };
 
   /** «1 enlace» / «137 enlaces»: el impacto de cada acción sobre el dominio. */
-  readonly linksLabel = (d: DomainDto): string => countLabel(d.linksCount, "enlace", "enlaces");
+  readonly linksLabel = (d: DomainDto): string => countLabel(d.linksCount, $localize`:@@ui.902ee7f27eee59:enlace`, $localize`:@@ui.41b0ae1f3fe239:enlaces`);
 
   readonly stateLabel = (d: DomainDto): string => {
-    if (this.isChecking(d)) return "Comprobando DNS…";
+    if (this.isChecking(d)) return $localize`:@@ui.42876b3b8ef3eb:Comprobando DNS…`;
     // Degraded keeps serving on grace — the label must say "act now", not
     // pretend the green state still applies.
-    if (d.trafficStatus === "degraded") return "Requiere atención";
-    if (d.state === "active" && !d.edgeEligible) return "Revalidación necesaria";
+    if (d.trafficStatus === "degraded") return $localize`:@@ui.5d265f2433957c:Requiere atención`;
+    if (d.state === "active" && !d.edgeEligible) return $localize`:@@ui.b5b3e43e9ad09c:Revalidación necesaria`;
     return domainStateLabel(d.state);
   };
 
@@ -124,19 +126,19 @@ export class DomainsComponent {
     const remainingMs = Date.parse(d.graceExpiresAt) - Date.now();
     if (!Number.isFinite(remainingMs)) return null;
     if (remainingMs <= 0) {
-      return "El periodo de seguridad está terminando. El dominio puede dejar de servir enlaces en cualquier momento.";
+      return $localize`:@@ui.78d68cb0f3b2c2:El periodo de seguridad está terminando. El dominio puede dejar de servir enlaces en cualquier momento.`;
     }
     const minutes = Math.round(remainingMs / 60_000);
     const human = minutes >= 90 ? `aproximadamente ${Math.round(minutes / 60)} h` : `aproximadamente ${Math.max(1, minutes)} min`;
-    return `El dominio sigue funcionando durante el periodo de seguridad. Podría desconectarse en ${human}.`;
+    return $localize`:@@ui.a21c91b4ee8f12:El dominio sigue funcionando durante el periodo de seguridad. Podría desconectarse en ${human}.`;
   };
 
   readonly dnsErrorLabel = (error: string | null): string | null => error
-    ? (DNS_ERROR_LABEL[error] ?? "No se pudo confirmar la configuración DNS.")
+    ? (DNS_ERROR_LABEL[error] ?? $localize`:@@ui.90bd947a89e02d:No se pudo confirmar la configuración DNS.`)
     : null;
 
   readonly tlsErrorLabel = (error: string | null): string | null => error
-    ? (TLS_ERROR_LABEL[error] ?? "No se pudo completar la preparación HTTPS.")
+    ? (TLS_ERROR_LABEL[error] ?? $localize`:@@ui.7285a173ca6935:No se pudo completar la preparación HTTPS.`)
     : null;
 
   readonly isChecking = (d: DomainDto): boolean => {
@@ -189,7 +191,7 @@ export class DomainsComponent {
       this.domains.set(domains);
     } catch (err) {
       if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los dominios");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.d32bda0e1dfe12:No se pudieron cargar los dominios`);
     } finally {
       if (this.loadRequests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
@@ -220,12 +222,12 @@ export class DomainsComponent {
       // move it into another tenant's list or another operation's result.
       if (!target.isCurrent() || !this.addMutation.isCurrent(action)) return;
       if (this.newDomain().trim() === domain) this.newDomain.set("");
-      this.snackbar.open("Dominio añadido. Vamos a configurar sus registros DNS.", "Cerrar", { duration: 4000 });
+      this.snackbar.open($localize`:@@ui.e054941917aa32:Dominio añadido. Vamos a configurar sus registros DNS.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       void this.router.navigate(["/app/domains", created.id]);
       this.domains.update((d) => [created, ...d]);
     } catch (err) {
       if (!target.isCurrent() || !this.addMutation.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo añadir el dominio", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.1e18936b195ff1:No se pudo añadir el dominio`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       // Only the operation that still owns the slot may clear it.
       this.addMutation.settle(action);
@@ -245,14 +247,14 @@ export class DomainsComponent {
       const path = `/api/v1/domains/${d.id}/${revalidation ? "revalidate" : "verify"}`;
       const result = await this.api.post<{ state: DomainState }>(path, undefined, decodeDomainStateResponse);
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Verificación DNS iniciada. Actualizaremos el estado automáticamente.", "Cerrar", { duration: 4000 });
+      this.snackbar.open($localize`:@@ui.0122e36182624f:Verificación DNS iniciada. Actualizaremos el estado automáticamente.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       this.pollVerification(d.id);
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(
-        err instanceof ApiRequestError ? err.message : "No se pudo verificar el dominio",
-        "Cerrar",
+        err instanceof ApiRequestError ? err.message : $localize`:@@ui.106a940b8693ea:No se pudo verificar el dominio`,
+        $localize`:@@ui.aeccae342e4bd0:Cerrar`,
         { duration: 5000 },
       );
       // 409 = ya hay una comprobación en vuelo (la del planificador o la de
@@ -277,7 +279,7 @@ export class DomainsComponent {
       // records starts auto-TLS in the same breath, so "settled" is only true
       // once nothing is in flight — not merely when the DNS answer landed.
       settled: (domain) => !this.isChecking(domain) && domain.tlsStatus !== "provisioning",
-      exhausted: "La operación sigue en curso. Puedes actualizar el estado dentro de unos minutos.",
+      exhausted: $localize`:@@ui.fbf07e33584942:La operación sigue en curso. Puedes actualizar el estado dentro de unos minutos.`,
     });
   }
 
@@ -322,7 +324,7 @@ export class DomainsComponent {
         if (settled) return;
         if (remaining <= 0) {
           if (this.pollRequests.isCurrent(request, this.workspaces.currentId())) {
-            this.snackbar.open(options.exhausted, "Cerrar", { duration: 5000 });
+            this.snackbar.open(options.exhausted, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
           }
           return;
         }
@@ -352,14 +354,14 @@ export class DomainsComponent {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.domains.update((domains) => domains.map((item) => item.id === d.id ? { ...item, state: result.state } : item));
       if (result.state === "provisioning") {
-        this.snackbar.open("Emitiendo y validando el certificado…", "Cerrar", { duration: 3500 });
+        this.snackbar.open($localize`:@@ui.4d53ba2cbc97f9:Emitiendo y validando el certificado…`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
         this.pollActivation(d.id);
       } else {
-        this.snackbar.open("Dominio activado", "Cerrar", { duration: 2500 });
+        this.snackbar.open($localize`:@@ui.a1fc801ff22791:Dominio activado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       }
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       // Misma lectura que en verify: un 409 significa trabajo en curso cuyo
       // estado conviene seguir, no un final.
       if (err instanceof ApiRequestError && err.status === 409) {
@@ -374,7 +376,7 @@ export class DomainsComponent {
     this.pollDomainState(id, {
       attempts: 30,
       settled: (domain) => domain.tlsStatus !== "provisioning",
-      exhausted: "La emisión continúa en segundo plano. El estado se actualizará al terminar.",
+      exhausted: $localize`:@@ui.61a7e3b9ccf7c6:La emisión continúa en segundo plano. El estado se actualizará al terminar.`,
     });
   }
 
@@ -385,9 +387,9 @@ export class DomainsComponent {
     // Desactivar apaga todos los enlaces del dominio a la vez: la confirmación
     // dice cuántos y que ninguno se elimina.
     const confirmed = await this.actions.confirm({
-      title: "Desactivar dominio",
-      message: `¿Quieres desactivar ${d.domain}? ${d.linksCount === 1 ? "1 enlace dejará" : `${d.linksCount} enlaces dejarán`} de responder mientras el dominio esté desactivado. Los enlaces no se eliminarán.`,
-      confirmLabel: "Desactivar dominio",
+      title: $localize`:@@ui.8e42027d1e787c:Desactivar dominio`,
+      message: `¿Quieres desactivar ${d.domain}? ${d.linksCount === 1 ? $localize`:@@ui.d9dc53200c0073:1 enlace dejará` : $localize`:@@ui.44877498e74fa6:${d.linksCount} enlaces dejarán`} de responder mientras el dominio esté desactivado. Los enlaces no se eliminarán.`,
+      confirmLabel: $localize`:@@ui.8e42027d1e787c:Desactivar dominio`,
       destructive: true,
     });
     if (!confirmed || this.actionId() || !target.isCurrent()) return;
@@ -397,11 +399,11 @@ export class DomainsComponent {
         this.api.post(`/api/v1/domains/${d.id}/disable`, undefined, undefined, { "Idempotency-Key": key }),
       );
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Dominio desactivado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.8370e3be51576b:Dominio desactivado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       void this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       // Only the operation that still owns the slot may clear it: a stale
       // action landing late must not re-enable the rows of a newer one.
@@ -423,14 +425,14 @@ export class DomainsComponent {
       await this.api.patch(`/api/v1/domains/${d.id}`, { isDefault });
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.snackbar.open(
-        isDefault ? "Dominio predeterminado para los enlaces nuevos" : "Preferencia eliminada",
-        "Cerrar",
+        isDefault ? $localize`:@@ui.000f0736b1a2f1:Dominio predeterminado para los enlaces nuevos` : $localize`:@@ui.f6cb6554167abf:Preferencia eliminada`,
+        $localize`:@@ui.aeccae342e4bd0:Cerrar`,
         { duration: 2500 },
       );
       void this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(action);
     }
@@ -447,11 +449,11 @@ export class DomainsComponent {
     try {
       const result = await this.removal.open(d, { signal: lifetime.signal });
       if (!target.isCurrent() || !this.mutations.isCurrent(action) || this.session.generation() !== generation || !this.canAdmin()) return;
-      if (result?.deleted) this.snackbar.open("Dominio eliminado", "Cerrar", { duration: 2500 });
+      if (result?.deleted) this.snackbar.open($localize`:@@ui.0247fa5bb3584f:Dominio eliminado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       void this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       untrack();
       lifetime.abort();
@@ -465,12 +467,12 @@ export class DomainsComponent {
     if (!value) return;
     const write = navigator.clipboard?.writeText(value);
     if (!write) {
-      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.b2b3a94dcbea08:El navegador no permite copiar automáticamente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       return;
     }
     void write.then(
-      () => this.snackbar.open(`${label} copiado`, "Cerrar", { duration: 2000 }),
-      () => this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }),
+      () => this.snackbar.open(`${label} copiado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 }),
+      () => this.snackbar.open($localize`:@@ui.2af3009605d0a4:No se pudo copiar`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 }),
     );
   }
 

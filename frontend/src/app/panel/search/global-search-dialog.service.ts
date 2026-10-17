@@ -61,7 +61,7 @@ export class GlobalSearchDialogService {
         this.active = undefined; resize.unsubscribe(); backdrop.unsubscribe(); disconnectViewport(); unregister();
         if (selection && !owner.destroyed && selection.context === this.search.context()) void this.perform(selection, owner);
       });
-    } catch { if (!owner.destroyed && context === this.search.context()) this.snackbar.open("No se pudo abrir la búsqueda. Vuelve a intentarlo.", "Cerrar", { duration: 4000 }); }
+    } catch { if (!owner.destroyed && context === this.search.context()) this.snackbar.open($localize`:@@ui.f97282be93de08:No se pudo abrir la búsqueda. Vuelve a intentarlo.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 }); }
     finally { this.opening = false; }
   }
 
@@ -86,7 +86,7 @@ export class GlobalSearchDialogService {
         if (!current() || this.actionController !== controller || controller.signal.aborted) return;
         const { QrDialogComponent } = await import("../links/qr-dialog.component");
         if (current() && !controller.signal.aborted && (this.dialogs.openDialogs?.length ?? 0) === 0) this.dialogs.open(QrDialogComponent, { data: { url: link.shareUrl ?? link.shortUrl, linkId: link.id }, width: "760px", maxWidth: "calc(100vw - 32px)" });
-      } catch (error) { if (current() && !controller.signal.aborted) this.snackbar.open(error instanceof Error ? error.message : "No se pudo abrir el QR de este enlace.", "Cerrar", { duration: 5000 }); }
+      } catch (error) { if (current() && !controller.signal.aborted) this.snackbar.open(error instanceof Error ? error.message : $localize`:@@ui.e1390e37174788:No se pudo abrir el QR de este enlace.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 }); }
       finally { unregister(); if (this.actionController === controller) { this.actionController = undefined; this.actionContext = undefined; } }
     }
   }

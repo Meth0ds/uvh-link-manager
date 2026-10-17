@@ -31,12 +31,12 @@ class PendingHandoffController
 
         $bearer = trim(UvhRequest::inputString($request, 'token'));
         if (! PendingHandoff::accepts($bearer)) {
-            return response()->json(['error' => 'Token inválido'], 422);
+            return response()->json(['error' => __('messages.error_f0bd101ade1cc6')], 422);
         }
 
         $deadline = PendingHandoff::deadline($kind, UvhRequest::inputString($request, 'expiresAt'));
         if ($deadline === null) {
-            return response()->json(['error' => 'La credencial ya ha caducado'], 422);
+            return response()->json(['error' => __('messages.error_cc7ef5a59109eb')], 422);
         }
 
         return response()->json([
@@ -92,6 +92,6 @@ class PendingHandoffController
 
     private function unknownKind(): JsonResponse
     {
-        return response()->json(['error' => 'Handoff desconocido'], 404);
+        return response()->json(['error' => __('messages.error_76a04d2587127e')], 404);
     }
 }

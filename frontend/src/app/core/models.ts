@@ -4,6 +4,7 @@ import type { NotificationCategory, NotificationDelivery, NotificationKind } fro
 import type { ExpiredPageSpec } from "./link-workflows";
 
 export interface AuthUser {
+  language?: "es" | "en" | null;
   id: number;
   email: string;
   name: string;

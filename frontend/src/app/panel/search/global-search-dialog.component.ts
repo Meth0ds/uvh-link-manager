@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from "@angular/core";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
@@ -20,6 +21,7 @@ const EMPTY: GlobalSearchResponse = { version: 1, links: [], domains: [], moreLi
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GlobalSearchDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly search = inject(GlobalSearchService);
   private readonly owner = inject(DestroyRef);
   private readonly dialog = inject(MatDialogRef<GlobalSearchDialogComponent, SearchSelection>);
@@ -30,25 +32,25 @@ export class GlobalSearchDialogComponent {
   readonly queryLength = computed(() => Array.from(this.q().trim()).length);
   readonly busy = signal(false); readonly error = signal<string | null>(null);
   readonly results = signal<GlobalSearchResponse>(EMPTY); readonly active = signal(0);
-  readonly workspaceName = computed(() => this.search.workspaces.list().find(workspace => workspace.id === this.search.workspaces.currentId())?.name ?? "Tu workspace");
+  readonly workspaceName = computed(() => this.search.workspaces.list().find(workspace => workspace.id === this.search.workspaces.currentId())?.name ?? $localize`:@@ui.a900619e292991:Tu workspace`);
   readonly options = computed<Option[]>(() => {
     const term = this.q().trim().toLocaleLowerCase();
     const options: Option[] = [];
     if (!this.qrMode()) {
-      if (this.search.canCreate()) options.push({ key: "create", group: "Acciones", title: "Crear enlace", subtitle: "Abrir el editor de enlaces", icon: "add", action: { kind: "create" } });
-      options.push({ key: "qr", group: "Acciones", title: "Abrir editor QR", subtitle: "Elegir un enlace y preparar su QR", icon: "qr_code_2", action: { kind: "choose-qr" } });
-      for (const group of this.search.navigation()) for (const item of group.items) options.push({ key: item.path, group: "Navegación", title: item.label, subtitle: group.label, icon: item.icon, action: { kind: "navigate", path: item.path } });
+      if (this.search.canCreate()) options.push({ key: "create", group: "Acciones", title: $localize`:@@ui.3daf36ee52f052:Crear enlace`, subtitle: $localize`:@@ui.aadcf5577a3655:Abrir el editor de enlaces`, icon: "add", action: { kind: "create" } });
+      options.push({ key: "qr", group: "Acciones", title: $localize`:@@ui.d68faa89ed521e:Abrir editor QR`, subtitle: $localize`:@@ui.7cab907a42d086:Elegir un enlace y preparar su QR`, icon: "qr_code_2", action: { kind: "choose-qr" } });
+      for (const group of this.search.navigation()) for (const item of group.items) options.push({ key: item.path, group: $localize`:@@ui.6d4ca0e85a74b8:Navegación`, title: item.label, subtitle: group.label, icon: item.icon, action: { kind: "navigate", path: item.path } });
     }
     const local = options.filter(option => !term || `${option.title} ${option.subtitle}`.toLocaleLowerCase().includes(term));
-    for (const link of this.results().links) local.push({ key: `link-${link.id}`, group: "Enlaces", title: link.name || this.displayUrl(link.shortUrl), subtitle: this.displayUrl(link.shortUrl), icon: "link", state: linkStateLabel(link.state),
+    for (const link of this.results().links) local.push({ key: `link-${link.id}`, group: $localize`:@@ui.f1a5125bb4f0ad:Enlaces`, title: link.name || this.displayUrl(link.shortUrl), subtitle: this.displayUrl(link.shortUrl), icon: "link", state: linkStateLabel(link.state),
       action: this.qrMode() ? { kind: "qr", id: link.id } : { kind: "navigate", path: `/app/links/${link.id}` } });
     if (!this.qrMode()) {
-      const domainLabels = { online: "Disponible", degraded: "Degradado", provisioning: "Preparando", offline: "Sin servicio" };
-      for (const domain of this.results().domains) local.push({ key: `domain-${domain.id}`, group: "Dominios", title: domain.hostname, subtitle: "Dominio personalizado", icon: "language", state: domainLabels[domain.state], action: { kind: "navigate", path: `/app/domains/${domain.id}` } });
+      const domainLabels = { online: $localize`:@@ui.f4e4f699637be8:Disponible`, degraded: "Degradado", provisioning: "Preparando", offline: $localize`:@@ui.0da846feb1df86:Sin servicio` };
+      for (const domain of this.results().domains) local.push({ key: `domain-${domain.id}`, group: $localize`:@@ui.3facb8d257990f:Dominios`, title: domain.hostname, subtitle: $localize`:@@ui.2d438631289266:Dominio personalizado`, icon: "language", state: domainLabels[domain.state], action: { kind: "navigate", path: `/app/domains/${domain.id}` } });
       for (const workspace of this.search.workspaces.list()) {
-        if (workspace.id !== this.search.workspaces.currentId() && (!term || workspace.name.toLocaleLowerCase().includes(term))) local.push({ key: `workspace-${workspace.id}`, group: "Cambiar de workspace", title: workspace.name, subtitle: isWorkspaceRole(workspace.role ?? "") ? workspaceRoleLabel(workspace.role as "owner" | "admin" | "editor" | "viewer") : "Workspace", icon: "workspaces", action: { kind: "workspace", id: workspace.id } });
+        if (workspace.id !== this.search.workspaces.currentId() && (!term || workspace.name.toLocaleLowerCase().includes(term))) local.push({ key: `workspace-${workspace.id}`, group: $localize`:@@ui.2e8d2796a5f911:Cambiar de workspace`, title: workspace.name, subtitle: isWorkspaceRole(workspace.role ?? "") ? workspaceRoleLabel(workspace.role as "owner" | "admin" | "editor" | "viewer") : "Workspace", icon: "workspaces", action: { kind: "workspace", id: workspace.id } });
       }
-      if (Array.from(term).length >= 2) local.push({ key: "all", group: "Biblioteca", title: "Ver todos los enlaces", subtitle: `Buscar «${this.q().trim()}» en la biblioteca`, icon: "arrow_forward", action: { kind: "all", q: this.q().trim() } });
+      if (Array.from(term).length >= 2) local.push({ key: "all", group: "Biblioteca", title: $localize`:@@ui.43b8fbd0a4ef63:Ver todos los enlaces`, subtitle: $localize`:@@ui.840110fd193752:Buscar «${this.q().trim()}» en la biblioteca`, icon: "arrow_forward", action: { kind: "all", q: this.q().trim() } });
     }
     return local;
   });
@@ -62,13 +64,13 @@ export class GlobalSearchDialogComponent {
   });
   readonly activeId = computed(() => this.options()[this.active()] ? `search-option-${this.active()}` : null);
   readonly status = computed(() => {
-    if (!this.q() && !this.qrMode()) return "Busca en tu workspace o elige una acción.";
+    if (!this.q() && !this.qrMode()) return $localize`:@@ui.d13a8ce55f2049:Busca en tu workspace o elige una acción.`;
     if (this.busy()) return "Buscando…";
-    if (this.error()) return "No se pudo completar la búsqueda.";
-    if (Array.from(this.q().trim()).length < 2) return "Escribe al menos dos caracteres para buscar enlaces.";
+    if (this.error()) return $localize`:@@ui.b1709a223eddd5:No se pudo completar la búsqueda.`;
+    if (Array.from(this.q().trim()).length < 2) return $localize`:@@ui.523fba5cd4e339:Escribe al menos dos caracteres para buscar enlaces.`;
     const { links, domains, moreLinks, moreDomains } = this.results();
-    const linkCount = `${links.length}${moreLinks ? '+' : ''} ${links.length === 1 ? 'enlace' : 'enlaces'}`;
-    const domainCount = `${domains.length}${moreDomains ? '+' : ''} ${domains.length === 1 ? 'dominio' : 'dominios'}`;
+    const linkCount = `${links.length}${moreLinks ? '+' : ''} ${links.length === 1 ? $localize`:@@ui.902ee7f27eee59:enlace` : $localize`:@@ui.41b0ae1f3fe239:enlaces`}`;
+    const domainCount = `${domains.length}${moreDomains ? '+' : ''} ${domains.length === 1 ? $localize`:@@ui.257a5e14d818fc:dominio` : $localize`:@@ui.6115eb818067e3:dominios`}`;
     return this.qrMode() ? `${linkCount}.` : `${linkCount} y ${domainCount}.`;
   });
 
@@ -94,7 +96,7 @@ export class GlobalSearchDialogComponent {
       const results = await this.search.search(q, request.signal);
       if (this.requests.isCurrent(request, this.search.context()) && q === this.q().trim()) { this.results.set(results); this.active.set(0); }
     } catch (error) {
-      if (this.requests.isCurrent(request, this.search.context())) this.error.set(error instanceof Error ? error.message : "No se pudo buscar. Vuelve a intentarlo.");
+      if (this.requests.isCurrent(request, this.search.context())) this.error.set(error instanceof Error ? error.message : $localize`:@@ui.7fc46cf61f71ab:No se pudo buscar. Vuelve a intentarlo.`);
     } finally { if (this.requests.isCurrent(request, this.search.context())) this.busy.set(false); }
   }
   choose(index: number): void {

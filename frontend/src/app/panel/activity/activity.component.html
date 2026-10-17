@@ -1,15 +1,15 @@
-<app-page-header icon="history" title="Actividad" eyebrow="Workspace" description="Consulta los cambios recientes y su resultado en el workspace seleccionado." />
+<app-page-header icon="history" title="Actividad" eyebrow="Workspace" description="Consulta los cambios recientes y su resultado en el workspace seleccionado."  i18n-title="@@ui.d134a8ecb32a6e" i18n-description="@@ui.125f0d6e414fdd" i18n-eyebrow="@@ui.87bb59ba2f92f2"/>
 @if (context(); as workspace) {
   <section class="activity" aria-labelledby="activity-title" [attr.aria-busy]="loading()">
     <div class="heading">
       <h2 id="activity-title">{{ workspace.name }}</h2>
-      <button mat-stroked-button type="button" (click)="reload()" [disabled]="loading()">Actualizar desde el inicio</button>
+      <button mat-stroked-button type="button" (click)="reload()" [disabled]="loading()"><ng-container i18n="@@ui.eb5ffe754cea4f">Actualizar desde el inicio</ng-container></button>
     </div>
-    <p class="coverage">Solo se muestran eventos atribuidos a este workspace. El historial puede ser incompleto y no sustituye una auditoría íntegra.</p>
-    <p class="coverage">«Solicitud admitida» no confirma recepción de correos, entregas de webhooks ni emisión de certificados. Fechas en UTC.</p>
+    <p class="coverage"><ng-container i18n="@@ui.26a23392af630e">Solo se muestran eventos atribuidos a este workspace. El historial puede ser incompleto y no sustituye una auditoría íntegra.</ng-container></p>
+    <p class="coverage"><ng-container i18n="@@ui.4266a9cf1b4d09">«Solicitud admitida» no confirma recepción de correos, entregas de webhooks ni emisión de certificados. Fechas en UTC.</ng-container></p>
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Cargando actividad" />
-      <p role="status">Cargando actividad…</p>
+      <mat-progress-bar mode="indeterminate" aria-label="Cargando actividad"  i18n-aria-label="@@ui.971e03d5ad0e1b"/>
+      <p role="status"><ng-container i18n="@@ui.494d2157d69784">Cargando actividad…</ng-container></p>
     }
     @if (error(); as message) {
       <p class="error" role="alert">
@@ -21,29 +21,29 @@
         }
       </p>
     } @else if (!loading() && events().length === 0) {
-      <p role="status">No hay actividad disponible para mostrar. Esto no implica que no hayan ocurrido cambios.</p>
+      <p role="status"><ng-container i18n="@@ui.c50caf3df97d32">No hay actividad disponible para mostrar. Esto no implica que no hayan ocurrido cambios.</ng-container></p>
     }
     @if (events().length > 0) {
-      <ol class="events" aria-label="Eventos, del más reciente al más antiguo">
+      <ol class="events" aria-label="Eventos, del más reciente al más antiguo" i18n-aria-label="@@ui.a4637a632f28ae">
         @for (event of events(); track event.id) {
           <li data-activity-event>
             <div class="event-heading"><h3>{{ event.label }}</h3><span class="outcome" [attr.data-outcome]="event.outcome">{{ outcomeLabels[event.outcome] }}</span></div>
             <p>{{ event.actor.label }} · {{ resourceLabel(event.resource.type) }}@if (event.resource.id !== null) { <span> #{{ event.resource.id }}</span> }</p>
-            <time [attr.datetime]="event.createdAt">{{ event.createdAt | date:'dd/MM/yyyy HH:mm:ss':'UTC' }} UTC</time>
+            <time [attr.datetime]="event.createdAt"><ng-container i18n="@@ui.03fed140d3294b">{{ event.createdAt | date:'dd/MM/yyyy HH:mm:ss':'UTC' }} UTC</ng-container></time>
           </li>
         }
       </ol>
       <div class="pagination">
-        <p role="status">{{ events().length }} eventos cargados.</p>
+        <p role="status"><ng-container i18n="@@ui.e415f20ad97975">{{ events().length }} eventos cargados.</ng-container></p>
         @if (hasMore()) {
-          <button mat-stroked-button type="button" (click)="loadMore()" [disabled]="loading()">Cargar más</button>
+          <button mat-stroked-button type="button" (click)="loadMore()" [disabled]="loading()"><ng-container i18n="@@ui.86cddfa2fa5348">Cargar más</ng-container></button>
         }
       </div>
       @if (capped()) {
-        <p class="coverage">Has llegado al límite de {{ maximumEvents }} eventos de esta vista. Actualizar inicia una consulta nueva; no es una exportación completa.</p>
+        <p class="coverage"><ng-container i18n="@@ui.9c9afd59dc1d87">Has llegado al límite de {{ maximumEvents }} eventos de esta vista. Actualizar inicia una consulta nueva; no es una exportación completa.</ng-container></p>
       }
     }
   </section>
 } @else {
-  <section class="activity"><h2>Actividad no disponible</h2><p>Selecciona un workspace donde seas propietario o administrador y usa una cuenta verificada.</p></section>
+  <section class="activity"><h2><ng-container i18n="@@ui.6b9934ec6bb64d">Actividad no disponible</ng-container></h2><p><ng-container i18n="@@ui.da96448aece3d5">Selecciona un workspace donde seas propietario o administrador y usa una cuenta verificada.</ng-container></p></section>
 }

@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, effect, inject } from "@angular/core";
+import { isPlatformBrowser } from "@angular/common";
+import { Component, ChangeDetectionStrategy, effect, inject, PLATFORM_ID } from "@angular/core";
 import { Router, RouterOutlet } from "@angular/router";
 import { AuthService } from "./core/services/auth.service";
 import { safeReturnTo } from "./core/guards/auth.guard";
@@ -18,7 +19,7 @@ export class AppComponent {
     // Session discovery is intentionally non-blocking. Public routes should
     // remain usable when the API is slow or temporarily unavailable; guards
     // still await the same coalesced init() promise before entering /app.
-    void this.auth.init();
+    if (isPlatformBrowser(inject(PLATFORM_ID))) void this.auth.init();
 
     effect(() => {
       const invalidated = this.auth.sessionInvalidated();

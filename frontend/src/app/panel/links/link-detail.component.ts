@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { SharingService } from "../../core/services/sharing.service";
 import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
@@ -64,6 +65,7 @@ import { utcTimeToLocalTime } from "../../core/strict-wire";
   styleUrl: "./link-detail.component.scss",
 })
 export class LinkDetailComponent {
+  readonly uiText = UI_TEXT;
   readonly sharing = inject(SharingService);
   async editSocialCard(): Promise<void> {
     const link=this.link(); const context=this.sharing.context(); if (!link || !this.canWrite()) return;
@@ -145,7 +147,7 @@ export class LinkDetailComponent {
   private loadedContext: string | null | undefined;
 
   constructor() {
-    effect(() => { const message = this.favorites.error(); if (message) this.snackbar.open(message, "Cerrar", { duration: 4000 }); });
+    effect(() => { const message = this.favorites.error(); if (message) this.snackbar.open(message, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 }); });
     this.dialogOwner.onDestroy(() => this.mutations.reset());
     this.route.queryParamMap?.pipe(takeUntilDestroyed()).subscribe(params => {
       this.requestedWorkspace.set(params.get("workspaceId"));
@@ -182,7 +184,7 @@ export class LinkDetailComponent {
       this.activityError.set(null);
       this.activityTruncated.set(false);
       if (linkId === null) {
-        this.error.set("El identificador del enlace no es válido");
+        this.error.set($localize`:@@ui.bd0ef95f565dd3:El identificador del enlace no es válido`);
         this.loading.set(false);
         return;
       }
@@ -203,7 +205,7 @@ export class LinkDetailComponent {
     const member = id !== null && this.workspaces.list().some(workspace => workspace.id === id);
     this.requestedWorkspace.set(null);
     if (!member) {
-      this.routeWorkspaceError.set("No tienes acceso al espacio de este aviso.");
+      this.routeWorkspaceError.set($localize`:@@ui.9ca6f28a2bb86f:No tienes acceso al espacio de este aviso.`);
       return;
     }
     this.routeWorkspaceError.set(null);
@@ -244,7 +246,7 @@ export class LinkDetailComponent {
       await Promise.all([this.loadAnalytics(), this.loadActivity()]);
     } catch (err) {
       if (!this.loadRequests.isCurrent(request, this.currentContext())) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar el enlace");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.c2c57ce995bba7:No se pudo cargar el enlace`);
     } finally {
       if (this.loadRequests.isCurrent(request, this.currentContext())) this.loading.set(false);
     }
@@ -271,7 +273,7 @@ export class LinkDetailComponent {
     } catch (err) {
       if (!this.analyticsRequests.isCurrent(request, this.currentContext())) return;
       this.analytics.set(null);
-      this.analyticsError.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la analítica");
+      this.analyticsError.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.7cc975a589d8e1:No se pudo cargar la analítica`);
     }
   }
 
@@ -301,7 +303,7 @@ export class LinkDetailComponent {
       if (!this.activityRequests.isCurrent(request, this.currentContext())) return;
       this.activity.set([]);
       this.activityTruncated.set(false);
-      this.activityError.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la actividad");
+      this.activityError.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.bc6d36ee4fff5c:No se pudo cargar la actividad`);
     }
   }
 
@@ -400,11 +402,11 @@ export class LinkDetailComponent {
     try {
       await this.api.post(`/api/v1/links/${target.linkId}/state`, { state });
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
+      this.snackbar.open($localize`:@@ui.64c6aa1a673969:Estado actualizado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 });
       void this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
     } finally {
       this.mutations.settle(action);
     }
@@ -416,9 +418,9 @@ export class LinkDetailComponent {
     const target = this.targetLink();
     if (!target) return;
     const confirmed = await this.actions.confirm({
-      title: "Eliminar enlace",
-      message: `¿Quieres eliminar ${l.shortUrl}? Dejará de estar disponible de inmediato.`,
-      confirmLabel: "Eliminar enlace",
+      title: $localize`:@@ui.ad730f5de914c2:Eliminar enlace`,
+      message: $localize`:@@ui.481be642af23f8:¿Quieres eliminar ${l.shortUrl}? Dejará de estar disponible de inmediato.`,
+      confirmLabel: $localize`:@@ui.ad730f5de914c2:Eliminar enlace`,
       destructive: true,
     });
     if (!confirmed || this.actionBusy() || !target.isCurrent()) return;
@@ -428,11 +430,11 @@ export class LinkDetailComponent {
       // Quién publica el resultado es la operación que lo consiguió: una
       // operación vieja que llega tarde no navega fuera de la pantalla nueva.
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
+      this.snackbar.open($localize`:@@ui.603361fe8b670b:Enlace eliminado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 });
       await this.router.navigate(["/app/links"]);
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
     } finally {
       this.mutations.settle(action);
     }
@@ -443,8 +445,8 @@ export class LinkDetailComponent {
     const raw = rule as RedirectRule & { time_from?: string | null; time_to?: string | null };
     const timeFrom = rule.timeFrom ?? raw.time_from;
     const timeTo = rule.timeTo ?? raw.time_to;
-    if (rule.country) parts.push(`País: ${rule.country.toUpperCase()}`);
-    if (rule.language) parts.push(`Idioma: ${rule.language}`);
+    if (rule.country) parts.push($localize`:@@ui.b73b64f549dfbc:País: ${rule.country.toUpperCase()}`);
+    if (rule.language) parts.push($localize`:@@ui.7c8d54d2c9000e:Idioma: ${rule.language}`);
     if (rule.device) parts.push(`Dispositivo: ${rule.device}`);
     if (rule.os) parts.push(`SO: ${rule.os}`);
     if (timeFrom || timeTo) {
@@ -453,8 +455,8 @@ export class LinkDetailComponent {
       parts.push(`Horario: ${localFrom}–${localTo} ${this.ruleTimezone} (${timeFrom ?? "00:00"}–${timeTo ?? "23:59"} UTC)`);
     }
     if (rule.referrer) parts.push(`Referente: ${rule.referrer}`);
-    if (rule.campaign) parts.push(`Campaña: ${rule.campaign}`);
-    return parts.length ? parts.join(" · ") : "Sin condición";
+    if (rule.campaign) parts.push($localize`:@@ui.f31b3bce9a3998:Campaña: ${rule.campaign}`);
+    return parts.length ? parts.join(" · ") : $localize`:@@ui.48425f98d74f26:Sin condición`;
   }
 
   /**
@@ -469,11 +471,11 @@ export class LinkDetailComponent {
     const target = this.targetLink();
     if (!target) return;
     const message = await this.actions.prompt({
-      title: "Solicitar revisión del bloqueo",
-      message: "Cuenta por qué crees que el bloqueo es un error. La revisión la resuelve la administración de la plataforma.",
-      confirmLabel: "Enviar solicitud",
-      inputLabel: "Comentario (opcional)",
-      inputPlaceholder: "Contexto que ayude a revisar el caso…",
+      title: $localize`:@@ui.d8117d0aba2e11:Solicitar revisión del bloqueo`,
+      message: $localize`:@@ui.70ed269b7b9295:Cuenta por qué crees que el bloqueo es un error. La revisión la resuelve la administración de la plataforma.`,
+      confirmLabel: $localize`:@@ui.c9bb5c644aeb6e:Enviar solicitud`,
+      inputLabel: $localize`:@@ui.bdd67fb232e8fa:Comentario (opcional)`,
+      inputPlaceholder: $localize`:@@ui.65014c888e7694:Contexto que ayude a revisar el caso…`,
       inputHint: "Hasta 2000 caracteres.",
       inputRequired: false,
       inputMaxLength: 2000,
@@ -484,11 +486,11 @@ export class LinkDetailComponent {
     try {
       await this.api.post(`/api/v1/links/${target.linkId}/appeal`, { message: message.trim() });
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Solicitud enviada. La revisión la resuelve la administración.", "Cerrar", { duration: 3500 });
+      this.snackbar.open($localize`:@@ui.9c03379ed2e3c9:Solicitud enviada. La revisión la resuelve la administración.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
       await this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo enviar la solicitud", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.08b9f1d29ed1fb:No se pudo enviar la solicitud`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       await this.load();
     } finally {
       this.mutations.settle(action);
@@ -503,18 +505,18 @@ export class LinkDetailComponent {
 
   actionLabel(action: string): string {
     const map: Record<string, string> = {
-      "link.create": "Creación",
-      "link.duplicate": "Duplicación",
-      "link.update": "Edición",
-      "link.state_change": "Cambio de estado",
-      "link.delete": "Eliminación",
-      "link.restore": "Restauración",
-      "link.appeal": "Revisión solicitada",
-      "admin.link_block": "Bloqueo de la plataforma",
-      "admin.link_unblock": "Bloqueo retirado",
-      "admin.link_appeal_resolved": "Respuesta a la revisión",
-      "admin.report_moderate": "Moderación de denuncia",
-      "system.link_block": "Bloqueo automático",
+      "link.create": $localize`:@@ui.478a1f7d03d22b:Creación`,
+      "link.duplicate": $localize`:@@ui.ef2f1e5dc70764:Duplicación`,
+      "link.update": $localize`:@@ui.f162950691763a:Edición`,
+      "link.state_change": $localize`:@@ui.a99d4d45d84189:Cambio de estado`,
+      "link.delete": $localize`:@@ui.5a7b37de471971:Eliminación`,
+      "link.restore": $localize`:@@ui.1c1b505bfe1665:Restauración`,
+      "link.appeal": $localize`:@@ui.99d992452bef56:Revisión solicitada`,
+      "admin.link_block": $localize`:@@ui.e27c7727003d88:Bloqueo de la plataforma`,
+      "admin.link_unblock": $localize`:@@ui.932fed461ca49f:Bloqueo retirado`,
+      "admin.link_appeal_resolved": $localize`:@@ui.d1cf6b6c8a3b13:Respuesta a la revisión`,
+      "admin.report_moderate": $localize`:@@ui.ce47e0a34f57c0:Moderación de denuncia`,
+      "system.link_block": $localize`:@@ui.f1588ab3631fb4:Bloqueo automático`,
     };
     return map[action] ?? action;
   }

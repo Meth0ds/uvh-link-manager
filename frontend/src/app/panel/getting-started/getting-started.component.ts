@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -24,6 +25,7 @@ type LoadState = { key: string; loading: boolean; error: string | null; data: Wo
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GettingStartedComponent {
+  readonly uiText = UI_TEXT;
   readonly compact = input(false);
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
@@ -98,7 +100,7 @@ export class GettingStartedComponent {
     } catch (error) {
       if (!isCurrent()) return;
       this.state.set({ key: context.key, loading: false, data: null,
-        error: error instanceof ApiRequestError ? error.message : "No se pudo comprobar el estado de la guía." });
+        error: error instanceof ApiRequestError ? error.message : $localize`:@@ui.13f98f9a9b59b3:No se pudo comprobar el estado de la guía.` });
     }
   }
 

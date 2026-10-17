@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountCredentialsController;
+use App\Http\Controllers\AccountLanguageController;
 use App\Http\Controllers\AccountProfileController;
 use App\Http\Controllers\AccountRecoveryController;
 use App\Http\Controllers\AccountSessionsController;
@@ -146,6 +147,7 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
     Route::get('auth/mfa/session', [MfaSessionController::class, 'mfaSessionStatus'])->middleware('uvh.auth');
     Route::post('auth/mfa/reauthenticate', [MfaSessionController::class, 'mfaReauthenticate'])
         ->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
+    Route::patch('auth/language', [AccountLanguageController::class, 'update'])->middleware('uvh.auth');
     Route::patch('auth/profile', [AccountProfileController::class, 'profile'])->middleware('uvh.auth');
     Route::post('auth/change-email', [AccountCredentialsController::class, 'requestEmailChange'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);
     Route::post('auth/change-email/cancel', [AccountCredentialsController::class, 'cancelEmailChange'])->middleware(['uvh.auth:verified', 'throttle:uvh-credential']);

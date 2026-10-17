@@ -36,7 +36,7 @@ final class MfaFreshness
     public static function reauthenticationRequired(): JsonResponse
     {
         return response()->json([
-            'error' => 'Vuelve a confirmar tu identidad para continuar',
+            'error' => __('messages.error_5cbec30b790e8e'),
             'details' => ['reason' => 'mfa_reauthentication_required'],
         ], 403);
     }

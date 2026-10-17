@@ -1,6 +1,11 @@
+import { LocaleUrlSerializer } from "./core/localisation/locale-url-serializer";
+import "./core/localisation/locale-data";
+import { PublicSeoService } from "./core/localisation/public-seo.service";
+import { UI_LANGUAGE, PUBLIC_ROUTES } from "./core/localisation/locale";
 import { SharingService } from "./core/services/sharing.service";
-import { ApplicationConfig, inject, provideAppInitializer } from "@angular/core";
-import { provideRouter, RouteReuseStrategy, withComponentInputBinding, withInMemoryScrolling, type RouterFeatures, type Routes } from "@angular/router";
+import { isPlatformBrowser } from "@angular/common";
+import { ApplicationConfig, inject, PLATFORM_ID, provideAppInitializer } from "@angular/core";
+import { provideRouter, UrlSerializer, RouteReuseStrategy, withComponentInputBinding, withInMemoryScrolling, type RouterFeatures, type Routes } from "@angular/router";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
 import { apiInterceptor } from "./core/interceptors/api.interceptor";
@@ -8,10 +13,11 @@ import { PendingHandoffService } from "./core/services/pending-handoff.service";
 import { AuthRouteReuseStrategy } from "./core/auth-route-reuse";
 
 export const routes: Routes = [
-  { path: "reports/:publicId", title: "Informe compartido · UVH", loadComponent: () => import("./public-report/public-report.component").then(m => m.PublicReportComponent) },
+  ...(UI_LANGUAGE === "es" ? [{ path: "help", redirectTo: "ayuda", pathMatch: "full" as const }, { path: "status", redirectTo: "estado", pathMatch: "full" as const }] : []),
+  { path: "reports/:publicId", title: $localize`:@@ui.a901db2fb4198d:Informe compartido · UVH`, loadComponent: () => import("./public-report/public-report.component").then(m => m.PublicReportComponent) },
   {
     path: "",
-    title: "UVH · Acorta y gestiona tus enlaces",
+    title: $localize`:@@ui.965c2fdd1a3422:UVH · Acorta y gestiona tus enlaces`,
     loadComponent: () => import("./landing/landing.component").then((m) => m.LandingComponent),
   },
   {
@@ -23,13 +29,13 @@ export const routes: Routes = [
     loadChildren: () => import("./legal/legal.routes").then((m) => m.legalRoutes),
   },
   {
-    path: "help",
-    title: "Ayuda técnica · UVH",
+    path: PUBLIC_ROUTES.help[UI_LANGUAGE].slice(1),
+    title: $localize`:@@ui.7dfc1cd4408199:Ayuda técnica · UVH`,
     loadComponent: () => import("./help/help.component").then((m) => m.HelpComponent),
   },
   {
-    path: "status",
-    title: "Estado del servicio · UVH",
+    path: PUBLIC_ROUTES.status[UI_LANGUAGE].slice(1),
+    title: $localize`:@@ui.71de223b0148f2:Estado del servicio · UVH`,
     loadComponent: () => import("./public-status/public-status.component").then((m) => m.PublicStatusComponent),
   },
   {
@@ -41,15 +47,15 @@ export const routes: Routes = [
   },
   {
     path: "forbidden",
-    title: "403 · Acceso restringido · UVH",
+    title: $localize`:@@ui.cd27bea26135a1:403 · Acceso restringido · UVH`,
     data: { kind: "forbidden" },
     loadComponent: () => import("./status-page.component").then((m) => m.StatusPageComponent),
   },
   {
     path: "not-found",
-    title: "404 · Página no encontrada · UVH",
+    title: $localize`:@@ui.fd4b8d18f72051:404 · Página no encontrada · UVH`,
     data: { kind: "not-found" },
-    loadComponent: () => import("./status-page.component").then((m) => m.StatusPageComponent),
+    loadComponent: () => import("./not-found.component").then((m) => m.NotFoundComponent),
   },
   {
     path: "app",
@@ -84,6 +90,8 @@ export const routerFeatures: RouterFeatures[] = [
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    { provide: UrlSerializer, useClass: LocaleUrlSerializer },
+    provideAppInitializer(() => { inject(PublicSeoService); }),
     provideRouter(routes, ...routerFeatures),
     { provide: RouteReuseStrategy, useClass: AuthRouteReuseStrategy },
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),
@@ -93,9 +101,9 @@ export const appConfig: ApplicationConfig = {
     // answer must not delay the first paint, and a screen that has not heard
     // back yet shows the neutral option (no pending handoff) instead of a CTA
     // that may not work.
-    provideAppInitializer(() => { void inject(SharingService).refreshCapabilities(); }),
+    provideAppInitializer(() => { if (isPlatformBrowser(inject(PLATFORM_ID))) void inject(SharingService).refreshCapabilities(); }),
     provideAppInitializer(() => {
-      void inject(PendingHandoffService).refresh();
+      if (isPlatformBrowser(inject(PLATFORM_ID))) void inject(PendingHandoffService).refresh();
     }),
   ],
 };

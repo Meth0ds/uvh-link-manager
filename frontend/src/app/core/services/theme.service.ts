@@ -33,7 +33,7 @@ export class ThemeService {
       const dark = pref === "dark" || (pref === "system" && this.systemDark());
       const root = this.document.documentElement;
       root.classList.toggle(DARK_CLASS, dark);
-      root.dataset["theme"] = dark ? "dark" : "light";
+      root.setAttribute("data-theme", dark ? "dark" : "light");
     });
 
     this.destroyRef.onDestroy(() => {

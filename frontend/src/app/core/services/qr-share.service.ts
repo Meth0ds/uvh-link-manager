@@ -25,15 +25,15 @@ export class QrShareService {
   private readonly platform = inject(QR_SHARE_PLATFORM);
 
   unavailableReason(): string | null {
-    if (!this.platform.secureContext()) return "Para compartir una imagen necesitas una conexión segura. Puedes descargar el PNG.";
+    if (!this.platform.secureContext()) return $localize`:@@ui.33dd89149578ca:Para compartir una imagen necesitas una conexión segura. Puedes descargar el PNG.`;
     if (!this.platform.canShare || !this.platform.share || typeof File === "undefined") {
-      return "Este navegador no permite compartir archivos. Descarga el PNG y añádelo a tu aplicación.";
+      return $localize`:@@ui.72d5990fd98a7f:Este navegador no permite compartir archivos. Descarga el PNG y añádelo a tu aplicación.`;
     }
     return null;
   }
 
   file(blob: Blob): File {
-    if (blob.type !== "image/png" || !blob.size || blob.size > 64 * 1024 * 1024) throw new Error("No se pudo preparar una imagen PNG válida para compartir.");
+    if (blob.type !== "image/png" || !blob.size || blob.size > 64 * 1024 * 1024) throw new Error($localize`:@@ui.51dc79ca710de6:No se pudo preparar una imagen PNG válida para compartir.`);
     return new File([blob], "uvh-qr.png", { type: "image/png" });
   }
 
@@ -48,7 +48,7 @@ export class QrShareService {
     try {
       // Do not insert an await or a scheduled callback here: Safari requires
       // this invocation to remain within the original user activation.
-      return this.platform.share!({ files: [file], title: "Código QR de UVH" })
+      return this.platform.share!({ files: [file], title: $localize`:@@ui.41466761f1621d:Código QR de UVH` })
         .then(() => "shared" as const, (error: unknown) => this.failure(error));
     } catch (error) { return Promise.resolve(this.failure(error)); }
   }

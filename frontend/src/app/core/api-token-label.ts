@@ -24,9 +24,9 @@ export function apiTokenState(token: Pick<ApiTokenDto, "revokedAt" | "expiresAt"
 
 export const TOKEN_STATE_LABEL = {
   revoked: "Revocado",
-  active: "Activo",
+  active: $localize`:@@ui.723858144bd548:Activo`,
   expired: "Caducado",
-  unknown: "Estado desconocido",
+  unknown: $localize`:@@ui.af53a4e3556e62:Estado desconocido`,
 } as const;
 
 export const TOKEN_ACTION_LABEL = { revoked: "Revocado", active: "Revocar" } as const;

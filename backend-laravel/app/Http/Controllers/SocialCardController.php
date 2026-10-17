@@ -21,14 +21,14 @@ final class SocialCardController
             $protected = $link && $link->password_hash && SocialPreview::eligible($link);
             $published = $link && SocialPreview::publishable($link);
             $spec = $published ? $link->social_preview : null;
-            $title = $protected ? 'Enlace protegido' : 'Enlace no disponible';
-            $description = $protected ? 'Este enlace requiere una contraseña para continuar.' : 'Consulta su disponibilidad con el propietario.';
+            $title = $protected ? __('display.display_8caf6ff98de4f2') : __('display.display_11e385a1023bde');
+            $description = $protected ? __('display.display_040ccc353fd68f') : __('display.display_49f03ef373faa9');
             $image = null;
             $alt = '';
             $canonical = null;
             if ($published) {
-                $title = 'Enlace compartido';
-                $description = 'Abre este enlace para continuar.';
+                $title = __('display.display_2d245b135a19a7');
+                $description = __('display.display_9bf33b95b33b24');
                 $canonical = LinkService::shortUrl($link->domain?->domain, $link->alias);
                 $variant = QrAttribution::fromRequest($request);
                 if ($variant !== null && DB::table('qr_variants')->where('link_id', $link->id)->where('public_id', $variant)->exists()) {

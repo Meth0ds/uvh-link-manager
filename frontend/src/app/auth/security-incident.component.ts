@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { afterNextRender, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, Injector, signal, viewChild } from "@angular/core";
 import { DOCUMENT, Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -18,26 +19,26 @@ import { decodeSecurityIncident } from "../core/services/public-action-response-
   template: `
     <app-auth-shell>
       <section class="card center" aria-labelledby="security-incident-title">
-        <span class="step-kicker">SEGURIDAD / RESPUESTA DE EMERGENCIA</span>
-        @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Revocando accesos" /> }
+        <span class="step-kicker"><ng-container i18n="@@ui.32dd5fe5cc0f3d">SEGURIDAD / RESPUESTA DE EMERGENCIA</ng-container></span>
+        @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Revocando accesos"  i18n-aria-label="@@ui.9d29d66b8d8c9a"/> }
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="failed() || (done() && !ok())">
           {{ ok() ? 'verified_user' : (failed() || done() ? 'error_outline' : 'gpp_maybe') }}
         </mat-icon>
-        <h2 id="security-incident-title">{{ ok() ? 'Accesos revocados' : (!token ? 'Enlace no disponible' : (done() ? 'No se pudo usar el enlace' : 'Cerrar accesos de emergencia')) }}</h2>
+        <h2 id="security-incident-title">{{ ok() ? uiText.ui_7517a9c64382d6 : (!token ? uiText.ui_11e385a1023bde : (done() ? uiText.ui_2a83bbdd4ce6e1 : uiText.ui_e41afec51f17a8)) }}</h2>
         <p class="sub" [attr.role]="failed() ? 'alert' : 'status'">{{ message() }}</p>
 
         @if (!done()) {
           <div class="alert emergency-copy">
-            Se cerrarán todas las sesiones, se revocarán los tokens API y se cancelarán cambios de email, exportaciones y eliminaciones pendientes. Tu email y tu MFA no se modificarán.
-          </div>
+            <ng-container i18n="@@ui.e101a52a96ebd7">Se cerrarán todas las sesiones, se revocarán los tokens API y se cancelarán cambios de email, exportaciones y eliminaciones pendientes. Tu email y tu MFA no se modificarán.
+          </ng-container></div>
           <button #actionButton mat-flat-button class="danger-action submit" type="button" (click)="revoke()" [disabled]="busy() || !token">
-            {{ busy() ? 'Cerrando accesos…' : (failed() ? 'Reintentar revocación' : 'Revocar todos los accesos') }}
+            {{ busy() ? uiText.ui_7950a190e90842 : (failed() ? uiText.ui_728b973553ecd7 : uiText.ui_b50200584d6ac2) }}
           </button>
-          <a class="back" routerLink="/auth">No hacer cambios</a>
+          <a class="back" routerLink="/auth"><ng-container i18n="@@ui.14d5a438a49b58">No hacer cambios</ng-container></a>
         } @else if (ok()) {
-          <a #recoveryLink mat-flat-button color="primary" routerLink="/auth/forgot-password">Restablecer mi contraseña</a>
+          <a #recoveryLink mat-flat-button color="primary" routerLink="/auth/forgot-password"><ng-container i18n="@@ui.d1c722a1ae7ceb">Restablecer mi contraseña</ng-container></a>
         } @else {
-          <a #recoveryLink mat-flat-button color="primary" routerLink="/auth/forgot-password">Iniciar recuperación segura</a>
+          <a #recoveryLink mat-flat-button color="primary" routerLink="/auth/forgot-password"><ng-container i18n="@@ui.bd0fd8a3f89be0">Iniciar recuperación segura</ng-container></a>
         }
       </section>
     </app-auth-shell>
@@ -46,6 +47,7 @@ import { decodeSecurityIncident } from "../core/services/public-action-response-
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class SecurityIncidentComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly location = inject(Location);
@@ -61,13 +63,13 @@ export class SecurityIncidentComponent {
   readonly done = signal(false);
   readonly ok = signal(false);
   readonly failed = signal(false);
-  readonly message = signal("Usa este control si no reconoces el cambio o el cierre de sesiones comunicado por email.");
+  readonly message = signal($localize`:@@ui.1fda1317df362f:Usa este control si no reconoces el cambio o el cierre de sesiones comunicado por email.`);
 
   constructor() {
     this.location.replaceState("/auth/security-incident");
     if (!this.token) {
       this.done.set(true);
-      this.message.set("Falta el código de emergencia. Solicita una recuperación de contraseña para proteger la cuenta.");
+      this.message.set($localize`:@@ui.75856b250a0a56:Falta el código de emergencia. Solicita una recuperación de contraseña para proteger la cuenta.`);
     }
   }
 
@@ -93,7 +95,7 @@ export class SecurityIncidentComponent {
       if (this.requests.isCurrent(request, this.token)) {
         this.failed.set(true);
         this.done.set(error instanceof ApiRequestError && error.status > 0 && error.status !== 429 && error.status < 500);
-        this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar el cierre de accesos. Inténtalo de nuevo.");
+        this.message.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.59a0f477bae47b:No se pudo confirmar el cierre de accesos. Inténtalo de nuevo.`);
       }
     } finally {
       if (this.requests.isCurrent(request, this.token)) {

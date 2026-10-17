@@ -1,89 +1,89 @@
-<a class="back-link" routerLink="/app/domains"><mat-icon>arrow_back</mat-icon> Volver a dominios</a>
-<app-page-header icon="language" eyebrow="Dominio propio" title="Conecta tu dominio" description="Configura sus registros DNS, comprueba la conexión y sigue la preparación de HTTPS." />
+<a class="back-link" routerLink="/app/domains"><mat-icon>arrow_back</mat-icon> <ng-container i18n="@@ui.e64545d9140afa">Volver a dominios</ng-container></a>
+<app-page-header icon="language" eyebrow="Dominio propio" title="Conecta tu dominio" description="Configura sus registros DNS, comprueba la conexión y sigue la preparación de HTTPS."  i18n-title="@@ui.325eacbe2a6eef" i18n-description="@@ui.fcc1fa32ecb7f8" i18n-eyebrow="@@ui.301c9b5c7dd463"/>
 
 @if (loading() && !domain()) {
-  <app-panel-skeleton variant="cards" label="Cargando diagnóstico del dominio" />
+  <app-panel-skeleton variant="cards" label="Cargando diagnóstico del dominio"  i18n-label="@@ui.fe75700f8fa241"/>
 }
 @if (loading() && domain()) {
-  <mat-progress-bar mode="indeterminate" aria-label="Actualizando diagnóstico" />
+  <mat-progress-bar mode="indeterminate" aria-label="Actualizando diagnóstico"  i18n-aria-label="@@ui.d8e924a4ed05d8"/>
 }
 @if (error()) {
-  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
 }
 
 @if (domain(); as d) {
   <section class="summary-card" aria-labelledby="domain-name">
     <div>
-      <span class="eyebrow">Dominio observado</span>
+      <span class="eyebrow"><ng-container i18n="@@ui.d207d79e39b59d">Dominio observado</ng-container></span>
       <h2 id="domain-name" class="tnum">{{ d.domain }}</h2>
-      <p>Tráfico: <strong>{{ trafficStatusLabel(d) }}</strong></p>
-      <p>Topología admitida: subdominio con CNAME directo. No se validan apex, flattening ni proxies DNS.</p>
+      <p><ng-container i18n="@@ui.5a13f725867950">Tráfico: </ng-container><strong>{{ trafficStatusLabel(d) }}</strong></p>
+      <p><ng-container i18n="@@ui.acb4b722f7ac84">Topología admitida: subdominio con CNAME directo. No se validan apex, flattening ni proxies DNS.</ng-container></p>
     </div>
     <span class="state-chip" [class]="'st-' + d.state">{{ stateLabel(d.state) }}</span>
-    <button mat-stroked-button class="neutral-action" type="button" (click)="load()" [disabled]="loading() || actionBusy()"><mat-icon aria-hidden="true">refresh</mat-icon> Actualizar estado</button>
+    <button mat-stroked-button class="neutral-action" type="button" (click)="load()" [disabled]="loading() || actionBusy()"><mat-icon aria-hidden="true">refresh</mat-icon> <ng-container i18n="@@ui.d266f6697dc3a5">Actualizar estado</ng-container></button>
   </section>
 
   @if (!canEdit()) {
-    <div class="alert permission" role="status">Vista de solo lectura. El desafío TXT de propiedad se oculta por seguridad.</div>
+    <div class="alert permission" role="status"><ng-container i18n="@@ui.e41067f1092e92">Vista de solo lectura. El desafío TXT de propiedad se oculta por seguridad.</ng-container></div>
   }
 
   <section class="setup-guide" aria-labelledby="setup-title">
-    <div><span class="eyebrow">Configuración paso a paso</span><h2 id="setup-title">{{ d.servingReady ? 'Tu dominio está disponible' : 'Prepara la conexión' }}</h2></div>
-    <ol class="setup-progress" aria-label="Progreso de configuración">
+    <div><span class="eyebrow"><ng-container i18n="@@ui.21c4b2c116b829">Configuración paso a paso</ng-container></span><h2 id="setup-title">{{ d.servingReady ? uiText.ui_8eac3c17d422bc : uiText.ui_40781c5c04d873 }}</h2></div>
+    <ol class="setup-progress" aria-label="Progreso de configuración" i18n-aria-label="@@ui.a5315e25e8e071">
       @for (step of setupSteps(); track step.label) {
-        <li [class.complete]="step.complete"><mat-icon aria-hidden="true">{{ step.complete ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon><span>{{ step.label }}<span class="cdk-visually-hidden">: {{ step.complete ? 'completado' : 'pendiente' }}</span></span></li>
+        <li [class.complete]="step.complete"><mat-icon aria-hidden="true">{{ step.complete ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon><span>{{ step.label }}<span class="cdk-visually-hidden">: {{ step.complete ? uiText.ui_1e7c1eef4a6293 : uiText.ui_b66292585132b8 }}</span></span></li>
       }
     </ol>
     <p class="setup-advice" role="status">{{ setupAdvice() }}</p>
     @if (canEdit()) {
-      <h3>1. Añade los registros en tu proveedor DNS</h3>
-      <div class="provider-choice" role="group" aria-label="Proveedor DNS"><button mat-stroked-button type="button" [attr.aria-pressed]="provider() === 'generic'" (click)="provider.set('generic')">Otro proveedor</button><button mat-stroked-button type="button" [attr.aria-pressed]="provider() === 'cloudflare'" (click)="provider.set('cloudflare')">Cloudflare</button></div>
+      <h3><ng-container i18n="@@ui.56b8e80d0308e1">1. Añade los registros en tu proveedor DNS</ng-container></h3>
+      <div class="provider-choice" role="group" aria-label="Proveedor DNS" i18n-aria-label="@@ui.5a6ad13dbee748"><button mat-stroked-button type="button" [attr.aria-pressed]="provider() === 'generic'" (click)="provider.set('generic')"><ng-container i18n="@@ui.0b3be96a7758b1">Otro proveedor</ng-container></button><button mat-stroked-button type="button" [attr.aria-pressed]="provider() === 'cloudflare'" (click)="provider.set('cloudflare')"><ng-container i18n="@@ui.f9191531404c40">Cloudflare</ng-container></button></div>
       @if (provider() === 'cloudflare') {
-        <ol class="provider-instructions"><li>Abre tu zona en Cloudflare y entra en <strong>DNS → Records → Add record</strong>.</li><li>Crea el TXT de propiedad y el CNAME de tráfico con los nombres y valores que aparecen debajo.</li><li>En el CNAME selecciona <strong>DNS only</strong> (nube gris). Este flujo necesita un CNAME directo, sin proxy ni flattening.</li><li>Guarda los registros y vuelve a UVH para comprobar la conexión.</li></ol>
-        <p><a href="https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/" target="_blank" rel="noopener noreferrer">Consultar la documentación oficial de Cloudflare<span class="cdk-visually-hidden"> (se abre en otra pestaña)</span></a></p>
+        <ol class="provider-instructions"><li><ng-container i18n="@@ui.ecb88d00c3001c">Abre tu zona en Cloudflare y entra en </ng-container><strong><ng-container i18n="@@ui.9bfc6d2613650b">DNS → Records → Add record</ng-container></strong>.</li><li><ng-container i18n="@@ui.1ed84cf3c0119d">Crea el TXT de propiedad y el CNAME de tráfico con los nombres y valores que aparecen debajo.</ng-container></li><li><ng-container i18n="@@ui.5a0df99f6417ea">En el CNAME selecciona </ng-container><strong><ng-container i18n="@@ui.9f7f82a4887e3e">DNS only</ng-container></strong> <ng-container i18n="@@ui.03a4262e197045">(nube gris). Este flujo necesita un CNAME directo, sin proxy ni flattening.</ng-container></li><li><ng-container i18n="@@ui.d2f0c58deba2ba">Guarda los registros y vuelve a UVH para comprobar la conexión.</ng-container></li></ol>
+        <p><a href="https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/" target="_blank" rel="noopener noreferrer"><ng-container i18n="@@ui.9b92d970142c4a">Consultar la documentación oficial de Cloudflare</ng-container><span class="cdk-visually-hidden"> <ng-container i18n="@@ui.454d00af1db038">(se abre en otra pestaña)</ng-container></span></a></p>
       } @else {
-        <p>Abre la zona DNS de tu dominio y crea un registro TXT para acreditar la propiedad y un CNAME para dirigir el tráfico. Usa los nombres completos mostrados debajo; revisa si tu proveedor añade automáticamente la zona para no duplicarla.</p>
+        <p><ng-container i18n="@@ui.55a6a25758db19">Abre la zona DNS de tu dominio y crea un registro TXT para acreditar la propiedad y un CNAME para dirigir el tráfico. Usa los nombres completos mostrados debajo; revisa si tu proveedor añade automáticamente la zona para no duplicarla.</ng-container></p>
       }
-      <p>Conserva ambos registros durante todo el uso del dominio. La propagación depende del proveedor y de las cachés DNS.</p>
+      <p><ng-container i18n="@@ui.6f081ec5482944">Conserva ambos registros durante todo el uso del dominio. La propagación depende del proveedor y de las cachés DNS.</ng-container></p>
     }
     <p class="copy-status" role="status" aria-live="polite">{{ copyStatus() }}</p>
   </section>
 
   <div class="diagnostic-grid">
     <section class="diagnostic-card" aria-labelledby="ownership-title">
-      <header><span class="step">1</span><div><h2 id="ownership-title">Propiedad</h2><p>Registro TXT</p></div><mat-icon [class.ready]="!!d.ownershipVerifiedAt">{{ d.ownershipVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon></header>
-      <p class="observed">{{ d.ownershipVerifiedAt ? 'Confirmada el ' + formatDate(d.ownershipVerifiedAt) : d.ownershipTxtPresent === false ? 'No encontramos el registro TXT' : d.ownershipTxtPresent ? 'El registro TXT existe pero su valor no coincide' : 'Aún no confirmada' }}</p>
+      <header><span class="step">1</span><div><h2 id="ownership-title"><ng-container i18n="@@ui.0cefd64415d26b">Propiedad</ng-container></h2><p><ng-container i18n="@@ui.c29ac105d201da">Registro TXT</ng-container></p></div><mat-icon [class.ready]="!!d.ownershipVerifiedAt">{{ d.ownershipVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon></header>
+      <p class="observed">{{ d.ownershipVerifiedAt ? uiText.ui_328912a34d5aa6 + formatDate(d.ownershipVerifiedAt) : d.ownershipTxtPresent === false ? uiText.ui_7ab5589580568c : d.ownershipTxtPresent ? uiText.ui_24966a8e489c23 : uiText.ui_8b46ed596be0ab }}</p>
       @if (canEdit() && d.verificationHost && d.verificationToken) {
-        <div class="record"><span>Nombre</span><code>{{ d.verificationHost }}</code><button mat-icon-button type="button" (click)="copy(d.verificationHost, 'Nombre TXT')" aria-label="Copiar nombre TXT"><mat-icon>content_copy</mat-icon></button></div>
-        <div class="record"><span>Valor</span><code>{{ d.verificationToken }}</code><button mat-icon-button type="button" (click)="copy(d.verificationToken, 'Valor TXT')" aria-label="Copiar valor TXT"><mat-icon>content_copy</mat-icon></button></div>
-        <p class="warning" role="status"><strong>Mantén este registro TXT.</strong> UVH lo comprueba periódicamente para confirmar que sigues controlando el dominio. Si lo eliminas, el dominio puede dejar de servir enlaces tras el periodo de seguridad.</p>
+        <div class="record"><span><ng-container i18n="@@ui.562bb15757a8b5">Nombre</ng-container></span><code>{{ d.verificationHost }}</code><button mat-icon-button type="button" (click)="copy(d.verificationHost, uiText.ui_88234a3675fc3e)" aria-label="Copiar nombre TXT" i18n-aria-label="@@ui.56e9066855e267"><mat-icon>content_copy</mat-icon></button></div>
+        <div class="record"><span><ng-container i18n="@@ui.b2f530c4699131">Valor</ng-container></span><code>{{ d.verificationToken }}</code><button mat-icon-button type="button" (click)="copy(d.verificationToken, 'Valor TXT')" aria-label="Copiar valor TXT" i18n-aria-label="@@ui.e3e111f99ff254"><mat-icon>content_copy</mat-icon></button></div>
+        <p class="warning" role="status"><strong><ng-container i18n="@@ui.636aa531243257">Mantén este registro TXT.</ng-container></strong> <ng-container i18n="@@ui.c67ecd756d811f">UVH lo comprueba periódicamente para confirmar que sigues controlando el dominio. Si lo eliminas, el dominio puede dejar de servir enlaces tras el periodo de seguridad.</ng-container></p>
       } @else if (d.verificationHost) {
-        <div class="record"><span>Nombre</span><code>{{ d.verificationHost }}</code></div>
+        <div class="record"><span><ng-container i18n="@@ui.562bb15757a8b5">Nombre</ng-container></span><code>{{ d.verificationHost }}</code></div>
       }
     </section>
 
     <section class="diagnostic-card" aria-labelledby="routing-title">
-      <header><span class="step">2</span><div><h2 id="routing-title">Ruta DNS</h2><p>Registro CNAME</p></div><mat-icon [class.ready]="!!d.routingVerifiedAt">{{ d.routingVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon></header>
-      <p class="observed">{{ d.routingVerifiedAt ? 'Confirmada el ' + formatDate(d.routingVerifiedAt) : 'Aún no confirmada' }}</p>
-      <div class="record"><span>Nombre</span><code>{{ d.domain }}</code><button mat-icon-button type="button" (click)="copy(d.domain, 'Nombre CNAME')" aria-label="Copiar nombre CNAME"><mat-icon>content_copy</mat-icon></button></div>
+      <header><span class="step">2</span><div><h2 id="routing-title"><ng-container i18n="@@ui.8b2a0b3e4a3af7">Ruta DNS</ng-container></h2><p><ng-container i18n="@@ui.ff8e6d41fa3a85">Registro CNAME</ng-container></p></div><mat-icon [class.ready]="!!d.routingVerifiedAt">{{ d.routingVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon></header>
+      <p class="observed">{{ d.routingVerifiedAt ? uiText.ui_328912a34d5aa6 + formatDate(d.routingVerifiedAt) : uiText.ui_8b46ed596be0ab }}</p>
+      <div class="record"><span><ng-container i18n="@@ui.562bb15757a8b5">Nombre</ng-container></span><code>{{ d.domain }}</code><button mat-icon-button type="button" (click)="copy(d.domain, uiText.ui_9b79892d660083)" aria-label="Copiar nombre CNAME" i18n-aria-label="@@ui.020f87d0154a2d"><mat-icon>content_copy</mat-icon></button></div>
       @if (d.cnameTarget) {
-        <div class="record"><span>Destino</span><code>{{ d.cnameTarget }}</code><button mat-icon-button type="button" (click)="copy(d.cnameTarget, 'Destino CNAME')" aria-label="Copiar destino CNAME"><mat-icon>content_copy</mat-icon></button></div>
+        <div class="record"><span><ng-container i18n="@@ui.8e7290e445465b">Destino</ng-container></span><code>{{ d.cnameTarget }}</code><button mat-icon-button type="button" (click)="copy(d.cnameTarget, uiText.ui_d8510f439a184d)" aria-label="Copiar destino CNAME" i18n-aria-label="@@ui.6741a4bcfe965e"><mat-icon>content_copy</mat-icon></button></div>
       } @else {
-        <p class="warning">El destino CNAME no está configurado en este entorno.</p>
+        <p class="warning"><ng-container i18n="@@ui.f3f0856e4f02fd">El destino CNAME no está configurado en este entorno.</ng-container></p>
       }
       @if (observedRoutingLabel(); as observed) {
         <p class="observed" role="status">{{ observed }}</p>
       }
       @if (d.routingObservedProxied) {
-        <p class="warning" role="status">Parece haber un proxy DNS delante (p. ej. Cloudflare «naranja») o flattening. Este flujo sólo admite un CNAME directo.</p>
+        <p class="warning" role="status"><ng-container i18n="@@ui.34ec505b32642e">Parece haber un proxy DNS delante (p. ej. Cloudflare «naranja») o flattening. Este flujo sólo admite un CNAME directo.</ng-container></p>
       }
     </section>
 
     <section class="diagnostic-card" aria-labelledby="tls-title">
-      <header><span class="step">3</span><div><h2 id="tls-title">HTTPS</h2><p>Certificado TLS</p></div><mat-icon [class.ready]="!!d.tlsReadyAt">{{ d.tlsReadyAt ? 'verified_user' : 'schedule' }}</mat-icon></header>
-      <p class="observed">{{ d.tlsReadyAt ? 'Preparado el ' + formatDate(d.tlsReadyAt) : d.state === 'provisioning' ? 'Emisión en curso' : 'Todavía no preparado' }}</p>
+      <header><span class="step">3</span><div><h2 id="tls-title"><ng-container i18n="@@ui.205ecf3f81bf7e">HTTPS</ng-container></h2><p><ng-container i18n="@@ui.5cb69c21a5c794">Certificado TLS</ng-container></p></div><mat-icon [class.ready]="!!d.tlsReadyAt">{{ d.tlsReadyAt ? 'verified_user' : 'schedule' }}</mat-icon></header>
+      <p class="observed">{{ d.tlsReadyAt ? uiText.ui_274119fd877385 + formatDate(d.tlsReadyAt) : d.state === 'provisioning' ? uiText.ui_d012295346c8e7 : uiText.ui_b1e9af822b9906 }}</p>
       @if (tlsExpiryLabel(); as expiry) { <p class="observed" role="status">{{ expiry }}</p> }
-      @if (d.tlsIssuer) { <p class="observed">Emitido por {{ d.tlsIssuer }}.</p> }
+      @if (d.tlsIssuer) { <p class="observed"><ng-container i18n="@@ui.387e86e3c7abe5">Emitido por {{ d.tlsIssuer }}.</ng-container></p> }
       @if (caaLabel(); as caa) { <p class="warning" role="status">{{ caa }}</p> }
       @if (tlsErrorLabel(d.tlsError); as tlsMessage) { <p class="warning" role="status">{{ tlsMessage }}</p> }
     </section>
@@ -91,47 +91,47 @@
 
   @if (canEdit()) {
     <section class="setup-guide" aria-labelledby="check-title">
-      <h2 id="check-title">2. Comprueba la conexión y prepara HTTPS</h2>
-      <p>UVH comprobará el TXT y el CNAME. Cuando estén correctos, preparará HTTPS automáticamente cuando corresponda. Si un intento anterior quedó pendiente, podrás reintentarlo aquí.</p>
-      <div class="actions"><button mat-flat-button type="button" (click)="startDnsCheck()" [disabled]="actionBusy() || dnsWait() > 0 || d.dnsCheckInProgress || d.tlsStatus === 'provisioning'"><mat-icon aria-hidden="true">dns</mat-icon>{{ d.dnsCheckInProgress ? 'Comprobando conexión…' : 'Comprobar conexión' }}</button>
-        @if (d.state === 'verified' && d.tlsStatus !== 'provisioning') { <button mat-stroked-button type="button" (click)="activate()" [disabled]="actionBusy() || tlsWait() > 0 || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon aria-hidden="true">https</mat-icon>Preparar HTTPS</button> }
+      <h2 id="check-title"><ng-container i18n="@@ui.1d83492d8e8507">2. Comprueba la conexión y prepara HTTPS</ng-container></h2>
+      <p><ng-container i18n="@@ui.876061e37049da">UVH comprobará el TXT y el CNAME. Cuando estén correctos, preparará HTTPS automáticamente cuando corresponda. Si un intento anterior quedó pendiente, podrás reintentarlo aquí.</ng-container></p>
+      <div class="actions"><button mat-flat-button type="button" (click)="startDnsCheck()" [disabled]="actionBusy() || dnsWait() > 0 || d.dnsCheckInProgress || d.tlsStatus === 'provisioning'"><mat-icon aria-hidden="true">dns</mat-icon>{{ d.dnsCheckInProgress ? uiText.ui_0a8bf48f81f4e0 : uiText.ui_390c6c1a7f6da9 }}</button>
+        @if (d.state === 'verified' && d.tlsStatus !== 'provisioning') { <button mat-stroked-button type="button" (click)="activate()" [disabled]="actionBusy() || tlsWait() > 0 || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon aria-hidden="true">https</mat-icon><ng-container i18n="@@ui.7b3d1234a44cb1">Preparar HTTPS</ng-container></button> }
       </div>
-      @if (dnsWait() > 0) { <p role="status">Podrás volver a comprobar DNS en {{ waitLabel(dnsWait()) }}.</p> }
-      @if (tlsWait() > 0) { <p role="status">Podrás reintentar HTTPS en {{ waitLabel(tlsWait()) }}.</p> }
-      <p>Última comprobación: {{ formatDate(d.dnsCheckCompletedAt) }}. @if (d.tlsNextRetryAt) { Próximo reintento HTTPS: {{ formatDate(d.tlsNextRetryAt) }}. }</p>
+      @if (dnsWait() > 0) { <p role="status"><ng-container i18n="@@ui.273e11bea2ae9a">Podrás volver a comprobar DNS en {{ waitLabel(dnsWait()) }}.</ng-container></p> }
+      @if (tlsWait() > 0) { <p role="status"><ng-container i18n="@@ui.99d93af2821c32">Podrás reintentar HTTPS en {{ waitLabel(tlsWait()) }}.</ng-container></p> }
+      <p><ng-container i18n="@@ui.d8f393dcb5dac4">Última comprobación: {{ formatDate(d.dnsCheckCompletedAt) }}. </ng-container>@if (d.tlsNextRetryAt) { <ng-container i18n="@@ui.f709f86cf46627">Próximo reintento HTTPS: {{ formatDate(d.tlsNextRetryAt) }}. </ng-container>}</p>
     </section>
   }
 
-  <details class="advanced-diagnostics"><summary>Diagnóstico avanzado, historial y preferencias</summary>
+  <details class="advanced-diagnostics"><summary><ng-container i18n="@@ui.a77ffa8ea0caca">Diagnóstico avanzado, historial y preferencias</ng-container></summary>
 
   <section class="schedule-card" aria-labelledby="schedule-title">
     <div>
-      <span class="eyebrow">Calendario de comprobación</span>
-      <h2 id="schedule-title">Revalidación DNS</h2>
+      <span class="eyebrow"><ng-container i18n="@@ui.ac04d0b1be1f60">Calendario de comprobación</ng-container></span>
+      <h2 id="schedule-title"><ng-container i18n="@@ui.a54d1539cb43e3">Revalidación DNS</ng-container></h2>
     </div>
     <dl>
-      <div><dt>Último inicio</dt><dd>{{ formatDate(d.dnsCheckStartedAt) }}</dd></div>
-      <div><dt>Último resultado</dt><dd>{{ formatDate(d.dnsCheckCompletedAt) }}</dd></div>
-      <div><dt>Próximo intento automático</dt><dd>{{ d.dnsCheckInProgress ? 'En curso' : d.automaticDnsRetry ? (d.dnsCheckDue ? 'Pendiente de ejecución' : formatDate(d.nextDnsCheckAt)) : 'Sólo tras activarlo' }}</dd></div>
-      <div><dt>Política actual</dt><dd>{{ d.automaticDnsRetry ? 'Cada ' + d.dnsRetryIntervalHours + ' h según el último resultado' : 'Sin reintento automático' }}</dd></div>
+      <div><dt><ng-container i18n="@@ui.6801dddbb7acf0">Último inicio</ng-container></dt><dd>{{ formatDate(d.dnsCheckStartedAt) }}</dd></div>
+      <div><dt><ng-container i18n="@@ui.d527eade588280">Último resultado</ng-container></dt><dd>{{ formatDate(d.dnsCheckCompletedAt) }}</dd></div>
+      <div><dt><ng-container i18n="@@ui.8b6a1e8c0e4355">Próximo intento automático</ng-container></dt><dd>{{ d.dnsCheckInProgress ? uiText.ui_75f1f75e333774 : d.automaticDnsRetry ? (d.dnsCheckDue ? uiText.ui_4c203f7ff6b952 : formatDate(d.nextDnsCheckAt)) : uiText.ui_051e25b8f8f646 }}</dd></div>
+      <div><dt><ng-container i18n="@@ui.c1f3c0c380b002">Política actual</ng-container></dt><dd>{{ d.automaticDnsRetry ? uiText.ui_fb3e1e42c59e34 + d.dnsRetryIntervalHours + uiText.ui_650d98937e43bf : uiText.ui_34c8600fb681df }}</dd></div>
     </dl>
     @if (dnsErrorLabel(d.dnsError); as dnsMessage) { <p class="warning" role="status">{{ dnsMessage }}</p> }
     @if (graceLabel(); as grace) { <p class="warning degraded" role="status">{{ grace }}</p> }
-    <p class="scheduler-note">La fecha indica cuándo el planificador puede admitir el trabajo. La ejecución puede demorarse por cola. Mientras haya una comprobación o una emisión en curso, esta página se actualiza sola.</p>
+    <p class="scheduler-note"><ng-container i18n="@@ui.5f38728322896a">La fecha indica cuándo el planificador puede admitir el trabajo. La ejecución puede demorarse por cola. Mientras haya una comprobación o una emisión en curso, esta página se actualiza sola.</ng-container></p>
   </section>
 
   <section class="schedule-card activity-card" aria-labelledby="activity-title">
     <div>
-      <span class="eyebrow">Historial</span>
-      <h2 id="activity-title">Actividad del dominio</h2>
+      <span class="eyebrow"><ng-container i18n="@@ui.995c071dfaee74">Historial</ng-container></span>
+      <h2 id="activity-title"><ng-container i18n="@@ui.26b8880c93d52e">Actividad del dominio</ng-container></h2>
     </div>
-    <p class="scheduler-note">Historial de cambios y comprobaciones del dominio, con los eventos disponibles para las integraciones.</p>
+    <p class="scheduler-note"><ng-container i18n="@@ui.13fa5eaf9b0a59">Historial de cambios y comprobaciones del dominio, con los eventos disponibles para las integraciones.</ng-container></p>
     @if (activityError(); as message) {
       <p class="warning" role="status">{{ message }}</p>
     } @else if (activityLoading() && !activity().length) {
-      <p class="scheduler-note" role="status">Cargando actividad…</p>
+      <p class="scheduler-note" role="status"><ng-container i18n="@@ui.494d2157d69784">Cargando actividad…</ng-container></p>
     } @else if (!activity().length) {
-      <p class="scheduler-note">Todavía no hay eventos registrados para este dominio.</p>
+      <p class="scheduler-note"><ng-container i18n="@@ui.b538f601e29a61">Todavía no hay eventos registrados para este dominio.</ng-container></p>
     }
     @if (activity().length) {
       <ul class="activity-list">
@@ -150,37 +150,37 @@
 
   <section class="schedule-card" aria-labelledby="surface-title">
     <div>
-      <span class="eyebrow">Comportamiento del dominio</span>
-      <h2 id="surface-title">Página principal y rutas desconocidas</h2>
+      <span class="eyebrow"><ng-container i18n="@@ui.decd20c6b9d9cc">Comportamiento del dominio</ng-container></span>
+      <h2 id="surface-title"><ng-container i18n="@@ui.cbcefef25d6597">Página principal y rutas desconocidas</ng-container></h2>
     </div>
-    <p class="scheduler-note">Configura el destino de la página principal <code>/</code> y la respuesta para una ruta desconocida.</p>
+    <p class="scheduler-note"><ng-container i18n="@@ui.fa70be72587a9a">Configura el destino de la página principal </ng-container><code>/</code> <ng-container i18n="@@ui.f07ddbf49e647b">y la respuesta para una ruta desconocida.</ng-container></p>
     @if (canEdit()) {
       <div class="surface-form">
         <mat-form-field appearance="outline" class="surface-root">
-          <mat-label>Destino raíz (/)</mat-label>
-          <input matInput [ngModel]="rootDestinationInput()" (ngModelChange)="onRootChange($event)" placeholder="https://tu-marca.com" />
-          <mat-hint>Vacío: la raíz responde «no encontrado».</mat-hint>
+          <mat-label><ng-container i18n="@@ui.395a1dc2f09128">Destino raíz (/)</ng-container></mat-label>
+          <input matInput [ngModel]="rootDestinationInput()" (ngModelChange)="onRootChange($event)" placeholder="https://tu-marca.com"  i18n-placeholder="@@ui.a9ca25f38417fc"/>
+          <mat-hint><ng-container i18n="@@ui.79f4bb179be86b">Vacío: la raíz responde «no encontrado».</ng-container></mat-hint>
         </mat-form-field>
         <mat-form-field appearance="outline">
-          <mat-label>Rutas desconocidas</mat-label>
+          <mat-label><ng-container i18n="@@ui.491144e9ad617c">Rutas desconocidas</ng-container></mat-label>
           <mat-select [value]="notFoundModeInput()" (selectionChange)="onModeChange($event.value)">
-            <mat-option value="platform">Aviso de la plataforma</mat-option>
-            <mat-option value="redirect">Redirigir al destino raíz</mat-option>
-            <mat-option value="branded">Aviso con la marca del dominio</mat-option>
+            <mat-option value="platform"><ng-container i18n="@@ui.83c88ff37315fe">Aviso de la plataforma</ng-container></mat-option>
+            <mat-option value="redirect"><ng-container i18n="@@ui.edbf1580d733ff">Redirigir al destino raíz</ng-container></mat-option>
+            <mat-option value="branded"><ng-container i18n="@@ui.c72146238dea91">Aviso con la marca del dominio</ng-container></mat-option>
           </mat-select>
         </mat-form-field>
-        <button mat-flat-button color="primary" type="button" (click)="saveSurface()" [disabled]="actionBusy()"><mat-icon>save</mat-icon> Guardar</button>
+        <button mat-flat-button color="primary" type="button" (click)="saveSurface()" [disabled]="actionBusy()"><mat-icon>save</mat-icon> <ng-container i18n="@@ui.13e51a210f45ed">Guardar</ng-container></button>
       </div>
     } @else {
       <dl>
-        <div><dt>Destino raíz</dt><dd>{{ d.rootDestination ?? 'Sin destino configurado' }}</dd></div>
-        <div><dt>Rutas desconocidas</dt><dd>{{ surfaceModeLabel(d.notFoundMode) }}</dd></div>
+        <div><dt><ng-container i18n="@@ui.593bf2563d04a2">Destino raíz</ng-container></dt><dd>{{ d.rootDestination ?? uiText.ui_ef4f479741900f }}</dd></div>
+        <div><dt><ng-container i18n="@@ui.491144e9ad617c">Rutas desconocidas</ng-container></dt><dd>{{ surfaceModeLabel(d.notFoundMode) }}</dd></div>
       </dl>
     }
   </section>
   </details>
   <app-domain-app-profile [domainId]="d.id" [domain]="d.domain" />
   @if (canAdmin()) {
-    <section class="domain-removal"><div><h2>Eliminar dominio</h2><p>Revisa sus enlaces y los de la papelera antes de confirmar el borrado.</p></div><button mat-stroked-button class="danger" type="button" (click)="remove()" [disabled]="actionBusy()" [attr.aria-label]="'Eliminar ' + d.domain"><mat-icon aria-hidden="true">delete_outline</mat-icon>Eliminar dominio</button></section>
+    <section class="domain-removal"><div><h2><ng-container i18n="@@ui.5a624d67c83f69">Eliminar dominio</ng-container></h2><p><ng-container i18n="@@ui.98a7f22053bcd3">Revisa sus enlaces y los de la papelera antes de confirmar el borrado.</ng-container></p></div><button mat-stroked-button class="danger" type="button" (click)="remove()" [disabled]="actionBusy()" [attr.aria-label]="uiText.ui_46b36b8c9fa695 + d.domain"><mat-icon aria-hidden="true">delete_outline</mat-icon><ng-container i18n="@@ui.5a624d67c83f69">Eliminar dominio</ng-container></button></section>
   }
 }

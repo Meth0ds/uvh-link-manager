@@ -8,9 +8,9 @@ import type { AccountRecoveryStatus } from "./models";
  * way in Spanish ("Estado: Aprobada" agrees with recuperación).
  */
 export const ACCOUNT_RECOVERY_STATE_LABEL: Record<AccountRecoveryStatus, string> = {
-  requested: "Email pendiente",
-  email_confirmed: "Lista para revisar",
-  in_review: "En revisión",
+  requested: $localize`:@@ui.1a0effbc02c9c7:Email pendiente`,
+  email_confirmed: $localize`:@@ui.120e2da744adf0:Lista para revisar`,
+  in_review: $localize`:@@ui.a193059ef75192:En revisión`,
   approved: "Aprobada",
   rejected: "Rechazada",
   completed: "Completada",

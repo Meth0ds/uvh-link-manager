@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, signal, viewChild } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -31,6 +32,7 @@ export type DataExportDialogResult = boolean | "unconfirmed";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DataExportDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly data = inject<DataExportDialogData>(MAT_DIALOG_DATA);
   readonly ref = inject(MatDialogRef<DataExportDialogComponent, DataExportDialogResult>);
   private readonly auth = inject(AuthService);
@@ -88,7 +90,7 @@ export class DataExportDialogComponent {
     }
     if (this.auth.sessionGeneration() !== this.context) {
       this.clearSecrets();
-      this.error.set("Tu sesión ha cambiado. Cierra esta ventana y empieza de nuevo.");
+      this.error.set($localize`:@@ui.2538ca555395be:Tu sesión ha cambiado. Cierra esta ventana y empieza de nuevo.`);
       this.moveTo(1);
       return;
     }
@@ -113,8 +115,8 @@ export class DataExportDialogComponent {
         this.error.set(error instanceof ApiRequestError
           ? error.message
           : this.isDownload
-            ? "No se pudo descargar el archivo. Sigue disponible: vuelve a intentarlo."
-            : "No se pudo confirmar la solicitud. Comprueba su estado antes de volver a intentarlo.");
+            ? $localize`:@@ui.1de9f6ab065bde:No se pudo descargar el archivo. Sigue disponible: vuelve a intentarlo.`
+            : $localize`:@@ui.a5d3a521ca5b9d:No se pudo confirmar la solicitud. Comprueba su estado antes de volver a intentarlo.`);
         this.moveTo(1);
       }
     } finally {
@@ -126,10 +128,10 @@ export class DataExportDialogComponent {
   }
 
   primaryLabel(): string {
-    if (this.requiresMfa) return "Continuar a 2FA";
+    if (this.requiresMfa) return $localize`:@@ui.4d6b9e9999ef24:Continuar a 2FA`;
     return this.busy()
       ? (this.isDownload ? "Descargando…" : "Solicitando…")
-      : (this.isDownload ? "Descargar archivo" : "Solicitar mi archivo");
+      : (this.isDownload ? $localize`:@@ui.78af97cd8f0e7c:Descargar archivo` : $localize`:@@ui.8030f0c5576b80:Solicitar mi archivo`);
   }
 
   private async finishDownload(password: string, factorCode?: string): Promise<void> {
@@ -139,7 +141,7 @@ export class DataExportDialogComponent {
       // No se acusa nada: la exportación sigue `ready` y un reintento vuelve
       // a entregar el mismo archivo tras un nuevo step-up.
       this.clearSecrets();
-      this.error.set("El navegador no pudo guardar el archivo. La exportación sigue disponible: vuelve a intentarlo.");
+      this.error.set($localize`:@@ui.e5d1ebce649a98:El navegador no pudo guardar el archivo. La exportación sigue disponible: vuelve a intentarlo.`);
       this.moveTo(1);
       return;
     }

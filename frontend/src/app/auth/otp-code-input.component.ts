@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, EventEmitter, Input, OnInit, Output, QueryList, ViewChildren, afterNextRender, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
@@ -28,7 +29,7 @@ import { FormControl, ReactiveFormsModule } from "@angular/forms";
           maxlength="1"
           [value]="box"
           [disabled]="disabled"
-          [attr.aria-label]="$index === 0 ? 'Código de autenticación' : 'Dígito ' + ($index + 1) + ' de 6'"
+          [attr.aria-label]="$index === 0 ? uiText.ui_a316754c4db165 : uiText.ui_765b83ea01e8b1 + ($index + 1) + uiText.ui_5202cbdd86f5ce"
           (input)="onInput($event, $index)"
           (keydown)="onKeydown($event, $index)"
           (paste)="onPaste($event, $index)"
@@ -59,6 +60,7 @@ import { FormControl, ReactiveFormsModule } from "@angular/forms";
   `],
 })
 export class OtpCodeInputComponent implements OnInit {
+  readonly uiText = UI_TEXT;
   @Input({ required: true }) control!: FormControl<string | null>;
   @Input() disabled = false;
   /** Fires exactly once each time the sixth digit lands. */

@@ -9,16 +9,16 @@
   emptyHint="No hay casos que coincidan con esta vista."
   [compactEmpty]="true"
   [pageSizes]="pageSizes"
->
+ i18n-title="@@ui.ec0df73ff39d79" i18n-emptyTitle="@@ui.545295a64e3abb" i18n-loadingLabel="@@ui.0a6cb4ae35618a">
   <p queue-summary>
-    Revisa las solicitudes de los propietarios para mantener o retirar el bloqueo de sus enlaces.@if (!appeals.stale()) { {{ countLabel(appeals.total(), "caso coincide", "casos coinciden") }} con los filtros. }
+    <ng-container i18n="@@ui.b3c721b6273575">Revisa las solicitudes de los propietarios para mantener o retirar el bloqueo de sus enlaces.</ng-container>@if (!appeals.stale()) { <ng-container i18n="@@ui.b027669fd8e7cb">{{ countLabel(appeals.total(), "caso coincide", "casos coinciden") }} con los filtros. </ng-container>}
   </p>
 
   <div class="filters" queue-filters>
     <mat-form-field appearance="outline">
-      <mat-label>Estado de la apelación</mat-label>
-      <mat-select [value]="status()" (selectionChange)="filter($event.value)" aria-label="Estado de la apelación">
-        <mat-option value="">Todas</mat-option>
+      <mat-label><ng-container i18n="@@ui.f75af28fc5a843">Estado de la apelación</ng-container></mat-label>
+      <mat-select [value]="status()" (selectionChange)="filter($event.value)" aria-label="Estado de la apelación" i18n-aria-label="@@ui.f75af28fc5a843">
+        <mat-option value=""><ng-container i18n="@@ui.aff4d19d6ee43b">Todas</ng-container></mat-option>
         @for (option of appealStatusOptions; track option) { <mat-option [value]="option">{{ appealLabel(option) }}</mat-option> }
       </mat-select>
     </mat-form-field>
@@ -33,19 +33,19 @@
         </header>
         <div class="moderation-target"><b>/{{ appeal.alias }}</b><span [title]="appeal.destination">{{ appeal.destination }}</span></div>
         <div class="moderation-copy">
-          <span>Motivo presentado por el propietario</span>
-          @if (appeal.message) { <p>{{ appeal.message }}</p> } @else { <p>Sin comentario.</p> }
+          <span><ng-container i18n="@@ui.9f736df47f5a31">Motivo presentado por el propietario</ng-container></span>
+          @if (appeal.message) { <p>{{ appeal.message }}</p> } @else { <p><ng-container i18n="@@ui.7249fe4e11a2f3">Sin comentario.</ng-container></p> }
         </div>
-        <dl><div><dt>Workspace</dt><dd>#{{ appeal.workspace_id }}</dd></div><div><dt>Enlace</dt><dd>{{ linkStateLabel(appeal.link_state) }}</dd></div><div><dt>Solicitada</dt><dd>{{ formatDate(appeal.created_at) }}</dd></div></dl>
+        <dl><div><dt><ng-container i18n="@@ui.87bb59ba2f92f2">Workspace</ng-container></dt><dd>#{{ appeal.workspace_id }}</dd></div><div><dt><ng-container i18n="@@ui.08dab6446d0e6f">Enlace</ng-container></dt><dd>{{ linkStateLabel(appeal.link_state) }}</dd></div><div><dt><ng-container i18n="@@ui.1ef0e040384314">Solicitada</ng-container></dt><dd>{{ formatDate(appeal.created_at) }}</dd></div></dl>
         @if (appeal.decided_at) {
-          <div class="appeal-verdict"><span>Resuelta {{ formatDate(appeal.decided_at) }}</span>@if (appeal.decision_note) { <p>{{ appeal.decision_note }}</p> }</div>
+          <div class="appeal-verdict"><span><ng-container i18n="@@ui.624296ec861fe1">Resuelta {{ formatDate(appeal.decided_at) }}</ng-container></span>@if (appeal.decision_note) { <p>{{ appeal.decision_note }}</p> }</div>
         }
         <footer>
           @if (appeal.status === "open") {
-            <button mat-flat-button type="button" (click)="resolve(appeal, 'restore')" [attr.aria-label]="'Restaurar /' + appeal.alias" [disabled]="appeals.stale() || busy()"><mat-icon>restart_alt</mat-icon>Restaurar enlace</button>
-            <button mat-stroked-button class="danger-button" type="button" (click)="resolve(appeal, 'uphold')" [attr.aria-label]="'Confirmar el bloqueo de /' + appeal.alias" [disabled]="appeals.stale() || busy()"><mat-icon>gavel</mat-icon>Confirmar bloqueo</button>
+            <button mat-flat-button type="button" (click)="resolve(appeal, 'restore')" [attr.aria-label]="uiText.ui_4423a1ad0edaff + appeal.alias" [disabled]="appeals.stale() || busy()"><mat-icon>restart_alt</mat-icon><ng-container i18n="@@ui.917670d52a893a">Restaurar enlace</ng-container></button>
+            <button mat-stroked-button class="danger-button" type="button" (click)="resolve(appeal, 'uphold')" [attr.aria-label]="uiText.ui_488baeefd9a8fb + appeal.alias" [disabled]="appeals.stale() || busy()"><mat-icon>gavel</mat-icon><ng-container i18n="@@ui.56095944348484">Confirmar bloqueo</ng-container></button>
           } @else {
-            <span class="appeal-settled"><mat-icon aria-hidden="true">done_all</mat-icon>Ya resuelta</span>
+            <span class="appeal-settled"><mat-icon aria-hidden="true">done_all</mat-icon><ng-container i18n="@@ui.25b318c4ba7aa3">Ya resuelta</ng-container></span>
           }
         </footer>
       </article>

@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { Component, DestroyRef, inject, signal, computed, effect, ChangeDetectionStrategy } from "@angular/core";
 
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -30,6 +31,7 @@ import { qrContrast, qrPrintLayout, validateQrPhysicalSize, validateQrDesign, ty
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class QrDialogComponent {
+  readonly uiText = UI_TEXT;
   private readonly destroyRef = inject(DestroyRef);
   private readonly qrCode = inject(QrCodeService);
   private readonly qrShare = inject(QrShareService);
@@ -105,7 +107,7 @@ export class QrDialogComponent {
       else validateQrPhysicalSize(this.design(), this.modules(), this.sizeMm());
       return null;
     }
-    catch (error) { return error instanceof Error ? error.message : "Configuración de impresión inválida."; }
+    catch (error) { return error instanceof Error ? error.message : $localize`:@@ui.470cd23a58392b:Configuración de impresión inválida.`; }
   });
   readonly printSlots = computed(() => {
     const layout = this.printLayout();
@@ -135,21 +137,21 @@ export class QrDialogComponent {
   readonly printPreviewBusy = signal(false);
   private logoRevision = 0;
   readonly correctionLevels = [
-    { level: "L", label: "Baja" },
-    { level: "M", label: "Media" },
-    { level: "Q", label: "Alta" },
-    { level: "H", label: "Máxima" },
+    { level: "L", label: $localize`:@@ui.0b6af7d377dad0:Baja` },
+    { level: "M", label: $localize`:@@ui.d357175cfe8978:Media` },
+    { level: "Q", label: $localize`:@@ui.42719229fd62e2:Alta` },
+    { level: "H", label: $localize`:@@ui.6c14c547e5a557:Máxima` },
   ] as const;
   readonly margins = [
-    { size: 4, label: "Estándar" },
-    { size: 6, label: "Amplio" },
-    { size: 8, label: "Extra" },
+    { size: 4, label: $localize`:@@ui.51db4780cd4e5d:Estándar` },
+    { size: 6, label: $localize`:@@ui.6f70bf63b7f445:Amplio` },
+    { size: 8, label: $localize`:@@ui.2e4aaf05df1cbf:Extra` },
   ] as const;
   readonly downloadSizes = [
-    { size: 512, label: "Digital" },
-    { size: 1024, label: "Versátil" },
-    { size: 2048, label: "Impresión" },
-    { size: 4096, label: "Gran formato" },
+    { size: 512, label: $localize`:@@ui.42be1f53d688ed:Digital` },
+    { size: 1024, label: $localize`:@@ui.3ef124f94a3ccc:Versátil` },
+    { size: 2048, label: $localize`:@@ui.075fb21ba19f4c:Impresión` },
+    { size: 4096, label: $localize`:@@ui.91cd61591e9058:Gran formato` },
   ] as const;
 
   constructor() {
@@ -190,12 +192,12 @@ export class QrDialogComponent {
           logo = await this.library.preparedLogo(variant.spec.logo.assetId, variant.name, { signal: this.exportAbort.signal });
           if (!this.validContext()) return;
         } catch (error) {
-          if (this.validContext()) { this.canonicalFailed.set(true); this.previewBusy.set(false); this.dataUrl.set(null); this.error.set(error instanceof Error ? error.message : "No se pudo recuperar el logo guardado."); }
+          if (this.validContext()) { this.canonicalFailed.set(true); this.previewBusy.set(false); this.dataUrl.set(null); this.error.set(error instanceof Error ? error.message : $localize`:@@ui.68ed244231033e:No se pudo recuperar el logo guardado.`); }
           return;
         }
       }
       this.savedCampaignDesign.set(JSON.stringify(variant.spec));
-      this.confirmation.set("QR de campaña guardado. Descarga esta nueva versión para atribuir sus visitas.");
+      this.confirmation.set($localize`:@@ui.fec6b2f75a4b71:QR de campaña guardado. Descarga esta nueva versión para atribuir sus visitas.`);
       await this.applyDesign({ spec: variant.spec, logo });
     } finally { if (this.validContext()) this.canonicalBusy.set(false); }
   }
@@ -256,10 +258,10 @@ export class QrDialogComponent {
       if (!current()) return;
       const file = this.qrShare.file(blob);
       if (!this.qrShare.supports(file)) {
-        this.shareFallback.set(true); this.shareNotice.set("Este navegador no permite compartir esta imagen. Descarga el PNG y añádelo a tu aplicación.");
+        this.shareFallback.set(true); this.shareNotice.set($localize`:@@ui.9b619b47694c1a:Este navegador no permite compartir esta imagen. Descarga el PNG y añádelo a tu aplicación.`);
       } else this.shareFile.set(file);
     } catch {
-      if (current()) { this.shareFallback.set(true); this.shareNotice.set("No se pudo preparar la imagen para compartir. Puedes intentar descargar el PNG."); }
+      if (current()) { this.shareFallback.set(true); this.shareNotice.set($localize`:@@ui.e9839fd1666c79:No se pudo preparar la imagen para compartir. Puedes intentar descargar el PNG.`); }
     } finally { if (current()) this.sharePreparing.set(false); }
   }
 
@@ -274,13 +276,13 @@ export class QrDialogComponent {
     const operation = this.qrShare.share(file);
     void operation.then(outcome => {
       if (!this.validContext() || !this.workflows.enabled() || revision !== this.shareRevision || key !== this.shareIdentity()) return;
-      if (outcome === "shared") this.shareNotice.set("Acción de compartir completada.");
-      else if (outcome === "cancelled") this.shareNotice.set("Has cerrado el menú de compartir.");
+      if (outcome === "shared") this.shareNotice.set($localize`:@@ui.73fa0aef9882ce:Acción de compartir completada.`);
+      else if (outcome === "cancelled") this.shareNotice.set($localize`:@@ui.022dbee55021a7:Has cerrado el menú de compartir.`);
       else {
         this.shareFallback.set(true);
         this.shareNotice.set(outcome === "denied"
-          ? "El navegador no ha permitido compartir la imagen. Revisa sus permisos o descarga el PNG."
-          : "No se pudo abrir el menú para esta imagen. Descarga el PNG y añádelo a tu aplicación.");
+          ? $localize`:@@ui.3836cc1fd502cc:El navegador no ha permitido compartir la imagen. Revisa sus permisos o descarga el PNG.`
+          : $localize`:@@ui.f41524611ee690:No se pudo abrir el menú para esta imagen. Descarga el PNG y añádelo a tu aplicación.`);
       }
     }).finally(() => { if (this.validContext() && revision === this.shareRevision) this.shareBusy.set(false); });
   }
@@ -297,7 +299,7 @@ export class QrDialogComponent {
     if (!this.dataUrl() || this.previewBusy() || this.logoBusy() || this.needsCustomLogo() || this.downloadBusy() || this.designBusy() || !this.validContext() || !this.campaignReady()) return;
     this.confirmation.set(null); this.copyFallback.set(false); this.error.set(null);
     if (!window.isSecureContext || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
-      this.error.set("Este navegador no permite copiar imágenes en este contexto. Puedes descargar el PNG y añadirlo a tu documento."); this.copyFallback.set(true); return;
+      this.error.set($localize`:@@ui.8bcfcca50e161c:Este navegador no permite copiar imágenes en este contexto. Puedes descargar el PNG y añadirlo a tu documento.`); this.copyFallback.set(true); return;
     }
     const design = this.design();
     this.downloadBusy.set(true); this.copying.set(true);
@@ -308,13 +310,13 @@ export class QrDialogComponent {
       const png = this.exportOptions().then(async options => {
         const blob = await this.qrCode.export(url, design, "png", options);
         options.signal?.throwIfAborted();
-        if (!this.validContext()) throw new DOMException("Contexto cambiado", "AbortError");
+        if (!this.validContext()) throw new DOMException($localize`:@@ui.9bef3e6db73693:Contexto cambiado`, "AbortError");
         return blob;
       });
       await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-      if (this.validContext()) this.confirmation.set("Imagen copiada. Ya puedes pegarla en tu documento.");
+      if (this.validContext()) this.confirmation.set($localize`:@@ui.0c8af2b3a9f14f:Imagen copiada. Ya puedes pegarla en tu documento.`);
     } catch {
-      if (this.validContext()) { this.error.set("No se pudo copiar la imagen. Comprueba el permiso del portapapeles o descarga el PNG."); this.copyFallback.set(true); }
+      if (this.validContext()) { this.error.set($localize`:@@ui.21ccd85ff0660b:No se pudo copiar la imagen. Comprueba el permiso del portapapeles o descarga el PNG.`); this.copyFallback.set(true); }
     } finally { if (this.validContext()) { this.downloadBusy.set(false); this.copying.set(false); this.progress.set(null); } }
   }
 
@@ -334,10 +336,10 @@ export class QrDialogComponent {
       const href = URL.createObjectURL(blob), anchor = document.createElement("a");
       anchor.href = href; anchor.download = `uvh-qr${this.bulkLinks && format !== "pdf" ? "-lote" : section === "print" || this.bulkLinks ? "-a4" : ""}.${this.bulkLinks && format !== "pdf" ? "zip" : format}`;
       try { anchor.click(); } finally { setTimeout(() => URL.revokeObjectURL(href), 60_000); }
-      this.confirmation.set("Archivo preparado. La descarga ha comenzado.");
+      this.confirmation.set($localize`:@@ui.608e84558056b9:Archivo preparado. La descarga ha comenzado.`);
     } catch (error) { if (this.validContext()) {
-      if (error instanceof DOMException && error.name === "AbortError") this.confirmation.set("Exportación cancelada.");
-      else this.error.set((forcePng ? "No se pudo preparar el PNG. " : "") + (error instanceof Error ? error.message : "No se pudo preparar el archivo."));
+      if (error instanceof DOMException && error.name === "AbortError") this.confirmation.set($localize`:@@ui.69bb1f424d99a2:Exportación cancelada.`);
+      else this.error.set((forcePng ? $localize`:@@ui.14417b74f41050:No se pudo preparar el PNG. ` : "") + (error instanceof Error ? error.message : $localize`:@@ui.d0867e97ba5b3f:No se pudo preparar el archivo.`));
     } }
     finally { if (this.validContext()) { this.downloadBusy.set(false); this.progress.set(null); } }
   }
@@ -378,7 +380,7 @@ export class QrDialogComponent {
       this.logoFile.set(file); this.assetId.set(null);
       await this.generate();
     } catch (error) {
-      if (current()) this.logoError.set(error instanceof Error ? error.message : "No se pudo preparar el logo. Prueba con otra imagen.");
+      if (current()) this.logoError.set(error instanceof Error ? error.message : $localize`:@@ui.40596aef63c420:No se pudo preparar el logo. Prueba con otra imagen.`);
     } finally {
       if (current()) this.logoBusy.set(false);
     }
@@ -460,7 +462,7 @@ export class QrDialogComponent {
         await new Promise<void>(resolve => setTimeout(resolve, 0));
       }
     } catch (error) {
-      if (current()) { this.dataUrl.set(null); this.error.set(error instanceof Error ? error.message : "No se pudo preparar la vista previa de la hoja."); }
+      if (current()) { this.dataUrl.set(null); this.error.set(error instanceof Error ? error.message : $localize`:@@ui.772418d168d74e:No se pudo preparar la vista previa de la hoja.`); }
     } finally { if (current()) this.printPreviewBusy.set(false); }
   }
 
@@ -484,7 +486,7 @@ export class QrDialogComponent {
     } catch (error) {
       if (current()) {
         this.dataUrl.set(null);
-        this.error.set("No se pudo generar el código QR. " + (error instanceof Error ? error.message : "Inténtalo de nuevo."));
+        this.error.set($localize`:@@ui.e31443fd4ab6f3:No se pudo generar el código QR. ` + (error instanceof Error ? error.message : $localize`:@@ui.985860a22b9a90:Inténtalo de nuevo.`));
       }
     } finally {
       if (current()) this.previewBusy.set(false);

@@ -50,4 +50,9 @@ final class WorkspaceActivityCatalog
         'link.appeal' => ['link', 'Apelación enviada', 'pending'],
         'admin.link_appeal_resolved' => ['link', 'Apelación resuelta', 'completed'],
     ];
+
+    public static function label(string $action): ?string
+    {
+        return isset(self::EVENTS[$action]) ? __('activity.'.str_replace('.', '_', $action)) : null;
+    }
 }

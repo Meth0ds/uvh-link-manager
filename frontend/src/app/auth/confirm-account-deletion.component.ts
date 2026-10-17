@@ -1,3 +1,5 @@
+import { UI_LOCALE } from "../core/localisation/locale";
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from "@angular/core";
 import { Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -17,15 +19,15 @@ import { decodeAccountDeletionConfirmation } from "../core/services/public-actio
   template: `
     <app-auth-shell>
       <section class="card center" aria-labelledby="confirm-account-deletion-title">
-        <span class="step-kicker">ELIMINACIÓN DE CUENTA</span>
+        <span class="step-kicker"><ng-container i18n="@@ui.0477b868bec717">ELIMINACIÓN DE CUENTA</ng-container></span>
         <mat-icon class="icon" aria-hidden="true" [class.ok]="done()" [class.bad]="error()">{{ done() ? 'event_available' : (error() ? 'error_outline' : 'person_remove') }}</mat-icon>
-        <h2 id="confirm-account-deletion-title">{{ done() ? 'Eliminación programada' : (!hasLink ? 'Enlace no disponible' : (error() ? 'No se pudo programar' : 'Última confirmación')) }}</h2>
+        <h2 id="confirm-account-deletion-title">{{ done() ? uiText.ui_336f99f7165207 : (!hasLink ? uiText.ui_11e385a1023bde : (error() ? uiText.ui_bb1460b991665c : uiText.ui_8e9a13c30e58f8)) }}</h2>
         <p class="sub" role="status">{{ message() }}</p>
         @if (!done() && (!error() || retryable())) {
-          <button mat-flat-button class="danger-action" type="button" (click)="confirm()" [disabled]="busy()">{{ busy() ? 'Programando…' : (retryable() ? 'Reintentar confirmación' : 'Cerrar acceso y programar eliminación') }}</button>
-          <a class="back" routerLink="/app/settings">No eliminar mi cuenta</a>
+          <button mat-flat-button class="danger-action" type="button" (click)="confirm()" [disabled]="busy()">{{ busy() ? uiText.ui_f50ed74884e4da : (retryable() ? uiText.ui_536ca3adeeb621 : uiText.ui_1b30fb58cb4a96) }}</button>
+          <a class="back" routerLink="/app/settings"><ng-container i18n="@@ui.873aa5e8e24d5a">No eliminar mi cuenta</ng-container></a>
         } @else {
-          <a mat-flat-button color="primary" routerLink="/auth">Volver al acceso</a>
+          <a mat-flat-button color="primary" routerLink="/auth"><ng-container i18n="@@ui.7c60b6892ea0a1">Volver al acceso</ng-container></a>
         }
       </section>
     </app-auth-shell>
@@ -34,6 +36,7 @@ import { decodeAccountDeletionConfirmation } from "../core/services/public-actio
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class ConfirmAccountDeletionComponent {
+  readonly uiText = UI_TEXT;
   private api = inject(ApiService);
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
@@ -47,14 +50,14 @@ export class ConfirmAccountDeletionComponent {
   readonly done = signal(false);
   readonly error = signal(false);
   readonly retryable = signal(false);
-  readonly message = signal("Al confirmar se cerrarán todas las sesiones y se cancelarán las invitaciones pendientes enviadas y recibidas. Recibirás un enlace para cancelar la eliminación durante los próximos 7 días; las invitaciones no se restaurarán.");
+  readonly message = signal($localize`:@@ui.a9cd27f607fcd6:Al confirmar se cerrarán todas las sesiones y se cancelarán las invitaciones pendientes enviadas y recibidas. Recibirás un enlace para cancelar la eliminación durante los próximos 7 días; las invitaciones no se restaurarán.`);
 
   constructor() {
     this.token = authBearer(this.route);
     this.location.replaceState("/auth/confirm-account-deletion");
     if (!this.token) {
       this.error.set(true);
-      this.message.set("Falta el token de confirmación.");
+      this.message.set($localize`:@@ui.74346950fede1b:Falta el token de confirmación.`);
     }
   }
 
@@ -74,12 +77,12 @@ export class ConfirmAccountDeletionComponent {
       if (result.current) this.auth.accountSignedOut(generation);
       if (!this.requests.isCurrent(request, this.token)) return;
       this.done.set(true);
-      this.message.set(`El acceso de la cuenta asociada a este enlace está cerrado. La anonimización se ejecutará a partir de ${new Date(result.executeAfter).toLocaleString()}. Revisa tu email para conservar el enlace de cancelación.`);
+      this.message.set($localize`:@@ui.7a7ba3e3639bc7:El acceso de la cuenta asociada a este enlace está cerrado. La anonimización se ejecutará a partir de ${new Date(result.executeAfter).toLocaleString(UI_LOCALE)}. Revisa tu email para conservar el enlace de cancelación.`);
     } catch (error) {
       if (!this.requests.isCurrent(request, this.token)) return;
       this.error.set(true);
       this.retryable.set(!(error instanceof ApiRequestError) || error.status === 0 || error.status === 429 || error.status >= 500);
-      this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo completar la confirmación.");
+      this.message.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.9900039804ce07:No se pudo completar la confirmación.`);
     } finally {
       if (this.requests.isCurrent(request, this.token)) this.busy.set(false);
     }

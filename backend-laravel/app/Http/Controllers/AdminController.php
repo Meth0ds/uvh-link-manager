@@ -86,7 +86,7 @@ class AdminController
     public function setRegistrationPause(Request $request): JsonResponse
     {
         if (! $request->has('paused') || ! is_bool($request->input('paused'))) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         $paused = $request->input('paused');
 
@@ -102,7 +102,7 @@ class AdminController
             return 'ok';
         });
         if ($updated === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
 
         return response()->json(['ok' => true, 'paused' => $paused]);
@@ -119,7 +119,7 @@ class AdminController
         // «Registros pendientes»; filtrar aquí por `email_verified_at` miraría
         // una columna que ya no significa lo que su nombre dice.
         if (! in_array($status, ['', 'active', 'blocked', 'admin', 'mfa'], true)) {
-            return response()->json(['error' => 'Filtro de usuario inválido'], 422);
+            return response()->json(['error' => __('messages.error_47d0d60336607f')], 422);
         }
 
         $columns = ['u.id', 'u.email', 'u.name', 'u.is_admin', 'u.email_verified_at', 'u.mfa_enabled', 'u.created_at', 'u.deleted_at'];
@@ -213,7 +213,7 @@ class AdminController
         if ((! $hasAdmin && ! $hasBlocked)
             || ($hasAdmin && ! is_bool($isAdmin))
             || ($hasBlocked && ! is_bool($blocked))) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $actorId = UvhRequest::user($request)->id;
@@ -335,22 +335,22 @@ class AdminController
             ];
         });
         if ($result['status'] === 'not_found') {
-            return response()->json(['error' => 'Usuario no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_2b23ceeae12ac2')], 404);
         }
         if ($result['status'] === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         if ($result['status'] === 'last_admin') {
-            return response()->json(['error' => 'Debe quedar al menos un administrador activo'], 403);
+            return response()->json(['error' => __('messages.error_92eb3c3fcac206')], 403);
         }
         if ($result['status'] === 'admin_ineligible') {
-            return response()->json(['error' => 'Una cuenta administradora debe estar activa, verificada y tener MFA habilitado'], 409);
+            return response()->json(['error' => __('messages.error_64b17c1b20e9dc')], 409);
         }
         if ($result['status'] === 'deletion_scheduled') {
-            return response()->json(['error' => 'La cuenta tiene una eliminación programada. Debe cancelarse con su enlace de seguridad antes de reactivarla'], 409);
+            return response()->json(['error' => __('messages.error_54e2b5dc0250ba')], 409);
         }
         if ($result['status'] === 'deletion_executed') {
-            return response()->json(['error' => 'La cuenta ya fue anonimizada y no puede reactivarse desde administración'], 409);
+            return response()->json(['error' => __('messages.error_c858500501afe9')], 409);
         }
 
         foreach ($result['artifacts'] as $artifact) {
@@ -371,7 +371,7 @@ class AdminController
         $search = $this->search($request);
         $status = UvhRequest::queryString($request, 'status');
         if (! in_array($status, ['', 'open', 'reviewed', 'actioned', 'dismissed'], true)) {
-            return response()->json(['error' => 'Filtro de denuncia inválido'], 422);
+            return response()->json(['error' => __('messages.error_ab07bee0018115')], 422);
         }
 
         $query = DB::table('abuse_reports as r')
@@ -418,7 +418,7 @@ class AdminController
     {
         $status = UvhRequest::inputString($request, 'status');
         if (! in_array($status, ['open', 'reviewed', 'actioned', 'dismissed'], true)) {
-            return response()->json(['error' => 'Estado inválido'], 422);
+            return response()->json(['error' => __('messages.error_f49ab2eaafd27a')], 422);
         }
 
         $actorId = UvhRequest::user($request)->id;
@@ -441,10 +441,10 @@ class AdminController
             return 'ok';
         });
         if ($updated === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         if ($updated === 'not_found') {
-            return response()->json(['error' => 'Denuncia no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_961301d8d87c6d')], 404);
         }
 
         return response()->json(['ok' => true]);
@@ -455,17 +455,17 @@ class AdminController
     {
         $action = UvhRequest::inputString($request, 'action');
         if (! in_array($action, ['block', 'unblock', 'review', 'dismiss'], true)) {
-            return response()->json(['error' => 'Acción de moderación inválida'], 422);
+            return response()->json(['error' => __('messages.error_07eb433ff719ea')], 422);
         }
         $reason = trim(UvhRequest::inputString($request, 'reason'));
         if (! AdminText::encodable($reason)) {
-            return response()->json(['error' => 'El motivo contiene caracteres no válidos'], 422);
+            return response()->json(['error' => __('messages.error_593e88cb8cfe47')], 422);
         }
         if ($action === 'block' && ! AdminText::bounded($reason, 3, AdminText::MAX_REASON)) {
-            return response()->json(['error' => 'Indica un motivo de entre 3 y 500 caracteres'], 422);
+            return response()->json(['error' => __('messages.error_0d29a5bdd132dd')], 422);
         }
         if ($action !== 'block' && ! AdminText::bounded($reason, 0, AdminText::MAX_REASON)) {
-            return response()->json(['error' => 'El comentario no puede superar 500 caracteres'], 422);
+            return response()->json(['error' => __('messages.error_d54a65612345a1')], 422);
         }
 
         $actorId = UvhRequest::user($request)->id;
@@ -512,10 +512,10 @@ class AdminController
             return ['status' => 'ok', 'linkState' => $linkState, 'reportStatus' => $reportStatus];
         });
         if ($result === null) {
-            return response()->json(['error' => 'Denuncia no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_961301d8d87c6d')], 404);
         }
         if ($result['status'] === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         unset($result['status']);
 
@@ -526,7 +526,7 @@ class AdminController
     {
         $reason = trim(UvhRequest::inputString($request, 'reason'));
         if (! AdminText::bounded($reason, 3, AdminText::MAX_REASON)) {
-            return response()->json(['error' => 'Motivo requerido'], 422);
+            return response()->json(['error' => __('messages.error_d9aacae86f0c30')], 422);
         }
 
         $actorId = UvhRequest::user($request)->id;
@@ -546,10 +546,10 @@ class AdminController
             return 'ok';
         });
         if ($updated === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         if ($updated === 'not_found') {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
 
         return response()->json(['ok' => true]);
@@ -575,10 +575,10 @@ class AdminController
             return ['status' => 'ok', 'state' => $state];
         });
         if ($result['status'] === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         if ($result['status'] === 'not_found') {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
 
         return response()->json(['ok' => true, 'state' => $result['state']]);
@@ -590,7 +590,7 @@ class AdminController
         [$page, $perPage] = $this->pagination($request);
         $status = UvhRequest::queryString($request, 'status');
         if (! in_array($status, ['', 'requested', 'email_confirmed', 'in_review', 'approved', 'rejected', 'completed', 'expired', 'cancelled'], true)) {
-            return response()->json(['error' => 'Estado de recuperación inválido'], 422);
+            return response()->json(['error' => __('messages.error_58fe8c7277acf6')], 422);
         }
         $search = $this->search($request);
         $query = DB::table('account_recovery_requests as r')
@@ -656,14 +656,14 @@ class AdminController
         if (! in_array($decision, ['approve', 'reject'], true)
             || ($decision === 'approve' && (! $verified || $reasonCode !== 'identity_verified_external'))
             || ($decision === 'reject' && ! in_array($reasonCode, ['insufficient_evidence', 'suspected_abuse'], true))) {
-            return response()->json(['error' => 'Confirma la verificación y selecciona una decisión válida'], 422);
+            return response()->json(['error' => __('messages.error_89f53f5a6395d2')], 422);
         }
 
         $actor = UvhRequest::user($request);
         $sessionId = UvhRequest::sessionId($request);
         $snapshot = AccountRecoveryRequest::where('id', $id)->first(['id', 'user_id']);
         if (! $snapshot) {
-            return response()->json(['error' => 'Expediente no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_99909f70fde641')], 404);
         }
         $targetUserId = (int) $snapshot->user_id;
         try {
@@ -782,23 +782,23 @@ class AdminController
                 return $admit(['status' => 'approved', 'user_id' => (int) $target->id, 'approvals' => $approvalCount]);
             });
         } catch (MailAdmissionException) {
-            return response()->json(['error' => 'No se pudo admitir el correo de recuperación. No se ha aplicado la decisión final'], 503);
+            return response()->json(['error' => __('messages.error_232c73018a8fcc')], 503);
         }
 
         if ($result['status'] === 'not_found') {
-            return response()->json(['error' => 'Expediente no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_99909f70fde641')], 404);
         }
         if ($result['status'] === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_88c3059a5168bb')], 409);
         }
         if ($result['status'] === 'self') {
-            return response()->json(['error' => 'No puedes aprobar tu propia recuperación'], 403);
+            return response()->json(['error' => __('messages.error_c5d5441130813e')], 403);
         }
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La cuenta o el expediente cambió y ya no puede aprobarse'], 409);
+            return response()->json(['error' => __('messages.error_dca623e906494f')], 409);
         }
         if ($result['status'] === 'state') {
-            return response()->json(['error' => 'El expediente no está pendiente de decisión'], 409);
+            return response()->json(['error' => __('messages.error_bc3d990f5fceb8')], 409);
         }
 
         return response()->json([
@@ -823,7 +823,7 @@ class AdminController
         $state = UvhRequest::queryString($request, 'state');
         $validStates = ['', 'pending', 'verifying', 'verified', 'provisioning', 'active', 'error', 'disabled'];
         if (! in_array($state, $validStates, true)) {
-            return response()->json(['error' => 'Filtro de dominio inválido'], 422);
+            return response()->json(['error' => __('messages.error_43be4a350ae514')], 422);
         }
 
         $query = DB::table('custom_domains as d')
@@ -935,82 +935,82 @@ class AdminController
         $queueHeartbeatAge = $this->heartbeatAge('queue');
         $schedulerHeartbeatAge = $this->heartbeatAge('scheduler');
         $checks = [
-            $this->operationCheck('environment', 'Entorno', $production, 'La aplicación no se está ejecutando como producción.', $production),
-            $this->operationCheck('debug', 'Depuración', ! (bool) config('app.debug'), 'APP_DEBUG está activado.', $production),
-            $this->operationCheck('https', 'Origen HTTPS', str_starts_with((string) config('app.url'), 'https://'), 'APP_URL no usa HTTPS.', $production),
+            $this->operationCheck('environment', __('display.display_e69fc723f1e93f'), $production, __('display.display_e60e4bff8a2306'), $production),
+            $this->operationCheck('debug', __('display.display_aa65b01053c1dc'), ! (bool) config('app.debug'), __('display.display_2f14084a4ec55c'), $production),
+            $this->operationCheck('https', __('display.display_4664659b8c725d'), str_starts_with((string) config('app.url'), 'https://'), __('display.display_9ae74a466dbd6d'), $production),
             $this->operationCheck(
                 'cookies',
-                'Cookies de sesión',
+                __('display.display_50bd7ec5072609'),
                 (bool) config('uvh.cookie_secure')
                     && (string) config('uvh.cookie_domain') === ''
                     && str_starts_with((string) config('uvh.session_cookie'), '__Host-')
                     && str_starts_with((string) config('uvh.csrf_cookie'), '__Host-'),
-                'Las cookies no tienen el aislamiento requerido para producción.',
+                __('display.display_b40ea0ee5ad056'),
                 $production,
             ),
-            $this->operationCheck('hsts', 'HSTS', (bool) config('uvh.hsts_enabled'), 'HSTS no está activado.', $production),
+            $this->operationCheck('hsts', 'HSTS', (bool) config('uvh.hsts_enabled'), __('display.display_be320ee8346146'), $production),
             $this->operationCheck(
                 'trusted_proxies',
-                'Proxies confiables',
+                __('display.display_fe28421328a080'),
                 ProductionSecurity::validTrustedProxies((string) config('uvh.trusted_proxies')),
-                'TRUSTED_PROXIES no contiene una lista concreta válida.',
+                __('display.display_036bc456b88448'),
                 $production,
             ),
             $this->operationCheck(
                 'database',
-                'PostgreSQL cifrado',
+                __('display.display_793a63885906e8'),
                 config('database.default') === 'pgsql' && config('database.connections.pgsql.sslmode') === 'verify-full',
-                'La conexión principal no usa PostgreSQL con verify-full.',
+                __('display.display_e440f268387e17'),
                 $production,
             ),
             $this->operationCheck(
                 'cache',
-                'Caché compartida',
+                __('display.display_0fbaa995e6091f'),
                 in_array((string) config('cache.default'), ['database', 'redis', 'memcached', 'dynamodb'], true),
-                'La caché no es compartida entre procesos.',
+                __('display.display_83a443cf0547b6'),
                 $production,
             ),
             $this->operationCheck(
                 'queue',
-                'Cola persistente',
+                __('display.display_1ab5c91a1ea075'),
                 ! in_array((string) config('queue.default'), ['', 'sync', 'null', 'background', 'deferred'], true),
-                'La cola no es persistente o se ejecuta en el proceso web.',
+                __('display.display_013a905c2a77b9'),
                 $production,
             ),
             $this->operationCheck(
                 'queue_worker',
-                'Worker de cola',
+                __('display.display_a7507524cc1dfa'),
                 $queueHeartbeatAge !== null && $queueHeartbeatAge <= 180,
-                'No hay un heartbeat reciente de un worker de cola.',
+                __('display.display_56adc872bc6fe9'),
                 $production,
             ),
             $this->operationCheck(
                 'scheduler',
-                'Planificador',
+                __('display.display_6dc295258d080f'),
                 $schedulerHeartbeatAge !== null && $schedulerHeartbeatAge <= 210,
-                'No hay un heartbeat reciente del scheduler.',
+                __('display.display_8fd180383c09c1'),
                 $production,
             ),
             $this->operationCheck(
                 'mail',
-                'Entrega de correo',
+                __('display.display_2305447b38bbf6'),
                 MailTransportPolicy::deliveryLeaves(config('mail')) !== null,
-                'La configuración de correo contiene un transporte que no garantiza entrega real.',
+                __('display.display_70c1bd0c805250'),
                 $production,
             ),
             $this->operationCheck(
                 'hcaptcha',
                 'hCaptcha',
                 trim((string) config('uvh.hcaptcha.site_key')) !== '' && trim((string) config('uvh.hcaptcha.secret')) !== '',
-                'hCaptcha no está configurado.',
+                __('display.display_7d02c26e1fd56c'),
                 $production,
             ),
             $this->operationCheck(
                 'custom_domain_edge',
-                'Edge de dominios',
+                __('display.display_3cba1505d3fb43'),
                 ProductionSecurity::validHostname(strtolower(trim((string) config('uvh.custom_domains.cname_target'), '.')))
                     && strlen((string) config('uvh.custom_domains.edge_ask_secret')) >= 43,
-                'El destino CNAME o la autorización privada del edge no están configurados.',
+                __('display.display_edc0d11afa1f18'),
                 $production,
             ),
         ];
@@ -1052,9 +1052,9 @@ class AdminController
             : null;
         $checks[] = $this->operationCheck(
             'mail_queue_age',
-            'Antigüedad del correo',
+            __('display.display_52dc74359bb9fc'),
             $oldestPendingMailAge === null || $oldestPendingMailAge <= 600,
-            'El correo pendiente más antiguo supera los diez minutos.',
+            __('display.display_85da4cd1bf163d'),
             $production,
         );
         $domainCounts = $this->countsByState('custom_domains', 'desired_state');
@@ -1082,23 +1082,23 @@ class AdminController
         // state is operationally actionable rather than normal queue latency.
         $checks[] = $this->operationCheck(
             'webhook_queue_age',
-            'Antigüedad de webhooks',
+            __('display.display_4ea52a85f31127'),
             $oldestPendingWebhookAge === null || $oldestPendingWebhookAge <= 600,
-            'La entrega webhook pendiente más antigua supera los diez minutos.',
+            __('display.display_113305bef6a0bc'),
             $production,
         );
         $checks[] = $this->operationCheck(
             'dns_check_age',
-            'Verificación DNS',
+            __('display.display_6a921ccce190a0'),
             $oldestDnsCheckAge === null || $oldestDnsCheckAge <= 600,
-            'Hay una verificación DNS en curso desde hace más de diez minutos.',
+            __('display.display_66a7e1c651d99e'),
             $production,
         );
         $checks[] = $this->operationCheck(
             'tls_provisioning_age',
-            'Emisión TLS',
+            __('display.display_6f82b6fee4a54d'),
             $oldestTlsProvisioningAge === null || $oldestTlsProvisioningAge <= 3600,
-            'Hay una emisión TLS en curso desde hace más de una hora.',
+            __('display.display_cd4de7f3e8b6f0'),
             $production,
         );
         $activeSessions = DB::table('sessions')
@@ -1173,7 +1173,7 @@ class AdminController
         [$page, $perPage] = $this->pagination($request);
         $status = UvhRequest::queryString($request, 'status');
         if (! in_array($status, ['', 'pending', 'queued', 'processing', 'sent', 'failed', 'obsolete', 'comp_pending', 'compensating', 'compensated'], true)) {
-            return response()->json(['error' => 'Estado de correo inválido'], 422);
+            return response()->json(['error' => __('messages.error_d3e3bc1dc7f883')], 422);
         }
         $query = DB::table('mail_outbox')
             ->when($status !== '', fn ($q) => $q->where('status', $status));
@@ -1273,25 +1273,25 @@ class AdminController
                 return 'queued';
             });
         } catch (\Throwable) {
-            return response()->json(['error' => 'No se pudo verificar el estado del correo. No se ha reintentado'], 503);
+            return response()->json(['error' => __('messages.error_b858b84d85fd5e')], 503);
         }
 
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Correo no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_abff530bd556ca')], 404);
         }
         if ($result === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         if ($result === 'state') {
-            return response()->json(['error' => 'El correo ya no está en estado fallido'], 409);
+            return response()->json(['error' => __('messages.error_e2ac46f8dda6cb')], 409);
         }
         if ($result === 'limit') {
-            return response()->json(['error' => 'El correo superó su ventana o límite de reintentos manuales'], 409);
+            return response()->json(['error' => __('messages.error_d21736b1996d08')], 409);
         }
         if ($result === 'obsolete') {
             OperationalMetrics::increment('mail.obsolete');
 
-            return response()->json(['error' => 'El enlace o evento de este correo ya no es válido'], 409);
+            return response()->json(['error' => __('messages.error_a4ffb4dcae34ee')], 409);
         }
 
         OperationalMetrics::increment('mail.manual_retry');
@@ -1352,7 +1352,7 @@ class AdminController
         [$page, $perPage] = $this->pagination($request);
         $status = UvhRequest::queryString($request, 'status');
         if (! in_array($status, ['', 'open', 'upheld', 'restored'], true)) {
-            return response()->json(['error' => 'Filtro de apelación inválido'], 422);
+            return response()->json(['error' => __('messages.error_2b210b193cad58')], 422);
         }
 
         $query = DB::table('link_appeals as a')
@@ -1401,11 +1401,11 @@ class AdminController
     {
         $decision = UvhRequest::inputString($request, 'decision');
         if (! in_array($decision, ['restore', 'uphold'], true)) {
-            return response()->json(['error' => 'Decisión inválida'], 422);
+            return response()->json(['error' => __('messages.error_0ba5797b009033')], 422);
         }
         $note = trim(UvhRequest::inputString($request, 'note'));
         if (! AdminText::bounded($note, 0, AdminText::MAX_REASON)) {
-            return response()->json(['error' => 'La nota contiene caracteres no válidos'], 422);
+            return response()->json(['error' => __('messages.error_d08fad2dc0a22e')], 422);
         }
 
         $actorId = UvhRequest::user($request)->id;
@@ -1461,13 +1461,13 @@ class AdminController
             return ['status' => 'ok', 'state' => $state, 'removed' => count($removed)];
         });
         if ($result === null) {
-            return response()->json(['error' => 'Apelación no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_815d843caff7f3')], 404);
         }
         if ($result['status'] === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         if ($result['status'] === 'decided') {
-            return response()->json(['error' => 'Esta apelación ya fue resuelta'], 409);
+            return response()->json(['error' => __('messages.error_30d24e424ce6ab')], 409);
         }
 
         return response()->json(['ok' => true, 'state' => $result['state'], 'removedEntries' => $result['removed']]);
@@ -1483,12 +1483,12 @@ class AdminController
     {
         $reason = trim(UvhRequest::inputString($request, 'reason'));
         if (! AdminText::bounded($reason, 3, AdminText::MAX_REASON)) {
-            return response()->json(['error' => 'Motivo requerido'], 422);
+            return response()->json(['error' => __('messages.error_d9aacae86f0c30')], 422);
         }
         $scope = UvhRequest::inputString($request, 'scope');
         $scope = $scope === '' ? 'url' : $scope;
         if (! in_array($scope, ['url', 'host'], true)) {
-            return response()->json(['error' => 'Alcance inválido'], 422);
+            return response()->json(['error' => __('messages.error_3891df89088e72')], 422);
         }
 
         $actorId = UvhRequest::user($request)->id;
@@ -1526,16 +1526,16 @@ class AdminController
             return ['status' => 'ok', 'host' => $host, 'entryId' => $entryId];
         });
         if ($result === null) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
         if ($result['status'] === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         if ($result['status'] === 'unsupported') {
-            return response()->json(['error' => 'No se pudo interpretar el destino de este enlace'], 422);
+            return response()->json(['error' => __('messages.error_533067d4dfcd62')], 422);
         }
         if ($result['status'] === 'public_suffix') {
-            return response()->json(['error' => 'Ese destino es un sufijo público (por ejemplo co.uk o github.io): bloquearlo afectaría a todos los sitios alojados bajo él'], 422);
+            return response()->json(['error' => __('messages.error_032be6306989c6')], 422);
         }
 
         // Every link that could already point at the same host is re-evaluated
@@ -1593,10 +1593,10 @@ class AdminController
             return 'ok';
         });
         if ($removed === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol, cuenta o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_c32d79a75fdd37')], 409);
         }
         if ($removed === 'not_found') {
-            return response()->json(['error' => 'Entrada no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_333ff8e805f5d1')], 404);
         }
 
         // Outside the transaction: withdrawing an entry has to reach the links it

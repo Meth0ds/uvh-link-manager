@@ -48,13 +48,13 @@ class CollectionController
         }
         $name = trim((string) $request->input('name'));
         if ($this->nameTaken($workspaceId, $name)) {
-            return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
+            return response()->json(['error' => __('messages.error_083a0c4709052a')], 409);
         }
 
         try {
             $collection = WorkspaceMutation::run($request, function () use ($workspaceId, $name): Collection {
                 if (Collection::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('collections')) {
-                    throw new LinkException('Límite de colecciones alcanzado. Elimina una antes de crear otra.', 409);
+                    throw new LinkException(__('messages.error_4f021df8a709b1'), 409);
                 }
 
                 return Collection::create(['workspace_id' => $workspaceId, 'name' => $name]);
@@ -68,7 +68,7 @@ class CollectionController
             // petición tomó el nombre en ese hueco, el índice único es el que
             // decide y el resultado es un conflicto, no un error 500.
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
+                return response()->json(['error' => __('messages.error_083a0c4709052a')], 409);
             }
             throw $e;
         }
@@ -89,17 +89,17 @@ class CollectionController
 
         $collection = Collection::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $collection) {
-            return response()->json(['error' => 'Colección no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_6568a0022eb114')], 404);
         }
         if ($this->nameTaken($workspaceId, $name, $id)) {
-            return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
+            return response()->json(['error' => __('messages.error_083a0c4709052a')], 409);
         }
 
         try {
             WorkspaceMutation::run($request, function () use ($workspaceId, $id, $name): void {
                 $collection = Collection::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
                 if (! $collection) {
-                    throw new LinkException('Colección no encontrada', 404);
+                    throw new LinkException(__('messages.error_6568a0022eb114'), 404);
                 }
                 $collection->update(['name' => $name]);
             }, function () use ($request, $user, $workspaceId, $id, $name): void {
@@ -109,7 +109,7 @@ class CollectionController
             return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'Ya existe una colección con ese nombre'], 409);
+                return response()->json(['error' => __('messages.error_083a0c4709052a')], 409);
             }
             throw $e;
         }
@@ -124,7 +124,7 @@ class CollectionController
 
         $collection = Collection::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $collection) {
-            return response()->json(['error' => 'Colección no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_6568a0022eb114')], 404);
         }
 
         // Los enlaces quedan sin agrupar: la colección es una comodidad, no
@@ -136,7 +136,7 @@ class CollectionController
             [$moved, $cleared] = WorkspaceMutation::run($request, function () use ($workspaceId, $id): array {
                 $collection = Collection::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
                 if (! $collection) {
-                    throw new LinkException('Colección no encontrada', 404);
+                    throw new LinkException(__('messages.error_6568a0022eb114'), 404);
                 }
                 $links = Link::withTrashed()->where('workspace_id', $workspaceId)->where('collection_id', $id)
                     ->orderBy('id')->lockForUpdate()->get();
@@ -174,7 +174,7 @@ class CollectionController
         if (! is_string($name) || ! mb_check_encoding($name, 'UTF-8')
             || mb_strlen(trim($name)) < 1 || mb_strlen($name) > 60
             || preg_match('/[\x00-\x1f\x7f]/', $name)) {
-            return 'Nombre de colección inválido';
+            return __('display.display_9d592a34494b06');
         }
 
         return null;

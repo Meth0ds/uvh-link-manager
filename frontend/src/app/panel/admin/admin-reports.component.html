@@ -7,19 +7,19 @@
   emptyTitle="Sin denuncias"
   emptyHint="No hay casos que coincidan con esta vista."
   [pageSizes]="pageSizes"
->
-  <p queue-summary>@if (!reports.stale()) { {{ countLabel(reports.total(), "denuncia coincide", "denuncias coinciden") }} con los filtros. }</p>
+ i18n-title="@@ui.50a87ec136f3f6" i18n-emptyTitle="@@ui.477b6ff5f28ffa" i18n-loadingLabel="@@ui.1eea7dff19c48f">
+  <p queue-summary>@if (!reports.stale()) { <ng-container i18n="@@ui.1ba61b9443ee45">{{ countLabel(reports.total(), "denuncia coincide", "denuncias coinciden") }} con los filtros. </ng-container>}</p>
 
   <div class="filters" queue-filters>
     <mat-form-field appearance="outline" class="filter-search">
-      <mat-label>Buscar alias, motivo o email</mat-label><mat-icon matPrefix>search</mat-icon>
+      <mat-label><ng-container i18n="@@ui.b0a76893bc7e36">Buscar alias, motivo o email</ng-container></mat-label><mat-icon matPrefix>search</mat-icon>
       <input matInput [value]="query()" (keyup.enter)="search(reportSearch.value)" #reportSearch />
-      <button mat-icon-button matSuffix type="button" (click)="search(reportSearch.value)" aria-label="Buscar denuncias"><mat-icon>arrow_forward</mat-icon></button>
+      <button mat-icon-button matSuffix type="button" (click)="search(reportSearch.value)" aria-label="Buscar denuncias" i18n-aria-label="@@ui.e7f1f58de9ab91"><mat-icon>arrow_forward</mat-icon></button>
     </mat-form-field>
     <mat-form-field appearance="outline">
-      <mat-label>Estado</mat-label>
+      <mat-label><ng-container i18n="@@ui.98e5acddb6c46a">Estado</ng-container></mat-label>
       <mat-select [value]="status()" (selectionChange)="filter($event.value)">
-        <mat-option value="">Todas</mat-option>
+        <mat-option value=""><ng-container i18n="@@ui.aff4d19d6ee43b">Todas</ng-container></mat-option>
         @for (option of reportStatusOptions; track option) { <mat-option [value]="option">{{ reportLabel(option) }}</mat-option> }
       </mat-select>
     </mat-form-field>
@@ -33,26 +33,26 @@
           <time>{{ formatDate(report.created_at) }}</time>
         </header>
         <div class="moderation-target"><b>/{{ report.alias }}</b><span [title]="report.destination">{{ report.destination }}</span></div>
-        <div class="moderation-copy"><span>Motivo</span><b>{{ report.reason }}</b>@if (report.details) { <p>{{ report.details }}</p> }</div>
-        <dl><div><dt>Remitente</dt><dd>{{ report.reporter_email ?? "Anónimo" }}</dd></div><div><dt>Workspace</dt><dd>#{{ report.workspace_id }}</dd></div><div><dt>Enlace</dt><dd>{{ linkStateLabel(report.link_state) }}</dd></div></dl>
+        <div class="moderation-copy"><span><ng-container i18n="@@ui.c7b288b1c0bb65">Motivo</ng-container></span><b>{{ report.reason }}</b>@if (report.details) { <p>{{ report.details }}</p> }</div>
+        <dl><div><dt><ng-container i18n="@@ui.1fe512ab94b68a">Remitente</ng-container></dt><dd>{{ report.reporter_email ?? uiText.ui_7e3e94d30a7380 }}</dd></div><div><dt><ng-container i18n="@@ui.87bb59ba2f92f2">Workspace</ng-container></dt><dd>#{{ report.workspace_id }}</dd></div><div><dt><ng-container i18n="@@ui.08dab6446d0e6f">Enlace</ng-container></dt><dd>{{ linkStateLabel(report.link_state) }}</dd></div></dl>
         <footer>
           <div class="case-actions">
-          @if (report.status !== "reviewed") { <button mat-stroked-button type="button" (click)="review(report)" [attr.aria-label]="'Marcar revisada la denuncia de /' + report.alias" [disabled]="reports.stale() || busy()">Revisada</button> }
-          @if (report.status !== "dismissed") { <button mat-stroked-button type="button" (click)="dismiss(report)" [attr.aria-label]="'Desestimar la denuncia de /' + report.alias" [disabled]="reports.stale() || busy()">Desestimar</button> }
+          @if (report.status !== "reviewed") { <button mat-stroked-button type="button" (click)="review(report)" [attr.aria-label]="uiText.ui_25a73f1ea1bcb3 + report.alias" [disabled]="reports.stale() || busy()"><ng-container i18n="@@ui.ee85bbbdfcac57">Revisada</ng-container></button> }
+          @if (report.status !== "dismissed") { <button mat-stroked-button type="button" (click)="dismiss(report)" [attr.aria-label]="uiText.ui_d5e8627d02792f + report.alias" [disabled]="reports.stale() || busy()"><ng-container i18n="@@ui.d026272ace4419">Desestimar</ng-container></button> }
           @if (report.link_state !== "blocked") {
-            <button mat-flat-button class="destructive" type="button" (click)="block(report)" [attr.aria-label]="'Bloquear /' + report.alias" [disabled]="reports.stale() || busy()"><mat-icon>block</mat-icon>Bloquear</button>
+            <button mat-flat-button class="destructive" type="button" (click)="block(report)" [attr.aria-label]="uiText.ui_affd677ae3a241 + report.alias" [disabled]="reports.stale() || busy()"><mat-icon>block</mat-icon><ng-container i18n="@@ui.096dc9d4b02042">Bloquear</ng-container></button>
           } @else {
-            <button mat-flat-button type="button" (click)="unblock(report)" [attr.aria-label]="'Desbloquear /' + report.alias" [disabled]="reports.stale() || busy()"><mat-icon>restart_alt</mat-icon>Desbloquear</button>
+            <button mat-flat-button type="button" (click)="unblock(report)" [attr.aria-label]="uiText.ui_831d5f0aaaf786 + report.alias" [disabled]="reports.stale() || busy()"><mat-icon>restart_alt</mat-icon><ng-container i18n="@@ui.d4c2d75416f69c">Desbloquear</ng-container></button>
           }
           </div>
           <div class="destination-actions">
-          <p>Bloqueo del destino para toda la plataforma</p>
-          <button mat-stroked-button class="danger-button" type="button" (click)="blockDestination(report, 'url')" [attr.aria-label]="'Bloquear la URL de /' + report.alias" [disabled]="reports.stale() || busy()" matTooltip="Bloquea esta URL exacta para cualquier enlace">
-            <mat-icon>link_off</mat-icon>Bloquear URL
-          </button>
-          <button mat-stroked-button class="danger-button" type="button" (click)="blockDestination(report, 'host')" [attr.aria-label]="'Bloquear el host de /' + report.alias" [disabled]="reports.stale() || busy()" matTooltip="Bloquea todo el host y reanaliza los enlaces que ya apuntaban ahí">
-            <mat-icon>link_off</mat-icon>Bloquear host
-          </button>
+          <p><ng-container i18n="@@ui.9a46b4ccf128dc">Bloqueo del destino para toda la plataforma</ng-container></p>
+          <button mat-stroked-button class="danger-button" type="button" (click)="blockDestination(report, 'url')" [attr.aria-label]="uiText.ui_ad8f01943ef382 + report.alias" [disabled]="reports.stale() || busy()" matTooltip="Bloquea esta URL exacta para cualquier enlace" i18n-matTooltip="@@ui.73d10fc33af61c">
+            <mat-icon>link_off</mat-icon><ng-container i18n="@@ui.d618db661c2759">Bloquear URL
+          </ng-container></button>
+          <button mat-stroked-button class="danger-button" type="button" (click)="blockDestination(report, 'host')" [attr.aria-label]="uiText.ui_79861add2bcaa5 + report.alias" [disabled]="reports.stale() || busy()" matTooltip="Bloquea todo el host y reanaliza los enlaces que ya apuntaban ahí" i18n-matTooltip="@@ui.8062b8ae2277c2">
+            <mat-icon>link_off</mat-icon><ng-container i18n="@@ui.39ba999426b96d">Bloquear host
+          </ng-container></button>
           </div>
         </footer>
       </article>

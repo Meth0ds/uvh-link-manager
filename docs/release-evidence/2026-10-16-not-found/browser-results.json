@@ -1,0 +1,62 @@
+[
+  {
+    "browser": "chromium",
+    "surface": "web",
+    "themes": 2,
+    "widths": 5,
+    "keyboard": true,
+    "requestsDuringGame": 0,
+    "cspErrors": 0
+  },
+  {
+    "browser": "chromium",
+    "surface": "link",
+    "themes": 2,
+    "widths": 5,
+    "keyboard": true,
+    "requestsDuringGame": 0,
+    "cspErrors": 0
+  },
+  {
+    "browser": "chromium",
+    "surface": "web",
+    "javaScript": false,
+    "staticFallback": true
+  },
+  {
+    "browser": "chromium",
+    "surface": "link",
+    "javaScript": false,
+    "staticFallback": true
+  },
+  {
+    "browser": "webkit",
+    "surface": "web",
+    "themes": 2,
+    "widths": 5,
+    "keyboard": true,
+    "requestsDuringGame": 0,
+    "cspErrors": 0
+  },
+  {
+    "browser": "webkit",
+    "surface": "link",
+    "themes": 2,
+    "widths": 5,
+    "keyboard": true,
+    "requestsDuringGame": 0,
+    "cspErrors": 0
+  },
+  {
+    "browser": "webkit",
+    "surface": "web",
+    "javaScript": false,
+    "staticFallback": true
+  },
+  {
+    "browser": "webkit",
+    "surface": "link",
+    "javaScript": false,
+    "staticFallback": true
+  }
+]

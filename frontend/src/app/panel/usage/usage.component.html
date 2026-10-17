@@ -1,7 +1,7 @@
-<app-page-header icon="data_usage" title="Uso y límites" eyebrow="Workspace" description="Consulta el consumo de tu workspace, sus límites y la retención de datos.">
+<app-page-header icon="data_usage" title="Uso y límites" eyebrow="Workspace" description="Consulta el consumo de tu workspace, sus límites y la retención de datos." i18n-title="@@ui.69cceceabf3e75" i18n-description="@@ui.ddda261b6b721a" i18n-eyebrow="@@ui.87bb59ba2f92f2">
   <button mat-stroked-button type="button" (click)="reload()" [disabled]="loading()">
-    <mat-icon aria-hidden="true">refresh</mat-icon> Actualizar
-  </button>
+    <mat-icon aria-hidden="true">refresh</mat-icon> <ng-container i18n="@@ui.fa3f0ec7fb6642">Actualizar
+  </ng-container></button>
 </app-page-header>
 
 @if (context(); as workspace) {
@@ -12,19 +12,19 @@
         <h2 id="usage-title">{{ workspace.name }}</h2>
       </div>
       @if (data(); as snapshot) {
-        <p class="measured">Medido <time [attr.datetime]="snapshot.measuredAt">{{ snapshot.measuredAt | date:'dd/MM/yyyy HH:mm:ss':'UTC' }} UTC</time></p>
+        <p class="measured"><ng-container i18n="@@ui.be9fe3e312a608">Medido </ng-container><time [attr.datetime]="snapshot.measuredAt"><ng-container i18n="@@ui.8c35841fb11bcc">{{ snapshot.measuredAt | date:'dd/MM/yyyy HH:mm:ss':'UTC' }} UTC</ng-container></time></p>
       }
     </div>
 
-    <p class="scope-note">Es una fotografía informativa, no una reserva de capacidad. Cada operación vuelve a comprobar su límite en el servidor.</p>
+    <p class="scope-note"><ng-container i18n="@@ui.e10d9f991d599c">Es una fotografía informativa, no una reserva de capacidad. Cada operación vuelve a comprobar su límite en el servidor.</ng-container></p>
 
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Cargando uso y límites" />
-      <p role="status">Consultando el consumo del workspace…</p>
+      <mat-progress-bar mode="indeterminate" aria-label="Cargando uso y límites"  i18n-aria-label="@@ui.b6bfa4f7660330"/>
+      <p role="status"><ng-container i18n="@@ui.cce890d4977039">Consultando el consumo del workspace…</ng-container></p>
     } @else if (error(); as message) {
       <div class="error" role="alert">
         <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <div><strong>No se pudo cargar el uso</strong>
+        <div><strong><ng-container i18n="@@ui.ecf440eac19e98">No se pudo cargar el uso</ng-container></strong>
           <p>
             @if (waitSeconds() > 0) {
               <!-- El contador se muestra pero no se anuncia en cada tick. -->
@@ -36,28 +36,28 @@
         </div>
       </div>
     } @else if (data(); as snapshot) {
-      <div class="cards" aria-label="Consumo por recurso">
+      <div class="cards" aria-label="Consumo por recurso" i18n-aria-label="@@ui.a01f7f860081ff">
         @for (card of cards(); track card.key) {
           <article class="usage-card" [attr.data-resource]="card.key" [class.reached]="card.quota.reached === true" [class.unavailable]="card.quota.policy === 'unavailable'">
             <header>
               <span class="card-icon" aria-hidden="true"><mat-icon>{{ card.icon }}</mat-icon></span>
               <div><h3>{{ card.label }}</h3><span class="status">
-                @if (card.quota.policy === 'unavailable') { Configuración no disponible }
-                @else if (card.quota.policy === 'not_configured') { Sin límite configurado }
-                @else if (card.quota.reached) { Límite alcanzado }
-                @else { Capacidad disponible }
+                @if (card.quota.policy === 'unavailable') { <ng-container i18n="@@ui.513f7bc602fb1d">Configuración no disponible </ng-container>}
+                @else if (card.quota.policy === 'not_configured') { <ng-container i18n="@@ui.93143ddb10570d">Sin límite configurado </ng-container>}
+                @else if (card.quota.reached) { <ng-container i18n="@@ui.04836957aa8ac1">Límite alcanzado </ng-container>}
+                @else { <ng-container i18n="@@ui.fcbd5845d24644">Capacidad disponible </ng-container>}
               </span></div>
             </header>
             <div class="figures">
               <strong>{{ card.quota.used }}</strong>
-              @if (card.quota.limit !== null) { <span>de {{ card.quota.limit }}</span> }
-              @else { <span>en uso</span> }
+              @if (card.quota.limit !== null) { <span><ng-container i18n="@@ui.4d74c4164d64f8">de {{ card.quota.limit }}</ng-container></span> }
+              @else { <span><ng-container i18n="@@ui.7d52ec86dca9f7">en uso</ng-container></span> }
             </div>
             @if (card.percent !== null) {
-              <div class="meter" role="progressbar" [attr.aria-label]="'Uso de ' + card.label" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="card.percent">
+              <div class="meter" role="progressbar" [attr.aria-label]="uiText.ui_cad2375a4c9363 + card.label" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="card.percent">
                 <span [style.width.%]="card.percent"></span>
               </div>
-              <p class="remaining">{{ card.quota.remaining }} disponibles según esta fotografía</p>
+              <p class="remaining"><ng-container i18n="@@ui.a089454c71a892">{{ card.quota.remaining }} disponibles según esta fotografía</ng-container></p>
             }
             <p class="guidance">{{ card.guidance }}</p>
             <a mat-stroked-button [routerLink]="card.route">{{ card.action }}</a>
@@ -68,11 +68,11 @@
       <article class="analytics" aria-labelledby="analytics-policy-title">
         <span class="card-icon" aria-hidden="true"><mat-icon>query_stats</mat-icon></span>
         <div>
-          <h3 id="analytics-policy-title">Retención de analítica</h3>
-          <p>Política configurada: <strong>{{ snapshot.analytics.retentionDays }} días</strong>. Intervalo máximo por consulta: <strong>{{ snapshot.analytics.maximumQueryRangeDays }} días</strong>.</p>
+          <h3 id="analytics-policy-title"><ng-container i18n="@@ui.af8e7cbf90b5d9">Retención de analítica</ng-container></h3>
+          <p><ng-container i18n="@@ui.c3db5894975730">Política configurada: </ng-container><strong><ng-container i18n="@@ui.f63c948f9fb960">{{ snapshot.analytics.retentionDays }} días</ng-container></strong><ng-container i18n="@@ui.4ef175370b8079">. Intervalo máximo por consulta: </ng-container><strong><ng-container i18n="@@ui.e6b3ca787e1085">{{ snapshot.analytics.maximumQueryRangeDays }} días</ng-container></strong>.</p>
           <p class="scope-note">
-            @if (snapshot.analytics.purgeVerified) { La ejecución de la purga está verificada por el servicio. }
-            @else { Esta respuesta describe la política configurada; no acredita que la última purga se haya ejecutado. }
+            @if (snapshot.analytics.purgeVerified) { <ng-container i18n="@@ui.6b6b771cc6a885">La ejecución de la purga está verificada por el servicio. </ng-container>}
+            @else { <ng-container i18n="@@ui.a7799f62f1649c">Esta respuesta describe la política configurada; no acredita que la última purga se haya ejecutado. </ng-container>}
           </p>
         </div>
       </article>
@@ -81,7 +81,7 @@
 } @else {
   <section class="usage empty" aria-labelledby="usage-unavailable-title">
     <mat-icon aria-hidden="true">workspaces</mat-icon>
-    <h2 id="usage-unavailable-title">Uso no disponible</h2>
-    <p>Selecciona un workspace con una cuenta verificada para consultar sus límites.</p>
+    <h2 id="usage-unavailable-title"><ng-container i18n="@@ui.c9a3578c01c4cf">Uso no disponible</ng-container></h2>
+    <p><ng-container i18n="@@ui.af45182924d696">Selecciona un workspace con una cuenta verificada para consultar sus límites.</ng-container></p>
   </section>
 }

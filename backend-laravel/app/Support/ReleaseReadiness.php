@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /** Read-only deployment prerequisites; not proof of full production readiness. */
@@ -38,6 +39,16 @@ final class ReleaseReadiness
             // catch partial/manual schema restoration without reading its contents.
             if (! Schema::hasColumns('invitation_mail_budgets', ['budget_key', 'used', 'expires_at_epoch'])) {
                 $errors[] = 'Falta el esquema de presupuestos de invitación (000032).';
+            }
+            if (config('uvh.localisation_enabled')) {
+                if (! Schema::hasColumn('users', 'language') || ! Schema::hasColumn('pending_registrations', 'language')
+                    || ! Schema::hasColumn('notifications', 'subject_data')
+                    || ! Schema::hasColumns('legal_acceptances', ['language', 'document_sha256'])) {
+                    $errors[] = 'Falta el esquema de preferencias de idioma (2026_10_17).';
+                }
+                if (DB::table('links')->whereNull('domain_id')->whereIn(DB::raw('lower(alias)'), Language::SUPPORTED)->exists()) {
+                    $errors[] = 'Hay alias públicos que colisionan con /es o /en. Ejecuta uvh:localisation-audit antes de activar.';
+                }
             }
             if (! Schema::hasColumns('audit_outbox', ['id', 'event', 'created_at'])
                 || ! Schema::hasColumns('operational_notice_events', ['kind', 'resource_id', 'generation', 'created_at'])) {

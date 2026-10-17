@@ -8,7 +8,7 @@ import type { WebhookDelivery } from "./models";
  * it for its own sentence, so the two could disagree.
  */
 export const WEBHOOK_STATE_LABEL: Record<"active" | "paused", string> = {
-  active: "Activo",
+  active: $localize`:@@ui.723858144bd548:Activo`,
   paused: "Pausado",
 };
 
@@ -18,7 +18,7 @@ export const WEBHOOK_STATE_LABEL: Record<"active" | "paused", string> = {
  * The webhook list and the inspector documented this map twice, word for word.
  */
 export const WEBHOOK_DELIVERY_LABEL: Record<WebhookDelivery["status"], string> = {
-  pending: "En cola",
+  pending: $localize`:@@ui.d197619adfc612:En cola`,
   processing: "Enviando",
   success: "Entregada",
   failed: "Fallida",

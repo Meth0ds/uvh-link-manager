@@ -15,7 +15,7 @@ class RequireMfa
         $user = UvhRequest::user($request);
         if (! $user || ! $user->mfa_enabled || ! UvhRequest::mfaVerified($request)) {
             return response()->json([
-                'error' => 'Esta operación requiere una sesión autenticada con MFA',
+                'error' => __('messages.error_63c806663b57b5'),
                 'details' => ['reason' => 'mfa_required'],
             ], 403);
         }
@@ -24,7 +24,7 @@ class RequireMfa
             $verifiedAt = UvhRequest::mfaVerifiedAt($request);
             if (! MfaFreshness::isFresh($verifiedAt)) {
                 return response()->json([
-                    'error' => 'Vuelve a confirmar tu identidad para acceder a administración',
+                    'error' => __('messages.error_e5bb1fc949b48a'),
                     'details' => ['reason' => 'mfa_reauthentication_required'],
                 ], 403);
             }

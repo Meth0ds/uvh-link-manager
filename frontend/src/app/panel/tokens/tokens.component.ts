@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy, HostListener, ElementRef, viewChild, afterNextRender, Injector, untracked, NgZone } from "@angular/core";
 
 import { FormsModule } from "@angular/forms";
@@ -33,11 +34,11 @@ import { dateTimeLabel } from "../../core/date-time-label";
 import { decodePublicActionAcknowledgement } from "../../core/services/public-action-response-decoders";
 
 const SCOPES = [
-  { value: "links:read", label: "Consultar enlaces", description: "Ver los enlaces y sus destinos." },
-  { value: "links:write", label: "Gestionar enlaces", description: "Crear, editar, cambiar estado, eliminar y restaurar enlaces." },
-  { value: "analytics:read", label: "Consultar analítica", description: "Ver las estadísticas de uso de los enlaces." },
-  { value: "domains:read", label: "Consultar dominios", description: "Ver la configuración y el estado de los dominios." },
-  { value: "domains:write", label: "Gestionar dominios", description: "Crear, configurar, verificar, activar, desactivar y eliminar dominios." },
+  { value: "links:read", label: $localize`:@@ui.87e9447abeef9f:Consultar enlaces`, description: $localize`:@@ui.fdecd5e39d8a06:Ver los enlaces y sus destinos.` },
+  { value: "links:write", label: $localize`:@@ui.578708dfd25fb0:Gestionar enlaces`, description: $localize`:@@ui.e9b03465e140da:Crear, editar, cambiar estado, eliminar y restaurar enlaces.` },
+  { value: "analytics:read", label: $localize`:@@ui.a9d03313b23954:Consultar analítica`, description: $localize`:@@ui.6a6bd08808435a:Ver las estadísticas de uso de los enlaces.` },
+  { value: "domains:read", label: $localize`:@@ui.9c8d2d39f673ca:Consultar dominios`, description: $localize`:@@ui.3f645f85eb4ae8:Ver la configuración y el estado de los dominios.` },
+  { value: "domains:write", label: $localize`:@@ui.8d5ef78befeaf6:Gestionar dominios`, description: $localize`:@@ui.2861beca39f28c:Crear, configurar, verificar, activar, desactivar y eliminar dominios.` },
 ] as const;
 
 @Component({
@@ -60,6 +61,7 @@ const SCOPES = [
   styleUrl: "./tokens.component.scss",
 })
 export class TokensComponent {
+  readonly uiText = UI_TEXT;
   private api = inject(ApiService);
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
@@ -191,7 +193,7 @@ export class TokensComponent {
       this.confirmedRevocations.update(ids => ids.filter(id => tokens.some(t => t.id === id && !t.revokedAt)));
     } catch (err) {
       if (!this.requests.isCurrent(request, this.contextKey())) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los tokens");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.a1a1199067c84c:No se pudieron cargar los tokens`);
     } finally {
       if (this.requests.isCurrent(request, this.contextKey())) this.loading.set(false);
     }
@@ -256,11 +258,11 @@ export class TokensComponent {
     const raw = this.expiresAt().trim();
     if (!raw) return null;
     const iso = localDateTimeIso(raw);
-    if (iso === null) return "Introduce una fecha y hora válidas.";
+    if (iso === null) return $localize`:@@ui.5b4c7ec4ffd400:Introduce una fecha y hora válidas.`;
     const now = Date.now();
     const latest = new Date(now); latest.setFullYear(latest.getFullYear() + 1);
     const instant = Date.parse(iso);
-    return instant <= now || instant > latest.getTime() ? "Elige una caducidad futura, dentro de un año." : null;
+    return instant <= now || instant > latest.getTime() ? $localize`:@@ui.7e759fdc0136c2:Elige una caducidad futura, dentro de un año.` : null;
   }
 
   canCreate(): boolean {
@@ -310,7 +312,7 @@ export class TokensComponent {
       try {
         await this.auth.refreshUser();
       } catch {
-        if (current()) this.snackbar.open("Token creado. Actualiza Ajustes para revisar el estado de recuperación.", "Cerrar", { duration: 4000 });
+        if (current()) this.snackbar.open($localize`:@@ui.20fce6d02a773b:Token creado. Actualiza Ajustes para revisar el estado de recuperación.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       }
     } catch (err) {
       if (!current()) return;
@@ -318,8 +320,8 @@ export class TokensComponent {
       this.creationUnconfirmed.set(uncertain);
       if (uncertain) { this.requireRegistryRefresh(); this.creationReviewed.set(false); }
       this.issueError.set(uncertain
-        ? "No pudimos confirmar la creación. El token puede haberse creado sin que recibieras el secreto. Actualiza el registro y revoca cualquier credencial que no puedas utilizar antes de crear otra."
-        : err instanceof ApiRequestError ? err.message : "No se pudo crear el token");
+        ? $localize`:@@ui.e4a9038fdb6647:No pudimos confirmar la creación. El token puede haberse creado sin que recibieras el secreto. Actualiza el registro y revoca cualquier credencial que no puedas utilizar antes de crear otra.`
+        : err instanceof ApiRequestError ? err.message : $localize`:@@ui.af0f816410fe48:No se pudo crear el token`);
     } finally {
       if (current()) this.creating.set(false);
     }
@@ -345,9 +347,9 @@ export class TokensComponent {
     if (!this.currentView() || this.mutationBusy() || this.loading() || this.error() || this.registryNeedsRefresh() || !live || this.isRevoked(live)) return;
     const context = this.contextKey();
     const confirmed = await this.actions.confirm({
-      title: "Revocar token",
-      message: `¿Revocar el token “${live.name}”? Las integraciones que lo usen dejarán de autenticarse y esta acción no se puede deshacer.`,
-      confirmLabel: "Revocar token", destructive: true,
+      title: $localize`:@@ui.79e14eb1e9a883:Revocar token`,
+      message: $localize`:@@ui.f26b979548fef2:¿Revocar el token “${live.name}”? Las integraciones que lo usen dejarán de autenticarse y esta acción no se puede deshacer.`,
+      confirmLabel: $localize`:@@ui.79e14eb1e9a883:Revocar token`, destructive: true,
     });
     const selected = this.tokens().find(row => row.id === live.id);
     if (!confirmed || !this.currentView() || context !== this.contextKey() || this.mutationBusy()
@@ -363,7 +365,7 @@ export class TokensComponent {
       if (this.issuedTokenId === selected.id) {
         this.clearIssued();
       }
-      this.snackbar.open("Token revocado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.3e61232433a88d:Token revocado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       // The backend retains revoked rows as history. Do not invent a persisted
       // revocation timestamp or promise that revoking exposes older pages.
       void this.load();
@@ -372,8 +374,8 @@ export class TokensComponent {
       const uncertain = err instanceof ApiRequestError && (err.status === 0 || err.status === 502);
       if (uncertain) this.requireRegistryRefresh();
       this.snackbar.open(uncertain
-        ? "No pudimos confirmar la revocación. Actualiza el registro para comprobar si el token sigue activo antes de reintentarlo."
-        : err instanceof ApiRequestError ? err.message : "No se pudo revocar el token", "Cerrar", { duration: 4000 });
+        ? $localize`:@@ui.06ae5eb54e84e1:No pudimos confirmar la revocación. Actualiza el registro para comprobar si el token sigue activo antes de reintentarlo.`
+        : err instanceof ApiRequestError ? err.message : $localize`:@@ui.fd3f0a58a8ad65:No se pudo revocar el token`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       if (current()) this.revokingId.set(null);
     }
@@ -388,9 +390,9 @@ export class TokensComponent {
     try {
       if (!navigator.clipboard) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(plain);
-      if (current()) this.copyFeedback.set("Token copiado");
+      if (current()) this.copyFeedback.set($localize`:@@ui.5f0c0661360dcc:Token copiado`);
     } catch {
-      if (current()) this.copyFeedback.set("No se pudo copiar. Selecciona el token y cópialo manualmente.");
+      if (current()) this.copyFeedback.set($localize`:@@ui.af301a50a3489f:No se pudo copiar. Selecciona el token y cópialo manualmente.`);
     } finally {
       if (current()) this.copyBusy.set(false);
     }

@@ -1,3 +1,5 @@
+import { LocaleLinkDirective } from "../core/localisation/locale-link.directive";
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { DOCUMENT } from "@angular/common";
 import { Component, DestroyRef, ElementRef, Injector, afterNextRender, inject, signal, ChangeDetectionStrategy, ViewChild } from "@angular/core";
 import { RouterLink } from "@angular/router";
@@ -23,6 +25,7 @@ interface PublicConfigResponse {
   };
 }
 
+// Stable submission values: translate labels, never the API category.
 const REASONS = [
   "Phishing o suplantación de identidad",
   "Fraude, estafa o cobro engañoso",
@@ -30,7 +33,7 @@ const REASONS = [
   "Spam o comunicaciones no solicitadas",
   "Amenazas o contenido ilegal",
   "Vulneración de privacidad o derechos",
-  "Otro",
+  "Otro"
 ] as const;
 
 /** Normalize without resolving or visiting the reported destination. */
@@ -60,7 +63,7 @@ export function reportReferenceValidator(control: AbstractControl<string>): Vali
 @Component({
   selector: "app-report",
   standalone: true,
-  imports: [
+  imports: [LocaleLinkDirective,
     RouterLink,
     ReactiveFormsModule,
     MatButtonModule,
@@ -77,6 +80,7 @@ export function reportReferenceValidator(control: AbstractControl<string>): Vali
   styleUrl: "./report.component.scss",
 })
 export class ReportComponent {
+  readonly uiText = UI_TEXT;
   @ViewChild("reportCaptcha") private captchaWidget?: HCaptchaWidgetComponent;
 
   private fb = inject(FormBuilder);
@@ -89,22 +93,31 @@ export class ReportComponent {
   private readonly submitRequests = new LatestRequest(inject(DestroyRef));
 
   readonly reasons = REASONS;
+  readonly reasonLabels: Record<(typeof REASONS)[number], string> = {
+    "Phishing o suplantación de identidad": $localize`:@@ui.f47ef94315ae01:Phishing o suplantación de identidad`,
+    "Fraude, estafa o cobro engañoso": $localize`:@@ui.df8ed68c8eed9d:Fraude, estafa o cobro engañoso`,
+    "Malware o software malicioso": $localize`:@@ui.9c50a4c1cce536:Malware o software malicioso`,
+    "Spam o comunicaciones no solicitadas": $localize`:@@ui.a43078886681de:Spam o comunicaciones no solicitadas`,
+    "Amenazas o contenido ilegal": $localize`:@@ui.537c8cd7d7500c:Amenazas o contenido ilegal`,
+    "Vulneración de privacidad o derechos": $localize`:@@ui.f7874e3c5424b4:Vulneración de privacidad o derechos`,
+    "Otro": $localize`:@@ui.0d5a52a92cb9f4:Otro`,
+  };
   // Guidance is presentation-only: submitted categories and API validation
   // remain unchanged. Never ask the visitor to visit or investigate a target.
   readonly reasonHints: Record<(typeof REASONS)[number], string> = {
-    "Phishing o suplantación de identidad": "Páginas que aparentan ser una persona o entidad para pedir contraseñas, códigos o datos privados.",
-    "Fraude, estafa o cobro engañoso": "Ofertas, pagos o solicitudes de dinero que inducen a engaño.",
-    "Malware o software malicioso": "Enlaces que distribuyen archivos o programas potencialmente dañinos. No descargues nada para comprobarlo.",
-    "Spam o comunicaciones no solicitadas": "Enlaces difundidos de forma abusiva o en mensajes no solicitados.",
-    "Amenazas o contenido ilegal": "Contenido que amenaza a personas o cuya difusión podría ser ilegal. Ante peligro inmediato, contacta con las autoridades.",
-    "Vulneración de privacidad o derechos": "Difusión de datos personales o contenido que pueda vulnerar derechos de terceros.",
-    "Otro": "Si ninguna categoría encaja, puedes explicar el problema en el contexto opcional, sin incluir datos sensibles.",
+    "Phishing o suplantación de identidad": $localize`:@@ui.04a91becf7cd5b:Páginas que aparentan ser una persona o entidad para pedir contraseñas, códigos o datos privados.`,
+    "Fraude, estafa o cobro engañoso": $localize`:@@ui.3d6af076c3d1ca:Ofertas, pagos o solicitudes de dinero que inducen a engaño.`,
+    "Malware o software malicioso": $localize`:@@ui.4f0675238bfb01:Enlaces que distribuyen archivos o programas potencialmente dañinos. No descargues nada para comprobarlo.`,
+    "Spam o comunicaciones no solicitadas": $localize`:@@ui.1a2e7575cd48ed:Enlaces difundidos de forma abusiva o en mensajes no solicitados.`,
+    "Amenazas o contenido ilegal": $localize`:@@ui.c42c2f4e69efb2:Contenido que amenaza a personas o cuya difusión podría ser ilegal. Ante peligro inmediato, contacta con las autoridades.`,
+    "Vulneración de privacidad o derechos": $localize`:@@ui.e00d2e463c49f3:Difusión de datos personales o contenido que pueda vulnerar derechos de terceros.`,
+    "Otro": $localize`:@@ui.9f0c0ed05df1bb:Si ninguna categoría encaja, puedes explicar el problema en el contexto opcional, sin incluir datos sensibles.`,
   };
   readonly reportTypes = [
-    { icon: "phishing", title: "Phishing y fraude", text: "Suplantación, robo de credenciales, pagos engañosos o estafas." },
-    { icon: "bug_report", title: "Malware", text: "Descargas dañinas, ransomware, scripts o software malicioso." },
-    { icon: "campaign", title: "Spam y abuso", text: "Mensajes no solicitados, cloaking o evasión reiterada de bloqueos." },
-    { icon: "gavel", title: "Contenido ilegal", text: "Amenazas, explotación o vulneración de derechos de terceros." },
+    { icon: "phishing", title: $localize`:@@ui.e43f4493624fda:Phishing y fraude`, text: $localize`:@@ui.357f661d2e8a0f:Suplantación, robo de credenciales, pagos engañosos o estafas.` },
+    { icon: "bug_report", title: $localize`:@@ui.518a3b2192d9d7:Malware`, text: $localize`:@@ui.f54bb81a5c4ebe:Descargas dañinas, ransomware, scripts o software malicioso.` },
+    { icon: "campaign", title: $localize`:@@ui.0112ff1baa7651:Spam y abuso`, text: $localize`:@@ui.9bc7c7bff2afc6:Mensajes no solicitados, cloaking o evasión reiterada de bloqueos.` },
+    { icon: "gavel", title: $localize`:@@ui.d71911c8d431b2:Contenido ilegal`, text: $localize`:@@ui.598a3fc1bf660d:Amenazas, explotación o vulneración de derechos de terceros.` },
   ];
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
@@ -128,7 +141,7 @@ export class ReportComponent {
 
   get selectedReasonHint(): string {
     const hint = this.reasonHints[this.form.controls.reason.value as (typeof REASONS)[number]];
-    return typeof hint === "string" ? hint : "Si no estás seguro, elige la opción más próxima o «Otro».";
+    return typeof hint === "string" ? hint : $localize`:@@ui.e108626690aa24:Si no estás seguro, elige la opción más próxima o «Otro».`;
   }
 
   onCaptchaToken(token: string): void {
@@ -153,7 +166,7 @@ export class ReportComponent {
     } catch {
       if (this.configRequests.isCurrent(request, null)) {
         this.hcaptchaSiteKey.set("");
-        this.captchaConfigError.set("No se pudo cargar la comprobación antiabuso.");
+        this.captchaConfigError.set($localize`:@@ui.909e47ff30c9a7:No se pudo cargar la comprobación antiabuso.`);
       }
     } finally {
       if (this.configRequests.isCurrent(request, null)) this.captchaConfigBusy.set(false);
@@ -188,7 +201,7 @@ export class ReportComponent {
       return;
     }
     if (!this.captchaToken()) {
-      this.error.set("Completa la comprobación antiabuso antes de enviar la denuncia.");
+      this.error.set($localize`:@@ui.3b2bd85c3cd18e:Completa la comprobación antiabuso antes de enviar la denuncia.`);
       return;
     }
     this.busy.set(true);
@@ -211,7 +224,7 @@ export class ReportComponent {
       try {
         decodePublicActionAcknowledgement(response);
       } catch {
-        throw new ApiRequestError("No se ha podido confirmar el registro de la denuncia. Los datos se han conservado para que puedas revisarlos.", 502);
+        throw new ApiRequestError($localize`:@@ui.9b68f29feea40f:No se ha podido confirmar el registro de la denuncia. Los datos se han conservado para que puedas revisarlos.`, 502);
       }
       this.receivedReference.set(context);
       this.done.set(true);
@@ -219,7 +232,7 @@ export class ReportComponent {
       this.focusAfterRender(".report-receipt");
     } catch (err) {
       if (this.submitRequests.isCurrent(request, context)) {
-        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo enviar la denuncia");
+        this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.942220145a1df8:No se pudo enviar la denuncia`);
       }
     } finally {
       // hCaptcha tokens are single-use even when the API rejects another

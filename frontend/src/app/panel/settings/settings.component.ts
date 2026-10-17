@@ -1,3 +1,6 @@
+import { LanguageSelectorComponent } from "../../core/localisation/language-selector.component";
+import { LocaleLinkDirective } from "../../core/localisation/locale-link.directive";
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { afterNextRender, NgZone, Component, computed, effect, inject, signal, untracked, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
 import { Location } from "@angular/common";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
@@ -61,7 +64,7 @@ import { SettingsPreferenceRowComponent } from "./settings-preference-row.compon
 @Component({
   selector: "app-settings",
   standalone: true,
-  imports: [
+  imports: [LanguageSelectorComponent, LocaleLinkDirective,
     ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -88,6 +91,7 @@ import { SettingsPreferenceRowComponent } from "./settings-preference-row.compon
   styleUrl: "./settings.component.scss",
 })
 export class SettingsComponent implements AfterViewInit {
+  readonly uiText = UI_TEXT;
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private workspaces = inject(WorkspaceService);
@@ -133,11 +137,11 @@ export class SettingsComponent implements AfterViewInit {
   };
   readonly activeSection = signal(this.initialSection());
   readonly sectionNavItems = computed<SettingsSectionNavItem[]>(() => [
-    { id: "account", label: "Perfil y apariencia", description: "Nombre, email y tema", icon: "person_outline", status: this.userRefreshRequired() ? "Revisar" : null, statusTone: "attention" },
-    { id: "security", label: "Acceso y seguridad", description: "Contraseña, MFA y sesiones", icon: "lock_outline", status: this.userRefreshRequired() ? "Pendiente" : this.user()?.mfaEnabled ? "Protegido" : "MFA recomendado", statusTone: this.userRefreshRequired() || !this.user()?.mfaEnabled ? "attention" : "success" },
-    { id: "notifications", label: "Notificaciones", description: "Avisos y frecuencia", icon: "notifications", status: this.notificationPrefsBusy() ? "Guardando" : null, statusTone: "quiet" },
-    { id: "privacy", label: "Tus datos", description: "Descargas y solicitudes", icon: "policy", status: this.privacyAction() ? "En curso" : null, statusTone: "quiet" },
-    { id: "danger", label: "Cerrar la cuenta", description: "Requisitos y consecuencias", icon: "warning_amber", status: null, statusTone: "attention" },
+    { id: "account", label: $localize`:@@ui.86c6655806304c:Perfil y apariencia`, description: $localize`:@@ui.69d87dc7a26c46:Nombre, email y tema`, icon: "person_outline", status: this.userRefreshRequired() ? $localize`:@@ui.52fadddb772ffb:Revisar` : null, statusTone: "attention" },
+    { id: "security", label: $localize`:@@ui.c95ad05d6312a1:Acceso y seguridad`, description: $localize`:@@ui.62cfe8ac639774:Contraseña, MFA y sesiones`, icon: "lock_outline", status: this.userRefreshRequired() ? $localize`:@@ui.2ef68536d8e212:Pendiente` : this.user()?.mfaEnabled ? "Protegido" : $localize`:@@ui.8c32d8d87598cb:MFA recomendado`, statusTone: this.userRefreshRequired() || !this.user()?.mfaEnabled ? "attention" : "success" },
+    { id: "notifications", label: $localize`:@@ui.80dade6fab6f93:Notificaciones`, description: $localize`:@@ui.3f2c956adb16ad:Avisos y frecuencia`, icon: "notifications", status: this.notificationPrefsBusy() ? "Guardando" : null, statusTone: "quiet" },
+    { id: "privacy", label: $localize`:@@ui.200922014753a8:Tus datos`, description: $localize`:@@ui.90490606bc5b4b:Descargas y solicitudes`, icon: "policy", status: this.privacyAction() ? $localize`:@@ui.75f1f75e333774:En curso` : null, statusTone: "quiet" },
+    { id: "danger", label: $localize`:@@ui.e11487df7ef5ea:Cerrar la cuenta`, description: $localize`:@@ui.6b11fcb8bef647:Requisitos y consecuencias`, icon: "warning_amber", status: null, statusTone: "attention" },
   ]);
   /** Per-view admission of section reads, cleared with the account context. */
   private readonly initializedSections = new Set<string>();
@@ -310,9 +314,9 @@ export class SettingsComponent implements AfterViewInit {
   // ---------------- Appearance ----------------
   readonly themePref = this.theme.preference;
   readonly themeOptions: Array<{ value: ThemePreference; label: string }> = [
-    { value: "light", label: "Claro" },
-    { value: "dark", label: "Oscuro" },
-    { value: "system", label: "Seguir sistema" },
+    { value: "light", label: $localize`:@@ui.2f3e8dcc246498:Claro` },
+    { value: "dark", label: $localize`:@@ui.1b1c27c397aee6:Oscuro` },
+    { value: "system", label: $localize`:@@ui.a1b5f5425a6f80:Seguir sistema` },
   ];
 
   // ---------------- Notification preferences ----------------
@@ -361,7 +365,7 @@ export class SettingsComponent implements AfterViewInit {
       const preferences = await this.notifications.preferences({ signal: request.signal });
       if (current()) this.notificationPreferences.set(preferences);
     } catch {
-      if (current()) this.notificationPrefsError.set("No se pudieron cargar tus preferencias de aviso. Inténtalo de nuevo.");
+      if (current()) this.notificationPrefsError.set($localize`:@@ui.3f032ac1f4eac5:No se pudieron cargar tus preferencias de aviso. Inténtalo de nuevo.`);
     } finally {
       if (current()) this.notificationPrefsLoading.set(false);
     }
@@ -381,9 +385,9 @@ export class SettingsComponent implements AfterViewInit {
       const preferences = await this.notifications.updatePreferences([{ kind: pref.kind, delivery }]);
       if (!current()) return;
       this.notificationPreferences.set(preferences);
-      this.snackbar.open("Preferencia de avisos guardada", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.80ee592bd13d13:Preferencia de avisos guardada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
     } catch (err) {
-      if (current()) this.toast(err, "No se pudo guardar la preferencia. Inténtalo de nuevo.");
+      if (current()) this.toast(err, $localize`:@@ui.e6b3f4e6a5412d:No se pudo guardar la preferencia. Inténtalo de nuevo.`);
     } finally {
       if (current()) this.notificationPrefsBusy.set(false);
     }
@@ -507,8 +511,8 @@ export class SettingsComponent implements AfterViewInit {
   private toast(err: unknown, fallback: string): void {
     const message = err instanceof ApiRequestError
       ? err.message
-      : fallback || "No se pudo completar la operación";
-    this.snackbar.open(message, "Cerrar", { duration: 4000 });
+      : fallback || $localize`:@@ui.b1c26ea000def7:No se pudo completar la operación`;
+    this.snackbar.open(message, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
   }
 
   /** A committed security change must never be reported as rolled back. */
@@ -516,7 +520,7 @@ export class SettingsComponent implements AfterViewInit {
     const context = this.accountContext();
     const results = await Promise.allSettled(tasks);
     if (context === this.accountContext() && !this.destroyRef.destroyed && results.some((result) => result.status === "rejected")) {
-      this.snackbar.open("El cambio se aplicó, pero no se pudo actualizar toda la vista. Recárgala antes de repetir la operación.", "Cerrar", { duration: 5000 });
+      this.snackbar.open($localize`:@@ui.118b2d3dee30e7:El cambio se aplicó, pero no se pudo actualizar toda la vista. Recárgala antes de repetir la operación.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
     }
   }
 
@@ -530,7 +534,7 @@ export class SettingsComponent implements AfterViewInit {
       if (!current()) return;
       this.profileForm.markAsPristine();
       this.profileSaveState.set("saved");
-      this.snackbar.open("Perfil actualizado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.0d776709ee6731:Perfil actualizado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
     } catch (err) {
       if (!current()) return;
       this.toast(err, "");
@@ -570,7 +574,7 @@ export class SettingsComponent implements AfterViewInit {
         section?.focus({ preventScroll: true });
       }
     } catch (error) {
-      if (current()) this.toast(error, "Los cambios siguen confirmados, pero no se pudo actualizar la vista.");
+      if (current()) this.toast(error, $localize`:@@ui.8c51e56c2213c0:Los cambios siguen confirmados, pero no se pudo actualizar la vista.`);
     } finally {
       if (current()) this.profileRefreshBusy.set(false);
     }
@@ -583,14 +587,14 @@ export class SettingsComponent implements AfterViewInit {
     const dialog = this.dialogs.open(EmailAccessDialogComponent, {
       data, width: "min(560px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: mode === "change" ? "#email-address-step input" : "first-heading", restoreFocus: true, injector: this.injector,
-      ariaLabel: mode === "change" ? "Cambiar el email de acceso" : "Cancelar el cambio de email pendiente",
+      ariaLabel: mode === "change" ? $localize`:@@ui.7d85a47228f751:Cambiar el email de acceso` : $localize`:@@ui.f07602dac1c062:Cancelar el cambio de email pendiente`,
     });
     this.emailDialog = dialog;
     dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
       if (this.emailDialog !== dialog) return;
       this.emailDialog = undefined;
       if (!completed || context !== this.accountContext() || this.destroyRef.destroyed) return;
-      this.snackbar.open(mode === "change" ? "Confirmación enviada al nuevo email" : "Cambio de email cancelado", "Cerrar", { duration: 3500 });
+      this.snackbar.open(mode === "change" ? $localize`:@@ui.85a964ac8eaabf:Confirmación enviada al nuevo email` : $localize`:@@ui.0e55f6ade6c6aa:Cambio de email cancelado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
     });
   }
 
@@ -600,14 +604,14 @@ export class SettingsComponent implements AfterViewInit {
     const dialog = this.dialogs.open(PasswordChangeDialogComponent, {
       width: "min(610px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: "#password-credentials-step input", restoreFocus: true, injector: this.injector,
-      ariaLabel: "Cambiar la contraseña de acceso",
+      ariaLabel: $localize`:@@ui.1ae6668b609d6a:Cambiar la contraseña de acceso`,
     });
     this.passwordDialog = dialog;
     dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((completed) => {
       if (this.passwordDialog !== dialog) return;
       this.passwordDialog = undefined;
       if (!completed || context !== this.accountContext() || this.destroyRef.destroyed) return;
-      this.snackbar.open("Contraseña actualizada", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.f29a5970a4ab27:Contraseña actualizada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       void this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     });
   }
@@ -632,7 +636,7 @@ export class SettingsComponent implements AfterViewInit {
       if (!this.sessionsRequest.isCurrent(request, this.accountContext())) return;
       this.sessions.set([]);
       this.sessionsTruncated.set(false);
-      this.sessionsError.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las sesiones");
+      this.sessionsError.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.0a77c5488d3df2:No se pudieron cargar las sesiones`);
     } finally {
       if (this.sessionsRequest.isCurrent(request, this.accountContext())) this.sessionsLoading.set(false);
     }
@@ -662,8 +666,8 @@ export class SettingsComponent implements AfterViewInit {
       if (statusChanged && reloadHistory) void this.loadExportHistory();
     } catch (err) {
       if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
-      this.exportError.set(err instanceof ApiRequestError ? err.message : "No se pudo consultar el estado de la exportación");
-      if (notify && !silent) this.toast(err, "No se pudo consultar el estado de la exportación");
+      this.exportError.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.221074773ba701:No se pudo consultar el estado de la exportación`);
+      if (notify && !silent) this.toast(err, $localize`:@@ui.221074773ba701:No se pudo consultar el estado de la exportación`);
     } finally {
       if (this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) {
         if (!silent) this.exportLoading.set(false);
@@ -753,7 +757,7 @@ export class SettingsComponent implements AfterViewInit {
       data: { purpose },
       width: "min(560px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: "#export-password-step input", restoreFocus: true, injector: this.injector,
-      ariaLabel: purpose === "download" ? "Descargar la exportación de datos" : "Solicitar una exportación de datos",
+      ariaLabel: purpose === "download" ? $localize`:@@ui.d14302fe9e5469:Descargar la exportación de datos` : $localize`:@@ui.638968dd8eea63:Solicitar una exportación de datos`,
     });
     this.exportDialog = dialog;
     dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
@@ -761,9 +765,9 @@ export class SettingsComponent implements AfterViewInit {
       this.exportDialog = undefined;
       if (!result || context !== this.accountContext() || this.destroyRef.destroyed) return;
       if (result === "unconfirmed") {
-        this.snackbar.open("Archivo descargado. No pudimos confirmar la recepción: puedes descargarlo de nuevo o dejar que caduque.", "Cerrar", { duration: 6000 });
+        this.snackbar.open($localize`:@@ui.8ba338ee08955f:Archivo descargado. No pudimos confirmar la recepción: puedes descargarlo de nuevo o dejar que caduque.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 6000 });
       } else {
-        this.snackbar.open(purpose === "download" ? "Archivo descargado" : "Solicitud de exportación iniciada", "Cerrar", { duration: 3500 });
+        this.snackbar.open(purpose === "download" ? $localize`:@@ui.415a5c68626ffb:Archivo descargado` : $localize`:@@ui.0f44741eab4e98:Solicitud de exportación iniciada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
       }
       void this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.loadExportHistory()]);
     });
@@ -775,9 +779,9 @@ export class SettingsComponent implements AfterViewInit {
     const request = this.exportMutationRequest.begin(this.accountContext());
     const current = () => this.exportMutationRequest.isCurrent(request, this.accountContext());
     const confirmed = await this.actions.confirm({
-      title: "Cancelar exportación",
-      message: "La descarga pendiente dejará de funcionar y se eliminará el archivo privado si ya estaba preparado.",
-      confirmLabel: "Cancelar exportación",
+      title: $localize`:@@ui.18b3cbc9663064:Cancelar exportación`,
+      message: $localize`:@@ui.773975fc9171ab:La descarga pendiente dejará de funcionar y se eliminará el archivo privado si ya estaba preparado.`,
+      confirmLabel: $localize`:@@ui.18b3cbc9663064:Cancelar exportación`,
       destructive: true,
     });
     // The answer can arrive after another attempt started; the dialog is not a
@@ -787,7 +791,7 @@ export class SettingsComponent implements AfterViewInit {
     try {
       await this.auth.cancelDataExport();
       if (!current()) return;
-      this.snackbar.open("Exportación cancelada", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.5de8ee35ff5ac2:Exportación cancelada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       await this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.loadExportHistory()]);
     } catch (err) {
       if (current()) this.toast(err, "");
@@ -808,25 +812,25 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   private static readonly EXPORT_STAGE_LABELS: Record<DataExportStage, string> = {
-    collecting: "Recopilando tus datos",
-    analytics: "Calculando totales",
-    encoding: "Preparando el contenido",
-    encrypting: "Cifrando el archivo",
-    finalizing: "Finalizando la entrega",
+    collecting: $localize`:@@ui.ded18e499b9989:Recopilando tus datos`,
+    analytics: $localize`:@@ui.d0e456ee29ea8c:Calculando totales`,
+    encoding: $localize`:@@ui.0de61228d15e5f:Preparando el contenido`,
+    encrypting: $localize`:@@ui.90a0155ac11d8c:Cifrando el archivo`,
+    finalizing: $localize`:@@ui.ec4e979c0a2474:Finalizando la entrega`,
   };
 
   private static readonly EXPORT_STATUS_LABELS: Record<DataExportStatus["status"], string> = {
-    processing: "En preparación",
+    processing: $localize`:@@ui.e7f805cdbc6e2a:En preparación`,
     ready: "Lista",
     downloaded: "Descargada",
-    failed: "Falló",
+    failed: $localize`:@@ui.184f9f08775f92:Falló`,
     cancelled: "Cancelada",
     expired: "Caducada",
   };
 
   /** Etapa viva de la generación; sin etapa conocida, texto neutro. */
   exportStageLabel(stage: DataExportStage | null): string {
-    return stage ? SettingsComponent.EXPORT_STAGE_LABELS[stage] : "Preparando el archivo";
+    return stage ? SettingsComponent.EXPORT_STAGE_LABELS[stage] : $localize`:@@ui.5462b220b401da:Preparando el archivo`;
   }
 
   exportStatusLabel(status: DataExportStatus["status"]): string {
@@ -872,8 +876,8 @@ export class SettingsComponent implements AfterViewInit {
     } catch (err) {
       if (!this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) return;
       this.deletionImpact.set(null);
-      this.deletionError.set(err instanceof ApiRequestError ? err.message : "No se pudo consultar el impacto de la eliminación");
-      if (notify) this.toast(err, "No se pudo consultar el impacto de la eliminación");
+      this.deletionError.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.f704117f5b61d6:No se pudo consultar el impacto de la eliminación`);
+      if (notify) this.toast(err, $localize`:@@ui.f704117f5b61d6:No se pudo consultar el impacto de la eliminación`);
     } finally {
       if (this.deletionRequest.isCurrent(request, this.auth.sessionGeneration())) this.deletionLoading.set(false);
     }
@@ -885,7 +889,7 @@ export class SettingsComponent implements AfterViewInit {
     const dialog = this.dialogs.open(AccountDeletionDialogComponent, {
       width: "min(580px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
       autoFocus: "first-heading", restoreFocus: true, injector: this.injector,
-      ariaLabel: "Solicitar el cierre de cuenta",
+      ariaLabel: $localize`:@@ui.71e30909a34f9d:Solicitar el cierre de cuenta`,
     });
     this.deletionDialog = dialog;
     dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
@@ -919,8 +923,8 @@ export class SettingsComponent implements AfterViewInit {
       const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
       if (!this.privacyRequest.isCurrent(request, current)) return;
       this.privacyRequests.set([]);
-      this.privacyError.set(error instanceof ApiRequestError ? error.message : "No se pudieron cargar las solicitudes");
-      if (notify) this.toast(error, "No se pudieron cargar las solicitudes");
+      this.privacyError.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.cfaf0e382ffa5a:No se pudieron cargar las solicitudes`);
+      if (notify) this.toast(error, $localize`:@@ui.cfaf0e382ffa5a:No se pudieron cargar las solicitudes`);
     } finally {
       const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
       if (this.privacyRequest.isCurrent(request, current)) this.privacyLoading.set(false);
@@ -958,7 +962,7 @@ export class SettingsComponent implements AfterViewInit {
       if (!current()) return;
       let admitted: PrivacyRightRequest;
       try { admitted = decodePrivacyRequestCreated(response, type); }
-      catch { throw new ApiRequestError("No pudimos confirmar el registro. Conservamos el texto; comprueba el seguimiento antes de volver a enviarlo.", 502); }
+      catch { throw new ApiRequestError($localize`:@@ui.9014251881a1ec:No pudimos confirmar el registro. Conservamos el texto; comprueba el seguimiento antes de volver a enviarlo.`, 502); }
       this.privacyReceipt.set({ id: admitted.id, type: admitted.type, dueAt: admitted.dueAt });
       afterNextRender(() => {
         if (current() && this.activeSection() === "privacy" && this.privacyReceipt()?.id === admitted.id) {
@@ -971,7 +975,7 @@ export class SettingsComponent implements AfterViewInit {
       this.privacyPage.set(0);
       await this.loadPrivacyRequests(false);
       if (!current()) return;
-      this.snackbar.open("Solicitud registrada y plazo iniciado", "Cerrar", { duration: 3500 });
+      this.snackbar.open($localize`:@@ui.7741b3a10a9b4d:Solicitud registrada y plazo iniciado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
     } catch (error) {
       if (!current()) return;
       this.privacyMutationError.set(this.privacyFailure(error));
@@ -1016,7 +1020,7 @@ export class SettingsComponent implements AfterViewInit {
       this.privacyResponseForm.reset();
       await this.loadPrivacyRequests(false);
       if (!current()) return;
-      this.snackbar.open("Respuesta incorporada al expediente", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.5e1fff735fdae3:Respuesta incorporada al expediente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
     } catch (error) {
       if (!current()) return;
       this.privacyMutationError.set(this.privacyFailure(error));
@@ -1031,9 +1035,9 @@ export class SettingsComponent implements AfterViewInit {
     const mutation = this.privacyMutationRequest.begin(this.accountContext());
     const current = () => this.privacyMutationRequest.isCurrent(mutation, this.accountContext());
     const confirmed = await this.actions.confirm({
-      title: "Cancelar solicitud",
-      message: "El expediente quedará cerrado como cancelado. Podrás crear otra solicitud del mismo tipo más adelante.",
-      confirmLabel: "Cancelar solicitud",
+      title: $localize`:@@ui.c9d98050b715ed:Cancelar solicitud`,
+      message: $localize`:@@ui.dbdcf79b5764a9:El expediente quedará cerrado como cancelado. Podrás crear otra solicitud del mismo tipo más adelante.`,
+      confirmLabel: $localize`:@@ui.c9d98050b715ed:Cancelar solicitud`,
       destructive: true,
     });
     if (!confirmed || !current() || this.privacyBusy()) return;
@@ -1044,7 +1048,7 @@ export class SettingsComponent implements AfterViewInit {
       this.confirmPrivacyAcknowledgement(response);
       await this.loadPrivacyRequests();
       if (!current()) return;
-      this.snackbar.open("Solicitud cancelada", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.e075f56997a31c:Solicitud cancelada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
     } catch (error) {
       if (!current()) return;
       this.privacyMutationError.set(this.privacyFailure(error));
@@ -1091,12 +1095,12 @@ export class SettingsComponent implements AfterViewInit {
 
   private confirmPrivacyAcknowledgement(response: unknown): void {
     try { decodePublicActionAcknowledgement(response); }
-    catch { throw new ApiRequestError("No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.", 502); }
+    catch { throw new ApiRequestError($localize`:@@ui.8caf71d50f77ff:No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.`, 502); }
   }
 
   private privacyFailure(error: unknown): string {
     return error instanceof ApiRequestError ? error.message
-      : "No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.";
+      : $localize`:@@ui.8caf71d50f77ff:No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.`;
   }
 
   readonly privacyGuidance = PRIVACY_RIGHT_GUIDANCE;
@@ -1120,7 +1124,7 @@ export class SettingsComponent implements AfterViewInit {
     } catch (error) {
       if (!current()) return;
       if (this.workspaces.currentId() === id) this.workspaces.select(previous);
-      this.toast(error, "No se pudo abrir el workspace");
+      this.toast(error, $localize`:@@ui.1e00cd61af484f:No se pudo abrir el workspace`);
     }
   }
 
@@ -1135,7 +1139,7 @@ export class SettingsComponent implements AfterViewInit {
     try {
       revokedCurrent = await this.auth.revokeSession(session.id, session.current);
     } catch (err) {
-      if (live() && this.accountContext() === context) this.toast(err, "No se pudo revocar la sesión");
+      if (live() && this.accountContext() === context) this.toast(err, $localize`:@@ui.971a3b33f92d4b:No se pudo revocar la sesión`);
       return;
     }
     if (!live()) return;
@@ -1149,13 +1153,13 @@ export class SettingsComponent implements AfterViewInit {
       try {
         const navigated = await this.router.navigate(["/auth"]);
         if (!current()) return;
-        if (!navigated) this.snackbar.open("La sesión quedó revocada. Abre la pantalla de acceso para continuar.", "Cerrar", { duration: 5000 });
+        if (!navigated) this.snackbar.open($localize`:@@ui.e6482d2ddd1e69:La sesión quedó revocada. Abre la pantalla de acceso para continuar.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
       } catch {
-        if (current()) this.snackbar.open("La sesión quedó revocada, pero no se pudo abrir la pantalla de acceso.", "Cerrar", { duration: 5000 });
+        if (current()) this.snackbar.open($localize`:@@ui.36ad28621f6de0:La sesión quedó revocada, pero no se pudo abrir la pantalla de acceso.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
       }
       return;
     }
-    this.snackbar.open("Sesión revocada", "Cerrar", { duration: 2500 });
+    this.snackbar.open($localize`:@@ui.eef3d770790a42:Sesión revocada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
     void this.loadSessions();
   }
 
@@ -1195,7 +1199,7 @@ export class SettingsComponent implements AfterViewInit {
         // The server-side setup already exists. Preserve the manual secret
         // instead of inviting a retry that could rotate it again.
         this.mfaQr.set(null);
-        this.snackbar.open("La configuración está preparada, pero no se pudo generar el QR. Usa la clave manual mostrada.", "Cerrar", { duration: 5000 });
+        this.snackbar.open($localize`:@@ui.8bf0f88cbc0a91:La configuración está preparada, pero no se pudo generar el QR. Usa la clave manual mostrada.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
       } finally {
         if (current()) this.mfaQrLoading.set(false);
       }
@@ -1226,7 +1230,7 @@ export class SettingsComponent implements AfterViewInit {
       this.uncertainMfaSetup.set(false);
       this.recoveryCodesAcknowledged.set(false);
       this.clearMfaSetupUi();
-      this.snackbar.open("MFA activado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.99b29f803bfed8:MFA activado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
       if (!current()) return;
@@ -1242,9 +1246,9 @@ export class SettingsComponent implements AfterViewInit {
     const request = this.mfaRequests.begin(this.accountContext());
     const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     const confirmed = await this.actions.confirm({
-      title: "Desactivar MFA",
-      message: "Tu cuenta perderá la verificación en dos pasos. Confirma con tu contraseña y un código de tu aplicación o de recuperación.",
-      confirmLabel: "Desactivar MFA",
+      title: $localize`:@@ui.abda53de5e75f0:Desactivar MFA`,
+      message: $localize`:@@ui.8ba04bd6cd693e:Tu cuenta perderá la verificación en dos pasos. Confirma con tu contraseña y un código de tu aplicación o de recuperación.`,
+      confirmLabel: $localize`:@@ui.abda53de5e75f0:Desactivar MFA`,
       destructive: true,
     });
     if (!confirmed || !current() || this.mfaBusy() || this.userRefreshRequired()) return;
@@ -1264,7 +1268,7 @@ export class SettingsComponent implements AfterViewInit {
       this.mfaPasswordForm.reset();
       this.mfaCodeForm.reset();
       this.mfaDisableForm.reset();
-      this.snackbar.open("MFA desactivado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.af28c171782d92:MFA desactivado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
       if (!current()) return;
@@ -1337,7 +1341,7 @@ export class SettingsComponent implements AfterViewInit {
     if (!this.recoveryCodesAcknowledged()) return;
     this.recoveryCodes.set([]);
     this.recoveryCodesAcknowledged.set(false);
-    this.snackbar.open("Configuración completada", "Cerrar", { duration: 2500 });
+    this.snackbar.open($localize`:@@ui.8ab09e6cdebc14:Configuración completada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
   }
 
   beginRecoveryRegeneration(): void {
@@ -1360,9 +1364,9 @@ export class SettingsComponent implements AfterViewInit {
     const request = this.mfaRequests.begin(this.accountContext());
     const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
     const confirmed = await this.actions.confirm({
-      title: "Regenerar códigos de recuperación",
-      message: "Los códigos anteriores dejarán de funcionar y se cerrarán las demás sesiones de tu cuenta.",
-      confirmLabel: "Regenerar códigos",
+      title: $localize`:@@ui.d11ca81ed62f56:Regenerar códigos de recuperación`,
+      message: $localize`:@@ui.dd893854c65e40:Los códigos anteriores dejarán de funcionar y se cerrarán las demás sesiones de tu cuenta.`,
+      confirmLabel: $localize`:@@ui.3ddb11527b0b1e:Regenerar códigos`,
       destructive: true,
     });
     if (!confirmed || !current() || this.mfaBusy() || this.userRefreshRequired()) return;
@@ -1379,7 +1383,7 @@ export class SettingsComponent implements AfterViewInit {
       this.recoveryCodesAcknowledged.set(false);
       this.recoveryRegenerating.set(false);
       this.recoveryRegenerateForm.reset();
-      this.snackbar.open("Códigos regenerados", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.7787db03239183:Códigos regenerados`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
     } catch (err) {
       if (!current()) return;
@@ -1397,12 +1401,12 @@ export class SettingsComponent implements AfterViewInit {
     const current = () => !this.destroyRef.destroyed && context === this.accountContext() && codes === this.recoveryCodes();
     const copy = navigator.clipboard?.writeText(codes.join("\n"));
     if (!copy) {
-      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.b2b3a94dcbea08:El navegador no permite copiar automáticamente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       return;
     }
     void copy.then(
-      () => { if (current()) this.snackbar.open("Códigos copiados", "Cerrar", { duration: 2000 }); },
-      () => { if (current()) this.snackbar.open("No se pudieron copiar los códigos", "Cerrar", { duration: 2500 }); },
+      () => { if (current()) this.snackbar.open($localize`:@@ui.03f45134535134:Códigos copiados`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 }); },
+      () => { if (current()) this.snackbar.open($localize`:@@ui.9e5d87300baeca:No se pudieron copiar los códigos`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 }); },
     );
   }
 
@@ -1410,16 +1414,16 @@ export class SettingsComponent implements AfterViewInit {
     const codes = this.recoveryCodes();
     if (!codes.length || typeof document === "undefined") return;
     const body = [
-      "UVH · Códigos de recuperación",
+      $localize`:@@ui.15572ca1eaeb8e:UVH · Códigos de recuperación`,
       "",
-      "Cada código funciona una sola vez. Guárdalos fuera de tu cuenta.",
+      $localize`:@@ui.3a70ca36235f4c:Cada código funciona una sola vez. Guárdalos fuera de tu cuenta.`,
       "",
       ...codes,
       "",
       `Generados: ${new Date().toISOString()}`,
     ].join("\n");
     if (!downloadBlob(new Blob([body], { type: "text/plain;charset=utf-8" }), "uvh-codigos-recuperacion.txt")) {
-      this.snackbar.open("El navegador no pudo descargar los códigos. Cópialos antes de continuar.", "Cerrar", { duration: 5000 });
+      this.snackbar.open($localize`:@@ui.f499cedfd63ea2:El navegador no pudo descargar los códigos. Cópialos antes de continuar.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
     }
   }
 
@@ -1428,6 +1432,6 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   formatDate(iso: string): string {
-    return dateTimeMediumLabel(iso, "Fecha no disponible");
+    return dateTimeMediumLabel(iso, $localize`:@@ui.4657b321be4201:Fecha no disponible`);
   }
 }

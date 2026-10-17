@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -32,6 +33,7 @@ export interface RuleSimulatorDialogData {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RuleSimulatorDialogComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
   private readonly ref = inject(MatDialogRef<RuleSimulatorDialogComponent>);
@@ -95,7 +97,7 @@ export class RuleSimulatorDialogComponent {
       if (this.openedContext !== this.contextKey()) { this.ref.close(false); return; }
       this.result.set(result);
     } catch (error) {
-      this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo probar la configuración");
+      this.error.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.6646735adc83dd:No se pudo probar la configuración`);
     } finally {
       this.busy.set(false);
     }

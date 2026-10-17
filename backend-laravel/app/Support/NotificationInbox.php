@@ -29,6 +29,7 @@ final class NotificationInbox
      * @param  ?string  $dedupeKey  identidad lógica del evento; null = evento
      *                              singular. Con clave, el registro es idempotente por cuenta.
      * @param  ?string  $route  ruta interna del panel; null = la del catálogo
+     * @param  array<string, mixed>|null  $subjectData  structured system-owned display context
      * @return ?string la entrega decidida (`immediate|daily_digest|in_app_only`)
      *                 o null si el evento no se registra (kind desconocido u operativo
      *                 desactivado).
@@ -40,6 +41,7 @@ final class NotificationInbox
         ?string $subject = null,
         ?string $dedupeKey = null,
         ?string $route = null,
+        ?array $subjectData = null,
     ): ?string {
         if (! NotificationKinds::exists($kind)) {
             Log::warning('[notifications] unknown kind rejected', ['kind' => $kind]);
@@ -65,6 +67,7 @@ final class NotificationInbox
             'workspace_id' => $workspaceId,
             'kind' => $kind,
             'subject' => $subject !== null ? mb_substr($subject, 0, 120) : null,
+            'subject_data' => $subjectData !== null ? json_encode($subjectData, JSON_THROW_ON_ERROR) : null,
             'dedupe_key' => $dedupeKey !== null ? mb_substr($dedupeKey, 0, 160) : null,
             'route' => $route ?? NotificationKinds::route($kind),
             'created_at' => now(),

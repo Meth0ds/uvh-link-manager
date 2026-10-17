@@ -66,7 +66,7 @@ class WorkspaceController
         $name = trim(UvhRequest::inputString($request, 'name'));
 
         if (! mb_check_encoding($name, 'UTF-8') || mb_strlen($name) < 2 || mb_strlen($name) > 80 || preg_match('/[\x00-\x1f\x7f]/', $name)) {
-            return response()->json(['error' => 'Nombre inválido'], 422);
+            return response()->json(['error' => __('messages.error_84b9f3abd554d6')], 422);
         }
 
         $result = DB::transaction(function () use ($name, $user, $request): array {
@@ -92,7 +92,7 @@ class WorkspaceController
             return ['status' => 'created', 'workspace' => $w];
         });
         if ($result['status'] !== 'created') {
-            return response()->json(['error' => 'Límite de workspaces alcanzado'], 429);
+            return response()->json(['error' => __('messages.error_9c4d1560b6694c')], 429);
         }
         /** @var Workspace $workspace */
         $workspace = $result['workspace'];
@@ -111,12 +111,12 @@ class WorkspaceController
         $user = UvhRequest::user($request);
         $m = WorkspaceAccess::getMembership($user->id, $id);
         if (! $m) {
-            return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+            return response()->json(['error' => __('messages.error_d9a2380a9ab989')], 403);
         }
 
         $workspace = Workspace::find($id);
         if (! $workspace) {
-            return response()->json(['error' => 'El workspace ya no existe'], 404);
+            return response()->json(['error' => __('messages.error_ae30a27babce20')], 404);
         }
 
         [$memberPage, $memberPerPage] = $this->pagination($request, 'memberPage', 'memberPerPage');
@@ -154,7 +154,7 @@ class WorkspaceController
         $user = UvhRequest::user($request);
         $name = trim(UvhRequest::inputString($request, 'name'));
         if (! mb_check_encoding($name, 'UTF-8') || mb_strlen($name) < 2 || mb_strlen($name) > 80 || preg_match('/[\x00-\x1f\x7f]/', $name)) {
-            return response()->json(['error' => 'Nombre inválido'], 422);
+            return response()->json(['error' => __('messages.error_84b9f3abd554d6')], 422);
         }
 
         $renamed = DB::transaction(function () use ($user, $id, $name, $request): bool {
@@ -168,7 +168,7 @@ class WorkspaceController
             return true;
         });
         if (! $renamed) {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
 
         return response()->json(['ok' => true]);
@@ -182,17 +182,17 @@ class WorkspaceController
         // request must never be able to create a second owner or transfer
         // ownership without an explicit ownership workflow.
         if (! in_array($role, ['owner', 'admin', 'editor', 'viewer'], true)) {
-            return response()->json(['error' => 'Rol inválido'], 422);
+            return response()->json(['error' => __('messages.error_2664250e7b4de3')], 422);
         }
         if ($role === 'owner') {
-            return response()->json(['error' => 'La transferencia de propiedad requiere un flujo explícito'], 403);
+            return response()->json(['error' => __('messages.error_3c6930130ba955')], 403);
         }
 
         // Authorise cheaply before taking an arbitrary target-user lock. The
         // same authority is re-read under the workspace lock below.
         $preflight = WorkspaceAccess::getMembership($user->id, $id);
         if (! $preflight || ! WorkspaceAccess::roleAtLeast($preflight->role, 'admin')) {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
 
         $result = DB::transaction(function () use ($user, $id, $userId, $role, $request): string {
@@ -236,22 +236,22 @@ class WorkspaceController
             return 'updated';
         });
         if ($result === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Miembro no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4fc5bcb5063cdb')], 404);
         }
         if ($result === 'target_inactive') {
-            return response()->json(['error' => 'La cuenta del miembro no está activa o verificada'], 409);
+            return response()->json(['error' => __('messages.error_610f21fdc42a36')], 409);
         }
         if ($result === 'owner') {
-            return response()->json(['error' => 'No se puede cambiar el rol del propietario'], 403);
+            return response()->json(['error' => __('messages.error_595bae3a33e76b')], 403);
         }
         if ($result === 'admin_forbidden') {
-            return response()->json(['error' => 'Solo el propietario puede asignar el rol de propietario o gestionar administradores'], 403);
+            return response()->json(['error' => __('messages.error_f8ea13b8fe8041')], 403);
         }
         if ($result === 'busy') {
-            return response()->json(['error' => 'Hay una entrega de webhook en curso para este miembro. Espera unos segundos y vuelve a intentarlo.'], 409);
+            return response()->json(['error' => __('messages.error_3203682bd47203')], 409);
         }
 
         return response()->json(['ok' => true]);
@@ -265,7 +265,7 @@ class WorkspaceController
         $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
         if (! is_int($targetInput) || $targetInput <= 0 || $targetInput === (int) $actor->id
             || $password === '' || strlen($password) > 72 || strlen($factorCode) > 24) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         // Avoid allowing an arbitrary authenticated account to hold a victim's
@@ -273,7 +273,7 @@ class WorkspaceController
         // workspace. Authority is still revalidated under locks below.
         $preflight = WorkspaceAccess::getMembership($actor->id, $id);
         if (! $preflight || $preflight->role !== 'owner') {
-            return response()->json(['error' => 'Solo el propietario actual puede transferir el workspace'], 403);
+            return response()->json(['error' => __('messages.error_6fedfa89629761')], 403);
         }
 
         try {
@@ -364,19 +364,19 @@ class WorkspaceController
         } catch (MailAdmissionException) {
             Audit::write($actor->id, 'auth.email_delivery_failed', 'workspace', $id, ['kind' => 'workspace_ownership_transfer']);
 
-            return response()->json(['error' => 'No se pudieron guardar los avisos. No se transfirió el workspace. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_16cfa63e808519')], 503);
         }
         if ($result['status'] === 'forbidden') {
-            return response()->json(['error' => 'Solo el propietario actual puede transferir el workspace'], 403);
+            return response()->json(['error' => __('messages.error_6fedfa89629761')], 403);
         }
         if ($result['status'] === 'not_found') {
-            return response()->json(['error' => 'El nuevo propietario debe ser miembro del workspace'], 404);
+            return response()->json(['error' => __('messages.error_1741b583747c68')], 404);
         }
         if ($result['status'] === 'limit') {
-            return response()->json(['error' => 'El nuevo propietario ha alcanzado el límite de workspaces'], 429);
+            return response()->json(['error' => __('messages.error_1348e12edb47a7')], 429);
         }
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($result['status'] === 'locked') {
             return MfaAttempts::tooManyResponse($actor->id, MfaStepUp::ATTEMPT_PURPOSE);
@@ -385,10 +385,10 @@ class WorkspaceController
             return MfaFreshness::reauthenticationRequired();
         }
         if ($result['status'] === 'password') {
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return response()->json(['error' => __('messages.error_30124a1d7f08a4')], 403);
         }
         if ($result['status'] === 'factor') {
-            return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_94f7173a80a9cb')], 403);
         }
 
         return response()->json(['ok' => true]);
@@ -433,19 +433,19 @@ class WorkspaceController
             return 'removed';
         });
         if ($removed === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($removed === 'not_found') {
-            return response()->json(['error' => 'Miembro no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4fc5bcb5063cdb')], 404);
         }
         if ($removed === 'owner') {
-            return response()->json(['error' => 'No se puede eliminar al propietario'], 403);
+            return response()->json(['error' => __('messages.error_66ff49bde917be')], 403);
         }
         if ($removed === 'admin_forbidden') {
-            return response()->json(['error' => 'Solo el propietario puede eliminar administradores'], 403);
+            return response()->json(['error' => __('messages.error_3de689c0692314')], 403);
         }
         if ($removed === 'busy') {
-            return response()->json(['error' => 'Hay una entrega de webhook en curso para este miembro. Espera unos segundos y vuelve a intentarlo.'], 409);
+            return response()->json(['error' => __('messages.error_3203682bd47203')], 409);
         }
 
         return response()->json(['ok' => true]);
@@ -481,13 +481,13 @@ class WorkspaceController
             return 'left';
         });
         if ($left === 'not_member') {
-            return response()->json(['error' => 'No eres miembro'], 404);
+            return response()->json(['error' => __('messages.error_5615d79818ef39')], 404);
         }
         if ($left === 'owner') {
-            return response()->json(['error' => 'El propietario no puede abandonar el workspace'], 403);
+            return response()->json(['error' => __('messages.error_8e843c1884a309')], 403);
         }
         if ($left === 'busy') {
-            return response()->json(['error' => 'Hay una entrega de webhook en curso. Espera unos segundos y vuelve a intentarlo.'], 409);
+            return response()->json(['error' => __('messages.error_bbb3508ab2ffad')], 409);
         }
 
         return response()->json(['ok' => true]);
@@ -501,7 +501,7 @@ class WorkspaceController
         $confirmation = trim(UvhRequest::inputString($request, 'confirmation'));
         if ($password === '' || strlen($password) > 72 || strlen($factorCode) > 24
             || $confirmation === '' || mb_strlen($confirmation) > 120) {
-            return response()->json(['error' => 'Confirma el nombre del workspace y tus credenciales'], 422);
+            return response()->json(['error' => __('messages.error_bf6aaf3d0be4c1')], 422);
         }
         try {
             $deleted = DB::transaction(function () use ($id, $user, $password, $factorCode, $confirmation, $request): array {
@@ -558,16 +558,16 @@ class WorkspaceController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'workspace', $id, ['kind' => 'workspace_deleted']);
 
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se eliminó el workspace. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_5ec456b01b2b25')], 503);
         }
         if ($deleted['status'] === 'forbidden') {
-            return response()->json(['error' => 'Solo el propietario puede eliminar el workspace'], 403);
+            return response()->json(['error' => __('messages.error_8bdb2b1fa2206f')], 403);
         }
         if ($deleted['status'] === 'confirmation') {
-            return response()->json(['error' => 'El nombre de confirmación no coincide'], 422);
+            return response()->json(['error' => __('messages.error_07f0e66030b93b')], 422);
         }
         if ($deleted['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($deleted['status'] === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, MfaStepUp::ATTEMPT_PURPOSE);
@@ -576,13 +576,13 @@ class WorkspaceController
             return MfaFreshness::reauthenticationRequired();
         }
         if ($deleted['status'] === 'password') {
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return response()->json(['error' => __('messages.error_30124a1d7f08a4')], 403);
         }
         if ($deleted['status'] === 'factor') {
-            return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_94f7173a80a9cb')], 403);
         }
         if ($deleted['status'] === 'busy') {
-            return response()->json(['error' => 'Hay una entrega de webhook en curso. Espera unos segundos y vuelve a intentarlo.'], 409);
+            return response()->json(['error' => __('messages.error_bbb3508ab2ffad')], 409);
         }
 
         return response()->json(['ok' => true]);
@@ -593,18 +593,18 @@ class WorkspaceController
         $user = UvhRequest::user($request);
         $m = WorkspaceAccess::getMembership($user->id, $id);
         if (! $m || ! WorkspaceAccess::roleAtLeast($m->role, 'admin')) {
-            return response()->json(['error' => 'Permisos insuficientes'], 403);
+            return response()->json(['error' => __('messages.error_82d3cfd8e62d1d')], 403);
         }
 
         $email = trim(UvhRequest::inputString($request, 'email'));
         $role = UvhRequest::inputString($request, 'role');
         if (! filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254 || ! in_array($role, ['admin', 'editor', 'viewer'], true)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $email = strtolower($email);
         if ($role === 'admin' && $m->role !== 'owner') {
-            return response()->json(['error' => 'Solo el propietario puede invitar administradores'], 403);
+            return response()->json(['error' => __('messages.error_469b40d735b2be')], 403);
         }
 
         $existing = DB::table('memberships')
@@ -612,7 +612,7 @@ class WorkspaceController
             ->whereIn('user_id', DB::table('users')->whereRaw('lower(email) = ?', [$email])->select('id'))
             ->exists();
         if ($existing) {
-            return response()->json(['error' => 'Este usuario ya es miembro'], 409);
+            return response()->json(['error' => __('messages.error_5e218ca1bb5c07')], 409);
         }
 
         $token = Ids::randomToken(32);
@@ -694,29 +694,29 @@ class WorkspaceController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'workspace.invitation_delivery_failed', 'workspace', $id);
 
-            return response()->json(['error' => 'No se pudo poner en cola la invitación. Inténtalo de nuevo.'], 503);
+            return response()->json(['error' => __('messages.error_e799300291b484')], 503);
         } catch (InvitationBudgetExceeded $error) {
             OperationalMetrics::increment('invitation.budget_rejected');
 
-            return response()->json(['error' => 'Límite temporal de correo de invitaciones alcanzado. Inténtalo más tarde.'], 429)
+            return response()->json(['error' => __('messages.error_7882d48ecd6370')], 429)
                 ->header('Retry-After', (string) $error->retryAfter);
         } catch (InvitationBudgetUnavailable) {
             OperationalMetrics::increment('invitation.budget_unavailable');
 
-            return response()->json(['error' => 'No se pudo comprobar el presupuesto de correo. No se ha enviado la invitación.'], 503);
+            return response()->json(['error' => __('messages.error_5721442290d69b')], 503);
         }
         if ($result['status'] === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso o rol en el workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_4b01de7d739e36')], 403);
         }
         if ($result['status'] === 'members_limit') {
-            return response()->json(['error' => 'Límite de miembros alcanzado en este workspace'], 409);
+            return response()->json(['error' => __('messages.error_307b358d087519')], 409);
         }
         if ($result['status'] !== 'created') {
             if ($result['status'] === 'limit') {
-                return response()->json(['error' => 'Límite de invitaciones activas alcanzado en este workspace'], 429);
+                return response()->json(['error' => __('messages.error_96c28ed9c19a1a')], 429);
             }
 
-            return response()->json(['error' => 'Este usuario ya es miembro o ya tiene una invitación pendiente'], 409);
+            return response()->json(['error' => __('messages.error_2fb0f10c287d83')], 409);
         }
 
         return response()->json(['ok' => true], 201);
@@ -735,7 +735,7 @@ class WorkspaceController
             $token = PendingHandoff::bearer($request, PendingHandoff::INVITATION) ?? '';
         }
         if ($token === '' || strlen($token) > 256) {
-            return response()->json(['error' => 'Token inválido'], 422);
+            return response()->json(['error' => __('messages.error_f0bd101ade1cc6')], 422);
         }
 
         $tokenHash = Ids::sha256Hex($token);
@@ -777,7 +777,7 @@ class WorkspaceController
                     return null;
                 }
                 if (Membership::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('members')) {
-                    throw new LinkException('Límite de miembros alcanzado. Pide al propietario que libere una plaza.', 409);
+                    throw new LinkException(__('messages.error_e24722ab3ddd5c'), 409);
                 }
                 $locked->update(['status' => 'accepted']);
                 Membership::create(['workspace_id' => $locked->workspace_id, 'user_id' => $target->id, 'role' => $locked->role]);
@@ -789,7 +789,7 @@ class WorkspaceController
             return response()->json(['error' => $error->getMessage()], $error->status);
         }
         if (! $inv) {
-            $rejected = response()->json(['error' => 'Invitación inválida, cancelada o caducada'], 400);
+            $rejected = response()->json(['error' => __('messages.error_630d20c1a18f59')], 400);
 
             // Terminal: a parked bearer that reached a final state will not
             // become valid on a retry. Leaving it parked would put the same
@@ -813,7 +813,7 @@ class WorkspaceController
             $token = PendingHandoff::bearer($request, PendingHandoff::INVITATION) ?? '';
         }
         if ($token === '' || strlen($token) > 256) {
-            return response()->json(['error' => 'Token inválido'], 422);
+            return response()->json(['error' => __('messages.error_f0bd101ade1cc6')], 422);
         }
 
         $tokenHash = Ids::sha256Hex($token);
@@ -837,7 +837,7 @@ class WorkspaceController
             return $locked;
         }) : null;
         if (! $inv) {
-            $rejected = response()->json(['error' => 'Invitación inválida'], 400);
+            $rejected = response()->json(['error' => __('messages.error_d22c0b47af5dd6')], 400);
 
             return $fromParked ? PendingHandoff::clearOn($rejected, PendingHandoff::INVITATION) : $rejected;
         }
@@ -872,16 +872,16 @@ class WorkspaceController
             return 'ok';
         });
         if ($changed === 'access_changed') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($changed === 'not_found') {
-            return response()->json(['error' => 'Invitación no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_56fc6b684a1984')], 404);
         }
         if ($changed === 'not_pending') {
-            return response()->json(['error' => 'La invitación ya no está pendiente'], 409);
+            return response()->json(['error' => __('messages.error_82672a812bdc02')], 409);
         }
         if ($changed === 'forbidden') {
-            return response()->json(['error' => 'Solo el propietario puede gestionar invitaciones de administrador'], 403);
+            return response()->json(['error' => __('messages.error_872e59a5007bc5')], 403);
         }
 
         return response()->json(['ok' => true]);
@@ -952,29 +952,29 @@ class WorkspaceController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'workspace.invitation_delivery_failed', 'workspace', $id);
 
-            return response()->json(['error' => 'No se pudo poner en cola el reenvío. Se conservan el enlace y la caducidad anteriores.'], 503);
+            return response()->json(['error' => __('messages.error_a726866ec978d2')], 503);
         } catch (InvitationBudgetExceeded $error) {
             OperationalMetrics::increment('invitation.budget_rejected');
 
-            return response()->json(['error' => 'Límite temporal de correo de invitaciones alcanzado. Inténtalo más tarde.'], 429)
+            return response()->json(['error' => __('messages.error_7882d48ecd6370')], 429)
                 ->header('Retry-After', (string) $error->retryAfter);
         } catch (InvitationBudgetUnavailable) {
             OperationalMetrics::increment('invitation.budget_unavailable');
 
-            return response()->json(['error' => 'No se pudo comprobar el presupuesto de correo. Se conserva la invitación anterior.'], 503);
+            return response()->json(['error' => __('messages.error_747c103f2c8b1c')], 503);
         }
         if ($result['status'] === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($result['status'] !== 'updated') {
             if ($result['status'] === 'limit') {
-                return response()->json(['error' => 'Límite de invitaciones activas alcanzado en este workspace'], 429);
+                return response()->json(['error' => __('messages.error_96c28ed9c19a1a')], 429);
             }
             if ($result['status'] === 'conflict') {
-                return response()->json(['error' => 'Este usuario ya es miembro o tiene otra invitación pendiente'], 409);
+                return response()->json(['error' => __('messages.error_cd3d1656ce2d7f')], 409);
             }
 
-            return response()->json(['error' => 'Invitación no encontrada, no renovable o sin permisos'], 404);
+            return response()->json(['error' => __('messages.error_af78364ddc24fa')], 404);
         }
 
         return response()->json(['ok' => true]);
@@ -1006,7 +1006,7 @@ class WorkspaceController
     {
         $user = UvhRequest::user($request);
         if (! WorkspaceAccess::getMembership($user->id, $id)) {
-            return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+            return response()->json(['error' => __('messages.error_d9a2380a9ab989')], 403);
         }
 
         $perPage = (int) $request->query('perPage', 10);

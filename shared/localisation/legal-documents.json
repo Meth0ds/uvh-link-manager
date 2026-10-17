@@ -1,0 +1,26 @@
+{
+  "terms": {
+    "2026-10-09": {
+      "es": {
+        "path": "/legal/versions/2026-10-09/terminos.html",
+        "sha256": "60c645ddbb7645ce0832431c197a7879d599a378b9653be4c8c488d512c42085"
+      },
+      "en": {
+        "path": "/legal/versions/2026-10-09/en/terms.html",
+        "sha256": "bda8ae27999d27ad46ae1fc670ac8395ab09be39217fb64c33230c9d27a99914"
+      }
+    }
+  },
+  "privacy_notice": {
+    "2026-10-09": {
+      "es": {
+        "path": "/legal/versions/2026-10-09/privacidad.html",
+        "sha256": "ea43c69a76de75fdb26830dfaa42528038c3987c6cf2feb85cc857931d00f3e8"
+      },
+      "en": {
+        "path": "/legal/versions/2026-10-09/en/privacy.html",
+        "sha256": "b9c2ead27562347dc7cbd42c5a43bc680bd73903fb18c3c01dab2df4ecba0a3a"
+      }
+    }
+  }
+}

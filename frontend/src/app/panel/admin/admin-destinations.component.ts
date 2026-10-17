@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, untracked } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -36,6 +37,7 @@ import { QueueSectionComponent } from "../queue-section.component";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdminDestinationsComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionDialogService);
   private readonly snackbar = inject(MatSnackBar);
@@ -60,7 +62,7 @@ export class AdminDestinationsComponent {
     destroyRef: inject(DestroyRef),
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudieron cargar los destinos bloqueados",
+    fallback: $localize`:@@ui.0396b0c841e38b:No se pudieron cargar los destinos bloqueados`,
     // This list has no filters: one page is identified by its number alone.
     filters: () => null,
     read: async (page, perPage, signal) => {
@@ -110,11 +112,11 @@ export class AdminDestinationsComponent {
     const intent = this.view.capture();
     if (!intent() || this.entries.stale() || this.busy()) return;
     const confirmed = await this.actions.confirm({
-      title: "Retirar el bloqueo",
+      title: $localize`:@@ui.de70979afe4918:Retirar el bloqueo`,
       message: entry.match_kind === "host"
-        ? `Se levanta el bloqueo de todo ${entry.match_value} y se reanalizan los enlaces que ya no tengan otro motivo para seguir bloqueados.`
-        : "Se retira esta entrada de URL exacta y se reanalizan los enlaces que ya no tengan otro motivo para seguir bloqueados.",
-      confirmLabel: "Retirar entrada",
+        ? $localize`:@@ui.c0d9caaab44833:Se levanta el bloqueo de todo ${entry.match_value} y se reanalizan los enlaces que ya no tengan otro motivo para seguir bloqueados.`
+        : $localize`:@@ui.9ff1bd8338f49a:Se retira esta entrada de URL exacta y se reanalizan los enlaces que ya no tengan otro motivo para seguir bloqueados.`,
+      confirmLabel: $localize`:@@ui.0fe1c145af9fbf:Retirar entrada`,
       destructive: true,
     });
     if (!confirmed || this.entries.stale()) return;
@@ -125,9 +127,9 @@ export class AdminDestinationsComponent {
       if (!operation.isCurrent()) return;
       this.snackbar.open(
         result.releasedLinks > 0
-          ? `Entrada retirada. ${countLabel(result.releasedLinks, "enlace recupera su estado", "enlaces recuperan su estado")}.`
-          : "Entrada retirada",
-        "Cerrar",
+          ? $localize`:@@ui.e7cf51d1c06df1:Entrada retirada. ${countLabel(result.releasedLinks, $localize`:@@ui.22d7aa1b1541fd:enlace recupera su estado`, $localize`:@@ui.5c6fde0d75a058:enlaces recuperan su estado`)}.`
+          : $localize`:@@ui.8eb9ff574a4174:Entrada retirada`,
+        $localize`:@@ui.aeccae342e4bd0:Cerrar`,
         { duration: 3500 },
       );
       // The console re-reads every view of these links on `changed`, this list
@@ -135,7 +137,7 @@ export class AdminDestinationsComponent {
       this.changed.emit();
     } catch (error) {
       if (!operation.isCurrent()) return;
-      this.snackbar.open(apiMessage(error, "No se pudo retirar la entrada"), "Cerrar", { duration: 4000 });
+      this.snackbar.open(apiMessage(error, $localize`:@@ui.7e9338c7f142f2:No se pudo retirar la entrada`), $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       operation.settle();
     }

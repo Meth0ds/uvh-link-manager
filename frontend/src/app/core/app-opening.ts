@@ -33,25 +33,25 @@ export const APP_PROVIDERS: {
     id: "spotify",
     name: "Spotify",
     example: "https://open.spotify.com/track/…",
-    help: "Canción, álbum, artista, lista o episodio.",
+    help: $localize`:@@ui.f360268ab65628:Canción, álbum, artista, lista o episodio.`,
   },
   {
     id: "youtube",
     name: "YouTube",
     example: "https://www.youtube.com/watch?v=…",
-    help: "Un vídeo o una lista de reproducción.",
+    help: $localize`:@@ui.9c0056ec5d47ec:Un vídeo o una lista de reproducción.`,
   },
   {
     id: "google_maps",
     name: "Google Maps",
     example: "https://www.google.com/maps/search/?api=1&query=…",
-    help: "URL de Maps con api=1, de búsqueda o ruta.",
+    help: $localize`:@@ui.f11265c9161c3c:URL de Maps con api=1, de búsqueda o ruta.`,
   },
   {
     id: "apple_maps",
     name: "Apple Maps",
     example: "https://maps.apple.com/?q=…",
-    help: "Un lugar o una ruta de Apple Maps.",
+    help: $localize`:@@ui.4d6c7f75d0afbb:Un lugar o una ruta de Apple Maps.`,
   },
 ];
 function profileIdentifier(value: unknown): string {

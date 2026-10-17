@@ -1,96 +1,96 @@
-<app-page-header icon="link" eyebrow="Biblioteca" title="Enlaces" description="Administra, edita y mide todos tus enlaces cortos desde un único lugar.">
-  <a mat-stroked-button routerLink="/app/links/trash"><mat-icon>delete_sweep</mat-icon> Papelera</a>
+<app-page-header icon="link" eyebrow="Biblioteca" title="Enlaces" description="Administra, edita y mide todos tus enlaces cortos desde un único lugar." i18n-title="@@ui.f1a5125bb4f0ad" i18n-description="@@ui.282c90a9507428" i18n-eyebrow="@@ui.c9169c12cba9cf">
+  <a mat-stroked-button routerLink="/app/links/trash"><mat-icon>delete_sweep</mat-icon> <ng-container i18n="@@ui.c5181f94537ec9">Papelera</ng-container></a>
   @if (canWrite()) {
     <button mat-flat-button color="primary" (click)="create()">
-      <mat-icon>add</mat-icon> Crear enlace
-    </button>
+      <mat-icon>add</mat-icon> <ng-container i18n="@@ui.6e3806f32a55c4">Crear enlace
+    </ng-container></button>
   }
 </app-page-header>
 
 @if (pendingLink(); as pending) {
-  <section class="pending-link" role="status" aria-label="URL guardada para crear un enlace">
+  <section class="pending-link" role="status" aria-label="URL guardada para crear un enlace" i18n-aria-label="@@ui.b8b53c378b9606">
     <span class="pending-link-icon"><mat-icon aria-hidden="true">bookmark_added</mat-icon></span>
     <div>
-      <strong>Tu URL está lista para convertirse en enlace.</strong>
-      <p>La guardamos hasta {{ pending.expiresAt | date:'shortTime' }}. Puedes retomarla ahora o descartarla.</p>
+      <strong><ng-container i18n="@@ui.4fffd18cec740a">Tu URL está lista para convertirse en enlace.</ng-container></strong>
+      <p><ng-container i18n="@@ui.ddb0b27d70f2fb">La guardamos hasta {{ pending.expiresAt | date:'shortTime' }}. Puedes retomarla ahora o descartarla.</ng-container></p>
     </div>
     @if (canWrite()) {
       <div class="pending-link-actions">
-        <button mat-flat-button color="primary" type="button" (click)="resumePendingLink()"><mat-icon>arrow_forward</mat-icon> Retomar</button>
-        <button mat-button type="button" (click)="discardPendingLink()">Descartar</button>
+        <button mat-flat-button color="primary" type="button" (click)="resumePendingLink()"><mat-icon>arrow_forward</mat-icon> <ng-container i18n="@@ui.6304c5019ae883">Retomar</ng-container></button>
+        <button mat-button type="button" (click)="discardPendingLink()"><ng-container i18n="@@ui.1a878a55c594b0">Descartar</ng-container></button>
       </div>
     } @else {
-      <span class="pending-link-note">Necesitas permisos de edición para crearla.</span>
+      <span class="pending-link-note"><ng-container i18n="@@ui.c1e0b756ce214b">Necesitas permisos de edición para crearla.</ng-container></span>
     }
   </section>
 }
 
-<section class="filter-plate" aria-label="Buscar y filtrar enlaces">
+<section class="filter-plate" aria-label="Buscar y filtrar enlaces" i18n-aria-label="@@ui.9ff7a647315ece">
   <div class="filter-bar">
-    <div class="filter-meta"><mat-icon aria-hidden="true">filter_list</mat-icon>Explorar enlaces</div>
+    <div class="filter-meta"><mat-icon aria-hidden="true">filter_list</mat-icon><ng-container i18n="@@ui.6e9b7fff19596c">Explorar enlaces</ng-container></div>
     <div class="filter-summary">
       @if (workflows.enabled()) {
-        <mat-checkbox [checked]="favoritesOnly()" (change)="onFavorites($event.checked)">Solo favoritos</mat-checkbox>
-        <button mat-button type="button" [attr.aria-expanded]="advancedFilters()" aria-controls="advanced-link-filters" (click)="advancedFilters.set(!advancedFilters())"><mat-icon aria-hidden="true">tune</mat-icon>Más filtros@if (advancedFilterCount()) { <span class="advanced-filter-count">{{ advancedFilterCount() }}</span> }</button>
+        <mat-checkbox [checked]="favoritesOnly()" (change)="onFavorites($event.checked)"><ng-container i18n="@@ui.b40b232d0059d7">Solo favoritos</ng-container></mat-checkbox>
+        <button mat-button type="button" [attr.aria-expanded]="advancedFilters()" aria-controls="advanced-link-filters" (click)="advancedFilters.set(!advancedFilters())"><mat-icon aria-hidden="true">tune</mat-icon><ng-container i18n="@@ui.75508af49e77b6">Más filtros</ng-container>@if (advancedFilterCount()) { <span class="advanced-filter-count">{{ advancedFilterCount() }}</span> }</button>
       }
       @if (tag()) {
         <button
           type="button"
           class="tag-filter"
-          [attr.aria-label]="'Quitar el filtro por la etiqueta ' + tag()"
+          [attr.aria-label]="uiText.ui_0b2aa480024f4a + tag()"
           (click)="toggleTag(tag())"
         ><mat-icon aria-hidden="true">sell</mat-icon>#{{ tag() }}<mat-icon aria-hidden="true">close</mat-icon></button>
       }
       @if (hasFilters()) {
-        <button mat-button type="button" (click)="clearFilters()">Limpiar filtros</button>
+        <button mat-button type="button" (click)="clearFilters()"><ng-container i18n="@@ui.bfc2d16235868e">Limpiar filtros</ng-container></button>
       }
-      <span class="filter-count tnum" role="status">{{ loading() ? 'Buscando…' : error() ? 'Resultados sin actualizar' : total() + (total() === 1 ? ' resultado' : ' resultados') }}</span>
+      <span class="filter-count tnum" role="status">{{ loading() ? uiText.ui_82d69149e2c132 : error() ? uiText.ui_44b1455c3bdf25 : total() + (total() === 1 ? uiText.ui_947e091ce188ac : uiText.ui_3ae32693bdb352) }}</span>
     </div>
   </div>
   <div class="filters">
     <mat-form-field appearance="outline" class="search" subscriptSizing="dynamic">
-      <mat-label>Buscar enlaces</mat-label>
+      <mat-label><ng-container i18n="@@ui.305043ad91a6f2">Buscar enlaces</ng-container></mat-label>
       <mat-icon matPrefix aria-hidden="true">search</mat-icon>
-      <input matInput type="search" name="link-search" autocomplete="off" spellcheck="false" aria-label="Buscar enlaces" placeholder="Buscar por nombre, alias, destino o notas…" [value]="q()" maxlength="300" (keyup.enter)="onSearch(searchInput.value)" #searchInput />
-      <button mat-icon-button matSuffix type="button" (click)="onSearch(searchInput.value)" aria-label="Ejecutar búsqueda"><mat-icon>arrow_forward</mat-icon></button>
+      <input matInput type="search" name="link-search" autocomplete="off" spellcheck="false" aria-label="Buscar enlaces" placeholder="Buscar por nombre, alias, destino o notas…" [value]="q()" maxlength="300" (keyup.enter)="onSearch(searchInput.value)" #searchInput  i18n-placeholder="@@ui.c56dc4c9d94720" i18n-aria-label="@@ui.305043ad91a6f2"/>
+      <button mat-icon-button matSuffix type="button" (click)="onSearch(searchInput.value)" aria-label="Ejecutar búsqueda" i18n-aria-label="@@ui.6dcf22832abc2b"><mat-icon>arrow_forward</mat-icon></button>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
-      <mat-label>Estado</mat-label>
-      <mat-select [value]="state()" (selectionChange)="onState($event.value)" aria-label="Estado">
-        <mat-option value="">Todos los estados</mat-option>
-        <mat-option value="active">Activos</mat-option>
-        <mat-option value="paused">En pausa</mat-option>
-        <mat-option value="scheduled">Programados</mat-option>
-        <mat-option value="expired">Caducados</mat-option>
-        <mat-option value="archived">Archivados</mat-option>
-        <mat-option value="blocked">Bloqueados</mat-option>
+      <mat-label><ng-container i18n="@@ui.98e5acddb6c46a">Estado</ng-container></mat-label>
+      <mat-select [value]="state()" (selectionChange)="onState($event.value)" aria-label="Estado" i18n-aria-label="@@ui.98e5acddb6c46a">
+        <mat-option value=""><ng-container i18n="@@ui.ecda92faab01f5">Todos los estados</ng-container></mat-option>
+        <mat-option value="active"><ng-container i18n="@@ui.eff343801ea99f">Activos</ng-container></mat-option>
+        <mat-option value="paused"><ng-container i18n="@@ui.c28d816de98269">En pausa</ng-container></mat-option>
+        <mat-option value="scheduled"><ng-container i18n="@@ui.0ff2c77f32c846">Programados</ng-container></mat-option>
+        <mat-option value="expired"><ng-container i18n="@@ui.85c567692ff696">Caducados</ng-container></mat-option>
+        <mat-option value="archived"><ng-container i18n="@@ui.e0cbab809661b1">Archivados</ng-container></mat-option>
+        <mat-option value="blocked"><ng-container i18n="@@ui.f7abda74dc6d80">Bloqueados</ng-container></mat-option>
       </mat-select>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
-      <mat-label>Dominio</mat-label>
-      <mat-select [canSelectNullableOptions]="true" [value]="domainId()" (selectionChange)="onDomain($event.value)" aria-label="Dominio">
-        <mat-option [value]="null">Todos los dominios</mat-option>
+      <mat-label><ng-container i18n="@@ui.5199d835a3f9ed">Dominio</ng-container></mat-label>
+      <mat-select [canSelectNullableOptions]="true" [value]="domainId()" (selectionChange)="onDomain($event.value)" aria-label="Dominio" i18n-aria-label="@@ui.5199d835a3f9ed">
+        <mat-option [value]="null"><ng-container i18n="@@ui.765b24bc0e01e2">Todos los dominios</ng-container></mat-option>
         @for (d of domainOptions(); track d.id) {
           <mat-option [value]="d.id">{{ d.domain }}</mat-option>
         }
       </mat-select>
     </mat-form-field>
     <mat-form-field appearance="outline" class="filter" subscriptSizing="dynamic">
-      <mat-label>Ordenar</mat-label>
-      <mat-select [value]="sort()" (selectionChange)="onSort($event.value)" aria-label="Ordenar">
-        <mat-option value="created_at_desc">Más recientes</mat-option>
-        <mat-option value="created_at_asc">Más antiguos</mat-option>
-        <mat-option value="clicks_desc">Más clics</mat-option>
-        <mat-option value="alias_asc">Alias A–Z</mat-option>
-        <mat-option value="name_asc">Nombre A–Z</mat-option>
-        <mat-option value="name_desc">Nombre Z–A</mat-option>
+      <mat-label><ng-container i18n="@@ui.39f93451ee48b9">Ordenar</ng-container></mat-label>
+      <mat-select [value]="sort()" (selectionChange)="onSort($event.value)" aria-label="Ordenar" i18n-aria-label="@@ui.39f93451ee48b9">
+        <mat-option value="created_at_desc"><ng-container i18n="@@ui.2ad7457e368813">Más recientes</ng-container></mat-option>
+        <mat-option value="created_at_asc"><ng-container i18n="@@ui.37fcd1c26ea39f">Más antiguos</ng-container></mat-option>
+        <mat-option value="clicks_desc"><ng-container i18n="@@ui.60cb7980b769ed">Más clics</ng-container></mat-option>
+        <mat-option value="alias_asc"><ng-container i18n="@@ui.aa0e541d6c30a7">Alias A–Z</ng-container></mat-option>
+        <mat-option value="name_asc"><ng-container i18n="@@ui.15d998a2aea834">Nombre A–Z</ng-container></mat-option>
+        <mat-option value="name_desc"><ng-container i18n="@@ui.8f5cb3db90cde8">Nombre Z–A</ng-container></mat-option>
       </mat-select>
     </mat-form-field>
   </div>
   @if (workflows.enabled()) {
     <div class="workflow-filters" id="advanced-link-filters" [hidden]="!advancedFilters()">
-      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Colección</mat-label><mat-select [canSelectNullableOptions]="true" [value]="collectionId()" (selectionChange)="onCollection($event.value)"><mat-option [value]="null">Todas las colecciones</mat-option>@for (collection of collections(); track collection.id) { <mat-option [value]="collection.id">{{ collection.name }}</mat-option> }</mat-select></mat-form-field>
-      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Campaña UTM</mat-label><input matInput [value]="utmCampaign()" maxlength="100" placeholder="navidad" #campaignInput (keyup.enter)="onCampaign(campaignInput.value)" /><button mat-icon-button matSuffix type="button" aria-label="Filtrar por campaña" (click)="onCampaign(campaignInput.value)"><mat-icon>arrow_forward</mat-icon></button></mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.1f5e6d240313d9">Colección</ng-container></mat-label><mat-select [canSelectNullableOptions]="true" [value]="collectionId()" (selectionChange)="onCollection($event.value)"><mat-option [value]="null"><ng-container i18n="@@ui.f88598610fcf7e">Todas las colecciones</ng-container></mat-option>@for (collection of collections(); track collection.id) { <mat-option [value]="collection.id">{{ collection.name }}</mat-option> }</mat-select></mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.41747ec991f4c7">Campaña UTM</ng-container></mat-label><input matInput [value]="utmCampaign()" maxlength="100" placeholder="navidad" #campaignInput (keyup.enter)="onCampaign(campaignInput.value)"  i18n-placeholder="@@ui.dd22025b5f9a91"/><button mat-icon-button matSuffix type="button" aria-label="Filtrar por campaña" (click)="onCampaign(campaignInput.value)" i18n-aria-label="@@ui.06180f83f2bec1"><mat-icon>arrow_forward</mat-icon></button></mat-form-field>
     </div>
     <app-saved-link-filters [spec]="filterSpec()" (filterApplied)="applySavedFilter($event)" />
   }
@@ -101,97 +101,97 @@
         [disabled]="loading() || !links().length || actionId() !== null"
         (change)="toggleSelectPage($event.checked)"
         aria-label="Seleccionar todos los enlaces de la página"
-      >Seleccionar página</mat-checkbox>
+       i18n-aria-label="@@ui.0520d66fc52572"><ng-container i18n="@@ui.a2fbacdeb88751">Seleccionar página</ng-container></mat-checkbox>
     <div class="scale-tools">
-      <div class="tool-group" role="group" aria-label="Organizar enlaces">
-        <button mat-button type="button" (click)="openTags()"><mat-icon aria-hidden="true">sell</mat-icon> Etiquetas</button>
-        <button mat-button type="button" (click)="openCollections()"><mat-icon aria-hidden="true">folder</mat-icon> Colecciones</button>
+      <div class="tool-group" role="group" aria-label="Organizar enlaces" i18n-aria-label="@@ui.2939f0dd9fd0ff">
+        <button mat-button type="button" (click)="openTags()"><mat-icon aria-hidden="true">sell</mat-icon> <ng-container i18n="@@ui.137cb944c52673">Etiquetas</ng-container></button>
+        <button mat-button type="button" (click)="openCollections()"><mat-icon aria-hidden="true">folder</mat-icon> <ng-container i18n="@@ui.d55fb32ce8a0eb">Colecciones</ng-container></button>
       </div>
-      <button mat-stroked-button type="button" (click)="openQrDesigns()"><mat-icon aria-hidden="true">palette</mat-icon>Diseños QR</button>
-      <button mat-stroked-button type="button" [matMenuTriggerFor]="csvMenu" aria-label="Importar o exportar enlaces en CSV"><mat-icon aria-hidden="true">import_export</mat-icon> CSV<mat-icon iconPositionEnd aria-hidden="true">expand_more</mat-icon></button>
+      <button mat-stroked-button type="button" (click)="openQrDesigns()"><mat-icon aria-hidden="true">palette</mat-icon><ng-container i18n="@@ui.5b5e376f9bfda7">Diseños QR</ng-container></button>
+      <button mat-stroked-button type="button" [matMenuTriggerFor]="csvMenu" aria-label="Importar o exportar enlaces en CSV" i18n-aria-label="@@ui.afca09f870b692"><mat-icon aria-hidden="true">import_export</mat-icon> <ng-container i18n="@@ui.eb6b42f54c42d2">CSV</ng-container><mat-icon iconPositionEnd aria-hidden="true">expand_more</mat-icon></button>
       <mat-menu #csvMenu="matMenu">
-        @if (canWrite()) { <button mat-menu-item type="button" (click)="importCsv()"><mat-icon aria-hidden="true">upload</mat-icon> Importar CSV</button> }
-        <button mat-menu-item type="button" (click)="exportCsv()" [disabled]="exporting()"><mat-icon aria-hidden="true">download</mat-icon> {{ exporting() ? 'Exportando…' : 'Exportar CSV' }}</button>
+        @if (canWrite()) { <button mat-menu-item type="button" (click)="importCsv()"><mat-icon aria-hidden="true">upload</mat-icon> <ng-container i18n="@@ui.a04ea8186d5dfa">Importar CSV</ng-container></button> }
+        <button mat-menu-item type="button" (click)="exportCsv()" [disabled]="exporting()"><mat-icon aria-hidden="true">download</mat-icon> {{ exporting() ? uiText.ui_f5d4157024b123 : uiText.ui_2f7cd80aedf240 }}</button>
       </mat-menu>
     </div>
   </div>
 </section>
 
 @if (selected().size > 0) {
-  <section class="bulk-bar" aria-label="Acciones sobre los enlaces seleccionados">
+  <section class="bulk-bar" aria-label="Acciones sobre los enlaces seleccionados" i18n-aria-label="@@ui.0cb71020f5eb4e">
     <div class="bulk-line">
-      <div class="bulk-selection"><b class="tnum">{{ selected().size }} {{ selected().size === 1 ? 'enlace seleccionado' : 'enlaces seleccionados' }}</b><button mat-button type="button" (click)="clearSelection()" [disabled]="actionId() !== null">Cancelar selección</button></div>
-      <div class="bulk-tools" role="group" aria-label="Herramientas de la selección">
-        @if (sharing.canPublish()) { <button mat-stroked-button type="button" (click)="shareSelectedReport()" [disabled]="reportSnapshotBusy() || selected().size > 100"><mat-icon>insert_chart_outlined</mat-icon>Compartir informe</button> }
-        <button mat-stroked-button type="button" (click)="exportSelectedQr()" [disabled]="qrSnapshotBusy() || selected().size > 100"><mat-icon>qr_code_2</mat-icon>{{ qrSnapshotBusy() ? 'Preparando selección…' : 'Exportar QR' }}</button>
+      <div class="bulk-selection"><b class="tnum">{{ selected().size }} {{ selected().size === 1 ? uiText.ui_dd6ff41ecec568 : uiText.ui_d4eeccb927cfc6 }}</b><button mat-button type="button" (click)="clearSelection()" [disabled]="actionId() !== null"><ng-container i18n="@@ui.708f57bc8c81b8">Cancelar selección</ng-container></button></div>
+      <div class="bulk-tools" role="group" aria-label="Herramientas de la selección" i18n-aria-label="@@ui.a3db3b282d2700">
+        @if (sharing.canPublish()) { <button mat-stroked-button type="button" (click)="shareSelectedReport()" [disabled]="reportSnapshotBusy() || selected().size > 100"><mat-icon>insert_chart_outlined</mat-icon><ng-container i18n="@@ui.ff831cef7042e8">Compartir informe</ng-container></button> }
+        <button mat-stroked-button type="button" (click)="exportSelectedQr()" [disabled]="qrSnapshotBusy() || selected().size > 100"><mat-icon>qr_code_2</mat-icon>{{ qrSnapshotBusy() ? uiText.ui_2915b2d61e9525 : uiText.ui_6df2969323987b }}</button>
         @if (canWrite()) {
-        <button mat-stroked-button type="button" (click)="openBulkPanel('tag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'tag'"><mat-icon aria-hidden="true">sell</mat-icon> Etiquetar</button>
-        <button mat-stroked-button type="button" (click)="openBulkPanel('move')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'move'"><mat-icon aria-hidden="true">drive_file_move</mat-icon> Mover</button>
-        <button mat-stroked-button type="button" [matMenuTriggerFor]="bulkMenu" [disabled]="actionId() !== null" aria-label="Más acciones sobre los enlaces seleccionados"><mat-icon aria-hidden="true">more_horiz</mat-icon> Más acciones</button>
+        <button mat-stroked-button type="button" (click)="openBulkPanel('tag')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'tag'"><mat-icon aria-hidden="true">sell</mat-icon> <ng-container i18n="@@ui.b36495f78e56b1">Etiquetar</ng-container></button>
+        <button mat-stroked-button type="button" (click)="openBulkPanel('move')" [disabled]="actionId() !== null" [attr.aria-pressed]="bulkPanel() === 'move'"><mat-icon aria-hidden="true">drive_file_move</mat-icon> <ng-container i18n="@@ui.6624c0d31888ec">Mover</ng-container></button>
+        <button mat-stroked-button type="button" [matMenuTriggerFor]="bulkMenu" [disabled]="actionId() !== null" aria-label="Más acciones sobre los enlaces seleccionados" i18n-aria-label="@@ui.c54917827304cb"><mat-icon aria-hidden="true">more_horiz</mat-icon> <ng-container i18n="@@ui.78eb2e0551731b">Más acciones</ng-container></button>
         <mat-menu #bulkMenu="matMenu">
-          <button mat-menu-item type="button" (click)="bulkState('pause')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">pause</mat-icon> Pausar</button>
-          <button mat-menu-item type="button" (click)="bulkState('activate')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">play_arrow</mat-icon> Activar</button>
-          <button mat-menu-item type="button" (click)="bulkState('archive')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">archive</mat-icon> Archivar</button>
+          <button mat-menu-item type="button" (click)="bulkState('pause')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">pause</mat-icon> <ng-container i18n="@@ui.cd25ee5b1db8f5">Pausar</ng-container></button>
+          <button mat-menu-item type="button" (click)="bulkState('activate')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">play_arrow</mat-icon> <ng-container i18n="@@ui.8e38c2571d87f6">Activar</ng-container></button>
+          <button mat-menu-item type="button" (click)="bulkState('archive')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">archive</mat-icon> <ng-container i18n="@@ui.f35f9141f4427c">Archivar</ng-container></button>
           <mat-divider></mat-divider>
-          <button mat-menu-item type="button" (click)="openBulkPanel('untag')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">sell</mat-icon> Quitar etiqueta</button>
-          <button mat-menu-item type="button" (click)="openBulkPanel('domain')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">language</mat-icon> Cambiar dominio</button>
+          <button mat-menu-item type="button" (click)="openBulkPanel('untag')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">sell</mat-icon> <ng-container i18n="@@ui.2f81ec51bcdba7">Quitar etiqueta</ng-container></button>
+          <button mat-menu-item type="button" (click)="openBulkPanel('domain')" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">language</mat-icon> <ng-container i18n="@@ui.5cd39cc3e9f46a">Cambiar dominio</ng-container></button>
           <mat-divider></mat-divider>
-          <button mat-menu-item type="button" class="danger" (click)="bulkTrash()" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> Eliminar</button>
+          <button mat-menu-item type="button" class="danger" (click)="bulkTrash()" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> <ng-container i18n="@@ui.c9894cf002f90b">Eliminar</ng-container></button>
         </mat-menu>
         }
       </div>
     </div>
-    @if (actionId() !== null) { <p class="bulk-status" role="status">Aplicando cambios a la selección…</p> }
+    @if (actionId() !== null) { <p class="bulk-status" role="status"><ng-container i18n="@@ui.9b51a6416a916d">Aplicando cambios a la selección…</ng-container></p> }
     @if (bulkPanel() === 'tag' || bulkPanel() === 'untag') {
       <div class="bulk-inline">
         <mat-form-field appearance="outline" class="bulk-tags">
-          <mat-label>{{ bulkPanel() === 'tag' ? 'Etiquetas a añadir' : 'Etiquetas a quitar' }}</mat-label>
-          <input matInput [ngModel]="bulkTagsInput" (ngModelChange)="bulkTagsInput = $event" placeholder="prensa; 2026" (keyup.enter)="applyBulkTags()" aria-label="Etiquetas separadas por punto y coma" />
+          <mat-label>{{ bulkPanel() === 'tag' ? uiText.ui_eff30ed9240767 : uiText.ui_97082aaff2bb2e }}</mat-label>
+          <input matInput [ngModel]="bulkTagsInput" (ngModelChange)="bulkTagsInput = $event" placeholder="prensa; 2026" (keyup.enter)="applyBulkTags()" aria-label="Etiquetas separadas por punto y coma"  i18n-aria-label="@@ui.aaff2afbf57da4" i18n-placeholder="@@ui.080005cd91f2ce"/>
         </mat-form-field>
-        <button mat-flat-button color="primary" type="button" (click)="applyBulkTags()" [disabled]="actionId() !== null || !bulkTagsInput.trim()">Aplicar</button>
+        <button mat-flat-button color="primary" type="button" (click)="applyBulkTags()" [disabled]="actionId() !== null || !bulkTagsInput.trim()"><ng-container i18n="@@ui.3a04898a6b8b6e">Aplicar</ng-container></button>
       </div>
     }
     @if (bulkPanel() === 'move') {
       <div class="bulk-inline">
         <mat-form-field appearance="outline" class="bulk-collection">
-          <mat-label>Colección</mat-label>
-          <mat-select [canSelectNullableOptions]="true" [value]="bulkCollectionId()" (selectionChange)="bulkCollectionId.set($event.value)" aria-label="Colección de destino">
-            <mat-option [value]="null">Sin colección</mat-option>
+          <mat-label><ng-container i18n="@@ui.1f5e6d240313d9">Colección</ng-container></mat-label>
+          <mat-select [canSelectNullableOptions]="true" [value]="bulkCollectionId()" (selectionChange)="bulkCollectionId.set($event.value)" aria-label="Colección de destino" i18n-aria-label="@@ui.03526d12251ef8">
+            <mat-option [value]="null"><ng-container i18n="@@ui.0961066c2e4c04">Sin colección</ng-container></mat-option>
             @for (collection of collections(); track collection.id) {
               <mat-option [value]="collection.id">{{ collection.name }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
-        <button mat-flat-button color="primary" type="button" (click)="applyBulkMove()" [disabled]="actionId() !== null">Mover</button>
+        <button mat-flat-button color="primary" type="button" (click)="applyBulkMove()" [disabled]="actionId() !== null"><ng-container i18n="@@ui.6624c0d31888ec">Mover</ng-container></button>
       </div>
     }
     @if (bulkPanel() === 'domain') {
       <div class="bulk-inline">
         <mat-form-field appearance="outline" class="bulk-collection">
-          <mat-label>Dominio de destino</mat-label>
-          <mat-select [canSelectNullableOptions]="true" [value]="bulkDomainId()" (selectionChange)="bulkDomainId.set($event.value)" aria-label="Dominio de destino">
-            <mat-option [value]="null">Dominio de plataforma (uvh.es)</mat-option>
+          <mat-label><ng-container i18n="@@ui.85aa7146b14ad1">Dominio de destino</ng-container></mat-label>
+          <mat-select [canSelectNullableOptions]="true" [value]="bulkDomainId()" (selectionChange)="bulkDomainId.set($event.value)" aria-label="Dominio de destino" i18n-aria-label="@@ui.85aa7146b14ad1">
+            <mat-option [value]="null"><ng-container i18n="@@ui.98628386968218">Dominio de plataforma (uvh.es)</ng-container></mat-option>
             @for (d of bulkDomainOptions(); track d.id) {
-              <mat-option [value]="d.id">{{ d.domain }}{{ d.isDefault ? ' — Predeterminado' : '' }}</mat-option>
+              <mat-option [value]="d.id">{{ d.domain }}{{ d.isDefault ? uiText.ui_222dd86cc55b18 : '' }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
-        <button mat-flat-button color="primary" type="button" (click)="applyBulkDomain()" [disabled]="actionId() !== null">Cambiar dominio</button>
+        <button mat-flat-button color="primary" type="button" (click)="applyBulkDomain()" [disabled]="actionId() !== null"><ng-container i18n="@@ui.5cd39cc3e9f46a">Cambiar dominio</ng-container></button>
       </div>
     }
   </section>
 }
 
 @if (loading() && links().length) {
-  <mat-progress-bar mode="indeterminate" aria-label="Cargando enlaces" />
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando enlaces"  i18n-aria-label="@@ui.361d62814bf3d7"/>
 }
 
 @if (loading() && !links().length) {
-  <app-panel-skeleton variant="list" label="Cargando enlaces" />
+  <app-panel-skeleton variant="list" label="Cargando enlaces"  i18n-label="@@ui.361d62814bf3d7"/>
 }
 
 @if (error()) {
-  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="reload()">Reintentar</button></div>
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="reload()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
 }
 
 @if (!loading() && (!error() || links().length)) {
@@ -202,14 +202,14 @@
             class="link-check"
             [checked]="selected().has(link.id)"
             (change)="toggleSelected(link.id)"
-            [aria-label]="'Seleccionar enlace ' + (link.name || displayUrl(link.shortUrl))"
+            [aria-label]="uiText.ui_17c187c590d9df + (link.name || displayUrl(link.shortUrl))"
           ></mat-checkbox>
         @if (workflows.enabled()) {
-          <button mat-icon-button type="button" class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="(favorites.value(link) ? 'Quitar de favoritos: ' : 'Añadir a favoritos: ') + (link.name || link.alias)" [matTooltip]="favorites.value(link) ? 'Quitar de favoritos' : 'Añadir a favoritos'" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button>
+          <button mat-icon-button type="button" class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="(favorites.value(link) ? uiText.ui_7565cdf63d72a8 : uiText.ui_545b32142d2df6) + (link.name || link.alias)" [matTooltip]="favorites.value(link) ? uiText.ui_66ba4c7c288144 : uiText.ui_cd2319d6f377b6" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button>
         } @else { <span class="link-leading" aria-hidden="true"><mat-icon>link</mat-icon></span> }
         <div class="link-main">
           <div class="link-top">
-            <a class="short tnum" [routerLink]="['/app/links', link.id]" [attr.aria-label]="'Abrir enlace ' + (link.name || displayUrl(link.shortUrl))">{{ link.name || displayUrl(link.shortUrl) }}</a>
+            <a class="short tnum" [routerLink]="['/app/links', link.id]" [attr.aria-label]="uiText.ui_48fd3d19b892ff + (link.name || displayUrl(link.shortUrl))">{{ link.name || displayUrl(link.shortUrl) }}</a>
             <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
             @if (link.clickCount > 0) {
               <span class="clicks tnum"><mat-icon>touch_app</mat-icon> {{ link.clickCount }}</span>
@@ -225,7 +225,7 @@
                   class="tag"
                   [class.tag-on]="tag() === t"
                   [attr.aria-pressed]="tag() === t"
-                  [attr.aria-label]="tag() === t ? 'Quitar el filtro por la etiqueta ' + t : 'Filtrar los enlaces por la etiqueta ' + t"
+                  [attr.aria-label]="tag() === t ? uiText.ui_0b2aa480024f4a + t : uiText.ui_50509de01f5388 + t"
                   (click)="$event.stopPropagation(); toggleTag(t)"
                 >#{{ t }}</button>
               }
@@ -233,38 +233,38 @@
           }
         </div>
         <div class="link-actions">
-          <button mat-icon-button [matTooltip]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copied' ? 'Copiado' : 'Copiar'" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying'" (click)="$event.stopPropagation(); copy((link.shareUrl || link.shortUrl))" [attr.aria-label]="'Copiar enlace ' + (link.name || displayUrl(link.shortUrl))">
+          <button mat-icon-button [matTooltip]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copied' ? uiText.ui_d8dd878fb14359 : uiText.ui_39dcf1cbeb5adb" [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying'" (click)="$event.stopPropagation(); copy((link.shareUrl || link.shortUrl))" [attr.aria-label]="uiText.ui_17353160ecdd32 + (link.name || displayUrl(link.shortUrl))">
             <app-copy-feedback-icon [phase]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope)" />
           </button>
-          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr((link.shareUrl || link.shortUrl), link.id)" [attr.aria-label]="'Generar QR para ' + (link.name || displayUrl(link.shortUrl))">
+          <button mat-icon-button matTooltip="QR" (click)="$event.stopPropagation(); showQr((link.shareUrl || link.shortUrl), link.id)" [attr.aria-label]="uiText.ui_9976a16ab8824e + (link.name || displayUrl(link.shortUrl))" i18n-matTooltip="@@ui.a439fba430a33b">
             <mat-icon>qr_code_2</mat-icon>
           </button>
           @if (canWrite()) {
-            <button mat-icon-button matTooltip="Editar" (click)="$event.stopPropagation(); edit(link)" [attr.aria-label]="'Editar enlace ' + (link.name || displayUrl(link.shortUrl))" [disabled]="actionId() === link.id">
+            <button mat-icon-button matTooltip="Editar" (click)="$event.stopPropagation(); edit(link)" [attr.aria-label]="uiText.ui_48fce2cac386bb + (link.name || displayUrl(link.shortUrl))" [disabled]="actionId() === link.id" i18n-matTooltip="@@ui.2eba946b2e1ee4">
               <mat-icon>edit</mat-icon>
             </button>
           }
-          <button mat-icon-button [matMenuTriggerFor]="menu" (click)="$event.stopPropagation()" [attr.aria-label]="'Más acciones para ' + (link.name || displayUrl(link.shortUrl))" [disabled]="actionId() === link.id">
+          <button mat-icon-button [matMenuTriggerFor]="menu" (click)="$event.stopPropagation()" [attr.aria-label]="uiText.ui_a0d40e50466273 + (link.name || displayUrl(link.shortUrl))" [disabled]="actionId() === link.id">
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">
-            <button mat-menu-item (click)="showQr((link.shareUrl || link.shortUrl), link.id)"><mat-icon>qr_code_2</mat-icon> QR</button>
-            <button mat-menu-item [disabled]="copyFeedback.busy()" (click)="copy((link.shareUrl || link.shortUrl))"><mat-icon>content_copy</mat-icon> Copiar URL</button>
-            <a mat-menu-item [routerLink]="['/app/links', link.id]"><mat-icon>query_stats</mat-icon> Analítica</a>
+            <button mat-menu-item (click)="showQr((link.shareUrl || link.shortUrl), link.id)"><mat-icon>qr_code_2</mat-icon> <ng-container i18n="@@ui.a439fba430a33b">QR</ng-container></button>
+            <button mat-menu-item [disabled]="copyFeedback.busy()" (click)="copy((link.shareUrl || link.shortUrl))"><mat-icon>content_copy</mat-icon> <ng-container i18n="@@ui.96a1ec86cd74cb">Copiar URL</ng-container></button>
+            <a mat-menu-item [routerLink]="['/app/links', link.id]"><mat-icon>query_stats</mat-icon> <ng-container i18n="@@ui.f5b4c86a85509e">Analítica</ng-container></a>
             @if (canWrite()) {
-              @if (workflows.enabled() && link.state !== 'blocked') { <button mat-menu-item (click)="duplicate(link)"><mat-icon>library_add</mat-icon>Duplicar enlace</button> }
-              <button mat-menu-item (click)="edit(link)" [disabled]="actionId() === link.id"><mat-icon>edit</mat-icon> Editar</button>
+              @if (workflows.enabled() && link.state !== 'blocked') { <button mat-menu-item (click)="duplicate(link)"><mat-icon>library_add</mat-icon><ng-container i18n="@@ui.cbce5acbfee967">Duplicar enlace</ng-container></button> }
+              <button mat-menu-item (click)="edit(link)" [disabled]="actionId() === link.id"><mat-icon>edit</mat-icon> <ng-container i18n="@@ui.2eba946b2e1ee4">Editar</ng-container></button>
               @if (link.state === 'active') {
-                <button mat-menu-item (click)="setState(link, 'paused')" [disabled]="actionId() !== null"><mat-icon>pause</mat-icon> Pausar</button>
+                <button mat-menu-item (click)="setState(link, 'paused')" [disabled]="actionId() !== null"><mat-icon>pause</mat-icon> <ng-container i18n="@@ui.cd25ee5b1db8f5">Pausar</ng-container></button>
               }
               @if (link.state === 'paused') {
-                <button mat-menu-item (click)="setState(link, 'active')" [disabled]="actionId() !== null"><mat-icon>play_arrow</mat-icon> Reactivar</button>
+                <button mat-menu-item (click)="setState(link, 'active')" [disabled]="actionId() !== null"><mat-icon>play_arrow</mat-icon> <ng-container i18n="@@ui.44f9bcc469524e">Reactivar</ng-container></button>
               }
               @if (link.state !== 'archived') {
-                <button mat-menu-item (click)="setState(link, 'archived')" [disabled]="actionId() !== null"><mat-icon>archive</mat-icon> Archivar</button>
+                <button mat-menu-item (click)="setState(link, 'archived')" [disabled]="actionId() !== null"><mat-icon>archive</mat-icon> <ng-container i18n="@@ui.f35f9141f4427c">Archivar</ng-container></button>
               }
               <mat-divider></mat-divider>
-              <button mat-menu-item class="danger" (click)="remove(link)" [disabled]="actionId() !== null"><mat-icon>delete</mat-icon> Eliminar</button>
+              <button mat-menu-item class="danger" (click)="remove(link)" [disabled]="actionId() !== null"><mat-icon>delete</mat-icon> <ng-container i18n="@@ui.c9894cf002f90b">Eliminar</ng-container></button>
             }
           </mat-menu>
         </div>
@@ -273,12 +273,12 @@
     @if (!links().length && !loading() && !error()) {
       <div class="empty-state">
         <mat-icon aria-hidden="true">{{ hasFilters() ? 'search_off' : 'link_off' }}</mat-icon>
-        <b>{{ hasFilters() ? 'No hay enlaces con estos filtros' : 'Tu biblioteca empieza aquí' }}</b>
-        <p>{{ hasFilters() ? 'Prueba otra búsqueda o limpia los filtros para ver todos los enlaces.' : canWrite() ? 'Crea tu primer enlace corto. Aquí podrás cambiar su destino y seguir sus clics.' : 'Los enlaces de este espacio aparecerán aquí cuando el equipo los cree.' }}</p>
+        <b>{{ hasFilters() ? uiText.ui_d225a1fb8a83e5 : uiText.ui_359490b518e49d }}</b>
+        <p>{{ hasFilters() ? uiText.ui_80dd4870b6eadf : canWrite() ? uiText.ui_5c969e6c63f040 : uiText.ui_576b716db09783 }}</p>
         @if (hasFilters()) {
-          <button mat-stroked-button type="button" (click)="clearFilters()">Limpiar filtros</button>
+          <button mat-stroked-button type="button" (click)="clearFilters()"><ng-container i18n="@@ui.bfc2d16235868e">Limpiar filtros</ng-container></button>
         } @else if (canWrite()) {
-          <button mat-flat-button color="primary" type="button" (click)="create()">Crear enlace</button>
+          <button mat-flat-button color="primary" type="button" (click)="create()"><ng-container i18n="@@ui.3daf36ee52f052">Crear enlace</ng-container></button>
         }
       </div>
     }
@@ -294,5 +294,5 @@
     (page)="onPage($event)"
     showFirstLastButtons
     aria-label="Paginación de enlaces"
-  ></mat-paginator>
+   i18n-aria-label="@@ui.62d0c2f895df60"></mat-paginator>
 }

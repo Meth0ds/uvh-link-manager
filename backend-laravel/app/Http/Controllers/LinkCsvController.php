@@ -72,7 +72,7 @@ class LinkCsvController
 
         $total = Link::where('workspace_id', $workspaceId)->whereNull('deleted_at')->count();
         if ($total > self::MAX_EXPORT_ROWS) {
-            return response()->json(['error' => 'El export CSV admite hasta '.self::MAX_EXPORT_ROWS.' enlaces ('.$total.')'], 409);
+            return response()->json(['error' => __('display.csv_export_limit', ['limit' => self::MAX_EXPORT_ROWS, 'total' => $total])], 409);
         }
 
         // `domain` va eager-loaded: el export es una operación de «scale» y no
@@ -120,11 +120,11 @@ class LinkCsvController
 
         $dryRun = $request->input('dryRun', false);
         if (! is_bool($dryRun)) {
-            return response()->json(['error' => 'dryRun inválido'], 422);
+            return response()->json(['error' => __('messages.error_ff79d488839304')], 422);
         }
         $text = $request->input('csv');
         if (! is_string($text) || $text === '' || strlen($text) > self::MAX_IMPORT_BYTES) {
-            return response()->json(['error' => 'CSV inválido (vacío o demasiado grande)'], 422);
+            return response()->json(['error' => __('messages.error_bf8ba29375a27b')], 422);
         }
 
         $parsed = Csv::parse($text, self::MAX_IMPORT_ROWS);
@@ -139,10 +139,10 @@ class LinkCsvController
             }
         }
         if (in_array('tags', $parsed['header'], true) && in_array('tags_json', $parsed['header'], true)) {
-            return response()->json(['error' => 'Usa tags o tags_json, no ambas columnas'], 422);
+            return response()->json(['error' => __('messages.error_53e2356e053bf5')], 422);
         }
         if (! in_array('alias', $parsed['header'], true) || ! in_array('destination', $parsed['header'], true)) {
-            return response()->json(['error' => 'El CSV necesita las columnas alias y destination'], 422);
+            return response()->json(['error' => __('messages.error_ab01097381b74d')], 422);
         }
 
         // La identidad de la intención incluye el workspace: la misma clave en
@@ -162,10 +162,10 @@ class LinkCsvController
                 return response()->json($begin['body'], $begin['status'])->header('Idempotent-Replay', 'true');
             }
             if ($begin['state'] === 'mismatch') {
-                return response()->json(['error' => 'Esta Idempotency-Key ya se usó con otra petición'], 409);
+                return response()->json(['error' => __('messages.error_696b407ad5767b')], 409);
             }
             if ($begin['state'] === 'in_progress') {
-                return response()->json(['error' => 'Ya hay una operación en curso con esta clave. Espera a que termine.'], 409);
+                return response()->json(['error' => __('messages.error_4d29d4aa9b576d')], 409);
             }
             $lease = (string) ($begin['lease'] ?? '');
         }
@@ -270,7 +270,7 @@ class LinkCsvController
         $batch = DB::table('link_import_batches')
             ->where('user_id', $userId)->where('workspace_id', $workspaceId)->where('idempotency_key', $key)->first();
         if ($batch === null || ! hash_equals((string) $batch->request_hash, $requestHash)) {
-            throw new LinkException('Esta Idempotency-Key ya se usó con otra importación', 409);
+            throw new LinkException(__('messages.error_40ec30538c48ac'), 409);
         }
 
         return (int) $batch->id;
@@ -294,7 +294,7 @@ class LinkCsvController
                 $domain = CustomDomain::where('workspace_id', $workspaceId)
                     ->whereRaw('lower(domain) = lower(?)', [$hostname])->first(['id']);
                 if (! $domain) {
-                    return $rejected('El dominio '.$hostname.' no existe en este workspace');
+                    return $rejected(__('display.csv_domain_missing', ['hostname' => $hostname]));
                 }
                 $input['domain_id'] = (int) $domain->id;
             }

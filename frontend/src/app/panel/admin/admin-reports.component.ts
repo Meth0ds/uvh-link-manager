@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, signal, untracked } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -44,6 +45,7 @@ type ReportStatus = "" | AdminReport["status"];
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdminReportsComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionDialogService);
   private readonly snackbar = inject(MatSnackBar);
@@ -65,7 +67,7 @@ export class AdminReportsComponent {
     destroyRef: inject(DestroyRef),
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudieron cargar las denuncias",
+    fallback: $localize`:@@ui.c8f6ca1239ac3d:No se pudieron cargar las denuncias`,
     filters: () => [this.query(), this.status()],
     read: async (page, perPage, signal) => {
       const response = await this.api.get(
@@ -114,49 +116,49 @@ export class AdminReportsComponent {
   }
 
   async review(report: AdminReport): Promise<void> {
-    await this.moderate(report, "review", "Denuncia marcada como revisada");
+    await this.moderate(report, "review", $localize`:@@ui.9af6b702139a73:Denuncia marcada como revisada`);
   }
 
   async dismiss(report: AdminReport): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.reports.stale() || this.busy()) return;
     const confirmed = await this.actions.confirm({
-      title: "Desestimar denuncia",
-      message: `La denuncia sobre “${report.alias}” se cerrará sin modificar el enlace.`,
-      confirmLabel: "Desestimar",
+      title: $localize`:@@ui.9662348c879b20:Desestimar denuncia`,
+      message: $localize`:@@ui.c2e7f46ca5e397:La denuncia sobre “${report.alias}” se cerrará sin modificar el enlace.`,
+      confirmLabel: $localize`:@@ui.d026272ace4419:Desestimar`,
       destructive: false,
     });
-    if (confirmed && intent()) await this.moderate(report, "dismiss", "Denuncia desestimada", undefined, intent);
+    if (confirmed && intent()) await this.moderate(report, "dismiss", $localize`:@@ui.bdc606b5338c79:Denuncia desestimada`, undefined, intent);
   }
 
   async block(report: AdminReport): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.reports.stale() || this.busy()) return;
     const reason = await this.actions.prompt({
-      title: "Bloquear enlace",
-      message: `La resolución de “${report.alias}” se detendrá y la denuncia quedará resuelta.`,
-      confirmLabel: "Bloquear enlace",
+      title: $localize`:@@ui.6ca93c1e4ff21b:Bloquear enlace`,
+      message: $localize`:@@ui.27f044d3dca068:La resolución de “${report.alias}” se detendrá y la denuncia quedará resuelta.`,
+      confirmLabel: $localize`:@@ui.6ca93c1e4ff21b:Bloquear enlace`,
       destructive: true,
-      inputLabel: "Motivo del bloqueo",
-      inputPlaceholder: "Describe el incumplimiento…",
+      inputLabel: $localize`:@@ui.213a8dca4906ef:Motivo del bloqueo`,
+      inputPlaceholder: $localize`:@@ui.d46e9ad106a454:Describe el incumplimiento…`,
       inputHint: "Entre 3 y 500 caracteres.",
       inputRequired: true,
       inputMinLength: 3,
       inputMaxLength: 500,
     });
-    if (reason && intent()) await this.moderate(report, "block", "Enlace bloqueado", reason, intent);
+    if (reason && intent()) await this.moderate(report, "block", $localize`:@@ui.d6b873f3278abd:Enlace bloqueado`, reason, intent);
   }
 
   async unblock(report: AdminReport): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.reports.stale() || this.busy()) return;
     const confirmed = await this.actions.confirm({
-      title: "Desbloquear enlace",
-      message: `“${report.alias}” volverá al estado que corresponda según su programación y caducidad.`,
-      confirmLabel: "Desbloquear",
+      title: $localize`:@@ui.720111af094ae0:Desbloquear enlace`,
+      message: $localize`:@@ui.2a97b03bafdb0b:“${report.alias}” volverá al estado que corresponda según su programación y caducidad.`,
+      confirmLabel: $localize`:@@ui.d4c2d75416f69c:Desbloquear`,
       destructive: false,
     });
-    if (confirmed && intent()) await this.moderate(report, "unblock", "Enlace desbloqueado", undefined, intent);
+    if (confirmed && intent()) await this.moderate(report, "unblock", $localize`:@@ui.ea22b74e1ad6e8:Enlace desbloqueado`, undefined, intent);
   }
 
   /**
@@ -172,19 +174,19 @@ export class AdminReportsComponent {
     if (!intent() || this.reports.stale() || this.busy()) return;
     const host = this.hostOf(report.destination);
     if (scope === "host" && host === null) {
-      this.snackbar.open("No se pudo leer el host de ese destino", "Cerrar", { duration: 3500 });
+      this.snackbar.open($localize`:@@ui.47b24a750ef1e6:No se pudo leer el host de ese destino`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
       return;
     }
     const reason = await this.actions.prompt({
-      title: scope === "host" ? "Bloquear todo el host" : "Bloquear la URL exacta",
+      title: scope === "host" ? $localize`:@@ui.a0e86becffc0e1:Bloquear todo el host` : $localize`:@@ui.05c0b748b19558:Bloquear la URL exacta`,
       message: scope === "host"
-        ? `Todo ${host} dejará de resolverse para cualquier enlace, y se reanalizan en segundo plano los que ya apuntaban ahí. Un sufijo público como co.uk se rechaza.`
-        : `${report.destination} dejará de resolverse para cualquier enlace. Si el abuso puede reaparecer en otra URL del mismo host, este alcance no lo detiene.`,
-      confirmLabel: "Bloquear destino",
+        ? $localize`:@@ui.d13f3644d45f71:Todo ${host} dejará de resolverse para cualquier enlace, y se reanalizan en segundo plano los que ya apuntaban ahí. Un sufijo público como co.uk se rechaza.`
+        : $localize`:@@ui.aca47ace4a1e0e:${report.destination} dejará de resolverse para cualquier enlace. Si el abuso puede reaparecer en otra URL del mismo host, este alcance no lo detiene.`,
+      confirmLabel: $localize`:@@ui.7b748cb5b81414:Bloquear destino`,
       destructive: true,
       inputLabel: "Motivo",
-      inputPlaceholder: "Suplantación de identidad, phishing confirmado…",
-      inputHint: "Obligatorio: entre 3 y 500 caracteres. Queda en el registro.",
+      inputPlaceholder: $localize`:@@ui.954eb8b8923535:Suplantación de identidad, phishing confirmado…`,
+      inputHint: $localize`:@@ui.fe077e52123211:Obligatorio: entre 3 y 500 caracteres. Queda en el registro.`,
       inputRequired: true,
       inputMinLength: 3,
       inputMaxLength: 500,
@@ -199,7 +201,7 @@ export class AdminReportsComponent {
         decodeDestinationBlock,
       );
       if (!operation.isCurrent()) return;
-      this.snackbar.open(`Destino bloqueado. ${this.sweepLabel(result.linksScheduled, result.linksSweepTruncated)}`, "Cerrar", { duration: 4500 });
+      this.snackbar.open($localize`:@@ui.814726653e1d89:Destino bloqueado. ${this.sweepLabel(result.linksScheduled, result.linksSweepTruncated)}`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4500 });
       this.changed.emit();
     } catch (error) {
       if (!operation.isCurrent()) return;
@@ -212,11 +214,11 @@ export class AdminReportsComponent {
   /** What the sweep that follows a destination block did, in the operator's words. */
   private sweepLabel(scheduled: number, truncated: boolean): string {
     if (truncated) {
-      return "Los enlaces restantes que apuntaban ahí se reanalizan en segundo plano.";
+      return $localize`:@@ui.22185b0ace33ae:Los enlaces restantes que apuntaban ahí se reanalizan en segundo plano.`;
     }
     return scheduled > 0
-      ? `${countLabel(scheduled, "enlace ya apuntaba ahí y se reanaliza", "enlaces ya apuntaban ahí y se reanalizan")}.`
-      : "No había enlaces que apuntaran ahí.";
+      ? $localize`:@@ui.05cffa33d227f9:${countLabel(scheduled, $localize`:@@ui.e95853803a9fd2:enlace ya apuntaba ahí y se reanaliza`, $localize`:@@ui.843a5ee48f8d83:enlaces ya apuntaban ahí y se reanalizan`)}.`
+      : $localize`:@@ui.b2a794700e8bbe:No había enlaces que apuntaran ahí.`;
   }
 
   /** The host of a decoded destination, or null when it cannot be read as one. */
@@ -242,7 +244,7 @@ export class AdminReportsComponent {
     try {
       await this.api.post(`/api/v1/admin/reports/${report.id}/moderate`, { action, reason });
       if (!operation.isCurrent()) return;
-      this.snackbar.open(success, "Cerrar", { duration: 2500 });
+      this.snackbar.open(success, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       this.changed.emit();
     } catch (error) {
       if (!operation.isCurrent()) return;
@@ -253,6 +255,6 @@ export class AdminReportsComponent {
   }
 
   private showError(error: unknown): void {
-    this.snackbar.open(apiMessage(error, "No se pudo completar la acción"), "Cerrar", { duration: 4000 });
+    this.snackbar.open(apiMessage(error, $localize`:@@ui.e04201e3425722:No se pudo completar la acción`), $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
   }
 }

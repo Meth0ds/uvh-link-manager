@@ -26,7 +26,7 @@ class UvhCsrf
             // this rejection from an authorization 403 by status alone, and only
             // this one may be answered by fetching a fresh token and repeating
             // the mutation once.
-            return response()->json(['error' => 'Token CSRF inválido', 'reason' => 'csrf_rejected'], 403);
+            return response()->json(['error' => __('messages.error_b5f16d6a4c35eb'), 'reason' => 'csrf_rejected'], 403);
         }
 
         $response = $next($request);

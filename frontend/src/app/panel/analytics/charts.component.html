@@ -1,12 +1,12 @@
 <div class="chart-block">
-  <div class="chart-title"><div><span>Serie diaria</span><h2>Clics por día</h2></div><span class="chart-legend"><i aria-hidden="true"></i>Clics registrados</span></div>
-  <div class="chart-summary">{{ formatCount(overview().totals.clicks) }} clics repartidos en {{ overview().series.length }} días devueltos por la consulta.</div>
+  <div class="chart-title"><div><span><ng-container i18n="@@ui.4119dd1a11cdb6">Serie diaria</ng-container></span><h2><ng-container i18n="@@ui.108ea53630ab9b">Clics por día</ng-container></h2></div><span class="chart-legend"><i aria-hidden="true"></i><ng-container i18n="@@ui.a501ae2d2519e3">Clics registrados</ng-container></span></div>
+  <div class="chart-summary"><ng-container i18n="@@ui.400c417eac469b">{{ formatCount(overview().totals.clicks) }} clics repartidos en {{ overview().series.length }} días devueltos por la consulta.</ng-container></div>
   @if (points()) {
     @if (showBreakdowns()) {
-      <dl class="chart-insights" aria-label="Lectura rápida de la serie">
-        <div><dt>Pico del periodo</dt><dd>{{ formatCount(peak()?.clicks ?? 0) }}</dd><dd class="metric-note">{{ dayLabel(peak()?.day ?? '') }}</dd></div>
-        <div><dt>Media diaria</dt><dd>{{ formatAverage(dailyAverage()) }}</dd><dd class="metric-note">clics por día con datos</dd></div>
-        <div><dt>Último dato</dt><dd>{{ formatCount(latest()?.clicks ?? 0) }}</dd><dd class="metric-note">{{ dayLabel(latest()?.day ?? '') }}</dd></div>
+      <dl class="chart-insights" aria-label="Lectura rápida de la serie" i18n-aria-label="@@ui.708aaae05cf8f7">
+        <div><dt><ng-container i18n="@@ui.e41bdcf57860e8">Pico del periodo</ng-container></dt><dd>{{ formatCount(peak()?.clicks ?? 0) }}</dd><dd class="metric-note">{{ dayLabel(peak()?.day ?? '') }}</dd></div>
+        <div><dt><ng-container i18n="@@ui.8a1f47fd0a11e3">Media diaria</ng-container></dt><dd>{{ formatAverage(dailyAverage()) }}</dd><dd class="metric-note"><ng-container i18n="@@ui.ce1577bafd15d4">clics por día con datos</ng-container></dd></div>
+        <div><dt><ng-container i18n="@@ui.3c646bcd42f5f9">Último dato</ng-container></dt><dd>{{ formatCount(latest()?.clicks ?? 0) }}</dd><dd class="metric-note">{{ dayLabel(latest()?.day ?? '') }}</dd></div>
       </dl>
     }
     <div class="plot" aria-hidden="true">
@@ -26,17 +26,17 @@
       </div>
     </div>
     <details class="series-data">
-      <summary>Consultar datos por día <span>{{ overview().series.length }} filas</span></summary>
-      <p>Los pseudónimos cambian cada día: su suma no representa personas únicas.</p>
-      <div class="table-scroll" role="region" aria-label="Tabla diaria de actividad" tabindex="0">
-        <table><caption>Clics y pseudónimos diarios de la serie disponible</caption>
-          <thead><tr><th scope="col">Día</th><th scope="col">Clics</th><th scope="col">Pseudónimos diarios</th></tr></thead>
+      <summary><ng-container i18n="@@ui.8038bdf539d5c3">Consultar datos por día </ng-container><span><ng-container i18n="@@ui.0322facb32e1a0">{{ overview().series.length }} filas</ng-container></span></summary>
+      <p><ng-container i18n="@@ui.32763b7b5dfc23">Los pseudónimos cambian cada día: su suma no representa personas únicas.</ng-container></p>
+      <div class="table-scroll" role="region" aria-label="Tabla diaria de actividad" tabindex="0" i18n-aria-label="@@ui.e7c7ae2ca1df92">
+        <table><caption><ng-container i18n="@@ui.1f37249eb5da4b">Clics y pseudónimos diarios de la serie disponible</ng-container></caption>
+          <thead><tr><th scope="col"><ng-container i18n="@@ui.ffd6f24b18b1a9">Día</ng-container></th><th scope="col"><ng-container i18n="@@ui.826c2d3872dac9">Clics</ng-container></th><th scope="col"><ng-container i18n="@@ui.2ac314c9a15c54">Pseudónimos diarios</ng-container></th></tr></thead>
           <tbody>@for (row of overview().series; track row.day) { <tr><th scope="row"><time [attr.datetime]="row.day">{{ row.day }}</time></th><td>{{ formatCount(row.clicks) }}</td><td>{{ formatCount(row.visitors) }}</td></tr> }</tbody>
         </table>
       </div>
     </details>
   } @else {
-    <div class="no-data"><b>La serie todavía está vacía.</b><p>No hay datos diarios disponibles para dibujar en este periodo.</p></div>
+    <div class="no-data"><b><ng-container i18n="@@ui.4c01c4b09b5db3">La serie todavía está vacía.</ng-container></b><p><ng-container i18n="@@ui.e47b39011b31d5">No hay datos diarios disponibles para dibujar en este periodo.</ng-container></p></div>
   }
 </div>
 
@@ -46,23 +46,23 @@
       @for (b of breakdownKeys; track b) {
         @let data = breakdown(b);
         <section class="breakdown" [attr.aria-label]="label(b)">
-          <div class="breakdown-title"><h3>{{ label(b) }}</h3><span>{{ dimensionCount(b) }} valores distintos</span></div>
+          <div class="breakdown-title"><h3>{{ label(b) }}</h3><span><ng-container i18n="@@ui.1dfe9d155f7bec">{{ dimensionCount(b) }} valores distintos</ng-container></span></div>
           <ul>
             @for (item of data.items; track item.key) {
-              <li class="bar-row"><span class="bar-label">{{ item.key }}</span><span class="bar-value">{{ formatCount(item.value) }} <small>clics</small></span>
+              <li class="bar-row"><span class="bar-label">{{ item.key }}</span><span class="bar-value">{{ formatCount(item.value) }} <small><ng-container i18n="@@ui.54b14e0662d5e7">clics</ng-container></small></span>
                 <div class="bar-track" aria-hidden="true"><div class="bar-fill" [style.width.%]="pct(item.value, data.max)"></div></div>
               </li>
             }
           </ul>
-          @if (!data.items.length) { <p class="bar-empty">Sin datos para este periodo.</p> }
+          @if (!data.items.length) { <p class="bar-empty"><ng-container i18n="@@ui.edae0a3d65e11d">Sin datos para este periodo.</ng-container></p> }
         </section>
       }
     </div>
   } @else {
     <div class="breakdowns-empty" role="status">
-      <span>Desglose del periodo</span>
-      <b>Todavía no hay datos para comparar.</b>
-      <p>Cuando lleguen clics, aquí podrás contrastar países, dispositivos, navegadores, sistemas, referentes y campañas.</p>
+      <span><ng-container i18n="@@ui.3b9dca36380495">Desglose del periodo</ng-container></span>
+      <b><ng-container i18n="@@ui.494d1bfcf68132">Todavía no hay datos para comparar.</ng-container></b>
+      <p><ng-container i18n="@@ui.75d10d67362e0d">Cuando lleguen clics, aquí podrás contrastar países, dispositivos, navegadores, sistemas, referentes y campañas.</ng-container></p>
     </div>
   }
 }

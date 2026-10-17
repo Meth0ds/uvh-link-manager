@@ -1,88 +1,88 @@
-@if (sharing.canPublish()) { <nav class="analytics-tabs" aria-label="Vistas de estadísticas"><a routerLink="/app/analytics" aria-current="page">Resumen</a><a routerLink="/app/analytics/reports">Informes compartidos</a></nav> }
-<app-page-header icon="query_stats" eyebrow="Rendimiento" title="Analítica" description="Consulta clics, procedencia y campañas en el periodo seleccionado.">
-  <div class="period-switch" role="group" aria-label="Periodo de la analítica">
+@if (sharing.canPublish()) { <nav class="analytics-tabs" aria-label="Vistas de estadísticas" i18n-aria-label="@@ui.5414b324d57d11"><a routerLink="/app/analytics" aria-current="page"><ng-container i18n="@@ui.ed7bdc67c84b3e">Resumen</ng-container></a><a routerLink="/app/analytics/reports"><ng-container i18n="@@ui.08abaadae77da4">Informes compartidos</ng-container></a></nav> }
+<app-page-header icon="query_stats" eyebrow="Rendimiento" title="Analítica" description="Consulta clics, procedencia y campañas en el periodo seleccionado." i18n-title="@@ui.f5b4c86a85509e" i18n-description="@@ui.f45e0e4cfefccb" i18n-eyebrow="@@ui.0fb6f5157a9090">
+  <div class="period-switch" role="group" aria-label="Periodo de la analítica" i18n-aria-label="@@ui.67f0160c7027f6">
     @for (option of periodOptions; track option.value) {
       <button type="button" [class.active]="period() === option.value" [attr.aria-pressed]="period() === option.value" [attr.aria-label]="option.label" (click)="onPeriod(option.value)">{{ option.short }}</button>
     }
   </div>
-  <div class="export-actions" role="group" aria-label="Exportar la analítica">
+  <div class="export-actions" role="group" aria-label="Exportar la analítica" i18n-aria-label="@@ui.1386d88d052e82">
     <button mat-stroked-button type="button" (click)="export('csv')" [disabled]="exporting() || awaitingCustomRange() || customRangeError() !== null">
-      <mat-icon>download</mat-icon> Exportar CSV
-    </button>
+      <mat-icon>download</mat-icon> <ng-container i18n="@@ui.236c553c8da123">Exportar CSV
+    </ng-container></button>
     <button mat-stroked-button type="button" (click)="export('json')" [disabled]="exporting() || awaitingCustomRange() || customRangeError() !== null">
-      <mat-icon>data_object</mat-icon> JSON
-    </button>
+      <mat-icon>data_object</mat-icon> <ng-container i18n="@@ui.760023c62029aa">JSON
+    </ng-container></button>
   </div>
   @if (period() === "custom") {
-    <div class="custom-range" role="group" aria-label="Fechas del rango personalizado">
-      <label>Desde <input #fromInput type="date" [value]="customFrom()" (change)="onCustomDate('from', fromInput.value)" /></label>
-      <label>Hasta <input #toInput type="date" [value]="customTo()" (change)="onCustomDate('to', toInput.value)" /></label>
+    <div class="custom-range" role="group" aria-label="Fechas del rango personalizado" i18n-aria-label="@@ui.ca1e52a08dbad4">
+      <label><ng-container i18n="@@ui.ce6f55749afd5d">Desde </ng-container><input #fromInput type="date" [value]="customFrom()" (change)="onCustomDate('from', fromInput.value)" /></label>
+      <label><ng-container i18n="@@ui.45d11be52fcf28">Hasta </ng-container><input #toInput type="date" [value]="customTo()" (change)="onCustomDate('to', toInput.value)" /></label>
       @if (customRangeError(); as message) { <p class="custom-range-error" role="alert">{{ message }}</p> }
     </div>
   }
 </app-page-header>
 
-<aside class="reading-note" aria-label="Cómo interpretar estas métricas">
+<aside class="reading-note" aria-label="Cómo interpretar estas métricas" i18n-aria-label="@@ui.056c2a67a273a2">
   <mat-icon aria-hidden="true">privacy_tip</mat-icon>
-  <p><b>Cómo interpretar estos datos.</b> “Pseudónimos diarios” no significa personas únicas: una misma visita puede contarse de nuevo otro día.</p>
-  <a routerLink="/help" fragment="analytics">Cómo leer la analítica<mat-icon aria-hidden="true">arrow_outward</mat-icon></a>
+  <p><b><ng-container i18n="@@ui.0e68ede666f8d6">Cómo interpretar estos datos.</ng-container></b> <ng-container i18n="@@ui.55b99013caf1be">“Pseudónimos diarios” no significa personas únicas: una misma visita puede contarse de nuevo otro día.</ng-container></p>
+  <a routerLink="/help" fragment="analytics"><ng-container i18n="@@ui.0a6bb7925931fa">Cómo leer la analítica</ng-container><mat-icon aria-hidden="true">arrow_outward</mat-icon></a>
 </aside>
 
 @if (loading() && overview()) {
-  <mat-progress-bar mode="indeterminate" aria-label="Cargando analítica" />
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando analítica"  i18n-aria-label="@@ui.a8ca90cac48a4b"/>
 }
 @if (error()) {
-  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
 }
 
 @if (loading() && !overview()) {
-  <app-panel-skeleton variant="dashboard" label="Cargando analítica" />
+  <app-panel-skeleton variant="dashboard" label="Cargando analítica"  i18n-label="@@ui.a8ca90cac48a4b"/>
 }
 
 @if (!loading() && !overview() && !error()) {
   @if (awaitingCustomRange() || customRangeError()) {
     <div class="empty-state">
       <mat-icon>date_range</mat-icon>
-      <b>Elige las dos fechas</b>
-      <p>Selecciona desde y hasta para consultar tu rango personalizado (hasta 180 días).</p>
+      <b><ng-container i18n="@@ui.d15a9fc0312099">Elige las dos fechas</ng-container></b>
+      <p><ng-container i18n="@@ui.e6845020eab23e">Selecciona desde y hasta para consultar tu rango personalizado (hasta 180 días).</ng-container></p>
     </div>
   } @else {
     <div class="empty-state">
       <mat-icon>query_stats</mat-icon>
-      <b>Aún no hay analítica</b>
-      <p>Comparte un enlace para empezar a observar clics, actividad diaria y campañas.</p>
-      <button mat-flat-button color="primary" routerLink="/app/links">Ver enlaces</button>
+      <b><ng-container i18n="@@ui.733724f4230d5b">Aún no hay analítica</ng-container></b>
+      <p><ng-container i18n="@@ui.0f89e5e0c0109f">Comparte un enlace para empezar a observar clics, actividad diaria y campañas.</ng-container></p>
+      <button mat-flat-button color="primary" routerLink="/app/links"><ng-container i18n="@@ui.ff7267d90a63b2">Ver enlaces</ng-container></button>
     </div>
   }
 }
 
 @if (overview(); as o) {
-  <dl class="metric-strip" aria-label="Resumen del periodo seleccionado">
-    <div class="metric primary-metric"><dt>Clics registrados</dt><dd>{{ formatCount(o.totals.clicks) }}</dd><dd class="metric-note">{{ periodLabel() }}</dd></div>
-    <div class="metric"><dt>Pseudónimos diarios</dt><dd>{{ formatCount(o.totals.visitors) }}</dd><dd class="metric-note">Actividad privada; no son personas únicas.</dd></div>
-    <div class="metric"><dt>Días en la serie</dt><dd>{{ formatCount(o.series.length) }}</dd><dd class="metric-note">Intervalos con datos devueltos.</dd></div>
-    <div class="metric"><dt>Enlaces destacados</dt><dd>{{ formatCount(o.topLinks.length) }}</dd><dd class="metric-note">Los que concentran más clics.</dd></div>
+  <dl class="metric-strip" aria-label="Resumen del periodo seleccionado" i18n-aria-label="@@ui.1a23b8d0965fe0">
+    <div class="metric primary-metric"><dt><ng-container i18n="@@ui.a501ae2d2519e3">Clics registrados</ng-container></dt><dd>{{ formatCount(o.totals.clicks) }}</dd><dd class="metric-note">{{ periodLabel() }}</dd></div>
+    <div class="metric"><dt><ng-container i18n="@@ui.2ac314c9a15c54">Pseudónimos diarios</ng-container></dt><dd>{{ formatCount(o.totals.visitors) }}</dd><dd class="metric-note"><ng-container i18n="@@ui.c7a97239d2f32a">Actividad privada; no son personas únicas.</ng-container></dd></div>
+    <div class="metric"><dt><ng-container i18n="@@ui.bbbc3460a7a791">Días en la serie</ng-container></dt><dd>{{ formatCount(o.series.length) }}</dd><dd class="metric-note"><ng-container i18n="@@ui.2a743b82ccf7e7">Intervalos con datos devueltos.</ng-container></dd></div>
+    <div class="metric"><dt><ng-container i18n="@@ui.82c1378a30e3d0">Enlaces destacados</ng-container></dt><dd>{{ formatCount(o.topLinks.length) }}</dd><dd class="metric-note"><ng-container i18n="@@ui.e821e416fecff8">Los que concentran más clics.</ng-container></dd></div>
   </dl>
   <app-charts [overview]="o" />
-  <div class="section-heading"><div><span>Rendimiento</span><h2>Enlaces con más actividad</h2></div><small>{{ periodLabel() }}</small></div>
+  <div class="section-heading"><div><span><ng-container i18n="@@ui.0fb6f5157a9090">Rendimiento</ng-container></span><h2><ng-container i18n="@@ui.3cf475b544adcd">Enlaces con más actividad</ng-container></h2></div><small>{{ periodLabel() }}</small></div>
   <ol class="top-links">
     @for (l of o.topLinks; track l.id; let i = $index) {
       <li><a
         class="top-link"
         [routerLink]="['/app/links', l.id]"
-        [attr.aria-label]="'Abrir enlace ' + l.alias"
+        [attr.aria-label]="uiText.ui_48fd3d19b892ff + l.alias"
       >
         <span class="rank tnum" aria-hidden="true">{{ i + 1 < 10 ? '0' : '' }}{{ i + 1 }}</span>
         <div class="top-main">
           <b class="tnum">{{ l.alias }}</b>
           <span>{{ l.destination }}</span>
         </div>
-        <dl class="top-values"><div><dt>Clics</dt><dd>{{ formatCount(l.clicks) }}</dd></div><div><dt>Pseudónimos</dt><dd>{{ formatCount(l.visitors) }}</dd></div></dl>
+        <dl class="top-values"><div><dt><ng-container i18n="@@ui.826c2d3872dac9">Clics</ng-container></dt><dd>{{ formatCount(l.clicks) }}</dd></div><div><dt><ng-container i18n="@@ui.3a31d24ba7f2c2">Pseudónimos</ng-container></dt><dd>{{ formatCount(l.visitors) }}</dd></div></dl>
         <mat-icon class="row-arrow" aria-hidden="true">arrow_outward</mat-icon>
       </a></li>
     }
     @if (!o.topLinks.length) {
-      <li class="none"><b>Todavía no hay enlaces destacados.</b><span>Cuando se registren clics, aparecerán aquí ordenados por actividad.</span></li>
+      <li class="none"><b><ng-container i18n="@@ui.c1369ea04a1606">Todavía no hay enlaces destacados.</ng-container></b><span><ng-container i18n="@@ui.971431f707081c">Cuando se registren clics, aparecerán aquí ordenados por actividad.</ng-container></span></li>
     }
   </ol>
 }

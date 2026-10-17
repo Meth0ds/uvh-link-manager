@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { Component, ChangeDetectionStrategy, DestroyRef, inject, signal } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators, type ValidatorFn } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -33,26 +34,26 @@ const meaningfulName: ValidatorFn = control =>
     MatProgressBarModule,
   ],
   template: `
-    <h2 mat-dialog-title><span class="title-icon" aria-hidden="true"><mat-icon>workspaces</mat-icon></span><span><small>Nuevo espacio</small><b>Crear workspace</b></span></h2>
+    <h2 mat-dialog-title><span class="title-icon" aria-hidden="true"><mat-icon>workspaces</mat-icon></span><span><small><ng-container i18n="@@ui.d047cbb0534dca">Nuevo espacio</ng-container></small><b><ng-container i18n="@@ui.204a65194041a4">Crear workspace</ng-container></b></span></h2>
     <mat-dialog-content>
-      @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Creando workspace" /> }
-      <p class="intro">Dale un lugar propio a un proyecto o equipo. Sus enlaces, dominios y miembros se organizan dentro de este espacio.</p>
+      @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Creando workspace"  i18n-aria-label="@@ui.7854f8c35a9a48"/> }
+      <p class="intro"><ng-container i18n="@@ui.2b958f9e252bb4">Dale un lugar propio a un proyecto o equipo. Sus enlaces, dominios y miembros se organizan dentro de este espacio.</ng-container></p>
       <form [formGroup]="form" (ngSubmit)="save()">
         <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-          <mat-label>Nombre del workspace</mat-label>
-          <input matInput formControlName="name" autocomplete="organization" maxlength="80" placeholder="Por ejemplo, Estudio Norte" [readonly]="busy()" />
+          <mat-label><ng-container i18n="@@ui.14bccd90f6df1e">Nombre del workspace</ng-container></mat-label>
+          <input matInput formControlName="name" autocomplete="organization" maxlength="80" placeholder="Por ejemplo, Estudio Norte" [readonly]="busy()"  i18n-placeholder="@@ui.c8342cbe164144"/>
           <mat-icon matPrefix>workspaces</mat-icon>
-          <mat-hint>Un nombre que tu equipo reconozca. Entre 2 y 80 caracteres.</mat-hint>
-          @if (form.controls.name.invalid && form.controls.name.touched) { <mat-error>Escribe un nombre de al menos 2 caracteres, sin contar espacios al principio o al final.</mat-error> }
+          <mat-hint><ng-container i18n="@@ui.79e3b6a33d9bb1">Un nombre que tu equipo reconozca. Entre 2 y 80 caracteres.</ng-container></mat-hint>
+          @if (form.controls.name.invalid && form.controls.name.touched) { <mat-error><ng-container i18n="@@ui.cc2843c5fefe64">Escribe un nombre de al menos 2 caracteres, sin contar espacios al principio o al final.</ng-container></mat-error> }
         </mat-form-field>
         @if (error()) { <div class="error" role="alert">{{ error() }}</div> }
       </form>
-      <div class="workspace-note"><mat-icon aria-hidden="true">swap_horiz</mat-icon><p><b>Sin perder de vista los demás.</b> Podrás cambiar de espacio desde el selector de workspace del panel.</p></div>
+      <div class="workspace-note"><mat-icon aria-hidden="true">swap_horiz</mat-icon><p><b><ng-container i18n="@@ui.dcd2000332c9b4">Sin perder de vista los demás.</ng-container></b> <ng-container i18n="@@ui.b242348515a635">Podrás cambiar de espacio desde el selector de workspace del panel.</ng-container></p></div>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button type="button" mat-dialog-close>Cancelar</button>
+      <button mat-button type="button" mat-dialog-close><ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button>
       <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="form.invalid || busy()" [attr.aria-busy]="busy()">
-        <mat-icon aria-hidden="true">{{ busy() ? 'hourglass_top' : 'add' }}</mat-icon> {{ busy() ? 'Creando…' : 'Crear workspace' }}
+        <mat-icon aria-hidden="true">{{ busy() ? 'hourglass_top' : 'add' }}</mat-icon> {{ busy() ? uiText.ui_7b5825e6fdd079 : uiText.ui_204a65194041a4 }}
       </button>
     </mat-dialog-actions>
   `,
@@ -60,6 +61,7 @@ const meaningfulName: ValidatorFn = control =>
   styleUrl: "./workspace-dialog.component.scss",
 })
 export class WorkspaceDialogComponent {
+  readonly uiText = UI_TEXT;
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ApiService);
   private readonly dialogRef = inject(MatDialogRef<WorkspaceDialogComponent, WorkspaceDialogResult | undefined>);
@@ -85,7 +87,7 @@ export class WorkspaceDialogComponent {
       this.dialogRef.close({ workspace });
     } catch (err) {
       if (this.requests.isCurrent(request, name)) {
-        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo crear el workspace");
+        this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.e1d38f0c154b02:No se pudo crear el workspace`);
       }
     } finally {
       if (this.requests.isCurrent(request, name)) this.busy.set(false);

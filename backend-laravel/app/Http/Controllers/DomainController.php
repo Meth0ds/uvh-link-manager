@@ -69,7 +69,7 @@ class DomainController
             ->where('id', $id)
             ->first();
         if (! $domain) {
-            return response()->json(['error' => 'Dominio no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_188558b9814e77')], 404);
         }
 
         return response()->json([
@@ -88,7 +88,7 @@ class DomainController
             ->where('id', $id)
             ->first();
         if (! $domain) {
-            return response()->json(['error' => 'Dominio no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_188558b9814e77')], 404);
         }
 
         $events = DB::table('domain_events')
@@ -137,12 +137,12 @@ class DomainController
         $notFoundMode = $request->input('notFoundMode');
         $isDefault = $request->input('isDefault');
         if ($hasDefaultInput && ! is_bool($isDefault)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         if ($hasRootInput) {
             if ($rootDestination !== null && ! is_string($rootDestination)) {
-                return response()->json(['error' => 'Datos inválidos'], 422);
+                return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
             }
             $rootDestination = is_string($rootDestination) ? trim($rootDestination) : null;
             if ($rootDestination === '') {
@@ -150,15 +150,15 @@ class DomainController
             } elseif ($rootDestination !== null) {
                 $valid = UrlUtil::validateDestination($rootDestination);
                 if (! $valid['ok']) {
-                    return response()->json(['error' => $valid['error'] ?? 'Destino raíz inválido'], 422);
+                    return response()->json(['error' => $valid['error'] ?? __('display.display_c4d70f525fead9')], 422);
                 }
                 if (DestinationDenylist::reason($rootDestination) !== null) {
-                    return response()->json(['error' => 'Destino raíz no permitido'], 422);
+                    return response()->json(['error' => __('messages.error_e46c48c118e108')], 422);
                 }
             }
         }
         if ($hasModeInput && ! in_array($notFoundMode, ['platform', 'redirect', 'branded'], true)) {
-            return response()->json(['error' => 'Modo de no encontrado inválido'], 422);
+            return response()->json(['error' => __('messages.error_8bf15f0070aed6')], 422);
         }
 
         $result = DB::transaction(function () use ($id, $workspaceId, $user, $apiTokenContext, $hasRootInput, $hasModeInput, $hasDefaultInput, $rootDestination, $notFoundMode, $isDefault): string {
@@ -213,16 +213,16 @@ class DomainController
             return 'ok';
         });
         if ($result === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Dominio no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_188558b9814e77')], 404);
         }
         if ($result === 'redirect_without_destination') {
-            return response()->json(['error' => 'Configura antes un destino raíz para redirigir las rutas desconocidas'], 422);
+            return response()->json(['error' => __('messages.error_e650793f782cbb')], 422);
         }
         if ($result === 'default_requires_serving') {
-            return response()->json(['error' => 'Un dominio solo puede ser el predeterminado cuando está activo sirviendo enlaces. Actívalo antes.'], 422);
+            return response()->json(['error' => __('messages.error_3a9b21fe5b3c90')], 422);
         }
         Audit::write($user->id, 'domain.update', 'domain', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
 
@@ -244,7 +244,7 @@ class DomainController
         // uniqueness and edge checks operate on one representation.
         if ($domain === null || strlen($domain) > 235 || ! ProductionSecurity::validHostname($domain)) {
             return response()->json([
-                'error' => 'Dominio inválido. Usa un hostname DNS compatible con un CNAME directo.',
+                'error' => __('messages.error_31ef5a498679a2'),
             ], 422);
         }
         // The server enforces what the UI promises: subdomains only, never an
@@ -252,9 +252,9 @@ class DomainController
         $rejection = DomainAdmission::rejectReason($domain, app()->environment('production'), $this->firstPartyHosts());
         $error = match ($rejection) {
             'ip_literal' => 'No se admiten direcciones IP. Usa un subdominio con CNAME.',
-            'special_use' => 'Ese nombre no pertenece a un dominio público utilizable.',
-            'apex' => 'Usa un subdominio (p. ej. go.tudominio.com). No se admiten dominios raíz, flattening ni proxies DNS.',
-            'first_party' => 'Este hostname está reservado por UVH',
+            'special_use' => __('display.display_fff9660d61f059'),
+            'apex' => __('display.display_402d87d9a7b4fd'),
+            'first_party' => __('display.display_c56d229aff8ec3'),
             default => null,
         };
         if ($error !== null) {
@@ -315,19 +315,19 @@ class DomainController
         } catch (QueryException $e) {
             $this->releaseIdempotency($guard);
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'Este dominio ya está registrado en este workspace'], 409);
+                return response()->json(['error' => __('messages.error_141904f5e7f12c')], 409);
             }
             throw $e;
         }
         if ($result['status'] === 'forbidden') {
             $this->releaseIdempotency($guard);
 
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($result['status'] !== 'created') {
             $this->releaseIdempotency($guard);
 
-            return response()->json(['error' => 'Límite de dominios alcanzado'], 429);
+            return response()->json(['error' => __('messages.error_0740244beda796')], 429);
         }
         /** @var CustomDomain $d */
         $d = $result['domain'];
@@ -431,13 +431,13 @@ class DomainController
         });
 
         $error = match ($prepared['status']) {
-            'forbidden' => ['Tu acceso al workspace cambió. Recarga antes de continuar.', 403],
-            'not_found' => ['Dominio no encontrado', 404],
-            'not_verified' => ['El dominio debe estar verificado antes de activarlo', 422],
-            'not_ready' => ['El dominio aún no tiene propiedad y ruta DNS confirmadas. Revalídalo antes de activarlo.', 409],
-            'stale_verification' => ['La verificación ha caducado. Revalida el dominio antes de activarlo.', 409],
-            'verification_in_progress' => ['Hay una comprobación DNS en curso. Espera a que termine antes de preparar HTTPS.', 409],
-            'tls_cooldown' => ['La emisión de certificado se está reintentando. Vuelve a probar en unos minutos.', 429],
+            'forbidden' => [__('display.display_48d563fa5de1c6'), 403],
+            'not_found' => [__('display.display_188558b9814e77'), 404],
+            'not_verified' => [__('display.display_e2fd216171d38b'), 422],
+            'not_ready' => [__('display.display_69767cb38d0625'), 409],
+            'stale_verification' => [__('display.display_3fb20af490af29'), 409],
+            'verification_in_progress' => [__('display.display_e3f986128c365a'), 409],
+            'tls_cooldown' => [__('display.display_87a6509a20d68f'), 429],
             default => null,
         };
         if ($error !== null) {
@@ -479,7 +479,7 @@ class DomainController
             report($e);
             $this->releaseIdempotency($guard);
 
-            return response()->json(['error' => 'No se pudo iniciar la emisión TLS. Inténtalo de nuevo.'], 503);
+            return response()->json(['error' => __('messages.error_eea80eb0f35804')], 503);
         }
 
         Audit::write($user->id, 'domain.tls_requested', 'domain', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
@@ -546,12 +546,12 @@ class DomainController
         if ($result === 'forbidden') {
             $this->releaseIdempotency($guard);
 
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($result === 'not_found') {
             $this->releaseIdempotency($guard);
 
-            return response()->json(['error' => 'Dominio no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_188558b9814e77')], 404);
         }
         if ($result !== 'unchanged') {
             Audit::write($user->id, 'domain.disable', 'domain', $id, null, UvhRequest::ip($request), workspaceId: $workspaceId);
@@ -616,14 +616,14 @@ class DomainController
             return 'deleted';
         });
         if ($result === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Dominio no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_188558b9814e77')], 404);
         }
         if ($result === 'in_use') {
             return response()->json([
-                'error' => 'Reasigna los enlaces de este dominio, incluidos los eliminados que quieras conservar, antes de borrarlo',
+                'error' => __('messages.error_0787bf38b475d0'),
             ], 409);
         }
 
@@ -647,13 +647,13 @@ class DomainController
             report($e);
 
             return response()->json([
-                'error' => 'La coordinación de verificación DNS no está disponible temporalmente. Inténtalo de nuevo.',
+                'error' => __('messages.error_5925fdbe3c4d92'),
             ], 503);
         }
         if (! $lockAcquired) {
             OperationalMetrics::increment('lock.unavailable');
 
-            return response()->json(['error' => 'Ya hay una verificación en curso para este dominio'], 409);
+            return response()->json(['error' => __('messages.error_702db9100e2b40')], 409);
         }
 
         $dispatched = false;
@@ -693,13 +693,13 @@ class DomainController
                 ];
             });
             if ($prepared['status'] === 'forbidden') {
-                return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+                return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
             }
             if ($prepared['status'] === 'not_found') {
-                return response()->json(['error' => 'Dominio no encontrado'], 404);
+                return response()->json(['error' => __('messages.error_188558b9814e77')], 404);
             }
             if ($prepared['status'] !== 'ready') {
-                return response()->json(['error' => 'El dominio no está en un estado verificable'], 409);
+                return response()->json(['error' => __('messages.error_e963d5b8c3e36e')], 409);
             }
 
             try {
@@ -727,7 +727,7 @@ class DomainController
                     ]);
                 report($e);
 
-                return response()->json(['error' => 'No se pudo iniciar la verificación DNS. Inténtalo de nuevo.'], 503);
+                return response()->json(['error' => __('messages.error_a3fdd3560cb652')], 503);
             }
 
             return response()->json(['ok' => true, 'state' => $revalidation ? $prepared['previous'] : 'verifying'], 202);
@@ -773,10 +773,10 @@ class DomainController
             return response()->json($begin['body'], $begin['status'])->header('Idempotent-Replay', 'true');
         }
         if ($begin['state'] === 'mismatch') {
-            return response()->json(['error' => 'Esta Idempotency-Key ya se usó con otra petición'], 409);
+            return response()->json(['error' => __('messages.error_696b407ad5767b')], 409);
         }
         if ($begin['state'] === 'in_progress') {
-            return response()->json(['error' => 'Ya hay una operación en curso con esta clave. Espera a que termine.'], 409);
+            return response()->json(['error' => __('messages.error_4d29d4aa9b576d')], 409);
         }
 
         return [

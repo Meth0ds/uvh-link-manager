@@ -12,11 +12,11 @@ final class AppProviders
     public static function normalize(string $provider, mixed $input): string
     {
         if (! isset(self::LABELS[$provider]) || ! is_string($input) || ! UrlUtil::validateDestination($input)['ok']) {
-            throw new LinkException('Elige un servicio y una dirección HTTPS oficial válida.', 422);
+            throw new LinkException(__('messages.error_73ea36c480808d'), 422);
         }
         $parts = parse_url($input);
         if (! is_array($parts) || ($parts['scheme'] ?? '') !== 'https' || isset($parts['user'], $parts['pass']) || isset($parts['user']) || isset($parts['port']) || isset($parts['fragment'])) {
-            throw new LinkException('Usa una dirección HTTPS oficial, sin credenciales ni fragmentos.', 422);
+            throw new LinkException(__('messages.error_e689e3be3e6c98'), 422);
         }
         $host = strtolower($parts['host'] ?? '');
         $path = $parts['path'] ?? '/';
@@ -47,7 +47,7 @@ final class AppProviders
         if ($provider === 'apple_maps' && $host === 'maps.apple.com' && $path === '/' && (isset($query['q']) || isset($query['daddr']) || isset($query['ll']))) {
             return 'https://maps.apple.com/?'.self::query($query, ['q', 'address', 'll', 'sll', 'saddr', 'daddr', 'dirflg', 't', 'z']);
         }
-        throw new LinkException('Esta dirección no corresponde a un formato de contenido admitido para el servicio.', 422);
+        throw new LinkException(__('messages.error_f2f30c24bcff2c'), 422);
     }
 
     /** @param array<string, mixed> $input
@@ -62,7 +62,7 @@ final class AppProviders
             }
             $value = $input[$key];
             if (! is_string($value) || strlen($value) > 1000 || preg_match('/[\x00-\x1f\x7f]/', $value)) {
-                throw new LinkException('El contenido del enlace de aplicación no es válido.', 422);
+                throw new LinkException(__('messages.error_5f144df32b6522'), 422);
             }
             $result[$key] = $value;
         }

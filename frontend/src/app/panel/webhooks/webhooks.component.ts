@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { Component, DestroyRef, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
@@ -69,6 +70,7 @@ const EVENTS = [
   styleUrl: "./webhooks.component.scss",
 })
 export class WebhooksComponent {
+  readonly uiText = UI_TEXT;
   private api = inject(ApiService);
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
@@ -98,19 +100,19 @@ export class WebhooksComponent {
   readonly actionId = this.mutations.value;
   readonly canEdit = computed(() => ["owner", "admin", "editor"].includes(this.workspaces.currentRole() ?? ""));
   readonly eventDescriptions: Record<string, string> = {
-    "link.created": "Se crea un enlace", "link.updated": "Se modifica un enlace", "link.deleted": "Se elimina un enlace",
-    "link.threshold_reached": "Un enlace alcanza su umbral",
-    "domain.claimed": "Tu workspace obtiene la propiedad de un dominio",
-    "domain.claim_transferred": "La propiedad de un dominio cambia de workspace",
-    "domain.verified": "Se verifica un dominio",
-    "domain.degraded": "La configuración DNS de un dominio empieza a fallar",
-    "domain.offline": "Un dominio deja de servir enlaces",
-    "domain.recovered": "Un dominio se recupera",
-    "domain.activated": "Se activa un dominio",
-    "domain.disabled": "Se desactiva un dominio",
-    "domain.tls_failed": "Falla el certificado HTTPS de un dominio",
-    "domain.tls_expiring": "El certificado de un dominio está por caducar",
-    "domain.deleted": "Se elimina un dominio",
+    "link.created": $localize`:@@ui.25b6a85aa35406:Se crea un enlace`, "link.updated": $localize`:@@ui.f94b224dc7a28b:Se modifica un enlace`, "link.deleted": $localize`:@@ui.cb9827610dc002:Se elimina un enlace`,
+    "link.threshold_reached": $localize`:@@ui.05fec795d08fb4:Un enlace alcanza su umbral`,
+    "domain.claimed": $localize`:@@ui.f0eca4d8af8626:Tu workspace obtiene la propiedad de un dominio`,
+    "domain.claim_transferred": $localize`:@@ui.1b667785f833f1:La propiedad de un dominio cambia de workspace`,
+    "domain.verified": $localize`:@@ui.bfd91521d54d8c:Se verifica un dominio`,
+    "domain.degraded": $localize`:@@ui.c64cb7aa1645a4:La configuración DNS de un dominio empieza a fallar`,
+    "domain.offline": $localize`:@@ui.91288da23ef540:Un dominio deja de servir enlaces`,
+    "domain.recovered": $localize`:@@ui.cd4df7747753da:Un dominio se recupera`,
+    "domain.activated": $localize`:@@ui.da15509d84043d:Se activa un dominio`,
+    "domain.disabled": $localize`:@@ui.3f8f6cb5273745:Se desactiva un dominio`,
+    "domain.tls_failed": $localize`:@@ui.6fceb814db2551:Falla el certificado HTTPS de un dominio`,
+    "domain.tls_expiring": $localize`:@@ui.f6faf59d40f3fd:El certificado de un dominio está por caducar`,
+    "domain.deleted": $localize`:@@ui.806785e9792176:Se elimina un dominio`,
   };
 
   private loadedContext: string | undefined;
@@ -160,7 +162,7 @@ export class WebhooksComponent {
       this.webhooks.set(webhooks);
     } catch (err) {
       if (!this.loadRequests.isCurrent(request, this.workspaces.currentId())) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los webhooks");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.94c5402063cf1e:No se pudieron cargar los webhooks`);
     } finally {
       if (this.loadRequests.isCurrent(request, this.workspaces.currentId())) this.loading.set(false);
     }
@@ -199,7 +201,7 @@ export class WebhooksComponent {
     const secret = this.secret();
     if (!this.canEdit() || !this.url().trim() || !this.selectedEvents().length || this.saving()) return;
     if (secret && (secret.length < 16 || secret.length > 128)) {
-      this.snackbar.open("El secreto debe tener entre 16 y 128 caracteres", "Cerrar", { duration: 3500 });
+      this.snackbar.open($localize`:@@ui.5ddd2d78c17a6f:El secreto debe tener entre 16 y 128 caracteres`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
       return;
     }
     const workspaceId = this.workspaces.currentId();
@@ -216,7 +218,7 @@ export class WebhooksComponent {
       if (this.editId()) {
         await this.api.patch(`/api/v1/webhooks/${this.editId()}`, payload);
         if (!this.mutationRequests.isCurrent(request, this.workspaces.currentId())) return;
-        this.snackbar.open("Webhook actualizado", "Cerrar", { duration: 2500 });
+        this.snackbar.open($localize`:@@ui.77d8c5ebd7e282:Webhook actualizado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       } else {
         const { webhook, secret } = await this.api.post<{ webhook: WebhookDto; secret: string }>(
           "/api/v1/webhooks",
@@ -226,7 +228,7 @@ export class WebhooksComponent {
         if (!this.mutationRequests.isCurrent(request, this.workspaces.currentId())) return;
         createdSecret = secret;
         this.webhooks.update((list) => [webhook, ...list]);
-        this.snackbar.open("Webhook creado. Guarda el secreto ahora; no volverá a mostrarse.", "Cerrar", { duration: 6000 });
+        this.snackbar.open($localize`:@@ui.5adbe4cbd94ba7:Webhook creado. Guarda el secreto ahora; no volverá a mostrarse.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 6000 });
       }
       if (!this.mutationRequests.isCurrent(request, this.workspaces.currentId())) return;
       this.resetForm();
@@ -234,7 +236,7 @@ export class WebhooksComponent {
       void this.load();
     } catch (err) {
       if (!this.mutationRequests.isCurrent(request, this.workspaces.currentId())) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo guardar el webhook", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.808b6d82760266:No se pudo guardar el webhook`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       if (this.mutationRequests.isCurrent(request, this.workspaces.currentId())) this.saving.set(false);
     }
@@ -245,12 +247,12 @@ export class WebhooksComponent {
     if (!secret) return;
     const copy = navigator.clipboard?.writeText(secret);
     if (!copy) {
-      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.b2b3a94dcbea08:El navegador no permite copiar automáticamente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       return;
     }
     void copy.then(
-      () => this.snackbar.open("Secreto copiado", "Cerrar", { duration: 2000 }),
-      () => this.snackbar.open("No se pudo copiar el secreto", "Cerrar", { duration: 2500 }),
+      () => this.snackbar.open($localize`:@@ui.d5e6fd3e8011d6:Secreto copiado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 }),
+      () => this.snackbar.open($localize`:@@ui.b8d86ec35e95ba:No se pudo copiar el secreto`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 }),
     );
   }
 
@@ -269,7 +271,7 @@ export class WebhooksComponent {
       void this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(action);
     }
@@ -283,10 +285,10 @@ export class WebhooksComponent {
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/test`);
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Ping admitido en la cola. Consulta el inspector para ver su entrega.", "Cerrar", { duration: 4500 });
+      this.snackbar.open($localize`:@@ui.efd68860773176:Ping admitido en la cola. Consulta el inspector para ver su entrega.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4500 });
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(action);
     }
@@ -298,9 +300,9 @@ export class WebhooksComponent {
     // apply it to a newly selected workspace or after capability was lost.
     const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({
-      title: "Eliminar webhook",
-      message: `¿Eliminar el webhook ${w.url}? Se cancelarán las entregas pendientes. Si hay una entrega en curso, tendrás que reintentarlo al terminar.`,
-      confirmLabel: "Eliminar webhook",
+      title: $localize`:@@ui.fe3193025fa22e:Eliminar webhook`,
+      message: $localize`:@@ui.eb78e3a7dea73b:¿Eliminar el webhook ${w.url}? Se cancelarán las entregas pendientes. Si hay una entrega en curso, tendrás que reintentarlo al terminar.`,
+      confirmLabel: $localize`:@@ui.fe3193025fa22e:Eliminar webhook`,
       destructive: true,
     });
     if (!confirmed || !this.canEdit() || !target.isCurrent() || this.actionId()) return;
@@ -309,10 +311,10 @@ export class WebhooksComponent {
       await this.api.delete(`/api/v1/webhooks/${w.id}`);
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.webhooks.update((list) => list.filter((x) => x.id !== w.id));
-      this.snackbar.open("Webhook eliminado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.1598ab5035c623:Webhook eliminado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(action);
     }
@@ -349,7 +351,7 @@ export class WebhooksComponent {
       if (!guard.isCurrent(request, this.workspaces.currentId())) return;
       this.deliveriesError.update((state) => ({
         ...state,
-        [w.id]: err instanceof ApiRequestError ? err.message : "No se pudieron cargar las entregas",
+        [w.id]: err instanceof ApiRequestError ? err.message : $localize`:@@ui.5210075b96c538:No se pudieron cargar las entregas`,
       }));
     } finally {
       if (guard.isCurrent(request, this.workspaces.currentId())) {
@@ -366,13 +368,13 @@ export class WebhooksComponent {
     try {
       await this.api.post(`/api/v1/webhooks/${w.id}/deliveries/${deliveryId}/resend`);
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Reenvío programado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.8d51c2a40a5480:Reenvío programado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       // Read the accepted operation without inventing an empty history.
       // A failed refresh keeps the last snapshot and its own recovery notice.
       await this.loadDeliveries(w, true);
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(action);
     }

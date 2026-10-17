@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../../core/localisation/template-messages";
 import {
   Component,
   DestroyRef,
@@ -49,6 +50,7 @@ import {
   styleUrl: "./report-dialog.component.scss",
 })
 export class ReportDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly sharing = inject(SharingService);
   readonly copy = inject(CopyFeedbackService);
   readonly ref = inject(MatDialogRef<ReportDialogComponent>);
@@ -73,14 +75,14 @@ export class ReportDialogComponent {
   readonly saved = signal<AnalyticsReport | null>(null);
   readonly searchTotal = signal(0);
   readonly sections: { key: ReportSection; title: string; hint: string }[] = [
-    { key: "visits", title: "Visitas", hint: "Total registrado en el periodo" },
+    { key: "visits", title: $localize`:@@ui.c6e253ffde95f8:Visitas`, hint: $localize`:@@ui.06188791083699:Total registrado en el periodo` },
     {
       key: "series",
-      title: "Evolución diaria",
-      hint: "Actividad a lo largo del tiempo",
+      title: $localize`:@@ui.4f60a7900f7ea1:Evolución diaria`,
+      hint: $localize`:@@ui.1e1bccd5ba7d00:Actividad a lo largo del tiempo`,
     },
-    { key: "countries", title: "Países", hint: "Procedencia aproximada" },
-    { key: "devices", title: "Dispositivos", hint: "Móvil, ordenador y otros" },
+    { key: "countries", title: $localize`:@@ui.993af13e12d377:Países`, hint: $localize`:@@ui.4761b570fa245e:Procedencia aproximada` },
+    { key: "devices", title: $localize`:@@ui.a70a1e62833434:Dispositivos`, hint: $localize`:@@ui.ab8dc3b05a4ce1:Móvil, ordenador y otros` },
   ];
   spec: ReportSpec = this.data.report
     ? {
@@ -186,7 +188,7 @@ export class ReportDialogComponent {
         this.searchError.set(
           e instanceof ApiRequestError
             ? e.message
-            : "No se pudieron cargar los enlaces.",
+            : $localize`:@@ui.de310225847ffd:No se pudieron cargar los enlaces.`,
         );
     } finally {
       if (this.searches.isCurrent(req, this.sharing.context()))
@@ -210,7 +212,7 @@ export class ReportDialogComponent {
       this.expiryEnabled &&
       (!expiresAt || Date.parse(expiresAt) <= Date.now())
     ) {
-      this.error.set("Elige una caducidad futura.");
+      this.error.set($localize`:@@ui.7f9af1b3a16905:Elige una caducidad futura.`);
       return;
     }
     if (
@@ -219,7 +221,7 @@ export class ReportDialogComponent {
       !this.spec.sections.length
     ) {
       this.error.set(
-        "Completa el título, selecciona enlaces y elige al menos una sección.",
+        $localize`:@@ui.9acd9ff50f74cb:Completa el título, selecciona enlaces y elige al menos una sección.`,
       );
       return;
     }
@@ -257,7 +259,7 @@ export class ReportDialogComponent {
         this.error.set(
           e instanceof ApiRequestError
             ? e.message
-            : "No se pudo guardar el informe. Puedes reintentar.",
+            : $localize`:@@ui.cc60ce59de7133:No se pudo guardar el informe. Puedes reintentar.`,
         );
     } finally {
       if (!this.destroy.destroyed) {

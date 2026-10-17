@@ -56,7 +56,7 @@ final class Idempotency
     public static function validateKey(mixed $key): array
     {
         if (! is_string($key) || preg_match(self::KEY_PATTERN, $key) !== 1) {
-            return ['ok' => false, 'error' => 'Falta una Idempotency-Key válida (8-64 caracteres: letras, dígitos, . _ : -)'];
+            return ['ok' => false, 'error' => __('messages.error_d46865155c776d')];
         }
 
         return ['ok' => true];

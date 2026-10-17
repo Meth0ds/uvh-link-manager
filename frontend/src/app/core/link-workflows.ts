@@ -19,6 +19,6 @@ export function emptyLinkFilter(): LinkFilterSpec {
 }
 export function defaultExpiredPage(): ExpiredPageSpec {
   return { version: 1, enabled: false,
-    expired: { title: "Este enlace ha caducado", message: "El contenido ya no está disponible. Puedes pedir un enlace nuevo a quien te lo compartió.", buttonLabel: "", buttonUrl: null },
-    exhausted: { title: "Este enlace se ha agotado", message: "Este enlace ha alcanzado su límite de usos. Puedes pedir un enlace nuevo a quien te lo compartió.", buttonLabel: "", buttonUrl: null } };
+    expired: { title: $localize`:@@ui.f6e14ef3528034:Este enlace ha caducado`, message: $localize`:@@ui.6adc2ca0a6e985:El contenido ya no está disponible. Puedes pedir un enlace nuevo a quien te lo compartió.`, buttonLabel: "", buttonUrl: null },
+    exhausted: { title: $localize`:@@ui.03b2dd4c2282e7:Este enlace se ha agotado`, message: $localize`:@@ui.70478835019ea4:Este enlace ha alcanzado su límite de usos. Puedes pedir un enlace nuevo a quien te lo compartió.`, buttonLabel: "", buttonUrl: null } };
 }

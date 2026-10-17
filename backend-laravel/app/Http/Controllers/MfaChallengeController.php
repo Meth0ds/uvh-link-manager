@@ -24,22 +24,22 @@ final class MfaChallengeController
         $code = UvhRequest::inputString($request, 'code');
 
         if ($challenge === '' || strlen($challenge) > 128 || ! preg_match('/^\d{6}$/', $code)) {
-            return response()->json(['error' => 'Código inválido'], 422);
+            return response()->json(['error' => __('messages.error_f86b8a9bfef328')], 422);
         }
 
         $ch = MfaChallengeStore::get($challenge);
         if (! $ch) {
-            return response()->json(['error' => 'Sesión MFA caducada'], 401);
+            return response()->json(['error' => __('messages.error_0cba14a15d63a0')], 401);
         }
 
         $user = User::where('id', $ch['user_id'])->whereNull('deleted_at')->first();
         if (! $user || ! $user->email_verified_at || ! $user->mfa_secret) {
-            return response()->json(['error' => 'MFA no configurado o email no verificado'], 401);
+            return response()->json(['error' => __('messages.error_f4453c6b66e8a9')], 401);
         }
         if ((int) $ch['security_version'] !== (int) $user->security_version) {
             MfaChallengeStore::forget($challenge);
 
-            return response()->json(['error' => 'Sesión MFA caducada'], 401);
+            return response()->json(['error' => __('messages.error_0cba14a15d63a0')], 401);
         }
 
         if (MfaAttempts::tooMany($user->id, 'totp')) {
@@ -49,12 +49,12 @@ final class MfaChallengeController
         try {
             $lock = Cache::lock(MfaChallengeStore::lockKey($challenge), 15);
             if (! $lock->get()) {
-                return response()->json(['error' => 'Esta verificación ya se está procesando'], 409);
+                return response()->json(['error' => __('messages.error_2b46052d206c12')], 409);
             }
         } catch (\Throwable) {
             Audit::write($user->id, 'auth.mfa_lock_unavailable', 'user', $user->id, ['method' => 'totp']);
 
-            return response()->json(['error' => 'La verificación no está disponible temporalmente'], 503);
+            return response()->json(['error' => __('messages.error_7518973c358fbe')], 503);
         }
 
         try {
@@ -66,21 +66,21 @@ final class MfaChallengeController
                 || (int) $ch['security_version'] !== (int) $user->security_version) {
                 MfaChallengeStore::forget($challenge);
 
-                return response()->json(['error' => 'Sesión MFA caducada'], 401);
+                return response()->json(['error' => __('messages.error_0cba14a15d63a0')], 401);
             }
 
             $verified = MfaLoginAdmission::totp((int) $user->id, (int) $ch['security_version'], $challenge, $code, $request);
             if ($verified['status'] === 'unreadable') {
-                return response()->json(['error' => 'La aplicación autenticadora no está disponible. Usa un código de recuperación.'], 409);
+                return response()->json(['error' => __('messages.error_06fa2d6b1d3d0f')], 409);
             }
             if ($verified['status'] === 'factor') {
                 MfaAttempts::recordFailure($user->id, 'totp');
                 Audit::write($user->id, 'auth.mfa_failed', 'user', $user->id, ['method' => 'totp'], UvhRequest::ip($request));
 
-                return response()->json(['error' => 'Código incorrecto'], 401);
+                return response()->json(['error' => __('messages.error_4454e8b15406c0')], 401);
             }
             if ($verified['status'] !== 'ok') {
-                return response()->json(['error' => 'Sesión MFA caducada'], 401);
+                return response()->json(['error' => __('messages.error_0cba14a15d63a0')], 401);
             }
             MfaAttempts::clear($user->id, 'totp');
 
@@ -103,23 +103,23 @@ final class MfaChallengeController
         $code = $this->normalizeRecoveryCode(UvhRequest::inputString($request, 'code'));
 
         if ($challenge === '' || strlen($challenge) > 128 || ! preg_match('/^[A-Z2-9]{16}$/D', $code)) {
-            return response()->json(['error' => 'Código de recuperación inválido'], 422);
+            return response()->json(['error' => __('messages.error_4be7cadeac20a6')], 422);
         }
 
         $ch = MfaChallengeStore::get($challenge);
         if (! $ch) {
-            return response()->json(['error' => 'Sesión MFA caducada'], 401);
+            return response()->json(['error' => __('messages.error_0cba14a15d63a0')], 401);
         }
 
         $user = User::where('id', $ch['user_id'])->whereNull('deleted_at')->first();
 
         if (! $user || ! $user->email_verified_at || ! $user->mfa_enabled || $user->recovery_codes === null) {
-            return response()->json(['error' => 'Código de recuperación incorrecto'], 401);
+            return response()->json(['error' => __('messages.error_a02a98ab8ad529')], 401);
         }
         if ((int) $ch['security_version'] !== (int) $user->security_version) {
             MfaChallengeStore::forget($challenge);
 
-            return response()->json(['error' => 'Sesión MFA caducada'], 401);
+            return response()->json(['error' => __('messages.error_0cba14a15d63a0')], 401);
         }
 
         if (MfaAttempts::tooMany($user->id, 'recovery')) {
@@ -129,18 +129,18 @@ final class MfaChallengeController
         try {
             $lock = Cache::lock(MfaChallengeStore::lockKey($challenge), 15);
             if (! $lock->get()) {
-                return response()->json(['error' => 'Esta verificación ya se está procesando'], 409);
+                return response()->json(['error' => __('messages.error_2b46052d206c12')], 409);
             }
         } catch (\Throwable) {
             Audit::write($user->id, 'auth.mfa_lock_unavailable', 'user', $user->id, ['method' => 'recovery']);
 
-            return response()->json(['error' => 'La verificación no está disponible temporalmente'], 503);
+            return response()->json(['error' => __('messages.error_7518973c358fbe')], 503);
         }
 
         try {
             $ch = MfaChallengeStore::get($challenge);
             if (! $ch || (int) $ch['user_id'] !== (int) $user->id) {
-                return response()->json(['error' => 'Sesión MFA caducada'], 401);
+                return response()->json(['error' => __('messages.error_0cba14a15d63a0')], 401);
             }
 
             // Consume the one-time recovery code while locking the user row.
@@ -148,13 +148,13 @@ final class MfaChallengeController
             // request from spending this login at the same time.
             $consumed = MfaLoginAdmission::recovery((int) $user->id, (int) $ch['security_version'], $challenge, $code, $request);
             if ($consumed['status'] === 'challenge') {
-                return response()->json(['error' => 'Sesión MFA caducada'], 401);
+                return response()->json(['error' => __('messages.error_0cba14a15d63a0')], 401);
             }
             if ($consumed['status'] !== 'ok') {
                 MfaAttempts::recordFailure($user->id, 'recovery');
                 Audit::write($user->id, 'auth.mfa_failed', 'user', $user->id, ['method' => 'recovery'], UvhRequest::ip($request));
 
-                return response()->json(['error' => 'Código de recuperación incorrecto'], 401);
+                return response()->json(['error' => __('messages.error_a02a98ab8ad529')], 401);
             }
 
             MfaAttempts::clear($user->id, 'recovery');

@@ -17,14 +17,14 @@ trait ValidatesAuthInput
         }
         if ($result === HCaptcha::UNAVAILABLE) {
             return response()->json([
-                'error' => 'La verificación antiabuso no está disponible. Espera un momento y vuelve a intentarlo.',
+                'error' => __('messages.error_91aafbeefa5920'),
             ], 503);
         }
 
         // Deliberately generic: do not expose whether a passcode was expired,
         // malformed or already redeemed.
         return response()->json([
-            'error' => 'Completa de nuevo la verificación antiabuso.',
+            'error' => __('messages.error_ce7a06e96d3ff6'),
         ], 422);
     }
 

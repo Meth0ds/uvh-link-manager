@@ -33,7 +33,7 @@ export class ActivityComponent {
   private readonly waits = new RetryCountdown(this.destroyRef);
   readonly maximumEvents = 500;
   readonly pageSize = 25;
-  readonly outcomeLabels = { completed: "Completado", pending: "Solicitud admitida", failed: "Fallido", unknown: "Resultado no confirmado" };
+  readonly outcomeLabels = { completed: "Completado", pending: $localize`:@@ui.f09f3af3853468:Solicitud admitida`, failed: "Fallido", unknown: $localize`:@@ui.50d73ee77137d2:Resultado no confirmado` };
   readonly resourceLabel = resourceTypeLabel;
   readonly context = computed<Context | null>(() => {
     const user = this.auth.user();
@@ -58,7 +58,7 @@ export class ActivityComponent {
    */
   readonly error = computed(() => {
     const wait = this.waitSeconds();
-    return wait > 0 ? `Espera ${wait} segundos antes de volver a consultar.` : this.current()?.error ?? null;
+    return wait > 0 ? $localize`:@@ui.e845f88f253166:Espera ${wait} segundos antes de volver a consultar.` : this.current()?.error ?? null;
   });
   readonly capped = computed(() => this.events().length >= this.maximumEvents);
   readonly hasMore = computed(() => !!this.current()?.cursor && !this.capped());
@@ -122,10 +122,10 @@ export class ActivityComponent {
       if (status === 429 || status === 503) {
         this.waits.defer(String(context.userId), error instanceof ApiRequestError ? error.retryAfterSeconds : undefined);
       }
-      reset(status === 401 || status === 403 ? "Ya no tienes acceso a esta actividad. Comprueba tu sesión y tus permisos."
-        : status === 422 ? "La paginación ha caducado o no es válida. Actualiza para empezar desde el inicio."
-        : status === 429 ? "Se ha alcanzado el límite de consultas. Espera antes de actualizar."
-        : "No se pudo consultar la actividad. Puedes volver a intentarlo más tarde.");
+      reset(status === 401 || status === 403 ? $localize`:@@ui.6707991dfe99b7:Ya no tienes acceso a esta actividad. Comprueba tu sesión y tus permisos.`
+        : status === 422 ? $localize`:@@ui.cc295081ccb5a0:La paginación ha caducado o no es válida. Actualiza para empezar desde el inicio.`
+        : status === 429 ? $localize`:@@ui.9c12a63e4cb78b:Se ha alcanzado el límite de consultas. Espera antes de actualizar.`
+        : $localize`:@@ui.6b16a8c71a8501:No se pudo consultar la actividad. Puedes volver a intentarlo más tarde.`);
       // No polling, automatic retries or automatic restart of expired cursors.
     }
   }

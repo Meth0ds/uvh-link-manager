@@ -1,41 +1,41 @@
-<app-page-header icon="group" eyebrow="Colaboración" title="Equipo" description="Gestiona el workspace, sus miembros, roles e invitaciones pendientes." />
+<app-page-header icon="group" eyebrow="Colaboración" title="Equipo" description="Gestiona el workspace, sus miembros, roles e invitaciones pendientes."  i18n-title="@@ui.c29446754ae19b" i18n-description="@@ui.30612b81a3a934" i18n-eyebrow="@@ui.e96a0571e859cb"/>
 
 @if (loading() && detail()) {
-  <mat-progress-bar mode="indeterminate" aria-label="Actualizando equipo" />
+  <mat-progress-bar mode="indeterminate" aria-label="Actualizando equipo"  i18n-aria-label="@@ui.d106dd96091377"/>
 }
 @if (loading() && !detail()) {
-  <app-panel-skeleton variant="cards" label="Cargando equipo" />
+  <app-panel-skeleton variant="cards" label="Cargando equipo"  i18n-label="@@ui.12ffc44490d8cb"/>
 }
 @if (error()) {
-  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
 }
 
 @if (!loading() && !detail() && !error()) {
   <div class="empty-state">
     <mat-icon>workspaces</mat-icon>
-    <b>No hay un workspace seleccionado</b>
-    <p>Crea o selecciona un workspace desde la barra superior para gestionar tu equipo.</p>
+    <b><ng-container i18n="@@ui.bfa65a20f9fa34">No hay un workspace seleccionado</ng-container></b>
+    <p><ng-container i18n="@@ui.61aa455c6a0c37">Crea o selecciona un workspace desde la barra superior para gestionar tu equipo.</ng-container></p>
   </div>
 }
 
 @if (detail(); as d) {
   <div class="card-block workspace-card">
-    <div class="card-heading"><span class="card-icon"><mat-icon>workspaces</mat-icon></span><div><h2>Workspace</h2><p>Identidad visible para todas las personas del equipo.</p></div></div>
-    <div class="workspace-identity"><strong>{{ d.workspace.name }}</strong><span class="role-chip">Tu acceso: {{ d.workspace.role ? roleLabel(d.workspace.role) : 'Acceso sin confirmar' }}</span></div>
+    <div class="card-heading"><span class="card-icon"><mat-icon>workspaces</mat-icon></span><div><h2><ng-container i18n="@@ui.87bb59ba2f92f2">Workspace</ng-container></h2><p><ng-container i18n="@@ui.e6d2d8d41154be">Identidad visible para todas las personas del equipo.</ng-container></p></div></div>
+    <div class="workspace-identity"><strong>{{ d.workspace.name }}</strong><span class="role-chip"><ng-container i18n="@@ui.daa35e081fe509">Tu acceso: {{ d.workspace.role ? roleLabel(d.workspace.role) : uiText.ui_0aa70332e7e604 }}</ng-container></span></div>
     @if (isAdmin()) {
       <div class="rename-row">
         <mat-form-field appearance="outline" class="grow">
-          <mat-label>Nombre del workspace</mat-label>
+          <mat-label><ng-container i18n="@@ui.14bccd90f6df1e">Nombre del workspace</ng-container></mat-label>
           <input matInput [(ngModel)]="renameValue" />
         </mat-form-field>
-        <button mat-stroked-button type="button" (click)="rename()" [disabled]="renameValue().trim().length < 2 || renameValue().trim() === d.workspace.name || saving()">Guardar nombre</button>
+        <button mat-stroked-button type="button" (click)="rename()" [disabled]="renameValue().trim().length < 2 || renameValue().trim() === d.workspace.name || saving()"><ng-container i18n="@@ui.60c0dfe6979ac1">Guardar nombre</ng-container></button>
       </div>
     } @else {
-      <p class="workspace-note">El propietario y los administradores pueden cambiar el nombre y gestionar el equipo.</p>
+      <p class="workspace-note"><ng-container i18n="@@ui.2116710042b4ea">El propietario y los administradores pueden cambiar el nombre y gestionar el equipo.</ng-container></p>
     }
   </div>
   <div class="card-block">
-    <div class="card-heading"><span class="card-icon"><mat-icon>group</mat-icon></span><div><h2>Miembros</h2><p>Acceso y responsabilidades dentro de este workspace.</p></div><span class="count-badge tnum">{{ d.membersPage.total }}</span></div>
+    <div class="card-heading"><span class="card-icon"><mat-icon>group</mat-icon></span><div><h2><ng-container i18n="@@ui.0d00d93befb181">Miembros</ng-container></h2><p><ng-container i18n="@@ui.61ad37e7a69b32">Acceso y responsabilidades dentro de este workspace.</ng-container></p></div><span class="count-badge tnum">{{ d.membersPage.total }}</span></div>
     @for (m of d.members; track trackByMember($index, m)) {
       <div class="member-row">
         <div class="member-info">
@@ -48,7 +48,7 @@
         <div class="member-actions">
           @if (canManageMember(m)) {
             <mat-form-field appearance="outline">
-              <mat-select #memberRole [value]="m.role" (selectionChange)="changeRole(m, $event.value, memberRole)" [aria-label]="'Rol de ' + m.name + ' (' + m.email + ')'" [disabled]="saving()">
+              <mat-select #memberRole [value]="m.role" (selectionChange)="changeRole(m, $event.value, memberRole)" [aria-label]="uiText.ui_b812d789114bb0 + m.name + ' (' + m.email + ')'" [disabled]="saving()">
                 @for (role of assignableRoles(); track role) { <mat-option [value]="role">{{ roleLabel(role) }}</mat-option> }
               </mat-select>
             </mat-form-field>
@@ -57,36 +57,36 @@
             <span class="role-chip">{{ roleLabel(m.role) }}</span>
           }
           @if (canManageMember(m)) {
-            <button mat-stroked-button type="button" class="remove-member" (click)="removeMember(m)" [attr.aria-label]="'Eliminar a ' + m.name + ' del workspace'" [disabled]="saving()">
-              <mat-icon>person_remove</mat-icon> Eliminar
-            </button>
+            <button mat-stroked-button type="button" class="remove-member" (click)="removeMember(m)" [attr.aria-label]="uiText.ui_31c8a7060874f5 + m.name + uiText.ui_baada0df9278d4" [disabled]="saving()">
+              <mat-icon>person_remove</mat-icon> <ng-container i18n="@@ui.84771925f04a90">Eliminar
+            </ng-container></button>
           }
         </div>
       </div>
     }
     @if (d.membersPage.total > d.membersPage.perPage) {
-      <mat-paginator class="team-paginator" [length]="d.membersPage.total" [pageIndex]="memberPageIndex()" [pageSize]="memberPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" aria-label="Paginar miembros" (page)="onMembersPage($event)" />
+      <mat-paginator class="team-paginator" [length]="d.membersPage.total" [pageIndex]="memberPageIndex()" [pageSize]="memberPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" aria-label="Paginar miembros" (page)="onMembersPage($event)"  i18n-aria-label="@@ui.d0684230c6b05e"/>
     }
   </div>
   @if (isAdmin()) {
     <div class="card-block invitations-card">
-      <div class="card-heading"><span class="card-icon"><mat-icon>person_add</mat-icon></span><div><h2>Invitaciones</h2><p>Asigna el rol mínimo necesario antes de enviar el acceso.</p></div></div>
+      <div class="card-heading"><span class="card-icon"><mat-icon>person_add</mat-icon></span><div><h2><ng-container i18n="@@ui.561d5148bbba66">Invitaciones</ng-container></h2><p><ng-container i18n="@@ui.69206a3e2ff1c6">Asigna el rol mínimo necesario antes de enviar el acceso.</ng-container></p></div></div>
       <div class="invite-row invite-form">
         <mat-form-field appearance="outline" class="grow">
-          <mat-label>Email</mat-label>
+          <mat-label><ng-container i18n="@@ui.969ccbd3cf6300">Email</ng-container></mat-label>
           <input matInput type="email" autocomplete="email" maxlength="254" [(ngModel)]="inviteEmail" (keyup.enter)="invite()" />
         </mat-form-field>
         <mat-form-field appearance="outline" class="role">
-          <mat-select [(ngModel)]="inviteRole" aria-label="Rol de la nueva invitación">
+          <mat-select [(ngModel)]="inviteRole" aria-label="Rol de la nueva invitación" i18n-aria-label="@@ui.65892a182cc81c">
             @for (role of assignableRoles(); track role) { <mat-option [value]="role">{{ roleLabel(role) }}</mat-option> }
           </mat-select>
         </mat-form-field>
         <button mat-flat-button color="primary" (click)="invite()" [disabled]="!inviteEmail().trim() || saving() || invitationRetry.remaining(d.workspace.id, inviteEmail()) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inviteEmail()) > 0 ? 'invite-retry-wait' : null">
-          <mat-icon>send</mat-icon> Invitar
-        </button>
+          <mat-icon>send</mat-icon> <ng-container i18n="@@ui.14ac3ec0d217a8">Invitar
+        </ng-container></button>
       </div>
       @if (invitationRetry.remaining(d.workspace.id, inviteEmail()); as seconds) {
-        <p class="retry-wait" id="invite-retry-wait">Espera para este destinatario: <span role="timer" aria-live="off">{{ invitationRetry.label(seconds) }}</span>. No se enviará automáticamente.</p>
+        <p class="retry-wait" id="invite-retry-wait"><ng-container i18n="@@ui.abd8f28e1690d3">Espera para este destinatario: </ng-container><span role="timer" aria-live="off">{{ invitationRetry.label(seconds) }}</span><ng-container i18n="@@ui.781c2a79b5bea4">. No se enviará automáticamente.</ng-container></p>
       }
       @for (inv of d.invitations; track trackByInvitation($index, inv)) {
         <div class="invite-row">
@@ -94,101 +94,101 @@
             <span class="avatar muted">&#64;</span>
             <div>
               <b>{{ inv.email }}</b>
-              <span>Invitado como {{ roleLabel(inv.role) }} · {{ invitationLabel(inv.status) }}</span>
+              <span><ng-container i18n="@@ui.7a3ea1715649aa">Invitado como {{ roleLabel(inv.role) }} · {{ invitationLabel(inv.status) }}</ng-container></span>
               @if (invitationRetry.remaining(d.workspace.id, inv.email); as seconds) {
-                <span class="retry-wait" [id]="'invite-retry-' + inv.id">Espera: <span role="timer" aria-live="off">{{ invitationRetry.label(seconds) }}</span>. Reenvío manual.</span>
+                <span class="retry-wait" [id]="'invite-retry-' + inv.id"><ng-container i18n="@@ui.7e56a65a476435">Espera: </ng-container><span role="timer" aria-live="off">{{ invitationRetry.label(seconds) }}</span><ng-container i18n="@@ui.9f68ca0fc96fce">. Reenvío manual.</ng-container></span>
               }
             </div>
           </div>
           @if (canManageInvitation(inv) && (inv.status === 'pending' || inv.status === 'expired')) {
             <div class="member-actions">
-              <button mat-stroked-button type="button" (click)="resendInvite(inv)" [attr.aria-label]="'Reenviar invitación a ' + inv.email" [disabled]="saving() || invitationRetry.remaining(d.workspace.id, inv.email) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inv.email) > 0 ? 'invite-retry-' + inv.id : null"><mat-icon>refresh</mat-icon> Reenviar</button>
+              <button mat-stroked-button type="button" (click)="resendInvite(inv)" [attr.aria-label]="uiText.ui_be9e223f7cbfde + inv.email" [disabled]="saving() || invitationRetry.remaining(d.workspace.id, inv.email) > 0" [attr.aria-describedby]="invitationRetry.remaining(d.workspace.id, inv.email) > 0 ? 'invite-retry-' + inv.id : null"><mat-icon>refresh</mat-icon> <ng-container i18n="@@ui.d643face5ca5c8">Reenviar</ng-container></button>
               @if (inv.status === 'pending') {
-                <button mat-stroked-button type="button" (click)="cancelInvite(inv)" [attr.aria-label]="'Cancelar invitación a ' + inv.email" [disabled]="saving()"><mat-icon>close</mat-icon> Cancelar</button>
+                <button mat-stroked-button type="button" (click)="cancelInvite(inv)" [attr.aria-label]="uiText.ui_c91e7194af4d20 + inv.email" [disabled]="saving()"><mat-icon>close</mat-icon> <ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button>
               }
             </div>
           }
         </div>
       }
-      @if (d.invitations.length === 0) { <p class="workspace-note">No hay invitaciones en esta página. Invita a alguien por email para compartir el workspace.</p> }
+      @if (d.invitations.length === 0) { <p class="workspace-note"><ng-container i18n="@@ui.3f23ca866f525b">No hay invitaciones en esta página. Invita a alguien por email para compartir el workspace.</ng-container></p> }
       @if (d.invitationsPage.total > d.invitationsPage.perPage) {
-        <mat-paginator class="team-paginator" [length]="d.invitationsPage.total" [pageIndex]="invitationPageIndex()" [pageSize]="invitationPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" aria-label="Paginar invitaciones" (page)="onInvitationsPage($event)" />
+        <mat-paginator class="team-paginator" [length]="d.invitationsPage.total" [pageIndex]="invitationPageIndex()" [pageSize]="invitationPageSize()" [pageSizeOptions]="[10, 25, 50, 100]" aria-label="Paginar invitaciones" (page)="onInvitationsPage($event)"  i18n-aria-label="@@ui.58973fb7601cae"/>
       }
     </div>
   }
   @if (canLeave()) {
     <div class="card-block membership-card">
       <div class="danger-row">
-        <div><b>Tu pertenencia al equipo</b><span>Si abandonas este workspace, necesitarás otra invitación para volver.</span></div>
-        <button mat-stroked-button type="button" (click)="leave()" [disabled]="saving()">Abandonar</button>
+        <div><b><ng-container i18n="@@ui.fafd0349f0d6ca">Tu pertenencia al equipo</ng-container></b><span><ng-container i18n="@@ui.a92132da8dbc24">Si abandonas este workspace, necesitarás otra invitación para volver.</ng-container></span></div>
+        <button mat-stroked-button type="button" (click)="leave()" [disabled]="saving()"><ng-container i18n="@@ui.2a9baf5c382506">Abandonar</ng-container></button>
       </div>
     </div>
   }
   @if (isOwner()) {
     <div class="card-block danger-zone">
-      <div class="card-heading danger-heading"><span class="card-icon"><mat-icon>warning_amber</mat-icon></span><div><h2>Propiedad del workspace</h2><p>Estas decisiones cambian el control del equipo o eliminan sus datos.</p></div></div>
+      <div class="card-heading danger-heading"><span class="card-icon"><mat-icon>warning_amber</mat-icon></span><div><h2><ng-container i18n="@@ui.7993009a5d86a3">Propiedad del workspace</ng-container></h2><p><ng-container i18n="@@ui.88f8bf289aea23">Estas decisiones cambian el control del equipo o eliminan sus datos.</ng-container></p></div></div>
       @if (isOwner()) {
         <div class="danger-row transfer-row">
           <div>
-            <b>Transferir propiedad</b>
-            <span>Convierte a otro miembro verificado en propietario y conserva tu acceso como administrador.</span>
+            <b><ng-container i18n="@@ui.d2e7a136a00c45">Transferir propiedad</ng-container></b>
+            <span><ng-container i18n="@@ui.b15a7d426879b6">Convierte a otro miembro verificado en propietario y conserva tu acceso como administrador.</ng-container></span>
           </div>
           @if (d.membersPage.total > 1 && !transferOpen()) {
-            <button mat-stroked-button (click)="beginOwnershipTransfer()" [disabled]="saving()">Transferir</button>
+            <button mat-stroked-button (click)="beginOwnershipTransfer()" [disabled]="saving()"><ng-container i18n="@@ui.15bdbc83123df0">Transferir</ng-container></button>
           } @else if (d.membersPage.total <= 1) {
-            <span class="role-chip">Añade otro miembro primero</span>
+            <span class="role-chip"><ng-container i18n="@@ui.e556571cf422c7">Añade otro miembro primero</ng-container></span>
           }
         </div>
         @if (transferOpen()) {
           <div class="transfer-form">
-            <div class="transfer-form-copy"><b>Nuevo propietario</b><p>La transferencia requiere tu contraseña{{ user()?.mfaEnabled ? ' y segundo factor' : '' }}.</p></div>
+            <div class="transfer-form-copy"><b><ng-container i18n="@@ui.5e888358d13b24">Nuevo propietario</ng-container></b><p><ng-container i18n="@@ui.e8cbe60a7295ec">La transferencia requiere tu contraseña{{ user()?.mfaEnabled ? uiText.ui_09bf1272fd426c : '' }}.</ng-container></p></div>
             @if (transferTarget(); as target) {
               <div class="transfer-selected">
                 <div><b>{{ target.name }}</b><span>{{ target.email }} · {{ roleLabel(target.role) }}</span></div>
-                <button mat-stroked-button type="button" (click)="clearTransferTarget()" [disabled]="saving()"><mat-icon>person_search</mat-icon> Elegir otra persona</button>
+                <button mat-stroked-button type="button" (click)="clearTransferTarget()" [disabled]="saving()"><mat-icon>person_search</mat-icon> <ng-container i18n="@@ui.06d0b9d13bfb73">Elegir otra persona</ng-container></button>
               </div>
             } @else {
-              <mat-form-field appearance="outline" class="transfer-search"><mat-label>Buscar por nombre o email</mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="transferQuery()" (input)="onTransferQuery(memberSearch.value)" #memberSearch autocomplete="off" maxlength="120" aria-label="Buscar entre todos los miembros del workspace" />@if (transferSearching()) { <mat-icon matSuffix>sync</mat-icon> }</mat-form-field>
+              <mat-form-field appearance="outline" class="transfer-search"><mat-label><ng-container i18n="@@ui.2dfb4fac7932bf">Buscar por nombre o email</ng-container></mat-label><mat-icon matPrefix>search</mat-icon><input matInput [value]="transferQuery()" (input)="onTransferQuery(memberSearch.value)" #memberSearch autocomplete="off" maxlength="120" aria-label="Buscar entre todos los miembros del workspace"  i18n-aria-label="@@ui.cf5a679c8bb626"/>@if (transferSearching()) { <mat-icon matSuffix>sync</mat-icon> }</mat-form-field>
               <div class="transfer-results">
                 @if (transferSearchError()) {
-                  <p class="transfer-search-error" role="alert">No se pudo buscar miembros.</p><button mat-stroked-button type="button" (click)="searchTransferCandidates()" [disabled]="transferSearching()">Reintentar búsqueda</button>
+                  <p class="transfer-search-error" role="alert"><ng-container i18n="@@ui.43922933a33705">No se pudo buscar miembros.</ng-container></p><button mat-stroked-button type="button" (click)="searchTransferCandidates()" [disabled]="transferSearching()"><ng-container i18n="@@ui.b97272e714346e">Reintentar búsqueda</ng-container></button>
                 } @else if (transferResults(); as results) {
                   @for (candidate of results; track candidate.id) {
                     <button type="button" class="transfer-result" (click)="selectTransferTarget(candidate)"><span class="candidate-name">{{ candidate.name }}</span><span>{{ candidate.email }}</span><span class="role-chip">{{ roleLabel(candidate.role) }}</span></button>
                   } @empty {
-                    <p class="transfer-search-hint">Ningún miembro coincide con la búsqueda.</p>
+                    <p class="transfer-search-hint"><ng-container i18n="@@ui.568d825047963a">Ningún miembro coincide con la búsqueda.</ng-container></p>
                   }
                   @if (transferTotal() > results.length) {
-                    <p class="transfer-search-hint">{{ transferTotal() }} coincidencias en el workspace; sigue escribiendo para acotar.</p>
+                    <p class="transfer-search-hint"><ng-container i18n="@@ui.a41332c8cf97c3">{{ transferTotal() }} coincidencias en el workspace; sigue escribiendo para acotar.</ng-container></p>
                   }
                 } @else if (transferSearching()) {
-                  <p class="transfer-search-hint" role="status">Buscando miembros…</p>
+                  <p class="transfer-search-hint" role="status"><ng-container i18n="@@ui.aa09d45df91b71">Buscando miembros…</ng-container></p>
                 } @else {
-                  <p class="transfer-search-hint">Escribe para buscar entre todos los miembros del workspace, no sólo de esta página.</p>
+                  <p class="transfer-search-hint"><ng-container i18n="@@ui.7cafc0a5e904c0">Escribe para buscar entre todos los miembros del workspace, no sólo de esta página.</ng-container></p>
                 }
               </div>
             }
-            <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" [(ngModel)]="transferPassword" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
-            @if (user()?.mfaEnabled) { <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput [(ngModel)]="transferFactorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field> }
-            <div class="transfer-actions"><button mat-stroked-button type="button" (click)="cancelOwnershipTransfer()" [disabled]="saving()">Cancelar</button><button mat-flat-button color="warn" type="button" (click)="transferOwnership()" [disabled]="!transferTarget() || !transferPassword() || (user()?.mfaEnabled && !transferFactorCode()) || saving()">{{ saving() ? 'Transfiriendo…' : 'Confirmar transferencia' }}</button></div>
+            <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.14a433147337bb">Contraseña actual</ng-container></mat-label><input matInput type="password" [(ngModel)]="transferPassword" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+            @if (user()?.mfaEnabled) { <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.24df0c17255828">Código de autenticación o recuperación</ng-container></mat-label><input matInput [(ngModel)]="transferFactorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field> }
+            <div class="transfer-actions"><button mat-stroked-button type="button" (click)="cancelOwnershipTransfer()" [disabled]="saving()"><ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button><button mat-flat-button color="warn" type="button" (click)="transferOwnership()" [disabled]="!transferTarget() || !transferPassword() || (user()?.mfaEnabled && !transferFactorCode()) || saving()">{{ saving() ? uiText.ui_c899af05b9162d : uiText.ui_a32cd62ae09f32 }}</button></div>
           </div>
         }
         <div class="danger-row">
           <div>
-            <b>Eliminar workspace</b>
-            <span>Borra permanentemente el workspace y todos sus enlaces.</span>
+            <b><ng-container i18n="@@ui.2af0f1aac82c4c">Eliminar workspace</ng-container></b>
+            <span><ng-container i18n="@@ui.0116fa2c44577d">Borra permanentemente el workspace y todos sus enlaces.</ng-container></span>
           </div>
           @if (!deleteOpen()) {
-            <button mat-stroked-button class="danger" (click)="beginWorkspaceDeletion()" [disabled]="saving()">Eliminar</button>
+            <button mat-stroked-button class="danger" (click)="beginWorkspaceDeletion()" [disabled]="saving()"><ng-container i18n="@@ui.c9894cf002f90b">Eliminar</ng-container></button>
           }
         </div>
         @if (deleteOpen()) {
           <div class="transfer-form delete-form">
-            <div class="transfer-form-copy"><b>Confirmación irreversible</b><p>Escribe <strong>{{ d.workspace.name }}</strong> exactamente y confirma tus credenciales.</p></div>
-            <mat-form-field appearance="outline"><mat-label>Nombre del workspace</mat-label><input matInput [(ngModel)]="deleteConfirmation" autocomplete="off" maxlength="120" /><mat-icon matPrefix>domain_disabled</mat-icon></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" [(ngModel)]="deletePassword" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
-            @if (user()?.mfaEnabled) { <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput [(ngModel)]="deleteFactorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field> }
-            <div class="transfer-actions"><button mat-stroked-button type="button" (click)="cancelWorkspaceDeletion()" [disabled]="saving()">Cancelar</button><button mat-flat-button color="warn" type="button" (click)="deleteWorkspace()" [disabled]="deleteConfirmation() !== d.workspace.name || !deletePassword() || (user()?.mfaEnabled && !deleteFactorCode()) || saving()">{{ saving() ? 'Eliminando…' : 'Eliminar definitivamente' }}</button></div>
+            <div class="transfer-form-copy"><b><ng-container i18n="@@ui.86961316eaa9d0">Confirmación irreversible</ng-container></b><p><ng-container i18n="@@ui.1350c7dcc7680f">Escribe </ng-container><strong>{{ d.workspace.name }}</strong> <ng-container i18n="@@ui.394f761d5f9ca5">exactamente y confirma tus credenciales.</ng-container></p></div>
+            <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.14bccd90f6df1e">Nombre del workspace</ng-container></mat-label><input matInput [(ngModel)]="deleteConfirmation" autocomplete="off" maxlength="120" /><mat-icon matPrefix>domain_disabled</mat-icon></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.14a433147337bb">Contraseña actual</ng-container></mat-label><input matInput type="password" [(ngModel)]="deletePassword" autocomplete="current-password" maxlength="72" /><mat-icon matPrefix>lock_outline</mat-icon></mat-form-field>
+            @if (user()?.mfaEnabled) { <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.24df0c17255828">Código de autenticación o recuperación</ng-container></mat-label><input matInput [(ngModel)]="deleteFactorCode" autocomplete="one-time-code" maxlength="24" /><mat-icon matPrefix>key</mat-icon></mat-form-field> }
+            <div class="transfer-actions"><button mat-stroked-button type="button" (click)="cancelWorkspaceDeletion()" [disabled]="saving()"><ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button><button mat-flat-button color="warn" type="button" (click)="deleteWorkspace()" [disabled]="deleteConfirmation() !== d.workspace.name || !deletePassword() || (user()?.mfaEnabled && !deleteFactorCode()) || saving()">{{ saving() ? uiText.ui_22f067cf9e0581 : uiText.ui_be4089a3f07e35 }}</button></div>
           </div>
         }
       }

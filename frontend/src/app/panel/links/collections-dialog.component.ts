@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -29,54 +30,55 @@ import type { CollectionDto } from "../../core/models";
   template: `
     <h2 mat-dialog-title>
       <span class="title-mark" aria-hidden="true"><mat-icon>folder</mat-icon></span>
-      <span><small>Organiza tus enlaces</small><b>Colecciones</b></span>
+      <span><small><ng-container i18n="@@ui.2192653950bdd0">Organiza tus enlaces</ng-container></small><b><ng-container i18n="@@ui.d55fb32ce8a0eb">Colecciones</ng-container></b></span>
     </h2>
     <mat-dialog-content class="manager-content">
-      <p class="message">Agrupa enlaces de una campaña o proyecto. Borrar una colección conserva sus enlaces, sin agrupar.</p>
+      <p class="message"><ng-container i18n="@@ui.7ea8ff6c7cdc30">Agrupa enlaces de una campaña o proyecto. Borrar una colección conserva sus enlaces, sin agrupar.</ng-container></p>
       @if (canWrite()) {
         <div class="inline-form manager-create">
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Nueva colección</mat-label>
-            <input matInput [ngModel]="newName" (ngModelChange)="newName = $event" name="collection-name" autocomplete="off" maxlength="120" placeholder="Por ejemplo, Lanzamiento de otoño" (keyup.enter)="create()" aria-label="Nombre de la nueva colección" [readonly]="busy()" />
-            <mat-hint>Hasta 60 caracteres. Usa un nombre único en este espacio.</mat-hint>
+            <mat-label><ng-container i18n="@@ui.ea27a47a03f902">Nueva colección</ng-container></mat-label>
+            <input matInput [ngModel]="newName" (ngModelChange)="newName = $event" name="collection-name" autocomplete="off" maxlength="120" placeholder="Por ejemplo, Lanzamiento de otoño" (keyup.enter)="create()" aria-label="Nombre de la nueva colección" [readonly]="busy()"  i18n-aria-label="@@ui.56069672a0a012" i18n-placeholder="@@ui.b64a80405c92db"/>
+            <mat-hint><ng-container i18n="@@ui.fa320beb900619">Hasta 60 caracteres. Usa un nombre único en este espacio.</ng-container></mat-hint>
           </mat-form-field>
           <button mat-flat-button type="button" (click)="create()" [disabled]="busy() || !newName.trim()" [attr.aria-busy]="busy()">
-            <mat-icon aria-hidden="true">add</mat-icon> Crear colección
-          </button>
+            <mat-icon aria-hidden="true">add</mat-icon> <ng-container i18n="@@ui.72a8060ab5ed05">Crear colección
+          </ng-container></button>
         </div>
       }
-      @if (loading()) { <p class="manager-status" role="status">Cargando colecciones…</p> }
+      @if (loading()) { <p class="manager-status" role="status"><ng-container i18n="@@ui.61a26eb98df300">Cargando colecciones…</ng-container></p> }
       @if (loadError()) {
-        <div class="error manager-error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="reload()" [disabled]="loading() || busy()">Reintentar</button></div>
+        <div class="error manager-error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="reload()" [disabled]="loading() || busy()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
       }
       @if (!loading() && !loadError() && !collections().length) {
-        <div class="manager-empty"><mat-icon aria-hidden="true">folder_open</mat-icon><h3>Todavía no hay colecciones</h3><p>{{ canWrite() ? 'Crea la primera arriba. Después podrás asignar enlaces desde el editor o mover varios desde la biblioteca.' : 'Aquí aparecerán las colecciones que cree el equipo.' }}</p></div>
+        <div class="manager-empty"><mat-icon aria-hidden="true">folder_open</mat-icon><h3><ng-container i18n="@@ui.0dee6f3eeb52ed">Todavía no hay colecciones</ng-container></h3><p>{{ canWrite() ? uiText.ui_11f30911573394 : uiText.ui_0c501bd5cbf57a }}</p></div>
       }
       @if (collections().length) {
-        <div class="manager-summary"><h3>Tus colecciones</h3><span>{{ collections().length }} en este espacio</span></div>
-        <ul class="row-list manager-list" [attr.aria-busy]="loading() || busy()" aria-label="Colecciones del espacio">
+        <div class="manager-summary"><h3><ng-container i18n="@@ui.88898ba87b1ea2">Tus colecciones</ng-container></h3><span><ng-container i18n="@@ui.459c73808fe932">{{ collections().length }} en este espacio</ng-container></span></div>
+        <ul class="row-list manager-list" [attr.aria-busy]="loading() || busy()" aria-label="Colecciones del espacio" i18n-aria-label="@@ui.44e7919c7b7aba">
           @for (collection of collections(); track collection.id) {
             <li class="row-item">
-              <div class="row-copy"><span class="name">{{ collection.name }}</span><span class="count">{{ collection.links }} {{ collection.links === 1 ? 'enlace' : 'enlaces' }}</span></div>
+              <div class="row-copy"><span class="name">{{ collection.name }}</span><span class="count">{{ collection.links }} {{ collection.links === 1 ? uiText.ui_902ee7f27eee59 : uiText.ui_41b0ae1f3fe239 }}</span></div>
               @if (canWrite()) {
                 <div class="manager-actions">
-                  <button mat-button type="button" (click)="rename(collection)" [disabled]="busy()" [attr.aria-label]="'Renombrar colección ' + collection.name">Renombrar</button>
-                  <button mat-icon-button type="button" class="manager-danger" (click)="remove(collection)" [disabled]="busy()" [attr.aria-label]="'Borrar colección ' + collection.name"><mat-icon aria-hidden="true">delete_outline</mat-icon></button>
+                  <button mat-button type="button" (click)="rename(collection)" [disabled]="busy()" [attr.aria-label]="uiText.ui_ec91a0a0f81a8f + collection.name"><ng-container i18n="@@ui.c89723ac88fde6">Renombrar</ng-container></button>
+                  <button mat-icon-button type="button" class="manager-danger" (click)="remove(collection)" [disabled]="busy()" [attr.aria-label]="uiText.ui_582afea27d5f98 + collection.name"><mat-icon aria-hidden="true">delete_outline</mat-icon></button>
                 </div>
               }
             </li>
           }
         </ul>
       }
-      @if (busy()) { <p class="manager-status" role="status">Guardando cambios…</p> }
+      @if (busy()) { <p class="manager-status" role="status"><ng-container i18n="@@ui.abb094d0948814">Guardando cambios…</ng-container></p> }
       @if (error() && !loadError()) { <div class="error" role="alert">{{ error() }}</div> }
     </mat-dialog-content>
-    <mat-dialog-actions align="end"><button mat-stroked-button type="button" (click)="close()">Cerrar</button></mat-dialog-actions>
+    <mat-dialog-actions align="end"><button mat-stroked-button type="button" (click)="close()"><ng-container i18n="@@ui.aeccae342e4bd0">Cerrar</ng-container></button></mat-dialog-actions>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["../dialog-identity.scss", "../scale-dialog.scss"],
 })
 export class CollectionsDialogComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly destroyRef = inject(DestroyRef);
   private active = true;
@@ -120,13 +122,13 @@ export class CollectionsDialogComponent {
     const name = this.newName.trim();
     if (!name || this.busy()) return;
     if (Array.from(name).length > 60) {
-      this.error.set("El nombre admite hasta 60 caracteres.");
+      this.error.set($localize`:@@ui.fa3d214e0a5ec2:El nombre admite hasta 60 caracteres.`);
       return;
     }
     const draft = this.newName;
     const created = await this.mutate(
       () => this.api.post("/api/v1/collections", { name }, decodeCollectionResponse),
-      "No se pudo crear la colección",
+      $localize`:@@ui.6c8c6a9d7f3fbf:No se pudo crear la colección`,
     );
     if (!created || !this.isCurrent()) return;
     if (this.newName === draft) this.newName = "";
@@ -135,10 +137,10 @@ export class CollectionsDialogComponent {
 
   async rename(collection: CollectionDto): Promise<void> {
     const name = await this.actions.prompt({
-      title: "Renombrar colección",
-      message: "El nombre es único dentro del workspace sin distinguir mayúsculas.",
-      confirmLabel: "Renombrar",
-      inputLabel: "Nombre",
+      title: $localize`:@@ui.c1840d30f9d219:Renombrar colección`,
+      message: $localize`:@@ui.151d3d02e1ef6a:El nombre es único dentro del workspace sin distinguir mayúsculas.`,
+      confirmLabel: $localize`:@@ui.c89723ac88fde6:Renombrar`,
+      inputLabel: $localize`:@@ui.562bb15757a8b5:Nombre`,
       inputRequired: true,
       inputMinLength: 1,
       inputMaxLength: 60,
@@ -146,22 +148,22 @@ export class CollectionsDialogComponent {
     if (name === null || name === collection.name) return;
     const renamed = await this.mutate(
       () => this.api.patch(`/api/v1/collections/${collection.id}`, { name }, decodeCollectionMutationResponse),
-      "No se pudo renombrar la colección",
+      $localize`:@@ui.8fb75bf255da31:No se pudo renombrar la colección`,
     );
     if (renamed) await this.reload();
   }
 
   async remove(collection: CollectionDto): Promise<void> {
     const confirmed = await this.actions.confirm({
-      title: "Borrar colección",
-      message: `¿Quieres borrar «${collection.name}»? Sus ${collection.links} enlaces seguirán vivos, sin agrupar.`,
-      confirmLabel: "Borrar colección",
+      title: $localize`:@@ui.a6fb39389e0419:Borrar colección`,
+      message: $localize`:@@ui.af218737d2c5ee:¿Quieres borrar «${collection.name}»? Sus ${collection.links} enlaces seguirán vivos, sin agrupar.`,
+      confirmLabel: $localize`:@@ui.a6fb39389e0419:Borrar colección`,
       destructive: true,
     });
     if (!confirmed) return;
     const removed = await this.mutate(
       () => this.api.delete(`/api/v1/collections/${collection.id}`, undefined, decodeCollectionDeleteResponse),
-      "No se pudo borrar la colección",
+      $localize`:@@ui.88d2e483569c37:No se pudo borrar la colección`,
     );
     if (removed) await this.reload();
   }
@@ -208,7 +210,7 @@ export class CollectionsDialogComponent {
       if (!this.isCurrent()) return;
       this.loading.set(false);
       this.loadError.set(true);
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las colecciones");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.6582e658b8c124:No se pudieron cargar las colecciones`);
     }
   }
 }

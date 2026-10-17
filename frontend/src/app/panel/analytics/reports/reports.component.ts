@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../../core/localisation/template-messages";
 import {
   Component,
   DestroyRef,
@@ -31,6 +32,7 @@ import type { AnalyticsReport } from "../../../core/sharing";
   styleUrl: "./reports.component.scss",
 })
 export class ReportsComponent {
+  readonly uiText = UI_TEXT;
   readonly sharing = inject(SharingService);
   readonly copy = inject(CopyFeedbackService);
   private actions = inject(ActionDialogService);
@@ -72,7 +74,7 @@ export class ReportsComponent {
         this.error.set(
           e instanceof Error
             ? e.message
-            : "No se pudieron cargar los informes.",
+            : $localize`:@@ui.c2b9f6ea59e3f6:No se pudieron cargar los informes.`,
         );
     } finally {
       if (this.requests.isCurrent(r, this.context())) this.loading.set(false);
@@ -96,13 +98,13 @@ export class ReportsComponent {
     const confirmed = await this.actions.confirm({
       title:
         action === "revoke"
-          ? "Revocar este informe"
-          : "Cambiar la URL de acceso",
+          ? $localize`:@@ui.065750855ed9ef:Revocar este informe`
+          : $localize`:@@ui.587b98f52c5ce6:Cambiar la URL de acceso`,
       message:
         action === "revoke"
-          ? "El cliente dejará de poder abrir el informe. Para compartirlo de nuevo tendrás que crear otro."
-          : "La URL anterior y los accesos abiertos dejarán de funcionar. Tendrás que compartir la nueva URL.",
-      confirmLabel: action === "revoke" ? "Revocar informe" : "Cambiar URL",
+          ? $localize`:@@ui.7f90684e0b09fc:El cliente dejará de poder abrir el informe. Para compartirlo de nuevo tendrás que crear otro.`
+          : $localize`:@@ui.0f81f22316b3de:La URL anterior y los accesos abiertos dejarán de funcionar. Tendrás que compartir la nueva URL.`,
+      confirmLabel: action === "revoke" ? $localize`:@@ui.06980a043a6b02:Revocar informe` : $localize`:@@ui.81e9c5f348c032:Cambiar URL`,
       destructive: action === "revoke",
     });
     if (!confirmed || context !== this.context() || this.destroy.destroyed)
@@ -119,7 +121,7 @@ export class ReportsComponent {
     } catch (e) {
       if (context === this.context() && !this.destroy.destroyed)
         this.error.set(
-          e instanceof Error ? e.message : "No se pudo completar la acción.",
+          e instanceof Error ? e.message : $localize`:@@ui.4d8c09fb8e5553:No se pudo completar la acción.`,
         );
     } finally {
       if (context === this.context() && !this.destroy.destroyed)
@@ -132,10 +134,10 @@ export class ReportsComponent {
   }
   state(report: AnalyticsReport): string {
     return {
-      active: "Activo",
+      active: $localize`:@@ui.723858144bd548:Activo`,
       expired: "Caducado",
       revoked: "Revocado",
-      needs_review: "Requiere revisión",
+      needs_review: $localize`:@@ui.0970a2881d7e5a:Requiere revisión`,
     }[report.state];
   }
 }

@@ -12,12 +12,12 @@ import type { DomainState } from "./models";
  * state can never mean one thing in a row and another in its own page.
  */
 export const DOMAIN_STATE_LABEL: Record<DomainState, string> = {
-  pending: "Pendiente de verificación",
-  verifying: "Comprobando DNS",
-  verified: "DNS verificado",
-  provisioning: "Preparando HTTPS",
-  active: "Activo",
-  error: "Requiere atención",
+  pending: $localize`:@@ui.de1c2d344762f9:Pendiente de verificación`,
+  verifying: $localize`:@@ui.c00f0f560899d7:Comprobando DNS`,
+  verified: $localize`:@@ui.75155f8e5b8627:DNS verificado`,
+  provisioning: $localize`:@@ui.dbd22407d65c08:Preparando HTTPS`,
+  active: $localize`:@@ui.723858144bd548:Activo`,
+  error: $localize`:@@ui.5d265f2433957c:Requiere atención`,
   disabled: "Desactivado",
 };
 

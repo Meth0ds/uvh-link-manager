@@ -1,3 +1,5 @@
+import { UI_LOCALE } from "../../core/localisation/locale";
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { SharingService } from "../../core/services/sharing.service";
 import { Component, DestroyRef, computed, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { RouterLink } from "@angular/router";
@@ -35,8 +37,9 @@ import { downloadBlob } from "../../core/services/browser-download";
   styleUrl: "./analytics.component.scss",
 })
 export class AnalyticsComponent {
+  readonly uiText = UI_TEXT;
   readonly sharing = inject(SharingService);
-  private readonly numberFormatter = new Intl.NumberFormat("es-ES");
+  private readonly numberFormatter = new Intl.NumberFormat(UI_LOCALE);
   private api = inject(ApiService);
   private workspaces = inject(WorkspaceService);
   private snackbar = inject(MatSnackBar);
@@ -51,20 +54,20 @@ export class AnalyticsComponent {
   readonly error = signal<string | null>(null);
   readonly exporting = signal(false);
   readonly periodOptions = [
-    { value: "24h", short: "24 h", label: "Últimas 24 horas" },
-    { value: "7d", short: "7 d", label: "Últimos 7 días" },
-    { value: "30d", short: "30 d", label: "Últimos 30 días" },
-    { value: "90d", short: "90 d", label: "Últimos 90 días" },
-    { value: "custom", short: "Personalizado", label: "Rango personalizado" },
+    { value: "24h", short: "24 h", label: $localize`:@@ui.f6b12b22a24db3:Últimas 24 horas` },
+    { value: "7d", short: "7 d", label: $localize`:@@ui.bb16b73fa6875b:Últimos 7 días` },
+    { value: "30d", short: "30 d", label: $localize`:@@ui.43b4552642c140:Últimos 30 días` },
+    { value: "90d", short: "90 d", label: $localize`:@@ui.368dc5257e1e76:Últimos 90 días` },
+    { value: "custom", short: "Personalizado", label: $localize`:@@ui.49db51ca4e0083:Rango personalizado` },
   ] as const;
-  private readonly dateFormatter = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+  private readonly dateFormatter = new Intl.DateTimeFormat(UI_LOCALE, { day: "2-digit", month: "2-digit", year: "numeric" });
 
   /** The date picker has no window yet: show the picker, not a false «no data». */
   readonly awaitingCustomRange = computed(() => this.period() === "custom"
     && (!this.customFrom() || !this.customTo()));
   readonly customRangeError = computed(() => this.period() === "custom"
     && this.customFrom() !== "" && this.customTo() !== "" && this.customFrom() > this.customTo()
-    ? "La fecha inicial debe ser anterior o igual a la final."
+    ? $localize`:@@ui.e3ebda4c8f62b0:La fecha inicial debe ser anterior o igual a la final.`
     : null);
 
   private loadedContext: string | undefined;
@@ -124,7 +127,7 @@ export class AnalyticsComponent {
       this.overview.set(a);
     } catch (err) {
       if (!this.requests.isCurrent(request, this.viewContext())) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar las métricas");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.1297bba9e1fbe3:No se pudieron cargar las métricas`);
     } finally {
       if (this.requests.isCurrent(request, this.viewContext())) this.loading.set(false);
     }
@@ -162,9 +165,9 @@ export class AnalyticsComponent {
     if (this.period() === "custom") {
       const from = this.formatDay(this.customFrom());
       const to = this.formatDay(this.customTo());
-      return from !== "" && to !== "" ? `Del ${from} al ${to}` : "Rango personalizado";
+      return from !== "" && to !== "" ? `Del ${from} al ${to}` : $localize`:@@ui.49db51ca4e0083:Rango personalizado`;
     }
-    return this.periodOptions.find((option) => option.value === this.period())?.label ?? "Periodo seleccionado";
+    return this.periodOptions.find((option) => option.value === this.period())?.label ?? $localize`:@@ui.efb7a645f609f8:Periodo seleccionado`;
   }
 
   private formatDay(value: string): string {
@@ -193,13 +196,13 @@ export class AnalyticsComponent {
       if (!current()) return;
       const stamp = new Date().toISOString().slice(0, 10);
       if (!downloadBlob(blob, `uvh-analytics-${stamp}.${format}`)) {
-        this.snackbar.open("No se pudo iniciar la descarga", "Cerrar", { duration: 3000 });
+        this.snackbar.open($localize`:@@ui.5d0c0bc073faba:No se pudo iniciar la descarga`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
         return;
       }
-      this.snackbar.open(`Export ${format.toUpperCase()} descargado`, "Cerrar", { duration: 2500 });
+      this.snackbar.open(`Export ${format.toUpperCase()} descargado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
     } catch (err) {
       if (!current()) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo exportar la analítica", "Cerrar", { duration: 3500 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.0980eb8e19731a:No se pudo exportar la analítica`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
     } finally {
       if (current()) this.exporting.set(false);
     }

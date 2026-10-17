@@ -20,16 +20,16 @@ final class LinkHistoryController
     public function index(Request $request, int $id): JsonResponse
     {
         if (! config('workflows.link_history', true)) {
-            return response()->json(['error' => 'Esta función no está disponible'], 404);
+            return response()->json(['error' => __('messages.error_082a2b7ba08855')], 404);
         }
         $workspaceId = UvhRequest::workspaceId($request);
         $link = Link::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $link) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
         $source = $request->query('source');
         if ($source !== null && (! is_string($source) || ! in_array($source, ['create', 'update', 'duplicate', 'restore', 'import', 'bulk'], true))) {
-            return response()->json(['error' => 'Filtro de operación inválido'], 422);
+            return response()->json(['error' => __('messages.error_937be38ad1aa7f')], 422);
         }
         $perPage = min(50, max(1, (int) $request->query('perPage', 20)));
         $versions = LinkVersion::with('actor:id,name')
@@ -48,7 +48,7 @@ final class LinkHistoryController
     public function show(Request $request, int $id, int $revision): JsonResponse
     {
         if (! config('workflows.link_history', true)) {
-            return response()->json(['error' => 'Esta función no está disponible'], 404);
+            return response()->json(['error' => __('messages.error_082a2b7ba08855')], 404);
         }
         $version = $this->version($request, $id, $revision);
 
@@ -58,12 +58,12 @@ final class LinkHistoryController
     public function compare(Request $request, int $id): JsonResponse
     {
         if (! config('workflows.link_history', true)) {
-            return response()->json(['error' => 'Esta función no está disponible'], 404);
+            return response()->json(['error' => __('messages.error_082a2b7ba08855')], 404);
         }
         $from = (int) $request->query('from');
         $to = (int) $request->query('to');
         if ($from < 1 || $to < 1 || $from === $to) {
-            return response()->json(['error' => 'Selecciona dos revisiones diferentes'], 422);
+            return response()->json(['error' => __('messages.error_e4fcf07431a98d')], 422);
         }
         $left = $this->version($request, $id, $from);
         $right = $this->version($request, $id, $to);
@@ -96,14 +96,14 @@ final class LinkHistoryController
     public function restore(Request $request, int $id, int $revision): JsonResponse
     {
         if (! config('workflows.link_history_restore', true)) {
-            return response()->json(['error' => 'Esta función no está disponible'], 404);
+            return response()->json(['error' => __('messages.error_082a2b7ba08855')], 404);
         }
         $workspaceId = UvhRequest::workspaceId($request);
         $user = UvhRequest::user($request);
         $version = $this->version($request, $id, $revision);
         $expected = $request->input('expectedVersion');
         if (! is_int($expected) || $expected < 1) {
-            return response()->json(['error' => 'Versión actual inválida'], 422);
+            return response()->json(['error' => __('messages.error_d1a835c5bdca0b')], 422);
         }
         $key = $request->header('Idempotency-Key');
         $check = Idempotency::validateKey($key);
@@ -117,10 +117,10 @@ final class LinkHistoryController
             return response()->json($begin['body'] ?? [], $begin['status'] ?? 200);
         }
         if ($begin['state'] === 'mismatch') {
-            return response()->json(['error' => 'Esta clave corresponde a otra restauración.'], 409);
+            return response()->json(['error' => __('messages.error_00fdaa8687d60f')], 409);
         }
         if ($begin['state'] === 'in_progress') {
-            return response()->json(['error' => 'La restauración anterior sigue en curso.'], 409);
+            return response()->json(['error' => __('messages.error_1b829e52971b0c')], 409);
         }
         try {
             $configuration = $version->configuration ?? [];
@@ -149,12 +149,12 @@ final class LinkHistoryController
             $actor = WorkspaceWriteActor::fromRequest($request);
             $body = DB::transaction(function () use ($id, $workspaceId, $user, $input, $expected, $request, $actor, $scope, $key, $hash, $begin, $revision): array {
                 if (! $actor->lockMembership((int) $user->id, $workspaceId, (int) $user->security_version)) {
-                    throw new LinkException('Tu acceso al workspace cambió. Recarga antes de restaurar.', 403);
+                    throw new LinkException(__('messages.error_facd4117352b2b'), 403);
                 }
                 Idempotency::renew((int) $user->id, $scope, $key, $hash, $begin['lease']);
                 $valid = LinkService::validate($input);
                 if (! $valid['ok']) {
-                    throw new LinkException($valid['error'] ?? 'La configuración ya no es válida', 422);
+                    throw new LinkException($valid['error'] ?? __('display.display_dd7200728ad2d1'), 422);
                 }
                 LinkService::update($id, $workspaceId, (int) $user->id, $input, $expected, UvhRequest::apiToken($request), (int) $user->security_version, $actor, 'restore');
                 $link = Link::with([AppOpening::domainRelation(), 'tags', 'collection'])->where('id', $id)->where('workspace_id', $workspaceId)->firstOrFail();
@@ -181,7 +181,7 @@ final class LinkHistoryController
         $workspaceId = UvhRequest::workspaceId($request);
         $version = LinkVersion::with('actor:id,name')->where('link_id', $id)->where('workspace_id', $workspaceId)->where('revision', $revision)->first();
         if (! $version) {
-            throw new LinkException('Versión no encontrada', 404);
+            throw new LinkException(__('messages.error_90353dab4a2bcb'), 404);
         }
 
         return $version;

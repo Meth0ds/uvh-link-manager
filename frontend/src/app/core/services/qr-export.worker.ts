@@ -16,5 +16,5 @@ addEventListener("message", async ({ data }: MessageEvent<QrWorkerRequest>) => {
       : data.kind === "print" ? await exportQrA4(data.urls, data.spec, data.print, data.options, progress)
         : await exportQrBulk(data.links, data.spec, data.format, data.options, data.print, progress);
     postMessage({ kind: "done", blob });
-  } catch (error) { postMessage({ kind: "error", message: error instanceof Error ? error.message : "No se pudo preparar el archivo QR." }); }
+  } catch (error) { postMessage({ kind: "error", message: error instanceof Error ? error.message : $localize`:@@ui.dbe2ef755be354:No se pudo preparar el archivo QR.` }); }
 });

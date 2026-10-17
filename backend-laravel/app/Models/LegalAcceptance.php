@@ -24,6 +24,8 @@ class LegalAcceptance extends Model
         'version',
         'source',
         'accepted_at',
+        'language',
+        'document_sha256',
     ];
 
     protected function casts(): array

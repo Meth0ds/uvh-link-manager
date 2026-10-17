@@ -107,31 +107,28 @@ class RedirectController
         }
 
         if ($outcome['kind'] === 'gone') {
-            return VisitorAnswer::notice('Enlace agotado', 'Este enlace ya no está disponible (límite de clics o uso único alcanzado).', 410);
+            return VisitorAnswer::notice(__('visitor.exhausted_title'), __('visitor.exhausted_body'), 410);
         }
 
         if ($outcome['kind'] === 'unavailable') {
             $labels = [
-                'paused' => ['Enlace en pausa', 'Este enlace está temporalmente desactivado.'],
-                'expired' => ['Enlace caducado', 'Este enlace ha expirado.'],
-                'blocked' => ['Enlace bloqueado', 'Este enlace fue bloqueado por incumplir nuestras normas.'],
-                'archived' => ['Enlace archivado', 'Este enlace ya no está activo.'],
-                'scheduled' => ['Enlace programado', 'Este enlace se activará pronto.'],
-                'domain' => ['Dominio no configurado', 'El dominio de este enlace no está activo.'],
+                'paused' => [__('visitor.paused_title'), __('visitor.paused_body')],
+                'expired' => [__('visitor.expired_title'), __('visitor.expired_body')],
+                'blocked' => [__('visitor.blocked_title'), __('visitor.blocked_body')],
+                'archived' => [__('visitor.archived_title'), __('visitor.archived_body')],
+                'scheduled' => [__('visitor.scheduled_title'), __('visitor.scheduled_body')],
+                'domain' => [__('visitor.domain_title'), __('visitor.domain_body')],
             ];
-            [$title, $body] = $labels[$outcome['reason']] ?? ['No disponible', 'Este enlace no está disponible.'];
+            [$title, $body] = $labels[$outcome['reason']] ?? [__('visitor.unavailable_title'), __('visitor.unavailable_body')];
 
             return VisitorAnswer::notice($title, $body, 404);
         }
 
-        // A `branded` domain answers as itself: the page names the hostname,
-        // not the platform behind it.
-        $brandedHost = $outcome['branded_host'] ?? null;
-        if (is_string($brandedHost) && $brandedHost !== '') {
-            return VisitorAnswer::notice('Enlace no encontrado', 'El enlace que buscas no existe o fue eliminado.', 404, $brandedHost);
+        if ($outcome['kind'] === 'not_found') {
+            return VisitorAnswer::notFound($outcome['branded_host'] ?? null, $outcome['root_destination'] ?? null);
         }
 
-        return VisitorAnswer::notice('Enlace no encontrado', 'El enlace que buscas no existe o fue eliminado.', 404);
+        return VisitorAnswer::notice(__('visitor.unavailable_title'), __('visitor.unavailable_body'), 404);
     }
 
     /**

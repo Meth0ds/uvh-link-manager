@@ -25,9 +25,9 @@ export type AsyncOperationTone = "working" | "ready" | "done" | "failed" | "expi
         <ng-content />
         @if (waitSeconds() > 0) {
           <p class="async-operation-wait">
-            {{ waitText() }} <span role="timer" aria-live="off">{{ waitLabel() }}</span>.
+            {{ waitText() }} <span role="timer" aria-live="off">{{ waitLabel() }}</span><ng-container i18n="@@ui.e0195aa5cfc330">.
             No se reintentará automáticamente.
-          </p>
+          </ng-container></p>
         }
       </div>
     </section>
@@ -69,7 +69,7 @@ export class AsyncOperationStatusComponent {
   /** Seconds left of a server-proposed wait; 0 renders no countdown. */
   readonly waitSeconds = input(0);
   /** Sentence before the countdown, chosen by the caller. */
-  readonly waitText = input("Reintento disponible en");
+  readonly waitText = input($localize`:@@ui.3adef10186ccd0:Reintento disponible en`);
 
   readonly waitLabel = computed(() => formatWaitLabel(Math.max(0, this.waitSeconds())));
   readonly toneClass = computed(() => `async-operation ${this.tone()}`);

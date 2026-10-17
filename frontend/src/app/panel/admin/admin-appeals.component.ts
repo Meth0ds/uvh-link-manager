@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, signal, untracked } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -37,6 +38,7 @@ type AppealStatusFilter = "" | LinkAppealStatus;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdminAppealsComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionDialogService);
   private readonly snackbar = inject(MatSnackBar);
@@ -57,7 +59,7 @@ export class AdminAppealsComponent {
     destroyRef: inject(DestroyRef),
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudieron cargar las apelaciones",
+    fallback: $localize`:@@ui.b934a275725884:No se pudieron cargar las apelaciones`,
     filters: () => [this.status()],
     read: async (page, perPage, signal) => {
       const response = await this.api.get(
@@ -112,14 +114,14 @@ export class AdminAppealsComponent {
     if (!intent() || this.appeals.stale() || this.busy()) return;
     const restoring = decision === "restore";
     const note = await this.actions.prompt({
-      title: restoring ? "Restaurar el enlace" : "Confirmar el bloqueo",
+      title: restoring ? $localize`:@@ui.7393a004859e18:Restaurar el enlace` : $localize`:@@ui.adc96de83b7525:Confirmar el bloqueo`,
       message: restoring
         ? `Vas a resolver a favor la apelación de /${appeal.alias}: recupera su estado anterior y se retiran las entradas de lista negra que aplicaban a su destino.`
         : `Vas a resolver en contra la apelación de /${appeal.alias}: el enlace sigue bloqueado.`,
-      confirmLabel: restoring ? "Restaurar enlace" : "Confirmar bloqueo",
-      inputLabel: "Nota del expediente (opcional)",
-      inputPlaceholder: "Por qué se decide así…",
-      inputHint: "Hasta 500 caracteres. Queda en el expediente del enlace, junto a la decisión.",
+      confirmLabel: restoring ? $localize`:@@ui.917670d52a893a:Restaurar enlace` : $localize`:@@ui.56095944348484:Confirmar bloqueo`,
+      inputLabel: $localize`:@@ui.18ef4e89404dfd:Nota del expediente (opcional)`,
+      inputPlaceholder: $localize`:@@ui.b2b67c43334edf:Por qué se decide así…`,
+      inputHint: $localize`:@@ui.8c6d2679679a83:Hasta 500 caracteres. Queda en el expediente del enlace, junto a la decisión.`,
       inputRequired: false,
       inputMaxLength: 500,
     });
@@ -130,11 +132,11 @@ export class AdminAppealsComponent {
     try {
       await this.api.post(`/api/v1/admin/appeals/${appeal.id}/decision`, { decision, note: note.trim() });
       if (!operation.isCurrent()) return;
-      this.snackbar.open(restoring ? "Enlace restaurado" : "Bloqueo confirmado", "Cerrar", { duration: 2500 });
+      this.snackbar.open(restoring ? $localize`:@@ui.a9415edd73f52b:Enlace restaurado` : $localize`:@@ui.83117ad12ff552:Bloqueo confirmado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       this.changed.emit();
     } catch (error) {
       if (!operation.isCurrent()) return;
-      this.snackbar.open(apiMessage(error, "No se pudo completar la acción"), "Cerrar", { duration: 4000 });
+      this.snackbar.open(apiMessage(error, $localize`:@@ui.e04201e3425722:No se pudo completar la acción`), $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       operation.settle();
     }

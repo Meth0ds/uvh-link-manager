@@ -41,7 +41,7 @@ class AccountController
     {
         $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if ($context === null) {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 401);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 401);
         }
         $user = $context->user;
         $row = DataExportRequest::where('user_id', $user->id)->latest('id')->first();
@@ -62,7 +62,7 @@ class AccountController
     {
         $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if ($context === null) {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 401);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 401);
         }
         $user = $context->user;
         $rows = DataExportRequest::where('user_id', $user->id)
@@ -80,7 +80,7 @@ class AccountController
         $password = UvhRequest::inputString($request, 'password');
         $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
         if ($password === '' || strlen($password) > 72 || strlen($factorCode) > 24) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $user = UvhRequest::user($request);
@@ -149,13 +149,13 @@ class AccountController
             });
         } catch (QueryException $e) {
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'Ya existe una exportación activa para esta cuenta'], 409);
+                return response()->json(['error' => __('messages.error_8d938c79c73b86')], 409);
             }
             throw $e;
         }
 
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($result['status'] === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, $purpose);
@@ -166,16 +166,16 @@ class AccountController
         if ($result['status'] === 'password') {
             Audit::write($user->id, 'account.data_export_request_failed', 'user', $user->id, ['reason' => 'password']);
 
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return response()->json(['error' => __('messages.error_30124a1d7f08a4')], 403);
         }
         if ($result['status'] === 'factor') {
             Audit::write($user->id, 'account.data_export_request_failed', 'user', $user->id, ['reason' => 'factor']);
 
-            return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_94f7173a80a9cb')], 403);
         }
         if ($result['status'] === 'active') {
             return response()->json([
-                'error' => 'Ya existe una exportación activa para esta cuenta',
+                'error' => __('messages.error_8d938c79c73b86'),
                 'export' => $this->publicExport($result['export']),
             ], 409);
         }
@@ -233,10 +233,10 @@ class AccountController
             ];
         });
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($result['status'] === 'missing') {
-            return response()->json(['error' => 'No hay una exportación activa'], 409);
+            return response()->json(['error' => __('messages.error_cae69e3d80953a')], 409);
         }
         if (is_string($result['path']) && $result['path'] !== '') {
             PrivateArtifactCleanup::afterCommit($result['id'], $result['path']);
@@ -257,7 +257,7 @@ class AccountController
         $password = UvhRequest::inputString($request, 'password');
         $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
         if ($password === '' || strlen($password) > 72 || strlen($factorCode) > 24) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $user = UvhRequest::user($request);
@@ -317,7 +317,7 @@ class AccountController
             OperationalMetrics::increment('export.download_unavailable');
 
             return response()->json([
-                'error' => 'La descarga no está disponible temporalmente. Inténtalo de nuevo.',
+                'error' => __('messages.error_d06f71e68bba00'),
             ], 503);
         }
 
@@ -327,7 +327,7 @@ class AccountController
             PrivateArtifactCleanup::afterCommit((int) $result['request_id'], $result['path']);
         }
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($result['status'] === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, $purpose);
@@ -338,21 +338,21 @@ class AccountController
         if ($result['status'] === 'password') {
             Audit::write($user->id, 'account.data_export_download_failed', 'user', $user->id, ['reason' => 'password']);
 
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return response()->json(['error' => __('messages.error_30124a1d7f08a4')], 403);
         }
         if ($result['status'] === 'factor') {
             Audit::write($user->id, 'account.data_export_download_failed', 'user', $user->id, ['reason' => 'factor']);
 
-            return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_94f7173a80a9cb')], 403);
         }
         if ($result['status'] === 'expired') {
-            return response()->json(['error' => 'La exportación ha caducado. Solicita una nueva desde Ajustes'], 400);
+            return response()->json(['error' => __('messages.error_b86c5f52e031a2')], 400);
         }
         if ($result['status'] === 'missing') {
-            return response()->json(['error' => 'El archivo ya no está disponible. Solicita una nueva exportación'], 410);
+            return response()->json(['error' => __('messages.error_5aaad1e3c0e977')], 410);
         }
         if ($result['status'] !== 'ok') {
-            return response()->json(['error' => 'La exportación cambió de estado antes de poder entregarse'], 409);
+            return response()->json(['error' => __('messages.error_19146c5e1534c2')], 409);
         }
 
         $cipher = null;
@@ -379,7 +379,7 @@ class AccountController
             OperationalMetrics::increment('export.download_unavailable');
 
             return response()->json([
-                'error' => 'La descarga no está disponible temporalmente. Inténtalo de nuevo.',
+                'error' => __('messages.error_d06f71e68bba00'),
             ], 503);
         }
 
@@ -424,13 +424,13 @@ class AccountController
             OperationalMetrics::increment('export.download_unavailable');
 
             return response()->json([
-                'error' => 'La descarga no está disponible temporalmente. Inténtalo de nuevo.',
+                'error' => __('messages.error_d06f71e68bba00'),
             ], 503);
         }
         if (! $stillEligible) {
             fclose($cipher);
 
-            return response()->json(['error' => 'La exportación cambió de estado antes de poder entregarse'], 409);
+            return response()->json(['error' => __('messages.error_19146c5e1534c2')], 409);
         }
 
         // "Served" means that the response is about to leave PHP. It is not a
@@ -525,7 +525,7 @@ class AccountController
             OperationalMetrics::increment('export.download_ack_unavailable');
 
             return response()->json([
-                'error' => 'No se pudo confirmar la recepción. La exportación caducará automáticamente.',
+                'error' => __('messages.error_a83203b203187a'),
             ], 503);
         }
 
@@ -533,22 +533,22 @@ class AccountController
             PrivateArtifactCleanup::afterCommit((int) $result['request_id'], $result['path']);
         }
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($result['status'] === 'expired') {
-            return response()->json(['error' => 'La exportación ha caducado'], 400);
+            return response()->json(['error' => __('messages.error_ebaa64a6bcdc61')], 400);
         }
         if ($result['status'] === 'missing') {
-            return response()->json(['error' => 'El archivo ya no está disponible'], 410);
+            return response()->json(['error' => __('messages.error_922d5ccd7030b1')], 410);
         }
         if ($result['status'] === 'not_served') {
-            return response()->json(['error' => 'La exportación todavía no se ha servido'], 409);
+            return response()->json(['error' => __('messages.error_eba58acea1b0bb')], 409);
         }
         if ($result['status'] === 'foreign_session') {
-            return response()->json(['error' => 'Confirma la descarga desde la sesión que la realizó'], 409);
+            return response()->json(['error' => __('messages.error_b31c66d481f2af')], 409);
         }
         if ($result['status'] !== 'ok') {
-            return response()->json(['error' => 'No hay ninguna exportación disponible para esta cuenta'], 404);
+            return response()->json(['error' => __('messages.error_400c67a1fa307e')], 404);
         }
 
         return response()->json(['ok' => true]);
@@ -558,7 +558,7 @@ class AccountController
     {
         $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if ($context === null) {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 401);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 401);
         }
         $user = $context->user;
         $owned = DB::table('workspaces')->where('owner_user_id', $user->id)
@@ -591,7 +591,7 @@ class AccountController
         $confirmation = trim(UvhRequest::inputString($request, 'confirmation'));
         if ($password === '' || strlen($password) > 72 || strlen($factorCode) > 24
             || ! hash_equals('ELIMINAR MI CUENTA', $confirmation)) {
-            return response()->json(['error' => 'Confirma la operación escribiendo ELIMINAR MI CUENTA'], 422);
+            return response()->json(['error' => __('messages.error_fa0df89c26d891')], 422);
         }
 
         $user = UvhRequest::user($request);
@@ -683,33 +683,33 @@ class AccountController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'account_deletion_confirmation']);
 
-            return response()->json(['error' => 'No se pudo enviar la confirmación. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_56de9526b62aa7')], 503);
         }
 
         if ($result['status'] === 'audit_pending') {
-            return response()->json(['error' => 'La cancelación anterior está guardada. Espera a que se complete su registro antes de solicitar otro borrado.'], 503);
+            return response()->json(['error' => __('messages.error_27e655eb605814')], 503);
         }
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($result['status'] === 'admin') {
-            return response()->json(['error' => 'Retira primero el rol de administrador de plataforma'], 409);
+            return response()->json(['error' => __('messages.error_108b41c1870fcf')], 409);
         }
         if ($result['status'] === 'owned') {
             return response()->json([
-                'error' => 'Transfiere o elimina primero los workspaces de los que eres propietario',
+                'error' => __('messages.error_da347b8a4d3967'),
                 'ownedWorkspaces' => $result['workspaces'],
             ], 409);
         }
         if ($result['status'] === 'privacy') {
             return response()->json([
-                'error' => 'Resuelve o cancela primero las solicitudes de privacidad que requieren conservar tus datos',
+                'error' => __('messages.error_fabc9e0f18963c'),
                 'privacyRequests' => $result['requests'],
             ], 409);
         }
         if ($result['status'] === 'active') {
             return response()->json([
-                'error' => 'Ya hay una confirmación pendiente',
+                'error' => __('messages.error_67c53759e1b480'),
                 'confirmationExpiresAt' => $result['expires_at']->toIso8601String(),
             ], 409);
         }
@@ -722,12 +722,12 @@ class AccountController
         if ($result['status'] === 'password') {
             Audit::write($user->id, 'account.deletion_request_failed', 'user', $user->id, ['reason' => 'password']);
 
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return response()->json(['error' => __('messages.error_30124a1d7f08a4')], 403);
         }
         if ($result['status'] === 'factor') {
             Audit::write($user->id, 'account.deletion_request_failed', 'user', $user->id, ['reason' => 'factor']);
 
-            return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_94f7173a80a9cb')], 403);
         }
 
         return response()->json([
@@ -740,7 +740,7 @@ class AccountController
     {
         $token = UvhRequest::inputString($request, 'token');
         if (! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token)) {
-            return response()->json(['error' => 'Token inválido'], 422);
+            return response()->json(['error' => __('messages.error_f0bd101ade1cc6')], 422);
         }
 
         $tokenHash = Ids::sha256Hex($token);
@@ -856,20 +856,20 @@ class AccountController
                 ];
             }) : ['status' => 'invalid'];
         } catch (MailAdmissionException) {
-            return response()->json(['error' => 'No se pudo programar la eliminación porque el email de cancelación no está disponible'], 503);
+            return response()->json(['error' => __('messages.error_6a3a21b5501f76')], 503);
         }
 
         if ($result['status'] === 'expired') {
-            return response()->json(['error' => 'La confirmación ha caducado'], 400);
+            return response()->json(['error' => __('messages.error_5432b0d986aa3a')], 400);
         }
         if ($result['status'] === 'owned') {
-            return response()->json(['error' => 'La cuenta ahora posee uno o más workspaces. Cancela la operación y resuelve su propiedad'], 409);
+            return response()->json(['error' => __('messages.error_dfcec8b6816318')], 409);
         }
         if ($result['status'] === 'privacy') {
-            return response()->json(['error' => 'Hay solicitudes de privacidad activas que deben resolverse antes de eliminar la cuenta'], 409);
+            return response()->json(['error' => __('messages.error_bc0ae9f2196066')], 409);
         }
         if ($result['status'] !== 'ok') {
-            return response()->json(['error' => 'La confirmación no es válida o la cuenta ya no puede eliminarse'], 400);
+            return response()->json(['error' => __('messages.error_7339224e567f8e')], 400);
         }
         foreach ($result['artifacts'] as $artifact) {
             PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
@@ -898,7 +898,7 @@ class AccountController
     {
         $token = UvhRequest::inputString($request, 'token');
         if (! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token)) {
-            return response()->json(['error' => 'Token inválido'], 422);
+            return response()->json(['error' => __('messages.error_f0bd101ade1cc6')], 422);
         }
 
         $tokenHash = Ids::sha256Hex($token);
@@ -955,7 +955,7 @@ class AccountController
         }) : ['status' => 'invalid'];
 
         if ($result['status'] !== 'ok') {
-            return response()->json(['error' => 'El enlace no es válido, ya se utilizó o el periodo de gracia terminó'], 400);
+            return response()->json(['error' => __('messages.error_b3ed2cac93d11d')], 400);
         }
         if (! $result['notice_admitted']) {
             Audit::write($result['user_id'], 'auth.email_delivery_failed', 'user', $result['user_id'], ['kind' => 'account_deletion_cancelled']);

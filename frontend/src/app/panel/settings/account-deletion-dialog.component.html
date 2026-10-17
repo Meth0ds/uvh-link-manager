@@ -1,46 +1,46 @@
-<h2 mat-dialog-title><span class="title-mark danger" aria-hidden="true"><mat-icon>person_remove</mat-icon></span><span><small>Cierre de cuenta</small><b>Una decisión, paso a paso.</b></span></h2>
+<h2 mat-dialog-title><span class="title-mark danger" aria-hidden="true"><mat-icon>person_remove</mat-icon></span><span><small><ng-container i18n="@@ui.61584cc3fcf3ac">Cierre de cuenta</ng-container></small><b><ng-container i18n="@@ui.c1b3cb94587068">Una decisión, paso a paso.</ng-container></b></span></h2>
 <mat-dialog-content>
-  <ol class="steps" aria-label="Progreso de la solicitud">
-    <li [attr.aria-current]="step() === 1 ? 'step' : null" [class.done]="step() > 1"><span>1</span>Revisar</li>
-    <li [attr.aria-current]="step() === 2 ? 'step' : null" [class.done]="step() > 2"><span>2</span>Contraseña</li>
-    @if (requiresMfa) { <li [attr.aria-current]="step() === 3 ? 'step' : null" [class.done]="step() > 3"><span>3</span>Segundo factor</li> }
-    <li [attr.aria-current]="(!requiresMfa && step() === 3) || step() === 4 ? 'step' : null"><span>{{ requiresMfa ? 4 : 3 }}</span>Correo</li>
+  <ol class="steps" aria-label="Progreso de la solicitud" i18n-aria-label="@@ui.13a02f3cb41983">
+    <li [attr.aria-current]="step() === 1 ? 'step' : null" [class.done]="step() > 1"><span>1</span><ng-container i18n="@@ui.52fadddb772ffb">Revisar</ng-container></li>
+    <li [attr.aria-current]="step() === 2 ? 'step' : null" [class.done]="step() > 2"><span>2</span><ng-container i18n="@@ui.a389a638dec325">Contraseña</ng-container></li>
+    @if (requiresMfa) { <li [attr.aria-current]="step() === 3 ? 'step' : null" [class.done]="step() > 3"><span>3</span><ng-container i18n="@@ui.918073072dca10">Segundo factor</ng-container></li> }
+    <li [attr.aria-current]="(!requiresMfa && step() === 3) || step() === 4 ? 'step' : null"><span>{{ requiresMfa ? 4 : 3 }}</span><ng-container i18n="@@ui.0b61df381e1b1d">Correo</ng-container></li>
   </ol>
-  <h3 #stepHeading tabindex="-1">{{ step() === 1 ? 'Qué ocurre al cerrar tu cuenta' : step() === 2 ? 'Confirma con tu contraseña' : step() === 3 && requiresMfa ? 'Introduce tu segundo factor' : 'El siguiente paso está en tu correo' }}</h3>
+  <h3 #stepHeading tabindex="-1">{{ step() === 1 ? uiText.ui_541c4f56c3a3ed : step() === 2 ? uiText.ui_38182ce640e035 : step() === 3 && requiresMfa ? uiText.ui_81b3aceadce9a8 : uiText.ui_287f47e7f8a51c }}</h3>
   @if (step() === 1) {
-    <p class="intro">Esta ventana no elimina tu cuenta. Primero te enviaremos un enlace de confirmación.</p>
-    <ul class="consequences"><li>Al confirmar por email, se cerrarán tus sesiones y se revocarán tus tokens API.</li><li>Dispondrás de <b>7 días para cancelar</b> desde el enlace enviado.</li><li>Después se anonimizarán tus datos personales y se retirarán tus membresías.</li><li>Los enlaces de workspaces ajenos permanecerán, con el autor anonimizado.</li></ul>
-    @if (loading()) { <p role="status">Comprobando los requisitos de tu cuenta…</p> }
-    @if (!loading() && allowed()) { <mat-checkbox [checked]="acknowledged()" (change)="acknowledged.set($event.checked)">He leído las consecuencias y quiero continuar.</mat-checkbox> }
+    <p class="intro"><ng-container i18n="@@ui.67d92e2c72f4ab">Esta ventana no elimina tu cuenta. Primero te enviaremos un enlace de confirmación.</ng-container></p>
+    <ul class="consequences"><li><ng-container i18n="@@ui.44526abb932168">Al confirmar por email, se cerrarán tus sesiones y se revocarán tus tokens API.</ng-container></li><li><ng-container i18n="@@ui.22c57a5dd4beab">Dispondrás de </ng-container><b><ng-container i18n="@@ui.f76ad64fc24b6b">7 días para cancelar</ng-container></b> <ng-container i18n="@@ui.8c53453c1cd2cc">desde el enlace enviado.</ng-container></li><li><ng-container i18n="@@ui.ba96e496de7566">Después se anonimizarán tus datos personales y se retirarán tus membresías.</ng-container></li><li><ng-container i18n="@@ui.6a4d8f0a2cf228">Los enlaces de workspaces ajenos permanecerán, con el autor anonimizado.</ng-container></li></ul>
+    @if (loading()) { <p role="status"><ng-container i18n="@@ui.508ecc8fdd5ef0">Comprobando los requisitos de tu cuenta…</ng-container></p> }
+    @if (!loading() && allowed()) { <mat-checkbox [checked]="acknowledged()" (change)="acknowledged.set($event.checked)"><ng-container i18n="@@ui.f64748816d5cef">He leído las consecuencias y quiero continuar.</ng-container></mat-checkbox> }
   } @else if (step() === 2) {
-    <p class="intro">Este paso verifica tu contraseña y que entiendes la acción. El segundo factor se solicitará después, en una pantalla independiente.</p>
+    <p class="intro"><ng-container i18n="@@ui.d9c2766c1fdd8e">Este paso verifica tu contraseña y que entiendes la acción. El segundo factor se solicitará después, en una pantalla independiente.</ng-container></p>
     <form id="account-deletion-credentials" class="credentials" [formGroup]="credentialsForm" (ngSubmit)="continueFromCredentials()">
-      <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" [readonly]="busy()" />@if (credentialsForm.controls.password.invalid && credentialsForm.controls.password.touched) { <mat-error>Introduce tu contraseña actual.</mat-error> }</mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Confirmación escrita</mat-label><input matInput formControlName="confirmation" autocomplete="off" spellcheck="false" maxlength="18" [readonly]="busy()" /><mat-hint>Escribe exactamente ELIMINAR MI CUENTA.</mat-hint>@if (credentialsForm.controls.confirmation.invalid && credentialsForm.controls.confirmation.touched) { <mat-error>La frase debe coincidir exactamente.</mat-error> }</mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.14a433147337bb">Contraseña actual</ng-container></mat-label><input matInput type="password" formControlName="password" autocomplete="current-password" maxlength="72" [readonly]="busy()" />@if (credentialsForm.controls.password.invalid && credentialsForm.controls.password.touched) { <mat-error><ng-container i18n="@@ui.76115edd8ea225">Introduce tu contraseña actual.</ng-container></mat-error> }</mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.6a3d678e62a91a">Confirmación escrita</ng-container></mat-label><input matInput formControlName="confirmation" autocomplete="off" spellcheck="false" maxlength="18" [readonly]="busy()" /><mat-hint><ng-container i18n="@@ui.e42430fd5541d2">Escribe exactamente ELIMINAR MI CUENTA.</ng-container></mat-hint>@if (credentialsForm.controls.confirmation.invalid && credentialsForm.controls.confirmation.touched) { <mat-error><ng-container i18n="@@ui.4e309c1abbd893">La frase debe coincidir exactamente.</ng-container></mat-error> }</mat-form-field>
     </form>
   } @else if (step() === 3 && requiresMfa) {
-    <div class="factor-intro"><span class="factor-mark" aria-hidden="true"><mat-icon>phonelink_lock</mat-icon></span><p>Abre tu aplicación autenticadora. También puedes utilizar uno de tus códigos de recuperación.</p></div>
+    <div class="factor-intro"><span class="factor-mark" aria-hidden="true"><mat-icon>phonelink_lock</mat-icon></span><p><ng-container i18n="@@ui.6fffc7927822e4">Abre tu aplicación autenticadora. También puedes utilizar uno de tus códigos de recuperación.</ng-container></p></div>
     <form id="account-deletion-factor" class="credentials factor-form" [formGroup]="factorForm" (ngSubmit)="submit()">
-      <mat-form-field appearance="outline"><mat-label>Código de autenticación o recuperación</mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" inputmode="numeric" maxlength="24" [readonly]="busy()" /><mat-icon matPrefix>key</mat-icon><mat-hint>6 dígitos o un código de recuperación.</mat-hint>@if (factorForm.controls.factorCode.invalid && factorForm.controls.factorCode.touched) { <mat-error>Introduce un código válido.</mat-error> }</mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.24df0c17255828">Código de autenticación o recuperación</ng-container></mat-label><input matInput formControlName="factorCode" autocomplete="one-time-code" inputmode="numeric" maxlength="24" [readonly]="busy()" /><mat-icon matPrefix>key</mat-icon><mat-hint><ng-container i18n="@@ui.1d46889b6a8812">6 dígitos o un código de recuperación.</ng-container></mat-hint>@if (factorForm.controls.factorCode.invalid && factorForm.controls.factorCode.touched) { <mat-error><ng-container i18n="@@ui.1b43fde3b3240f">Introduce un código válido.</ng-container></mat-error> }</mat-form-field>
     </form>
   } @else {
-    <div class="email-next" role="status"><mat-icon aria-hidden="true">mark_email_unread</mat-icon><p>Solicitud enviada. <b>Tu cuenta aún no se ha eliminado.</b> Revisa el correo de tu cuenta y sigue el enlace si quieres confirmar el cierre.</p></div>
-    <p class="intro">El plazo de 7 días comienza al confirmar por email, no al cerrar esta ventana.</p>
+    <div class="email-next" role="status"><mat-icon aria-hidden="true">mark_email_unread</mat-icon><p><ng-container i18n="@@ui.c8e08354b19bd8">Solicitud enviada. </ng-container><b><ng-container i18n="@@ui.d045d01180e700">Tu cuenta aún no se ha eliminado.</ng-container></b> <ng-container i18n="@@ui.e120e377877f2c">Revisa el correo de tu cuenta y sigue el enlace si quieres confirmar el cierre.</ng-container></p></div>
+    <p class="intro"><ng-container i18n="@@ui.32f5cee1d79a2f">El plazo de 7 días comienza al confirmar por email, no al cerrar esta ventana.</ng-container></p>
   }
   @if (error(); as message) { <div class="error" role="alert">{{ message }}</div> }
 </mat-dialog-content>
 <mat-dialog-actions>
   @if ((requiresMfa && step() !== 4) || (!requiresMfa && step() !== 3)) {
-    <button mat-button type="button" (click)="ref.close(false)" [disabled]="busy()">Cancelar</button>
+    <button mat-button type="button" (click)="ref.close(false)" [disabled]="busy()"><ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button>
     @if (step() === 1) {
-      @if (!loading() && !allowed()) { <button mat-stroked-button type="button" (click)="checkImpact()">Volver a comprobar</button> }
-      <button mat-flat-button type="button" (click)="next()" [disabled]="loading() || !allowed() || !acknowledged()">Continuar</button>
+      @if (!loading() && !allowed()) { <button mat-stroked-button type="button" (click)="checkImpact()"><ng-container i18n="@@ui.1568b4df4ebd76">Volver a comprobar</ng-container></button> }
+      <button mat-flat-button type="button" (click)="next()" [disabled]="loading() || !allowed() || !acknowledged()"><ng-container i18n="@@ui.63e2bbaf1c9243">Continuar</ng-container></button>
     } @else if (step() === 2) {
-      <button mat-stroked-button type="button" (click)="back()" [disabled]="busy()">Atrás</button>
-      <button mat-flat-button type="submit" form="account-deletion-credentials" [disabled]="credentialsForm.invalid || busy()">{{ requiresMfa ? 'Continuar a 2FA' : (busy() ? 'Enviando…' : 'Enviar confirmación') }}</button>
+      <button mat-stroked-button type="button" (click)="back()" [disabled]="busy()"><ng-container i18n="@@ui.f9618693ab0e05">Atrás</ng-container></button>
+      <button mat-flat-button type="submit" form="account-deletion-credentials" [disabled]="credentialsForm.invalid || busy()">{{ requiresMfa ? uiText.ui_4d6b9e9999ef24 : (busy() ? uiText.ui_9415ac2416c571 : uiText.ui_624656936c2e0c) }}</button>
     } @else {
-      <button mat-stroked-button type="button" (click)="back()" [disabled]="busy()">Atrás</button>
-      <button mat-flat-button class="destructive-confirm" type="submit" form="account-deletion-factor" [disabled]="factorForm.invalid || busy()" [attr.aria-busy]="busy()">{{ busy() ? 'Enviando…' : 'Verificar y enviar' }}</button>
+      <button mat-stroked-button type="button" (click)="back()" [disabled]="busy()"><ng-container i18n="@@ui.f9618693ab0e05">Atrás</ng-container></button>
+      <button mat-flat-button class="destructive-confirm" type="submit" form="account-deletion-factor" [disabled]="factorForm.invalid || busy()" [attr.aria-busy]="busy()">{{ busy() ? uiText.ui_9415ac2416c571 : uiText.ui_41649260f39581 }}</button>
     }
-  } @else { <button mat-flat-button type="button" (click)="ref.close(true)">Entendido</button> }
+  } @else { <button mat-flat-button type="button" (click)="ref.close(true)"><ng-container i18n="@@ui.3f3f7d88e05abb">Entendido</ng-container></button> }
 </mat-dialog-actions>

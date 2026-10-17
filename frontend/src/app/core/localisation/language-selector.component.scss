@@ -1,0 +1,22 @@
+:host { display: inline-flex; align-items: center; position: relative; flex: 0 0 auto; max-width: 100%; }
+.language-trigger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 44px; min-width: 76px; max-width: 100%; padding: 9px 8px;
+  border: 1px solid transparent; border-radius: 4px; background: transparent;
+  color: var(--ink, var(--uvh-ink)); font: 700 12px/1.4 Manrope, sans-serif;
+  white-space: nowrap; cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.language-trigger.full-name { justify-content: flex-start; min-width: 148px; padding-inline: 13px; gap: 10px; background: var(--raised, var(--uvh-surface-raised)); border-color: var(--line, var(--uvh-border)); }
+.language-trigger.full-name .language-chevron { margin-inline-start: auto; }
+.language-name { overflow: hidden; text-overflow: ellipsis; }
+.language-icon { width: 17px; height: 17px; flex: 0 0 17px; opacity: .8; }
+.language-chevron { width: 12px; height: 12px; flex: 0 0 12px; opacity: .65; transition: transform 160ms ease; }
+.language-trigger.open { background: var(--soft, var(--uvh-surface)); color: var(--accent, var(--uvh-electric)); }
+.language-trigger.open .language-chevron { transform: rotate(180deg); }
+.language-trigger:focus-visible { outline: 3px solid var(--accent, var(--uvh-electric)); outline-offset: 3px; }
+.language-trigger:active:not(:disabled) { background: var(--soft, var(--uvh-surface)); }
+.language-trigger:disabled { cursor: progress; opacity: .6; }
+.language-error { position: absolute; top: calc(100% + 6px); inset-inline-end: 0; z-index: 60; width: max-content; max-width: min(250px, calc(100vw - 40px)); padding: 10px 12px; border: 1px solid var(--line, var(--uvh-border)); border-radius: 4px; background: var(--raised, var(--uvh-surface-raised)); color: var(--ink, var(--uvh-ink)); font: 12px/1.5 Manrope, sans-serif; }
+@media (hover: hover) and (pointer: fine) { .language-trigger:hover:not(:disabled) { background: var(--soft, var(--uvh-surface)); color: var(--accent, var(--uvh-electric)); } }
+@media (prefers-reduced-motion: reduce) { .language-trigger, .language-chevron { transition: none; } }

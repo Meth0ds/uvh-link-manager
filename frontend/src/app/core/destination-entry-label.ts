@@ -8,8 +8,8 @@ import type { AdminDestinationEntry } from "./models";
  * a mismatch there would read as two different rules.
  */
 export const DESTINATION_KIND_LABEL: Record<AdminDestinationEntry["match_kind"], string> = {
-  host: "Todo el host",
-  url: "URL exacta",
+  host: $localize`:@@ui.fa0f2b724757b0:Todo el host`,
+  url: $localize`:@@ui.55155d977bf776:URL exacta`,
 };
 
 /** Where an entry came from: which is who can argue with it. */

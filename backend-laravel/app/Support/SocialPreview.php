@@ -15,7 +15,7 @@ final class SocialPreview
             return null;
         }
         if (! is_array($spec) || ($spec['version'] ?? null) !== 1 || ! is_bool($spec['enabled'] ?? null) || array_diff(array_keys($spec), ['version', 'enabled', 'title', 'description', 'imageAssetId', 'imageAlt'])) {
-            throw new LinkException('La tarjeta social no es válida.', 422);
+            throw new LinkException(__('messages.error_1cb8924ec8a2e0'), 422);
         }
         $title = AnalyticsReports::text($spec['title'] ?? '', 120, $spec['enabled']);
         $description = $spec['description'] ?? null;
@@ -28,10 +28,10 @@ final class SocialPreview
         }
         $asset = $spec['imageAssetId'] ?? null;
         if ($asset !== null && (! is_int($asset) || $asset < 1)) {
-            throw new LinkException('Imagen inválida.', 422);
+            throw new LinkException(__('messages.error_0ca116eaddf86c'), 422);
         }
         if ($asset !== null && $workspace !== null && ! DB::table('social_preview_assets')->where('workspace_id', $workspace)->where('id', $asset)->where('status', 'ready')->sharedLock()->first(['id'])) {
-            throw new LinkException('Esta imagen ya no está disponible en tu workspace.', 422);
+            throw new LinkException(__('messages.error_89c05b1edb32e4'), 422);
         }
 
         return ['version' => 1, 'enabled' => $spec['enabled'], 'title' => $title, 'description' => $description, 'imageAssetId' => $asset, 'imageAlt' => $alt];

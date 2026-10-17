@@ -115,7 +115,7 @@ final class MfaAttempts
         }
 
         return response()->json([
-            'error' => 'Demasiados intentos. Espera unos minutos.',
+            'error' => __('messages.error_a2b4bef4559b31'),
             'retryAfterSeconds' => $retryAfter,
         ], 429)->header('Retry-After', (string) $retryAfter);
     }

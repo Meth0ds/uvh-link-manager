@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ApiRequestError } from "../../core/services/api.service";
 import {
   Component,
@@ -31,6 +32,7 @@ import {
   styleUrl: "./app-opening-editor.component.scss",
 })
 export class AppOpeningEditorComponent {
+  readonly uiText = UI_TEXT;
   readonly spec = model<AppOpeningSpec | null>(null);
   readonly validity = output<boolean>();
   readonly validation = computed(() => {
@@ -44,18 +46,18 @@ export class AppOpeningEditorComponent {
     if (s.kind === "native") {
       const p = this.profile();
       if (!p || p.id !== s.profileId)
-        return "La app no está disponible para este dominio. Selecciona otro dominio o utiliza Solo web.";
+        return $localize`:@@ui.125475f0ae47ef:La app no está disponible para este dominio. Selecciona otro dominio o utiliza Solo web.`;
       return /^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]*$/.test(s.route) &&
         p.routePrefixes.some(
           (v) => s.route.startsWith(v) || s.route === v.slice(0, -1),
         )
         ? ""
-        : "Escribe una ruta dentro de los prefijos permitidos, sin parámetros ni fragmentos.";
+        : $localize`:@@ui.6e00fa7fa1336c:Escribe una ruta dentro de los prefijos permitidos, sin parámetros ni fragmentos.`;
     }
     if (!s.url.trim())
       return s.provider.endsWith("_maps")
-        ? "Escribe el lugar o el destino de la ruta."
-        : "Introduce la URL HTTPS del contenido que quieres abrir.";
+        ? $localize`:@@ui.d104cbff6fe90c:Escribe el lugar o el destino de la ruta.`
+        : $localize`:@@ui.60f8df72df5d35:Introduce la URL HTTPS del contenido que quieres abrir.`;
     try {
       const u = new URL(s.url);
       const hosts = {
@@ -77,12 +79,12 @@ export class AppOpeningEditorComponent {
         u.hash ||
         !hosts[s.provider].includes(u.hostname)
       )
-        return "Usa una URL HTTPS oficial del servicio, sin credenciales ni fragmentos.";
+        return $localize`:@@ui.94eac80d6b2774:Usa una URL HTTPS oficial del servicio, sin credenciales ni fragmentos.`;
       if (s.provider.endsWith("_maps") && !this.mapDetails().destination.trim())
-        return "Escribe el lugar o el destino de la ruta.";
+        return $localize`:@@ui.d104cbff6fe90c:Escribe el lugar o el destino de la ruta.`;
       return "";
     } catch {
-      return "Introduce una URL HTTPS válida del servicio seleccionado.";
+      return $localize`:@@ui.cd4b177eeaa4c0:Introduce una URL HTTPS válida del servicio seleccionado.`;
     }
   });
   readonly domainId = input<number | null>(null);
@@ -210,8 +212,8 @@ export class AppOpeningEditorComponent {
     return s?.kind === "provider"
       ? this.provider().name
       : s?.kind === "native"
-        ? "App del workspace"
-        : "Sin configurar";
+        ? $localize`:@@ui.7f4a54f321879c:App del workspace`
+        : $localize`:@@ui.8cbe82eda079e7:Sin configurar`;
   });
   constructor() {
     void this.apps.capabilities();
@@ -258,7 +260,7 @@ export class AppOpeningEditorComponent {
               this.error.set(
                 e instanceof ApiRequestError
                   ? e.message
-                  : "No se pudo cargar la app de este dominio.",
+                  : $localize`:@@ui.b883e98178c84f:No se pudo cargar la app de este dominio.`,
               );
           })
           .finally(() => {
@@ -319,16 +321,16 @@ export class AppOpeningEditorComponent {
   }
   platformCopy(): string {
     if (this.platform() === "desktop")
-      return "Continuará con el destino web. No se necesita una aplicación.";
+      return $localize`:@@ui.e4b86fc54457b3:Continuará con el destino web. No se necesita una aplicación.`;
     const s = this.spec();
     if (s?.kind === "native") {
       const p = this.profile();
       const supported =
         this.platform() === "ios" ? p?.iosAppId : p?.androidPackage;
       return supported
-        ? "El sistema podrá abrir la app. La app comprobará el acceso con UVH antes de mostrar el contenido."
-        : "Esta plataforma no está configurada. Se ofrecerá la alternativa web.";
+        ? $localize`:@@ui.0cf47f6d5d13e1:El sistema podrá abrir la app. La app comprobará el acceso con UVH antes de mostrar el contenido.`
+        : $localize`:@@ui.567768c42b202a:Esta plataforma no está configurada. Se ofrecerá la alternativa web.`;
     }
-    return "Podrá abrir el servicio si el dispositivo lo permite. Si hace falta, se mostrará un botón y una alternativa web.";
+    return $localize`:@@ui.7fd9270d1168ec:Podrá abrir el servicio si el dispositivo lo permite. Si hace falta, se mostrará un botón y una alternativa web.`;
   }
 }

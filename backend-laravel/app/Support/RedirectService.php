@@ -104,7 +104,7 @@ class RedirectService
             return ['kind' => 'root_redirect', 'location' => $rootDestination];
         }
         if ($mode === 'branded') {
-            return ['kind' => 'not_found', 'branded_host' => $host];
+            return ['kind' => 'not_found', 'branded_host' => $host, 'root_destination' => $rootDestination];
         }
 
         return ['kind' => 'not_found'];

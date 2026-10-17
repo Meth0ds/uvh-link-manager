@@ -3,71 +3,71 @@
   eyebrow="Operación de plataforma"
   title="Administración"
   description="Revisa cuentas y denuncias, atiende solicitudes y comprueba el estado de la plataforma."
->
-  <button mat-flat-button type="button" (click)="openTab(3)" [disabled]="!canOperate()"><mat-icon>flag</mat-icon>Ir a moderación</button>
+ i18n-title="@@ui.1a1b3e6ecc51b4" i18n-description="@@ui.b5be4da34ba56d" i18n-eyebrow="@@ui.13e4bdcb8f25f8">
+  <button mat-flat-button type="button" (click)="openTab(3)" [disabled]="!canOperate()"><mat-icon>flag</mat-icon><ng-container i18n="@@ui.424164dab8bbfc">Ir a moderación</ng-container></button>
   <button mat-stroked-button type="button" (click)="reloadAll()" [disabled]="refreshing() || !canOperate()">
     <mat-icon [class.spin]="refreshing()">refresh</mat-icon>
-    Actualizar todo
-  </button>
+    <ng-container i18n="@@ui.535b2b0a1394c1">Actualizar todo
+  </ng-container></button>
 </app-page-header>
 
 @if (!canOperate()) {
-  <div class="alert error" role="alert"><span>El acceso a administración requiere una cuenta administradora verificada y MFA activo. Vuelve a autenticarte.</span></div>
+  <div class="alert error" role="alert"><span><ng-container i18n="@@ui.3baf057a6a68ae">El acceso a administración requiere una cuenta administradora verificada y MFA activo. Vuelve a autenticarte.</ng-container></span></div>
 } @else {
   @if (initialLoading() && !overview() && !summaryError()) {
-    <app-panel-skeleton variant="cards" label="Cargando resumen administrativo" />
+    <app-panel-skeleton variant="cards" label="Cargando resumen administrativo"  i18n-label="@@ui.56294886e16b48"/>
   }
   @if (summaryError(); as message) {
     <div class="alert error" role="alert">
       <mat-icon aria-hidden="true">lock_outline</mat-icon>
       <span>{{ message }}</span>
-      <button mat-stroked-button type="button" (click)="loadOverview()" [disabled]="summaryLoading()">Reintentar</button>
+      <button mat-stroked-button type="button" (click)="loadOverview()" [disabled]="summaryLoading()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button>
     </div>
   }
 
-  <section class="command-strip" aria-label="Estado de la plataforma">
+  <section class="command-strip" aria-label="Estado de la plataforma" i18n-aria-label="@@ui.3aa1056212507c">
     <div class="command-state" [class]="'state-' + (operationsConfirmed() ? operations()!.state : 'attention')">
       <span class="state-dot" aria-hidden="true"></span>
       <div>
-        <b>{{ !operationsConfirmed() ? 'Sin confirmar' : operations()!.state === 'healthy' ? 'Operación normal' : operations()!.state === 'critical' ? 'Intervención necesaria' : 'Revisión pendiente' }}</b>
+        <b>{{ !operationsConfirmed() ? uiText.ui_30f0d1ceb28588 : operations()!.state === 'healthy' ? uiText.ui_e7cea4403e5c6e : operations()!.state === 'critical' ? uiText.ui_3222a6c0e8a7ed : uiText.ui_82c39c4ea16aa9 }}</b>
         <span>
           @if (operationsConfirmed()) { {{ countLabel(operations()!.metrics.failedJobs, 'trabajo fallido', 'trabajos fallidos') }} }
-          @else { {{ operationsLoading() ? 'Comprobando el estado operativo…' : 'No hay una lectura vigente del estado operativo.' }} }
+          @else { {{ operationsLoading() ? uiText.ui_33017fbf7d3b20 : uiText.ui_b760fc9e467875 }} }
         </span>
       </div>
     </div>
     <div class="command-meta"><span class="command-time">
-      @if (operations()?.generatedAt) { {{ operationsConfirmed() ? 'Actualizado' : 'Última lectura' }} {{ formatDate(operations()!.generatedAt) }} }
-    </span><button mat-stroked-button type="button" (click)="openTab(7)">Ver estado</button></div>
+      @if (operations()?.generatedAt) { {{ operationsConfirmed() ? uiText.ui_8b0062fa48c50d : uiText.ui_3165db024c470f }} {{ formatDate(operations()!.generatedAt) }} }
+    </span><button mat-stroked-button type="button" (click)="openTab(7)"><ng-container i18n="@@ui.8e09e70960a94e">Ver estado</ng-container></button></div>
   </section>
 
   @if (overview(); as overviewData) {
-    @if (summaryLoading() || summaryError()) { <p class="snapshot-note" role="status">Las cifras muestran el último resumen disponible.</p> }
+    @if (summaryLoading() || summaryError()) { <p class="snapshot-note" role="status"><ng-container i18n="@@ui.95c86f27bd0127">Las cifras muestran el último resumen disponible.</ng-container></p> }
     <details class="summary-disclosure">
-      <summary>Resumen de la plataforma<mat-icon aria-hidden="true">expand_more</mat-icon></summary>
-    <section class="platform-summary" aria-label="Resumen administrativo">
+      <summary><ng-container i18n="@@ui.1128bc9db5a625">Resumen de la plataforma</ng-container><mat-icon aria-hidden="true">expand_more</mat-icon></summary>
+    <section class="platform-summary" aria-label="Resumen administrativo" i18n-aria-label="@@ui.a55360bb3eefe6">
       <article class="platform-metric">
-        <span>Usuarios activos</span>
+        <span><ng-container i18n="@@ui.e407d3b02945e8">Usuarios activos</ng-container></span>
         <b class="tnum">{{ overviewData.users }}</b>
       </article>
       <article class="platform-metric">
-        <span>Workspaces</span>
+        <span><ng-container i18n="@@ui.1377264ba3b0a7">Workspaces</ng-container></span>
         <b class="tnum">{{ overviewData.workspaces }}</b>
       </article>
       <article class="platform-metric">
-        <span>Enlaces</span>
+        <span><ng-container i18n="@@ui.f1a5125bb4f0ad">Enlaces</ng-container></span>
         <b class="tnum">{{ overviewData.links }}</b>
       </article>
       <article class="platform-metric">
-        <span>Clics</span>
+        <span><ng-container i18n="@@ui.826c2d3872dac9">Clics</ng-container></span>
         <b class="tnum">{{ overviewData.clicks }}</b>
       </article>
       <article class="platform-metric attention">
-        <span>Por revisar</span>
+        <span><ng-container i18n="@@ui.81a6035fa8554b">Por revisar</ng-container></span>
         <b class="tnum">{{ overviewData.openReports }}</b>
       </article>
       <article class="platform-metric blocked">
-        <span>Bloqueados</span>
+        <span><ng-container i18n="@@ui.f7abda74dc6d80">Bloqueados</ng-container></span>
         <b class="tnum">{{ overviewData.blockedLinks }}</b>
       </article>
     </section>
@@ -75,8 +75,8 @@
 
   }
     <mat-form-field appearance="outline" class="section-picker">
-      <mat-label>Sección de administración</mat-label>
-      <mat-select [value]="activeTab()" (selectionChange)="openTab($event.value)" aria-label="Sección de administración">
+      <mat-label><ng-container i18n="@@ui.d6d9b1a55f3048">Sección de administración</ng-container></mat-label>
+      <mat-select [value]="activeTab()" (selectionChange)="openTab($event.value)" aria-label="Sección de administración" i18n-aria-label="@@ui.d6d9b1a55f3048">
         @for (group of navigation; track group.label) {
           <mat-optgroup [label]="group.label">
             @for (section of group.sections; track section.index) { <mat-option [value]="section.index">{{ section.label }}</mat-option> }
@@ -86,7 +86,7 @@
     </mat-form-field>
     <div class="admin-layout">
       <aside class="admin-sidebar">
-        <div class="section-navigation" role="tablist" aria-label="Secciones de administración" aria-orientation="vertical">
+        <div class="section-navigation" role="tablist" aria-label="Secciones de administración" aria-orientation="vertical" i18n-aria-label="@@ui.36254c5cf26027">
           @for (group of navigation; track group.label) {
             <div class="navigation-group" role="group" [attr.aria-label]="group.label">
               <h2>{{ group.label }}</h2>

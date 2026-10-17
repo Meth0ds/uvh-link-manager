@@ -1,30 +1,30 @@
-<a class="back-link" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> Volver a enlaces</a>
-<app-page-header icon="delete_sweep" eyebrow="Retención recuperable" title="Papelera de enlaces" description="Restaura enlaces eliminados antes de que venza su política de conservación." />
-@if (domainId() !== null) { <p role="status">Mostrando la papelera del dominio seleccionado. <button mat-button type="button" (click)="domainId.set(null); search('')">Ver toda la papelera</button></p> }
-@if (retentionDays(); as days) { <div class="retention-note" role="note"><mat-icon>schedule</mat-icon>Los enlaces se purgan automáticamente {{ days }} días después de eliminarlos.</div> }
-<section class="search-card"><mat-form-field appearance="outline"><mat-icon matPrefix>search</mat-icon><input matInput #query [value]="q()" placeholder="Buscar por nombre, alias o destino" (keyup.enter)="search(query.value)" /><button mat-icon-button matSuffix type="button" (click)="search(query.value)" aria-label="Buscar en la papelera"><mat-icon>arrow_forward</mat-icon></button></mat-form-field><b>{{ total() }} eliminados</b></section>
-@if (loading() && !rows().length) { <app-panel-skeleton variant="list" label="Cargando papelera" /> }
-@if (loading() && rows().length) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando papelera" /> }
-@if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div> }
-@if (!canRestore()) { <div class="alert permission" role="status">Vista de solo lectura. Restaurar requiere rol editor; borrar definitivamente requiere propietario o administrador.</div> }
+<a class="back-link" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> <ng-container i18n="@@ui.3b9d2df846ac6f">Volver a enlaces</ng-container></a>
+<app-page-header icon="delete_sweep" eyebrow="Retención recuperable" title="Papelera de enlaces" description="Restaura enlaces eliminados antes de que venza su política de conservación."  i18n-title="@@ui.3d02eed06b4ff7" i18n-description="@@ui.3b372fe7434e2d" i18n-eyebrow="@@ui.f3b1d3fe395dae"/>
+@if (domainId() !== null) { <p role="status"><ng-container i18n="@@ui.7a6145dbf6c331">Mostrando la papelera del dominio seleccionado. </ng-container><button mat-button type="button" (click)="domainId.set(null); search('')"><ng-container i18n="@@ui.323060fdad294a">Ver toda la papelera</ng-container></button></p> }
+@if (retentionDays(); as days) { <div class="retention-note" role="note"><mat-icon>schedule</mat-icon><ng-container i18n="@@ui.9b5b1636bccb31">Los enlaces se purgan automáticamente {{ days }} días después de eliminarlos.</ng-container></div> }
+<section class="search-card"><mat-form-field appearance="outline"><mat-icon matPrefix>search</mat-icon><input matInput #query [value]="q()" placeholder="Buscar por nombre, alias o destino" (keyup.enter)="search(query.value)"  i18n-placeholder="@@ui.30469bb6d09759"/><button mat-icon-button matSuffix type="button" (click)="search(query.value)" aria-label="Buscar en la papelera" i18n-aria-label="@@ui.6462457d1a91f5"><mat-icon>arrow_forward</mat-icon></button></mat-form-field><b><ng-container i18n="@@ui.d5ce79215bcca8">{{ total() }} eliminados</ng-container></b></section>
+@if (loading() && !rows().length) { <app-panel-skeleton variant="list" label="Cargando papelera"  i18n-label="@@ui.371ee8e79f481a"/> }
+@if (loading() && rows().length) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando papelera"  i18n-aria-label="@@ui.fe881fbbbeb6b5"/> }
+@if (error()) { <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div> }
+@if (!canRestore()) { <div class="alert permission" role="status"><ng-container i18n="@@ui.88fe238577c117">Vista de solo lectura. Restaurar requiere rol editor; borrar definitivamente requiere propietario o administrador.</ng-container></div> }
 
 <div class="trash-list">
   @for (row of rows(); track row.link.id) {
     <article class="trash-row">
-      <div class="trash-main"><span class="alias tnum">{{ row.link.name || row.link.shortUrl }}</span>@if (row.link.name) { <p class="named-short-url">{{ row.link.shortUrl }}</p> }<p>{{ row.link.destination }}</p><small>Eliminado: {{ formatDate(row.deletedAt) }} · Purga prevista: {{ formatDate(row.purgeAt) }}</small></div>
+      <div class="trash-main"><span class="alias tnum">{{ row.link.name || row.link.shortUrl }}</span>@if (row.link.name) { <p class="named-short-url">{{ row.link.shortUrl }}</p> }<p>{{ row.link.destination }}</p><small><ng-container i18n="@@ui.fffdb0e3c8449f">Eliminado: {{ formatDate(row.deletedAt) }} · Purga prevista: {{ formatDate(row.purgeAt) }}</ng-container></small></div>
       <div class="actions">
-        @if (canRestore()) { <button mat-stroked-button type="button" (click)="restore(row)" [disabled]="actionId() !== null"><mat-icon>restore</mat-icon> Restaurar</button> }
-        @if (canPurge()) { <button mat-stroked-button class="danger" type="button" (click)="purgeId() === row.link.id ? closePurge() : openPurge(row)" [disabled]="actionId() !== null"><mat-icon>delete_forever</mat-icon> Borrar definitivamente</button> }
+        @if (canRestore()) { <button mat-stroked-button type="button" (click)="restore(row)" [disabled]="actionId() !== null"><mat-icon>restore</mat-icon> <ng-container i18n="@@ui.eda02893d340c1">Restaurar</ng-container></button> }
+        @if (canPurge()) { <button mat-stroked-button class="danger" type="button" (click)="purgeId() === row.link.id ? closePurge() : openPurge(row)" [disabled]="actionId() !== null"><mat-icon>delete_forever</mat-icon> <ng-container i18n="@@ui.3bd64247a478ab">Borrar definitivamente</ng-container></button> }
       </div>
       @if (purgeId() === row.link.id) {
-        <section class="purge-confirm" aria-label="Confirmación de borrado definitivo">
-          <p>Escribe <code>ELIMINAR {{ row.link.alias }}</code>, introduce tu contraseña y, si procede, un factor actual.</p>
-          <div class="fields"><mat-form-field appearance="outline"><mat-label>Frase exacta</mat-label><input #purgeConfirmation matInput [(ngModel)]="confirmation" autocomplete="off" maxlength="100" /></mat-form-field><mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label><input matInput type="password" [(ngModel)]="password" autocomplete="current-password" maxlength="72" /></mat-form-field>@if (mfaEnabled()) { <mat-form-field appearance="outline"><mat-label>Código MFA o recuperación</mat-label><input matInput [(ngModel)]="factorCode" autocomplete="one-time-code" maxlength="24" /></mat-form-field> }</div>
-          <button mat-flat-button color="warn" type="button" (click)="purge(row)" [disabled]="actionId() !== null || !password() || confirmation() !== 'ELIMINAR ' + row.link.alias || (mfaEnabled() && !factorCode().trim())">Confirmar borrado irreversible</button>
+        <section class="purge-confirm" aria-label="Confirmación de borrado definitivo" i18n-aria-label="@@ui.1d18fda1153a9d">
+          <p><ng-container i18n="@@ui.1350c7dcc7680f">Escribe </ng-container><code>ELIMINAR {{ row.link.alias }}</code><ng-container i18n="@@ui.8d9b1e9cbfb8fb">, introduce tu contraseña y, si procede, un factor actual.</ng-container></p>
+          <div class="fields"><mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.1fc4c7b8fda5b8">Frase exacta</ng-container></mat-label><input #purgeConfirmation matInput [(ngModel)]="confirmation" autocomplete="off" maxlength="100" /></mat-form-field><mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.14a433147337bb">Contraseña actual</ng-container></mat-label><input matInput type="password" [(ngModel)]="password" autocomplete="current-password" maxlength="72" /></mat-form-field>@if (mfaEnabled()) { <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.c1b270050b84bf">Código MFA o recuperación</ng-container></mat-label><input matInput [(ngModel)]="factorCode" autocomplete="one-time-code" maxlength="24" /></mat-form-field> }</div>
+          <button mat-flat-button color="warn" type="button" (click)="purge(row)" [disabled]="actionId() !== null || !password() || confirmation() !== uiText.ui_0b641bd2157337 + row.link.alias || (mfaEnabled() && !factorCode().trim())"><ng-container i18n="@@ui.6bd77ffd16573a">Confirmar borrado irreversible</ng-container></button>
         </section>
       }
     </article>
   }
-  @if (!loading() && !rows().length && !error()) { <div class="empty-state"><mat-icon>recycling</mat-icon><b>La papelera está vacía</b><p>No hay enlaces pendientes de purga.</p></div> }
+  @if (!loading() && !rows().length && !error()) { <div class="empty-state"><mat-icon>recycling</mat-icon><b><ng-container i18n="@@ui.fc28f8f9aeb43b">La papelera está vacía</ng-container></b><p><ng-container i18n="@@ui.bac8f8f31d8479">No hay enlaces pendientes de purga.</ng-container></p></div> }
 </div>
-@if (total() > pageSizeOptions[0]) { <mat-paginator [length]="total()" [pageIndex]="page()" [pageSize]="pageSize()" [pageSizeOptions]="pageSizeOptions" (page)="paginate($event)" showFirstLastButtons aria-label="Paginación de la papelera" /> }
+@if (total() > pageSizeOptions[0]) { <mat-paginator [length]="total()" [pageIndex]="page()" [pageSize]="pageSize()" [pageSizeOptions]="pageSizeOptions" (page)="paginate($event)" showFirstLastButtons aria-label="Paginación de la papelera"  i18n-aria-label="@@ui.16c081ab003070"/> }

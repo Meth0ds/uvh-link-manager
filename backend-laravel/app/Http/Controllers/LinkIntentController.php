@@ -34,7 +34,7 @@ class LinkIntentController
         $destination = trim(UvhRequest::inputString($request, 'destination'));
         $valid = UrlUtil::validateDestination($destination);
         if (! $valid['ok']) {
-            return response()->json(['error' => $valid['error'] ?? 'URL inválida'], 422);
+            return response()->json(['error' => $valid['error'] ?? __('display.display_696247157534db')], 422);
         }
 
         $intent = Ids::randomToken(32);
@@ -80,7 +80,7 @@ class LinkIntentController
             return $this->temporarilyUnavailable();
         }
         if (! $accepted) {
-            return response()->json(['error' => 'Hay demasiadas URLs guardadas en este momento. Completa o descarta una antes de añadir otra.'], 429);
+            return response()->json(['error' => __('messages.error_c73369a460a7bd')], 429);
         }
         $record = [
             'destination' => $destination,
@@ -152,9 +152,9 @@ class LinkIntentController
                 return $record;
             });
         } catch (\OverflowException) {
-            return response()->json(['error' => 'Tienes demasiadas URLs pendientes. Completa o descarta alguna antes de continuar.'], 429);
+            return response()->json(['error' => __('messages.error_6613461f527a88')], 429);
         } catch (\Throwable) {
-            return response()->json(['error' => 'No se pudo recuperar la URL guardada. Inténtalo de nuevo más tarde.'], 503);
+            return response()->json(['error' => __('messages.error_98b67d319c90ff')], 503);
         }
 
         if ($record === null) {
@@ -428,7 +428,7 @@ class LinkIntentController
     private function temporarilyUnavailable()
     {
         return response()->json([
-            'error' => 'No se pudo acceder temporalmente a la URL guardada. Inténtalo de nuevo.',
+            'error' => __('messages.error_536f9758f12848'),
         ], 503);
     }
 
@@ -436,6 +436,6 @@ class LinkIntentController
     {
         // Same response for expired, malformed, consumed and foreign intents.
         // It avoids using the endpoint as an oracle for valid handoff tokens.
-        return response()->json(['error' => 'La URL guardada ya no está disponible'], 404);
+        return response()->json(['error' => __('messages.error_9e846aa8873a9f')], 404);
     }
 }

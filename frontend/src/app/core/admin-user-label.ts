@@ -23,7 +23,7 @@ export const ADMIN_ACCOUNT_STATE_LABEL = {
  */
 export const ADMIN_ACCOUNT_FLAG_LABEL = {
   admin: "Admin",
-  unverified: "Sin verificar",
+  unverified: $localize`:@@ui.cc05465c0e79f2:Sin verificar`,
   mfa: "MFA",
 } as const;
 

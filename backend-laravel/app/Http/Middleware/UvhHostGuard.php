@@ -27,6 +27,16 @@ class UvhHostGuard
         $host = $this->normalizeHost($request->getHost());
         $path = $request->path() === '/' ? '/' : '/'.ltrim($request->path(), '/');
 
+        if (config('uvh.localisation_enabled') && ($this->isAppHost($host) || $this->isPublicHost($host))) {
+            if ($path === '/' && ($this->isAppHost($host) || $this->isPublicHost($host))) {
+                return $next($request);
+            }
+            $path = preg_replace('#^/(es|en)(?=/|$)#', '', $path) ?: '/';
+            $path = match ($path) {
+                '/ayuda' => '/help', '/estado' => '/status', default => $path,
+            };
+        }
+
         if ($path === '/health') {
             return $next($request);
         }

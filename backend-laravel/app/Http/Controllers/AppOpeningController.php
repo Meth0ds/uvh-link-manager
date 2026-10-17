@@ -64,7 +64,7 @@ final class AppOpeningController
         $grant = $request->cookie('uvh_app_continue');
         $claims = is_string($grant) ? SignedToken::verify($grant, fn ($v) => json_decode($v, true)) : null;
         if (! is_array($claims) || ($claims['purpose'] ?? '') !== 'app-admission' || ($claims['id'] ?? '') !== $id) {
-            return VisitorAnswer::notice('El acceso ha caducado', 'Vuelve a abrir el enlace original para continuar.', 404);
+            return VisitorAnswer::notice(__('display.display_ea127513610944'), __('display.display_69c19e16ae2e10'), 404);
         }
         $request->merge(['grant' => $grant, 'alias' => $request->query('alias'), 'choice' => $choice]);
 
@@ -80,7 +80,7 @@ final class AppOpeningController
         $ctx['app_grant'] = $request->input('grant');
         $outcome = RedirectService::resolve($ctx);
         if (! in_array($outcome['kind'], ['redirect', 'app_opening'], true) || empty($outcome['grant'])) {
-            return VisitorAnswer::notice('El acceso ya no está disponible', 'Vuelve a abrir el enlace para comprobar su disponibilidad.', 404);
+            return VisitorAnswer::notice(__('display.display_5f64209d19819b'), __('display.display_d6fa5237ba5d47'), 404);
         }
         $url = $outcome['location'];
         if ($request->input('choice') === 'app' && ($outcome['app']['kind'] ?? '') === 'provider') {

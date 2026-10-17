@@ -3,6 +3,9 @@
 use App\Support\AccountExportDocument;
 
 return [
+    'repository_root' => env('UVH_REPO_ROOT', dirname(base_path())),
+    'localisation_enabled' => env('LOCALISATION_ENABLED', false),
+    'visitor_asset_source' => env('UVH_REPO_ROOT', dirname(base_path())).'/frontend/public/visitor-assets',
     'metrics' => [
         'bearer_token' => env('METRICS_BEARER_TOKEN', ''),
     ],

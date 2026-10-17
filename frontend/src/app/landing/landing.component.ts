@@ -1,3 +1,7 @@
+import { localePath } from "../core/localisation/locale";
+import { LanguageSelectorComponent } from "../core/localisation/language-selector.component";
+import { LocaleLinkDirective } from "../core/localisation/locale-link.directive";
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { DOCUMENT, ViewportScroller } from "@angular/common";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, ViewChild, afterNextRender, computed, inject, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
@@ -29,7 +33,7 @@ interface ProductView {
 @Component({
   selector: "app-landing",
   standalone: true,
-  imports: [
+  imports: [LocaleLinkDirective, LanguageSelectorComponent,
     RouterLink,
     FormsModule,
     MatIconModule,
@@ -42,6 +46,7 @@ interface ProductView {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LandingComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly intents = inject(PendingLinkIntentService);
   private readonly document = inject(DOCUMENT);
@@ -74,10 +79,10 @@ export class LandingComponent {
   readonly showMobileCreate = signal(false);
   readonly mobileCreateVisible = computed(() => this.showMobileCreate() && !this.mobileOpen());
   readonly navigationItems: { id: NavigationSection; label: string }[] = [
-    { id: "producto", label: "Qué puedes hacer" },
-    { id: "control", label: "Cómo empezar" },
-    { id: "operacion", label: "Para equipos" },
-    { id: "faq", label: "Preguntas" },
+    { id: "producto", label: $localize`:@@ui.75555bdbf8c991:Qué puedes hacer` },
+    { id: "control", label: $localize`:@@ui.5ca142309884f1:Cómo empezar` },
+    { id: "operacion", label: $localize`:@@ui.111f0e2fc1e395:Para equipos` },
+    { id: "faq", label: $localize`:@@landing.navigation.faq:Preguntas` },
   ];
   // The illustration is a local demonstration, never a published link or a
   // reserved alias. Switching it does not send the visitor's URL anywhere.
@@ -91,72 +96,72 @@ export class LandingComponent {
   readonly productViews: ProductView[] = [
     {
       id: "publish",
-      label: "Cartas y documentos",
+      label: $localize`:@@ui.8257e103661650:Cartas y documentos`,
       icon: "add_link",
-      title: "Actualiza la carta sin cambiar el enlace impreso.",
-      description: "Has impreso la dirección de tu carta en cada mesa. Cuando llegue la nueva temporada, cambia el destino en UVH y conserva el enlace que tus clientes ya tienen.",
-      bullets: ["Elige un alias que puedas leer en voz alta: /carta.", "Publica el enlace y úsalo en tus materiales.", "Actualiza el destino cuando cambie el menú."],
+      title: $localize`:@@ui.c4fed1040c66a1:Actualiza la carta sin cambiar el enlace impreso.`,
+      description: $localize`:@@ui.31aa967d2fa670:Has impreso la dirección de tu carta en cada mesa. Cuando llegue la nueva temporada, cambia el destino en UVH y conserva el enlace que tus clientes ya tienen.`,
+      bullets: [$localize`:@@ui.c7360ff951a89d:Elige un alias que puedas leer en voz alta: /carta.`, $localize`:@@ui.b1d0eff51b770e:Publica el enlace y úsalo en tus materiales.`, $localize`:@@ui.b78c5f8b261017:Actualiza el destino cuando cambie el menú.`],
       alias: "go.turestaurante.es/carta",
       before: "/carta-verano.pdf",
       after: "/carta-otono.pdf",
-      note: "Misma dirección impresa. Nueva carta al abrirla.",
+      note: $localize`:@@ui.3193757ee044a0:Misma dirección impresa. Nueva carta al abrirla.`,
     },
     {
       id: "route",
-      label: "Eventos e idiomas",
+      label: $localize`:@@ui.ef61dd625400a3:Eventos e idiomas`,
       icon: "route",
-      title: "Comparte el programa en el idioma adecuado.",
-      description: "Comparte una sola dirección para el evento. Una regla de idioma puede llevar al programa en español; el destino principal atiende a quienes no coincidan con esa regla.",
-      bullets: ["Define el programa general como destino principal.", "Añade una regla para el idioma español.", "Ordena las reglas: se aplica la primera que coincida."],
+      title: $localize`:@@ui.54a8e540877004:Comparte el programa en el idioma adecuado.`,
+      description: $localize`:@@ui.8d2093768a326f:Comparte una sola dirección para el evento. Una regla de idioma puede llevar al programa en español; el destino principal atiende a quienes no coincidan con esa regla.`,
+      bullets: [$localize`:@@ui.16238abc7e9655:Define el programa general como destino principal.`, $localize`:@@ui.d5268f6617dd32:Añade una regla para el idioma español.`, $localize`:@@ui.a0d935d4f9cf54:Ordena las reglas: se aplica la primera que coincida.`],
       alias: "go.tuevento.es/programa",
       before: "/programme",
       after: "/es/programa",
-      note: "Si el idioma es español, se abre su programa. Si ninguna regla coincide, se abre el programa general.",
+      note: $localize`:@@ui.4014683623675d:Si el idioma es español, se abre su programa. Si ninguna regla coincide, se abre el programa general.`,
     },
     {
       id: "measure",
-      label: "Campañas y clics",
+      label: $localize`:@@ui.7e1b21e0d7af71:Campañas y clics`,
       icon: "query_stats",
-      title: "Consulta los clics de cada campaña.",
-      description: "Prepara un enlace para tu boletín y consulta sus clics por periodo. Si la página de destino se mueve, puedes corregirla sin reenviar el correo a toda la lista.",
-      bullets: ["Usa un enlace específico para cada envío.", "Consulta cuándo recibe clics y desde qué dispositivos.", "Corrige el destino si cambia la página de la campaña."],
+      title: $localize`:@@ui.8cee59b24d273d:Consulta los clics de cada campaña.`,
+      description: $localize`:@@ui.9944ca9fa14402:Prepara un enlace para tu boletín y consulta sus clics por periodo. Si la página de destino se mueve, puedes corregirla sin reenviar el correo a toda la lista.`,
+      bullets: [$localize`:@@ui.fe5d68339ef7cb:Usa un enlace específico para cada envío.`, $localize`:@@ui.59f49c87278522:Consulta cuándo recibe clics y desde qué dispositivos.`, $localize`:@@ui.1e7636a12417f1:Corrige el destino si cambia la página de la campaña.`],
       alias: "uvh.es/edicion-septiembre",
       before: "/novedades-septiembre",
       after: "/coleccion/septiembre",
-      note: "El correo ya está enviado. El destino sigue siendo editable.",
+      note: $localize`:@@ui.16070d5dea5401:El correo ya está enviado. El destino sigue siendo editable.`,
     },
   ];
 
   readonly operations = [
-    { icon: "language", guide: "domains", title: "Dominios propios", text: "Usa una dirección como go.tumarca.es para que tus enlaces también lleven tu marca. El panel te guía para verificar y activar el subdominio." },
-    { icon: "key", guide: "api", title: "Conecta tus herramientas", text: "Crea y gestiona enlaces desde otros sistemas con API tokens. Define sus permisos y caducidad, y retira el acceso cuando ya no lo necesites." },
-    { icon: "webhook", guide: "webhooks", title: "Recibe eventos en tu sistema", text: "Conecta webhooks para recibir los eventos de UVH. Consulta las entregas y sus reintentos, y verifica su origen mediante firmas." },
+    { icon: "language", guide: "domains", title: $localize`:@@ui.8a8ac1bda919d9:Dominios propios`, text: $localize`:@@ui.06925702f89f1f:Usa una dirección como go.tumarca.es para que tus enlaces también lleven tu marca. El panel te guía para verificar y activar el subdominio.` },
+    { icon: "key", guide: "api", title: $localize`:@@ui.e73171d17d5d24:Conecta tus herramientas`, text: $localize`:@@ui.69cb20176bceb1:Crea y gestiona enlaces desde otros sistemas con API tokens. Define sus permisos y caducidad, y retira el acceso cuando ya no lo necesites.` },
+    { icon: "webhook", guide: "webhooks", title: $localize`:@@ui.67e48b0983fe22:Recibe eventos en tu sistema`, text: $localize`:@@ui.b26dea6c215416:Conecta webhooks para recibir los eventos de UVH. Consulta las entregas y sus reintentos, y verifica su origen mediante firmas.` },
   ];
 
   readonly faqs = [
     {
-      q: "¿Pegar una URL publica el enlace?",
-      a: "No. Primero preparas el destino. Para guardar el enlace necesitas una cuenta y verificar tu email. Conservamos la URL durante 24 horas para que puedas retomar el formulario después de entrar.",
+      q: $localize`:@@ui.5f959476c5ea35:¿Pegar una URL publica el enlace?`,
+      a: $localize`:@@ui.495525a86c4476:No. Primero preparas el destino. Para guardar el enlace necesitas una cuenta y verificar tu email. Conservamos la URL durante 24 horas para que puedas retomar el formulario después de entrar.`,
     },
     {
-      q: "¿Qué puedo cambiar después de compartirlo?",
-      a: "Puedes editar el destino, las reglas y los límites, o pausar el enlace. Para conservar la dirección que ya has compartido, mantén el mismo alias y dominio. Necesitas un rol con permiso de edición.",
+      q: $localize`:@@ui.76614828a7747d:¿Qué puedo cambiar después de compartirlo?`,
+      a: $localize`:@@ui.428481bdb9127c:Puedes editar el destino, las reglas y los límites, o pausar el enlace. Para conservar la dirección que ya has compartido, mantén el mismo alias y dominio. Necesitas un rol con permiso de edición.`,
     },
     {
-      q: "¿Una contraseña en el enlace protege también el archivo?",
-      a: "Protege el paso por UVH, no el acceso directo al destino. Quien conozca la URL final podría abrirla sin pasar por el enlace corto. Para contenido privado, configura también permisos en el servicio donde lo alojas.",
+      q: $localize`:@@ui.e080c316574c6f:¿Una contraseña en el enlace protege también el archivo?`,
+      a: $localize`:@@ui.04fa07933ad0b3:Protege el paso por UVH, no el acceso directo al destino. Quien conozca la URL final podría abrirla sin pasar por el enlace corto. Para contenido privado, configura también permisos en el servicio donde lo alojas.`,
     },
     {
-      q: "¿Puedo usar mi propio dominio?",
-      a: "Sí, con un subdominio como go.tumarca.es. Necesitas acceso a su DNS para configurar el CNAME directo y la verificación de propiedad. El panel muestra el estado de DNS y TLS antes de activarlo.",
+      q: $localize`:@@ui.4773c2c4394238:¿Puedo usar mi propio dominio?`,
+      a: $localize`:@@ui.f7abfc6bcc023b:Sí, con un subdominio como go.tumarca.es. Necesitas acceso a su DNS para configurar el CNAME directo y la verificación de propiedad. El panel muestra el estado de DNS y TLS antes de activarlo.`,
     },
     {
-      q: "¿Los clics equivalen a personas?",
-      a: "No. Una persona puede abrir un enlace varias veces y también pueden acceder sistemas automáticos. Los pseudónimos de visitante rotan diariamente: no son una cifra de personas únicas entre varios días. UVH tampoco confirma una compra o una conversión en la web de destino.",
+      q: $localize`:@@ui.bf1a76a597bd6c:¿Los clics equivalen a personas?`,
+      a: $localize`:@@ui.b2aef31597786b:No. Una persona puede abrir un enlace varias veces y también pueden acceder sistemas automáticos. Los pseudónimos de visitante rotan diariamente: no son una cifra de personas únicas entre varios días. UVH tampoco confirma una compra o una conversión en la web de destino.`,
     },
     {
-      q: "¿Qué ocurre cuando caduca o alcanza su límite?",
-      a: "El enlace deja de llevar al destino habitual. Puedes configurar un destino alternativo para los casos admitidos, como caducidad o límite de clics. Revisa esa configuración antes de publicar una promoción con fecha de fin.",
+      q: $localize`:@@ui.57ce32dd92eef2:¿Qué ocurre cuando caduca o alcanza su límite?`,
+      a: $localize`:@@ui.8e4a7a491d6192:El enlace deja de llevar al destino habitual. Puedes configurar un destino alternativo para los casos admitidos, como caducidad o límite de clics. Revisa esa configuración antes de publicar una promoción con fecha de fin.`,
     },
   ];
 
@@ -262,12 +267,12 @@ export class LandingComponent {
   }
 
   loginHref(): string {
-    return `${this.appUrl() || this.currentOrigin()}/auth`;
+    return `${this.appUrl() || this.currentOrigin()}${localePath("/auth")}`;
   }
 
   registerHref(): string {
     const returnTo = encodeURIComponent("/app/links");
-    return `${this.appUrl() || this.currentOrigin()}/auth?mode=register&returnTo=${returnTo}`;
+    return `${this.appUrl() || this.currentOrigin()}${localePath("/auth")}?mode=register&returnTo=${returnTo}`;
   }
 
   onUrlChange(value: string): void {
@@ -308,9 +313,9 @@ export class LandingComponent {
       // handoff crosses to another host, and the fragment is the one part of a
       // URL that no server, access log or `Referer` header ever sees.
       const params = new URLSearchParams({ mode: "register", returnTo: "/app/links" });
-      this.handoffToAuth(`${app}/auth?${params.toString()}#intent=${encodeURIComponent(receipt.intent)}`);
+      this.handoffToAuth(`${app}${localePath("/auth")}?${params.toString()}#intent=${encodeURIComponent(receipt.intent)}`);
     } catch (error) {
-      this.demoError.set(error instanceof ApiRequestError ? error.message : "No se pudo preparar tu enlace. Inténtalo de nuevo.");
+      this.demoError.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.d40f3ab42a3fc8:No se pudo preparar tu enlace. Inténtalo de nuevo.`);
       this.submitting.set(false);
     }
   }
@@ -371,7 +376,7 @@ export class LandingComponent {
 
   private validDestination(raw: string): boolean {
     if (!this.isValidDestination(raw)) {
-      this.demoError.set("Introduce una URL http(s) válida. Debe empezar por http:// o https:// y no incluir usuario ni contraseña.");
+      this.demoError.set($localize`:@@ui.767ca54c2f1aeb:Introduce una URL http(s) válida. Debe empezar por http:// o https:// y no incluir usuario ni contraseña.`);
       return false;
     }
     return true;

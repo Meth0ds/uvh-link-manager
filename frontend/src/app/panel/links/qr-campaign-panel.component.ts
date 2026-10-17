@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, DestroyRef } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -11,27 +12,28 @@ import { LatestRequest } from "../../core/services/latest-request";
 
 @Component({
   selector: "app-qr-campaign-panel", standalone: true, imports: [FormsModule, MatButtonModule, MatIconModule], changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<section class="campaign-panel" aria-labelledby="campaign-heading"><div class="campaign-heading"><div><h2 id="campaign-heading">QR de campaña</h2><p>Un enlace, varios QR. Compara las visitas de cada ubicación o iniciativa.</p></div>@if (canWrite()) { <button mat-stroked-button (click)="create()"><mat-icon>add</mat-icon>Crear campaña</button> }</div>
-    <div class="campaign-period"><label>Desde <input type="date" [ngModel]="from()" (ngModelChange)="from.set($event)" /></label><label>Hasta <input type="date" [ngModel]="to()" (ngModelChange)="to.set($event)" /></label><button mat-button (click)="load()" [disabled]="busy()">Comparar</button></div>
-    @if (busy()) { <p role="status">Cargando visitas…</p> }
+  template: `<section class="campaign-panel" aria-labelledby="campaign-heading"><div class="campaign-heading"><div><h2 id="campaign-heading"><ng-container i18n="@@ui.a90fb7659f13c6">QR de campaña</ng-container></h2><p><ng-container i18n="@@ui.435c9790ae5142">Un enlace, varios QR. Compara las visitas de cada ubicación o iniciativa.</ng-container></p></div>@if (canWrite()) { <button mat-stroked-button (click)="create()"><mat-icon>add</mat-icon><ng-container i18n="@@ui.d25f2aeacda695">Crear campaña</ng-container></button> }</div>
+    <div class="campaign-period"><label><ng-container i18n="@@ui.ce6f55749afd5d">Desde </ng-container><input type="date" [ngModel]="from()" (ngModelChange)="from.set($event)" /></label><label><ng-container i18n="@@ui.45d11be52fcf28">Hasta </ng-container><input type="date" [ngModel]="to()" (ngModelChange)="to.set($event)" /></label><button mat-button (click)="load()" [disabled]="busy()"><ng-container i18n="@@ui.58d55554ece4bf">Comparar</ng-container></button></div>
+    @if (busy()) { <p role="status"><ng-container i18n="@@ui.b06c45bb857ade">Cargando visitas…</ng-container></p> }
     @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
     @if (comparison(); as data) {
-      <div class="campaign-totals"><span><b>{{ data.attributedVisits }}</b> visitas atribuidas</span><span><b>{{ data.unattributedVisits }}</b> visitas sin atribución</span></div>
-      @if (!data.variants.length) { <div class="campaign-empty"><mat-icon aria-hidden="true">qr_code_2</mat-icon><p>Aún no hay variantes. Crea una para tu escaparate, un folleto o una campaña.</p></div> }
+      <div class="campaign-totals"><span><b>{{ data.attributedVisits }}</b> <ng-container i18n="@@ui.ad7fdb502cac0e">visitas atribuidas</ng-container></span><span><b>{{ data.unattributedVisits }}</b> <ng-container i18n="@@ui.0851680a0b06d2">visitas sin atribución</ng-container></span></div>
+      @if (!data.variants.length) { <div class="campaign-empty"><mat-icon aria-hidden="true">qr_code_2</mat-icon><p><ng-container i18n="@@ui.2ceb0c005d2b74">Aún no hay variantes. Crea una para tu escaparate, un folleto o una campaña.</ng-container></p></div> }
       @for (variant of data.variants; track variant.id) {
-        <article class="campaign-row"><div><strong>{{ variant.name }}</strong><small>{{ variant.archived ? 'Archivada · el QR sigue funcionando' : 'Campaña activa' }}</small></div><div class="variant-visits"><b>{{ variant.visits }}</b><span>visitas · {{ variant.attributedPercentage === null ? 'Sin atribución todavía' : variant.attributedPercentage + '% de las atribuidas' }}</span></div>
-          <div class="campaign-actions"><button mat-stroked-button (click)="open(variant)"><mat-icon>qr_code_2</mat-icon>Ver QR</button>@if (canWrite()) { <button mat-button (click)="open(variant, true)">Actualizar diseño</button><button mat-button (click)="archive(variant)" [disabled]="mutationBusy()">{{ variant.archived ? 'Reactivar' : 'Archivar' }}</button> }</div>
+        <article class="campaign-row"><div><strong>{{ variant.name }}</strong><small>{{ variant.archived ? uiText.ui_032437be173aeb : uiText.ui_278a9b5cb435e3 }}</small></div><div class="variant-visits"><b>{{ variant.visits }}</b><span><ng-container i18n="@@ui.3a64b081ff5868">visitas · {{ variant.attributedPercentage === null ? uiText.ui_8b3eb6dede0770 : variant.attributedPercentage + uiText.ui_97247545540c1b }}</ng-container></span></div>
+          <div class="campaign-actions"><button mat-stroked-button (click)="open(variant)"><mat-icon>qr_code_2</mat-icon><ng-container i18n="@@ui.490452634c74c4">Ver QR</ng-container></button>@if (canWrite()) { <button mat-button (click)="open(variant, true)"><ng-container i18n="@@ui.3cc8b70cb2fd45">Actualizar diseño</ng-container></button><button mat-button (click)="archive(variant)" [disabled]="mutationBusy()">{{ variant.archived ? uiText.ui_44f9bcc469524e : uiText.ui_f35f9141f4427c }}</button> }</div>
         </article>
       }
       @if (data.variants.length) {
-        <details class="campaign-series"><summary>Serie diaria · UTC</summary><div class="series-scroll"><table><thead><tr><th scope="col">Fecha</th>@for (variant of data.variants; track variant.id) { <th scope="col">{{ variant.name }}</th> }<th scope="col">Sin atribución</th></tr></thead><tbody>@for (point of data.series; track point.day) { <tr><th scope="row">{{ point.day }}</th>@for (variant of point.variants; track variant.id) { <td>{{ variant.visits === null ? 'Sin datos' : variant.visits }}</td> }<td>{{ point.unattributed === null ? 'Sin datos' : point.unattributed }}</td></tr> }</tbody></table></div></details>
+        <details class="campaign-series"><summary><ng-container i18n="@@ui.54196fe106a2ac">Serie diaria · UTC</ng-container></summary><div class="series-scroll"><table><thead><tr><th scope="col"><ng-container i18n="@@ui.93b2a9ef782cac">Fecha</ng-container></th>@for (variant of data.variants; track variant.id) { <th scope="col">{{ variant.name }}</th> }<th scope="col"><ng-container i18n="@@ui.af589a6f49f2e4">Sin atribución</ng-container></th></tr></thead><tbody>@for (point of data.series; track point.day) { <tr><th scope="row">{{ point.day }}</th>@for (variant of point.variants; track variant.id) { <td>{{ variant.visits === null ? uiText.ui_03dc8297d3d6c8 : variant.visits }}</td> }<td>{{ point.unattributed === null ? uiText.ui_03dc8297d3d6c8 : point.unattributed }}</td></tr> }</tbody></table></div></details>
       }
-      <p class="campaign-note">Las visitas son redirecciones registradas, no escaneos físicos comprobados ni personas distintas. Los datos pueden tardar unos instantes en actualizarse. Las fechas sin datos se muestran separadamente.</p>
+      <p class="campaign-note"><ng-container i18n="@@ui.4fae82dbeff13c">Las visitas son redirecciones registradas, no escaneos físicos comprobados ni personas distintas. Los datos pueden tardar unos instantes en actualizarse. Las fechas sin datos se muestran separadamente.</ng-container></p>
     }
   </section>`,
   styles: [`:host{display:block}.campaign-panel{padding:24px;border:1px solid var(--uvh-border);background:var(--uvh-surface);border-radius:8px;min-width:0}.campaign-heading{display:flex;align-items:start;justify-content:space-between;gap:20px}h2{font-size:20px;letter-spacing:-.03em;margin:0 0 8px;color:var(--uvh-ink)}p{font-size:13px;line-height:1.6;color:var(--uvh-muted);margin:0}.campaign-period{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:20px 0}.campaign-period label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--uvh-muted)}input{font:inherit;color:var(--uvh-ink);background:var(--uvh-bg);border:1px solid var(--uvh-border);padding:8px;border-radius:4px;min-width:0}.campaign-totals{display:flex;gap:24px;flex-wrap:wrap;padding-bottom:18px;color:var(--uvh-muted);font-size:12px}.campaign-totals b{color:var(--uvh-ink);font-size:22px;margin-right:5px}.campaign-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;padding:18px 0;border-top:1px solid var(--uvh-border)}.campaign-row strong{color:var(--uvh-ink);font-size:14px;overflow-wrap:anywhere}.campaign-row small{display:block;margin-top:5px;color:var(--uvh-muted);font-size:11px}.variant-visits{display:flex;flex-direction:column;align-items:end;gap:4px;color:var(--uvh-ink)}.variant-visits span{color:var(--uvh-muted);font-size:11px}.campaign-actions{display:flex;flex-wrap:wrap;gap:6px;grid-column:1/-1}.campaign-empty{display:flex;gap:12px;padding:20px 0;color:var(--uvh-muted)}.campaign-note{margin-top:18px;font-size:11px}.campaign-series{border-top:1px solid var(--uvh-border);padding-top:16px}.campaign-series summary{cursor:pointer;color:var(--uvh-ink);font-size:13px}.series-scroll{overflow-x:auto;margin-top:12px}table{border-collapse:collapse;font-size:12px;width:100%;color:var(--uvh-ink)}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--uvh-border);white-space:nowrap}.error{color:var(--uvh-danger)}input:focus-visible,summary:focus-visible{outline:2px solid var(--uvh-electric);outline-offset:2px}@media(max-width:600px){.campaign-panel{padding:16px}.campaign-heading{flex-direction:column}.campaign-row{grid-template-columns:1fr}.variant-visits{align-items:start}}`],
 })
 export class QrCampaignPanelComponent {
+  readonly uiText = UI_TEXT;
   readonly linkId = input.required<number>(); readonly url = input.required<string>();
   private readonly library = inject(QrLibraryService); private readonly dialog = inject(MatDialog);
   private readonly workspace = inject(WorkspaceService); private readonly session = inject(SessionContextService);
@@ -46,7 +48,7 @@ export class QrCampaignPanelComponent {
     try {
       const data = await this.library.comparison(this.linkId(), this.from(), this.to(), { signal: request.signal });
       if (this.requests.isCurrent(request, this.context())) this.comparison.set(data);
-    } catch (error) { if (this.requests.isCurrent(request, this.context())) this.error.set(error instanceof Error ? error.message : "No se pudo cargar la comparación."); }
+    } catch (error) { if (this.requests.isCurrent(request, this.context())) this.error.set(error instanceof Error ? error.message : $localize`:@@ui.7604649e6cbe13:No se pudo cargar la comparación.`); }
     finally { if (this.requests.isCurrent(request, this.context())) this.busy.set(false); }
   }
   create(): void { if (!this.canWrite()) return; const context = this.context(); this.dialog.open(QrDialogComponent, { data: { url: this.url(), linkId: this.linkId(), campaign: true }, width: "820px", maxWidth: "calc(100vw - 24px)" }).afterClosed().subscribe(() => { if (!this.destroy.destroyed && this.context() === context) void this.load(); }); }
@@ -59,7 +61,7 @@ export class QrCampaignPanelComponent {
     if (!this.canWrite() || this.mutationBusy()) return;
     const context = this.context(); this.mutationBusy.set(true);
     try { await this.library.updateVariant(variant, { archived: !variant.archived }); if (!this.destroy.destroyed && context === this.context()) await this.load(); }
-    catch (error) { if (!this.destroy.destroyed && context === this.context()) this.error.set(error instanceof Error ? error.message : "No se pudo cambiar el estado."); }
+    catch (error) { if (!this.destroy.destroyed && context === this.context()) this.error.set(error instanceof Error ? error.message : $localize`:@@ui.c49cf4d572bb20:No se pudo cambiar el estado.`); }
     finally { if (!this.destroy.destroyed && context === this.context()) this.mutationBusy.set(false); }
   }
 }

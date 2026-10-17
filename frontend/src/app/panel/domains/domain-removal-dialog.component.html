@@ -1,70 +1,70 @@
-<h2 mat-dialog-title>Eliminar dominio</h2>
+<h2 mat-dialog-title><ng-container i18n="@@ui.5a624d67c83f69">Eliminar dominio</ng-container></h2>
 <mat-dialog-content>
   <p class="hostname">{{ data.domain }}</p>
-  <p>Primero revisaremos los enlaces asociados. El borrado del dominio se confirma por separado.</p>
+  <p><ng-container i18n="@@ui.8449df3993977a">Primero revisaremos los enlaces asociados. El borrado del dominio se confirma por separado.</ng-container></p>
   <p class="status" role="status" aria-live="polite">{{ status() }}</p>
-  @if (loading() || busy()) { <mat-progress-bar mode="indeterminate" aria-label="Revisando el dominio" /> }
+  @if (loading() || busy()) { <mat-progress-bar mode="indeterminate" aria-label="Revisando el dominio"  i18n-aria-label="@@ui.53efe5848ba948"/> }
   @if (error(); as message) {
     <div class="alert error" role="alert" #operationError tabindex="-1"><p>{{ message }}</p>
       @if (uncertain()) {
-        <p>No hemos podido confirmar el resultado. Conservamos la misma operación para comprobarla sin repetir sus efectos.</p>
-        <p>Puedes reintentar aquí o cerrar y consultar el estado al volver.</p>
-        <button mat-stroked-button type="button" (click)="apply()" [disabled]="busy() !== null">Comprobar resultado y reintentar</button>
+        <p><ng-container i18n="@@ui.e081e94a235b3e">No hemos podido confirmar el resultado. Conservamos la misma operación para comprobarla sin repetir sus efectos.</ng-container></p>
+        <p><ng-container i18n="@@ui.e899b300097552">Puedes reintentar aquí o cerrar y consultar el estado al volver.</ng-container></p>
+        <button mat-stroked-button type="button" (click)="apply()" [disabled]="busy() !== null"><ng-container i18n="@@ui.6539d37743fd7d">Comprobar resultado y reintentar</ng-container></button>
       } @else if (!impact()) {
-        <button mat-stroked-button type="button" (click)="reload()" [disabled]="locked() || loading()">Reintentar revisión</button>
+        <button mat-stroked-button type="button" (click)="reload()" [disabled]="locked() || loading()"><ng-container i18n="@@ui.f77c7c5a0c2636">Reintentar revisión</ng-container></button>
       }
     </div>
   }
   @if (impact(); as impact) {
-    <h3 #impactHeading tabindex="-1">Enlaces asociados</h3>
-    <dl class="impact"><div><dt>Biblioteca</dt><dd>{{ impact.liveLinks }}</dd></div><div><dt>Papelera</dt><dd>{{ impact.trashedLinks }}</dd></div><div><dt>Bloqueados</dt><dd>{{ impact.blockedLinks }}</dd></div></dl>
-    @if (impact.isDefault) { <p class="alert">Es el dominio predeterminado. Al eliminarlo, los enlaces nuevos usarán el dominio de plataforma hasta que elijas otro.</p> }
-    @if (impact.blockedLinks > 0) { <p class="alert">Hay enlaces bloqueados. Su gestión requiere intervención de la administración de la plataforma.</p> }
+    <h3 #impactHeading tabindex="-1"><ng-container i18n="@@ui.d561b8c7cdb1c8">Enlaces asociados</ng-container></h3>
+    <dl class="impact"><div><dt><ng-container i18n="@@ui.c9169c12cba9cf">Biblioteca</ng-container></dt><dd>{{ impact.liveLinks }}</dd></div><div><dt><ng-container i18n="@@ui.c5181f94537ec9">Papelera</ng-container></dt><dd>{{ impact.trashedLinks }}</dd></div><div><dt><ng-container i18n="@@ui.f7abda74dc6d80">Bloqueados</ng-container></dt><dd>{{ impact.blockedLinks }}</dd></div></dl>
+    @if (impact.isDefault) { <p class="alert"><ng-container i18n="@@ui.8210e5318cda55">Es el dominio predeterminado. Al eliminarlo, los enlaces nuevos usarán el dominio de plataforma hasta que elijas otro.</ng-container></p> }
+    @if (impact.blockedLinks > 0) { <p class="alert"><ng-container i18n="@@ui.af965c52a6e2e2">Hay enlaces bloqueados. Su gestión requiere intervención de la administración de la plataforma.</ng-container></p> }
     @if (impact.canDelete) {
       <div class="delete-review">
-        <h3>Sin enlaces asociados</h3>
-        <p>Eliminarás <strong>{{ impact.domain }}</strong> de este workspace y se liberará su vinculación en UVH. Los registros de tu proveedor DNS permanecerán como están.</p>
-        <mat-checkbox [checked]="deleteConfirmation()" (change)="deleteConfirmation.set($event.checked)" [disabled]="locked()">Confirmo que quiero eliminar {{ impact.domain }}</mat-checkbox>
-        <button mat-flat-button class="danger" type="button" (click)="remove()" [disabled]="locked() || !deleteConfirmation()">Eliminar dominio definitivamente</button>
+        <h3><ng-container i18n="@@ui.076b6d986c6205">Sin enlaces asociados</ng-container></h3>
+        <p><ng-container i18n="@@ui.640763d5c3f373">Eliminarás </ng-container><strong>{{ impact.domain }}</strong> <ng-container i18n="@@ui.19785154f6bbeb">de este workspace y se liberará su vinculación en UVH. Los registros de tu proveedor DNS permanecerán como están.</ng-container></p>
+        <mat-checkbox [checked]="deleteConfirmation()" (change)="deleteConfirmation.set($event.checked)" [disabled]="locked()"><ng-container i18n="@@ui.3c4bdb81fcd925">Confirmo que quiero eliminar {{ impact.domain }}</ng-container></mat-checkbox>
+        <button mat-flat-button class="danger" type="button" (click)="remove()" [disabled]="locked() || !deleteConfirmation()"><ng-container i18n="@@ui.25747b06dbe1e8">Eliminar dominio definitivamente</ng-container></button>
       </div>
     } @else {
-      <p>Quedan {{ impact.totalLinks }} enlaces asociados. Reasígnalos antes de eliminar el dominio, incluidos los de la papelera que quieras conservar.</p>
-      @if (!managing()) { <button mat-flat-button type="button" (click)="startManaging()" [disabled]="locked()">Revisar y reasignar</button> }
+      <p><ng-container i18n="@@ui.4a19adf356b9ae">Quedan {{ impact.totalLinks }} enlaces asociados. Reasígnalos antes de eliminar el dominio, incluidos los de la papelera que quieras conservar.</ng-container></p>
+      @if (!managing()) { <button mat-flat-button type="button" (click)="startManaging()" [disabled]="locked()"><ng-container i18n="@@ui.2e56df4c5175aa">Revisar y reasignar</ng-container></button> }
     }
   }
   @if (managing() && impact() && !impact()!.canDelete) {
-    <section class="selection" aria-label="Enlaces para reasignar">
-      <h3 #selectionHeading tabindex="-1">1. Selecciona los enlaces</h3>
-      <p>Hasta 100 por operación. La selección se conserva al buscar y cambiar de página.</p>
-      <mat-tab-group [selectedIndex]="tab()" (selectedIndexChange)="changeTab($event)"><mat-tab label="Biblioteca" [disabled]="locked()" /><mat-tab label="Papelera" [disabled]="locked()" /></mat-tab-group>
-      <div class="search"><mat-form-field appearance="outline"><mat-label>Buscar por nombre, alias o destino</mat-label><input matInput #query [value]="q()" (keyup.enter)="search(query.value)" [disabled]="locked()" /></mat-form-field><button mat-stroked-button type="button" (click)="search(query.value)" [disabled]="locked()">Buscar</button></div>
-      @if (rowsLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando enlaces del dominio" /> }
-      @if (rowsError(); as message) { <div class="alert error" role="alert">{{ message }} <button mat-button type="button" (click)="loadRows()" [disabled]="locked()">Reintentar</button></div> }
+    <section class="selection" aria-label="Enlaces para reasignar" i18n-aria-label="@@ui.beb48c673d50fb">
+      <h3 #selectionHeading tabindex="-1"><ng-container i18n="@@ui.cb7a221586b1ff">1. Selecciona los enlaces</ng-container></h3>
+      <p><ng-container i18n="@@ui.b7453c27bc9416">Hasta 100 por operación. La selección se conserva al buscar y cambiar de página.</ng-container></p>
+      <mat-tab-group [selectedIndex]="tab()" (selectedIndexChange)="changeTab($event)"><mat-tab label="Biblioteca" [disabled]="locked()"  i18n-label="@@ui.c9169c12cba9cf"/><mat-tab label="Papelera" [disabled]="locked()"  i18n-label="@@ui.c5181f94537ec9"/></mat-tab-group>
+      <div class="search"><mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.30469bb6d09759">Buscar por nombre, alias o destino</ng-container></mat-label><input matInput #query [value]="q()" (keyup.enter)="search(query.value)" [disabled]="locked()" /></mat-form-field><button mat-stroked-button type="button" (click)="search(query.value)" [disabled]="locked()"><ng-container i18n="@@ui.5f55edf9008960">Buscar</ng-container></button></div>
+      @if (rowsLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Cargando enlaces del dominio"  i18n-aria-label="@@ui.9e24b37f83bb3b"/> }
+      @if (rowsError(); as message) { <div class="alert error" role="alert">{{ message }} <button mat-button type="button" (click)="loadRows()" [disabled]="locked()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div> }
       @for (row of rows(); track row.link.id) {
-        <div class="candidate"><mat-checkbox [checked]="selected().has(row.link.id)" (change)="toggle(row, $event.checked)" [disabled]="locked() || row.blocked || (!selected().has(row.link.id) && selected().size >= 100)" [aria-label]="'Seleccionar ' + row.link.alias" />
-          <div><strong>{{ row.link.name || row.link.alias }}</strong><p class="url">{{ row.link.shortUrl }}</p><small>{{ row.blocked ? 'Bloqueado · requiere administración' : stateLabel(row.link.state) }}@if (row.purgeAt) { · Purga prevista: {{ formatDate(row.purgeAt) }} }</small></div>
+        <div class="candidate"><mat-checkbox [checked]="selected().has(row.link.id)" (change)="toggle(row, $event.checked)" [disabled]="locked() || row.blocked || (!selected().has(row.link.id) && selected().size >= 100)" [aria-label]="uiText.ui_659be4aff65fbb + row.link.alias" />
+          <div><strong>{{ row.link.name || row.link.alias }}</strong><p class="url">{{ row.link.shortUrl }}</p><small>{{ row.blocked ? uiText.ui_aa4ca95b797902 : stateLabel(row.link.state) }}@if (row.purgeAt) { <ng-container i18n="@@ui.bfc33cc251eba1">· Purga prevista: {{ formatDate(row.purgeAt) }} </ng-container>}</small></div>
         </div>
-      } @empty { @if (!rowsLoading() && !rowsError()) { <p>No hay enlaces en esta vista.</p> } }
-      <mat-paginator [length]="total()" [pageSize]="perPage" [pageIndex]="page()" [disabled]="locked() || rowsLoading()" (page)="paginate($event)" aria-label="Páginas de enlaces del dominio" />
-      <p role="status">{{ selected().size }} enlaces seleccionados de un máximo de 100.</p>
-      <h3>2. Elige el destino y revisa</h3>
-      <mat-form-field appearance="outline" floatLabel="always"><mat-label>Dominio de destino</mat-label><mat-select placeholder="Elige un destino" [value]="targetId() === null ? 'platform' : targetId()" (selectionChange)="changeTarget($event.value === 'platform' ? null : $event.value)" [disabled]="locked()"><mat-option value="platform">Dominio de plataforma</mat-option>@for (domain of targetOptions(); track domain.id) { <mat-option [value]="domain.id">{{ domain.domain }}</mat-option> }</mat-select></mat-form-field>
-      <button mat-stroked-button type="button" (click)="review()" [disabled]="locked() || !selected().size || targetId() === undefined">Revisar cambios</button>
-      <p>Los enlaces de la papelera seguirán eliminados y conservarán su fecha de purga. Su alias volverá a comprobarse al restaurarlos.</p>
+      } @empty { @if (!rowsLoading() && !rowsError()) { <p><ng-container i18n="@@ui.9a68d8f969f60f">No hay enlaces en esta vista.</ng-container></p> } }
+      <mat-paginator [length]="total()" [pageSize]="perPage" [pageIndex]="page()" [disabled]="locked() || rowsLoading()" (page)="paginate($event)" aria-label="Páginas de enlaces del dominio"  i18n-aria-label="@@ui.696471e6942eb9"/>
+      <p role="status"><ng-container i18n="@@ui.bef91a125e5154">{{ selected().size }} enlaces seleccionados de un máximo de 100.</ng-container></p>
+      <h3><ng-container i18n="@@ui.36061cfa6ab1ab">2. Elige el destino y revisa</ng-container></h3>
+      <mat-form-field appearance="outline" floatLabel="always"><mat-label><ng-container i18n="@@ui.85aa7146b14ad1">Dominio de destino</ng-container></mat-label><mat-select placeholder="Elige un destino" [value]="targetId() === null ? 'platform' : targetId()" (selectionChange)="changeTarget($event.value === 'platform' ? null : $event.value)" [disabled]="locked()" i18n-placeholder="@@ui.daa3c9cf8cc54e"><mat-option value="platform"><ng-container i18n="@@ui.0cc77fb5a97e9b">Dominio de plataforma</ng-container></mat-option>@for (domain of targetOptions(); track domain.id) { <mat-option [value]="domain.id">{{ domain.domain }}</mat-option> }</mat-select></mat-form-field>
+      <button mat-stroked-button type="button" (click)="review()" [disabled]="locked() || !selected().size || targetId() === undefined"><ng-container i18n="@@ui.afda27aac75a77">Revisar cambios</ng-container></button>
+      <p><ng-container i18n="@@ui.2bb3e5191a9f25">Los enlaces de la papelera seguirán eliminados y conservarán su fecha de purga. Su alias volverá a comprobarse al restaurarlos.</ng-container></p>
     </section>
     @if (preview(); as preview) {
-      <section class="preview" aria-label="Vista previa de la reasignación">
-        <h3 #previewHeading tabindex="-1">3. Confirma las nuevas URL</h3>
-        <p class="alert"><strong>Cambiará la URL pública.</strong> Los enlaces y QR ya compartidos conservan la dirección anterior y tendrás que actualizarlos. No se creará una redirección desde la dirección antigua.</p>
+      <section class="preview" aria-label="Vista previa de la reasignación" i18n-aria-label="@@ui.bcd3cdf782d649">
+        <h3 #previewHeading tabindex="-1"><ng-container i18n="@@ui.1dc397f707d6cc">3. Confirma las nuevas URL</ng-container></h3>
+        <p class="alert"><strong><ng-container i18n="@@ui.2d9797874a1fd5">Cambiará la URL pública.</ng-container></strong> <ng-container i18n="@@ui.1d5d2ead7add65">Los enlaces y QR ya compartidos conservan la dirección anterior y tendrás que actualizarlos. No se creará una redirección desde la dirección antigua.</ng-container></p>
         @for (row of preview.links; track row.linkId) {
-          <article class="preview-row"><strong>{{ row.alias }}</strong><dl><div><dt>Anterior</dt><dd class="url">{{ row.oldUrl }}</dd></div><div><dt>Nueva</dt><dd class="url">{{ row.newUrl }}</dd></div></dl>
-            @if (row.inTrash) { <small>Se conserva en papelera · purga {{ formatDate(row.purgeAt) }}</small> }
-            @if (row.conflict) { <p class="error" role="status">{{ row.conflict === 'blocked' ? 'Bloqueado: requiere administración.' : 'Alias ocupado o repetido en la selección. Elige otro destino o ajusta la selección.' }}</p> }
+          <article class="preview-row"><strong>{{ row.alias }}</strong><dl><div><dt><ng-container i18n="@@ui.e4ce7c09d51e3b">Anterior</ng-container></dt><dd class="url">{{ row.oldUrl }}</dd></div><div><dt><ng-container i18n="@@ui.caf7d2bd0b101f">Nueva</ng-container></dt><dd class="url">{{ row.newUrl }}</dd></div></dl>
+            @if (row.inTrash) { <small><ng-container i18n="@@ui.668f5c3a7f1741">Se conserva en papelera · purga {{ formatDate(row.purgeAt) }}</ng-container></small> }
+            @if (row.conflict) { <p class="error" role="status">{{ row.conflict === 'blocked' ? uiText.ui_0ca95fdb1651e2 : uiText.ui_9bca123194fc23 }}</p> }
           </article>
         }
-        <button mat-flat-button type="button" (click)="apply()" [disabled]="busy() !== null || !preview.canApply || uncertain()">Confirmar reasignación de {{ preview.links.length }} enlaces</button>
+        <button mat-flat-button type="button" (click)="apply()" [disabled]="busy() !== null || !preview.canApply || uncertain()"><ng-container i18n="@@ui.a9988022b9bb68">Confirmar reasignación de {{ preview.links.length }} enlaces</ng-container></button>
       </section>
     }
   }
 </mat-dialog-content>
-<mat-dialog-actions align="end"><button mat-button type="button" (click)="close()" [disabled]="busy() !== null">Cerrar</button></mat-dialog-actions>
+<mat-dialog-actions align="end"><button mat-button type="button" (click)="close()" [disabled]="busy() !== null"><ng-container i18n="@@ui.aeccae342e4bd0">Cerrar</ng-container></button></mat-dialog-actions>

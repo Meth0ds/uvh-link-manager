@@ -28,8 +28,6 @@ namespace App\Support;
  */
 final class VisitorPage
 {
-    private const BRAND = 'UVH · Enlaces cortos. Control total.';
-
     /**
      * La puerta: pide la contraseña del enlace y, si el intento anterior falló,
      * explica por qué sin cambiar de pantalla.
@@ -43,12 +41,12 @@ final class VisitorPage
         $describedBy = $error !== null ? 'gate-error gate-hint' : 'gate-hint';
 
         $body = '<main class="plate">'
-            .'<p class="brand">'.self::escape(self::BRAND).'</p>'
-            .'<p class="chip">'.self::icon('lock').'Acceso restringido</p>'
-            .'<h1>Enlace protegido</h1>'
-            .'<p class="lede">Este enlace está protegido con contraseña. Introdúcela para continuar.</p>'
+            .'<p class="brand">'.self::escape(__('visitor.brand')).'</p>'
+            .'<p class="chip">'.self::icon('lock').self::escape(__('visitor.restricted')).'</p>'
+            .'<h1>'.self::escape(__('visitor.protected')).'</h1>'
+            .'<p class="lede">'.self::escape(__('visitor.protected_body')).'</p>'
             .'<form method="post" action="/r/'.rawurlencode($alias).'/unlock">'
-            .'<label for="gate-password">Contraseña</label>'
+            .'<label for="gate-password">'.self::escape(__('visitor.password')).'</label>'
             .'<input id="gate-password" name="password" type="password" autocomplete="current-password"'
             .' maxlength="72" required autofocus spellcheck="false" autocapitalize="none" enterkeyhint="go"'
             .' aria-describedby="'.$describedBy.'"'.($error !== null ? ' aria-invalid="true"' : '').'>'
@@ -57,15 +55,15 @@ final class VisitorPage
             .($error !== null
                 ? '<p class="note" id="gate-error" role="alert">'.self::escape($error).'</p>'
                 : '')
-            .'<p class="hint" id="gate-hint">Hasta 72 caracteres. Te la habrá compartido quien te envió el enlace.</p>'
+            .'<p class="hint" id="gate-hint">'.self::escape(__('visitor.password_hint')).'</p>'
             .'<input type="hidden" name="_csrf" value="'.self::escape($csrfToken).'">'
             .($qrPublicId !== null ? '<input type="hidden" name="qr" value="'.self::escape($qrPublicId).'">' : '')
-            .'<button type="submit"><span class="label">Continuar</span><span class="pending" aria-hidden="true">Comprobando…</span></button>'
+            .'<button type="submit"><span class="label">'.self::escape(__('visitor.continue')).'</span><span class="pending" aria-hidden="true">'.self::escape(__('visitor.checking')).'</span></button>'
             .'</form>'
-            .'<p class="foot">Si no conoces la contraseña, pídesela a quien te envió este enlace.</p>'
+            .'<p class="foot">'.self::escape(__('visitor.ask_password')).'</p>'
             .'</main>';
 
-        return self::document('Enlace protegido', $body);
+        return self::document(__('visitor.protected'), $body);
     }
 
     /**
@@ -87,16 +85,16 @@ final class VisitorPage
         $target = '/r/'.rawurlencode($alias).($qrPublicId !== null ? '?qr='.rawurlencode($qrPublicId) : '');
 
         $body = '<main class="plate">'
-            .'<p class="brand">'.self::escape(self::BRAND).'</p>'
-            .'<h1>Contraseña correcta</h1>'
-            .'<p class="lede">Te llevamos al destino.</p>'
-            .'<p class="handoff"><a href="'.self::escape($target).'">Continuar sin esperar</a></p>'
+            .'<p class="brand">'.self::escape(__('visitor.brand')).'</p>'
+            .'<h1>'.self::escape(__('visitor.password_correct')).'</h1>'
+            .'<p class="lede">'.self::escape(__('visitor.handoff')).'</p>'
+            .'<p class="handoff"><a href="'.self::escape($target).'">'.self::escape(__('visitor.continue_now')).'</a></p>'
             .'</main>';
 
         // El refresco se anuncia en el propio `<head>`: sin él, esta pantalla
         // sería un callejón sin salida para quien no ve el enlace.
         return self::document(
-            'Contraseña correcta',
+            __('visitor.password_correct'),
             $body,
             '<meta http-equiv="refresh" content="0;url='.self::escape($target).'">',
         );
@@ -118,8 +116,8 @@ final class VisitorPage
     public static function notice(string $title, string $body, int $status = 404, ?string $brandHost = null, ?array $button = null): string
     {
         $code = $status >= 400 ? (string) $status : null;
-        $chip = $status >= 500 ? 'Incidencia del servicio' : ($status >= 400 ? 'Enlace no disponible' : 'Aviso del enlace');
-        $brand = $brandHost ?? self::BRAND;
+        $chip = $status >= 500 ? __('visitor.service_issue') : ($status >= 400 ? __('visitor.unavailable_chip') : __('visitor.notice_chip'));
+        $brand = $brandHost ?? __('visitor.brand');
 
         $plate = '<main class="plate">'
             .'<p class="brand">'.self::escape($brand).'</p>'
@@ -129,7 +127,7 @@ final class VisitorPage
             .'<p class="lede">'.self::escape($body).'</p>'
             .($button !== null && ! empty($button['buttonUrl']) && ! empty($button['buttonLabel'])
                 ? '<p class="handoff"><a class="notice-action" href="'.self::escape($button['buttonUrl']).'" rel="noopener noreferrer nofollow">'.self::escape($button['buttonLabel']).'</a></p>' : '')
-            .'<p class="foot">Puedes pedir un enlace nuevo a quien te lo compartió.</p>'
+            .'<p class="foot">'.self::escape(__('visitor.request_new')).'</p>'
             .'</main>';
 
         return self::document($title, $plate, '', $brandHost);
@@ -140,7 +138,7 @@ final class VisitorPage
         // El título y el cuerpo se escapan por separado: `<title>` es texto
         // crudo, así que interpolar ahí sin escapar sería una inyección aunque
         // el cuerpo ya viniera escapado.
-        return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
+        return '<!doctype html><html lang="'.(Language::current() === 'en' ? 'en-GB' : 'es-ES').'"><head><meta charset="utf-8">'
             .'<meta name="viewport" content="width=device-width,initial-scale=1">'
             .'<meta name="color-scheme" content="light dark">'
             .'<meta name="robots" content="noindex">'

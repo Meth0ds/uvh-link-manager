@@ -57,6 +57,7 @@ section[id] { scroll-margin-top: 104px; }
 .brand-caption { font-size: 12px; line-height: 1.5; font-weight: 600; }
 .desktop-nav, .header-actions { display: flex; align-items: center; gap: 28px; }
 .desktop-nav a, .login-link { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 700; }
+.login-link { white-space: nowrap; }
 .desktop-nav a:hover, .login-link:hover { color: var(--accent); }
 .desktop-nav { gap: 22px; }
 .desktop-nav a { position: relative; }
@@ -253,6 +254,7 @@ section[id] { scroll-margin-top: 104px; }
   .footer-navigation { gap: 28px; }
 }
 @media (max-width: 1000px) {
+  .header-actions > app-language-selector { display: none; }
   .header-inner { min-height: 72px; }
   .desktop-nav, .header-create, .header-theme { display: none; }
   .header-actions { gap: 24px; }

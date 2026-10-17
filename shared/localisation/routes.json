@@ -1,0 +1,8 @@
+{
+  "home": { "es": "/", "en": "/" },
+  "help": { "es": "/ayuda", "en": "/help" },
+  "status": { "es": "/estado", "en": "/status" },
+  "terms": { "es": "/legal/terminos", "en": "/legal/terms" },
+  "privacy": { "es": "/legal/privacidad", "en": "/legal/privacy" },
+  "reportAbuse": { "es": "/legal/denuncias", "en": "/legal/report-abuse" }
+}

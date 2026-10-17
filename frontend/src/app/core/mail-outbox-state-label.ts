@@ -7,13 +7,13 @@ import type { MailOutboxStatus } from "./models";
  * filter for a state the badge never prints.
  */
 export const MAIL_OUTBOX_STATE_LABEL: Record<MailOutboxStatus, string> = {
-  pending: "Pendiente",
-  queued: "En cola",
+  pending: $localize`:@@ui.2ef68536d8e212:Pendiente`,
+  queued: $localize`:@@ui.d197619adfc612:En cola`,
   processing: "Procesando",
   sent: "Enviado",
   failed: "Fallido",
   obsolete: "Obsoleto",
-  comp_pending: "Compensación pendiente",
+  comp_pending: $localize`:@@ui.c541a8569f1a79:Compensación pendiente`,
   compensating: "Compensando",
   compensated: "Compensado",
 };

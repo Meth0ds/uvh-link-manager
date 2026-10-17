@@ -41,7 +41,7 @@ class WebhookController
             || strlen($url) > 2048
             || count($events) < 1 || count($events) > count(WebhookEvents::all())
             || count(array_diff($events, WebhookEvents::all())) > 0) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $urlOk = UrlUtil::validateDestination($url);
@@ -50,7 +50,7 @@ class WebhookController
         }
 
         if ($secret !== null && (! is_string($secret) || mb_strlen($secret) < 16 || mb_strlen($secret) > 128)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $plainSecret = is_string($secret) && $secret !== '' ? $secret : Ids::randomToken(32);
@@ -80,10 +80,10 @@ class WebhookController
             return ['status' => 'created', 'webhook' => $webhook];
         });
         if ($result['status'] === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de crear un webhook.'], 403);
+            return response()->json(['error' => __('messages.error_9d562b1245ab11')], 403);
         }
         if ($result['status'] !== 'created') {
-            return response()->json(['error' => 'Límite de webhooks alcanzado'], 429);
+            return response()->json(['error' => __('messages.error_de46e79ae9e652')], 429);
         }
         /** @var Webhook $webhook */
         $webhook = $result['webhook'];
@@ -98,7 +98,7 @@ class WebhookController
 
         $webhook = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $webhook) {
-            return response()->json(['error' => 'Webhook no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4f185028f9e466')], 404);
         }
 
         $url = $request->input('url');
@@ -107,7 +107,7 @@ class WebhookController
         $secret = $request->input('secret');
 
         if ($url !== null && ! is_string($url)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($url !== null) {
             $urlOk = UrlUtil::validateDestination($url);
@@ -120,13 +120,13 @@ class WebhookController
             || count(array_unique($events)) !== count($events)
             || count($events) < 1 || count($events) > count(WebhookEvents::all())
             || count(array_diff($events, WebhookEvents::all())) > 0)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($secret !== null && (! is_string($secret) || mb_strlen($secret) < 16 || mb_strlen($secret) > 128)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($active !== null && ! is_bool($active)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         [$lockAcquired, $updated] = WebhookService::mutateConfiguration($id, function () use ($id, $workspaceId, $user, $url, $events, $active, $secret, $request): string {
@@ -160,13 +160,13 @@ class WebhookController
             });
         });
         if (! $lockAcquired) {
-            return response()->json(['error' => 'Hay una entrega en curso para este webhook. Espera unos segundos antes de modificarlo.'], 409);
+            return response()->json(['error' => __('messages.error_0202e8bffded5f')], 409);
         }
         if ($updated === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de modificar el webhook.'], 403);
+            return response()->json(['error' => __('messages.error_3a07d5c6a0cbeb')], 403);
         }
         if ($updated !== 'ok') {
-            return response()->json(['error' => 'Webhook no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4f185028f9e466')], 404);
         }
 
         return response()->json(['ok' => true]);
@@ -179,7 +179,7 @@ class WebhookController
 
         $webhook = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $webhook) {
-            return response()->json(['error' => 'Webhook no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4f185028f9e466')], 404);
         }
 
         [$lockAcquired, $deleted] = WebhookService::mutateConfiguration($id, function () use ($id, $workspaceId, $user, $request): string {
@@ -199,13 +199,13 @@ class WebhookController
             });
         });
         if (! $lockAcquired) {
-            return response()->json(['error' => 'Hay una entrega en curso para este webhook. Espera unos segundos antes de eliminarlo.'], 409);
+            return response()->json(['error' => __('messages.error_c67549b5405e82')], 409);
         }
         if ($deleted === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de eliminar el webhook.'], 403);
+            return response()->json(['error' => __('messages.error_5f9d9e0d1e496a')], 403);
         }
         if ($deleted !== 'ok') {
-            return response()->json(['error' => 'Webhook no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4f185028f9e466')], 404);
         }
 
         return response()->json(['ok' => true]);
@@ -218,12 +218,12 @@ class WebhookController
         $page = filter_var($request->query('page', 1), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100000]]);
         $perPage = filter_var($request->query('perPage', 20), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 50]]);
         if ($page === false || $perPage === false) {
-            return response()->json(['error' => 'Paginación inválida'], 422);
+            return response()->json(['error' => __('messages.error_7efa41a49e5290')], 422);
         }
 
         $webhook = Webhook::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $webhook) {
-            return response()->json(['error' => 'Webhook no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4f185028f9e466')], 404);
         }
 
         $query = $webhook->deliveries()->orderByDesc('created_at')->orderByDesc('id');
@@ -301,19 +301,19 @@ class WebhookController
             });
         });
         if (! $lockAcquired || $result === 'processing') {
-            return response()->json(['error' => 'La entrega está en curso. Espera a que termine antes de reenviarla.'], 409);
+            return response()->json(['error' => __('messages.error_90b8d9c30acc1c')], 409);
         }
         if ($result === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de reenviar.'], 403);
+            return response()->json(['error' => __('messages.error_66eb455c760afa')], 403);
         }
         if ($result === 'webhook_not_found') {
-            return response()->json(['error' => 'Webhook no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4f185028f9e466')], 404);
         }
         if ($result === 'full') {
-            return response()->json(['error' => 'La cola de entregas del workspace está llena. Espera antes de reenviar.'], 429);
+            return response()->json(['error' => __('messages.error_ae3aa6a0005ac2')], 429);
         }
         if (! in_array($result, ['ok', 'already_pending'], true)) {
-            return response()->json(['error' => 'Entrega no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_2710d805b504bb')], 404);
         }
 
         WebhookService::enqueueExisting($deliveryId);
@@ -350,16 +350,16 @@ class WebhookController
             return $queued ? 'ok' : 'full';
         });
         if ($result === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de probar el webhook.'], 403);
+            return response()->json(['error' => __('messages.error_6fe997bb9a5e3a')], 403);
         }
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Webhook no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_4f185028f9e466')], 404);
         }
         if ($result === 'inactive') {
-            return response()->json(['error' => 'Activa el webhook antes de enviar una prueba'], 409);
+            return response()->json(['error' => __('messages.error_9d47825d4c3d59')], 409);
         }
         if ($result !== 'ok') {
-            return response()->json(['error' => 'La cola de entregas del workspace está llena. Espera a que terminen las entregas pendientes.'], 429);
+            return response()->json(['error' => __('messages.error_dbeabe94de3b6d')], 429);
         }
 
         return response()->json(['ok' => true, 'eventId' => $eventId], 202);
@@ -414,15 +414,15 @@ class WebhookController
             return null;
         }
         [$code, $message] = match (true) {
-            preg_match('/^HTTP [1-5][0-9]{2}$/', $error) === 1 => ['receiver_http', 'El receptor devolvió una respuesta no satisfactoria.'],
-            str_contains($error, 'política de red') => ['network_policy', 'El destino fue bloqueado por la política de red.'],
-            str_contains($error, 'resolver') => ['dns_resolution', 'No se pudo resolver el destino.'],
-            str_contains($error, 'serializar') => ['serialization', 'No se pudo preparar el evento.'],
-            str_contains($error, 'Configuración de webhook modificada') => ['configuration_changed', 'La configuración cambió antes de la entrega.'],
-            str_contains($error, 'creador ya no conserva') => ['creator_permission_revoked', 'El creador ya no conserva permiso de edición.'],
-            str_contains($error, 'infraestructura de entrega') => ['delivery_infrastructure', 'La infraestructura de entrega no estuvo disponible.'],
-            str_contains($error, 'conectar con el destino') => ['connection_failed', 'No se pudo conectar con el receptor.'],
-            default => ['unknown_failure', 'La entrega no se completó.'],
+            preg_match('/^HTTP [1-5][0-9]{2}$/', $error) === 1 => ['receiver_http', __('display.display_4ac028ee5e765c')],
+            str_contains($error, 'política de red') => ['network_policy', __('display.display_9f94d703e55f95')],
+            str_contains($error, 'resolver') => ['dns_resolution', __('display.display_2cb3206c445f82')],
+            str_contains($error, 'serializar') => ['serialization', __('display.display_9649b19c6e5546')],
+            str_contains($error, 'Configuración de webhook modificada') => ['configuration_changed', __('display.display_a3fb0df544ab74')],
+            str_contains($error, 'creador ya no conserva') => ['creator_permission_revoked', __('display.display_3eb10003d2082f')],
+            str_contains($error, 'infraestructura de entrega') => ['delivery_infrastructure', __('display.display_1ad248f1105414')],
+            str_contains($error, 'conectar con el destino') => ['connection_failed', __('display.display_723de4cb39c956')],
+            default => ['unknown_failure', __('display.display_66a1c935e5432c')],
         };
 
         return ['code' => $code, 'message' => $message];

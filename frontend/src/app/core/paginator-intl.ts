@@ -16,15 +16,15 @@ import { MatPaginatorIntl } from "@angular/material/paginator";
 // one before that deprecation becomes an error.
 @Injectable()
 export class SpanishPaginatorIntl extends MatPaginatorIntl {
-  override itemsPerPageLabel = "Elementos por página:";
-  override nextPageLabel = "Página siguiente";
-  override previousPageLabel = "Página anterior";
-  override firstPageLabel = "Primera página";
-  override lastPageLabel = "Última página";
+  override itemsPerPageLabel = $localize`:@@ui.2f202c718417be:Elementos por página:`;
+  override nextPageLabel = $localize`:@@ui.9dd6b398421db4:Página siguiente`;
+  override previousPageLabel = $localize`:@@ui.9bcad734827a84:Página anterior`;
+  override firstPageLabel = $localize`:@@ui.977c67cffa60e4:Primera página`;
+  override lastPageLabel = $localize`:@@ui.9369fd17b8566b:Última página`;
 
   override getRangeLabel = (page: number, pageSize: number, length: number): string => {
-    if (length === 0 || pageSize === 0) return `0 de ${length}`;
+    if (length === 0 || pageSize === 0) return $localize`:@@pagination.emptyRange:0 de ${length}:TOTAL:`;
     const start = page * pageSize;
-    return `${start + 1} – ${Math.min(start + pageSize, length)} de ${length}`;
+    return $localize`:@@pagination.range:${start + 1}:START: – ${Math.min(start + pageSize, length)}:END: de ${length}:TOTAL:`;
   };
 }

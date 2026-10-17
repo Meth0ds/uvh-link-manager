@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -33,49 +34,49 @@ import type { ImportReport } from "../../core/models";
   template: `
     <h2 mat-dialog-title>
       <span class="title-mark" aria-hidden="true"><mat-icon>upload</mat-icon></span>
-      <span><small>Biblioteca</small><b>Importar enlaces desde CSV</b></span>
+      <span><small><ng-container i18n="@@ui.c9169c12cba9cf">Biblioteca</ng-container></small><b><ng-container i18n="@@ui.af5f7c86f94fdf">Importar enlaces desde CSV</ng-container></b></span>
     </h2>
     <mat-dialog-content class="csv-content">
-      <p class="message">Trae varios enlaces a tu biblioteca. Primero comprobaremos el contenido; después podrás confirmar la importación.</p>
+      <p class="message"><ng-container i18n="@@ui.7bb74b4141f52f">Trae varios enlaces a tu biblioteca. Primero comprobaremos el contenido; después podrás confirmar la importación.</ng-container></p>
       <div class="csv-start">
-        <button mat-stroked-button type="button" (click)="pick.click()" [disabled]="busy() || done()"><mat-icon aria-hidden="true">attach_file</mat-icon> Elegir archivo CSV</button>
-        <span>También puedes pegar su contenido debajo.</span>
+        <button mat-stroked-button type="button" (click)="pick.click()" [disabled]="busy() || done()"><mat-icon aria-hidden="true">attach_file</mat-icon> <ng-container i18n="@@ui.0479e9a4e025f4">Elegir archivo CSV</ng-container></button>
+        <span><ng-container i18n="@@ui.d868a44b3e849b">También puedes pegar su contenido debajo.</ng-container></span>
         <input #pick type="file" accept=".csv,text/csv" hidden (change)="onFile($event)" />
       </div>
-      <label class="csv-label" for="csv-content">Contenido del archivo</label>
+      <label class="csv-label" for="csv-content"><ng-container i18n="@@ui.866e4eeecc5c60">Contenido del archivo</ng-container></label>
       <textarea id="csv-content" class="csv-input" [(ngModel)]="csv" (ngModelChange)="onCsvInput()" aria-label="Contenido CSV" aria-describedby="csv-content-hint" [readonly]="busy() || done()" [attr.maxlength]="maxCsvCharacters"
         placeholder="alias,destination,tags_json&#10;oferta-1,https://example.org/oferta,&quot;[&quot;&quot;prensa;2026&quot;&quot;]&quot;&#10;oferta-2,https://example.org/novedades,&quot;[&quot;&quot;editorial&quot;&quot;]&quot;"
-      ></textarea>
-      <p class="note" id="csv-content-hint">Una cabecera y un enlace por fila. Alias y destino son obligatorios. Máximo 256 KiB.</p>
-      <details class="csv-help"><summary>Formato, columnas y etiquetas</summary>
-        <p>Las columnas obligatorias son <code>alias</code> y <code>destination</code>. También se admiten <code>fallback_destination</code>, <code>notes</code>, <code>scheduled_at</code>, <code>expires_at</code>, <code>max_clicks</code> y <code>single_use</code>.</p>
-        <p><code>tags_json</code> contiene una lista JSON de nombres: <code>["prensa;2026"]</code> es una sola etiqueta. Es el formato del export y del ejemplo anterior.</p>
-        <p>La alternativa <code>tags</code> separa nombres por <b>;</b>: un nombre que lo contenga se partiría en varias etiquetas. Las dos columnas no se pueden usar a la vez en el mismo archivo. Cada fila se comprueba con las mismas reglas que un enlace manual.</p>
+       i18n-placeholder="@@ui.76c52a78414a28" i18n-aria-label="@@ui.99ffb1c0b00cc8"></textarea>
+      <p class="note" id="csv-content-hint"><ng-container i18n="@@ui.5febbcba3c4b03">Una cabecera y un enlace por fila. Alias y destino son obligatorios. Máximo 256 KiB.</ng-container></p>
+      <details class="csv-help"><summary><ng-container i18n="@@ui.e627badeef7748">Formato, columnas y etiquetas</ng-container></summary>
+        <p><ng-container i18n="@@ui.f9c2e056c200d3">Las columnas obligatorias son </ng-container><code>alias</code> <ng-container i18n="@@ui.c49603ad0241e6">y </ng-container><code>destination</code><ng-container i18n="@@ui.b27211c5d068bd">. También se admiten </ng-container><code>fallback_destination</code>, <code>notes</code>, <code>scheduled_at</code>, <code>expires_at</code>, <code>max_clicks</code> <ng-container i18n="@@ui.c49603ad0241e6">y </ng-container><code>single_use</code>.</p>
+        <p><code>tags_json</code> <ng-container i18n="@@ui.e7f290fd94e305">contiene una lista JSON de nombres: </ng-container><code>["prensa;2026"]</code> <ng-container i18n="@@ui.49ccc805be8771">es una sola etiqueta. Es el formato del export y del ejemplo anterior.</ng-container></p>
+        <p><ng-container i18n="@@ui.9194263a9b3301">La alternativa </ng-container><code>tags</code> <ng-container i18n="@@ui.27b9f24e48616e">separa nombres por </ng-container><b>;</b><ng-container i18n="@@ui.1f595cb45293ff">: un nombre que lo contenga se partiría en varias etiquetas. Las dos columnas no se pueden usar a la vez en el mismo archivo. Cada fila se comprueba con las mismas reglas que un enlace manual.</ng-container></p>
       </details>
-      @if (reading()) { <p class="csv-status" role="status">Leyendo el archivo…</p> }
-      @if (busy()) { <p class="csv-status" role="status">{{ importing() ? 'Importando enlaces…' : 'Comprobando el CSV…' }}</p> }
+      @if (reading()) { <p class="csv-status" role="status"><ng-container i18n="@@ui.59e9cb72bbc320">Leyendo el archivo…</ng-container></p> }
+      @if (busy()) { <p class="csv-status" role="status">{{ importing() ? uiText.ui_acc92a123145d0 : uiText.ui_10f442f519d097 }}</p> }
       @if (report(); as current) {
         <div class="report csv-report" role="status" [class.ok]="!current.errors.length">
           @if (current.dryRun) {
-            <b>Comprobación terminada. Todavía no se ha importado ningún enlace.</b>
-            <span>{{ current.valid }} filas importables con el estado actual del workspace. La comprobación no reserva alias ni cuota.</span>
+            <b><ng-container i18n="@@ui.11278668dfd750">Comprobación terminada. Todavía no se ha importado ningún enlace.</ng-container></b>
+            <span><ng-container i18n="@@ui.60b564c7c96ff8">{{ current.valid }} filas importables con el estado actual del workspace. La comprobación no reserva alias ni cuota.</ng-container></span>
           } @else {
-            <b>Importación completada.</b>
+            <b><ng-container i18n="@@ui.da5870cc1fb7d3">Importación completada.</ng-container></b>
             <span>
-              {{ current.created }} enlaces creados de {{ current.valid }} filas válidas.
-              @if (current.failed > 0) {
-                <b>{{ current.failed }} filas</b> no se pudieron crear.
-              }
+              <ng-container i18n="@@ui.4ddc0f5aa60fe0">{{ current.created }} enlaces creados de {{ current.valid }} filas válidas.
+              </ng-container>@if (current.failed > 0) {
+                <b><ng-container i18n="@@ui.37c3ba04df252b">{{ current.failed }} filas</ng-container></b> <ng-container i18n="@@ui.a5d2c1d648f89a">no se pudieron crear.
+              </ng-container>}
             </span>
           }
           @if (current.errors.length) {
             <ul class="row-errors">
               @for (row of current.errors; track row.row) {
-                <li><b>Fila {{ row.row }}:</b> {{ row.error }}</li>
+                <li><b><ng-container i18n="@@ui.bb42f859b71de5">Fila {{ row.row }}:</ng-container></b> {{ row.error }}</li>
               }
             </ul>
             @if (current.truncated) {
-              <p class="note">Hay más errores de los que se muestran: corrige estos y vuelve a validar.</p>
+              <p class="note"><ng-container i18n="@@ui.bac994f7b5e3cc">Hay más errores de los que se muestran: corrige estos y vuelve a validar.</ng-container></p>
             }
           }
         </div>
@@ -85,17 +86,17 @@ import type { ImportReport } from "../../core/models";
           <span>{{ error() }}</span>
           @if (retryImport()) {
             <button mat-stroked-button type="button" (click)="retry()" [disabled]="busy()">
-              <mat-icon>replay</mat-icon> Reintentar
-            </button>
+              <mat-icon>replay</mat-icon> <ng-container i18n="@@ui.50b2a935ab38f2">Reintentar
+            </ng-container></button>
           }
         </div>
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button type="button" (click)="close()" [disabled]="importing()">{{ done() ? "Cerrar" : "Cancelar" }}</button>
+      <button mat-button type="button" (click)="close()" [disabled]="importing()">{{ done() ? uiText.ui_aeccae342e4bd0 : uiText.ui_bb9dbb406dcbd5 }}</button>
       @if (!done()) {
-        <button mat-stroked-button type="button" (click)="validate()" [disabled]="busy() || reading() || !csv.trim() || retryImport() !== null"><mat-icon aria-hidden="true">fact_check</mat-icon> Comprobar archivo</button>
-        <button mat-flat-button type="button" (click)="import()" [disabled]="busy() || reading() || !csv.trim() || !report()?.dryRun || !report()?.valid || retryImport() !== null"><mat-icon aria-hidden="true">upload</mat-icon> {{ report()?.dryRun && report()?.valid ? 'Importar ' + report()!.valid + (report()!.valid === 1 ? ' enlace' : ' enlaces') : 'Importar enlaces' }}</button>
+        <button mat-stroked-button type="button" (click)="validate()" [disabled]="busy() || reading() || !csv.trim() || retryImport() !== null"><mat-icon aria-hidden="true">fact_check</mat-icon> <ng-container i18n="@@ui.be364d3586bc53">Comprobar archivo</ng-container></button>
+        <button mat-flat-button type="button" (click)="import()" [disabled]="busy() || reading() || !csv.trim() || !report()?.dryRun || !report()?.valid || retryImport() !== null"><mat-icon aria-hidden="true">upload</mat-icon> {{ report()?.dryRun && report()?.valid ? uiText.ui_c826abd76e49f9 + report()!.valid + (report()!.valid === 1 ? uiText.ui_def24a563de79d : uiText.ui_217d3b30904bdf) : uiText.ui_d4bc6d8690c68d }}</button>
       }
     </mat-dialog-actions>
   `,
@@ -103,6 +104,7 @@ import type { ImportReport } from "../../core/models";
   styleUrls: ["../dialog-identity.scss", "../scale-dialog.scss"],
 })
 export class CsvImportDialogComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly workspaces = inject(WorkspaceService);
@@ -152,7 +154,7 @@ export class CsvImportDialogComponent {
     this.error.set(null);
     this.retryImport.set(null);
     if (!csvFileCanFit(file.size)) {
-      this.error.set("El CSV supera el máximo de 256 KiB. Divide el archivo antes de importarlo.");
+      this.error.set($localize`:@@ui.5bceed7921b9f1:El CSV supera el máximo de 256 KiB. Divide el archivo antes de importarlo.`);
       return;
     }
     this.reading.set(true);
@@ -161,12 +163,12 @@ export class CsvImportDialogComponent {
       const text = await file.text();
       if (!current()) return;
       if (!csvTextWithinLimit(text)) {
-        this.error.set("El CSV supera el máximo de 256 KiB. Divide el archivo antes de importarlo.");
+        this.error.set($localize`:@@ui.5bceed7921b9f1:El CSV supera el máximo de 256 KiB. Divide el archivo antes de importarlo.`);
         return;
       }
       this.csv = text;
     } catch {
-      if (current()) this.error.set("No se pudo leer el archivo. Vuelve a elegirlo o pega su contenido.");
+      if (current()) this.error.set($localize`:@@ui.08647b5e071e3f:No se pudo leer el archivo. Vuelve a elegirlo o pega su contenido.`);
     } finally {
       if (current()) this.reading.set(false);
     }
@@ -244,7 +246,7 @@ export class CsvImportDialogComponent {
     if (!this.stillInOpenedWorkspace()) return;
     if (!csvTextWithinLimit(this.csv)) {
       this.report.set(null);
-      this.error.set("El CSV supera el máximo de 256 KiB. Divide el contenido antes de importarlo.");
+      this.error.set($localize`:@@ui.dc3455560b3e07:El CSV supera el máximo de 256 KiB. Divide el contenido antes de importarlo.`);
       return;
     }
     if (!this.csv.trim()) return;
@@ -267,7 +269,7 @@ export class CsvImportDialogComponent {
       const report = await this.api.post("/api/v1/links/import", { dryRun: true, csv: this.csv }, decodeImportReport);
       if (this.owns(context)) this.report.set(report);
     } catch (err) {
-      if (this.owns(context)) this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo validar el CSV");
+      if (this.owns(context)) this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.fae3436c9a77b0:No se pudo validar el CSV`);
     } finally {
       this.busy.set(false);
     }
@@ -301,7 +303,7 @@ export class CsvImportDialogComponent {
         this.lastImport = null;
         this.retryImport.set(null);
       }
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo importar el CSV");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.6de2f41007d52f:No se pudo importar el CSV`);
     } finally {
       this.dialogRef.disableClose = disabled;
       this.importing.set(false);

@@ -4,8 +4,11 @@ namespace App\Console\Commands;
 
 use App\Support\FrontendUrl;
 use App\Support\IsoDate;
+use App\Support\Language;
+use App\Support\MailLanguage;
 use App\Support\NotificationKinds;
 use App\Support\NotificationPreferences;
+use App\Support\NotificationSubject;
 use App\Support\UvhMail;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -99,7 +102,7 @@ class UvhNotificationsDigest extends Command
                 ->orderBy('id')
                 ->limit(self::MAX_ITEMS_PER_CLAIM)
                 ->lockForUpdate()
-                ->get(['id', 'kind', 'subject', 'created_at']);
+                ->get(['id', 'kind', 'subject', 'subject_data', 'created_at']);
             if ($rows->isEmpty()) {
                 return false;
             }
@@ -126,13 +129,16 @@ class UvhNotificationsDigest extends Command
             $total = (int) DB::table('notifications')->where('user_id', $userId)->whereNull('digested_at')->count();
             $shown = $claim->take(self::MAX_ITEMS_PER_USER)->values()->all();
             $hidden = max(0, $total - count($shown));
-            [$html, $text] = $this->render($shown, $hidden);
 
             // 2. Admisión con identidad determinista y sellado en la MISMA
             // transacción: mismo claim = misma clave de outbox (un reintento no
             // duplica), y admisión y sellado o compilan juntos o no existen.
             $generation = hash('sha256', json_encode([$userId, $ids], JSON_THROW_ON_ERROR));
-            if (! UvhMail::notificationDigest($email, $html, $text, $userId, $generation)) {
+            if (! MailLanguage::render($email, function () use ($email, $shown, $hidden, $userId, $generation): bool {
+                [$html, $text] = $this->render($shown, $hidden);
+
+                return UvhMail::notificationDigest($email, $html, $text, $userId, $generation, Language::current());
+            })) {
                 throw new \RuntimeException('Notification digest outbox admission failed');
             }
             DB::table('notifications')->whereIn('id', $ids)->whereNull('digested_at')
@@ -174,23 +180,24 @@ class UvhNotificationsDigest extends Command
      */
     private function render(array $rows, int $hidden): array
     {
-        $panelUrl = FrontendUrl::base().'/app/notifications';
+        $panelUrl = FrontendUrl::page('/app/notifications');
         $html = '';
         $text = [];
         foreach ($rows as $row) {
-            $title = NotificationKinds::title((string) $row->kind) ?? 'Aviso de UVH';
-            $subject = is_string($row->subject) && $row->subject !== '' ? ' — '.$row->subject : '';
+            $title = NotificationKinds::title((string) $row->kind) ?? __('notifications.generic');
+            $renderedSubject = NotificationSubject::forRow($row);
+            $subject = $renderedSubject !== null && $renderedSubject !== '' ? ' — '.$renderedSubject : '';
             $when = IsoDate::format($row->created_at) ?? '';
             $html .= '<p><strong>'.$this->esc($title).'</strong>'.$this->esc($subject)
                 .'<br><span style="color:#626357;font-size:12px">'.$this->esc($when).'</span></p>';
             $text[] = $title.$subject.' ('.$when.')';
         }
         if ($hidden > 0) {
-            $html .= '<p>…y '.$hidden.' avisos más en tu bandeja.</p>';
-            $text[] = '…y '.$hidden.' avisos más en tu bandeja.';
+            $html .= '<p>'.$this->esc(__('notifications.digest_more', ['count' => $hidden])).'</p>';
+            $text[] = __('notifications.digest_more', ['count' => $hidden]);
         }
-        $html .= '<p><a href="'.$this->esc($panelUrl).'" style="color:#b53c20;text-decoration:underline;">Ver tu bandeja de notificaciones</a></p>';
-        $text[] = 'Bandeja: '.$panelUrl;
+        $html .= '<p><a href="'.$this->esc($panelUrl).'" style="color:#b53c20;text-decoration:underline;">'.$this->esc(__('notifications.digest_view')).'</a></p>';
+        $text[] = __('notifications.digest_inbox', ['url' => $panelUrl]);
 
         return [$html, implode("\n", $text)];
     }

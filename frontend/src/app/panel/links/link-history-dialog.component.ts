@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { DatePipe } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -26,6 +27,7 @@ type HistoryChange = LinkHistoryComparison["changes"][number];
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LinkHistoryDialogComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionDialogService);
   private readonly ref = inject(MatDialogRef<LinkHistoryDialogComponent>);
@@ -67,7 +69,7 @@ export class LinkHistoryDialogComponent {
       if (this.versions().length >= 2 && this.selectedFrom() === null) {
         this.selectedFrom.set(this.versions()[1].revision); this.selectedTo.set(this.versions()[0].revision); await this.compare();
       }
-    } catch (error) { this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo cargar el historial"); }
+    } catch (error) { this.error.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.1377290bd3deb0:No se pudo cargar el historial`); }
     finally { if (request === this.loadRequest) this.loading.set(false); }
   }
 
@@ -100,7 +102,7 @@ export class LinkHistoryDialogComponent {
       if (!this.contextStillValid()) { this.ref.close(false); return; }
       this.comparison.set(result);
     } catch (error) {
-      if (request === this.compareRequest) this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo comparar las versiones");
+      if (request === this.compareRequest) this.error.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.15a42b27bdf7ed:No se pudo comparar las versiones`);
     }
     finally { if (request === this.compareRequest) this.comparing.set(false); }
   }
@@ -108,9 +110,9 @@ export class LinkHistoryDialogComponent {
   async restore(version: LinkHistoryEntry): Promise<void> {
     if (!this.data.canRestore || this.restoring() || !this.contextStillValid()) return;
     const confirmed = await this.actions.confirm({
-      title: `Restaurar revisión ${version.revision}`,
-      message: "Se restaurará la configuración seleccionada. La URL corta, la contraseña actual, los clics y el estado de moderación se conservarán.",
-      confirmLabel: "Restaurar configuración",
+      title: $localize`:@@ui.f8da27b5491a7d:Restaurar revisión ${version.revision}`,
+      message: $localize`:@@ui.ae612153bca9cd:Se restaurará la configuración seleccionada. La URL corta, la contraseña actual, los clics y el estado de moderación se conservarán.`,
+      confirmLabel: $localize`:@@ui.43780122322aaa:Restaurar configuración`,
     });
     if (!confirmed) return;
     if (!this.contextStillValid()) { this.ref.close(false); return; }
@@ -119,22 +121,22 @@ export class LinkHistoryDialogComponent {
       await this.api.post(`/api/v1/links/${this.data.linkId}/history/${version.revision}/restore`, { expectedVersion: this.data.expectedVersion }, undefined, { "Idempotency-Key": crypto.randomUUID() });
       if (!this.contextStillValid()) { this.ref.close(false); return; }
       this.ref.close(true);
-    } catch (error) { this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo restaurar la configuración"); }
+    } catch (error) { this.error.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.02f1f3a95a28d8:No se pudo restaurar la configuración`); }
     finally { this.restoring.set(false); }
   }
 
-  sourceLabel(source: LinkHistoryEntry["source"]): string { return ({ create: "Creación", update: "Edición", duplicate: "Duplicación", restore: "Restauración", import: "Importación", bulk: "Edición masiva" })[source]; }
-  fieldLabel(field: string): string { return ({ destination: "Destino", fallbackDestination: "Destino alternativo", rules: "Reglas", utm: "Campaña UTM", name: "Nombre", notes: "Notas", tags: "Etiquetas", collectionId: "Colección", maxClicks: "Límite de clics", singleUse: "Uso único", scheduledAt: "Activación", expiresAt: "Caducidad", expiredPage: "Página de caducidad", appOpening: "Abrir en una aplicación", socialPreview: "Tarjeta al compartir" })[field] ?? field; }
+  sourceLabel(source: LinkHistoryEntry["source"]): string { return ({ create: $localize`:@@ui.478a1f7d03d22b:Creación`, update: $localize`:@@ui.f162950691763a:Edición`, duplicate: $localize`:@@ui.ef2f1e5dc70764:Duplicación`, restore: $localize`:@@ui.1c1b505bfe1665:Restauración`, import: $localize`:@@ui.ab42305e757184:Importación`, bulk: $localize`:@@ui.31271ee16ec034:Edición masiva` })[source]; }
+  fieldLabel(field: string): string { return ({ destination: $localize`:@@ui.8e7290e445465b:Destino`, fallbackDestination: $localize`:@@ui.ebe25baa0d90dc:Destino alternativo`, rules: "Reglas", utm: $localize`:@@ui.41747ec991f4c7:Campaña UTM`, name: $localize`:@@ui.562bb15757a8b5:Nombre`, notes: $localize`:@@ui.8a6172e21a8758:Notas`, tags: $localize`:@@ui.137cb944c52673:Etiquetas`, collectionId: $localize`:@@ui.1f5e6d240313d9:Colección`, maxClicks: $localize`:@@ui.ef8c3f4fbb95c1:Límite de clics`, singleUse: $localize`:@@ui.0a79a125f400cb:Uso único`, scheduledAt: $localize`:@@ui.6618fdbaed073f:Activación`, expiresAt: "Caducidad", expiredPage: $localize`:@@ui.b43f40c3ef529e:Página de caducidad`, appOpening: $localize`:@@ui.a6e1ae556573bd:Abrir en una aplicación`, socialPreview: $localize`:@@ui.69eee355d1e388:Tarjeta al compartir` })[field] ?? field; }
   fieldGroup(field: string): string {
     if (/^rules(?:\.|\[)/.test(field)) return "Reglas";
-    if (field === "appOpening") return "Destino";
-    if (field === "socialPreview") return "Tarjeta social";
-    if (["destination", "fallbackDestination"].includes(field)) return "Destino";
-    if (["maxClicks", "singleUse"].includes(field)) return "Acceso";
-    if (["collectionId", "tags", "notes"].includes(field)) return "Organización";
-    if (["utm"].includes(field)) return "Campaña";
+    if (field === "appOpening") return $localize`:@@ui.8e7290e445465b:Destino`;
+    if (field === "socialPreview") return $localize`:@@ui.36107c599701c0:Tarjeta social`;
+    if (["destination", "fallbackDestination"].includes(field)) return $localize`:@@ui.8e7290e445465b:Destino`;
+    if (["maxClicks", "singleUse"].includes(field)) return $localize`:@@ui.bf904abc16526a:Acceso`;
+    if (["collectionId", "tags", "notes"].includes(field)) return $localize`:@@ui.e3dbe4d872a577:Organización`;
+    if (["utm"].includes(field)) return $localize`:@@ui.98c0f6d4a303e4:Campaña`;
     if (["scheduledAt", "expiresAt", "expiredPage"].includes(field)) return "Caducidad";
-    return "Configuración";
+    return $localize`:@@ui.bb507137e36313:Configuración`;
   }
   changeGroups(changes: HistoryChange[]): Array<{ label: string; changes: HistoryChange[] }> {
     const groups = new Map<string, HistoryChange[]>();
@@ -159,7 +161,7 @@ export class LinkHistoryDialogComponent {
     if (typeof value === "object") {
       const record = value as Record<string, unknown>;
       if ("imageAssetId" in record && typeof record["title"] === "string") {
-        return [record["enabled"] ? "Personalización activada" : "Personalización desactivada", record["title"], record["description"], record["imageAssetId"] ? "Con imagen personalizada" : "Sin imagen", record["imageAlt"]].filter(Boolean).join("\n");
+        return [record["enabled"] ? $localize`:@@ui.1089eff0957e3c:Personalización activada` : $localize`:@@ui.415eceec74cf81:Personalización desactivada`, record["title"], record["description"], record["imageAssetId"] ? $localize`:@@ui.81ea40e57f8714:Con imagen personalizada` : $localize`:@@ui.bc2505b2aefa66:Sin imagen`, record["imageAlt"]].filter(Boolean).join("\n");
       }
       if (typeof record["destination"] === "string") return `prioridad ${String(record["priority"] ?? "—")} · ${record["destination"]}`;
       return JSON.stringify(value);

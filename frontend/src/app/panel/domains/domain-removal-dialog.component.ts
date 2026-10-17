@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, viewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -28,9 +29,9 @@ interface Candidate { link: LinkDto; blocked: boolean; purgeAt: string | null }
 
 function paginatorLabels(): MatPaginatorIntl {
   const labels = new MatPaginatorIntl();
-  labels.itemsPerPageLabel = "Enlaces por página:";
-  labels.nextPageLabel = "Página siguiente"; labels.previousPageLabel = "Página anterior";
-  labels.firstPageLabel = "Primera página"; labels.lastPageLabel = "Última página";
+  labels.itemsPerPageLabel = $localize`:@@ui.f0bb7ad3257fb1:Enlaces por página:`;
+  labels.nextPageLabel = $localize`:@@ui.9dd6b398421db4:Página siguiente`; labels.previousPageLabel = $localize`:@@ui.9bcad734827a84:Página anterior`;
+  labels.firstPageLabel = $localize`:@@ui.977c67cffa60e4:Primera página`; labels.lastPageLabel = $localize`:@@ui.9369fd17b8566b:Última página`;
   labels.getRangeLabel = (page, size, total) => total === 0 ? "0 de 0" : `${page * size + 1}–${Math.min((page + 1) * size, total)} de ${total}`;
   return labels;
 }
@@ -45,6 +46,7 @@ function paginatorLabels(): MatPaginatorIntl {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DomainRemovalDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly data = inject<DomainRemovalDialogData>(MAT_DIALOG_DATA);
   private readonly ref = inject<MatDialogRef<DomainRemovalDialogComponent, DomainRemovalDialogResult>>(MatDialogRef);
   private readonly api = inject(ApiService);
@@ -160,7 +162,7 @@ export class DomainRemovalDialogComponent {
     } catch (error) {
       if (this.current() && this.rowRequests.isCurrent(request, key)) {
         this.rows.set([]);
-        this.rowsError.set(error instanceof ApiRequestError ? error.message : "No se pudieron cargar los enlaces. Vuelve a intentarlo.");
+        this.rowsError.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.86ca4cbae4fc01:No se pudieron cargar los enlaces. Vuelve a intentarlo.`);
       }
     } finally {
       if (this.current() && this.rowRequests.isCurrent(request, key)) this.rowsLoading.set(false);
@@ -212,7 +214,7 @@ export class DomainRemovalDialogComponent {
         (value) => decodeDomainReassignmentPreview(value, this.data.domainId, targetId, ids));
       if (!this.current() || !this.previewRequests.isCurrent(request, this.ownerContext)) return;
       this.preview.set(preview);
-      this.status.set(preview.canApply ? "Revisión preparada. Comprueba las URL antes de confirmar." : "Hay conflictos. Ajusta la selección o el destino y vuelve a revisar.");
+      this.status.set(preview.canApply ? $localize`:@@ui.00029b02b8f26c:Revisión preparada. Comprueba las URL antes de confirmar.` : $localize`:@@ui.1333bbb4d05eaf:Hay conflictos. Ajusta la selección o el destino y vuelve a revisar.`);
       this.focus("preview");
     } catch (error) {
       if (this.current() && this.previewRequests.isCurrent(request, this.ownerContext)) this.showError(error);
@@ -233,7 +235,7 @@ export class DomainRemovalDialogComponent {
       if (!this.current()) return;
       this.changed = true;
       this.uncertain.set(false); this.selected.set(new Map()); this.preview.set(null); this.targetId.set(undefined);
-      this.status.set(`${preview.links.length} enlaces reasignados. Revisa los enlaces y QR que ya habías compartido.`);
+      this.status.set($localize`:@@ui.0c2a431c65855f:${preview.links.length} enlaces reasignados. Revisa los enlaces y QR que ya habías compartido.`);
       await Promise.all([this.reload(), this.loadRows()]);
       this.focus("impact");
     } catch (error) {
@@ -278,7 +280,7 @@ export class DomainRemovalDialogComponent {
   }
 
   private showError(error: unknown): void {
-    this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo completar la operación. Vuelve a intentarlo.");
+    this.error.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.1f289ae0d2a67e:No se pudo completar la operación. Vuelve a intentarlo.`);
     this.focus("error");
   }
 

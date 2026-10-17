@@ -58,7 +58,7 @@ export class NotificationService {
     ++gate.epoch;
     const pending = gate.tail.then(async () => {
       // A queued read-all must never execute with a replacement account's cookie.
-      if (gate.generation !== this.auth.sessionGeneration()) throw new Error("La sesión cambió");
+      if (gate.generation !== this.auth.sessionGeneration()) throw new Error($localize`:@@ui.2c87771807576b:La sesión cambió`);
       const result = await operation();
       if (gate.generation === this.auth.sessionGeneration()) {
         this.count.set({ generation: gate.generation, value: result.unread });

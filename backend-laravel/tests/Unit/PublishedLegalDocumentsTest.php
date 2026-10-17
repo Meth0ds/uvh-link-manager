@@ -36,6 +36,9 @@ final class PublishedLegalDocumentsTest extends TestCase
         foreach ([['terms', 'terminos', RegistrationAdmission::TERMS_VERSION], ['privacy', 'privacidad', RegistrationAdmission::PRIVACY_VERSION]] as [$name, $slug, $version]) {
             $template = file_get_contents($root.'/frontend/src/app/legal/'.$name.'.component.html');
             $copy = file_get_contents($root.'/frontend/public/legal/versions/'.$version.'/'.$slug.'.html');
+            // Angular localisation markers do not alter the published legal wording.
+            $template = preg_replace('/<\/?ng-container(?:\s+i18n="[^"]*")?>/', '', $template);
+            $template = preg_replace('/\s+i18n(?:-[a-z-]+)?="[^"]*"/', '', $template);
             preg_match_all('/<section class="doc-section".*?<\/section>/s', $template, $sections);
             $this->assertCount(20, $sections[0]);
             foreach ($sections[0] as $clause) {
@@ -46,6 +49,24 @@ final class PublishedLegalDocumentsTest extends TestCase
             $this->assertFileExists($prior);
             $this->assertStringContainsString('Versión 2026-08-30', file_get_contents($prior));
             $this->assertNotSame('2026-08-30', $version);
+        }
+    }
+
+    public function test_english_copies_have_their_own_integrity_and_point_to_the_unchanged_spanish_source(): void
+    {
+        $directory = RepositoryRoot::path().'/frontend/public/legal/versions/2026-10-09';
+        $es = json_decode(file_get_contents($directory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+        $en = json_decode(file_get_contents($directory.'/en/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+        foreach (['terms' => 'terminos', 'privacy' => 'privacidad'] as $slug => $source) {
+            $copy = file_get_contents($directory.'/en/'.$slug.'.html');
+            $this->assertSame('en-GB', $en[$slug]['language']);
+            $this->assertSame($es[$source]['sha256'], $en[$slug]['sourceSha256']);
+            $this->assertSame(hash('sha256', $copy), $en[$slug]['sha256']);
+            $this->assertSame($es[$source]['anchors'], $en[$slug]['anchors']);
+            $this->assertStringContainsString('<html lang="en-GB">', $copy);
+            $this->assertStringNotContainsString('<script', $copy);
+            $this->assertStringNotContainsString('i18n=', $copy);
+            $this->assertStringContainsString('noindex,nofollow', $copy);
         }
     }
 }

@@ -6,6 +6,7 @@ use App\Support\DestinationDenylist;
 use App\Support\DestinationReputationService;
 use App\Support\ExternalEndpoint;
 use App\Support\HCaptcha;
+use App\Support\Language;
 use App\Support\LegalIdentity;
 use App\Support\RegistrationGate;
 use App\Support\UrlUtil;
@@ -52,12 +53,39 @@ class PublicController
 
     public function robots()
     {
-        return response("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /app/\n\nSitemap: https://".config('uvh.public_host')."/sitemap.xml\n", 200)
+        $private = ['/api/', '/app/', '/auth/', '/reports/', '/legal/versions/'];
+        if (config('uvh.localisation_enabled')) {
+            foreach (Language::SUPPORTED as $language) {
+                foreach (['app', 'auth', 'reports', 'legal/versions'] as $surface) {
+                    $private[] = '/'.$language.'/'.$surface.'/';
+                }
+            }
+        }
+        $rules = implode("\n", array_map(fn ($path) => 'Disallow: '.$path, $private));
+
+        return response("User-agent: *\nAllow: /\n".$rules."\n\nSitemap: https://".config('uvh.public_host')."/sitemap.xml\n", 200)
             ->header('Content-Type', 'text/plain');
     }
 
     public function sitemap()
     {
+        if (config('uvh.localisation_enabled')) {
+            $origin = rtrim((string) config('uvh.public_origin'), '/');
+            $escape = static fn (string $value): string => htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+            $urls = [];
+            foreach (Language::routes() as $translations) {
+                $alternatives = '';
+                foreach (['es' => 'es', 'en-GB' => 'en', 'en' => 'en', 'x-default' => 'es'] as $hreflang => $language) {
+                    $alternatives .= '<xhtml:link rel="alternate" hreflang="'.$hreflang.'" href="'.$escape($origin.'/'.$language.$translations[$language]).'"/>';
+                }
+                foreach (Language::SUPPORTED as $language) {
+                    $urls[] = '<url><loc>'.$escape($origin.'/'.$language.$translations[$language]).'</loc>'.$alternatives.'</url>';
+                }
+            }
+
+            return response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'.implode('', $urls).'</urlset>')
+                ->header('Content-Type', 'application/xml; charset=UTF-8');
+        }
         $pages = ['/', '/help', '/status', '/legal/terminos', '/legal/privacidad', '/legal/denuncias'];
         $urls = implode("\n", array_map(
             fn ($p) => '  <url><loc>https://'.config('uvh.public_host').$p.'</loc></url>',
@@ -241,14 +269,14 @@ class PublicController
         $statuses = ['operational', 'degraded', 'major_outage', 'maintenance'];
         // Fixed public names prevent an external feed from exposing topology.
         $componentLabels = [
-            'links' => 'Enlaces y redirecciones',
-            'panel' => 'Panel y API',
-            'webhooks' => 'Entrega de webhooks',
+            'links' => __('display.display_c2d0d38e8af51e'),
+            'panel' => __('display.display_4ea3074b0e8ae0'),
+            'webhooks' => __('display.display_fa4e3b4422dca2'),
             // The custom-domains edge surface, reported by the monitor like the
             // rest. A feed that predates it simply publishes no fourth
             // component: inventing a local status here is exactly what this
             // surface forbids.
-            'domains' => 'Dominios personalizados',
+            'domains' => __('display.display_39a781c0926b9b'),
         ];
         $components = [];
         foreach ($componentLabels as $id => $label) {
@@ -313,10 +341,10 @@ class PublicController
     {
         $captcha = HCaptcha::verify($request, UvhRequest::inputString($request, 'captchaToken'), 'public');
         if ($captcha === HCaptcha::UNAVAILABLE) {
-            return response()->json(['error' => 'La verificación antiabuso no está disponible. Inténtalo de nuevo en unos instantes.'], 503);
+            return response()->json(['error' => __('messages.error_5d206227cc6f30')], 503);
         }
         if ($captcha !== HCaptcha::VALID) {
-            return response()->json(['error' => 'Completa de nuevo la verificación antiabuso.'], 422);
+            return response()->json(['error' => __('messages.error_ce7a06e96d3ff6')], 422);
         }
 
         $alias = $request->input('alias');
@@ -329,32 +357,32 @@ class PublicController
         $validText = static fn (string $value): bool => mb_check_encoding($value, 'UTF-8')
             && preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $value) !== 1;
         if (! is_string($reason) || ! $validText($reason) || mb_strlen($reason) < 3 || mb_strlen($reason) > 200) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($details !== null && (! is_string($details) || ! $validText($details) || mb_strlen($details) > 2000)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($email !== null && (! is_string($email) || ($email !== '' && (! filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254)))) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         // Internal numeric IDs are deliberately not accepted on this public
         // endpoint. A reporter must possess the short URL or alias rather than
         // probing the global link-ID sequence.
         if ($request->has('linkId')) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($alias !== null && (! is_string($alias) || strlen($alias) > 64)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($reportedUrl !== null && (! is_string($reportedUrl) || $reportedUrl === '' || strlen($reportedUrl) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $reportedUrl))) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $resolvedLinkId = null;
         if (is_string($reportedUrl) && $reportedUrl !== '') {
             $resolvedLinkId = $this->resolveReportedLink($reportedUrl);
             if ($resolvedLinkId === -1) {
-                return response()->json(['error' => 'Referencia de enlace inválida'], 422);
+                return response()->json(['error' => __('messages.error_d08f2b68a0cbb9')], 422);
             }
         } elseif (is_string($alias) && $alias !== '') {
             $a = UrlUtil::normalizeAlias($alias);
@@ -364,7 +392,7 @@ class PublicController
         }
 
         if (! $resolvedLinkId) {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
 
         // A public report is only stored when the client address is known.
@@ -379,7 +407,7 @@ class PublicController
         // deployment is misconfigured, so this fails closed like the captcha.
         $ip = (string) ($request->ip() ?? '');
         if ($ip === '') {
-            return response()->json(['error' => 'La verificación antiabuso no está disponible. Inténtalo de nuevo en unos instantes.'], 503);
+            return response()->json(['error' => __('messages.error_5d206227cc6f30')], 503);
         }
 
         $day = now()->format('Y-m-d');
@@ -405,10 +433,10 @@ class PublicController
             return $inserted === 1 ? 'created' : 'duplicate';
         });
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Enlace no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
         }
         if ($result === 'full') {
-            return response()->json(['error' => 'Este enlace ya tiene el máximo diario de denuncias'], 429);
+            return response()->json(['error' => __('messages.error_5a40900b73e1da')], 429);
         }
 
         return response()->json(['ok' => true], 201);
@@ -484,6 +512,6 @@ class PublicController
 
     public function create()
     {
-        return response()->json(['error' => 'Crea una cuenta para acortar enlaces', 'requiresAuth' => true], 401);
+        return response()->json(['error' => __('messages.error_e78c839bc1f118'), 'requiresAuth' => true], 401);
     }
 }

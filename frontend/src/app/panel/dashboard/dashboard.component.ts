@@ -1,3 +1,5 @@
+import { UI_LOCALE } from "../../core/localisation/locale";
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 
@@ -48,6 +50,7 @@ interface DashboardPeriodOption {
   styleUrl: "./dashboard.component.scss",
 })
 export class DashboardComponent {
+  readonly uiText = UI_TEXT;
   private api = inject(ApiService);
   private readonly dialogOwner = inject(DestroyRef);
   readonly router = inject(Router);
@@ -75,14 +78,14 @@ export class DashboardComponent {
   readonly recentLoaded = signal(false);
   readonly period = signal<DashboardPeriod>("30d");
   readonly periods: readonly DashboardPeriodOption[] = [
-    { value: "24h", label: "24 h" },
-    { value: "7d", label: "7 días" },
-    { value: "30d", label: "30 días" },
-    { value: "90d", label: "90 días" },
+    { value: "24h", label: $localize`:@@ui.a00380040f74da:24 h` },
+    { value: "7d", label: $localize`:@@ui.f21b7e014222ce:7 días` },
+    { value: "30d", label: $localize`:@@ui.66d20ec35d5f2a:30 días` },
+    { value: "90d", label: $localize`:@@ui.d1172ad34584c1:90 días` },
   ];
-  readonly periodLabel = computed(() => this.periods.find((option) => option.value === this.period())?.label ?? "30 días");
+  readonly periodLabel = computed(() => this.periods.find((option) => option.value === this.period())?.label ?? $localize`:@@ui.66d20ec35d5f2a:30 días`);
 
-  private readonly numberFormatter = new Intl.NumberFormat("es-ES");
+  private readonly numberFormatter = new Intl.NumberFormat(UI_LOCALE);
 
   private loadedContext: string | null | undefined;
 
@@ -135,7 +138,7 @@ export class DashboardComponent {
       if (this.analyticsRequests.isCurrent(request, this.currentContext())) this.overview.set(overview);
     } catch (error) {
       if (!this.analyticsRequests.isCurrent(request, this.currentContext())) return;
-      this.analyticsError.set(error instanceof ApiRequestError ? error.message : "No se pudo cargar la actividad del periodo.");
+      this.analyticsError.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.e15a6a44662a78:No se pudo cargar la actividad del periodo.`);
     } finally {
       if (this.analyticsRequests.isCurrent(request, this.currentContext())) this.analyticsLoading.set(false);
     }
@@ -161,7 +164,7 @@ export class DashboardComponent {
       this.recentLoaded.set(true);
     } catch (error) {
       if (!this.recentRequests.isCurrent(request, this.currentContext())) return;
-      this.recentError.set(error instanceof ApiRequestError ? error.message : "No se pudieron cargar los enlaces recientes.");
+      this.recentError.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.b5a60c57c2d715:No se pudieron cargar los enlaces recientes.`);
     } finally {
       if (this.recentRequests.isCurrent(request, this.currentContext())) this.recentLoading.set(false);
     }
@@ -217,7 +220,7 @@ export class DashboardComponent {
   countryName(code: string): string {
     if (!/^[A-Za-z]{2}$/.test(code)) return code;
     try {
-      return new Intl.DisplayNames(["es"], { type: "region" }).of(code.toUpperCase()) ?? code;
+      return new Intl.DisplayNames([UI_LOCALE], { type: "region" }).of(code.toUpperCase()) ?? code;
     } catch {
       return code;
     }

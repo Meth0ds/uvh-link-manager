@@ -23,7 +23,7 @@ final class SecurityIncidentController
     {
         $token = UvhRequest::inputString($request, 'token');
         if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1) {
-            return response()->json(['error' => 'El enlace no es válido o ya se ha utilizado'], 400);
+            return response()->json(['error' => __('messages.error_1fcded71c0ec74')], 400);
         }
 
         $tokenHash = Ids::sha256Hex($token);
@@ -32,7 +32,7 @@ final class SecurityIncidentController
         $result = $snapshot ? CompromisedAccessRevocation::admit($snapshot, $tokenHash) : null;
 
         if (! $result) {
-            return response()->json(['error' => 'El enlace no es válido o ya se ha utilizado'], 400);
+            return response()->json(['error' => __('messages.error_1fcded71c0ec74')], 400);
         }
         foreach ($result['artifacts'] as $artifact) {
             PrivateArtifactCleanup::afterCommit($artifact['id'], $artifact['path']);
@@ -40,7 +40,7 @@ final class SecurityIncidentController
         LinkIntentRegistry::afterCommit($result['user_id']);
 
         return CredentialChangeResponse::forUser($request, $result['user_id'], [
-            'message' => 'Los accesos y cambios pendientes han quedado revocados. Restablece tu contraseña para recuperar la cuenta.',
+            'message' => __('messages.error_4c90f20b5ab8b4'),
         ]);
     }
 }

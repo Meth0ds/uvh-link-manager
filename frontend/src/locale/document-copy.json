@@ -1,0 +1,18 @@
+{
+  "es": {
+    "title": "UVH · Acorta y gestiona tus enlaces",
+    "heading": "Encuentra tu camino.",
+    "message": "Activa JavaScript para abrir las páginas y herramientas de UVH. Si has llegado con un enlace que no funciona, pide uno nuevo a quien lo compartió contigo.",
+    "home": "Volver al inicio",
+    "help": "Ayuda",
+    "imageAlt": "Un camino por conectar"
+  },
+  "en": {
+    "title": "UVH · Shorten and manage your links",
+    "heading": "Find your way.",
+    "message": "Enable JavaScript to open UVH pages and tools. If you arrived through a link that does not work, ask the person who shared it for a new one.",
+    "home": "Back to home",
+    "help": "Help",
+    "imageAlt": "A path waiting to be connected"
+  }
+}

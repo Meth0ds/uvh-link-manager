@@ -54,7 +54,7 @@ export function createQrScene(url: string, value: QrDesignSpec, logo?: QrRasterL
   if (design.logo.kind !== "none") {
     const center = inset + 500, relative = (matrix.size + 8) / (matrix.size + design.quietZone * 2);
     if (design.logo.kind === "custom") {
-      if (!logo || !Number.isInteger(logo.width) || !Number.isInteger(logo.height) || logo.width < 1 || logo.height < 1 || logo.width > 1024 || logo.height > 1024 || logo.png.byteLength > 8 * 1024 * 1024) throw new Error("Falta un logo normalizado válido.");
+      if (!logo || !Number.isInteger(logo.width) || !Number.isInteger(logo.height) || logo.width < 1 || logo.height < 1 || logo.width > 1024 || logo.height > 1024 || logo.png.byteLength > 8 * 1024 * 1024) throw new Error($localize`:@@ui.76bdfd97966452:Falta un logo normalizado válido.`);
       const scale = 200 * relative / Math.max(logo.width, logo.height), width = logo.width * scale, height = logo.height * scale, padding = 35 * relative;
       path(roundedPath(center - width / 2 - padding, center - height / 2 - padding, width + 2 * padding, height + 2 * padding, Math.min(width + 2 * padding, height + 2 * padding) * 0.12), "#FFFFFF");
       shapes.push({ kind: "image", x: center - width / 2, y: center - height / 2, width, height, logo });
@@ -69,8 +69,8 @@ export function createQrScene(url: string, value: QrDesignSpec, logo?: QrRasterL
     }
   }
   if (design.frame === "caption" && design.caption) {
-    if (!font) throw new Error("La fuente del marco no está disponible.");
-    for (const char of design.caption) if (!font.hasGlyphForCodePoint(char.codePointAt(0)!)) throw new Error(`La fuente del marco no admite el carácter «${char}».`);
+    if (!font) throw new Error($localize`:@@ui.a7412156f4b429:La fuente del marco no está disponible.`);
+    for (const char of design.caption) if (!font.hasGlyphForCodePoint(char.codePointAt(0)!)) throw new Error($localize`:@@ui.1397a75f397279:La fuente del marco no admite el carácter «${char}».`);
     const run = font.layout(design.caption);
     const advance = run.positions.reduce((sum, position) => sum + position.xAdvance, 0);
     const scale = Math.min(64 / font.unitsPerEm, 920 / Math.max(1, advance));

@@ -21,7 +21,7 @@ final class MfaSessionController
     {
         $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if ($context === null) {
-            return response()->json(['error' => 'No autenticado'], 401);
+            return response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
 
         return response()->json(AccountQueries::mfaSession($context));
@@ -33,7 +33,7 @@ final class MfaSessionController
         $password = UvhRequest::inputString($request, 'password');
         $factorCode = trim(UvhRequest::inputString($request, 'factorCode'));
         if ($password === '' || strlen($password) > 72 || strlen($factorCode) > 24) {
-            return response()->json(['error' => 'Introduce tu contraseña y segundo factor'], 422);
+            return response()->json(['error' => __('messages.error_1b1aaee656e2a6')], 422);
         }
 
         $user = UvhRequest::user($request);
@@ -45,10 +45,10 @@ final class MfaSessionController
         $result = ReauthenticationAdmission::admit($user, $sessionId, $password, $factorCode, UvhRequest::ip($request));
 
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($result['status'] === 'not_configured') {
-            return response()->json(['error' => 'Activa MFA antes de acceder a administración'], 403);
+            return response()->json(['error' => __('messages.error_a3308c53a602fa')], 403);
         }
         if ($result['status'] === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, 'reauthentication');
@@ -58,7 +58,7 @@ final class MfaSessionController
                 'reason' => $result['status'] === 'password' ? 'password' : 'factor',
             ], UvhRequest::ip($request));
 
-            return response()->json(['error' => 'Contraseña o segundo factor incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_9dfef0f6d97a7d')], 403);
         }
 
         $verifiedAt = $result['verified_at'];

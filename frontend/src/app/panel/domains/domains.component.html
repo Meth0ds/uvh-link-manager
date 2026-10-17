@@ -1,38 +1,38 @@
-<app-page-header icon="language" eyebrow="Marca y entrega" title="Dominios personalizados" description="Usa tu propia marca en cada enlace corto y controla su verificación DNS." />
+<app-page-header icon="language" eyebrow="Marca y entrega" title="Dominios personalizados" description="Usa tu propia marca en cada enlace corto y controla su verificación DNS."  i18n-title="@@ui.39a781c0926b9b" i18n-description="@@ui.24375b88b44d7c" i18n-eyebrow="@@ui.821db0ef5143bf"/>
 
 @if (loading() && domains().length) {
-  <mat-progress-bar mode="indeterminate" aria-label="Cargando dominios" />
+  <mat-progress-bar mode="indeterminate" aria-label="Cargando dominios"  i18n-aria-label="@@ui.57b67f42c49722"/>
 }
 @if (loading() && !domains().length) {
-  <app-panel-skeleton variant="cards" label="Cargando dominios" />
+  <app-panel-skeleton variant="cards" label="Cargando dominios"  i18n-label="@@ui.57b67f42c49722"/>
 }
 @if (error()) {
-  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
 }
 
 @if (canEdit()) {
 <section class="command-card" aria-labelledby="connect-domain-title">
   <div class="command-heading">
     <span class="command-icon" aria-hidden="true"><mat-icon>add_circle</mat-icon></span>
-    <div><h2 id="connect-domain-title">Conecta tu propia dirección</h2><p>Usa un subdominio como <code>go.tu-marca.com</code>. Después te mostraremos los registros DNS que debes añadir.</p></div>
+    <div><h2 id="connect-domain-title"><ng-container i18n="@@ui.d78ed3e14db0df">Conecta tu propia dirección</ng-container></h2><p><ng-container i18n="@@ui.ca3b5e2c9c3a2e">Usa un subdominio como </ng-container><code>go.tu-marca.com</code><ng-container i18n="@@ui.76d85ec96df1ec">. Después te mostraremos los registros DNS que debes añadir.</ng-container></p></div>
   </div>
-  <ol class="connection-steps" aria-label="Pasos para conectar un dominio"><li>Añade el subdominio</li><li>Configura y comprueba DNS</li><li>Prepara HTTPS</li></ol>
-  <details class="advanced-help"><summary>Requisitos del proveedor DNS</summary><p>Necesitas acceso a los registros TXT y un CNAME directo. Apex, flattening y proxies no están soportados por este flujo. Conserva el TXT durante todo el uso del dominio.</p></details>
+  <ol class="connection-steps" aria-label="Pasos para conectar un dominio" i18n-aria-label="@@ui.bda709e390b915"><li><ng-container i18n="@@ui.63595f83fca38e">Añade el subdominio</ng-container></li><li><ng-container i18n="@@ui.59b1f49cb42f9b">Configura y comprueba DNS</ng-container></li><li><ng-container i18n="@@ui.b9ea0bccf9cfd5">Prepara HTTPS</ng-container></li></ol>
+  <details class="advanced-help"><summary><ng-container i18n="@@ui.132716701acf6e">Requisitos del proveedor DNS</ng-container></summary><p><ng-container i18n="@@ui.0e616ba63dba32">Necesitas acceso a los registros TXT y un CNAME directo. Apex, flattening y proxies no están soportados por este flujo. Conserva el TXT durante todo el uso del dominio.</ng-container></p></details>
   <div class="add-bar">
     <mat-form-field appearance="outline" class="grow">
-      <mat-label>Dominio</mat-label>
+      <mat-label><ng-container i18n="@@ui.5199d835a3f9ed">Dominio</ng-container></mat-label>
       <mat-icon matPrefix>language</mat-icon>
-      <input matInput placeholder="go.tu-dominio.com" autocomplete="url" [(ngModel)]="newDomain" (keyup.enter)="add()" />
+      <input matInput placeholder="go.tu-dominio.com" autocomplete="url" [(ngModel)]="newDomain" (keyup.enter)="add()"  i18n-placeholder="@@ui.b8e1878b92eb09"/>
     </mat-form-field>
     <button mat-flat-button color="primary" (click)="add()" [disabled]="!newDomain().trim() || adding()">
-      <mat-icon>add</mat-icon> {{ adding() ? "Añadiendo…" : "Añadir dominio" }}
+      <mat-icon>add</mat-icon> {{ adding() ? uiText.ui_b09368c1f2df21 : uiText.ui_40a88223625900 }}
     </button>
   </div>
 </section>
 } @else {
   <div class="alert permission" role="status">
-    Puedes consultar los dominios conectados. Un editor o administrador debe realizar cambios en DNS y activación.
-  </div>
+    <ng-container i18n="@@ui.53d47a9cc8b990">Puedes consultar los dominios conectados. Un editor o administrador debe realizar cambios en DNS y activación.
+  </ng-container></div>
 }
 
 @if (!loading() && (!error() || domains().length)) {
@@ -43,9 +43,9 @@
           <span class="domain-icon" aria-hidden="true"><mat-icon>language</mat-icon></span>
           <div><a class="domain-name" [routerLink]="['/app/domains', d.id]">{{ d.domain }}</a></div>
           @if (d.isDefault) {
-            <span class="default-badge" title="Los enlaces nuevos se preseleccionan con este dominio"><mat-icon>star</mat-icon> Predeterminado</span>
+            <span class="default-badge" title="Los enlaces nuevos se preseleccionan con este dominio" i18n-title="@@ui.2eb65cccf514b7"><mat-icon>star</mat-icon> <ng-container i18n="@@ui.13bd6e86a13953">Predeterminado</ng-container></span>
           }
-          <span class="links-count" title="Enlaces activos en este dominio"><mat-icon>link</mat-icon> {{ linksLabel(d) }}</span>
+          <span class="links-count" title="Enlaces activos en este dominio" i18n-title="@@ui.fa4572a004cede"><mat-icon>link</mat-icon> {{ linksLabel(d) }}</span>
           <span class="state-chip" [class]="'st-' + d.state" [class.needs-attention]="d.trafficStatus === 'degraded' || (d.state === 'active' && !d.edgeEligible)">{{ stateLabel(d) }}</span>
         </div>
         @if (dnsErrorLabel(d.dnsError); as dnsMessage) {
@@ -55,12 +55,12 @@
           <p class="dns-message" role="status">{{ tlsMessage }}</p>
         }
         @if (d.state === 'pending' || d.state === 'error' || d.state === 'disabled' || d.state === 'verifying') {
-          <p class="next-step">{{ isChecking(d) ? 'Estamos comprobando la propiedad y la ruta DNS.' : d.state === 'disabled' ? 'Desactivado. Revisa la configuración antes de volver a conectarlo.' : 'Abre la configuración para añadir los registros TXT y CNAME y comprobarlos.' }}</p>
+          <p class="next-step">{{ isChecking(d) ? uiText.ui_8fa6ae7e0f2be1 : d.state === 'disabled' ? uiText.ui_d6d4ffd30838b4 : uiText.ui_406798a93493e9 }}</p>
         } @else {
-          <div class="readiness" aria-label="Estado de conexión del dominio">
-            <span [class.ready]="d.ownershipVerifiedAt"><mat-icon>{{ d.ownershipVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> Propiedad</span>
-            <span [class.ready]="d.routingVerifiedAt"><mat-icon>{{ d.routingVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> Ruta DNS</span>
-            <span [class.ready]="d.tlsReadyAt"><mat-icon>{{ d.tlsReadyAt ? 'check_circle' : 'schedule' }}</mat-icon> HTTPS</span>
+          <div class="readiness" aria-label="Estado de conexión del dominio" i18n-aria-label="@@ui.2039ada60b4966">
+            <span [class.ready]="d.ownershipVerifiedAt"><mat-icon>{{ d.ownershipVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> <ng-container i18n="@@ui.0cefd64415d26b">Propiedad</ng-container></span>
+            <span [class.ready]="d.routingVerifiedAt"><mat-icon>{{ d.routingVerifiedAt ? 'check_circle' : 'schedule' }}</mat-icon> <ng-container i18n="@@ui.8b2a0b3e4a3af7">Ruta DNS</ng-container></span>
+            <span [class.ready]="d.tlsReadyAt"><mat-icon>{{ d.tlsReadyAt ? 'check_circle' : 'schedule' }}</mat-icon> <ng-container i18n="@@ui.205ecf3f81bf7e">HTTPS</ng-container></span>
           </div>
         }
         @if (graceLabel(d); as grace) {
@@ -68,60 +68,60 @@
         }
         <div class="domain-footer domain-actions">
           <div class="domain-navigation details-action">
-            <a mat-stroked-button class="neutral-action" [routerLink]="['/app/domains', d.id]" [attr.aria-label]="'Configuración y diagnóstico de ' + d.domain"><mat-icon aria-hidden="true">settings</mat-icon> Configuración y diagnóstico</a>
+            <a mat-stroked-button class="neutral-action" [routerLink]="['/app/domains', d.id]" [attr.aria-label]="uiText.ui_740ee9dd7df6df + d.domain"><mat-icon aria-hidden="true">settings</mat-icon> <ng-container i18n="@@ui.692f3fb8fffa6b">Configuración y diagnóstico</ng-container></a>
             @if (d.linksCount > 0) {
-              <a mat-button class="neutral-action" [routerLink]="['/app/links']" [queryParams]="{ domainId: d.id }" [attr.aria-label]="'Ver ' + linksLabel(d) + ' de ' + d.domain"><mat-icon aria-hidden="true">link</mat-icon> Ver {{ linksLabel(d) }}</a>
+              <a mat-button class="neutral-action" [routerLink]="['/app/links']" [queryParams]="{ domainId: d.id }" [attr.aria-label]="uiText.ui_199d79e67ea29a + linksLabel(d) + uiText.ui_553c27d45c0c54 + d.domain"><mat-icon aria-hidden="true">link</mat-icon> <ng-container i18n="@@ui.5119ccccd5b91a">Ver {{ linksLabel(d) }}</ng-container></a>
             }
           </div>
           @if (canEdit() && d.state === 'verified') {
-            <button mat-flat-button type="button" (click)="activate(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon aria-hidden="true">https</mat-icon> Preparar HTTPS</button>
+            <button mat-flat-button type="button" (click)="activate(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress || !d.ownershipVerifiedAt || !d.routingVerifiedAt"><mat-icon aria-hidden="true">https</mat-icon> <ng-container i18n="@@ui.7b3d1234a44cb1">Preparar HTTPS</ng-container></button>
           }
           @if (canEdit() && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying')) {
-            <button mat-flat-button type="button" (click)="verify(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon aria-hidden="true">dns</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Comprobar DNS' }}</button>
+            <button mat-flat-button type="button" (click)="verify(d)" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon aria-hidden="true">dns</mat-icon> {{ isChecking(d) ? uiText.ui_d2a7094a2bfccb : uiText.ui_e9316d061650f3 }}</button>
           }
           @if (canAdmin() && (d.state === 'pending' || d.state === 'error' || d.state === 'verifying')) {
-            <button mat-stroked-button type="button" class="danger" (click)="remove(d)" [attr.aria-label]="'Eliminar ' + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> Eliminar dominio</button>
+            <button mat-stroked-button type="button" class="danger" (click)="remove(d)" [attr.aria-label]="uiText.ui_46b36b8c9fa695 + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> <ng-container i18n="@@ui.5a624d67c83f69">Eliminar dominio</ng-container></button>
           }
         </div>
         @if (canEdit() && (d.state === 'verified' || d.state === 'active' || d.state === 'disabled' || (d.state === 'provisioning' && canAdmin()))) {
           <details class="domain-management">
-            <summary [attr.aria-label]="'Opciones de ' + d.domain">
-              <span class="management-heading"><strong>Opciones del dominio</strong><span>DNS, preferencias y disponibilidad</span></span>
+            <summary [attr.aria-label]="uiText.ui_e784de5be6e57d + d.domain">
+              <span class="management-heading"><strong><ng-container i18n="@@ui.e66147d27337f8">Opciones del dominio</ng-container></strong><span><ng-container i18n="@@ui.ea137574a398cd">DNS, preferencias y disponibilidad</ng-container></span></span>
               <mat-icon aria-hidden="true">expand_more</mat-icon>
             </summary>
             <div class="management-content">
-              <div class="management-settings" role="group" [attr.aria-label]="'Mantenimiento y preferencias de ' + d.domain">
+              <div class="management-settings" role="group" [attr.aria-label]="uiText.ui_bfb59af0341a43 + d.domain">
               @if (d.state === 'verified' || d.state === 'active' || d.state === 'disabled') {
                 <div class="management-row">
-                  <div><h3>Comprobar la conexión</h3><p>Vuelve a consultar la propiedad y la ruta DNS. El resultado se actualizará automáticamente.</p></div>
-                  <button mat-stroked-button class="neutral-action" type="button" (click)="verify(d)" [attr.aria-label]="'Revalidar DNS de ' + d.domain" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon aria-hidden="true">refresh</mat-icon> {{ isChecking(d) ? 'Comprobando…' : 'Revalidar DNS' }}</button>
+                  <div><h3><ng-container i18n="@@ui.1458c99bc6484c">Comprobar la conexión</ng-container></h3><p><ng-container i18n="@@ui.01cd44e2c14e65">Vuelve a consultar la propiedad y la ruta DNS. El resultado se actualizará automáticamente.</ng-container></p></div>
+                  <button mat-stroked-button class="neutral-action" type="button" (click)="verify(d)" [attr.aria-label]="uiText.ui_a5c287d6b80b94 + d.domain" [disabled]="actionId() !== null || isChecking(d) || d.dnsCheckInProgress"><mat-icon aria-hidden="true">refresh</mat-icon> {{ isChecking(d) ? uiText.ui_d2a7094a2bfccb : uiText.ui_8a7231e64e43b4 }}</button>
                 </div>
               }
               @if (d.servingReady && !d.isDefault) {
                 <div class="management-row">
-                  <div><h3>Dominio para enlaces nuevos</h3><p>Preselecciona esta dirección al crear un enlace. Los enlaces existentes mantienen su dominio.</p></div>
-                  <button mat-stroked-button class="neutral-action" type="button" (click)="setDefault(d, true)" [attr.aria-label]="'Usar ' + d.domain + ' por defecto'" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">star</mat-icon> Usar por defecto</button>
+                  <div><h3><ng-container i18n="@@ui.62456a5c874aeb">Dominio para enlaces nuevos</ng-container></h3><p><ng-container i18n="@@ui.9a236599923234">Preselecciona esta dirección al crear un enlace. Los enlaces existentes mantienen su dominio.</ng-container></p></div>
+                  <button mat-stroked-button class="neutral-action" type="button" (click)="setDefault(d, true)" [attr.aria-label]="uiText.ui_4bdc4246014164 + d.domain + uiText.ui_8f4e3f2ceb6191" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">star</mat-icon> <ng-container i18n="@@ui.730024a67ec3c4">Usar por defecto</ng-container></button>
                 </div>
               }
               @if (d.isDefault) {
                 <div class="management-row">
-                  <div><h3>Dominio predeterminado</h3><p>Esta dirección se preselecciona al crear enlaces. Puedes quitar esa preferencia.</p></div>
-                  <button mat-stroked-button class="neutral-action" type="button" (click)="setDefault(d, false)" [attr.aria-label]="'Quitar preferencia de ' + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">star_border</mat-icon> Quitar preferencia</button>
+                  <div><h3><ng-container i18n="@@ui.fa93ff4c2d7729">Dominio predeterminado</ng-container></h3><p><ng-container i18n="@@ui.bb96dce1224b0a">Esta dirección se preselecciona al crear enlaces. Puedes quitar esa preferencia.</ng-container></p></div>
+                  <button mat-stroked-button class="neutral-action" type="button" (click)="setDefault(d, false)" [attr.aria-label]="uiText.ui_e5521754efe12b + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">star_border</mat-icon> <ng-container i18n="@@ui.221e4558d7f8ce">Quitar preferencia</ng-container></button>
                 </div>
               }
               </div>
               @if (canAdmin()) {
-                <div class="management-risk" role="group" [attr.aria-label]="'Acciones que afectan a ' + d.domain">
-                  <div class="management-risk-heading"><mat-icon aria-hidden="true">warning_amber</mat-icon><span>Disponibilidad y eliminación</span></div>
+                <div class="management-risk" role="group" [attr.aria-label]="uiText.ui_3da679ad87e6d5 + d.domain">
+                  <div class="management-risk-heading"><mat-icon aria-hidden="true">warning_amber</mat-icon><span><ng-container i18n="@@ui.cf5244503e7ec1">Disponibilidad y eliminación</ng-container></span></div>
                   @if (d.state === 'active' || d.state === 'verified' || d.state === 'provisioning') {
                     <div class="management-row">
-                      <div><h3>Desactivar el dominio</h3><p>Sus enlaces dejarán de responder mientras esté desactivado. Los enlaces se conservan.</p></div>
-                      <button mat-stroked-button type="button" class="danger" (click)="disable(d)" [attr.aria-label]="'Desactivar ' + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">pause</mat-icon> Desactivar</button>
+                      <div><h3><ng-container i18n="@@ui.6960dd3c3a415c">Desactivar el dominio</ng-container></h3><p><ng-container i18n="@@ui.adb28702ecea1a">Sus enlaces dejarán de responder mientras esté desactivado. Los enlaces se conservan.</ng-container></p></div>
+                      <button mat-stroked-button type="button" class="danger" (click)="disable(d)" [attr.aria-label]="uiText.ui_41ea8e13b05496 + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">pause</mat-icon> <ng-container i18n="@@ui.7ef1cd2d3486b2">Desactivar</ng-container></button>
                     </div>
                   }
                   <div class="management-row">
-                    <div><h3>Eliminar el dominio</h3><p>Antes debes reasignar sus enlaces, incluidos los de la papelera. Se pedirá confirmación.</p></div>
-                    <button mat-stroked-button type="button" class="danger" (click)="remove(d)" [attr.aria-label]="'Eliminar ' + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> Eliminar dominio</button>
+                    <div><h3><ng-container i18n="@@ui.ce8e02e0a5ce12">Eliminar el dominio</ng-container></h3><p><ng-container i18n="@@ui.775b9261b17c19">Antes debes reasignar sus enlaces, incluidos los de la papelera. Se pedirá confirmación.</ng-container></p></div>
+                    <button mat-stroked-button type="button" class="danger" (click)="remove(d)" [attr.aria-label]="uiText.ui_46b36b8c9fa695 + d.domain" [disabled]="actionId() !== null"><mat-icon aria-hidden="true">delete_outline</mat-icon> <ng-container i18n="@@ui.5a624d67c83f69">Eliminar dominio</ng-container></button>
                   </div>
                 </div>
               }
@@ -133,8 +133,8 @@
     @if (!domains().length && !error()) {
       <div class="empty-state">
         <mat-icon>language</mat-icon>
-        <b>Sin dominios todavía</b>
-        <p>{{ canEdit() ? 'Añade un subdominio para compartir enlaces con tu propia dirección.' : 'Un editor, administrador o propietario puede conectar un subdominio para este workspace.' }}</p>
+        <b><ng-container i18n="@@ui.aadf6a66a7fab8">Sin dominios todavía</ng-container></b>
+        <p>{{ canEdit() ? uiText.ui_7a958a59b6d67b : uiText.ui_ea5f6e4b345644 }}</p>
       </div>
     }
   </div>

@@ -1,3 +1,6 @@
+import { UI_LANGUAGE } from "../core/localisation/locale";
+import { LocaleLinkDirective } from "../core/localisation/locale-link.directive";
+import { UI_TEXT } from "../core/localisation/template-messages";
 import {
   AfterViewInit,
   afterNextRender,
@@ -44,7 +47,7 @@ interface HCaptchaFrameMessage {
 @Component({
   selector: "app-hcaptcha-widget",
   standalone: true,
-  imports: [MatIconModule],
+  imports: [LocaleLinkDirective, MatIconModule],
   template: `
     <section class="human-check" [attr.aria-busy]="state() === 'loading' || state() === 'verifying'">
       <div class="widget-stage" [class.compact]="compact()" [class.invisible]="invisible" [class.challenge-open]="challengeOpen()">
@@ -56,21 +59,21 @@ interface HCaptchaFrameMessage {
           referrerpolicy="no-referrer"
           loading="eager"
           (load)="onFrameLoad()"
-        ></iframe>
+         i18n-title="@@ui.a17e3faf52876c"></iframe>
       </div>
 
       @if (invisible) {
         <small class="captcha-notice">
-          Protegido por hCaptcha ·
-          <a href="https://www.hcaptcha.com/privacy" target="_blank" rel="noopener noreferrer">Privacidad</a> ·
-          <a href="https://www.hcaptcha.com/terms" target="_blank" rel="noopener noreferrer">Términos</a>
+          <ng-container i18n="@@ui.c06814a5937aa3">Protegido por hCaptcha ·
+          </ng-container><a href="https://www.hcaptcha.com/privacy" target="_blank" rel="noopener noreferrer"><ng-container i18n="@@ui.52233e2c4d6b2e">Privacidad</ng-container></a> ·
+          <a href="https://www.hcaptcha.com/terms" target="_blank" rel="noopener noreferrer"><ng-container i18n="@@ui.60eaf1f65f2194">Términos</ng-container></a>
         </small>
       }
 
       @if (state() === 'error' || state() === 'expired') {
         <div class="check-foot">
-          <span>{{ state() === 'expired' ? 'La comprobación ha caducado.' : 'No se pudo completar la comprobación.' }}</span>
-          <button type="button" (click)="retry()"><mat-icon aria-hidden="true">refresh</mat-icon> Reintentar</button>
+          <span>{{ state() === 'expired' ? uiText.ui_cda99802453ad4 : uiText.ui_b72a258b7f4be9 }}</span>
+          <button type="button" (click)="retry()"><mat-icon aria-hidden="true">refresh</mat-icon> <ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button>
         </div>
       }
     </section>
@@ -99,6 +102,7 @@ interface HCaptchaFrameMessage {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
+  readonly uiText = UI_TEXT;
   @Input({ required: true }) siteKey = "";
   @Input() invisible = false;
   @Output() readonly tokenChange = new EventEmitter<string>();
@@ -142,7 +146,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
     window.removeEventListener("message", this.onMessage);
     window.removeEventListener("resize", this.onResize);
     if (this.loadTimer) clearTimeout(this.loadTimer);
-    this.rejectPending("La comprobación antiabuso se interrumpió.");
+    this.rejectPending($localize`:@@ui.287d80735c4e55:La comprobación antiabuso se interrumpió.`);
   }
 
   onFrameLoad(): void {
@@ -158,7 +162,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
   }
 
   reset(): void {
-    this.rejectPending("La comprobación antiabuso se reinició.");
+    this.rejectPending($localize`:@@ui.c5725766c1afbb:La comprobación antiabuso se reinició.`);
     // Resetting the SDK alone cannot distinguish a callback already queued by
     // its previous challenge. A new document and channel retire that attempt.
     this.reloadFrame();
@@ -176,7 +180,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
    */
   execute(): Promise<string> {
     if (!this.invisible) {
-      return Promise.reject(new HCaptchaExecutionError("Completa la protección antiabuso para continuar."));
+      return Promise.reject(new HCaptchaExecutionError($localize`:@@ui.211b884be026c3:Completa la protección antiabuso para continuar.`));
     }
     if (this.pendingExecution) return this.pendingExecution.promise;
     const active = this.document.activeElement;
@@ -232,7 +236,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
         this.state.set("expired");
         this.challengeOpen.set(false);
         this.tokenChange.emit("");
-        this.rejectPending("La comprobación ha caducado. Inténtalo de nuevo.");
+        this.rejectPending($localize`:@@ui.d968d5258e5964:La comprobación ha caducado. Inténtalo de nuevo.`);
         break;
       case "challenge-open":
         if (this.invisible && (!this.pendingExecution?.dispatched || this.state() !== "verifying")) return;
@@ -243,7 +247,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
         if (this.pendingExecution) {
           this.state.set("expired");
           this.tokenChange.emit("");
-          this.rejectPending("Completa la protección antiabuso para continuar.");
+          this.rejectPending($localize`:@@ui.211b884be026c3:Completa la protección antiabuso para continuar.`);
           this.restoreTriggerFocus();
         }
         break;
@@ -287,6 +291,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
   private post(message: Record<string, unknown>): void {
     this.frame.nativeElement.contentWindow?.postMessage({
       source: "uvh-hcaptcha-host",
+      language: UI_LANGUAGE,
       channel: this.channel,
       ...message,
     }, "*");
@@ -311,7 +316,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
     this.challengeOpen.set(false);
     this.tokenChange.emit("");
     this.clearLoadTimeout();
-    this.rejectPending("No se pudo completar la protección antiabuso. Inténtalo de nuevo.");
+    this.rejectPending($localize`:@@ui.538cdfcbe31339:No se pudo completar la protección antiabuso. Inténtalo de nuevo.`);
     this.restoreTriggerFocus();
   }
 
@@ -336,7 +341,7 @@ export class HCaptchaWidgetComponent implements AfterViewInit, OnDestroy {
     this.executionTimer = setTimeout(() => {
       this.challengeOpen.set(false);
       this.state.set("expired");
-      this.rejectPending("La comprobación ha caducado. Inténtalo de nuevo.");
+      this.rejectPending($localize`:@@ui.d968d5258e5964:La comprobación ha caducado. Inténtalo de nuevo.`);
       this.restoreTriggerFocus();
     }, 120_000);
   }

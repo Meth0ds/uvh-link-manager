@@ -2,46 +2,46 @@
   icon="insert_chart_outlined"
   title="Informes compartidos"
   description="Comparte resultados claros con tus clientes y controla quién puede consultarlos."
->
+ i18n-title="@@ui.08abaadae77da4" i18n-description="@@ui.3c4f3cf5713a0d">
   @if (sharing.canPublish()) {
     <button mat-flat-button type="button" (click)="edit()">
-      <mat-icon>add</mat-icon>Crear informe
-    </button>
+      <mat-icon>add</mat-icon><ng-container i18n="@@ui.eb68a4822ca533">Crear informe
+    </ng-container></button>
   }
 </app-page-header>
-<nav class="analytics-tabs" aria-label="Vistas de estadísticas">
-  <a routerLink="/app/analytics">Resumen</a
+<nav class="analytics-tabs" aria-label="Vistas de estadísticas" i18n-aria-label="@@ui.5414b324d57d11">
+  <a routerLink="/app/analytics"><ng-container i18n="@@ui.ed7bdc67c84b3e">Resumen</ng-container></a
   ><a routerLink="/app/analytics/reports" aria-current="page"
-    >Informes compartidos</a
+    ><ng-container i18n="@@ui.08abaadae77da4">Informes compartidos</ng-container></a
   >
 </nav>
 @if (!sharing.canPublish()) {
   <section class="empty">
     <mat-icon>lock_outline</mat-icon>
-    <h2>Publicación controlada</h2>
+    <h2><ng-container i18n="@@ui.d0368554a34a35">Publicación controlada</ng-container></h2>
     <p>
-      Los propietarios y administradores pueden gestionar los informes cuando la
+      <ng-container i18n="@@ui.9f9c5add2d8011">Los propietarios y administradores pueden gestionar los informes cuando la
       función esté activada.
-    </p>
+    </ng-container></p>
   </section>
 } @else {
   <aside class="sharing-note">
     <mat-icon>lock_outline</mat-icon>
     <p>
-      Cada informe incluye solo los enlaces y datos que hayas elegido. Puedes
+      <ng-container i18n="@@ui.cb819b9de478f9">Cada informe incluye solo los enlaces y datos que hayas elegido. Puedes
       retirar el acceso en cualquier momento.
-    </p>
+    </ng-container></p>
   </aside>
   @if (loading()) {
-    <mat-progress-bar mode="indeterminate" aria-label="Cargando informes" />
+    <mat-progress-bar mode="indeterminate" aria-label="Cargando informes"  i18n-aria-label="@@ui.4d36a05b95b881"/>
   }
   @if (error()) {
     <div class="report-error" role="alert">
       <p>{{ error() }}</p>
-      <button mat-button type="button" (click)="load()">Reintentar</button>
+      <button mat-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button>
     </div>
   }
-  <section class="reports-list" aria-label="Informes del workspace">
+  <section class="reports-list" aria-label="Informes del workspace" i18n-aria-label="@@ui.214efa1fd1101c">
     @for (report of reports(); track report.id) {
       <article>
         <span class="report-icon"
@@ -58,29 +58,29 @@
           </div>
           <p>
             {{ report.links.length }}
-            {{ report.links.length === 1 ? "enlace" : "enlaces" }} ·
+            {{ report.links.length === 1 ? uiText.ui_902ee7f27eee59 : uiText.ui_41b0ae1f3fe239 }} ·
             {{
               report.spec.period === "custom"
-                ? "Fechas concretas"
-                : "Últimos " + report.spec.period.slice(0, -1) + " días"
+                ? uiText.ui_d71e379fc9a2ef
+                : uiText.ui_15d888bd2476c7 + report.spec.period.slice(0, -1) + uiText.ui_cb3ee4ef470dae
             }}
           </p>
           <small
             ><mat-icon>{{
               report.passwordProtected ? "lock" : "link"
             }}</mat-icon
-            >{{ report.passwordProtected ? "Con contraseña" : "URL secreta"
+            >{{ report.passwordProtected ? uiText.ui_60b69103f61c83 : uiText.ui_1e84146a779ae1
             }}<span>{{
               report.expiresAt
-                ? "Caduca el " + report.expiresAt.slice(0, 10)
-                : "Sin caducidad"
+                ? uiText.ui_883c7aa54a8ebc + report.expiresAt.slice(0, 10)
+                : uiText.ui_15cb784388aa7c
             }}</span></small
           >
           @if (report.state === "needs_review") {
             <p class="review-hint">
-              Un enlace se ha eliminado o bloqueado. Revisa la selección para
+              <ng-container i18n="@@ui.69c26a06613d66">Un enlace se ha eliminado o bloqueado. Revisa la selección para
               volver a publicar.
-            </p>
+            </ng-container></p>
           }
         </div>
         <div class="report-actions">
@@ -98,8 +98,8 @@
               }}</mat-icon
               >{{
                 copy.phase(report.shareUrl, context) === "copied"
-                  ? "Copiado"
-                  : "Copiar URL"
+                  ? uiText.ui_d8dd878fb14359
+                  : uiText.ui_96a1ec86cd74cb
               }}
             </button>
           }
@@ -110,15 +110,15 @@
               (click)="edit(report)"
               [disabled]="busy() !== null"
             >
-              Editar</button
+              <ng-container i18n="@@ui.2eba946b2e1ee4">Editar</ng-container></button
             ><button
               mat-button
               type="button"
               (click)="action(report, 'rotate-access')"
               [disabled]="busy() !== null"
               aria-label="Cambiar URL de acceso del informe"
-            >
-              Cambiar URL</button
+             i18n-aria-label="@@ui.083dc8719cc934">
+              <ng-container i18n="@@ui.81e9c5f348c032">Cambiar URL</ng-container></button
             ><button
               class="revoke"
               mat-button
@@ -126,7 +126,7 @@
               (click)="action(report, 'revoke')"
               [disabled]="busy() !== null"
             >
-              {{ busy() === report.id ? "Aplicando…" : "Revocar" }}
+              {{ busy() === report.id ? uiText.ui_d1c9714d3fec4a : uiText.ui_2634b553b39290 }}
             </button>
           }
         </div>
@@ -135,27 +135,27 @@
       @if (!loading() && !error()) {
         <div class="empty">
           <mat-icon>insert_chart_outlined</mat-icon>
-          <h2>Resultados listos para compartir</h2>
+          <h2><ng-container i18n="@@ui.cd4d7492f08933">Resultados listos para compartir</ng-container></h2>
           <p>
-            Crea tu primer informe y elige qué podrá ver el cliente, sin darle
+            <ng-container i18n="@@ui.c8e67793e1a743">Crea tu primer informe y elige qué podrá ver el cliente, sin darle
             acceso al workspace.
-          </p>
+          </ng-container></p>
           <button mat-flat-button type="button" (click)="edit()">
-            Crear primer informe
-          </button>
+            <ng-container i18n="@@ui.9419021b10eb2d">Crear primer informe
+          </ng-container></button>
         </div>
       }
     }
   </section>
   @if (lastPage() > 1) {
-    <nav class="report-pages" aria-label="Páginas de informes">
+    <nav class="report-pages" aria-label="Páginas de informes" i18n-aria-label="@@ui.17fdd97fb99fbc">
       <button
         mat-button
         type="button"
         (click)="changePage(-1)"
         [disabled]="page() <= 1 || loading()"
       >
-        Anterior</button
+        <ng-container i18n="@@ui.e4ce7c09d51e3b">Anterior</ng-container></button
       ><span>{{ page() }} / {{ lastPage() }}</span
       ><button
         mat-button
@@ -163,8 +163,8 @@
         (click)="changePage(1)"
         [disabled]="page() >= lastPage() || loading()"
       >
-        Siguiente
-      </button>
+        <ng-container i18n="@@ui.e8e0275fa699dc">Siguiente
+      </ng-container></button>
     </nav>
   }
 }

@@ -12,5 +12,5 @@ export function sessionAgentLabel(value: string | null): string {
         : /Windows/i.test(raw) ? "Windows"
           : /Macintosh|Mac OS X/i.test(raw) ? "macOS"
             : /Linux/i.test(raw) ? "Linux" : null;
-  return browser && system ? `${browser} en ${system}` : browser ?? system ?? "Dispositivo no identificado";
+  return browser && system ? `${browser} en ${system}` : browser ?? system ?? $localize`:@@ui.3402df4ec7e4b1:Dispositivo no identificado`;
 }

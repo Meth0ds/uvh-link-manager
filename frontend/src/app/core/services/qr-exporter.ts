@@ -11,7 +11,7 @@ let fontPromise: Promise<{ bytes: Uint8Array<ArrayBuffer>; font: Font; fontkit: 
 export function loadQrFont(): Promise<{ bytes: Uint8Array<ArrayBuffer>; font: Font; fontkit: QrFontKit }> {
   return fontPromise ??= (async () => {
     const [module, response] = await Promise.all([import("@pdf-lib/fontkit"), fetch("/fonts/manrope.ttf", { credentials: "omit", cache: "force-cache" })]);
-    if (!response.ok) throw new Error("No se pudo cargar la fuente del QR. Reintenta la descarga.");
+    if (!response.ok) throw new Error($localize`:@@ui.845fc325a82447:No se pudo cargar la fuente del QR. Reintenta la descarga.`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     // Fontkit publishes a default ESM export but declares named UMD exports.
     // Resolve both package entry points before using the same cached adapter.
@@ -37,13 +37,13 @@ export function qrSceneSvg(scene: QrScene): string {
 }
 
 export async function qrScenePng(scene: QrScene, pixels = 2048, signal?: AbortSignal): Promise<Blob> {
-  if (!Number.isInteger(pixels) || pixels < 240 || pixels > 4096) throw new Error("Resolución de PNG inválida.");
+  if (!Number.isInteger(pixels) || pixels < 240 || pixels > 4096) throw new Error($localize`:@@ui.3844229c651dd0:Resolución de PNG inválida.`);
   check(signal);
   const scale = pixels / scene.width, height = Math.round(scene.height * scale);
   const canvas = typeof document === "undefined" ? new OffscreenCanvas(pixels, height) : document.createElement("canvas");
   canvas.width = pixels; canvas.height = height;
   const context = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
-  if (!context) throw new Error("No se pudo preparar la imagen.");
+  if (!context) throw new Error($localize`:@@ui.126f899c470ec9:No se pudo preparar la imagen.`);
   // Align module runs to pixel edges. Vector exports preserve exact fractions.
   for (const shape of scene.shapes) {
     check(signal);
@@ -61,7 +61,7 @@ export async function qrScenePng(scene: QrScene, pixels = 2048, signal?: AbortSi
     }
   }
   check(signal);
-  return typeof OffscreenCanvas !== "undefined" && canvas instanceof OffscreenCanvas ? canvas.convertToBlob({ type: "image/png" }) : new Promise((resolve, reject) => (canvas as HTMLCanvasElement).toBlob((blob: Blob | null) => blob ? resolve(blob) : reject(new Error("No se pudo codificar el PNG.")), "image/png"));
+  return typeof OffscreenCanvas !== "undefined" && canvas instanceof OffscreenCanvas ? canvas.convertToBlob({ type: "image/png" }) : new Promise((resolve, reject) => (canvas as HTMLCanvasElement).toBlob((blob: Blob | null) => blob ? resolve(blob) : reject(new Error($localize`:@@ui.4d2960c434a50f:No se pudo codificar el PNG.`)), "image/png"));
 }
 
 async function drawScene(doc: PDFDocument, page: PDFPage, scene: QrScene, x: number, top: number, scale: number): Promise<void> {
@@ -86,7 +86,7 @@ async function drawScene(doc: PDFDocument, page: PDFPage, scene: QrScene, x: num
   }
   if (scene.caption) {
     const font = pdfFonts.get(doc);
-    if (!font) throw new Error("La fuente del PDF no está disponible.");
+    if (!font) throw new Error($localize`:@@ui.08eeb47bcb5a9c:La fuente del PDF no está disponible.`);
     // Outlines keep the visible caption identical in every format. A searchable
     // text layer also uses the embedded Manrope font, without drawing it twice.
     page.drawText(scene.caption.text, { font, x: x + scene.caption.x * scale,
@@ -112,7 +112,7 @@ export async function exportQr(url: string, design: QrDesignSpec, format: QrExpo
   check(options.signal);
   if (format === "svg") return new Blob([qrSceneSvg(scene)], { type: "image/svg+xml" });
   if (format === "png") return qrScenePng(scene, options.pixels, options.signal);
-  if (format !== "pdf") throw new Error("Formato no admitido.");
+  if (format !== "pdf") throw new Error($localize`:@@ui.d006cbb082be66:Formato no admitido.`);
   const size = options.sizeMm ?? 35;
   validateQrPhysicalSize(design, scene.modules, size);
   const doc = await pdfDocument(), scale = size / 1000 * 72 / 25.4;
@@ -123,7 +123,7 @@ export async function exportQr(url: string, design: QrDesignSpec, format: QrExpo
 }
 
 export async function exportQrA4(urls: readonly string[], design: QrDesignSpec, print: QrPrintOptions, options: QrExportOptions = {}, progress?: (done: number, total: number) => void): Promise<Blob> {
-  if (!urls.length || urls.length > 100) throw new Error("Selecciona entre 1 y 100 enlaces.");
+  if (!urls.length || urls.length > 100) throw new Error($localize`:@@ui.6e8d2b02559e60:Selecciona entre 1 y 100 enlaces.`);
   check(options.signal);
   const font = design.frame === "caption" && design.caption ? (await loadQrFont()).font : undefined;
   const scenes = urls.map(url => createQrScene(url, design, options.logo, font));
@@ -150,6 +150,6 @@ export async function exportQrA4(urls: readonly string[], design: QrDesignSpec, 
   }
   check(options.signal);
   const bytes = new Uint8Array(await doc.save());
-  if (bytes.byteLength > 64 * 1024 * 1024) throw new Error("El PDF supera el límite de 64 MB. Reduce el lote o el logo.");
+  if (bytes.byteLength > 64 * 1024 * 1024) throw new Error($localize`:@@ui.17bd8e85d01630:El PDF supera el límite de 64 MB. Reduce el lote o el logo.`);
   return new Blob([bytes], { type: "application/pdf" });
 }

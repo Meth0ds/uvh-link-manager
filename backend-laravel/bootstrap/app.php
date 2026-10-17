@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\CorrelateRequest;
 use App\Http\Middleware\RecordOperationalResponse;
+use App\Http\Middleware\RequestLanguage;
 use App\Http\Middleware\RequireApiToken;
 use App\Http\Middleware\RequireMfa;
 use App\Http\Middleware\RequireWorkspace;
@@ -11,8 +12,10 @@ use App\Http\Middleware\UvhCsrf;
 use App\Http\Middleware\UvhHostGuard;
 use App\Http\Middleware\UvhSession;
 use App\Http\Middleware\UvhThrottleRequests;
+use App\Support\Language;
 use App\Support\MfaInfrastructureUnavailable;
 use App\Support\OperationalMetrics;
+use App\Support\ResponseLanguage;
 use App\Support\StaleSecurityContext;
 use App\Support\WebhookAdmissionUnavailable;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -25,6 +28,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -64,6 +68,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(CorrelateRequest::class);
         $middleware->append(RecordOperationalResponse::class);
         $middleware->append(SecurityHeaders::class);
+        $middleware->append(RequestLanguage::class);
         $middleware->append(UvhHostGuard::class);
         $middleware->append(UvhSession::class);
 
@@ -84,6 +89,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {
+            $language = config('uvh.localisation_enabled')
+                ? ($request->is('api/*') ? Language::negotiate($request->header('Accept-Language'))
+                    : Language::fromRequest($request, Language::isFirstPartyHost($request->getHost()))) : 'es';
+
+            return ResponseLanguage::apply($response, $language);
+        });
         $exceptions->render(function (StaleSecurityContext $exception, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
@@ -95,11 +107,11 @@ return Application::configure(basePath: dirname(__DIR__))
             OperationalMetrics::increment('webhook.admission_failed');
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
-                    'error' => 'No se pudo registrar el evento de integración. No se ha aplicado el cambio; inténtalo de nuevo.',
+                    'error' => __('display.display_6c9595f839ccce'),
                 ], 503);
             }
 
-            return response('El enlace no puede procesarse temporalmente. Inténtalo de nuevo en unos instantes.', 503, [
+            return response(__('display.display_988daa84543286'), 503, [
                 'Content-Type' => 'text/plain; charset=utf-8',
                 'Retry-After' => '30',
             ]);
@@ -108,7 +120,7 @@ return Application::configure(basePath: dirname(__DIR__))
             OperationalMetrics::increment('mfa.infrastructure_unavailable');
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
-                    'error' => 'La verificación MFA no está disponible temporalmente. No se ha aplicado ningún cambio.',
+                    'error' => __('display.display_4d6306921f6d6b'),
                 ], 503);
             }
 

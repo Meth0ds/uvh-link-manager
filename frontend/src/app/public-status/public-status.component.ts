@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { DatePipe } from "@angular/common";
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
@@ -19,6 +20,7 @@ import { LegalShellComponent } from "../legal/legal-shell.component";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PublicStatusComponent implements OnInit {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly requests = new LatestRequest(inject(DestroyRef));
   readonly loading = signal(true);
@@ -62,7 +64,7 @@ export class PublicStatusComponent implements OnInit {
   }
 
   statusLabel(status: PublicServiceStatus): string {
-    return ({ operational: "Operativo", degraded: "Rendimiento degradado", major_outage: "Interrupción importante", maintenance: "Mantenimiento", unknown: "Estado desconocido" })[status];
+    return ({ operational: "Operativo", degraded: $localize`:@@ui.d9da73ce8ed035:Rendimiento degradado`, major_outage: $localize`:@@ui.c41c320573a50a:Interrupción importante`, maintenance: "Mantenimiento", unknown: $localize`:@@ui.af53a4e3556e62:Estado desconocido` })[status];
   }
 
   statusIcon(status: PublicServiceStatus): string {
@@ -70,6 +72,6 @@ export class PublicStatusComponent implements OnInit {
   }
 
   incidentLabel(status: PublicStatusSnapshot["incidents"][number]["status"]): string {
-    return { investigating: "En investigación", identified: "Causa identificada", monitoring: "En observación", resolved: "Resuelto" }[status];
+    return { investigating: $localize`:@@ui.c6cfcd91ce8ed3:En investigación`, identified: $localize`:@@ui.8e592caedda916:Causa identificada`, monitoring: $localize`:@@ui.dd5d5f98f95ebd:En observación`, resolved: "Resuelto" }[status];
   }
 }

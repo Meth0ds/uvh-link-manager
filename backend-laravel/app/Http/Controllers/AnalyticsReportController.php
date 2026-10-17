@@ -29,7 +29,7 @@ final class AnalyticsReportController
             AnalyticsReports::enabled();
             $row = DB::table('analytics_reports')->where('workspace_id', UvhRequest::workspaceId($request))->where('id', $id)->first();
             if (! $row) {
-                throw new LinkException('Informe no encontrado.', 404);
+                throw new LinkException(__('messages.error_f57ae32f4988cf'), 404);
             }
 
             return response()->json(['report' => AnalyticsReports::present($row)]);

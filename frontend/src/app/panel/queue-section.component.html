@@ -11,7 +11,7 @@
   <div class="alert error compact" role="alert">
     <mat-icon aria-hidden="true">error_outline</mat-icon>
     <span>{{ message }}</span>
-    <button mat-stroked-button type="button" (click)="paging().load()">Reintentar</button>
+    <button mat-stroked-button type="button" (click)="paging().load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button>
   </div>
 }
 <ng-content select="[queue-rows]" />

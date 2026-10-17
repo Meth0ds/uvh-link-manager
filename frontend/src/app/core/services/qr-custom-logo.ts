@@ -31,12 +31,12 @@ export function dimensions(bytes: Uint8Array): { width: number; height: number }
       offset += length;
     }
   }
-  throw new Error("Elige una imagen PNG o JPG válida. SVG y otros formatos no están admitidos.");
+  throw new Error($localize`:@@ui.a81ee1d883591d:Elige una imagen PNG o JPG válida. SVG y otros formatos no están admitidos.`);
 }
 
 function checkDimensions(width: number, height: number): void {
   if (width < 1 || height < 1 || width > MAX_SIDE || height > MAX_SIDE) {
-    throw new Error("El logo debe medir entre 1 y 4096 píxeles por lado.");
+    throw new Error($localize`:@@ui.f1d9237681fd9a:El logo debe medir entre 1 y 4096 píxeles por lado.`);
   }
 }
 
@@ -51,7 +51,7 @@ export async function prepareQrCustomLogo(file: File): Promise<QrCustomLogo> {
     // The signature, rather than the user-controlled filename/MIME, chooses the decoder.
     bitmap = await createImageBitmap(new Blob([bytes], { type: bytes[0] === 137 ? "image/png" : "image/jpeg" }));
   } catch {
-    throw new Error("No se pudo leer la imagen. Prueba con otro archivo PNG o JPG.");
+    throw new Error($localize`:@@ui.16cb80658003c4:No se pudo leer la imagen. Prueba con otro archivo PNG o JPG.`);
   }
   try {
     checkDimensions(bitmap.width, bitmap.height);
@@ -60,7 +60,7 @@ export async function prepareQrCustomLogo(file: File): Promise<QrCustomLogo> {
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("No se pudo preparar la imagen en este navegador.");
+    if (!context) throw new Error($localize`:@@ui.a29822b544f347:No se pudo preparar la imagen en este navegador.`);
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     // Reject invisible images, and remove transparent padding without cropping the artwork.
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -77,7 +77,7 @@ export async function prepareQrCustomLogo(file: File): Promise<QrCustomLogo> {
     const cropped = document.createElement("canvas");
     cropped.width = right - left + 1; cropped.height = bottom - top + 1;
     const croppedContext = cropped.getContext("2d");
-    if (!croppedContext) throw new Error("No se pudo preparar la imagen en este navegador.");
+    if (!croppedContext) throw new Error($localize`:@@ui.a29822b544f347:No se pudo preparar la imagen en este navegador.`);
     croppedContext.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
     const name = file.name.replace(/[\p{Cc}\p{Cf}]/gu, "").slice(0, 100) || "Mi logo";
     return { canvas: cropped, preview: cropped.toDataURL("image/png"), name };
@@ -88,22 +88,22 @@ export async function prepareQrCustomLogo(file: File): Promise<QrCustomLogo> {
 
 /** Private server assets are PNGs; validate their bounds before allocating a bitmap. */
 export async function prepareSavedQrLogo(blob: Blob, name: string): Promise<QrCustomLogo> {
-  if (blob.type !== "image/png" || blob.size < 24 || blob.size > 8 * 1024 * 1024) throw new Error("El logo guardado no es válido.");
+  if (blob.type !== "image/png" || blob.size < 24 || blob.size > 8 * 1024 * 1024) throw new Error($localize`:@@ui.c958c598aa1ffe:El logo guardado no es válido.`);
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const size = dimensions(bytes);
-  if (bytes[0] !== 137 || size.width < 1 || size.height < 1 || size.width > OUTPUT_SIDE || size.height > OUTPUT_SIDE) throw new Error("El logo guardado no es válido.");
+  if (bytes[0] !== 137 || size.width < 1 || size.height < 1 || size.width > OUTPUT_SIDE || size.height > OUTPUT_SIDE) throw new Error($localize`:@@ui.c958c598aa1ffe:El logo guardado no es válido.`);
   const bitmap = await createImageBitmap(blob);
   try {
-    if (bitmap.width !== size.width || bitmap.height !== size.height) throw new Error("El logo guardado no es válido.");
+    if (bitmap.width !== size.width || bitmap.height !== size.height) throw new Error($localize`:@@ui.c958c598aa1ffe:El logo guardado no es válido.`);
     const canvas = document.createElement("canvas"); canvas.width = size.width; canvas.height = size.height;
-    const context = canvas.getContext("2d"); if (!context) throw new Error("No se pudo preparar el logo.");
+    const context = canvas.getContext("2d"); if (!context) throw new Error($localize`:@@ui.b9a391f2d1d44e:No se pudo preparar el logo.`);
     context.drawImage(bitmap, 0, 0);
     return { canvas, preview: canvas.toDataURL("image/png"), name };
   } finally { bitmap.close(); }
 }
 
 export async function qrLogoRaster(canvas: HTMLCanvasElement): Promise<QrRasterLogo> {
-  if (canvas.width < 1 || canvas.height < 1 || canvas.width > OUTPUT_SIDE || canvas.height > OUTPUT_SIDE) throw new Error("El logo normalizado no es válido.");
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("No se pudo codificar el logo.")), "image/png"));
+  if (canvas.width < 1 || canvas.height < 1 || canvas.width > OUTPUT_SIDE || canvas.height > OUTPUT_SIDE) throw new Error($localize`:@@ui.285a7cee79d1a8:El logo normalizado no es válido.`);
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error($localize`:@@ui.f5ffaffdc2e71d:No se pudo codificar el logo.`)), "image/png"));
   return { png: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height };
 }

@@ -13,7 +13,7 @@ export async function renderQr(text: string, options: QrCodeRenderOptions): Prom
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error("No se pudo preparar la vista previa."));
+      reader.onerror = () => reject(new Error($localize`:@@ui.ac482f594e0fc4:No se pudo preparar la vista previa.`));
       reader.readAsDataURL(blob);
     });
   }

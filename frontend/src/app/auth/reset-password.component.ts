@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { afterNextRender, Component, computed, DestroyRef, ElementRef, inject, Injector, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
 import { DOCUMENT, Location } from "@angular/common";
 
@@ -22,32 +23,32 @@ import { decodeCredentialChange } from "../core/services/public-action-response-
   imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule, AuthShellComponent],
   template: `
     <app-auth-shell>
-      <div class="card" aria-label="Recuperar el acceso">
-        <span class="step-kicker">RECUPERAR EL ACCESO</span>
-        <h2 id="reset-password-title">{{ hasResetLink ? 'Nueva contraseña' : 'Enlace no disponible' }}</h2>
-        @if (hasResetLink) { <p class="sub">Utiliza una frase larga y exclusiva para UVH. No necesitas recordar la contraseña anterior.</p> }
+      <div class="card" aria-label="Recuperar el acceso" i18n-aria-label="@@ui.0cdc3b3b8e6841">
+        <span class="step-kicker"><ng-container i18n="@@ui.f24759f8d2b74c">RECUPERAR EL ACCESO</ng-container></span>
+        <h2 id="reset-password-title">{{ hasResetLink ? uiText.ui_902e689d3d52a0 : uiText.ui_11e385a1023bde }}</h2>
+        @if (hasResetLink) { <p class="sub"><ng-container i18n="@@ui.515fcbfca71ddd">Utiliza una frase larga y exclusiva para UVH. No necesitas recordar la contraseña anterior.</ng-container></p> }
         @if (pendingLink()) {
-          <p class="sub">Tu URL seguirá guardada cuando vuelvas a iniciar sesión.</p>
+          <p class="sub"><ng-container i18n="@@ui.50e54db5686f9d">Tu URL seguirá guardada cuando vuelvas a iniciar sesión.</ng-container></p>
         } @else if (pendingInvitation()) {
-          <p class="sub">Tu invitación seguirá preparada cuando vuelvas a iniciar sesión.</p>
+          <p class="sub"><ng-container i18n="@@ui.dfdc3edb12715f">Tu invitación seguirá preparada cuando vuelvas a iniciar sesión.</ng-container></p>
         }
 
         @if (!hasResetLink) {
-          <div class="alert error" role="alert">Este enlace no es válido o ha caducado. Abre el correo de recuperación o solicita uno nuevo.</div>
-          <a #nextLink mat-flat-button routerLink="/auth/forgot-password">Solicitar otro enlace</a>
+          <div class="alert error" role="alert"><ng-container i18n="@@ui.61a1485eebc5c3">Este enlace no es válido o ha caducado. Abre el correo de recuperación o solicita uno nuevo.</ng-container></div>
+          <a #nextLink mat-flat-button routerLink="/auth/forgot-password"><ng-container i18n="@@ui.345ca6883d4196">Solicitar otro enlace</ng-container></a>
         } @else if (!done()) {
         <form #actionForm class="form" [formGroup]="form" (ngSubmit)="submit()" [attr.aria-busy]="busy()">
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Nueva contraseña</mat-label>
+            <mat-label><ng-container i18n="@@ui.902e689d3d52a0">Nueva contraseña</ng-container></mat-label>
             <input matInput [type]="hide() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="72" />
-            <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
+            <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? uiText.ui_5fe3b78d0838f4 : uiText.ui_20d93396e534a5">
               <mat-icon>{{ hide() ? 'visibility_off' : 'visibility' }}</mat-icon>
             </button>
-            <mat-hint>Al menos 10 caracteres. Evita datos personales y frases habituales.</mat-hint>
-            @if (form.controls.password.invalid) { <mat-error>Utiliza entre 10 y 72 caracteres.</mat-error> }
+            <mat-hint><ng-container i18n="@@ui.d52130b02e2036">Al menos 10 caracteres. Evita datos personales y frases habituales.</ng-container></mat-hint>
+            @if (form.controls.password.invalid) { <mat-error><ng-container i18n="@@ui.e3acd3c0081b57">Utiliza entre 10 y 72 caracteres.</ng-container></mat-error> }
           </mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Confirmar contraseña</mat-label>
+            <mat-label><ng-container i18n="@@ui.9cd535f99c26ba">Confirmar contraseña</ng-container></mat-label>
             <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
           </mat-form-field>
 
@@ -55,20 +56,20 @@ import { decodeCredentialChange } from "../core/services/public-action-response-
             <div class="alert error" role="alert">{{ error() }}</div>
           }
           @if (form.hasError('mismatch') && form.controls.confirm.touched) {
-            <div class="alert error" role="alert">Las contraseñas no coinciden. Revisa el segundo campo.</div>
+            <div class="alert error" role="alert"><ng-container i18n="@@ui.dcce46a3ea026e">Las contraseñas no coinciden. Revisa el segundo campo.</ng-container></div>
           }
 
           <button #submitButton mat-flat-button color="primary" type="submit" class="submit" [disabled]="form.invalid || busy() || done()">
-            {{ busy() ? 'Guardando…' : 'Guardar contraseña' }}
+            {{ busy() ? uiText.ui_3c8dc4dc7a83dd : uiText.ui_4a0a1bd212fca9 }}
           </button>
         </form>
         }
 
         @if (done()) {
-          <div class="alert ok" role="status">Contraseña actualizada. Ya puedes iniciar sesión.</div>
-          <a #nextLink class="back" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">Ir a iniciar sesión</a>
+          <div class="alert ok" role="status"><ng-container i18n="@@ui.ca4b51b24c10d9">Contraseña actualizada. Ya puedes iniciar sesión.</ng-container></div>
+          <a #nextLink class="back" [routerLink]="['/auth']" [queryParams]="loginQueryParams()"><ng-container i18n="@@ui.18ab5ce5fc3a86">Ir a iniciar sesión</ng-container></a>
         } @else {
-          <a class="back" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">← Volver al acceso</a>
+          <a class="back" [routerLink]="['/auth']" [queryParams]="loginQueryParams()"><ng-container i18n="@@ui.161fc295cd82f8">← Volver al acceso</ng-container></a>
         }
       </div>
     </app-auth-shell>
@@ -77,6 +78,7 @@ import { decodeCredentialChange } from "../core/services/public-action-response-
   styleUrl: "./auth-card.scss",
 })
 export class ResetPasswordComponent {
+  readonly uiText = UI_TEXT;
   private fb = inject(FormBuilder);
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
@@ -134,7 +136,7 @@ export class ResetPasswordComponent {
       this.form.reset();
     } catch (err) {
       if (this.requests.isCurrent(request, this.token)) {
-        this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo restablecer la contraseña");
+        this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.4a9afd65769978:No se pudo restablecer la contraseña`);
         if (err instanceof ApiRequestError && err.status === 400) this.linkRejected.set(true);
       }
     } finally {

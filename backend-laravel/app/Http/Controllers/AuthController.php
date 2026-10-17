@@ -28,7 +28,7 @@ class AuthController
         $captchaToken = UvhRequest::inputString($request, 'captchaToken');
 
         if (! $this->validEmail($email) || $password === '' || strlen($password) > 72) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($captchaError = $this->captchaError($request, $captchaToken)) {
             return $captchaError;
@@ -42,10 +42,10 @@ class AuthController
 
         if (! $ok || $user === null) {
             if (RegistrationAttemptContext::owns($request, strtolower($email))) {
-                return response()->json(['error' => 'Revisa la solicitud de verificación de tu email', 'reason' => 'pending_registration'], 403);
+                return response()->json(['error' => __('messages.error_d51353b060e056'), 'reason' => 'pending_registration'], 403);
             }
 
-            return response()->json(['error' => 'Credenciales incorrectas'], 401);
+            return response()->json(['error' => __('messages.error_2486649f3fd713')], 401);
         }
 
         // Registration is sessionless until the verification bearer token has
@@ -53,7 +53,7 @@ class AuthController
         // neither a challenge nor a session.
         if (! $user->email_verified_at) {
             return response()->json([
-                'error' => 'Confirma tu email para continuar',
+                'error' => __('messages.error_9eb99b4c17d628'),
                 'reason' => 'email_verification_required',
             ], 403);
         }
@@ -62,7 +62,7 @@ class AuthController
         // its exact generation before granting a session and reporting success.
         $login = LoginAdmission::admit($user, $request);
         if (! $login) {
-            return response()->json(['error' => 'Credenciales incorrectas'], 401);
+            return response()->json(['error' => __('messages.error_2486649f3fd713')], 401);
         }
 
         if ($login['mfaRequired'] ?? false) {

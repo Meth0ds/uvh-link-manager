@@ -8,7 +8,7 @@ import type { Invitation } from "./models";
  * feminine because it agrees with the noun the row is about: the invitation.
  */
 export const INVITATION_STATUS_LABEL: Record<Invitation["status"], string> = {
-  pending: "Pendiente de aceptar",
+  pending: $localize`:@@ui.4f8eecbbeb55f7:Pendiente de aceptar`,
   accepted: "Aceptada",
   rejected: "Rechazada",
   cancelled: "Cancelada",

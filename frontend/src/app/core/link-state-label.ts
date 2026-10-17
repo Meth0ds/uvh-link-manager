@@ -9,8 +9,8 @@ import type { LinkState } from "./models";
  */
 export const LINK_STATE_LABEL: Record<LinkState, string> = {
   scheduled: "Programado",
-  active: "Activo",
-  paused: "En pausa",
+  active: $localize`:@@ui.723858144bd548:Activo`,
+  paused: $localize`:@@ui.c28d816de98269:En pausa`,
   expired: "Caducado",
   blocked: "Bloqueado",
   archived: "Archivado",

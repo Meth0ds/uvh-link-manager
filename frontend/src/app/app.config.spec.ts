@@ -16,12 +16,14 @@ describe("application routes", () => {
   it("registers the public and authenticated route surfaces", () => {
     const paths = routes.map((route) => route.path);
     expect(paths).toEqual([
+      "help",
+      "status",
       "reports/:publicId",
       "",
       "auth",
       "legal",
-      "help",
-      "status",
+      "ayuda",
+      "estado",
       "invitations/accept",
       "forbidden",
       "not-found",

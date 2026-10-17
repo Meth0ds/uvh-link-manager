@@ -1,3 +1,5 @@
+import { LanguageSelectorComponent } from "../core/localisation/language-selector.component";
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { Component, ChangeDetectionStrategy, DestroyRef, ElementRef, HostListener, ViewChild, inject, signal } from "@angular/core";
 import { DOCUMENT, ViewportScroller } from "@angular/common";
 import { RouterLink, RouterLinkActive } from "@angular/router";
@@ -7,12 +9,13 @@ import { PublicThemeToggleComponent } from "../core/public-theme-toggle.componen
 @Component({
   selector: "app-legal-shell",
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, MatIconModule, PublicThemeToggleComponent],
+  imports: [LanguageSelectorComponent, RouterLink, RouterLinkActive, MatIconModule, PublicThemeToggleComponent],
   templateUrl: "./legal-shell.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./legal-shell.component.scss",
 })
 export class LegalShellComponent {
+  readonly uiText = UI_TEXT;
   @ViewChild("menuButton") private menuButton?: ElementRef<HTMLButtonElement>;
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
@@ -21,11 +24,11 @@ export class LegalShellComponent {
   readonly year = new Date().getFullYear();
   readonly mobileOpen = signal(false);
   readonly pages = [
-    { path: "/help", label: "Ayuda" },
-    { path: "/status", label: "Estado del servicio" },
-    { path: "/legal/terminos", label: "Términos" },
-    { path: "/legal/privacidad", label: "Privacidad" },
-    { path: "/legal/denuncias", label: "Denunciar enlace" },
+    { path: "/help", label: $localize`:@@ui.32b40035b08043:Ayuda` },
+    { path: "/status", label: $localize`:@@ui.33c62602febfb0:Estado del servicio` },
+    { path: "/legal/terminos", label: $localize`:@@ui.60eaf1f65f2194:Términos` },
+    { path: "/legal/privacidad", label: $localize`:@@ui.52233e2c4d6b2e:Privacidad` },
+    { path: "/legal/denuncias", label: $localize`:@@ui.13366879e6ca92:Denunciar enlace` },
   ];
 
   constructor() {

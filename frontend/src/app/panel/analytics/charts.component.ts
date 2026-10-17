@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "../../core/localisation/locale";
 import { Component, computed, input, ChangeDetectionStrategy } from "@angular/core";
 
 import type { AnalyticsOverview } from "../../core/models";
@@ -15,8 +16,8 @@ export class ChartsComponent {
   // The dashboard shows the time series once; full analytics keeps all six
   // breakdowns. This is presentation only, never a different metric query.
   readonly showBreakdowns = input(true);
-  private readonly numberFormatter = new Intl.NumberFormat("es-ES");
-  private readonly decimalFormatter = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
+  private readonly numberFormatter = new Intl.NumberFormat(UI_LOCALE);
+  private readonly decimalFormatter = new Intl.NumberFormat(UI_LOCALE, { maximumFractionDigits: 1 });
 
   readonly maxClicks = computed(() => {
     const m = Math.max(0, ...this.overview().series.map((s) => s.clicks));
@@ -138,12 +139,12 @@ export class ChartsComponent {
 
   label(key: string): string {
     const map: Record<string, string> = {
-      countries: "Países",
+      countries: $localize`:@@ui.993af13e12d377:Países`,
       devices: "Dispositivos",
       browsers: "Navegadores",
       os: "Sistemas",
       referrers: "Referentes",
-      campaigns: "Campañas",
+      campaigns: $localize`:@@ui.ef446438473000:Campañas`,
     };
     return map[key] ?? key;
   }

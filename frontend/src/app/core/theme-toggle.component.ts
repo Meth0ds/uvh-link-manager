@@ -1,3 +1,4 @@
+import { UI_TEXT } from "./localisation/template-messages";
 import { ChangeDetectionStrategy, Component, inject, input } from "@angular/core";
 import { MatIconModule } from "@angular/material/icon";
 import { ThemeService } from "./services/theme.service";
@@ -15,8 +16,8 @@ import { ThemeService } from "./services/theme.service";
       [class.compact]="compact()"
       [class.is-dark]="theme.resolved() === 'dark'"
       [attr.aria-checked]="theme.resolved() === 'dark'"
-      [attr.aria-label]="theme.resolved() === 'dark' ? 'Activar tema claro' : 'Activar tema oscuro'"
-      [attr.title]="theme.resolved() === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
+      [attr.aria-label]="theme.resolved() === 'dark' ? uiText.ui_ef673acbaa87e8 : uiText.ui_333232984e2a8c"
+      [attr.title]="theme.resolved() === 'dark' ? uiText.ui_15a20e382f2451 : uiText.ui_b0b3ec877edf83"
       (click)="toggle($event)"
     >
       <span class="theme-orbit" aria-hidden="true">
@@ -27,10 +28,10 @@ import { ThemeService } from "./services/theme.service";
       </span>
       @if (showLabel()) {
         <span class="theme-copy">
-          <small>Apariencia</small>
-          <b>{{ theme.resolved() === 'dark' ? 'Modo oscuro' : 'Modo claro' }}</b>
+          <small><ng-container i18n="@@ui.e3e9cbaccaec3d">Apariencia</ng-container></small>
+          <b>{{ theme.resolved() === 'dark' ? uiText.ui_808d4a199c7409 : uiText.ui_3a28469f0c7f07 }}</b>
         </span>
-        <span class="theme-next">Cambiar a {{ theme.resolved() === 'dark' ? 'claro' : 'oscuro' }}</span>
+        <span class="theme-next"><ng-container i18n="@@ui.9b375526e5e516">Cambiar a {{ theme.resolved() === 'dark' ? uiText.ui_bdae5d555cce9e : uiText.ui_056d81558cc32d }}</ng-container></span>
       }
     </button>
   `,
@@ -138,6 +139,7 @@ import { ThemeService } from "./services/theme.service";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ThemeToggleComponent {
+  readonly uiText = UI_TEXT;
   readonly showLabel = input(false);
   readonly compact = input(false);
   readonly theme = inject(ThemeService);

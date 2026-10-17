@@ -25,7 +25,7 @@ final readonly class WorkspaceWriteActor
         $user = UvhRequest::user($request);
         $workspaceId = UvhRequest::workspaceId($request);
         if (! $user || ! $workspaceId) {
-            throw new LinkException('Tu acceso al workspace cambió. Recarga antes de continuar.', 403);
+            throw new LinkException(__('messages.error_48d563fa5de1c6'), 403);
         }
 
         return new self(clone $user, $workspaceId, UvhRequest::sessionId($request), UvhRequest::apiToken($request), UvhRequest::ip($request));

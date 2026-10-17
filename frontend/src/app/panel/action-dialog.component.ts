@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -30,7 +31,7 @@ export type ActionDialogResult = true | string | null;
   template: `
     <h2 mat-dialog-title>
       <span class="title-mark" [class.danger]="data.destructive" aria-hidden="true"><mat-icon>{{ data.destructive ? 'warning' : 'help_outline' }}</mat-icon></span>
-      <span><small>{{ data.destructive ? 'Confirmación sensible' : 'Confirmación' }}</small><b>{{ data.title }}</b></span>
+      <span><small>{{ data.destructive ? uiText.ui_6b7ab11384ff1a : uiText.ui_2258cf460f4a7e }}</small><b>{{ data.title }}</b></span>
     </h2>
     <mat-dialog-content>
       <p class="message">{{ data.message }}</p>
@@ -60,7 +61,7 @@ export type ActionDialogResult = true | string | null;
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button type="button" (click)="close()">Cancelar</button>
+      <button mat-button type="button" (click)="close()"><ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button>
       <button
         mat-flat-button
         [class.destructive-confirm]="data.destructive"
@@ -77,6 +78,7 @@ export type ActionDialogResult = true | string | null;
   styleUrl: "./dialog-identity.scss",
 })
 export class ActionDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly data = inject<ActionDialogData>(MAT_DIALOG_DATA);
   private readonly dialogRef = inject(MatDialogRef<ActionDialogComponent, ActionDialogResult>);
   value = this.data.inputValue ?? "";

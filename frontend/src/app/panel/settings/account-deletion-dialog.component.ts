@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, signal, viewChild } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -19,6 +20,7 @@ import type { AccountDeletionImpact } from "../../core/models";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AccountDeletionDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly auth = inject(AuthService);
   readonly ref = inject(MatDialogRef<AccountDeletionDialogComponent, boolean>);
   private readonly destroyRef = inject(DestroyRef);
@@ -62,9 +64,9 @@ export class AccountDeletionDialogComponent {
       if (this.destroyRef.destroyed) return;
       if (this.auth.sessionGeneration() !== this.context) throw new Error("Account context changed");
       this.impact.set(impact);
-      if (!this.allowed()) this.error.set("La cuenta tiene requisitos pendientes o una solicitud en curso. Cierra esta ventana y actualiza los ajustes antes de continuar.");
+      if (!this.allowed()) this.error.set($localize`:@@ui.dee9fb0ab7af04:La cuenta tiene requisitos pendientes o una solicitud en curso. Cierra esta ventana y actualiza los ajustes antes de continuar.`);
     } catch {
-      if (!this.destroyRef.destroyed) this.error.set("No se pudieron comprobar los requisitos de tu cuenta. Vuelve a consultar su estado antes de continuar.");
+      if (!this.destroyRef.destroyed) this.error.set($localize`:@@ui.28633a9b17c5cb:No se pudieron comprobar los requisitos de tu cuenta. Vuelve a consultar su estado antes de continuar.`);
     } finally {
       if (!this.destroyRef.destroyed) this.loading.set(false);
     }
@@ -106,7 +108,7 @@ export class AccountDeletionDialogComponent {
     if (this.auth.sessionGeneration() !== this.context) {
       this.credentialsForm.reset();
       this.factorForm.reset();
-      this.error.set("Tu sesión ha cambiado. Cierra esta ventana y vuelve a abrirla.");
+      this.error.set($localize`:@@ui.24f3682d31bf84:Tu sesión ha cambiado. Cierra esta ventana y vuelve a abrirla.`);
       return;
     }
     if (this.credentialsForm.invalid || (this.requiresMfa && this.factorForm.invalid)) {
@@ -136,7 +138,7 @@ export class AccountDeletionDialogComponent {
         this.step.set(1);
         this.acknowledged.set(false);
         this.impact.set(null);
-        this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar el envío. Comprueba tu correo y vuelve a consultar los requisitos antes de repetirlo.");
+        this.error.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.64e776d057a802:No se pudo confirmar el envío. Comprueba tu correo y vuelve a consultar los requisitos antes de repetirlo.`);
       }
     } finally {
       if (!this.destroyRef.destroyed) { this.busy.set(false); this.ref.disableClose = false; }

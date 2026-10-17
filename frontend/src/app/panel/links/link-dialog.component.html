@@ -2,15 +2,15 @@
   <div class="editor-heading">
     <span class="editor-mark" aria-hidden="true"><mat-icon>link</mat-icon></span>
     <div>
-      <h2 mat-dialog-title>{{ view() === 'success' ? 'Enlace creado' : isEdit ? 'Editar enlace' : isDuplicate ? 'Duplicar enlace' : view() === 'quick' ? 'Crear enlace' : 'Configurar enlace' }}</h2>
-      <p>{{ view() === 'success' ? 'Ya puedes compartirlo o seguir creando enlaces.' : isEdit ? 'Ajusta el destino y cómo funciona tu enlace.' : isDuplicate ? 'Los mismos ajustes, una dirección nueva y estadísticas desde cero.' : view() === 'quick' ? 'Acorta una URL en unos segundos.' : 'Ajusta todos los detalles antes de publicar.' }}</p>
+      <h2 mat-dialog-title>{{ view() === 'success' ? uiText.ui_8a1e65cabad862 : isEdit ? uiText.ui_1529d4ff998c93 : isDuplicate ? uiText.ui_cbce5acbfee967 : view() === 'quick' ? uiText.ui_3daf36ee52f052 : uiText.ui_e9babbb2285a0f }}</h2>
+      <p>{{ view() === 'success' ? uiText.ui_17b813fd15b7d4 : isEdit ? uiText.ui_d7eea38e599b05 : isDuplicate ? uiText.ui_ae0ec887f6a825 : view() === 'quick' ? uiText.ui_68c55f0b3bb611 : uiText.ui_10a10fbfcf808e }}</p>
     </div>
   </div>
-  <button mat-icon-button mat-dialog-close type="button" aria-label="Cerrar editor de enlace" class="editor-close"><mat-icon>close</mat-icon></button>
+  <button mat-icon-button mat-dialog-close type="button" aria-label="Cerrar editor de enlace" class="editor-close" i18n-aria-label="@@ui.5cb632fde1a589"><mat-icon>close</mat-icon></button>
   @if (view() !== 'success') {
-    <div class="mobile-address" aria-label="Vista previa de la URL corta">
+    <div class="mobile-address" aria-label="Vista previa de la URL corta" i18n-aria-label="@@ui.d5ec0d627975d5">
       <mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>
-      <span>{{ previewDomain }}/<b>{{ form.controls.alias.value.trim() || 'alias automático' }}</b></span>
+      <span>{{ previewDomain }}/<b>{{ form.controls.alias.value.trim() || uiText.ui_b04cfb3131d1a4 }}</b></span>
     </div>
   }
 </header>
@@ -18,21 +18,21 @@
 @if (view() === 'success') {
   <section class="creation-success" aria-labelledby="creation-success-title">
     <div class="success-emblem" aria-hidden="true"><mat-icon>check</mat-icon></div>
-    <h3 id="creation-success-title">Tu enlace está listo</h3>
-    <p class="success-intro">Compártelo ahora o sigue trabajando en tu biblioteca.</p>
+    <h3 id="creation-success-title"><ng-container i18n="@@ui.4c4d3bf2e8fe09">Tu enlace está listo</ng-container></h3>
+    <p class="success-intro"><ng-container i18n="@@ui.d5ccd066ddd052">Compártelo ahora o sigue trabajando en tu biblioteca.</ng-container></p>
     @if (createdLink(); as link) {
       @if (link.name) { <p class="success-name">{{ link.name }}</p> }
-      <button type="button" class="success-url" (click)="copyCreatedLink()" [attr.aria-label]="'Copiar ' + (link.shareUrl || link.shortUrl)">
+      <button type="button" class="success-url" (click)="copyCreatedLink()" [attr.aria-label]="uiText.ui_2fb865c4871351 + (link.shareUrl || link.shortUrl)">
         <mat-icon aria-hidden="true">link</mat-icon><span>{{ link.shareUrl || link.shortUrl }}</span><mat-icon aria-hidden="true">content_copy</mat-icon>
       </button>
       <p class="success-destination" [title]="link.destination">{{ link.destination }}</p>
-      <div class="success-actions" role="group" aria-label="Acciones del enlace creado">
-        <button mat-flat-button type="button" (click)="copyCreatedLink()"><mat-icon>content_copy</mat-icon>Copiar enlace</button>
-        <button mat-stroked-button type="button" (click)="openCreatedQr()"><mat-icon>qr_code_2</mat-icon>Crear QR</button>
-        <button mat-stroked-button type="button" (click)="openCreatedDetail()"><mat-icon>open_in_new</mat-icon>Ver detalle</button>
+      <div class="success-actions" role="group" aria-label="Acciones del enlace creado" i18n-aria-label="@@ui.b8eea553362496">
+        <button mat-flat-button type="button" (click)="copyCreatedLink()"><mat-icon>content_copy</mat-icon><ng-container i18n="@@ui.db164690a5469f">Copiar enlace</ng-container></button>
+        <button mat-stroked-button type="button" (click)="openCreatedQr()"><mat-icon>qr_code_2</mat-icon><ng-container i18n="@@ui.4c47f780fc7760">Crear QR</ng-container></button>
+        <button mat-stroked-button type="button" (click)="openCreatedDetail()"><mat-icon>open_in_new</mat-icon><ng-container i18n="@@ui.3139c028decfe0">Ver detalle</ng-container></button>
       </div>
     }
-    <button mat-button type="button" class="success-repeat" (click)="createAnother()"><mat-icon>add_link</mat-icon>Crear otro enlace</button>
+    <button mat-button type="button" class="success-repeat" (click)="createAnother()"><mat-icon>add_link</mat-icon><ng-container i18n="@@ui.6009439e9df60b">Crear otro enlace</ng-container></button>
   </section>
 } @else {
 
@@ -40,7 +40,7 @@
   @if (loading()) {
     <div class="editor-loading" role="status">
       <mat-progress-bar mode="indeterminate" />
-      <p>Cargando los datos del enlace…</p>
+      <p><ng-container i18n="@@ui.312d70b32cc465">Cargando los datos del enlace…</ng-container></p>
     </div>
   }
   @if (!loading()) {
@@ -49,239 +49,239 @@
         @if (view() === 'advanced' && templates().length) {
           <div class="template-tools">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Plantilla</mat-label>
-              <mat-select [value]="null" (selectionChange)="applyTemplate($event.value)" aria-label="Aplicar plantilla">
-                <mat-option [value]="null">Sin plantilla</mat-option>
+              <mat-label><ng-container i18n="@@ui.65ebd9bd0f84e7">Plantilla</ng-container></mat-label>
+              <mat-select [value]="null" (selectionChange)="applyTemplate($event.value)" aria-label="Aplicar plantilla" i18n-aria-label="@@ui.48656b6402b72e">
+                <mat-option [value]="null"><ng-container i18n="@@ui.7034a2f60a44fb">Sin plantilla</ng-container></mat-option>
                 @for (template of templates(); track template.id) {
                   <mat-option [value]="template">{{ template.name }}</mat-option>
                 }
               </mat-select>
             </mat-form-field>
-            <button mat-icon-button type="button" (click)="saveAsTemplate()" [disabled]="busy()" aria-label="Guardar como plantilla" matTooltip="Guardar como plantilla"><mat-icon>bookmark_add</mat-icon></button>
+            <button mat-icon-button type="button" (click)="saveAsTemplate()" [disabled]="busy()" aria-label="Guardar como plantilla" matTooltip="Guardar como plantilla" i18n-matTooltip="@@ui.464357acd4f2c2" i18n-aria-label="@@ui.464357acd4f2c2"><mat-icon>bookmark_add</mat-icon></button>
           </div>
         }
         @if (view() === 'quick') {
-          <div class="quick-form" aria-label="Creación rápida">
-            <div class="quick-intro"><span class="quick-kicker">Lo esencial</span><h3>Acorta una URL sin complicaciones</h3><p>Introduce el destino y tendrás un enlace listo para compartir.</p></div>
+          <div class="quick-form" aria-label="Creación rápida" i18n-aria-label="@@ui.6ef8625cbeda1a">
+            <div class="quick-intro"><span class="quick-kicker"><ng-container i18n="@@ui.b1e5f0cde20951">Lo esencial</ng-container></span><h3><ng-container i18n="@@ui.69ce4585fdda1a">Acorta una URL sin complicaciones</ng-container></h3><p><ng-container i18n="@@ui.179f9cba5a5874">Introduce el destino y tendrás un enlace listo para compartir.</ng-container></p></div>
             <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-              <mat-label>URL de destino</mat-label>
-              <input id="link-destination" matInput formControlName="destination" placeholder="https://ejemplo.com/tu-pagina" type="url" autocomplete="url" />
+              <mat-label><ng-container i18n="@@ui.cb0108f07f84c5">URL de destino</ng-container></mat-label>
+              <input id="link-destination" matInput formControlName="destination" placeholder="https://ejemplo.com/tu-pagina" type="url" autocomplete="url"  i18n-placeholder="@@ui.0a99a0a5e06015"/>
               <mat-icon matPrefix aria-hidden="true">north_east</mat-icon>
-              <mat-hint>Una dirección http o https, sin usuario ni contraseña.</mat-hint>
-              @if (form.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
-              @if (form.controls.destination.hasError('required')) { <mat-error>Escribe la URL de destino.</mat-error> }
+              <mat-hint><ng-container i18n="@@ui.9e2e4946bc58e4">Una dirección http o https, sin usuario ni contraseña.</ng-container></mat-hint>
+              @if (form.controls.destination.hasError('url')) { <mat-error><ng-container i18n="@@ui.48dabccd7c7a32">Introduce una URL http/https sin credenciales.</ng-container></mat-error> }
+              @if (form.controls.destination.hasError('required')) { <mat-error><ng-container i18n="@@ui.02b9221c619cc1">Escribe la URL de destino.</ng-container></mat-error> }
             </mat-form-field>
             <div class="quick-address">
               <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                <mat-label>Dominio</mat-label>
+                <mat-label><ng-container i18n="@@ui.5199d835a3f9ed">Dominio</ng-container></mat-label>
                 <mat-select formControlName="domainId" [canSelectNullableOptions]="true"><mat-option [value]="null">{{ platformDomain }}</mat-option>@for (d of domains(); track d.id) { <mat-option [value]="d.id">{{ d.domain }}</mat-option> }</mat-select>
               </mat-form-field>
               <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                <mat-label>Alias <span class="optional-label">— opcional</span></mat-label>
-                <input matInput formControlName="alias" placeholder="mi-enlace" autocomplete="off" />
+                <mat-label><ng-container i18n="@@ui.7ad59f3f8b42fe">Alias </ng-container><span class="optional-label"><ng-container i18n="@@ui.c18d84986443c9">— opcional</ng-container></span></mat-label>
+                <input matInput formControlName="alias" placeholder="mi-enlace" autocomplete="off"  i18n-placeholder="@@ui.4dec0a67b3a325"/>
                 @if (aliasStatus() === 'available') { <mat-hint class="success-hint">{{ aliasStatusText() }}</mat-hint> }
-                @if (aliasStatus() === 'checking') { <mat-hint>Comprobando disponibilidad…</mat-hint> }
+                @if (aliasStatus() === 'checking') { <mat-hint><ng-container i18n="@@ui.f672df27f5c067">Comprobando disponibilidad…</ng-container></mat-hint> }
                 @if (aliasStatus() === 'taken' || aliasStatus() === 'reserved' || aliasStatus() === 'invalid') { <mat-hint class="error-hint">{{ aliasStatusText() }}</mat-hint> }
-                @if (form.controls.alias.hasError('pattern')) { <mat-error>Usa letras, números, guion o guion bajo.</mat-error> }
+                @if (form.controls.alias.hasError('pattern')) { <mat-error><ng-container i18n="@@ui.7fdc30ce1c72a0">Usa letras, números, guion o guion bajo.</ng-container></mat-error> }
               </mat-form-field>
             </div>
-            <button mat-button type="button" class="quick-customize" (click)="quickPersonalizationOpen.update(value => !value)" [attr.aria-expanded]="quickPersonalizationOpen()"><mat-icon>{{ quickPersonalizationOpen() ? 'expand_less' : 'tune' }}</mat-icon>{{ quickPersonalizationOpen() ? 'Ocultar personalización' : 'Personalizar enlace' }}</button>
+            <button mat-button type="button" class="quick-customize" (click)="quickPersonalizationOpen.update(value => !value)" [attr.aria-expanded]="quickPersonalizationOpen()"><mat-icon>{{ quickPersonalizationOpen() ? 'expand_less' : 'tune' }}</mat-icon>{{ quickPersonalizationOpen() ? uiText.ui_5887597540fc98 : uiText.ui_57947e1a707fca }}</button>
             @if (quickPersonalizationOpen()) {
               <div class="quick-personalization">
-                <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label>Nombre del enlace <span class="optional-label">— opcional</span></mat-label><input matInput formControlName="name" placeholder="Carta restaurante — Octubre 2026" autocomplete="off" /><mat-icon matPrefix aria-hidden="true">label_outline</mat-icon><mat-hint>Solo sirve para reconocerlo en tu biblioteca.</mat-hint>@if (form.controls.name.invalid) { <mat-error>Usa hasta 120 caracteres sin caracteres de control.</mat-error> }</mat-form-field>
+                <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.96f003134391ee">Nombre del enlace </ng-container><span class="optional-label"><ng-container i18n="@@ui.c18d84986443c9">— opcional</ng-container></span></mat-label><input matInput formControlName="name" placeholder="Carta restaurante — Octubre 2026" autocomplete="off"  i18n-placeholder="@@ui.4d97da87255507"/><mat-icon matPrefix aria-hidden="true">label_outline</mat-icon><mat-hint><ng-container i18n="@@ui.c34576406e8f82">Solo sirve para reconocerlo en tu biblioteca.</ng-container></mat-hint>@if (form.controls.name.invalid) { <mat-error><ng-container i18n="@@ui.be4c1281dd2350">Usa hasta 120 caracteres sin caracteres de control.</ng-container></mat-error> }</mat-form-field>
               </div>
             }
-            <button mat-stroked-button type="button" class="advanced-link" (click)="showAdvanced()"><mat-icon>tune</mat-icon>Configurar más opciones</button>
+            <button mat-stroked-button type="button" class="advanced-link" (click)="showAdvanced()"><mat-icon>tune</mat-icon><ng-container i18n="@@ui.1bc83556040383">Configurar más opciones</ng-container></button>
           </div>
         } @else {
-        <div #advancedHeading class="advanced-mode-heading" tabindex="-1" aria-label="Configuración avanzada"><span class="eyebrow">Configuración avanzada</span><span>Todos los ajustes del enlace</span></div>
+        <div #advancedHeading class="advanced-mode-heading" tabindex="-1" aria-label="Configuración avanzada" i18n-aria-label="@@ui.6d8d8fbeb0da59"><span class="eyebrow"><ng-container i18n="@@ui.6d8d8fbeb0da59">Configuración avanzada</ng-container></span><span><ng-container i18n="@@ui.b4b717be205c86">Todos los ajustes del enlace</ng-container></span></div>
         <mat-tab-group animationDuration="0ms" class="editor-tabs">
-          <mat-tab label="Destino">
+          <mat-tab label="Destino" i18n-label="@@ui.8e7290e445465b">
             <div class="editor-section">
-              <div class="section-heading"><h3>¿Adónde lleva?</h3><p>La página que se abrirá al visitar tu enlace.</p></div>
+              <div class="section-heading"><h3><ng-container i18n="@@ui.05b16a62822810">¿Adónde lleva?</ng-container></h3><p><ng-container i18n="@@ui.5983b2743a48d9">La página que se abrirá al visitar tu enlace.</ng-container></p></div>
               <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-                <mat-label>URL de destino</mat-label>
-                <input id="link-destination" matInput formControlName="destination" placeholder="https://ejemplo.com/tu-pagina" type="url" autocomplete="url" />
+                <mat-label><ng-container i18n="@@ui.cb0108f07f84c5">URL de destino</ng-container></mat-label>
+                <input id="link-destination" matInput formControlName="destination" placeholder="https://ejemplo.com/tu-pagina" type="url" autocomplete="url"  i18n-placeholder="@@ui.0a99a0a5e06015"/>
                 <mat-icon matPrefix aria-hidden="true">north_east</mat-icon>
-                <mat-hint>Una dirección http o https, sin usuario ni contraseña.</mat-hint>
-                @if (form.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
-                @if (form.controls.destination.hasError('required')) { <mat-error>Escribe la URL de destino.</mat-error> }
+                <mat-hint><ng-container i18n="@@ui.9e2e4946bc58e4">Una dirección http o https, sin usuario ni contraseña.</ng-container></mat-hint>
+                @if (form.controls.destination.hasError('url')) { <mat-error><ng-container i18n="@@ui.48dabccd7c7a32">Introduce una URL http/https sin credenciales.</ng-container></mat-error> }
+                @if (form.controls.destination.hasError('required')) { <mat-error><ng-container i18n="@@ui.02b9221c619cc1">Escribe la URL de destino.</ng-container></mat-error> }
               </mat-form-field>
               <mat-form-field appearance="outline" class="full link-name-field" subscriptSizing="dynamic">
-                <mat-label>Nombre del enlace<span class="link-name-optional"> — opcional</span></mat-label>
-                <input matInput formControlName="name" aria-label="Nombre del enlace — opcional" placeholder="Carta restaurante — Octubre 2026" autocomplete="off" />
+                <mat-label><ng-container i18n="@@ui.39108b1438db29">Nombre del enlace</ng-container><span class="link-name-optional"> <ng-container i18n="@@ui.c18d84986443c9">— opcional</ng-container></span></mat-label>
+                <input matInput formControlName="name" aria-label="Nombre del enlace — opcional" placeholder="Carta restaurante — Octubre 2026" autocomplete="off"  i18n-placeholder="@@ui.4d97da87255507" i18n-aria-label="@@ui.4af8f890d55c1f"/>
                 <mat-icon matPrefix aria-hidden="true">label_outline</mat-icon>
-                <mat-hint><span class="link-name-mobile-hint">Opcional. </span>Para reconocerlo en tu biblioteca. No cambia la URL corta.</mat-hint>
-                @if (form.controls.name.invalid) { <mat-error>Usa hasta 120 caracteres sin caracteres de control.</mat-error> }
+                <mat-hint><span class="link-name-mobile-hint"><ng-container i18n="@@ui.bb4648ae3f2ec2">Opcional. </ng-container></span><ng-container i18n="@@ui.7bb508c77515a2">Para reconocerlo en tu biblioteca. No cambia la URL corta.</ng-container></mat-hint>
+                @if (form.controls.name.invalid) { <mat-error><ng-container i18n="@@ui.be4c1281dd2350">Usa hasta 120 caracteres sin caracteres de control.</ng-container></mat-error> }
               </mat-form-field>
               <app-destination-inspection [url]="destinationValue()" [preview]="true" [suggestName]="true" (previewResolved)="destinationTitle.set($event)" (nameSuggested)="applySuggestedName($event)" />
               <app-app-opening-editor [spec]="appOpening()" (specChange)="appOpening.set($event)" (validity)="appOpeningValid.set($event)" [domainId]="form.controls.domainId.value" [domain]="previewDomain" [alias]="form.controls.alias.value" [webUrl]="form.controls.destination.value" />
-              @if (sharing.socialEnabled()) { <app-social-preview-editor [spec]="socialPreview()" (specChange)="socialPreview.set($event)" [protected]="passwordWillProtect()" [linkName]="form.controls.name.value" [suggestionTitle]="socialTitleSuggestion()" [shortUrl]="data.link?.shortUrl || platformDomain + '/' + (form.controls.alias.value || 'tu-enlace')" (working)="socialBusy.set($event)" /> }
-              <div class="section-heading secondary"><h3>Tu URL corta</h3><p>Elige una dirección fácil de reconocer y compartir.</p></div>
+              @if (sharing.socialEnabled()) { <app-social-preview-editor [spec]="socialPreview()" (specChange)="socialPreview.set($event)" [protected]="passwordWillProtect()" [linkName]="form.controls.name.value" [suggestionTitle]="socialTitleSuggestion()" [shortUrl]="data.link?.shortUrl || platformDomain + '/' + (form.controls.alias.value || uiText.ui_9f78329a200934)" (working)="socialBusy.set($event)" /> }
+              <div class="section-heading secondary"><h3><ng-container i18n="@@ui.e4da35b547ab1c">Tu URL corta</ng-container></h3><p><ng-container i18n="@@ui.f38abb5044f740">Elige una dirección fácil de reconocer y compartir.</ng-container></p></div>
               <div class="address-fields">
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                  <mat-label>Dominio</mat-label>
+                  <mat-label><ng-container i18n="@@ui.5199d835a3f9ed">Dominio</ng-container></mat-label>
                   <mat-select formControlName="domainId" [canSelectNullableOptions]="true">
                     <mat-option [value]="null">{{ platformDomain }}</mat-option>
                     @if (currentDomainUnavailable(); as unavailable) {
-                      <mat-option [value]="unavailable.id" disabled>{{ unavailable.domain ?? 'Dominio' }} — No disponible</mat-option>
+                      <mat-option [value]="unavailable.id" disabled><ng-container i18n="@@ui.ceff074e89f96f">{{ unavailable.domain ?? uiText.ui_5199d835a3f9ed }} — No disponible</ng-container></mat-option>
                     }
                     @for (d of domains(); track d.id) { <mat-option [value]="d.id">{{ d.domain }}</mat-option> }
                   </mat-select>
                 </mat-form-field>
                 <span class="address-divider" aria-hidden="true">/</span>
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                  <mat-label>{{ isEdit ? 'Alias' : 'Alias (opcional)' }}</mat-label>
-                  <input matInput formControlName="alias" placeholder="mi-enlace" autocomplete="off" />
-                  @if (!isEdit && !form.controls.alias.value) { <mat-hint>Si lo dejas vacío, asignaremos uno.</mat-hint> }
+                  <mat-label>{{ isEdit ? uiText.ui_b19e02e9502bbe : uiText.ui_d47c4b5e4e39ab }}</mat-label>
+                  <input matInput formControlName="alias" placeholder="mi-enlace" autocomplete="off"  i18n-placeholder="@@ui.4dec0a67b3a325"/>
+                  @if (!isEdit && !form.controls.alias.value) { <mat-hint><ng-container i18n="@@ui.f04fc5c2cc04dc">Si lo dejas vacío, asignaremos uno.</ng-container></mat-hint> }
                   @if (aliasStatus() === 'available') { <mat-hint class="success-hint">{{ aliasStatusText() }}</mat-hint> }
-                  @if (aliasStatus() === 'checking') { <mat-hint>Comprobando disponibilidad…</mat-hint> }
+                  @if (aliasStatus() === 'checking') { <mat-hint><ng-container i18n="@@ui.f672df27f5c067">Comprobando disponibilidad…</ng-container></mat-hint> }
                   @if (aliasStatus() === 'taken' || aliasStatus() === 'reserved' || aliasStatus() === 'invalid') { <mat-hint class="error-hint">{{ aliasStatusText() }}</mat-hint> }
-                  @if (form.controls.alias.hasError('pattern')) { <mat-error>Usa letras, números, guion o guion bajo.</mat-error> }
-                  @if (form.controls.alias.hasError('required')) { <mat-error>El alias no se puede vaciar.</mat-error> }
+                  @if (form.controls.alias.hasError('pattern')) { <mat-error><ng-container i18n="@@ui.7fdc30ce1c72a0">Usa letras, números, guion o guion bajo.</ng-container></mat-error> }
+                  @if (form.controls.alias.hasError('required')) { <mat-error><ng-container i18n="@@ui.c794cd4e7ed8a4">El alias no se puede vaciar.</ng-container></mat-error> }
                 </mat-form-field>
               </div>
-              <div class="section-heading secondary"><h3>Destino alternativo</h3><p>Opcional. Se utiliza si ninguna regla de redirección coincide.</p></div>
+              <div class="section-heading secondary"><h3><ng-container i18n="@@ui.ebe25baa0d90dc">Destino alternativo</ng-container></h3><p><ng-container i18n="@@ui.7fc8c75a32eade">Opcional. Se utiliza si ninguna regla de redirección coincide.</ng-container></p></div>
               <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-                <mat-label>URL alternativa (opcional)</mat-label>
-                <input matInput formControlName="fallbackDestination" type="url" placeholder="https://ejemplo.com" />
-                @if (form.controls.fallbackDestination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales.</mat-error> }
+                <mat-label><ng-container i18n="@@ui.3a47092da508dc">URL alternativa (opcional)</ng-container></mat-label>
+                <input matInput formControlName="fallbackDestination" type="url" placeholder="https://ejemplo.com"  i18n-placeholder="@@ui.ceff7376a9a0cf"/>
+                @if (form.controls.fallbackDestination.hasError('url')) { <mat-error><ng-container i18n="@@ui.48dabccd7c7a32">Introduce una URL http/https sin credenciales.</ng-container></mat-error> }
               </mat-form-field>
             </div>
           </mat-tab>
-          <mat-tab label="Acceso">
+          <mat-tab label="Acceso" i18n-label="@@ui.bf904abc16526a">
             <div class="editor-section">
-              <div class="section-heading"><h3>Quién puede usarlo</h3><p>Añade protección o limita el número de visitas.</p></div>
+              <div class="section-heading"><h3><ng-container i18n="@@ui.463549f8554ee4">Quién puede usarlo</ng-container></h3><p><ng-container i18n="@@ui.3377b924b053bc">Añade protección o limita el número de visitas.</ng-container></p></div>
               <div class="field-pair">
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                  <mat-label>{{ isEdit || isDuplicate ? 'Nueva contraseña (opcional)' : 'Contraseña (opcional)' }}</mat-label>
+                  <mat-label>{{ isEdit || isDuplicate ? uiText.ui_4cb02464f0335e : uiText.ui_743d9121f68e5b }}</mat-label>
                   <input matInput formControlName="password" type="password" autocomplete="new-password" maxlength="72" />
                   <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
-                  @if ((isEdit || isDuplicate) && data.link?.passwordProtected) { <mat-hint>Déjala vacía para mantener la contraseña actual.</mat-hint> }
+                  @if ((isEdit || isDuplicate) && data.link?.passwordProtected) { <mat-hint><ng-container i18n="@@ui.9d447c9b5432a4">Déjala vacía para mantener la contraseña actual.</ng-container></mat-hint> }
                 </mat-form-field>
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                  <mat-label>Máximo de clics (opcional)</mat-label>
+                  <mat-label><ng-container i18n="@@ui.c6e64083861e28">Máximo de clics (opcional)</ng-container></mat-label>
                   <input matInput formControlName="maxClicks" type="number" min="1" max="10000000" />
-                  @if (form.controls.maxClicks.hasError('min') || form.controls.maxClicks.hasError('max')) { <mat-error>Usa un valor entre 1 y 10.000.000.</mat-error> }
+                  @if (form.controls.maxClicks.hasError('min') || form.controls.maxClicks.hasError('max')) { <mat-error><ng-container i18n="@@ui.19659e79616ae4">Usa un valor entre 1 y 10.000.000.</ng-container></mat-error> }
                 </mat-form-field>
               </div>
               <div class="access-choices">
-                @if ((isEdit || isDuplicate) && data.link?.passwordProtected) { <mat-checkbox formControlName="clearPassword">Quitar la contraseña actual</mat-checkbox> }
-                <mat-checkbox formControlName="singleUse">Uso único</mat-checkbox>
-                <p>Después del primer clic, el enlace deja de estar disponible.</p>
+                @if ((isEdit || isDuplicate) && data.link?.passwordProtected) { <mat-checkbox formControlName="clearPassword"><ng-container i18n="@@ui.4e7a4ddf700118">Quitar la contraseña actual</ng-container></mat-checkbox> }
+                <mat-checkbox formControlName="singleUse"><ng-container i18n="@@ui.0a79a125f400cb">Uso único</ng-container></mat-checkbox>
+                <p><ng-container i18n="@@ui.fa3b02cec989a9">Después del primer clic, el enlace deja de estar disponible.</ng-container></p>
               </div>
-              <div class="section-heading secondary"><h3>Cuándo está disponible</h3><p>Fechas en la zona horaria de tu dispositivo. Déjalas vacías para no limitar la vigencia.</p></div>
+              <div class="section-heading secondary"><h3><ng-container i18n="@@ui.c7fa834c95e47b">Cuándo está disponible</ng-container></h3><p><ng-container i18n="@@ui.7dd08de9606820">Fechas en la zona horaria de tu dispositivo. Déjalas vacías para no limitar la vigencia.</ng-container></p></div>
               <div class="field-pair">
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                  <mat-label>Activación programada</mat-label>
+                  <mat-label><ng-container i18n="@@ui.3620992da4c4c2">Activación programada</ng-container></mat-label>
                   <input matInput formControlName="scheduledAt" type="datetime-local" [attr.aria-describedby]="form.hasError('lifecycleOrder') ? 'link-window-error' : null" />
-                  @if (form.controls.scheduledAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
+                  @if (form.controls.scheduledAt.hasError('localDateTime')) { <mat-error><ng-container i18n="@@ui.f6d1994d5aab42">Introduce una fecha válida.</ng-container></mat-error> }
                 </mat-form-field>
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                  <mat-label>Expiración</mat-label>
+                  <mat-label><ng-container i18n="@@ui.dd3a3e8f73b8f1">Expiración</ng-container></mat-label>
                   <input matInput formControlName="expiresAt" type="datetime-local" [attr.aria-describedby]="form.hasError('lifecycleOrder') ? 'link-window-error' : null" />
-                  @if (form.controls.expiresAt.hasError('localDateTime')) { <mat-error>Introduce una fecha válida.</mat-error> }
-                  @if (form.controls.expiresAt.hasError('pastDateTime')) { <mat-error>Elige una fecha futura.</mat-error> }
+                  @if (form.controls.expiresAt.hasError('localDateTime')) { <mat-error><ng-container i18n="@@ui.f6d1994d5aab42">Introduce una fecha válida.</ng-container></mat-error> }
+                  @if (form.controls.expiresAt.hasError('pastDateTime')) { <mat-error><ng-container i18n="@@ui.8ff30d55825dfc">Elige una fecha futura.</ng-container></mat-error> }
                 </mat-form-field>
               </div>
-              @if (form.hasError('lifecycleOrder')) { <div id="link-window-error" class="editor-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>La expiración debe ser posterior a la activación.</span></div> }
-              @if (isDuplicate) { <div class="duplicate-note" role="status"><mat-icon aria-hidden="true">library_add</mat-icon><p>{{ duplicateExpired ? 'La copia conservará una fecha de caducidad pasada. Cambia esa fecha si quieres que el nuevo enlace esté disponible.' : 'Las fechas y límites se conservan. Los clics y el uso único empiezan desde cero.' }}</p></div> }
+              @if (form.hasError('lifecycleOrder')) { <div id="link-window-error" class="editor-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span><ng-container i18n="@@ui.d2b3c60ac30107">La expiración debe ser posterior a la activación.</ng-container></span></div> }
+              @if (isDuplicate) { <div class="duplicate-note" role="status"><mat-icon aria-hidden="true">library_add</mat-icon><p>{{ duplicateExpired ? uiText.ui_51c19081e66ec6 : uiText.ui_15ba99ca345fd4 }}</p></div> }
               @if (workflows.enabled()) {
-                <div class="reminder-help"><mat-icon aria-hidden="true">notifications_none</mat-icon><p>UVH avisa {{ workflows.capabilities()?.reminderHours }} horas antes de caducar y al consumir el {{ (workflows.capabilities()?.reminderClickRatio ?? 0.9) * 100 }} % del límite. <a routerLink="/app/settings/notifications" (click)="dialogRefClose()">Configurar mis avisos</a></p></div>
+                <div class="reminder-help"><mat-icon aria-hidden="true">notifications_none</mat-icon><p><ng-container i18n="@@ui.21a9fdc2ab0e9e">UVH avisa {{ workflows.capabilities()?.reminderHours }} horas antes de caducar y al consumir el {{ (workflows.capabilities()?.reminderClickRatio ?? 0.9) * 100 }} % del límite. </ng-container><a routerLink="/app/settings/notifications" (click)="dialogRefClose()"><ng-container i18n="@@ui.d3c96dd5520083">Configurar mis avisos</ng-container></a></p></div>
                 <app-expired-page-editor [(spec)]="expiredPage" />
               }
             </div>
           </mat-tab>
-          <mat-tab label="Organizar">
+          <mat-tab label="Organizar" i18n-label="@@ui.40dd592aa3333e">
             <div class="editor-section">
-              <div class="section-heading"><h3>Encuéntralo cuando lo necesites</h3><p>Agrupa el enlace y añade contexto para tu equipo.</p></div>
+              <div class="section-heading"><h3><ng-container i18n="@@ui.269b814fbe56b9">Encuéntralo cuando lo necesites</ng-container></h3><p><ng-container i18n="@@ui.e20e269ec1ddf0">Agrupa el enlace y añade contexto para tu equipo.</ng-container></p></div>
               <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-                <mat-label>Colección</mat-label>
+                <mat-label><ng-container i18n="@@ui.1f5e6d240313d9">Colección</ng-container></mat-label>
                 <mat-select formControlName="collectionId" [canSelectNullableOptions]="true">
-                  <mat-option [value]="null">Sin colección</mat-option>
+                  <mat-option [value]="null"><ng-container i18n="@@ui.0961066c2e4c04">Sin colección</ng-container></mat-option>
                   @for (collection of collections(); track collection.id) { <mat-option [value]="collection.id">{{ collection.name }}</mat-option> }
                 </mat-select>
               </mat-form-field>
               <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-                <mat-label>Etiquetas</mat-label>
-                <mat-chip-grid #tagGrid aria-label="Etiquetas">
+                <mat-label><ng-container i18n="@@ui.137cb944c52673">Etiquetas</ng-container></mat-label>
+                <mat-chip-grid #tagGrid aria-label="Etiquetas" i18n-aria-label="@@ui.137cb944c52673">
                   @for (tag of tags(); track tag) {
-                    <mat-chip-row (removed)="removeTag(tag)">{{ tag }}<button matChipRemove type="button" [attr.aria-label]="'Quitar ' + tag"><mat-icon>cancel</mat-icon></button></mat-chip-row>
+                    <mat-chip-row (removed)="removeTag(tag)">{{ tag }}<button matChipRemove type="button" [attr.aria-label]="uiText.ui_6737992f153c72 + tag"><mat-icon>cancel</mat-icon></button></mat-chip-row>
                   }
-                  <input [matChipInputFor]="tagGrid" (matChipInputTokenEnd)="addTag($event)" placeholder="Añadir etiqueta…" />
+                  <input [matChipInputFor]="tagGrid" (matChipInputTokenEnd)="addTag($event)" placeholder="Añadir etiqueta…"  i18n-placeholder="@@ui.0458fa3e09d614"/>
                 </mat-chip-grid>
-                <mat-hint>Pulsa Intro para añadir una etiqueta. Hasta 20.</mat-hint>
+                <mat-hint><ng-container i18n="@@ui.1c9c88b0c1c41d">Pulsa Intro para añadir una etiqueta. Hasta 20.</ng-container></mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-                <mat-label>Notas internas</mat-label>
-                <textarea matInput formControlName="notes" rows="4" placeholder="Qué debe saber tu equipo sobre este enlace"></textarea>
-                @if (form.controls.notes.hasError('maxlength')) { <mat-error>Acorta las notas a 1.000 caracteres.</mat-error> }
-                @if (form.controls.notes.hasError('controlCharacters')) { <mat-error>Escribe las notas en una sola línea.</mat-error> }
-                <mat-hint>Solo visibles dentro de tu workspace.</mat-hint>
+                <mat-label><ng-container i18n="@@ui.74cdafaa67ed0e">Notas internas</ng-container></mat-label>
+                <textarea matInput formControlName="notes" rows="4" placeholder="Qué debe saber tu equipo sobre este enlace" i18n-placeholder="@@ui.75e03fa678370c"></textarea>
+                @if (form.controls.notes.hasError('maxlength')) { <mat-error><ng-container i18n="@@ui.49c9efa191437d">Acorta las notas a 1.000 caracteres.</ng-container></mat-error> }
+                @if (form.controls.notes.hasError('controlCharacters')) { <mat-error><ng-container i18n="@@ui.5bbf7dca9dc814">Escribe las notas en una sola línea.</ng-container></mat-error> }
+                <mat-hint><ng-container i18n="@@ui.25407b07b589ea">Solo visibles dentro de tu workspace.</ng-container></mat-hint>
               </mat-form-field>
             </div>
           </mat-tab>
-          <mat-tab label="Campaña">
+          <mat-tab label="Campaña" i18n-label="@@ui.98c0f6d4a303e4">
             <div class="editor-section" formGroupName="utm">
-              <div class="section-heading"><h3>De dónde llegan las visitas</h3><p>Estos parámetros se añaden al destino al redirigir. Todos son opcionales.</p></div>
+              <div class="section-heading"><h3><ng-container i18n="@@ui.44bd4f78ea70f2">De dónde llegan las visitas</ng-container></h3><p><ng-container i18n="@@ui.4e5d72ec5f7486">Estos parámetros se añaden al destino al redirigir. Todos son opcionales.</ng-container></p></div>
               <div class="field-pair">
-                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Fuente (utm_source)</mat-label><input matInput formControlName="source" placeholder="newsletter" />@if (form.controls.utm.controls.source.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }<mat-hint>El origen del tráfico.</mat-hint></mat-form-field>
-                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Medio (utm_medium)</mat-label><input matInput formControlName="medium" placeholder="email" />@if (form.controls.utm.controls.medium.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }<mat-hint>El canal de la campaña.</mat-hint></mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.d46e95e9eb9dbf">Fuente (utm_source)</ng-container></mat-label><input matInput formControlName="source" placeholder="newsletter"  i18n-placeholder="@@ui.dd6f465f6810e9"/>@if (form.controls.utm.controls.source.invalid) { <mat-error><ng-container i18n="@@ui.f0896479377b87">Usa texto de hasta 100 caracteres, sin saltos de línea.</ng-container></mat-error> }<mat-hint><ng-container i18n="@@ui.20136f39e41fd8">El origen del tráfico.</ng-container></mat-hint></mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.f4eb6441b06a4e">Medio (utm_medium)</ng-container></mat-label><input matInput formControlName="medium" placeholder="email"  i18n-placeholder="@@ui.82244417f956ac"/>@if (form.controls.utm.controls.medium.invalid) { <mat-error><ng-container i18n="@@ui.f0896479377b87">Usa texto de hasta 100 caracteres, sin saltos de línea.</ng-container></mat-error> }<mat-hint><ng-container i18n="@@ui.b19d6a816d9803">El canal de la campaña.</ng-container></mat-hint></mat-form-field>
               </div>
-              <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label>Campaña (utm_campaign)</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" />@if (form.controls.utm.controls.campaign.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+              <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.cb851082a07c30">Campaña (utm_campaign)</ng-container></mat-label><input matInput formControlName="campaign" placeholder="lanzamiento"  i18n-placeholder="@@ui.7e78a51baaa9d4"/>@if (form.controls.utm.controls.campaign.invalid) { <mat-error><ng-container i18n="@@ui.f0896479377b87">Usa texto de hasta 100 caracteres, sin saltos de línea.</ng-container></mat-error> }</mat-form-field>
               <div class="field-pair">
-                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Término (utm_term)</mat-label><input matInput formControlName="term" placeholder="palabra clave" />@if (form.controls.utm.controls.term.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
-                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Contenido (utm_content)</mat-label><input matInput formControlName="content" placeholder="boton-principal" />@if (form.controls.utm.controls.content.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.dc511180058cce">Término (utm_term)</ng-container></mat-label><input matInput formControlName="term" placeholder="palabra clave"  i18n-placeholder="@@ui.e0986309e7447f"/>@if (form.controls.utm.controls.term.invalid) { <mat-error><ng-container i18n="@@ui.f0896479377b87">Usa texto de hasta 100 caracteres, sin saltos de línea.</ng-container></mat-error> }</mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.e116c9bdd272af">Contenido (utm_content)</ng-container></mat-label><input matInput formControlName="content" placeholder="boton-principal"  i18n-placeholder="@@ui.4ffcb95d1d0626"/>@if (form.controls.utm.controls.content.invalid) { <mat-error><ng-container i18n="@@ui.f0896479377b87">Usa texto de hasta 100 caracteres, sin saltos de línea.</ng-container></mat-error> }</mat-form-field>
               </div>
             </div>
           </mat-tab>
-          <mat-tab label="Reglas">
+          <mat-tab label="Reglas" i18n-label="@@ui.db8661d1e95a31">
             <div class="editor-section">
-              <div class="section-heading"><h3>Un destino para cada contexto</h3><p>La primera regla que coincida decide el destino. Una regla sin destino no se guarda.</p></div>
-              @if (!ruleForms.length) { <div class="rules-empty"><mat-icon aria-hidden="true">alt_route</mat-icon><p>Este enlace lleva siempre al destino principal.</p><span>Añade una regla para adaptar el destino al visitante.</span></div> }
+              <div class="section-heading"><h3><ng-container i18n="@@ui.8915e5bd7561f9">Un destino para cada contexto</ng-container></h3><p><ng-container i18n="@@ui.d7601ad9a6c827">La primera regla que coincida decide el destino. Una regla sin destino no se guarda.</ng-container></p></div>
+              @if (!ruleForms.length) { <div class="rules-empty"><mat-icon aria-hidden="true">alt_route</mat-icon><p><ng-container i18n="@@ui.8af1eb8a8a7495">Este enlace lleva siempre al destino principal.</ng-container></p><span><ng-container i18n="@@ui.fc68b520f84a8f">Añade una regla para adaptar el destino al visitante.</ng-container></span></div> }
               <div class="rules">
                 @for (rule of ruleForms; track rule; let i = $index) {
-                  <section class="rule" [formGroup]="rule" [attr.aria-label]="'Regla ' + (i + 1)">
-                    <div class="rule-heading"><h4>Regla {{ i + 1 }}</h4><button mat-icon-button type="button" (click)="removeRule(i)" [attr.aria-label]="'Eliminar regla ' + (i + 1)" [disabled]="ruleForms.length === 1"><mat-icon>delete_outline</mat-icon></button></div>
-                    <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label>Destino de la regla</mat-label><input matInput formControlName="destination" type="url" placeholder="https://ejemplo.com/oferta" />@if (rule.controls.destination.hasError('url')) { <mat-error>Introduce una URL http/https sin credenciales o déjala vacía.</mat-error> }</mat-form-field>
+                  <section class="rule" [formGroup]="rule" [attr.aria-label]="uiText.ui_b4d99f11d3ad0b + (i + 1)">
+                    <div class="rule-heading"><h4><ng-container i18n="@@ui.7201d194ab164c">Regla {{ i + 1 }}</ng-container></h4><button mat-icon-button type="button" (click)="removeRule(i)" [attr.aria-label]="uiText.ui_056dfb6273d767 + (i + 1)" [disabled]="ruleForms.length === 1"><mat-icon>delete_outline</mat-icon></button></div>
+                    <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.8188d6c99eb240">Destino de la regla</ng-container></mat-label><input matInput formControlName="destination" type="url" placeholder="https://ejemplo.com/oferta"  i18n-placeholder="@@ui.d9c74279d99e94"/>@if (rule.controls.destination.hasError('url')) { <mat-error><ng-container i18n="@@ui.6d21e5a6c47c4a">Introduce una URL http/https sin credenciales o déjala vacía.</ng-container></mat-error> }</mat-form-field>
                     <div class="rule-fields">
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>País (ISO)</mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2" />@if (rule.controls.country.invalid) { <mat-error>Usa dos letras, como ES.</mat-error> }</mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Idioma</mat-label><input matInput formControlName="language" placeholder="es o es-ES" maxlength="8" />@if (rule.controls.language.invalid) { <mat-error>Usa un idioma o una variante regional.</mat-error> }</mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Dispositivo</mat-label><mat-select formControlName="device"><mat-option value="">Cualquiera</mat-option><mat-option value="desktop">Escritorio</mat-option><mat-option value="mobile">Móvil</mat-option><mat-option value="tablet">Tablet</mat-option></mat-select></mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Sistema operativo</mat-label><input matInput formControlName="os" placeholder="Android" maxlength="80" />@if (rule.controls.os.invalid) { <mat-error>Usa texto de hasta 40 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Desde (hora local)</mat-label><input matInput formControlName="timeFrom" placeholder="08:00" />@if (rule.controls.timeFrom.invalid || ruleTimeInvalid(rule.controls.timeFrom.value)) { <mat-error>Usa una hora local válida; se guarda en UTC.</mat-error> } @else if (rule.controls.timeFrom.value) { <mat-hint>{{ ruleUtcPreview(rule.controls.timeFrom.value) }} · {{ ruleTimezone }}</mat-hint> }</mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Hasta (hora local)</mat-label><input matInput formControlName="timeTo" placeholder="20:00" />@if (rule.controls.timeTo.invalid || ruleTimeInvalid(rule.controls.timeTo.value)) { <mat-error>Usa una hora local válida; se guarda en UTC.</mat-error> } @else if (rule.controls.timeTo.value) { <mat-hint>{{ ruleUtcPreview(rule.controls.timeTo.value) }} · {{ ruleTimezone }}</mat-hint> }</mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Referente (contiene)</mat-label><input matInput formControlName="referrer" placeholder="ejemplo.com" maxlength="400" />@if (rule.controls.referrer.invalid) { <mat-error>Usa texto de hasta 200 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
-                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Campaña UTM</mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" maxlength="200" />@if (rule.controls.campaign.invalid) { <mat-error>Usa texto de hasta 100 caracteres, sin saltos de línea.</mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.c9f5d5376ba30e">País (ISO)</ng-container></mat-label><input matInput formControlName="country" placeholder="ES" maxlength="2"  i18n-placeholder="@@ui.ce344a41812796"/>@if (rule.controls.country.invalid) { <mat-error><ng-container i18n="@@ui.16dc3ec6532e1f">Usa dos letras, como ES.</ng-container></mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.7ae9d418353b39">Idioma</ng-container></mat-label><input matInput formControlName="language" placeholder="es o es-ES" maxlength="8"  i18n-placeholder="@@ui.0fffb9d331eef5"/>@if (rule.controls.language.invalid) { <mat-error><ng-container i18n="@@ui.768d84921661c0">Usa un idioma o una variante regional.</ng-container></mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.1c555eb7f1c05e">Dispositivo</ng-container></mat-label><mat-select formControlName="device"><mat-option value=""><ng-container i18n="@@ui.792f808c97648c">Cualquiera</ng-container></mat-option><mat-option value="desktop"><ng-container i18n="@@ui.557fb176483405">Escritorio</ng-container></mat-option><mat-option value="mobile"><ng-container i18n="@@ui.cac5d3230b6884">Móvil</ng-container></mat-option><mat-option value="tablet"><ng-container i18n="@@ui.e34a879c8b8b67">Tablet</ng-container></mat-option></mat-select></mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.7cf274c1d0f127">Sistema operativo</ng-container></mat-label><input matInput formControlName="os" placeholder="Android" maxlength="80"  i18n-placeholder="@@ui.6d612a86bee4b0"/>@if (rule.controls.os.invalid) { <mat-error><ng-container i18n="@@ui.9d320bf7d74320">Usa texto de hasta 40 caracteres, sin saltos de línea.</ng-container></mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.4db5194d2eeb61">Desde (hora local)</ng-container></mat-label><input matInput formControlName="timeFrom" placeholder="08:00" />@if (rule.controls.timeFrom.invalid || ruleTimeInvalid(rule.controls.timeFrom.value)) { <mat-error><ng-container i18n="@@ui.777f8a098d74af">Usa una hora local válida; se guarda en UTC.</ng-container></mat-error> } @else if (rule.controls.timeFrom.value) { <mat-hint>{{ ruleUtcPreview(rule.controls.timeFrom.value) }} · {{ ruleTimezone }}</mat-hint> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.0968335e1333d2">Hasta (hora local)</ng-container></mat-label><input matInput formControlName="timeTo" placeholder="20:00" />@if (rule.controls.timeTo.invalid || ruleTimeInvalid(rule.controls.timeTo.value)) { <mat-error><ng-container i18n="@@ui.777f8a098d74af">Usa una hora local válida; se guarda en UTC.</ng-container></mat-error> } @else if (rule.controls.timeTo.value) { <mat-hint>{{ ruleUtcPreview(rule.controls.timeTo.value) }} · {{ ruleTimezone }}</mat-hint> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.0a6655e33b3b31">Referente (contiene)</ng-container></mat-label><input matInput formControlName="referrer" placeholder="ejemplo.com" maxlength="400"  i18n-placeholder="@@ui.2cd36d1cef1cb4"/>@if (rule.controls.referrer.invalid) { <mat-error><ng-container i18n="@@ui.5bffaa7af773e8">Usa texto de hasta 200 caracteres, sin saltos de línea.</ng-container></mat-error> }</mat-form-field>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.41747ec991f4c7">Campaña UTM</ng-container></mat-label><input matInput formControlName="campaign" placeholder="lanzamiento" maxlength="200"  i18n-placeholder="@@ui.7e78a51baaa9d4"/>@if (rule.controls.campaign.invalid) { <mat-error><ng-container i18n="@@ui.f0896479377b87">Usa texto de hasta 100 caracteres, sin saltos de línea.</ng-container></mat-error> }</mat-form-field>
                     </div>
                   </section>
                 }
               </div>
-              <p class="timezone-help"><mat-icon aria-hidden="true">schedule</mat-icon>Las horas se muestran en {{ ruleTimezone }} y se guardan en UTC. El horario de verano puede cambiar la equivalencia.</p>
+              <p class="timezone-help"><mat-icon aria-hidden="true">schedule</mat-icon><ng-container i18n="@@ui.33642ca41e3e20">Las horas se muestran en {{ ruleTimezone }} y se guardan en UTC. El horario de verano puede cambiar la equivalencia.</ng-container></p>
               <div class="rule-actions">
-                <button mat-stroked-button type="button" class="add-rule" (click)="addRule()" [disabled]="ruleForms.length >= 20"><mat-icon>add</mat-icon>Añadir regla</button>
-                @if (workflows.ruleSimulatorEnabled()) { <button mat-flat-button type="button" class="simulate-rules" (click)="openRuleSimulator()" [disabled]="form.controls.destination.invalid || hasInvalidRules || busy()"><mat-icon>play_arrow</mat-icon>Probar reglas</button> }
+                <button mat-stroked-button type="button" class="add-rule" (click)="addRule()" [disabled]="ruleForms.length >= 20"><mat-icon>add</mat-icon><ng-container i18n="@@ui.9c35dfb43367d7">Añadir regla</ng-container></button>
+                @if (workflows.ruleSimulatorEnabled()) { <button mat-flat-button type="button" class="simulate-rules" (click)="openRuleSimulator()" [disabled]="form.controls.destination.invalid || hasInvalidRules || busy()"><mat-icon>play_arrow</mat-icon><ng-container i18n="@@ui.b950dd613b10f6">Probar reglas</ng-container></button> }
               </div>
             </div>
           </mat-tab>
         </mat-tab-group>
         }
-        @if (!templates().length) { <button mat-button type="button" class="save-template" (click)="saveAsTemplate()" [disabled]="busy()"><mat-icon>bookmark_add</mat-icon>Guardar como plantilla</button> }
+        @if (!templates().length) { <button mat-button type="button" class="save-template" (click)="saveAsTemplate()" [disabled]="busy()"><mat-icon>bookmark_add</mat-icon><ng-container i18n="@@ui.464357acd4f2c2">Guardar como plantilla</ng-container></button> }
       </form>
-      @if (view() !== 'quick') { <aside class="link-preview" aria-label="Vista previa del enlace">
+      @if (view() !== 'quick') { <aside class="link-preview" aria-label="Vista previa del enlace" i18n-aria-label="@@ui.1e42bdc2255b23">
         <div class="preview-content">
-        <span class="preview-label">Tu enlace</span>
-        <div class="preview-address"><mat-icon aria-hidden="true">link</mat-icon><div><span>{{ previewDomain }}/</span><strong>{{ form.controls.alias.value.trim() || 'Alias automático' }}</strong></div></div>
+        <span class="preview-label"><ng-container i18n="@@ui.b18689cc49fd14">Tu enlace</ng-container></span>
+        <div class="preview-address"><mat-icon aria-hidden="true">link</mat-icon><div><span>{{ previewDomain }}/</span><strong>{{ form.controls.alias.value.trim() || uiText.ui_e655f7832ae90d }}</strong></div></div>
         <div class="preview-route" aria-hidden="true"><span></span><mat-icon>south</mat-icon></div>
-        <span class="preview-label">Abre este destino</span>
-        <p class="preview-destination">{{ form.controls.destination.value.trim() || 'Añade una URL para empezar.' }}</p>
+        <span class="preview-label"><ng-container i18n="@@ui.f802550eca047c">Abre este destino</ng-container></span>
+        <p class="preview-destination">{{ form.controls.destination.value.trim() || uiText.ui_67254093bd27b6 }}</p>
         <div class="preview-conditions">
-          @if ((!form.controls.clearPassword.value && (form.controls.password.value || data.link?.passwordProtected))) { <span><mat-icon aria-hidden="true">lock_outline</mat-icon>Con contraseña</span> }
-          @if (form.controls.singleUse.value) { <span><mat-icon aria-hidden="true">touch_app</mat-icon>Un solo uso</span> }
-          @if (form.controls.scheduledAt.value) { <span><mat-icon aria-hidden="true">schedule</mat-icon>Activación programada</span> }
-          @if (form.controls.expiresAt.value) { <span><mat-icon aria-hidden="true">event_busy</mat-icon>Con fecha de expiración</span> }
+          @if ((!form.controls.clearPassword.value && (form.controls.password.value || data.link?.passwordProtected))) { <span><mat-icon aria-hidden="true">lock_outline</mat-icon><ng-container i18n="@@ui.60b69103f61c83">Con contraseña</ng-container></span> }
+          @if (form.controls.singleUse.value) { <span><mat-icon aria-hidden="true">touch_app</mat-icon><ng-container i18n="@@ui.6365964356746f">Un solo uso</ng-container></span> }
+          @if (form.controls.scheduledAt.value) { <span><mat-icon aria-hidden="true">schedule</mat-icon><ng-container i18n="@@ui.3620992da4c4c2">Activación programada</ng-container></span> }
+          @if (form.controls.expiresAt.value) { <span><mat-icon aria-hidden="true">event_busy</mat-icon><ng-container i18n="@@ui.8a7d278f0ff614">Con fecha de expiración</ng-container></span> }
         </div>
-        <p class="preview-note">{{ isEdit ? 'Los cambios se aplican al guardar.' : 'Podrás cambiar el destino después de crearlo.' }}</p>
+        <p class="preview-note">{{ isEdit ? uiText.ui_394c85aaf24f4a : uiText.ui_aeb7ad6ce076b3 }}</p>
       </div>
       </aside> }
     </div>
@@ -290,12 +290,12 @@
 
 @if (error()) { <div class="editor-request-error editor-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div> }
 <mat-dialog-actions class="editor-footer">
-  <p>{{ isEdit ? 'Conserva tu enlace. Cambia lo que necesitas.' : isDuplicate ? 'Revisa los ajustes antes de crear la copia.' : 'Solo necesitas una URL para empezar.' }}</p>
+  <p>{{ isEdit ? uiText.ui_9fb023dd29c540 : isDuplicate ? uiText.ui_8729831e019276 : uiText.ui_e23e00eb024e9b }}</p>
   <div class="footer-buttons">
-    <button mat-button mat-dialog-close type="button">Cancelar</button>
+    <button mat-button mat-dialog-close type="button"><ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button>
     <button mat-flat-button type="button" (click)="save()" [disabled]="form.invalid || !appOpeningValid() || hasInvalidRules || expiredPageInvalid || ['checking', 'taken', 'invalid', 'reserved'].includes(aliasStatus()) || busy() || loading() || ((isEdit || isDuplicate) && !editDetailsLoaded())">
       @if (!busy()) { <mat-icon>{{ isEdit ? 'check' : 'add_link' }}</mat-icon> }
-      {{ busy() ? 'Guardando…' : isEdit ? 'Guardar cambios' : isDuplicate ? 'Crear copia' : 'Crear enlace' }}
+      {{ busy() ? uiText.ui_3c8dc4dc7a83dd : isEdit ? uiText.ui_14bdfaf2face3a : isDuplicate ? uiText.ui_bd0b33016e3df8 : uiText.ui_3daf36ee52f052 }}
     </button>
   </div>
 </mat-dialog-actions>

@@ -1,4 +1,4 @@
-<nav class="settings-nav" aria-label="Secciones de ajustes">
+<nav class="settings-nav" aria-label="Secciones de ajustes" i18n-aria-label="@@ui.c503baa712db90">
   @for (item of items(); track item.id) {
     <a [href]="'/app/settings/' + (item.id === 'account' ? 'profile' : item.id)"
       [attr.aria-current]="activeId() === item.id ? 'page' : null"

@@ -1,3 +1,5 @@
+import { LocaleLinkDirective } from "../../core/localisation/locale-link.directive";
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { DomainAppProfileComponent } from "./domain-app-profile.component";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
 import { AsyncPoller } from "../../core/async-poller";
@@ -30,57 +32,58 @@ import { DomainRemovalDialogService } from "./domain-removal-dialog.service";
 import { domainSetupAdvice, domainSetupSteps } from "./domain-setup";
 
 const DNS_ERROR: Record<string, string> = {
-  ownership_and_routing_missing: "No encontramos ni el TXT de propiedad ni el CNAME de tráfico.",
-  ownership_missing: "No encontramos el TXT de propiedad.",
-  routing_missing: "El CNAME todavía no apunta al destino esperado.",
-  domain_claimed_elsewhere: "Otro workspace demostró la propiedad de este nombre. Tu solicitud no llegará a servirlo.",
-  resolver_unavailable: "El resolvedor DNS no respondió. El sistema volverá a intentarlo.",
-  queue_unavailable: "La comprobación no pudo entrar en cola. Puedes reintentarlo.",
-  queue_timeout: "La comprobación superó el tiempo previsto. Puedes iniciarla de nuevo.",
-  verification_cancelled: "La comprobación se canceló porque cambió la autorización.",
+  ownership_and_routing_missing: $localize`:@@ui.5fe5be4bdf969e:No encontramos ni el TXT de propiedad ni el CNAME de tráfico.`,
+  ownership_missing: $localize`:@@ui.276e3b28e2e0ea:No encontramos el TXT de propiedad.`,
+  routing_missing: $localize`:@@ui.1a8be4821fb3aa:El CNAME todavía no apunta al destino esperado.`,
+  domain_claimed_elsewhere: $localize`:@@ui.29e3b2e4834f65:Otro workspace demostró la propiedad de este nombre. Tu solicitud no llegará a servirlo.`,
+  resolver_unavailable: $localize`:@@ui.a271ed8b478bbb:El resolvedor DNS no respondió. El sistema volverá a intentarlo.`,
+  queue_unavailable: $localize`:@@ui.32f4af5a22e1b1:La comprobación no pudo entrar en cola. Puedes reintentarlo.`,
+  queue_timeout: $localize`:@@ui.7bdaa252b00189:La comprobación superó el tiempo previsto. Puedes iniciarla de nuevo.`,
+  verification_cancelled: $localize`:@@ui.773a38c3501f45:La comprobación se canceló porque cambió la autorización.`,
 };
 
 /** Qué hace el dominio con el tráfico ahora mismo; el usuario no necesita el modelo interno. */
 const TRAFFIC_LABEL: Record<DomainTrafficStatus, string> = {
-  online: "En línea",
-  degraded: "En línea, requiere atención",
-  provisioning: "Preparando HTTPS",
-  offline: "Fuera de servicio",
+  online: $localize`:@@ui.19162fce02947f:En línea`,
+  degraded: $localize`:@@ui.491e19b696a26e:En línea, requiere atención`,
+  provisioning: $localize`:@@ui.dbd22407d65c08:Preparando HTTPS`,
+  offline: $localize`:@@ui.f8cce940831fe8:Fuera de servicio`,
 };
 
 const ACTIVITY_LABEL: Record<string, string> = {
-  "domain.claimed": "Propiedad del dominio obtenida",
-  "domain.claim_transferred": "Propiedad transferida a otro workspace",
-  "domain.verified": "Dominio verificado",
-  "domain.degraded": "Configuración DNS degradada",
-  "domain.offline": "Dominio fuera de servicio",
-  "domain.recovered": "Dominio recuperado",
-  "domain.activated": "Dominio activado",
-  "domain.disabled": "Dominio desactivado",
-  "domain.tls_failed": "Certificado HTTPS retirado",
-  "domain.tls_expiring": "Certificado por caducar",
-  "domain.deleted": "Dominio eliminado",
+  "domain.claimed": $localize`:@@ui.4f2375685d5dba:Propiedad del dominio obtenida`,
+  "domain.claim_transferred": $localize`:@@ui.27d63f6a01831b:Propiedad transferida a otro workspace`,
+  "domain.verified": $localize`:@@ui.bbcb0517c35b41:Dominio verificado`,
+  "domain.degraded": $localize`:@@ui.e3a4fc3fff4ffd:Configuración DNS degradada`,
+  "domain.offline": $localize`:@@ui.7650a8f8c6220f:Dominio fuera de servicio`,
+  "domain.recovered": $localize`:@@ui.f1e87a40563426:Dominio recuperado`,
+  "domain.activated": $localize`:@@ui.a1fc801ff22791:Dominio activado`,
+  "domain.disabled": $localize`:@@ui.8370e3be51576b:Dominio desactivado`,
+  "domain.tls_failed": $localize`:@@ui.de238e6649648d:Certificado HTTPS retirado`,
+  "domain.tls_expiring": $localize`:@@ui.f06cec03c33d18:Certificado por caducar`,
+  "domain.deleted": $localize`:@@ui.0247fa5bb3584f:Dominio eliminado`,
 };
 
 const TLS_ERROR: Record<string, string> = {
-  certificate_provisioning_failed: "No se pudo emitir o validar el certificado. Revisa DNS y los registros CAA.",
-  certificate_expired: "El certificado caducó sin renovarse. El dominio está fuera de servicio hasta reemitirlo.",
-  certificate_probe_failed: "Las comprobaciones del certificado siguen fallando y el dominio se retiró del servicio.",
-  certificate_check_failed: "La última comprobación del certificado falló. El dominio sigue sirviendo mientras se reintenta.",
-  queue_unavailable: "La emisión del certificado no pudo entrar en cola.",
-  provisioning_cancelled: "La emisión del certificado se canceló.",
-  provisioning_timeout: "La emisión superó el tiempo previsto. Revisa DNS antes de reintentar.",
+  certificate_provisioning_failed: $localize`:@@ui.09c52fa8723e03:No se pudo emitir o validar el certificado. Revisa DNS y los registros CAA.`,
+  certificate_expired: $localize`:@@ui.899bf3e24cb947:El certificado caducó sin renovarse. El dominio está fuera de servicio hasta reemitirlo.`,
+  certificate_probe_failed: $localize`:@@ui.2b72bb57da0458:Las comprobaciones del certificado siguen fallando y el dominio se retiró del servicio.`,
+  certificate_check_failed: $localize`:@@ui.6ee36e4a6ce131:La última comprobación del certificado falló. El dominio sigue sirviendo mientras se reintenta.`,
+  queue_unavailable: $localize`:@@ui.ed3a43209187ee:La emisión del certificado no pudo entrar en cola.`,
+  provisioning_cancelled: $localize`:@@ui.dc5828e07217d8:La emisión del certificado se canceló.`,
+  provisioning_timeout: $localize`:@@ui.fea09ae248a735:La emisión superó el tiempo previsto. Revisa DNS antes de reintentar.`,
 };
 
 @Component({
   selector: "app-domain-detail",
   standalone: true,
-  imports: [DomainAppProfileComponent, RouterLink, FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressBarModule, MatSelectModule, MatSnackBarModule, PageHeaderComponent, PanelSkeletonComponent],
+  imports: [LocaleLinkDirective, DomainAppProfileComponent, RouterLink, FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressBarModule, MatSelectModule, MatSnackBarModule, PageHeaderComponent, PanelSkeletonComponent],
   templateUrl: "./domain-detail.component.html",
   styleUrl: "./domain-detail.component.scss",
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class DomainDetailComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly workspaces = inject(WorkspaceService);
@@ -181,7 +184,7 @@ export class DomainDetailComponent {
       // starts unblocked instead of inheriting a stuck busy state.
       this.mutations.reset();
       if (domainId === null) {
-        this.error.set("El identificador del dominio no es válido");
+        this.error.set($localize`:@@ui.ab85e2a9233f91:El identificador del dominio no es válido`);
         this.loading.set(false);
         return;
       }
@@ -244,8 +247,8 @@ export class DomainDetailComponent {
       }
       this.domain.set(null);
       this.error.set(err instanceof ApiRequestError && (err.status === 401 || err.status === 403)
-        ? "Ya no tienes acceso a este diagnóstico. Recarga tu sesión o selecciona otro workspace."
-        : err instanceof ApiRequestError ? err.message : "No se pudo cargar el diagnóstico del dominio");
+        ? $localize`:@@ui.f6f2ae12f73bcd:Ya no tienes acceso a este diagnóstico. Recarga tu sesión o selecciona otro workspace.`
+        : err instanceof ApiRequestError ? err.message : $localize`:@@ui.6e26a55cb65fef:No se pudo cargar el diagnóstico del dominio`);
     } finally {
       if (this.requests.isCurrent(request, this.currentContext())) this.loading.set(false);
       // A manual load kicks the follow-up; `schedule()` is a no-op once
@@ -276,7 +279,7 @@ export class DomainDetailComponent {
     } catch {
       if (!this.activityRequests.isCurrent(request, this.currentContext())) return;
       // Una lectura fallida del historial no debe empañar el diagnóstico.
-      if (this.activity().length === 0) this.activityError.set("No se pudo cargar la actividad del dominio");
+      if (this.activity().length === 0) this.activityError.set($localize`:@@ui.430a192bb456d2:No se pudo cargar la actividad del dominio`);
     } finally {
       if (this.activityRequests.isCurrent(request, this.currentContext())) this.activityLoading.set(false);
     }
@@ -296,11 +299,11 @@ export class DomainDetailComponent {
         decodeDomainStateResponse,
       );
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Comprobación DNS iniciada", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.ba5b89193f3c9e:Comprobación DNS iniciada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       await this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo iniciar la comprobación", "Cerrar", { duration: 5000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.d8595f53b4e6c1:No se pudo iniciar la comprobación`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
       if (err instanceof ApiRequestError && err.status === 429) this.retry.defer(`${this.currentContext()}:dns`, err.retryAfterSeconds);
       // 409 = ya hay una comprobación en vuelo; el estado avanza igualmente y
       // el refresco inmediato lo muestra sin esperar al siguiente sondeo.
@@ -327,11 +330,11 @@ export class DomainDetailComponent {
         this.api.post<{ state: DomainState }>(`/api/v1/domains/${current.id}/activate`, undefined, decodeDomainStateResponse, { "Idempotency-Key": key }),
       );
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Preparación HTTPS iniciada", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.d143aae0cc5fb1:Preparación HTTPS iniciada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       await this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo activar el dominio", "Cerrar", { duration: 5000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.d4f08d637b6027:No se pudo activar el dominio`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
       if (err instanceof ApiRequestError && err.status === 429) this.retry.defer(`${this.currentContext()}:tls`, err.retryAfterSeconds);
       // Misma lectura que en la comprobación: un 409 es trabajo en curso.
       if (err instanceof ApiRequestError && err.status === 409) {
@@ -354,8 +357,8 @@ export class DomainDetailComponent {
 
   surfaceModeLabel(mode: string | null): string {
     return mode === "redirect"
-      ? "Redirigir al destino raíz"
-      : mode === "branded" ? "Aviso con la marca del dominio" : "Aviso de la plataforma";
+      ? $localize`:@@ui.edbf1580d733ff:Redirigir al destino raíz`
+      : mode === "branded" ? $localize`:@@ui.c72146238dea91:Aviso con la marca del dominio` : $localize`:@@ui.83c88ff37315fe:Aviso de la plataforma`;
   }
 
   private syncSurface(d: DomainDto): void {
@@ -373,7 +376,7 @@ export class DomainDetailComponent {
     const mode = this.notFoundModeInput();
     // El mismo contrato del servidor, anticipado para no gastar un viaje.
     if (mode === "redirect" && root === "") {
-      this.snackbar.open("Configura antes un destino raíz para redirigir las rutas desconocidas", "Cerrar", { duration: 4500 });
+      this.snackbar.open($localize`:@@ui.e650793f782cbb:Configura antes un destino raíz para redirigir las rutas desconocidas`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4500 });
       return;
     }
     const target = targetWorkspace(this.workspaces);
@@ -393,10 +396,10 @@ export class DomainDetailComponent {
         this.surfaceDirty.set(false);
         this.syncSurface(response.domain);
       }
-      this.snackbar.open("Preferencias de visitante guardadas", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.87269b4c9759ed:Preferencias de visitante guardadas`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudieron guardar las preferencias", "Cerrar", { duration: 5000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.5a32864daf3601:No se pudieron guardar las preferencias`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
     } finally {
       this.mutations.settle(action);
     }
@@ -410,7 +413,7 @@ export class DomainDetailComponent {
   }
 
   activityLabel(event: string): string {
-    return ACTIVITY_LABEL[event] ?? "Evento de dominio";
+    return ACTIVITY_LABEL[event] ?? $localize`:@@ui.e77f8720f2ce04:Evento de dominio`;
   }
 
   activityIcon(entry: DomainActivityEvent): string {
@@ -429,7 +432,7 @@ export class DomainDetailComponent {
   activityDetail(entry: DomainActivityEvent): string | null {
     const parts: string[] = [];
     if (entry.payload.reason) parts.push(this.activityReasonLabel(entry.payload.reason));
-    if (entry.payload.daysRemaining !== undefined) parts.push(`quedan ${entry.payload.daysRemaining} días`);
+    if (entry.payload.daysRemaining !== undefined) parts.push($localize`:@@ui.3129537673861b:quedan ${entry.payload.daysRemaining} días`);
     if (entry.payload.failureCount !== undefined && entry.payload.failureCount > 1) {
       parts.push(`${entry.payload.failureCount} comprobaciones fallidas`);
     }
@@ -438,15 +441,15 @@ export class DomainDetailComponent {
 
   private activityReasonLabel(reason: string): string {
     return DNS_ERROR[reason] ?? TLS_ERROR[reason] ?? (reason === "claim_transferred"
-      ? "Otro workspace probó el control del nombre."
-      : "La configuración DNS dejó de ser válida.");
+      ? $localize`:@@ui.698c7a86022d6a:Otro workspace probó el control del nombre.`
+      : $localize`:@@ui.f7a838e0363fd8:La configuración DNS dejó de ser válida.`);
   }
 
-  dnsErrorLabel(error: string | null): string | null { return error ? (DNS_ERROR[error] ?? "No se pudo confirmar la configuración DNS.") : null; }
-  tlsErrorLabel(error: string | null): string | null { return error ? (TLS_ERROR[error] ?? "No se pudo completar la preparación HTTPS.") : null; }
+  dnsErrorLabel(error: string | null): string | null { return error ? (DNS_ERROR[error] ?? $localize`:@@ui.90bd947a89e02d:No se pudo confirmar la configuración DNS.`) : null; }
+  tlsErrorLabel(error: string | null): string | null { return error ? (TLS_ERROR[error] ?? $localize`:@@ui.7285a173ca6935:No se pudo completar la preparación HTTPS.`) : null; }
 
   formatDate(value: string | null): string {
-    return dateTimeMediumLabel(value, "Todavía no disponible");
+    return dateTimeMediumLabel(value, $localize`:@@ui.784581ffdef913:Todavía no disponible`);
   }
 
   /** The grace countdown for a degraded-but-serving domain. */
@@ -455,11 +458,11 @@ export class DomainDetailComponent {
     if (!d?.graceExpiresAt || d.trafficStatus !== "degraded") return null;
     const remainingMs = Date.parse(d.graceExpiresAt) - Date.now();
     if (!Number.isFinite(remainingMs)) return null;
-    if (remainingMs <= 0) return "El periodo de seguridad está terminando; el dominio puede dejar de servir enlaces en cualquier momento.";
+    if (remainingMs <= 0) return $localize`:@@ui.fc7bd2c345ff5c:El periodo de seguridad está terminando; el dominio puede dejar de servir enlaces en cualquier momento.`;
     const minutes = Math.round(remainingMs / 60_000);
     return minutes >= 90
-      ? `Sigue funcionando durante el periodo de seguridad. Podría desconectarse en aproximadamente ${Math.round(minutes / 60)} h.`
-      : `Sigue funcionando durante el periodo de seguridad. Podría desconectarse en aproximadamente ${Math.max(1, minutes)} min.`;
+      ? $localize`:@@ui.847f61b3154df8:Sigue funcionando durante el periodo de seguridad. Podría desconectarse en aproximadamente ${Math.round(minutes / 60)} h.`
+      : $localize`:@@ui.ded1c336403e31:Sigue funcionando durante el periodo de seguridad. Podría desconectarse en aproximadamente ${Math.max(1, minutes)} min.`;
   }
 
   /**
@@ -473,12 +476,12 @@ export class DomainDetailComponent {
     if (d.routingObservedTarget !== null) {
       const ttl = d.routingObservedTtl === null ? "" : ` (TTL ${d.routingObservedTtl} s)`;
       if (d.routingStatus === "healthy") return `El CNAME apunta a «${d.routingObservedTarget}»${ttl}.`;
-      return `Esperábamos «${d.cnameTarget ?? "el destino indicado"}», pero el resolvedor devuelve «${d.routingObservedTarget}»${ttl}.`;
+      return $localize`:@@ui.074892908be0e2:Esperábamos «${d.cnameTarget ?? $localize`:@@ui.4171ad3272bb79:el destino indicado`}», pero el resolvedor devuelve «${d.routingObservedTarget}»${ttl}.`;
     }
     if (d.routingObservedAddresses?.length) {
-      return `No hay CNAME en este nombre; responde con direcciones (${d.routingObservedAddresses.join(", ")}). Suele indicar un proxy o flattening, que este flujo no soporta.`;
+      return $localize`:@@ui.026d93f0886662:No hay CNAME en este nombre; responde con direcciones (${d.routingObservedAddresses.join(", ")}). Suele indicar un proxy o flattening, que este flujo no soporta.`;
     }
-    return "No encontramos ningún CNAME en este nombre.";
+    return $localize`:@@ui.37d979865e9346:No encontramos ningún CNAME en este nombre.`;
   }
 
   /** CAA guidance: the exact record to add, not just «revisa tu CAA». */
@@ -489,7 +492,7 @@ export class DomainDetailComponent {
       const observed = d.caaRecords?.map((r) => `${r.tag} «${r.value}»`).join(", ");
       return `Un registro CAA no permite a ${d.acmeIssuer} emitir el certificado${observed ? ` (observado: ${observed})` : ""}. Añade «issue "${d.acmeIssuer}"» o elimina la restricción.`;
     }
-    if (d.caaAllowsIssuer === true) return `CAA permite expresamente a ${d.acmeIssuer} emitir el certificado.`;
+    if (d.caaAllowsIssuer === true) return $localize`:@@ui.36ed4679e4b30b:CAA permite expresamente a ${d.acmeIssuer} emitir el certificado.`;
     return null;
   }
 
@@ -501,8 +504,8 @@ export class DomainDetailComponent {
     const base = `Caduca el ${this.formatDate(d.tlsNotAfter)}`;
     if (days === null) return base + ".";
     return days <= 20
-      ? `${base} — quedan ${days} días. Si no se renueva pronto, el dominio dejará de servir.`
-      : `${base} — quedan ${days} días.`;
+      ? $localize`:@@ui.2262a042cf010b:${base} — quedan ${days} días. Si no se renueva pronto, el dominio dejará de servir.`
+      : $localize`:@@ui.c107043c9974b9:${base} — quedan ${days} días.`;
   }
 
   async remove(): Promise<void> {
@@ -516,12 +519,12 @@ export class DomainDetailComponent {
       const result = await this.removal.open(domain, { signal: lifetime.signal });
       if (this.currentContext() !== context || !this.mutations.isCurrent(action) || !this.canAdmin()) return;
       if (result?.deleted) {
-        this.snackbar.open("Dominio eliminado", "Cerrar", { duration: 2500 });
+        this.snackbar.open($localize`:@@ui.0247fa5bb3584f:Dominio eliminado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
         await this.router.navigate(["/app/domains"]);
       } else await this.load();
     } catch (error) {
       if (this.currentContext() === context && this.mutations.isCurrent(action)) {
-        this.snackbar.open(error instanceof ApiRequestError ? error.message : "No se pudo abrir la revisión del dominio", "Cerrar", { duration: 4000 });
+        this.snackbar.open(error instanceof ApiRequestError ? error.message : $localize`:@@ui.fcda4693b5a91d:No se pudo abrir la revisión del dominio`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       }
     } finally { lifetime.abort(); this.mutations.settle(action); }
   }
@@ -530,13 +533,13 @@ export class DomainDetailComponent {
     if (!value) return;
     const pending = navigator.clipboard?.writeText(value);
     if (!pending) {
-      this.snackbar.open("El navegador no permite copiar automáticamente", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.b2b3a94dcbea08:El navegador no permite copiar automáticamente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       return;
     }
     const context = this.currentContext();
     void pending.then(
-      () => { if (this.currentContext() === context && !this.destroyRef.destroyed) { this.copyStatus.set(`${label} copiado`); this.snackbar.open(`${label} copiado`, "Cerrar", { duration: 2000 }); } },
-      () => { if (this.currentContext() === context && !this.destroyRef.destroyed) { this.copyStatus.set("No se pudo copiar"); this.snackbar.open("No se pudo copiar", "Cerrar", { duration: 2500 }); } },
+      () => { if (this.currentContext() === context && !this.destroyRef.destroyed) { this.copyStatus.set(`${label} copiado`); this.snackbar.open(`${label} copiado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 }); } },
+      () => { if (this.currentContext() === context && !this.destroyRef.destroyed) { this.copyStatus.set($localize`:@@ui.2af3009605d0a4:No se pudo copiar`); this.snackbar.open($localize`:@@ui.2af3009605d0a4:No se pudo copiar`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 }); } },
     );
   }
 }

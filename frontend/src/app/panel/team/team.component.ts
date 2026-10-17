@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { Component, computed, DestroyRef, effect, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 
 import { FormsModule } from "@angular/forms";
@@ -47,6 +48,7 @@ import { invitationStatusLabel } from "../../core/invitation-status-label";
   styleUrl: "./team.component.scss",
 })
 export class TeamComponent {
+  readonly uiText = UI_TEXT;
   private api = inject(ApiService);
   private snackbar = inject(MatSnackBar);
   private router = inject(Router);
@@ -225,7 +227,7 @@ export class TeamComponent {
     } catch (err) {
       if (!this.requests.isCurrent(request, this.viewContext())) return;
       this.detail.set(null);
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar el workspace");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.3c993623ee9ca6:No se pudo cargar el workspace`);
     } finally {
       if (this.requests.isCurrent(request, this.viewContext())) this.loading.set(false);
     }
@@ -247,14 +249,14 @@ export class TeamComponent {
       await this.auth.refreshWorkspaces();
       if (!target.isCurrent()) return;
       if (this.renameValue().trim() === name) this.renameValue.set(name);
-      this.snackbar.open("Workspace renombrado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.2a99312d8bf095:Workspace renombrado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       const detail = this.detail();
       if (detail) this.detail.set({ ...detail, workspace: { ...detail.workspace, name } });
       this.lastWorkspaceName = name;
       void this.load();
     } catch (err) {
       if (!target.isCurrent()) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(operation);
     }
@@ -275,7 +277,7 @@ export class TeamComponent {
       if (!target.isCurrent()) return;
       if (this.inviteEmail().trim() === email) this.inviteEmail.set("");
       this.invitationPageIndex.set(0);
-      this.snackbar.open("Invitación enviada", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.78277a229dded0:Invitación enviada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       void this.load();
     } catch (err) {
       if (target.isCurrent()) this.showInvitationError(err, workspaceId, email);
@@ -298,12 +300,12 @@ export class TeamComponent {
       if (!target.isCurrent()) return;
       const detail = this.detail();
       if (detail) this.detail.set({ ...detail, members: detail.members.map(row => row.id === m.id ? { ...row, role } : row) });
-      this.snackbar.open("Rol actualizado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.40d8d0462021dc:Rol actualizado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       void this.load();
     } catch (err) {
       if (!target.isCurrent()) return;
       if (selection) selection.value = m.role;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(operation);
     }
@@ -314,9 +316,9 @@ export class TeamComponent {
     const { workspaceId } = target;
     if (workspaceId === null || !target.isCurrent() || !this.canManageMember(m) || this.saving()) return;
     const confirmed = await this.actions.confirm({
-      title: "Eliminar miembro",
-      message: `¿Eliminar a ${m.name} del workspace? Perderá el acceso a sus enlaces y analítica, y se desactivarán los webhooks que creó. Si hay una entrega en curso, podrás reintentar al terminar.`,
-      confirmLabel: "Eliminar miembro",
+      title: $localize`:@@ui.dfc240db803b62:Eliminar miembro`,
+      message: $localize`:@@ui.3408f5b30c05eb:¿Eliminar a ${m.name} del workspace? Perderá el acceso a sus enlaces y analítica, y se desactivarán los webhooks que creó. Si hay una entrega en curso, podrás reintentar al terminar.`,
+      confirmLabel: $localize`:@@ui.dfc240db803b62:Eliminar miembro`,
       destructive: true,
     });
     // The confirmation names a member of one workspace. Never apply it to a
@@ -326,11 +328,11 @@ export class TeamComponent {
     try {
       await this.api.delete(`/api/v1/workspaces/${workspaceId}/members/${m.id}`);
       if (!target.isCurrent()) return;
-      this.snackbar.open("Miembro eliminado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.95f96c1ded9040:Miembro eliminado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       void this.load();
     } catch (err) {
       if (!target.isCurrent()) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(operation);
     }
@@ -347,7 +349,7 @@ export class TeamComponent {
       void this.load();
     } catch (err) {
       if (!target.isCurrent()) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(operation);
     }
@@ -362,12 +364,12 @@ export class TeamComponent {
     try {
       await this.api.post(`/api/v1/workspaces/${workspaceId}/invitations/${inv.id}/resend`);
       if (!target.isCurrent()) return;
-      this.snackbar.open("Invitación reenviada", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.14ca3810ef6f38:Invitación reenviada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       // Refresh expiry/status after rotation. A refresh failure must not imply
       // that the already-admitted mail failed and encourage another resend.
       await this.load();
       if (target.isCurrent() && this.error()) {
-        this.snackbar.open("Invitación reenviada. Recarga para actualizar su estado.", "Cerrar", { duration: 4000 });
+        this.snackbar.open($localize`:@@ui.758395da1af184:Invitación reenviada. Recarga para actualizar su estado.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       }
     } catch (err) {
       if (target.isCurrent()) this.showInvitationError(err, workspaceId, inv.email);
@@ -384,10 +386,10 @@ export class TeamComponent {
       this.invitationRetry.defer(workspaceId, email, error.retryAfterSeconds);
       const seconds = this.invitationRetry.remaining(workspaceId, email);
       message += seconds > 0
-        ? ` Vuelve a intentarlo en ${this.invitationRetry.label(seconds)}. No se reenviará automáticamente.`
-        : " Inténtalo más tarde; el servidor no ha indicado una espera válida.";
+        ? $localize`:@@ui.554b79576811d8: Vuelve a intentarlo en ${this.invitationRetry.label(seconds)}. No se reenviará automáticamente.`
+        : $localize`:@@ui.e25e1e16746eb2: Inténtalo más tarde; el servidor no ha indicado una espera válida.`;
     }
-    this.snackbar.open(message, "Cerrar", { duration: 6000 });
+    this.snackbar.open(message, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 6000 });
   }
 
   async leave(): Promise<void> {
@@ -402,9 +404,9 @@ export class TeamComponent {
     const { workspaceId } = target;
     if (workspaceId === null) return;
     const confirmed = await this.actions.confirm({
-      title: "Abandonar workspace",
-      message: "Dejarás de tener acceso a este workspace y necesitarás una nueva invitación para volver.",
-      confirmLabel: "Abandonar workspace",
+      title: $localize`:@@ui.e8ecb6fcdd8995:Abandonar workspace`,
+      message: $localize`:@@ui.02ead1b4191769:Dejarás de tener acceso a este workspace y necesitarás una nueva invitación para volver.`,
+      confirmLabel: $localize`:@@ui.e8ecb6fcdd8995:Abandonar workspace`,
       destructive: true,
     });
     if (!confirmed || this.saving() || !isCurrent()) return;
@@ -415,7 +417,7 @@ export class TeamComponent {
       if (generation === this.auth.sessionGeneration()) await this.auth.refreshWorkspaces();
     } catch (err) {
       if (!isCurrent()) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(operation);
     }
@@ -437,9 +439,9 @@ export class TeamComponent {
       ...(this.deleteFactorCode().trim() ? { factorCode: this.deleteFactorCode().trim() } : {}),
     };
     const confirmed = await this.actions.confirm({
-      title: "Eliminar workspace definitivamente",
-      message: `Se eliminará “${workspace.name}” con sus enlaces, dominios, tokens y miembros. Esta acción no se puede deshacer.`,
-      confirmLabel: "Eliminar definitivamente",
+      title: $localize`:@@ui.3ef1e7242e3050:Eliminar workspace definitivamente`,
+      message: $localize`:@@ui.9332f110f8035b:Se eliminará “${workspace.name}” con sus enlaces, dominios, tokens y miembros. Esta acción no se puede deshacer.`,
+      confirmLabel: $localize`:@@ui.be4089a3f07e35:Eliminar definitivamente`,
       destructive: true,
     });
     if (!confirmed || this.saving()) return;
@@ -460,12 +462,12 @@ export class TeamComponent {
         if (generation === this.auth.sessionGeneration()) await this.auth.refreshWorkspaces();
       } catch {
         if (isCurrent()) {
-          this.snackbar.open("Workspace eliminado. Recarga el panel para actualizar la navegación.", "Cerrar", { duration: 4000 });
+          this.snackbar.open($localize`:@@ui.96cd2b7cd5293c:Workspace eliminado. Recarga el panel para actualizar la navegación.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
         }
       }
     } catch (err) {
       if (!isCurrent()) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(operation);
     }
@@ -601,9 +603,9 @@ export class TeamComponent {
       ...(this.transferFactorCode().trim() ? { factorCode: this.transferFactorCode().trim() } : {}),
     };
     const confirmed = await this.actions.confirm({
-      title: "Transferir propiedad",
-      message: `${recipient.name} pasará a controlar el workspace. Tu rol cambiará a administrador y sólo el nuevo propietario podrá eliminarlo o volver a transferirlo. Las invitaciones pendientes de administrador que enviaste quedarán canceladas.`,
-      confirmLabel: "Transferir propiedad",
+      title: $localize`:@@ui.d2e7a136a00c45:Transferir propiedad`,
+      message: $localize`:@@ui.f1b46e6a145c5f:${recipient.name} pasará a controlar el workspace. Tu rol cambiará a administrador y sólo el nuevo propietario podrá eliminarlo o volver a transferirlo. Las invitaciones pendientes de administrador que enviaste quedarán canceladas.`,
+      confirmLabel: $localize`:@@ui.d2e7a136a00c45:Transferir propiedad`,
       destructive: true,
     });
     if (!confirmed || this.saving() || !isCurrent()) return;
@@ -616,7 +618,7 @@ export class TeamComponent {
         this.transferPassword.set("");
         this.transferFactorCode.set("");
         this.resetTransferPicker();
-        this.snackbar.open("Propiedad transferida", "Cerrar", { duration: 3000 });
+        this.snackbar.open($localize`:@@ui.773a830911ac98:Propiedad transferida`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       }
       try {
         if (generation !== this.auth.sessionGeneration()) return;
@@ -624,11 +626,11 @@ export class TeamComponent {
         if (isCurrent()) await this.load();
       } catch {
         if (!isCurrent()) return;
-        this.snackbar.open("Propiedad transferida. Recarga el panel para actualizar permisos.", "Cerrar", { duration: 4000 });
+        this.snackbar.open($localize`:@@ui.4d47a31c95d403:Propiedad transferida. Recarga el panel para actualizar permisos.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       }
     } catch (err) {
       if (!isCurrent()) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo transferir la propiedad", "Cerrar", { duration: 4000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.0ac234e4f6e52b:No se pudo transferir la propiedad`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       this.mutations.settle(operation);
     }

@@ -37,7 +37,7 @@ final class RegistrationController
         $honeypot = trim(UvhRequest::inputString($request, 'website'));
 
         if (! $this->validEmail($email) || $honeypot !== '') {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($captchaError = $this->captchaError($request, $captchaToken)) {
             return $captchaError;
@@ -48,7 +48,7 @@ final class RegistrationController
         // crear intento, pendiente, correo o cookie. Verificación, reenvío y
         // corrección de pendientes existentes siguen intactos.
         if (RegistrationGate::isPaused()) {
-            return response()->json(['error' => 'Registros temporalmente pausados. Inténtalo de nuevo más tarde.', 'reason' => 'registration_paused'], 503);
+            return response()->json(['error' => __('messages.error_dc4d5c8cb668e0'), 'reason' => 'registration_paused'], 503);
         }
 
         $email = strtolower($email);
@@ -74,7 +74,7 @@ final class RegistrationController
         } catch (MailAdmissionException) {
             Audit::write(null, 'auth.email_delivery_failed', 'user', null, ['kind' => 'verify']);
 
-            return response()->json(['error' => 'No se pudo completar el registro. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_e05ad189a2fcf7')], 503);
         }
 
         return response()->json(['user' => null], 201)->withCookie(RegistrationEdit::forAttempt($outcome));
@@ -88,14 +88,14 @@ final class RegistrationController
         $captchaToken = UvhRequest::inputString($request, 'captchaToken');
         $honeypot = trim(UvhRequest::inputString($request, 'website'));
         if (! $this->validEmail($currentEmail) || ! $this->validEmail($newEmail) || $currentEmail === $newEmail || $honeypot !== '') {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($captchaError = $this->captchaError($request, $captchaToken)) {
             return $captchaError;
         }
         $attempt = RegistrationAttemptContext::snapshot($request, $currentEmail);
         if (! $attempt) {
-            return response()->json(['error' => 'No se puede cambiar este registro'], 403);
+            return response()->json(['error' => __('messages.error_22b4f814655f87')], 403);
         }
         try {
             try {
@@ -111,10 +111,10 @@ final class RegistrationController
         } catch (MailAdmissionException) {
             Audit::write(null, 'auth.email_delivery_failed', 'registration_attempt', (string) $attempt->id, ['kind' => 'verify']);
 
-            return response()->json(['error' => 'No se pudo enviar la verificación. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_3952e1cf72ac7e')], 503);
         }
         if ($changed['attempt'] === null) {
-            return response()->json(['error' => 'No se puede cambiar este registro'], 403);
+            return response()->json(['error' => __('messages.error_22b4f814655f87')], 403);
         }
 
         return response()->json(['ok' => true])->withCookie(RegistrationEdit::forAttempt($changed['attempt']));
@@ -150,10 +150,10 @@ final class RegistrationController
         // "choose a password of 10 to 72 characters"— and none describes the
         // account, only the request that carried it.
         if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1) {
-            return response()->json(['error' => 'Token inválido'], 422);
+            return response()->json(['error' => __('messages.error_f0bd101ade1cc6')], 422);
         }
         if (! $this->validPassword($password)) {
-            return response()->json(['error' => 'La contraseña debe tener entre 10 y 72 caracteres'], 422);
+            return response()->json(['error' => __('messages.error_99f439bb9438a8')], 422);
         }
         // Identity and legal acceptance are decided at activation too, with the
         // current account input contract. An acceptance without the exact
@@ -161,11 +161,11 @@ final class RegistrationController
         if (! $this->validName($name) || ! $acceptTerms
             || ! hash_equals(RegistrationAdmission::TERMS_VERSION, $termsVersion)
             || ! hash_equals(RegistrationAdmission::PRIVACY_VERSION, $privacyVersion)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if (! PasswordStrength::isAcceptable($password)) {
             // Deliberately generic, exactly like register and reset-password.
-            return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
+            return response()->json(['error' => __('messages.error_637cd115d3504c')], 422);
         }
 
         $createdUser = null;
@@ -184,10 +184,10 @@ final class RegistrationController
             }
         });
         if ($userId === -1) {
-            return response()->json(['error' => 'La contraseña es demasiado débil'], 422);
+            return response()->json(['error' => __('messages.error_637cd115d3504c')], 422);
         }
         if ($userId === null) {
-            return response()->json(['error' => 'Token inválido o caducado'], 400);
+            return response()->json(['error' => __('messages.error_97f22af3608cd0')], 400);
         }
 
         $handoff = $createdUser !== null ? RegistrationLinkHandoff::forUser($createdUser) : null;
@@ -232,7 +232,7 @@ final class RegistrationController
             // en `pending_registrations`, y el login no da sesión sin verificar—,
             // así que un llamante autenticado no tiene nada pendiente que
             // reenviar. El contrato de siempre para este caso.
-            return response()->json(['error' => 'El email ya está verificado'], 400);
+            return response()->json(['error' => __('messages.error_ccd35c0dcf8778')], 400);
         }
         $valid = $this->validEmail($requestedEmail);
         // Una dirección vive en una sola autoridad: fila de usuario sin

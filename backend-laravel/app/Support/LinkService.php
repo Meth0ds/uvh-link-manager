@@ -27,61 +27,61 @@ class LinkService
     public static function validate(array $input): array
     {
         if (! is_string($input['destination'] ?? null)) {
-            return ['ok' => false, 'error' => 'URL de destino inválida'];
+            return ['ok' => false, 'error' => __('messages.error_7fd543ecbb6fd0')];
         }
         $dest = UrlUtil::validateDestination($input['destination']);
         if (! $dest['ok']) {
-            return ['ok' => false, 'error' => $dest['error']];
+            return ['ok' => false, 'error' => ApiErrorCode::translate($dest['error'])];
         }
         // The denylist decides here, synchronously, because it is a decision
         // already taken and needs no provider, no queue and no threshold. The
         // asynchronous half (reputation, re-analysis) never gates a write.
         if (DestinationDenylist::reason($input['destination']) !== null) {
-            return ['ok' => false, 'error' => self::BLOCKED_DESTINATION];
+            return ['ok' => false, 'error' => ApiErrorCode::translate(self::BLOCKED_DESTINATION)];
         }
 
         $fallback = $input['fallback_destination'] ?? null;
         if ($fallback !== null && ! is_string($fallback)) {
-            return ['ok' => false, 'error' => 'Destino fallback inválido'];
+            return ['ok' => false, 'error' => __('messages.error_c22d70671a5e07')];
         }
         if (is_string($fallback) && $fallback !== '') {
             $fb = UrlUtil::validateDestination($fallback);
             if (! $fb['ok']) {
-                return ['ok' => false, 'error' => "Destino fallback: {$fb['error']}"];
+                return ['ok' => false, 'error' => __('display.fallback_invalid', ['reason' => ApiErrorCode::translate($fb['error'])])];
             }
             if (DestinationDenylist::reason($fallback) !== null) {
-                return ['ok' => false, 'error' => 'Destino fallback: '.self::BLOCKED_DESTINATION];
+                return ['ok' => false, 'error' => __('display.fallback_invalid', ['reason' => ApiErrorCode::translate(self::BLOCKED_DESTINATION)])];
             }
         }
 
         $alias = $input['alias'] ?? null;
         if ($alias !== null && ! is_string($alias)) {
-            return ['ok' => false, 'error' => 'Alias inválido'];
+            return ['ok' => false, 'error' => __('messages.error_daed9d000a21b4')];
         }
         if (is_string($alias) && $alias !== '') {
             $normalizedAlias = UrlUtil::normalizeAlias($alias);
-            if (UrlUtil::isReservedAlias($normalizedAlias)) {
-                return ['ok' => false, 'error' => 'Este alias está reservado'];
+            if (UrlUtil::isReservedAlias($normalizedAlias) || Language::reservesPublicAlias($normalizedAlias, $input['domain_id'] ?? null)) {
+                return ['ok' => false, 'error' => __('messages.error_b2b519c1cb7270')];
             }
             if (! UrlUtil::isValidCustomAlias($normalizedAlias)) {
-                return ['ok' => false, 'error' => 'Alias inválido (solo letras, números, - y _)'];
+                return ['ok' => false, 'error' => __('messages.error_07d82bf255e165')];
             }
         }
 
         $domainId = $input['domain_id'] ?? null;
         if ($domainId !== null && (! is_int($domainId) || $domainId < 1)) {
-            return ['ok' => false, 'error' => 'Dominio inválido'];
+            return ['ok' => false, 'error' => __('messages.error_0487a66badd687')];
         }
         $collectionId = $input['collection_id'] ?? null;
         if ($collectionId !== null && (! is_int($collectionId) || $collectionId < 1)) {
-            return ['ok' => false, 'error' => 'Colección inválida'];
+            return ['ok' => false, 'error' => __('messages.error_d5a81f23c4dfd2')];
         }
         $maxClicks = $input['max_clicks'] ?? null;
         if ($maxClicks !== null && (! is_int($maxClicks) || $maxClicks < 1 || $maxClicks > 10_000_000)) {
-            return ['ok' => false, 'error' => 'Máximo de clics inválido'];
+            return ['ok' => false, 'error' => __('messages.error_009b78d4ae836a')];
         }
         if (isset($input['single_use']) && ! is_bool($input['single_use'])) {
-            return ['ok' => false, 'error' => 'Uso único inválido'];
+            return ['ok' => false, 'error' => __('messages.error_05b5d972492b1b')];
         }
 
         foreach (['scheduled_at', 'expires_at'] as $field) {
@@ -90,46 +90,46 @@ class LinkService
                 continue;
             }
             if ($value !== null && (! is_string($value) || strlen($value) > 64)) {
-                return ['ok' => false, 'error' => 'Fecha inválida'];
+                return ['ok' => false, 'error' => __('messages.error_4fcdd3bc433dc6')];
             }
             if (is_string($value) && IsoDate::parse($value) === null) {
-                return ['ok' => false, 'error' => 'Fecha inválida'];
+                return ['ok' => false, 'error' => __('messages.error_4fcdd3bc433dc6')];
             }
         }
         $scheduledAt = self::toDateTime($input['scheduled_at'] ?? null);
         $expiresAt = self::toDateTime($input['expires_at'] ?? null);
         if ($scheduledAt !== null && $expiresAt !== null && $scheduledAt->gte($expiresAt)) {
-            return ['ok' => false, 'error' => 'La caducidad debe ser posterior a la fecha de activación'];
+            return ['ok' => false, 'error' => __('messages.error_bbde93155088e9')];
         }
 
         if (! LinkName::valid($input['name'] ?? null)) {
-            return ['ok' => false, 'error' => 'Nombre inválido: usa hasta 120 caracteres sin caracteres de control.'];
+            return ['ok' => false, 'error' => __('messages.error_90efe87ce2b4eb')];
         }
 
         $notes = $input['notes'] ?? null;
         if ($notes !== null && (! is_string($notes) || ! mb_check_encoding($notes, 'UTF-8') || mb_strlen($notes) > 1000 || preg_match('/[\\x00-\\x1f\\x7f]/', $notes))) {
-            return ['ok' => false, 'error' => 'Notas inválidas'];
+            return ['ok' => false, 'error' => __('messages.error_44fc04fc5e4f94')];
         }
 
         $utm = $input['utm'] ?? [];
         if ($utm !== null && ! is_array($utm)) {
-            return ['ok' => false, 'error' => 'UTM inválido'];
+            return ['ok' => false, 'error' => __('messages.error_f636538a514903')];
         }
         foreach (['source', 'medium', 'campaign', 'term', 'content'] as $key) {
             $value = is_array($utm) ? ($utm[$key] ?? null) : null;
             if ($value !== null && (! is_string($value) || ! mb_check_encoding($value, 'UTF-8') || mb_strlen($value) > 100 || preg_match('/[\\x00-\\x1f\\x7f]/', $value))) {
-                return ['ok' => false, 'error' => 'UTM inválido'];
+                return ['ok' => false, 'error' => __('messages.error_f636538a514903')];
             }
         }
 
         $tags = $input['tags'] ?? null;
         if ($tags !== null) {
             if (! is_array($tags) || count($tags) > 20) {
-                return ['ok' => false, 'error' => 'Etiquetas inválidas'];
+                return ['ok' => false, 'error' => __('messages.error_08709c24a1bd71')];
             }
             foreach ($tags as $tag) {
                 if (! is_string($tag) || ! mb_check_encoding($tag, 'UTF-8') || mb_strlen($tag) > 40 || preg_match('/[\\x00-\\x1f\\x7f]/', $tag)) {
-                    return ['ok' => false, 'error' => 'Etiquetas inválidas'];
+                    return ['ok' => false, 'error' => __('messages.error_08709c24a1bd71')];
                 }
             }
         }
@@ -137,22 +137,22 @@ class LinkService
         $rules = $input['rules'] ?? null;
         if ($rules !== null) {
             if (! is_array($rules) || count($rules) > 20) {
-                return ['ok' => false, 'error' => 'Reglas inválidas'];
+                return ['ok' => false, 'error' => __('messages.error_df12cc4add1d10')];
             }
             foreach ($rules as $rule) {
                 $normalized = self::normalizeRule($rule);
                 if ($normalized === null) {
-                    return ['ok' => false, 'error' => 'Regla inválida'];
+                    return ['ok' => false, 'error' => __('messages.error_fce5d073de81cf')];
                 }
                 $result = UrlUtil::validateDestination($normalized['destination']);
                 if (! $result['ok']) {
-                    return ['ok' => false, 'error' => "Regla inválida: {$result['error']}"];
+                    return ['ok' => false, 'error' => __('display.rule_invalid', ['reason' => ApiErrorCode::translate($result['error'])])];
                 }
                 // A blocked primary destination is trivial to bypass with a
                 // redirect rule pointing at the same URL, so rules are held to
                 // the same rule as the destination itself.
                 if (DestinationDenylist::reason($normalized['destination']) !== null) {
-                    return ['ok' => false, 'error' => 'Regla inválida: '.self::BLOCKED_DESTINATION];
+                    return ['ok' => false, 'error' => __('display.rule_invalid', ['reason' => ApiErrorCode::translate(self::BLOCKED_DESTINATION)])];
                 }
             }
         }
@@ -185,7 +185,7 @@ class LinkService
         if (! empty($input['alias'])) {
             $alias = UrlUtil::normalizeAlias($input['alias']);
             if (self::aliasExists($domainId, $alias)) {
-                throw new LinkException('Este alias ya está en uso', 409);
+                throw new LinkException(__('messages.error_14a54c550a189f'), 409);
             }
         } else {
             $alias = self::generateUniqueAlias($domainId);
@@ -194,6 +194,9 @@ class LinkService
         $utm = $input['utm'] ?? [];
 
         $created = DB::transaction(function () use ($workspaceId, $userId, $domainId, $collectionId, $alias, $utm, $input, $apiTokenContext, $actorSecurityVersion, $writeActor, $versionSource) {
+            if (Language::reservesPublicAlias($alias, $domainId)) {
+                throw new LinkException(__('messages.error_b2b519c1cb7270'), 422);
+            }
             $membership = $writeActor
                 ? $writeActor->lockMembership($userId, $workspaceId, $actorSecurityVersion)
                 : WorkspaceAccess::getMembershipLocked(
@@ -205,16 +208,16 @@ class LinkService
                     $actorSecurityVersion,
                 );
             if (! $membership) {
-                throw new LinkException('Tu acceso al workspace cambió. Recarga antes de crear el enlace.', 403);
+                throw new LinkException(__('messages.error_e07f7f0dc4d04c'), 403);
             }
             if ($domainId !== null && ! CustomDomain::where('id', $domainId)
                 ->where('workspace_id', $workspaceId)->where('desired_state', 'enabled')
                 ->where('edge_eligible', true)->whereNotNull('tls_ready_at')->lockForUpdate()->first(['id'])) {
-                throw new LinkException('Dominio no activado o sin acceso', 403);
+                throw new LinkException(__('messages.error_1834ced0e9edbe'), 403);
             }
             if ($collectionId !== null && ! Collection::where('id', $collectionId)
                 ->where('workspace_id', $workspaceId)->exists()) {
-                throw new LinkException('Colección no encontrada', 422);
+                throw new LinkException(__('messages.error_6568a0022eb114'), 422);
             }
 
             $appOpening = AppOpening::validate($input['app_opening'] ?? null, $workspaceId, $domainId);
@@ -226,7 +229,7 @@ class LinkService
             $quota = DB::table('quotas')->where('workspace_id', $workspaceId)->lockForUpdate()->value('links_limit');
             $used = Link::where('workspace_id', $workspaceId)->whereNull('deleted_at')->count();
             if ($quota !== null && $used >= (int) $quota) {
-                throw new LinkException('Cuota de enlaces alcanzada', 429);
+                throw new LinkException(__('messages.error_2128d6ec0cc744'), 429);
             }
 
             // Account/workspace/quota locks can wait across a lifecycle
@@ -263,7 +266,7 @@ class LinkService
                 ]);
             } catch (QueryException $e) {
                 if (self::isUniqueViolation($e)) {
-                    throw new LinkException('Este alias ya está en uso', 409);
+                    throw new LinkException(__('messages.error_14a54c550a189f'), 409);
                 }
                 throw $e;
             }
@@ -317,14 +320,14 @@ class LinkService
                     $actorSecurityVersion,
                 );
             if (! $membership) {
-                throw new LinkException('Tu acceso al workspace cambió. Recarga antes de guardar.', 403);
+                throw new LinkException(__('messages.error_fee1d3fdb435de'), 403);
             }
             $link = Link::where('id', $linkId)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->lockForUpdate()->first();
             if (! $link) {
-                throw new LinkException('Enlace no encontrado', 404);
+                throw new LinkException(__('messages.error_56cb73fa20e635'), 404);
             }
             if ((int) $link->version !== $expectedVersion) {
-                throw new LinkException('Este enlace cambió en otro lugar. Recárgalo antes de guardar.', 409);
+                throw new LinkException(__('messages.error_276af743aaabdc'), 409);
             }
             $previousConfiguration = LinkVersioning::configuration($link);
             $social = SocialPreview::validate(array_key_exists('social_preview', $input) ? $input['social_preview'] : $link->social_preview, $workspaceId);
@@ -343,7 +346,7 @@ class LinkService
                         ->where('edge_eligible', true)->whereNotNull('tls_ready_at');
                 }
                 if (! $domainGuard->lockForUpdate()->first(['id'])) {
-                    throw new LinkException('Dominio no activado o sin acceso', 403);
+                    throw new LinkException(__('messages.error_1834ced0e9edbe'), 403);
                 }
             }
             $appOpening = array_key_exists('app_opening', $input) || $domainId !== $link->domain_id
@@ -351,7 +354,7 @@ class LinkService
             $collectionId = array_key_exists('collection_id', $input) ? $input['collection_id'] : $link->collection_id;
             if ($collectionId !== null && ! Collection::where('id', $collectionId)
                 ->where('workspace_id', $workspaceId)->exists()) {
-                throw new LinkException('Colección no encontrada', 422);
+                throw new LinkException(__('messages.error_6568a0022eb114'), 422);
             }
             // An explicit empty alias asks to clear what identifies the link —
             // impossible to apply — so it is refused with 422 instead of being
@@ -359,19 +362,22 @@ class LinkService
             // alias (PATCH semantics); the controller merges the current value
             // in first, so a non-string alias here can only be an explicit one.
             if (array_key_exists('alias', $input) && (! is_string($input['alias']) || $input['alias'] === '')) {
-                throw new LinkException('El alias no se puede vaciar; escribe otro alias', 422);
+                throw new LinkException(__('messages.error_b53ea90941038a'), 422);
             }
             $alias = ! empty($input['alias']) && $input['alias'] !== $link->alias
                 ? UrlUtil::normalizeAlias($input['alias']) : $link->alias;
+            if (Language::reservesPublicAlias($alias, $domainId)) {
+                throw new LinkException(__('messages.error_b2b519c1cb7270'), 422);
+            }
             if (! empty($input['alias'])) {
                 if (UrlUtil::isReservedAlias($alias)) {
-                    throw new LinkException('Este alias está reservado', 422);
+                    throw new LinkException(__('messages.error_b2b519c1cb7270'), 422);
                 }
                 if (! UrlUtil::isValidCustomAlias($alias)) {
-                    throw new LinkException('Alias inválido', 422);
+                    throw new LinkException(__('messages.error_daed9d000a21b4'), 422);
                 }
                 if (self::aliasExists($domainId, $alias, $linkId)) {
-                    throw new LinkException('Este alias ya está en uso', 409);
+                    throw new LinkException(__('messages.error_14a54c550a189f'), 409);
                 }
             }
 
@@ -413,7 +419,7 @@ class LinkService
                 ]);
             } catch (QueryException $e) {
                 if (self::isUniqueViolation($e)) {
-                    throw new LinkException('Este alias ya está en uso', 409);
+                    throw new LinkException(__('messages.error_14a54c550a189f'), 409);
                 }
                 throw $e;
             }
@@ -534,7 +540,7 @@ class LinkService
                 return $alias;
             }
         }
-        throw new LinkException('No se pudo generar un alias único', 500);
+        throw new LinkException(__('messages.error_40fe9169c41278'), 500);
     }
 
     private static function aliasExists(?int $domainId, string $alias, ?int $exceptId = null): bool
@@ -577,7 +583,7 @@ class LinkService
                 ->first();
             if (! $tag) {
                 if (Tag::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('tags')) {
-                    throw new LinkException('Límite de etiquetas alcanzado. Reutiliza o fusiona etiquetas existentes.', 409);
+                    throw new LinkException(__('messages.error_1f0e16af4efa70'), 409);
                 }
                 try {
                     $tag = Tag::create(['workspace_id' => $workspaceId, 'name' => $name]);

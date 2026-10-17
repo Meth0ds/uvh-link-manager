@@ -19,7 +19,7 @@ final class SearchController
     {
         $raw = $request->query('q', '');
         if (! is_string($raw) || ! mb_check_encoding($raw, 'UTF-8') || mb_strlen($raw) > 200 || preg_match('/[\p{Cc}\p{Cf}]/u', $raw)) {
-            return response()->json(['error' => 'Búsqueda inválida.'], 422);
+            return response()->json(['error' => __('messages.error_623f7b6004bba5')], 422);
         }
         $term = trim($raw);
         $empty = ['version' => 1, 'links' => [], 'domains' => [], 'moreLinks' => false, 'moreDomains' => false];

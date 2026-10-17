@@ -31,7 +31,7 @@ final class PrivacyRightsController
         [$page, $perPage] = $this->pagination($request);
         $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if (! $context) {
-            return response()->json(['error' => 'No autenticado'], 401);
+            return response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
         $user = $context->user;
         $query = DB::table('privacy_rights_requests')->where('user_id', $user->id);
@@ -53,10 +53,10 @@ final class PrivacyRightsController
         $type = UvhRequest::inputString($request, 'type');
         $details = $this->validBody(UvhRequest::inputString($request, 'details'), false);
         if (! in_array($type, self::TYPES, true) || $details === false) {
-            return response()->json(['error' => 'Tipo o detalles de solicitud inválidos'], 422);
+            return response()->json(['error' => __('messages.error_6d89bcf136a51e')], 422);
         }
         if (in_array($type, ['rectification', 'objection', 'restriction'], true) && mb_strlen($details) < 10) {
-            return response()->json(['error' => 'Describe con más detalle el alcance de la solicitud'], 422);
+            return response()->json(['error' => __('messages.error_97b904301be6cf')], 422);
         }
 
         $user = UvhRequest::user($request);
@@ -102,18 +102,18 @@ final class PrivacyRightsController
             });
         } catch (QueryException $error) {
             if (($error->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'Ya existe una solicitud activa de este tipo'], 409);
+                return response()->json(['error' => __('messages.error_ad8839e0d1da83')], 409);
             }
             throw $error;
         } catch (MailAdmissionException) {
-            return response()->json(['error' => 'No se pudo registrar la solicitud de forma verificable. Inténtalo de nuevo'], 503);
+            return response()->json(['error' => __('messages.error_3816206b317e49')], 503);
         }
 
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La cuenta o sesión ya no está disponible'], 409);
+            return response()->json(['error' => __('messages.error_31a702a149f99d')], 409);
         }
         if ($result['status'] === 'active') {
-            return response()->json(['error' => 'Ya existe una solicitud activa de este tipo', 'request' => $this->publicRequest($result['request'], true)], 409);
+            return response()->json(['error' => __('messages.error_ad8839e0d1da83'), 'request' => $this->publicRequest($result['request'], true)], 409);
         }
 
         $row = DB::table('privacy_rights_requests')->where('id', $result['id'])->first();
@@ -125,7 +125,7 @@ final class PrivacyRightsController
     {
         $body = $this->validBody(UvhRequest::inputString($request, 'message'), true);
         if ($body === false) {
-            return response()->json(['error' => 'El mensaje debe tener entre 10 y 2.000 caracteres'], 422);
+            return response()->json(['error' => __('messages.error_d50a5d61015b68')], 422);
         }
         $user = UvhRequest::user($request);
         $sessionId = UvhRequest::sessionId($request);
@@ -159,16 +159,16 @@ final class PrivacyRightsController
         });
 
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Solicitud no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_3f03bcf8417b97')], 404);
         }
         if ($result === 'stale') {
-            return response()->json(['error' => 'La cuenta o sesión ya no está disponible'], 409);
+            return response()->json(['error' => __('messages.error_31a702a149f99d')], 409);
         }
         if ($result === 'state') {
-            return response()->json(['error' => 'La solicitud no está esperando información'], 409);
+            return response()->json(['error' => __('messages.error_f8f831a06edf34')], 409);
         }
         if ($result === 'limit') {
-            return response()->json(['error' => 'El expediente alcanzó su límite de mensajes. Contacta con soporte'], 409);
+            return response()->json(['error' => __('messages.error_a5217e14ee95b8')], 409);
         }
 
         return response()->json(['ok' => true]);
@@ -211,16 +211,16 @@ final class PrivacyRightsController
                 return 'ok';
             });
         } catch (MailAdmissionException) {
-            return response()->json(['error' => 'No se pudo registrar la cancelación de forma verificable'], 503);
+            return response()->json(['error' => __('messages.error_e9702bbe1bab44')], 503);
         }
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Solicitud no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_3f03bcf8417b97')], 404);
         }
         if ($result === 'stale') {
-            return response()->json(['error' => 'La cuenta o sesión ya no está disponible'], 409);
+            return response()->json(['error' => __('messages.error_31a702a149f99d')], 409);
         }
         if ($result === 'state') {
-            return response()->json(['error' => 'La solicitud ya no se puede cancelar'], 409);
+            return response()->json(['error' => __('messages.error_49cecf1349192f')], 409);
         }
 
         return response()->json(['ok' => true]);
@@ -230,13 +230,13 @@ final class PrivacyRightsController
     {
         $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if (! $context) {
-            return response()->json(['error' => 'No autenticado'], 401);
+            return response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
         if (! $context->user->is_admin) {
-            return response()->json(['error' => 'Acceso restringido'], 403);
+            return response()->json(['error' => __('messages.error_7c0d7d7d6042d9')], 403);
         }
         if (! $context->user->mfa_enabled || ! $context->session->mfa_verified_at) {
-            return response()->json(['error' => 'Esta operación requiere una sesión autenticada con MFA', 'details' => ['reason' => 'mfa_required']], 403);
+            return response()->json(['error' => __('messages.error_63c806663b57b5'), 'details' => ['reason' => 'mfa_required']], 403);
         }
         if (! MfaFreshness::isFresh($context->session->mfa_verified_at)) {
             return MfaFreshness::reauthenticationRequired();
@@ -245,10 +245,10 @@ final class PrivacyRightsController
         $status = UvhRequest::queryString($request, 'status');
         $type = UvhRequest::queryString($request, 'type');
         if ($status !== '' && ! in_array($status, [...self::ACTIVE, 'completed', 'rejected', 'cancelled'], true)) {
-            return response()->json(['error' => 'Estado inválido'], 422);
+            return response()->json(['error' => __('messages.error_f49ab2eaafd27a')], 422);
         }
         if ($type !== '' && ! in_array($type, self::TYPES, true)) {
-            return response()->json(['error' => 'Tipo inválido'], 422);
+            return response()->json(['error' => __('messages.error_86b1a6a5d8b3c9')], 422);
         }
         $query = DB::table('privacy_rights_requests as r')
             ->leftJoin('users as u', 'u.id', '=', 'r.user_id')
@@ -286,7 +286,7 @@ final class PrivacyRightsController
         if (! in_array($action, ['start_review', 'request_information', 'complete', 'reject', 'extend'], true)
             || $message === false
             || ($action === 'extend' && ! in_array($reasonCode, ['complexity', 'request_volume'], true))) {
-            return response()->json(['error' => 'Acción, motivo o respuesta inválidos'], 422);
+            return response()->json(['error' => __('messages.error_d19265d1591888')], 422);
         }
 
         $actor = UvhRequest::user($request);
@@ -294,7 +294,7 @@ final class PrivacyRightsController
         $sessionId = UvhRequest::sessionId($request);
         $snapshot = DB::table('privacy_rights_requests')->where('id', $id)->first(['user_id']);
         if (! $snapshot) {
-            return response()->json(['error' => 'Solicitud no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_3f03bcf8417b97')], 404);
         }
         $targetUserId = $snapshot->user_id !== null ? (int) $snapshot->user_id : null;
         try {
@@ -370,26 +370,26 @@ final class PrivacyRightsController
                 return ['status' => 'ok', 'next' => $nextStatus];
             });
         } catch (MailAdmissionException) {
-            return response()->json(['error' => 'No se pudo registrar y notificar la decisión de forma atómica'], 503);
+            return response()->json(['error' => __('messages.error_07e8eb5c5012f5')], 503);
         }
 
         if ($result['status'] === 'not_found') {
-            return response()->json(['error' => 'Solicitud no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_3f03bcf8417b97')], 404);
         }
         if ($result['status'] === 'actor_changed') {
-            return response()->json(['error' => 'Tu rol o MFA cambió. Vuelve a autenticarte'], 409);
+            return response()->json(['error' => __('messages.error_88c3059a5168bb')], 409);
         }
         if ($result['status'] === 'state') {
-            return response()->json(['error' => 'La solicitud ya está cerrada'], 409);
+            return response()->json(['error' => __('messages.error_37fe190e04e91b')], 409);
         }
         if ($result['status'] === 'action_unavailable') {
-            return response()->json(['error' => 'La acción no es válida para el estado actual'], 409);
+            return response()->json(['error' => __('messages.error_460edae7b1ba8e')], 409);
         }
         if ($result['status'] === 'limit') {
-            return response()->json(['error' => 'El expediente alcanzó su límite de mensajes'], 409);
+            return response()->json(['error' => __('messages.error_4c1bc54c007171')], 409);
         }
         if ($result['status'] === 'extension_unavailable') {
-            return response()->json(['error' => 'La ampliación ya se usó o el plazo ordinario venció'], 409);
+            return response()->json(['error' => __('messages.error_725fad22fd561a')], 409);
         }
 
         return response()->json(['ok' => true, 'status' => $result['next']]);
@@ -419,7 +419,7 @@ final class PrivacyRightsController
         ];
         if ($admin) {
             $result['userId'] = $row->user_id !== null ? (int) $row->user_id : null;
-            $result['name'] = $row->name ?? 'Cuenta eliminada';
+            $result['name'] = $row->name ?? __('display.display_7ae183d2d1b680');
             $result['email'] = $row->email ?? null;
             $result['assignedAdminName'] = $row->assigned_admin_name ?? null;
         }

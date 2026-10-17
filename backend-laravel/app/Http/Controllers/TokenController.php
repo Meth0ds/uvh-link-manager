@@ -27,7 +27,7 @@ class TokenController
 {
     private const SCOPES = ['links:read', 'links:write', 'analytics:read', 'domains:read', 'domains:write'];
 
-    private const EXPIRY_ERROR = 'La caducidad debe estar entre ahora y un año';
+    private const EXPIRY_ERROR = __('display.display_7227db0203d086');
 
     public function index(Request $request)
     {
@@ -61,10 +61,10 @@ class TokenController
             || count(array_unique($scopes)) !== count($scopes)
             || count(array_diff($scopes, self::SCOPES)) > 0
             || $password === '' || strlen($password) > 72 || strlen($factorCode) > 24) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         if ($expiresAt !== null && ! is_string($expiresAt)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         $plain = 'uvh_'.Ids::randomToken(32);
         $sessionId = UvhRequest::sessionId($request);
@@ -72,7 +72,7 @@ class TokenController
         if (is_string($expiresAt) && $expiresAt !== '') {
             $expiresAtValue = IsoDate::parse($expiresAt);
             if ($expiresAtValue === null) {
-                return response()->json(['error' => 'Datos inválidos'], 422);
+                return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
             }
             if (! $this->validExpiry($expiresAtValue)) {
                 return response()->json(['error' => self::EXPIRY_ERROR], 422);
@@ -152,13 +152,13 @@ class TokenController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'workspace', $workspaceId, ['kind' => 'api_token_created']);
 
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se creó el token API. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_9d4a80ce567789')], 503);
         }
         if ($result['status'] === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($result['status'] === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, MfaStepUp::ATTEMPT_PURPOSE);
@@ -167,13 +167,13 @@ class TokenController
             return MfaFreshness::reauthenticationRequired();
         }
         if ($result['status'] === 'password') {
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return response()->json(['error' => __('messages.error_30124a1d7f08a4')], 403);
         }
         if ($result['status'] === 'factor') {
-            return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_94f7173a80a9cb')], 403);
         }
         if ($result['status'] !== 'created') {
-            return response()->json(['error' => 'Límite de tokens activos alcanzado'], 429);
+            return response()->json(['error' => __('messages.error_fc50967135689c')], 429);
         }
         /** @var ApiToken $token */
         $token = $result['token'];
@@ -202,10 +202,10 @@ class TokenController
             return 'revoked';
         });
         if ($result === 'forbidden') {
-            return response()->json(['error' => 'Tu acceso al workspace cambió. Recarga antes de continuar.'], 403);
+            return response()->json(['error' => __('messages.error_48d563fa5de1c6')], 403);
         }
         if ($result === 'not_found') {
-            return response()->json(['error' => 'Token no encontrado'], 404);
+            return response()->json(['error' => __('messages.error_47ec55e424857d')], 404);
         }
 
         return response()->json(['ok' => true]);

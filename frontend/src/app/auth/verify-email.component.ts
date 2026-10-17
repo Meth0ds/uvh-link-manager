@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { afterNextRender, Component, computed, DestroyRef, ElementRef, inject, Injector, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
 import { DOCUMENT, Location } from "@angular/common";
 
@@ -36,63 +37,63 @@ import { assessPassword, passwordStrengthLabel } from "./password-policy";
   template: `
     <app-auth-shell>
       <div class="card center" aria-labelledby="verify-email-title">
-        <span class="step-kicker">COMPLETAR REGISTRO</span>
+        <span class="step-kicker"><ng-container i18n="@@ui.6d73c370e7ba25">COMPLETAR REGISTRO</ng-container></span>
         @if (busy()) {
-          <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
+          <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud"  i18n-aria-label="@@ui.ecd743d7dea145"/>
         }
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="failed() || ((!token || linkRejected()) && done())">
           {{ ok() ? 'verified_user' : (failed() || !token || linkRejected() ? 'error_outline' : 'mark_email_read') }}
         </mat-icon>
-        <h2 id="verify-email-title">{{ ok() ? (newAccount() ? 'Cuenta creada correctamente' : 'Email verificado') : (!token || linkRejected() ? 'Enlace no disponible' : 'Completa tu registro') }}</h2>
+        <h2 id="verify-email-title">{{ ok() ? (newAccount() ? uiText.ui_b2120b1e6d5b61 : uiText.ui_22d93bf7496928) : (!token || linkRejected() ? uiText.ui_11e385a1023bde : uiText.ui_fb38b0e95c59d6) }}</h2>
         <p class="sub" [attr.role]="failed() ? 'alert' : 'status'">{{ message() }}</p>
         @if (token && !ok() && !linkRejected()) {
           <form #actionForm class="form" [formGroup]="form" (ngSubmit)="verify()" [attr.aria-busy]="busy()">
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Nombre completo</mat-label>
+              <mat-label><ng-container i18n="@@ui.acc2e245d5b951">Nombre completo</ng-container></mat-label>
               <input matInput formControlName="name" autocomplete="name" maxlength="80" />
-              <mat-hint>El nombre que quieres mostrar en UVH.</mat-hint>
-              @if (form.controls.name.invalid && form.controls.name.touched) { <mat-error>Utiliza entre 2 y 80 caracteres.</mat-error> }
+              <mat-hint><ng-container i18n="@@ui.d4b1161fae63aa">El nombre que quieres mostrar en UVH.</ng-container></mat-hint>
+              @if (form.controls.name.invalid && form.controls.name.touched) { <mat-error><ng-container i18n="@@ui.2a2a53e091ecdd">Utiliza entre 2 y 80 caracteres.</ng-container></mat-error> }
             </mat-form-field>
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Contraseña</mat-label>
+              <mat-label><ng-container i18n="@@ui.a389a638dec325">Contraseña</ng-container></mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="password" autocomplete="new-password" maxlength="72" />
-              <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
+              <button mat-icon-button matSuffix type="button" (click)="hide.set(!hide())" [attr.aria-label]="hide() ? uiText.ui_5fe3b78d0838f4 : uiText.ui_20d93396e534a5">
                 <mat-icon>{{ hide() ? 'visibility_off' : 'visibility' }}</mat-icon>
               </button>
-              <mat-hint>Elige la contraseña con la que iniciarás sesión. Entre 10 y 72 caracteres.</mat-hint>
-              @if (form.controls.password.invalid && form.controls.password.touched) { <mat-error>Utiliza entre 10 y 72 caracteres.</mat-error> }
+              <mat-hint><ng-container i18n="@@ui.679236f4d75f6b">Elige la contraseña con la que iniciarás sesión. Entre 10 y 72 caracteres.</ng-container></mat-hint>
+              @if (form.controls.password.invalid && form.controls.password.touched) { <mat-error><ng-container i18n="@@ui.e3acd3c0081b57">Utiliza entre 10 y 72 caracteres.</ng-container></mat-error> }
             </mat-form-field>
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Repite la contraseña</mat-label>
+              <mat-label><ng-container i18n="@@ui.fb1ba2096139e4">Repite la contraseña</ng-container></mat-label>
               <input matInput [type]="hide() ? 'password' : 'text'" formControlName="confirm" autocomplete="new-password" maxlength="72" />
             </mat-form-field>
             @if (passwordValue()) {
-              <p class="sub" role="status">Fortaleza estimada: {{ passwordStrength() }}. {{ passwordAssessment().feedback }}</p>
+              <p class="sub" role="status"><ng-container i18n="@@ui.7cbafa293ec788">Fortaleza estimada: {{ passwordStrength() }}. {{ passwordAssessment().feedback }}</ng-container></p>
             }
             @if (form.hasError('mismatch') && form.controls.confirm.touched) {
-              <div class="alert error" role="alert">Las contraseñas no coinciden. Revisa el segundo campo.</div>
+              <div class="alert error" role="alert"><ng-container i18n="@@ui.dcce46a3ea026e">Las contraseñas no coinciden. Revisa el segundo campo.</ng-container></div>
             }
             <mat-checkbox formControlName="acceptTerms" color="primary">
-              Acepto los <a routerLink="/legal/terminos" target="_blank" rel="noopener" (click)="$event.stopPropagation()">Términos de servicio</a> y confirmo que he leído la <a routerLink="/legal/privacidad" target="_blank" rel="noopener" (click)="$event.stopPropagation()">Política de privacidad</a> vigentes
-            </mat-checkbox>
+              <ng-container i18n="@@ui.7da94f946cb21e">Acepto los </ng-container><a routerLink="/legal/terminos" target="_blank" rel="noopener" (click)="$event.stopPropagation()"><ng-container i18n="@@ui.b4bfd7f8ce68b2">Términos de servicio</ng-container></a> <ng-container i18n="@@ui.fb5353ef6be3b1">y confirmo que he leído la </ng-container><a routerLink="/legal/privacidad" target="_blank" rel="noopener" (click)="$event.stopPropagation()"><ng-container i18n="@@ui.298dfe180a7fba">Política de privacidad</ng-container></a> <ng-container i18n="@@ui.8e7df73bc9c021">vigentes
+            </ng-container></mat-checkbox>
             @if (form.controls.acceptTerms.hasError('required') && form.controls.acceptTerms.touched) {
-              <div class="alert error" role="alert">Debes aceptar los términos vigentes para activar la cuenta.</div>
+              <div class="alert error" role="alert"><ng-container i18n="@@ui.0a24faed62e566">Debes aceptar los términos vigentes para activar la cuenta.</ng-container></div>
             }
             <button #submitButton mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()">
-              {{ busy() ? 'Creando cuenta…' : (attempted() ? 'Volver a intentarlo' : 'Crear mi cuenta') }}
+              {{ busy() ? uiText.ui_dca985cac02b9e : (attempted() ? uiText.ui_c35a102ad7130f : uiText.ui_47f281d09dc90c) }}
             </button>
           </form>
         }
         @if (done() && ok()) {
           @if (signedIn()) {
-            <a #nextLink mat-flat-button color="primary" [routerLink]="continueTo()">{{ hasPendingLink() ? 'Continuar con mi enlace' : (pendingInvitation() ? 'Revisar invitación' : 'Ir al panel') }}</a>
+            <a #nextLink mat-flat-button color="primary" [routerLink]="continueTo()">{{ hasPendingLink() ? uiText.ui_021d687dee0bce : (pendingInvitation() ? uiText.ui_8e3cfd59625c74 : uiText.ui_3bc27cd067f366) }}</a>
           } @else if (auth.authenticated()) {
-            <button mat-flat-button color="primary" type="button" (click)="switchAccount()" [disabled]="busy()">Cerrar la sesión actual y entrar con mi cuenta nueva</button>
+            <button mat-flat-button color="primary" type="button" (click)="switchAccount()" [disabled]="busy()"><ng-container i18n="@@ui.45b3ad58fbb5a4">Cerrar la sesión actual y entrar con mi cuenta nueva</ng-container></button>
           } @else {
-            <a #nextLink mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="loginQueryParams()">Iniciar sesión</a>
+            <a #nextLink mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="loginQueryParams()"><ng-container i18n="@@ui.8d518bb65ea3de">Iniciar sesión</ng-container></a>
           }
         } @else if (!token || linkRejected()) {
-          <a #nextLink mat-flat-button color="primary" routerLink="/auth" [queryParams]="{ mode: 'register' }">Solicitar otro enlace</a>
+          <a #nextLink mat-flat-button color="primary" routerLink="/auth" [queryParams]="{ mode: 'register' }"><ng-container i18n="@@ui.345ca6883d4196">Solicitar otro enlace</ng-container></a>
         }
       </div>
     </app-auth-shell>
@@ -101,6 +102,7 @@ import { assessPassword, passwordStrengthLabel } from "./password-policy";
   styleUrl: "./auth-card.scss",
 })
 export class VerifyEmailComponent {
+  readonly uiText = UI_TEXT;
   private fb = inject(FormBuilder);
   readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -126,7 +128,7 @@ export class VerifyEmailComponent {
   readonly newAccount = signal(false);
   readonly signedIn = signal(false);
   private readonly transferredLink = signal(false);
-  readonly message = signal("Elige tu nombre y contraseña para crear la cuenta y confirmar tu email. Si no solicitaste este registro, no continúes.");
+  readonly message = signal($localize`:@@ui.75966789644f0e:Elige tu nombre y contraseña para crear la cuenta y confirmar tu email. Si no solicitaste este registro, no continúes.`);
   readonly pendingLink = this.intents.pending;
   readonly pendingInvitation = this.invitations.pending;
   readonly token: string;
@@ -156,7 +158,7 @@ export class VerifyEmailComponent {
     this.location.replaceState("/auth/verify-email");
     if (!this.token) {
       this.done.set(true);
-      this.message.set("Este enlace de verificación no es válido. Solicita un correo de verificación nuevo.");
+      this.message.set($localize`:@@ui.07283ca45f4566:Este enlace de verificación no es válido. Solicita un correo de verificación nuevo.`);
     }
   }
 
@@ -198,15 +200,15 @@ export class VerifyEmailComponent {
       }
       this.message.set(
         this.signedIn()
-          ? (this.hasPendingLink() ? "Tu cuenta y tu sesión están listas. Continúa para revisar y crear el enlace que has guardado." : "Tu cuenta y tu sesión están listas. Ya puedes entrar al panel.")
-          : (this.auth.authenticated() ? "La cuenta está lista. Este navegador tiene otra cuenta abierta; puedes cerrar esa sesión para entrar con la nueva." : "Tu email quedó confirmado. Inicia sesión para continuar con tu cuenta."),
+          ? (this.hasPendingLink() ? $localize`:@@ui.e3e37bde65dea2:Tu cuenta y tu sesión están listas. Continúa para revisar y crear el enlace que has guardado.` : $localize`:@@ui.9dcd4b05a05932:Tu cuenta y tu sesión están listas. Ya puedes entrar al panel.`)
+          : (this.auth.authenticated() ? $localize`:@@ui.53b6bf77ac1c79:La cuenta está lista. Este navegador tiene otra cuenta abierta; puedes cerrar esa sesión para entrar con la nueva.` : $localize`:@@ui.21a6801538e93d:Tu email quedó confirmado. Inicia sesión para continuar con tu cuenta.`),
       );
     } catch (err) {
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(false);
       this.failed.set(true);
       if (err instanceof ApiRequestError && err.status === 400) this.linkRejected.set(true);
-      this.message.set(err instanceof ApiRequestError ? err.message : "El enlace de verificación no es válido o ha caducado.");
+      this.message.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.8e5c653629d637:El enlace de verificación no es válido o ha caducado.`);
     } finally {
       if (this.requests.isCurrent(request, this.token)) {
         this.busy.set(false);
@@ -228,7 +230,7 @@ export class VerifyEmailComponent {
       await this.auth.logout();
       await this.router.navigate(["/auth"], { queryParams: this.loginQueryParams() });
     } catch {
-      this.message.set("No se pudo cerrar la sesión actual. Inténtalo de nuevo.");
+      this.message.set($localize`:@@ui.93f50ffd498ec0:No se pudo cerrar la sesión actual. Inténtalo de nuevo.`);
     } finally {
       this.busy.set(false);
     }

@@ -9,24 +9,24 @@
   emptyHint="Ninguna entrada en la lista: nada se está rechazando por destino."
   [showPagerWhenEmpty]="false"
   [pageSizes]="pageSizes"
->
-  <p queue-summary>Bloqueos de destinos que afectan a todos los enlaces que coincidan con la URL o el host indicado. Retirar una entrada vuelve a analizar los enlaces y restaura los que no tengan otro motivo de bloqueo. Para las URL exactas se guarda una huella de coincidencia; la dirección original no se conserva en esta lista.</p>
+ i18n-title="@@ui.1d3e7f0b09bc2f" i18n-emptyTitle="@@ui.07aff795fb168e" i18n-loadingLabel="@@ui.533575af5c62d1">
+  <p queue-summary><ng-container i18n="@@ui.c7f03121255123">Bloqueos de destinos que afectan a todos los enlaces que coincidan con la URL o el host indicado. Retirar una entrada vuelve a analizar los enlaces y restaura los que no tengan otro motivo de bloqueo. Para las URL exactas se guarda una huella de coincidencia; la dirección original no se conserva en esta lista.</ng-container></p>
 
   <div class="entry-list" queue-rows>
     <div class="entry-row entry-head" aria-hidden="true">
-      <span>Destino</span><span>Alcance</span><span>Origen</span><span>Motivo</span><span>Alta</span><span>Caduca</span><span></span>
+      <span><ng-container i18n="@@ui.8e7290e445465b">Destino</ng-container></span><span><ng-container i18n="@@ui.477f2a69f25fbe">Alcance</ng-container></span><span><ng-container i18n="@@ui.167a940c62788a">Origen</ng-container></span><span><ng-container i18n="@@ui.c7b288b1c0bb65">Motivo</ng-container></span><span><ng-container i18n="@@ui.42719229fd62e2">Alta</ng-container></span><span><ng-container i18n="@@ui.704b31ddcdd03f">Caduca</ng-container></span><span></span>
     </div>
     @for (entry of entries.rows(); track entry.id) {
       <article class="entry-row">
         <b class="entry-value" [title]="entry.match_value">{{ entry.match_value }}</b>
-        <span data-label="Alcance"><span class="field-label">Alcance</span><span class="badge" [class.danger]="entry.match_kind === 'host'" [class.neutral]="entry.match_kind === 'url'">{{ kindLabel(entry.match_kind) }}</span></span>
-        <span data-label="Origen"><span class="field-label">Origen</span>{{ sourceLabel(entry.source) }}</span>
-        <span data-label="Motivo" class="entry-reason"><span class="field-label">Motivo</span>{{ entry.reason }}</span>
-        <time data-label="Alta"><span class="field-label">Alta</span>{{ formatDate(entry.created_at) }}</time>
-        <time data-label="Caduca"><span class="field-label">Caduca</span>{{ entry.expires_at ? formatDate(entry.expires_at) : "Sin caducidad" }}</time>
-        <button mat-stroked-button class="danger-button" type="button" (click)="withdraw(entry)" [disabled]="entries.stale() || busy()" [attr.aria-label]="'Retirar el bloqueo de ' + entry.match_value">
-          <mat-icon aria-hidden="true">delete_outline</mat-icon>Retirar
-        </button>
+        <span data-label="Alcance"><span class="field-label"><ng-container i18n="@@ui.477f2a69f25fbe">Alcance</ng-container></span><span class="badge" [class.danger]="entry.match_kind === 'host'" [class.neutral]="entry.match_kind === 'url'">{{ kindLabel(entry.match_kind) }}</span></span>
+        <span data-label="Origen"><span class="field-label"><ng-container i18n="@@ui.167a940c62788a">Origen</ng-container></span>{{ sourceLabel(entry.source) }}</span>
+        <span data-label="Motivo" class="entry-reason"><span class="field-label"><ng-container i18n="@@ui.c7b288b1c0bb65">Motivo</ng-container></span>{{ entry.reason }}</span>
+        <time data-label="Alta"><span class="field-label"><ng-container i18n="@@ui.42719229fd62e2">Alta</ng-container></span>{{ formatDate(entry.created_at) }}</time>
+        <time data-label="Caduca"><span class="field-label"><ng-container i18n="@@ui.704b31ddcdd03f">Caduca</ng-container></span>{{ entry.expires_at ? formatDate(entry.expires_at) : uiText.ui_15cb784388aa7c }}</time>
+        <button mat-stroked-button class="danger-button" type="button" (click)="withdraw(entry)" [disabled]="entries.stale() || busy()" [attr.aria-label]="uiText.ui_f00063b5739976 + entry.match_value">
+          <mat-icon aria-hidden="true">delete_outline</mat-icon><ng-container i18n="@@ui.7d404155b52942">Retirar
+        </ng-container></button>
       </article>
     }
   </div>

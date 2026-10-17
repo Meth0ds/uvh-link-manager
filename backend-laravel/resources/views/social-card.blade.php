@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ $title }}</title>
+<html lang="{{ app()->getLocale() === 'en_GB' ? 'en-GB' : 'es-ES' }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ $title }}</title>
 <meta name="robots" content="noindex, nofollow, noarchive"><meta property="og:type" content="website"><meta property="og:title" content="{{ $title }}"><meta property="og:description" content="{{ $description }}">
 @if ($canonical)<meta property="og:url" content="{{ $canonical }}">@endif
 <meta name="twitter:card" content="{{ $image ? 'summary_large_image' : 'summary' }}"><meta name="twitter:title" content="{{ $title }}"><meta name="twitter:description" content="{{ $description }}">

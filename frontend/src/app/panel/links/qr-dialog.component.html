@@ -1,17 +1,17 @@
 <header class="qr-dialog-header">
 <h2 mat-dialog-title>
   <span class="title-icon" aria-hidden="true"><mat-icon>qr_code_2</mat-icon></span>
-  <span class="title-copy"><b>{{ libraryMode ? 'Biblioteca de diseños QR' : bulkLinks ? 'Exportar ' + bulkLinks.length + ' QR' : campaignMode() ? 'QR de campaña' : 'QR del enlace' }}</b><small>Personaliza y comparte tu QR</small></span>
+  <span class="title-copy"><b>{{ libraryMode ? uiText.ui_a3e3c40630f1ef : bulkLinks ? uiText.ui_6f495cbbbe818f + bulkLinks.length + uiText.ui_12df6267c15f94 : campaignMode() ? uiText.ui_a90fb7659f13c6 : uiText.ui_f7c8628326a34b }}</b><small><ng-container i18n="@@ui.03098c102a0e74">Personaliza y comparte tu QR</ng-container></small></span>
 </h2>
-<button mat-icon-button mat-dialog-close type="button" class="header-close" aria-label="Cerrar configurador QR"><mat-icon>close</mat-icon></button>
+<button mat-icon-button mat-dialog-close type="button" class="header-close" aria-label="Cerrar configurador QR" i18n-aria-label="@@ui.0d483f706d5766"><mat-icon>close</mat-icon></button>
 </header>
 <mat-dialog-content class="qr-body">
   <div class="qr-layout">
     <figure class="qr-preview" [attr.aria-busy]="previewBusy() || printPreviewBusy()">
-      <div class="preview-heading"><span>Vista previa</span><span class="preview-state" [class.pending]="previewBusy() || printPreviewBusy()"><i aria-hidden="true"></i>{{ previewBusy() || printPreviewBusy() ? 'Actualizando' : 'Diseño actual' }}</span></div>
+      <div class="preview-heading"><span><ng-container i18n="@@ui.c5341f198fc2f4">Vista previa</ng-container></span><span class="preview-state" [class.pending]="previewBusy() || printPreviewBusy()"><i aria-hidden="true"></i>{{ previewBusy() || printPreviewBusy() ? uiText.ui_937c8ddb1b2a97 : uiText.ui_b9377ec1c7dd8d }}</span></div>
       <div class="qr-preview-stage" [class.updating]="previewBusy()">
         @if (a4Mode() && printLayout()) {
-          <svg class="a4-preview" viewBox="0 0 210 297" role="img" aria-label="Distribución de la primera hoja A4">
+          <svg class="a4-preview" viewBox="0 0 210 297" role="img" aria-label="Distribución de la primera hoja A4" i18n-aria-label="@@ui.2e3e7c34363fde">
             <rect width="210" height="297" fill="white" />
             <rect x="10" y="10" width="190" height="277" fill="none" stroke="#DDD" stroke-width="0.4" stroke-dasharray="2 2" />
             @for (slot of printSlots(); track slot.index) {
@@ -28,41 +28,41 @@
         }
       </div>
       @if (previewBusy() || printPreviewBusy()) {
-        <mat-progress-bar mode="indeterminate" aria-label="Generando vista previa del QR" />
-        <p class="preview-status" role="status">Actualizando vista previa…</p>
+        <mat-progress-bar mode="indeterminate" aria-label="Generando vista previa del QR"  i18n-aria-label="@@ui.7a1492fd1b6794"/>
+        <p class="preview-status" role="status"><ng-container i18n="@@ui.7901ca85261fac">Actualizando vista previa…</ng-container></p>
       }
       <figcaption class="url tnum">{{ url }}</figcaption>
-      <p class="export-summary">{{ a4Mode() ? 'PDF A4' : format().toUpperCase() }} @if (section() !== 'print' && format() === 'png') { · {{ downloadSize() }} px } @if (section() === 'print' || format() === 'pdf') { · {{ sizeMm() }} mm }</p>
-      <p class="scan-advice">Prueba el QR con tu móvil antes de imprimirlo.</p>
+      <p class="export-summary">{{ a4Mode() ? uiText.ui_b98fb082eea9a1 : format().toUpperCase() }} @if (section() !== 'print' && format() === 'png') { <ng-container i18n="@@ui.cb3b70fd3e8cef">· {{ downloadSize() }} px </ng-container>} @if (section() === 'print' || format() === 'pdf') { <ng-container i18n="@@ui.b3e61806dd8b71">· {{ sizeMm() }} mm </ng-container>}</p>
+      <p class="scan-advice"><ng-container i18n="@@ui.b697ce58c5df87">Prueba el QR con tu móvil antes de imprimirlo.</ng-container></p>
     </figure>
-    <section class="qr-options" aria-label="Opciones del QR">
-      <nav class="qr-sections" aria-label="Configuración del QR">
-        <button type="button" [attr.aria-pressed]="section() === 'design'" [disabled]="downloadBusy() || designBusy()" (click)="section.set('design')"><mat-icon aria-hidden="true">palette</mat-icon>Diseño</button>
-        <button type="button" [attr.aria-pressed]="section() === 'file'" [disabled]="downloadBusy() || designBusy()" (click)="section.set('file')"><mat-icon aria-hidden="true">download</mat-icon>Archivo</button>
-        <button type="button" [attr.aria-pressed]="section() === 'print'" [disabled]="downloadBusy() || designBusy()" (click)="section.set('print')"><mat-icon aria-hidden="true">print</mat-icon>Imprimir</button>
+    <section class="qr-options" aria-label="Opciones del QR" i18n-aria-label="@@ui.45ebff100ce1f6">
+      <nav class="qr-sections" aria-label="Configuración del QR" i18n-aria-label="@@ui.d941a2693a8ffe">
+        <button type="button" [attr.aria-pressed]="section() === 'design'" [disabled]="downloadBusy() || designBusy()" (click)="section.set('design')"><mat-icon aria-hidden="true">palette</mat-icon><ng-container i18n="@@ui.ae9ca0d496b5b3">Diseño</ng-container></button>
+        <button type="button" [attr.aria-pressed]="section() === 'file'" [disabled]="downloadBusy() || designBusy()" (click)="section.set('file')"><mat-icon aria-hidden="true">download</mat-icon><ng-container i18n="@@ui.75d6b4579e1d29">Archivo</ng-container></button>
+        <button type="button" [attr.aria-pressed]="section() === 'print'" [disabled]="downloadBusy() || designBusy()" (click)="section.set('print')"><mat-icon aria-hidden="true">print</mat-icon><ng-container i18n="@@ui.17637813d50e16">Imprimir</ng-container></button>
       </nav>
       <div class="design-section" [hidden]="section() !== 'design'">
       <app-qr-design-picker [initial]="initialSpec()" [initiallyOpen]="libraryMode" [spec]="design()" [logo]="customLogo()" [file]="logoFile()" [disabled]="downloadBusy() || designBusy() || previewBusy() || logoBusy() || needsCustomLogo()" (working)="libraryBusy.set($event)" (applied)="applyDesign($event)" (invalidated)="closeForContextChange()" />
       @if (campaignMode() && linkId) { <app-qr-campaign-save [linkId]="linkId" [spec]="design()" [file]="logoFile()" [variant]="variant()" [disabled]="downloadBusy() || designBusy() || previewBusy() || logoBusy() || needsCustomLogo()" (working)="campaignSaving.set($event)" (saved)="campaignSaved($event)" /> }
       <div class="options-heading">
-        <h3 id="qr-options-title">Personaliza tu QR</h3>
+        <h3 id="qr-options-title"><ng-container i18n="@@ui.db847165bb3e45">Personaliza tu QR</ng-container></h3>
         <button mat-icon-button type="button" (click)="resetOptions()" [disabled]="downloadBusy() || designBusy() || isDefault()"
-          aria-label="Restablecer opciones del QR" matTooltip="Restablecer opciones">
+          aria-label="Restablecer opciones del QR" matTooltip="Restablecer opciones" i18n-matTooltip="@@ui.bef4087888cb77" i18n-aria-label="@@ui.88b62747d9479a">
           <mat-icon>restart_alt</mat-icon>
         </button>
       </div>
-      @if (canWrite() && linkId && !campaignMode() && !bulkLinks) { <button mat-stroked-button class="campaign-shortcut" (click)="campaignMode.set(true)"><mat-icon>campaign</mat-icon>Crear un QR de campaña</button> }
-      <div class="qr-setting-group"><h4><mat-icon aria-hidden="true">image</mat-icon>Identidad</h4>
+      @if (canWrite() && linkId && !campaignMode() && !bulkLinks) { <button mat-stroked-button class="campaign-shortcut" (click)="campaignMode.set(true)"><mat-icon>campaign</mat-icon><ng-container i18n="@@ui.567c87066c332b">Crear un QR de campaña</ng-container></button> }
+      <div class="qr-setting-group"><h4><mat-icon aria-hidden="true">image</mat-icon><ng-container i18n="@@ui.d87a763fa72892">Identidad</ng-container></h4>
       <div class="brand-option">
-        <mat-checkbox [checked]="includeLogo()" (change)="setIncludeLogo($event.checked)" [disabled]="downloadBusy() || designBusy()">Incluir logo en el centro</mat-checkbox>
-        <p>Desactívalo para descargar un QR clásico.</p>
+        <mat-checkbox [checked]="includeLogo()" (change)="setIncludeLogo($event.checked)" [disabled]="downloadBusy() || designBusy()"><ng-container i18n="@@ui.120a56ebb54587">Incluir logo en el centro</ng-container></mat-checkbox>
+        <p><ng-container i18n="@@ui.dbcfb9bf97e3a4">Desactívalo para descargar un QR clásico.</ng-container></p>
       </div>
       @if (includeLogo()) {
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Logo del QR</mat-label>
+          <mat-label><ng-container i18n="@@ui.17778787b60faa">Logo del QR</ng-container></mat-label>
           <mat-select [value]="logoSource()" (selectionChange)="selectLogoSource($event.value)" [disabled]="downloadBusy() || designBusy()">
-            <mat-option value="uvh">Logo UVH</mat-option>
-            <mat-option value="custom">Mi propio logo</mat-option>
+            <mat-option value="uvh"><ng-container i18n="@@ui.322ca846379db5">Logo UVH</ng-container></mat-option>
+            <mat-option value="custom"><ng-container i18n="@@ui.b372414592ce05">Mi propio logo</ng-container></mat-option>
           </mat-select>
         </mat-form-field>
         @if (logoSource() === 'custom') {
@@ -70,114 +70,114 @@
             <input #logoInput type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden (change)="uploadLogo($event)" />
             @if (customLogo(); as logo) {
               <div class="logo-file">
-                <div class="logo-thumbnail"><img [src]="logo.preview" alt="Vista previa de tu logo" /></div>
-                <span><b>{{ logo.name }}</b><small>Ajustado sin deformar</small></span>
-                <button mat-icon-button type="button" (click)="removeCustomLogo()" [disabled]="downloadBusy() || designBusy()" aria-label="Quitar mi logo" matTooltip="Quitar logo"><mat-icon>close</mat-icon></button>
+                <div class="logo-thumbnail"><img [src]="logo.preview" alt="Vista previa de tu logo"  i18n-alt="@@ui.f789b328ad71e3"/></div>
+                <span><b>{{ logo.name }}</b><small><ng-container i18n="@@ui.ac7c568d090ce4">Ajustado sin deformar</ng-container></small></span>
+                <button mat-icon-button type="button" (click)="removeCustomLogo()" [disabled]="downloadBusy() || designBusy()" aria-label="Quitar mi logo" matTooltip="Quitar logo" i18n-matTooltip="@@ui.6f9811d40ed407" i18n-aria-label="@@ui.bedd7917614d44"><mat-icon>close</mat-icon></button>
               </div>
             }
             <button mat-stroked-button type="button" (click)="logoInput.click()" [disabled]="downloadBusy() || designBusy() || logoBusy()">
               <mat-icon>{{ customLogo() ? 'swap_horiz' : 'upload' }}</mat-icon>
-              {{ logoBusy() ? 'Preparando logo…' : customLogo() ? 'Cambiar imagen' : 'Elegir imagen' }}
+              {{ logoBusy() ? uiText.ui_7a4124972234d0 : customLogo() ? uiText.ui_8ad41677d65a77 : uiText.ui_027cd9116c7ca0 }}
             </button>
-            <p class="logo-help">PNG o JPG · hasta 2 MB y 4096 px por lado.<br />Elige una imagen nítida; se ajustará sin deformarse.</p>
-            @if (logoBusy()) { <mat-progress-bar mode="indeterminate" aria-label="Preparando tu logo" /> }
+            <p class="logo-help"><ng-container i18n="@@ui.c01d37a183b644">PNG o JPG · hasta 2 MB y 4096 px por lado.</ng-container><br /><ng-container i18n="@@ui.d2b1d9e2f305d6">Elige una imagen nítida; se ajustará sin deformarse.</ng-container></p>
+            @if (logoBusy()) { <mat-progress-bar mode="indeterminate" aria-label="Preparando tu logo"  i18n-aria-label="@@ui.9b9230baa90d2a"/> }
             @if (logoError()) { <p class="logo-error" role="alert">{{ logoError() }}</p> }
-            @if (needsCustomLogo() && !logoBusy()) { <p class="logo-pending" role="status">Elige tu logo para ver y descargar el QR.</p> }
+            @if (needsCustomLogo() && !logoBusy()) { <p class="logo-pending" role="status"><ng-container i18n="@@ui.aff0a5616b1d1a">Elige tu logo para ver y descargar el QR.</ng-container></p> }
           </div>
         }
       }
       </div>
-      <div class="qr-setting-group"><h4><mat-icon aria-hidden="true">qr_code</mat-icon>Lectura y margen</h4>
+      <div class="qr-setting-group"><h4><mat-icon aria-hidden="true">qr_code</mat-icon><ng-container i18n="@@ui.cd3418add03fdf">Lectura y margen</ng-container></h4>
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
-        <mat-label>Redundancia</mat-label>
+        <mat-label><ng-container i18n="@@ui.8644cc456dcd11">Redundancia</ng-container></mat-label>
         <mat-select [value]="correctionLevel()" (selectionChange)="selectCorrectionLevel($event.value)" [disabled]="downloadBusy() || designBusy() || includeLogo()">
           @for (option of correctionLevels; track option.level) {
             <mat-option [value]="option.level">{{ option.label }} · {{ option.level }}</mat-option>
           }
         </mat-select>
-        <mat-hint>{{ includeLogo() ? 'El logo requiere el nivel máximo.' : 'Recupera datos si el QR se deteriora.' }}</mat-hint>
+        <mat-hint>{{ includeLogo() ? uiText.ui_341f981d524165 : uiText.ui_da47a5c918690d }}</mat-hint>
       </mat-form-field>
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
-        <mat-label>Margen blanco</mat-label>
+        <mat-label><ng-container i18n="@@ui.81f3bac749e2a7">Margen blanco</ng-container></mat-label>
         <mat-select [value]="quietZone()" (selectionChange)="selectQuietZone($event.value)" [disabled]="downloadBusy() || designBusy()">
           @for (option of margins; track option.size) {
-            <mat-option [value]="option.size">{{ option.label }} · {{ option.size }} módulos</mat-option>
+            <mat-option [value]="option.size"><ng-container i18n="@@ui.40d04e18e7cd9f">{{ option.label }} · {{ option.size }} módulos</ng-container></mat-option>
           }
         </mat-select>
-        <mat-hint>Espacio que facilita el escaneo.</mat-hint>
+        <mat-hint><ng-container i18n="@@ui.2331a8195d4077">Espacio que facilita el escaneo.</ng-container></mat-hint>
       </mat-form-field>
       </div>
-      <div class="qr-setting-group"><h4><mat-icon aria-hidden="true">palette</mat-icon>Color y marco</h4>
+      <div class="qr-setting-group"><h4><mat-icon aria-hidden="true">palette</mat-icon><ng-container i18n="@@ui.472175f6fb408b">Color y marco</ng-container></h4>
       <div class="color-options">
-        <label><span>Módulos<small>{{ foreground().toUpperCase() }}</small></span> <input type="color" aria-label="Color de los módulos" [value]="foreground()" (input)="changeDesign('foreground', $any($event.target).value)" [disabled]="downloadBusy() || designBusy()" /></label>
-        <label><span>Fondo<small>{{ background().toUpperCase() }}</small></span> <input type="color" aria-label="Color del fondo" [value]="background()" (input)="changeDesign('background', $any($event.target).value)" [disabled]="downloadBusy() || designBusy()" /></label>
+        <label><span><ng-container i18n="@@ui.b73c3543528b14">Módulos</ng-container><small>{{ foreground().toUpperCase() }}</small></span> <input type="color" aria-label="Color de los módulos" [value]="foreground()" (input)="changeDesign('foreground', $any($event.target).value)" [disabled]="downloadBusy() || designBusy()"  i18n-aria-label="@@ui.7a53ffdf665dc4"/></label>
+        <label><span><ng-container i18n="@@ui.8c069b2a2ba075">Fondo</ng-container><small>{{ background().toUpperCase() }}</small></span> <input type="color" aria-label="Color del fondo" [value]="background()" (input)="changeDesign('background', $any($event.target).value)" [disabled]="downloadBusy() || designBusy()"  i18n-aria-label="@@ui.c4da0ef448579f"/></label>
       </div>
-      <p class="contrast-status" [class.insufficient]="contrastRatio() < 7" role="status"><mat-icon aria-hidden="true">{{ contrastRatio() >= 7 ? 'check_circle' : 'error_outline' }}</mat-icon>Contraste {{ contrastRatio().toFixed(1) }}:1 <span>· mínimo 7:1</span></p><p class="field-advice">El fondo debe ser claro. El margen de seguridad permanece blanco.</p>
+      <p class="contrast-status" [class.insufficient]="contrastRatio() < 7" role="status"><mat-icon aria-hidden="true">{{ contrastRatio() >= 7 ? 'check_circle' : 'error_outline' }}</mat-icon><ng-container i18n="@@ui.286a94b09b9631">Contraste {{ contrastRatio().toFixed(1) }}:1 </ng-container><span><ng-container i18n="@@ui.d4a6a28ddb2ccf">· mínimo 7:1</ng-container></span></p><p class="field-advice"><ng-container i18n="@@ui.f0d7b92159a24c">El fondo debe ser claro. El margen de seguridad permanece blanco.</ng-container></p>
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
-        <mat-label>Marco</mat-label><mat-select [value]="frame()" (selectionChange)="changeDesign('frame', $event.value)" [disabled]="downloadBusy() || designBusy()">
-          <mat-option value="none">Sin marco</mat-option><mat-option value="border">Borde discreto</mat-option><mat-option value="caption">Marco con texto</mat-option>
+        <mat-label><ng-container i18n="@@ui.669017e1461557">Marco</ng-container></mat-label><mat-select [value]="frame()" (selectionChange)="changeDesign('frame', $event.value)" [disabled]="downloadBusy() || designBusy()">
+          <mat-option value="none"><ng-container i18n="@@ui.a1dd32ed9ecfbb">Sin marco</ng-container></mat-option><mat-option value="border"><ng-container i18n="@@ui.0d7355454ff7fb">Borde discreto</ng-container></mat-option><mat-option value="caption"><ng-container i18n="@@ui.bac2e6cd1d0cae">Marco con texto</ng-container></mat-option>
         </mat-select>
       </mat-form-field>
       @if (frame() === 'caption') {
-        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Texto del marco</mat-label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.b5c72c55b2908b">Texto del marco</ng-container></mat-label>
           <input matInput maxlength="80" [value]="caption()" (input)="changeDesign('caption', $any($event.target).value)" [disabled]="downloadBusy() || designBusy()" />
-          <mat-hint>Hasta 80 caracteres. Un texto breve se lee mejor al imprimir.</mat-hint>
+          <mat-hint><ng-container i18n="@@ui.6a7c950d24e3e8">Hasta 80 caracteres. Un texto breve se lee mejor al imprimir.</ng-container></mat-hint>
         </mat-form-field>
       }
       </div>
       </div>
       @if (section() === 'file') {
-        <div class="options-heading"><h3>Elige el archivo</h3></div>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Formato</mat-label>
+        <div class="options-heading"><h3><ng-container i18n="@@ui.51109e1a6cea27">Elige el archivo</ng-container></h3></div>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.73e1804eb968f7">Formato</ng-container></mat-label>
           <mat-select [value]="format()" (selectionChange)="format.set($event.value)" [disabled]="downloadBusy() || designBusy()">
-            <mat-option value="png">{{ bulkLinks ? 'ZIP · imágenes PNG' : 'PNG · imagen' }}</mat-option><mat-option value="svg">{{ bulkLinks ? 'ZIP · vectores SVG' : 'SVG · vector editable' }}</mat-option><mat-option value="pdf">{{ bulkLinks ? 'PDF · hoja A4' : 'PDF · tamaño real' }}</mat-option>
+            <mat-option value="png">{{ bulkLinks ? uiText.ui_3b30790288a867 : uiText.ui_cf041d1c778e74 }}</mat-option><mat-option value="svg">{{ bulkLinks ? uiText.ui_e7e04ed3ad927b : uiText.ui_a99d86c8de8d72 }}</mat-option><mat-option value="pdf">{{ bulkLinks ? uiText.ui_7973780ae73e2b : uiText.ui_bbc296ff52e67e }}</mat-option>
           </mat-select>
         </mat-form-field>
-        <p class="field-advice">{{ format() === 'svg' ? 'Nítido a cualquier tamaño. El QR y el logo UVH son vectoriales; los logos propios mantienen su calidad original.' : format() === 'pdf' ? 'Documento vectorial con medidas reales. Imprime al 100 %, sin ajustar a página.' : 'Una imagen lista para documentos, redes y presentaciones.' }}</p>
+        <p class="field-advice">{{ format() === 'svg' ? uiText.ui_54bb6518e8c6cc : format() === 'pdf' ? uiText.ui_cc2ca65a9ae09c : uiText.ui_913bf00287a1a6 }}</p>
       }
       @if (section() === 'file' && format() === 'png') {
       <mat-form-field appearance="outline" subscriptSizing="dynamic" class="resolution-field">
-        <mat-label>Resolución de descarga</mat-label>
+        <mat-label><ng-container i18n="@@ui.581e9eeb970b92">Resolución de descarga</ng-container></mat-label>
         <mat-select [value]="downloadSize()" (selectionChange)="selectDownloadSize($event.value)" [disabled]="downloadBusy() || designBusy()">
           @for (option of downloadSizes; track option.size) {
-            <mat-option [value]="option.size">{{ option.size }} px de ancho · {{ option.label }}</mat-option>
+            <mat-option [value]="option.size"><ng-container i18n="@@ui.4addccd75af567">{{ option.size }} px de ancho · {{ option.label }}</ng-container></mat-option>
           }
         </mat-select>
       </mat-form-field>
       }
       @if (workflows.enabled() && section() === 'file' && !bulkLinks && !libraryMode) {
         <section class="qr-share" [class.ready]="shareReady()" [attr.aria-busy]="sharePreparing() || shareBusy()" aria-labelledby="qr-share-title">
-          <div class="share-heading"><mat-icon aria-hidden="true">ios_share</mat-icon><div><h4 id="qr-share-title">Compartir como imagen</h4><p>Envía un PNG de {{ downloadSize() }} px a una aplicación de tu dispositivo.</p></div></div>
+          <div class="share-heading"><mat-icon aria-hidden="true">ios_share</mat-icon><div><h4 id="qr-share-title"><ng-container i18n="@@ui.14f9622f787b3a">Compartir como imagen</ng-container></h4><p><ng-container i18n="@@ui.54bd24fd65c467">Envía un PNG de {{ downloadSize() }} px a una aplicación de tu dispositivo.</ng-container></p></div></div>
           @if (shareUnavailableReason || shareFallback()) {
             <p class="share-status" role="status">{{ shareUnavailableReason || shareNotice() }}</p>
-            <button mat-stroked-button type="button" (click)="download()" [disabled]="!campaignReady() || !dataUrl() || previewBusy() || logoBusy() || needsCustomLogo() || downloadBusy() || designBusy()"><mat-icon aria-hidden="true">download</mat-icon>Descargar PNG</button>
+            <button mat-stroked-button type="button" (click)="download()" [disabled]="!campaignReady() || !dataUrl() || previewBusy() || logoBusy() || needsCustomLogo() || downloadBusy() || designBusy()"><mat-icon aria-hidden="true">download</mat-icon><ng-container i18n="@@ui.c2f23209c653a5">Descargar PNG</ng-container></button>
           } @else {
             <button mat-stroked-button type="button" class="share-action" (click)="shareImage()" [disabled]="!shareReady() || !campaignReady() || previewBusy() || logoBusy() || downloadBusy() || designBusy()" [attr.aria-busy]="sharePreparing() || shareBusy()">
-              <mat-icon aria-hidden="true">{{ sharePreparing() ? 'hourglass_top' : 'ios_share' }}</mat-icon>{{ sharePreparing() ? 'Preparando imagen…' : shareBusy() ? 'Compartiendo…' : 'Compartir imagen' }}
+              <mat-icon aria-hidden="true">{{ sharePreparing() ? 'hourglass_top' : 'ios_share' }}</mat-icon>{{ sharePreparing() ? uiText.ui_16b0ce2b3a66bb : shareBusy() ? uiText.ui_34ea08f742316d : uiText.ui_663fbebaae7331 }}
             </button>
-            <p class="share-status" role="status">{{ shareNotice() || (sharePreparing() ? 'Preparando el diseño actual. Puedes seguir revisando las opciones.' : !campaignReady() ? 'Guarda primero el QR de campaña para compartir su versión definitiva.' : shareReady() ? 'Imagen preparada. Elige una aplicación en el menú de tu dispositivo.' : 'La imagen estará disponible cuando termine la vista previa.') }}</p>
+            <p class="share-status" role="status">{{ shareNotice() || (sharePreparing() ? uiText.ui_b4cc497b628560 : !campaignReady() ? uiText.ui_bf80da9635e056 : shareReady() ? uiText.ui_112dfa008adc50 : uiText.ui_e324b84e27ee80) }}</p>
           }
         </section>
       }
       @if (section() === 'print' || (section() === 'file' && format() === 'pdf')) {
-        <div class="options-heading"><h3>{{ section() === 'print' ? 'Tu hoja A4' : 'Medidas del QR' }}</h3></div>
+        <div class="options-heading"><h3>{{ section() === 'print' ? uiText.ui_e29a584a67c7ea : uiText.ui_0d4e94ed3ee0d1 }}</h3></div>
         <div class="measure-fields">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Tamaño del QR</mat-label>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.81c6d5454cd54f">Tamaño del QR</ng-container></mat-label>
             <input matInput type="number" min="0.1" step="0.1" [value]="unit() === 'cm' ? sizeMm() / 10 : sizeMm()" (input)="setSize($any($event.target).valueAsNumber)" [disabled]="downloadBusy() || designBusy()" />
           </mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Unidad</mat-label><mat-select [value]="unit()" (selectionChange)="unit.set($event.value)" [disabled]="downloadBusy() || designBusy()"><mat-option value="mm">mm</mat-option><mat-option value="cm">cm</mat-option></mat-select></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.69bc5768692227">Unidad</ng-container></mat-label><mat-select [value]="unit()" (selectionChange)="unit.set($event.value)" [disabled]="downloadBusy() || designBusy()"><mat-option value="mm"><ng-container i18n="@@ui.8fa1dddd53606c">mm</ng-container></mat-option><mat-option value="cm"><ng-container i18n="@@ui.b5039c325d7107">cm</ng-container></mat-option></mat-select></mat-form-field>
         </div>
-        <p class="field-advice">Incluye el QR y su margen blanco. El marco ocupa espacio adicional.</p>
+        <p class="field-advice"><ng-container i18n="@@ui.b15e3eb3efd3b2">Incluye el QR y su margen blanco. El marco ocupa espacio adicional.</ng-container></p>
         @if (a4Mode()) {
           @if (!bulkLinks) {
-          <mat-checkbox [checked]="fillPage()" (change)="fillPage.set($event.checked)" [disabled]="downloadBusy() || designBusy()">Llenar una hoja</mat-checkbox>
-          @if (!fillPage()) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Número de copias</mat-label><input matInput type="number" min="1" max="500" step="1" [value]="copies()" (input)="copies.set($any($event.target).valueAsNumber)" [disabled]="downloadBusy() || designBusy()" /></mat-form-field> }
+          <mat-checkbox [checked]="fillPage()" (change)="fillPage.set($event.checked)" [disabled]="downloadBusy() || designBusy()"><ng-container i18n="@@ui.8ab6f3f17e7ae6">Llenar una hoja</ng-container></mat-checkbox>
+          @if (!fillPage()) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label><ng-container i18n="@@ui.70378085731c28">Número de copias</ng-container></mat-label><input matInput type="number" min="1" max="500" step="1" [value]="copies()" (input)="copies.set($any($event.target).valueAsNumber)" [disabled]="downloadBusy() || designBusy()" /></mat-form-field> }
           }
-          <mat-checkbox [checked]="cutMarks()" (change)="cutMarks.set($event.checked)" [disabled]="downloadBusy() || designBusy()">Añadir marcas de corte</mat-checkbox>
+          <mat-checkbox [checked]="cutMarks()" (change)="cutMarks.set($event.checked)" [disabled]="downloadBusy() || designBusy()"><ng-container i18n="@@ui.e528c68f6f61b1">Añadir marcas de corte</ng-container></mat-checkbox>
           @if (printLayout(); as layout) {
-            <div class="print-summary" role="status"><b>{{ layout.copies }} {{ layout.copies === 1 ? 'copia' : 'copias' }} · {{ layout.pages }} {{ layout.pages === 1 ? 'página' : 'páginas' }}</b><span>{{ layout.columns }} columnas × {{ layout.rows }} filas por hoja</span><small>A4 vertical · márgenes de 10 mm · separación de 5 mm</small></div>
+            <div class="print-summary" role="status"><b>{{ layout.copies }} {{ layout.copies === 1 ? uiText.ui_5dd1ff6d2de353 : uiText.ui_d9b730fe90c997 }} · {{ layout.pages }} {{ layout.pages === 1 ? uiText.ui_eeaa7bfffd676b : uiText.ui_594f311bb7235f }}</b><span><ng-container i18n="@@ui.38e909ac2389aa">{{ layout.columns }} columnas × {{ layout.rows }} filas por hoja</ng-container></span><small><ng-container i18n="@@ui.1937aaee1cdd49">A4 vertical · márgenes de 10 mm · separación de 5 mm</ng-container></small></div>
           }
-          <p class="print-note"><mat-icon aria-hidden="true">info</mat-icon>Imprime al 100 %, sin «ajustar a página».</p>
+          <p class="print-note"><mat-icon aria-hidden="true">info</mat-icon><ng-container i18n="@@ui.df44a402779912">Imprime al 100 %, sin «ajustar a página».</ng-container></p>
         }
         @if (printError()) { <p class="logo-error" role="alert">{{ printError() }}</p> }
       }
@@ -186,19 +186,19 @@
   @if (error()) {
     <div class="qr-error" role="alert">
       <p>{{ error() }}</p>
-      @if (!dataUrl() && !previewBusy()) { <button mat-button (click)="retryPreview()">Reintentar</button> }
+      @if (!dataUrl() && !previewBusy()) { <button mat-button (click)="retryPreview()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button> }
     </div>
   }
-  @if (progress(); as state) { <mat-progress-bar mode="determinate" [value]="state.done / state.total * 100" aria-label="Progreso de exportación QR" /><p class="field-advice" role="status">{{ state.done }} de {{ state.total }} QR preparados</p> }
+  @if (progress(); as state) { <mat-progress-bar mode="determinate" [value]="state.done / state.total * 100" aria-label="Progreso de exportación QR"  i18n-aria-label="@@ui.1d9e43c8ad02fb"/><p class="field-advice" role="status"><ng-container i18n="@@ui.e79db080c705f6">{{ state.done }} de {{ state.total }} QR preparados</ng-container></p> }
   @if (confirmation()) { <p class="qr-confirmation" role="status"><mat-icon aria-hidden="true">check_circle</mat-icon>{{ confirmation() }}</p> }
-  @if (!campaignReady()) { <p class="field-advice" role="status">Guarda el QR de campaña antes de descargarlo para conservar su diseño y atribuir las visitas.</p> }
-  @if (copyFallback()) { <button mat-stroked-button (click)="download()" [disabled]="downloadBusy() || !dataUrl()">Descargar PNG</button> }
+  @if (!campaignReady()) { <p class="field-advice" role="status"><ng-container i18n="@@ui.54f51722aafeff">Guarda el QR de campaña antes de descargarlo para conservar su diseño y atribuir las visitas.</ng-container></p> }
+  @if (copyFallback()) { <button mat-stroked-button (click)="download()" [disabled]="downloadBusy() || !dataUrl()"><ng-container i18n="@@ui.c2f23209c653a5">Descargar PNG</ng-container></button> }
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close class="footer-close">Cerrar</button>
-  @if (downloadBusy() && !copying()) { <button mat-button type="button" (click)="cancelExport()">Cancelar exportación</button> }
-  @if (section() !== 'print' && !bulkLinks) { <button mat-stroked-button type="button" class="copy-action" aria-label="Copiar imagen" (click)="copyImage()" [disabled]="!campaignReady() || !dataUrl() || previewBusy() || logoBusy() || downloadBusy() || designBusy()"><mat-icon>content_copy</mat-icon><span class="copy-full">Copiar imagen</span><span class="copy-short" aria-hidden="true">Copiar</span></button> }
+  <button mat-button mat-dialog-close class="footer-close"><ng-container i18n="@@ui.aeccae342e4bd0">Cerrar</ng-container></button>
+  @if (downloadBusy() && !copying()) { <button mat-button type="button" (click)="cancelExport()"><ng-container i18n="@@ui.18b3cbc9663064">Cancelar exportación</ng-container></button> }
+  @if (section() !== 'print' && !bulkLinks) { <button mat-stroked-button type="button" class="copy-action" aria-label="Copiar imagen" (click)="copyImage()" [disabled]="!campaignReady() || !dataUrl() || previewBusy() || logoBusy() || downloadBusy() || designBusy()" i18n-aria-label="@@ui.3afe7022120867"><mat-icon>content_copy</mat-icon><span class="copy-full"><ng-container i18n="@@ui.3afe7022120867">Copiar imagen</ng-container></span><span class="copy-short" aria-hidden="true"><ng-container i18n="@@ui.39dcf1cbeb5adb">Copiar</ng-container></span></button> }
   <button mat-flat-button color="primary" class="export-primary" (click)="section() !== 'print' && format() === 'png' ? download() : downloadVectorOrPrint()" [disabled]="!campaignReady() || !dataUrl() || previewBusy() || printPreviewBusy() || logoBusy() || needsCustomLogo() || downloadBusy() || designBusy() || ((section() === 'print' || format() === 'pdf') && !!printError())" [attr.aria-busy]="downloadBusy()">
-    <mat-icon>download</mat-icon> {{ copying() ? 'Copiando…' : downloadBusy() ? 'Preparando…' : section() === 'print' ? 'Descargar A4' : 'Descargar ' + (bulkLinks && format() !== 'pdf' ? 'ZIP' : format().toUpperCase()) }}
+    <mat-icon>download</mat-icon> {{ copying() ? uiText.ui_1d37b4eba1772a : downloadBusy() ? uiText.ui_d2b925965ea8d2 : section() === 'print' ? uiText.ui_ea4fd311067b5e : uiText.ui_dc99e6e692eb74 + (bulkLinks && format() !== 'pdf' ? uiText.ui_eaca4b30692888 : format().toUpperCase()) }}
   </button>
 </mat-dialog-actions>

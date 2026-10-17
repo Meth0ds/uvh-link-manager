@@ -32,7 +32,7 @@ final class QrResources
         }
         $id = (int) $spec['logo']['assetId'];
         if (! DB::table('qr_assets')->where('workspace_id', $workspaceId)->where('id', $id)->where('status', 'ready')->lockForUpdate()->first()) {
-            throw new LinkException('Logo no encontrado en este workspace.', 422);
+            throw new LinkException(__('messages.error_f2c600b1bca24c'), 422);
         }
 
         return $id;
@@ -51,22 +51,22 @@ final class QrResources
             $receipt = DB::table('qr_creation_receipts')->where('workspace_id', $workspaceId)->where('scope', $table)->where('request_key', $key)->first();
             if ($receipt) {
                 if (! hash_equals($receipt->request_hash, $hash)) {
-                    throw new LinkException('Esta clave de idempotencia corresponde a otra creación.', 409);
+                    throw new LinkException(__('messages.error_ca4e5aebc31084'), 409);
                 }
                 $previous = DB::table($table)->where('workspace_id', $workspaceId)->where('id', $receipt->resource_id)->first();
                 if (! $previous) {
-                    throw new LinkException('El diseño creado con esta clave fue eliminado.', 410);
+                    throw new LinkException(__('messages.error_32e4cf006abc3d'), 410);
                 }
 
                 return $previous;
             }
             if ($linkId !== null && ! DB::table('links')->where('workspace_id', $workspaceId)->where('id', $linkId)->whereNull('deleted_at')->lockForUpdate()->first()) {
-                throw new LinkException('Enlace no encontrado.', 404);
+                throw new LinkException(__('messages.error_2f4bde2886e62b'), 404);
             }
             $old = DB::table($table)->where('workspace_id', $workspaceId)->where('request_key', $key)->first();
             if ($old) {
                 if (! hash_equals($old->request_hash, $hash)) {
-                    throw new LinkException('Esta clave de idempotencia corresponde a otra creación.', 409);
+                    throw new LinkException(__('messages.error_ca4e5aebc31084'), 409);
                 }
 
                 return $old;
@@ -74,7 +74,7 @@ final class QrResources
             $limit = $table === 'qr_designs' ? (int) config('qr.designs_per_workspace', 50) : (int) config('qr.variants_per_link', 100);
             $count = DB::table($table)->where('workspace_id', $workspaceId)->when($linkId !== null, fn ($query) => $query->where('link_id', $linkId))->count();
             if ($count >= $limit) {
-                throw new LinkException('Has alcanzado el límite de diseños o variantes.', 409);
+                throw new LinkException(__('messages.error_7bd5b0a28c32ac'), 409);
             }
             $asset = self::asset($workspaceId, $spec);
             $values = ['workspace_id' => $workspaceId, 'created_by' => UvhRequest::user($request)->id,
@@ -96,23 +96,23 @@ final class QrResources
     {
         $version = $request->input('version');
         if (! is_int($version) || $version < 1) {
-            throw new LinkException('La edición requiere la versión actual.', 422);
+            throw new LinkException(__('messages.error_16f61205cf0bc5'), 422);
         }
         $workspaceId = UvhRequest::workspaceId($request);
         $name = $request->has('name') ? QrDesign::name($request->input('name')) : null;
         $spec = $request->has('spec') ? QrDesign::validate($request->input('spec')) : null;
         $archived = $request->input('archived');
         if ($request->has('archived') && ($linkId === null || ! is_bool($archived))) {
-            throw new LinkException('Estado de archivo inválido.', 422);
+            throw new LinkException(__('messages.error_f78c6cb3605547'), 422);
         }
 
         return WorkspaceMutation::run($request, function () use ($request, $table, $id, $linkId, $workspaceId, $version, $name, $spec, $archived): object {
             $row = DB::table($table)->where('workspace_id', $workspaceId)->where('id', $id)->when($linkId !== null, fn ($query) => $query->where('link_id', $linkId))->lockForUpdate()->first();
             if (! $row) {
-                throw new LinkException('Diseño o variante no encontrados.', 404);
+                throw new LinkException(__('messages.error_30ad851ce7f863'), 404);
             }
             if ((int) $row->version !== $version) {
-                throw new LinkException('Otra persona modificó este diseño. Recarga antes de guardar.', 409);
+                throw new LinkException(__('messages.error_36f06d4781f388'), 409);
             }
             $values = ['version' => $version + 1, 'updated_at' => now()];
             if ($name !== null) {

@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Support\Audit;
 use App\Support\FrontendUrl;
 use App\Support\Ids;
+use App\Support\Language;
+use App\Support\LegalDocumentEvidence;
 use App\Support\MailAdmissionException;
 use App\Support\PasswordStrength;
 use App\Support\RegistrationEdit;
@@ -74,6 +76,7 @@ final class RegistrationAdmission
 
             $pending = PendingRegistration::create([
                 'email' => $email,
+                'language' => Language::current(),
                 // Primera generación del secreto de edición, escrita
                 // explícitamente para poder sellarla sin releer la fila.
                 'security_version' => 1,
@@ -170,6 +173,7 @@ final class RegistrationAdmission
                 EmailAddressLock::acquire(strtolower((string) $pending->email));
                 $user = User::create([
                     'email' => (string) $pending->email,
+                    'language' => $pending->language ?? 'es',
                     // Identity decided at activation, exactly like the password:
                     // nothing an anonymous registration proposed is the account
                     // owner's to keep — there is no proposal stored at all.
@@ -184,7 +188,7 @@ final class RegistrationAdmission
                 // write contract. Keep the generated resource inside that contract
                 // instead of creating an unreadable workspace.
                 $workspace = $user->ownedWorkspaces()->create([
-                    'name' => self::defaultWorkspaceName($name),
+                    'name' => self::defaultWorkspaceName($name, Language::current()),
                     'slug' => 'ws-'.strtolower(Ids::randomToken(6)),
                 ]);
                 $workspace->memberships()->create(['user_id' => $user->id, 'role' => 'owner']);
@@ -275,7 +279,8 @@ final class RegistrationAdmission
         ] as $document) {
             DB::table('legal_acceptances')->updateOrInsert(
                 ['user_id' => $userId, ...$document],
-                ['source' => 'registration', 'accepted_at' => $acceptedAt],
+                ['source' => 'registration', 'accepted_at' => $acceptedAt,
+                    ...LegalDocumentEvidence::forVersion($document['document_type'], $document['version'], Language::current())],
             );
         }
         // Activation and its exact events share admission: failure rolls back
@@ -285,9 +290,9 @@ final class RegistrationAdmission
         Audit::write($userId, 'auth.privacy_notice_acknowledged', 'privacy_notice', self::PRIVACY_VERSION);
     }
 
-    private static function defaultWorkspaceName(string $userName): string
+    private static function defaultWorkspaceName(string $userName, string $language = 'es'): string
     {
-        $prefix = 'Workspace de ';
+        $prefix = $language === 'en' ? 'Workspace for ' : 'Workspace de ';
         $maximumWorkspaceCharacters = 80;
         $availableCharacters = $maximumWorkspaceCharacters - mb_strlen($prefix, 'UTF-8');
 

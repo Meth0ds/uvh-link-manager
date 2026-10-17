@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { Component, DestroyRef, effect, inject, signal } from "@angular/core";
 import {
   MAT_DIALOG_DATA,
@@ -24,7 +25,7 @@ import { decodeLinkResponse } from "../../core/services/link-response-decoders";
   ],
   template: `<header>
       <div>
-        <h2 mat-dialog-title>Tarjeta al compartir</h2>
+        <h2 mat-dialog-title><ng-container i18n="@@ui.69eee355d1e388">Tarjeta al compartir</ng-container></h2>
         <p>{{ link.shortUrl }}</p>
       </div>
       <button
@@ -33,12 +34,12 @@ import { decodeLinkResponse } from "../../core/services/link-response-decoders";
         aria-label="Cerrar tarjeta social"
         (click)="ref.close()"
         [disabled]="saving()"
-      >
+       i18n-aria-label="@@ui.82ac0013097c9d">
         <mat-icon>close</mat-icon>
       </button>
     </header>
     @if (saving()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Guardando tarjeta" />
+      <mat-progress-bar mode="indeterminate" aria-label="Guardando tarjeta"  i18n-aria-label="@@ui.76387418ace800"/>
     }
     <mat-dialog-content
       ><app-social-preview-editor
@@ -60,14 +61,14 @@ import { decodeLinkResponse } from "../../core/services/link-response-decoders";
         (click)="ref.close()"
         [disabled]="saving()"
       >
-        Cancelar</button
+        <ng-container i18n="@@ui.bb9dbb406dcbd5">Cancelar</ng-container></button
       ><button
         mat-flat-button
         type="button"
         (click)="save()"
         [disabled]="saving() || working()"
       >
-        {{ saving() ? "Guardando…" : "Guardar tarjeta" }}
+        {{ saving() ? uiText.ui_3c8dc4dc7a83dd : uiText.ui_293b21b82385f5 }}
       </button></mat-dialog-actions
     >`,
   styles: [
@@ -136,6 +137,7 @@ import { decodeLinkResponse } from "../../core/services/link-response-decoders";
   ],
 })
 export class SocialPreviewDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly link = inject<LinkDto>(MAT_DIALOG_DATA);
   readonly ref = inject(MatDialogRef<SocialPreviewDialogComponent>);
   readonly sharing = inject(SharingService);
@@ -177,7 +179,7 @@ export class SocialPreviewDialogComponent {
     } catch (e) {
       if (!this.destroy.destroyed && this.sharing.context() === this.context)
         this.error.set(
-          e instanceof Error ? e.message : "No se pudo guardar la tarjeta.",
+          e instanceof Error ? e.message : $localize`:@@ui.6a4b7eba7f8226:No se pudo guardar la tarjeta.`,
         );
     } finally {
       if (!this.destroy.destroyed) {

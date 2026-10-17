@@ -19,18 +19,18 @@ final class LinkRuleSimulationController
     public function store(Request $request): JsonResponse
     {
         if (! config('workflows.rule_simulator', true)) {
-            return response()->json(['error' => 'Esta función no está disponible'], 404);
+            return response()->json(['error' => __('messages.error_082a2b7ba08855')], 404);
         }
         $workspaceId = UvhRequest::workspaceId($request);
         $link = null;
         $linkId = $request->input('linkId');
         if ($linkId !== null) {
             if (! is_int($linkId) || $linkId < 1) {
-                return response()->json(['error' => 'Enlace inválido'], 422);
+                return response()->json(['error' => __('messages.error_00078a605b28f0')], 422);
             }
             $link = Link::where('id', $linkId)->where('workspace_id', $workspaceId)->whereNull('deleted_at')->first();
             if (! $link) {
-                return response()->json(['error' => 'Enlace no encontrado'], 404);
+                return response()->json(['error' => __('messages.error_56cb73fa20e635')], 404);
             }
         }
         // A link id selects the saved, authorized configuration. Never let a
@@ -40,7 +40,7 @@ final class LinkRuleSimulationController
             ? $link->rules()->orderBy('priority')->orderBy('id')->get()->map(fn ($rule) => $rule->only(['id', 'priority', 'country', 'language', 'device', 'os', 'time_from', 'time_to', 'referrer', 'campaign', 'destination']))->all()
             : $request->input('rules');
         if (! is_array($rules)) {
-            return response()->json(['error' => 'Reglas inválidas'], 422);
+            return response()->json(['error' => __('messages.error_df12cc4add1d10')], 422);
         }
         $rules = array_values(array_map(static function (mixed $rule): array {
             if (! is_array($rule)) {
@@ -66,7 +66,7 @@ final class LinkRuleSimulationController
             'term' => $link->utm_term, 'content' => $link->utm_content,
         ] : $request->input('utm', []);
         if (! is_array($utm)) {
-            return response()->json(['error' => 'UTM inválido'], 422);
+            return response()->json(['error' => __('messages.error_f636538a514903')], 422);
         }
         $input = [
             'destination' => $link !== null ? $link->destination : $request->input('destination'),
@@ -80,17 +80,17 @@ final class LinkRuleSimulationController
         }
         $timezoneName = $request->input('timezone');
         if ($request->input('localTime') !== null && $timezoneName === null) {
-            return response()->json(['error' => 'Indica una zona horaria para convertir la hora local'], 422);
+            return response()->json(['error' => __('messages.error_f6263da85cc005')], 422);
         }
         $now = CarbonImmutable::now('UTC');
         $timezoneWarnings = [];
         if ($timezoneName !== null) {
             if (! is_string($timezoneName) || ! in_array($timezoneName, DateTimeZone::listIdentifiers(), true)) {
-                return response()->json(['error' => 'Zona horaria inválida'], 422);
+                return response()->json(['error' => __('messages.error_7ae15470e1e750')], 422);
             }
             $localTime = $request->input('localTime');
             if ($localTime !== null && (! is_string($localTime) || preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/D', $localTime) !== 1)) {
-                return response()->json(['error' => 'Hora local inválida'], 422);
+                return response()->json(['error' => __('messages.error_1cbd17557b9d31')], 422);
             }
             if ($localTime !== null) {
                 $zone = new DateTimeZone($timezoneName);
@@ -98,7 +98,7 @@ final class LinkRuleSimulationController
                 $localValue = $localDate.' '.$localTime;
                 $naive = CarbonImmutable::createFromFormat('!Y-m-d H:i', $localValue, 'UTC');
                 if ($naive === null) {
-                    return response()->json(['error' => 'Hora local inválida'], 422);
+                    return response()->json(['error' => __('messages.error_1cbd17557b9d31')], 422);
                 }
                 $naiveTimestamp = $naive->timestamp;
                 $candidates = [];
@@ -113,7 +113,7 @@ final class LinkRuleSimulationController
                     }
                 }
                 if ($candidates === []) {
-                    return response()->json(['error' => 'Esa hora no existe en la zona seleccionada por el cambio horario'], 422);
+                    return response()->json(['error' => __('messages.error_5831ba09535b63')], 422);
                 }
                 if (count($candidates) > 1) {
                     $timezoneWarnings[] = 'ambiguous_local_time';
@@ -123,20 +123,20 @@ final class LinkRuleSimulationController
         }
         $language = $request->input('language');
         if ($language !== null && (! is_string($language) || preg_match('/^[a-z]{2,3}(?:-[a-z0-9]{2,4})?$/iD', $language) !== 1)) {
-            return response()->json(['error' => 'Idioma inválido'], 422);
+            return response()->json(['error' => __('messages.error_c8a3420e3f73fb')], 422);
         }
         $device = $request->input('device');
         if ($device !== null && ! in_array($device, ['desktop', 'mobile', 'tablet'], true)) {
-            return response()->json(['error' => 'Dispositivo inválido'], 422);
+            return response()->json(['error' => __('messages.error_a39fe73b5ab199')], 422);
         }
         $country = $request->input('country');
         if ($country !== null && (! is_string($country) || preg_match('/^[a-z]{2}$/iD', $country) !== 1)) {
-            return response()->json(['error' => 'País inválido'], 422);
+            return response()->json(['error' => __('messages.error_b14324b5233f6c')], 422);
         }
         foreach (['os' => 40, 'campaign' => 100, 'referrer' => 200] as $field => $max) {
             $value = $request->input($field);
             if ($value !== null && (! is_string($value) || mb_strlen($value) > $max || preg_match('/[\x00-\x1f\x7f]/', $value))) {
-                return response()->json(['error' => 'Contexto inválido'], 422);
+                return response()->json(['error' => __('messages.error_ac10e0e5393ba9')], 422);
             }
         }
         $result = RedirectRuleMatcher::evaluate(
@@ -153,7 +153,7 @@ final class LinkRuleSimulationController
             $now,
         );
         if (! UrlUtil::validateDestination($result['destination'])['ok'] || ! UrlUtil::validateDestination($result['destinationWithUtm'])['ok']) {
-            return response()->json(['error' => 'El destino resultante no es válido'], 422);
+            return response()->json(['error' => __('messages.error_e0a782602aeddd')], 422);
         }
         $normalizedRules = $rules;
 

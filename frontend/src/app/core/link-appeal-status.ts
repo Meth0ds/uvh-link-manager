@@ -8,9 +8,9 @@ import type { LinkAppealStatus } from "./models";
  * cannot name a state differently than the owner does.
  */
 export const LINK_APPEAL_STATUS_LABEL: Record<LinkAppealStatus, string> = {
-  open: "Revisión solicitada",
-  upheld: "Bloqueo confirmado",
-  restored: "Bloqueo retirado",
+  open: $localize`:@@ui.99d992452bef56:Revisión solicitada`,
+  upheld: $localize`:@@ui.83117ad12ff552:Bloqueo confirmado`,
+  restored: $localize`:@@ui.932fed461ca49f:Bloqueo retirado`,
 };
 
 /** Every state, in the order a case moves through them, so no filter drops one. */

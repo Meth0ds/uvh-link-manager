@@ -55,13 +55,13 @@ class LinkTemplateController
         if (! is_string($name) || ! mb_check_encoding($name, 'UTF-8')
             || mb_strlen(trim($name)) < 1 || mb_strlen($name) > 60
             || preg_match('/[\x00-\x1f\x7f]/', $name)) {
-            return response()->json(['error' => 'Nombre de plantilla inválido'], 422);
+            return response()->json(['error' => __('messages.error_7a780acb053959')], 422);
         }
         $name = trim($name);
 
         $payload = $request->input('payload');
         if (! is_array($payload)) {
-            return response()->json(['error' => 'Payload inválido'], 422);
+            return response()->json(['error' => __('messages.error_b2802f95e9af19')], 422);
         }
         foreach (array_keys($payload) as $key) {
             if (! in_array($key, self::PAYLOAD_KEYS, true)) {
@@ -69,15 +69,15 @@ class LinkTemplateController
             }
         }
         if (array_key_exists('alias', $payload)) {
-            return response()->json(['error' => 'Una plantilla no guarda alias'], 422);
+            return response()->json(['error' => __('messages.error_a29ed0885a24ab')], 422);
         }
 
         $collectionId = $payload['collection_id'] ?? null;
         if ($collectionId !== null && (! is_int($collectionId) || $collectionId < 1)) {
-            return response()->json(['error' => 'Colección inválida'], 422);
+            return response()->json(['error' => __('messages.error_d5a81f23c4dfd2')], 422);
         }
         if ($collectionId !== null && ! Collection::where('id', $collectionId)->where('workspace_id', $workspaceId)->exists()) {
-            return response()->json(['error' => 'Colección no encontrada'], 422);
+            return response()->json(['error' => __('messages.error_6568a0022eb114')], 422);
         }
 
         // La plantilla se guarda ya validada: aplicarla luego no puede
@@ -88,17 +88,17 @@ class LinkTemplateController
         }
 
         if (LinkTemplate::where('workspace_id', $workspaceId)->whereRaw('lower(name) = lower(?)', [$name])->exists()) {
-            return response()->json(['error' => 'Ya existe una plantilla con ese nombre'], 409);
+            return response()->json(['error' => __('messages.error_7ac92dfe486f06')], 409);
         }
 
         try {
             $template = WorkspaceMutation::run($request, function () use ($workspaceId, $user, $name, $payload, $collectionId): LinkTemplate {
                 if ($collectionId !== null && ! Collection::where('workspace_id', $workspaceId)->where('id', $collectionId)->lockForUpdate()->first()) {
-                    throw new LinkException('Colección no encontrada', 422);
+                    throw new LinkException(__('messages.error_6568a0022eb114'), 422);
                 }
 
                 if (LinkTemplate::where('workspace_id', $workspaceId)->count() >= WorkspaceLimits::limit('templates')) {
-                    throw new LinkException('Límite de plantillas alcanzado. Elimina una antes de crear otra.', 409);
+                    throw new LinkException(__('messages.error_dd5db010a48f5c'), 409);
                 }
 
                 if (array_key_exists('app_opening', $payload)) {
@@ -127,7 +127,7 @@ class LinkTemplateController
             // petición tomó el nombre en ese hueco, el índice único es el que
             // decide y el resultado es un conflicto, no un error 500.
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'Ya existe una plantilla con ese nombre'], 409);
+                return response()->json(['error' => __('messages.error_7ac92dfe486f06')], 409);
             }
             throw $e;
         }
@@ -147,13 +147,13 @@ class LinkTemplateController
 
         $template = LinkTemplate::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $template) {
-            return response()->json(['error' => 'Plantilla no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_0416a2955b9c45')], 404);
         }
         try {
             WorkspaceMutation::run($request, function () use ($workspaceId, $id): void {
                 $template = LinkTemplate::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
                 if (! $template) {
-                    throw new LinkException('Plantilla no encontrada', 404);
+                    throw new LinkException(__('messages.error_0416a2955b9c45'), 404);
                 }
                 $template->delete();
             }, function () use ($request, $user, $workspaceId, $id): void {

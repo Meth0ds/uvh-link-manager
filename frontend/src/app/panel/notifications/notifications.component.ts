@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { DatePipe } from "@angular/common";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
@@ -30,6 +31,7 @@ import { PageHeaderComponent } from "../page-header.component";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NotificationsComponent {
+  readonly uiText = UI_TEXT;
   private readonly notifications = inject(NotificationService);
 
   private readonly auth = inject(AuthService);
@@ -41,7 +43,7 @@ export class NotificationsComponent {
     if (!item.route) return;
     if (item.workspaceId !== null) {
       if (!this.workspaces.list().some((workspace) => workspace.id === item.workspaceId)) {
-        this.error.set("Ya no tienes acceso al workspace de esta notificación.");
+        this.error.set($localize`:@@ui.71e9b8af0b498c:Ya no tienes acceso al workspace de esta notificación.`);
         return;
       }
       this.workspaces.select(item.workspaceId);
@@ -107,7 +109,7 @@ export class NotificationsComponent {
       this.cursor.set(page.nextCursor);
     } catch {
       if (!current()) return;
-      this.error.set("No se pudieron cargar tus notificaciones. Inténtalo de nuevo.");
+      this.error.set($localize`:@@ui.27cd2ddccf6bbc:No se pudieron cargar tus notificaciones. Inténtalo de nuevo.`);
     } finally {
       if (current()) this.loading.set(false);
     }
@@ -127,7 +129,7 @@ export class NotificationsComponent {
       this.cursor.set(page.nextCursor);
     } catch {
       if (!current()) return;
-      this.error.set("No se pudo cargar la siguiente página. Inténtalo de nuevo.");
+      this.error.set($localize`:@@ui.5355bb5264bb5e:No se pudo cargar la siguiente página. Inténtalo de nuevo.`);
     } finally {
       if (current()) this.busy.set(false);
     }
@@ -146,7 +148,7 @@ export class NotificationsComponent {
         row.id === item.id ? { ...row, readAt: new Date().toISOString() } : row));
     } catch {
       if (!current()) return;
-      this.error.set("No se pudo marcar la notificación. Inténtalo de nuevo.");
+      this.error.set($localize`:@@ui.45f4c4266fd6da:No se pudo marcar la notificación. Inténtalo de nuevo.`);
     } finally {
       if (current()) this.busy.set(false);
     }
@@ -165,7 +167,7 @@ export class NotificationsComponent {
       this.items.update((current) => current.map((row) => row.readAt === null ? { ...row, readAt: now } : row));
     } catch {
       if (!current()) return;
-      this.error.set("No se pudo marcar la bandeja. Inténtalo de nuevo.");
+      this.error.set($localize`:@@ui.2b0244b33ff70e:No se pudo marcar la bandeja. Inténtalo de nuevo.`);
     } finally {
       if (current()) this.busy.set(false);
     }

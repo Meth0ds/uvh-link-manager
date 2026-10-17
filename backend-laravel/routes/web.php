@@ -3,10 +3,12 @@
 use App\Http\Controllers\AppAssociationController;
 use App\Http\Controllers\AppOpeningController;
 use App\Http\Controllers\EdgeController;
+use App\Http\Controllers\LanguageEntryController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\PublicController;
 use App\Http\Controllers\RedirectController;
 use App\Http\Controllers\SocialCardController;
+use App\Http\Controllers\VisitorAssetController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [PublicController::class, 'health'])->middleware('throttle:uvh-health');
@@ -21,6 +23,7 @@ Route::get('/.well-known/{file}', [AppAssociationController::class, 'show'])->wh
 Route::get('/a/{alias}', [AppOpeningController::class, 'launch'])->middleware('throttle:uvh-resolve');
 Route::get('/app-links/continue/{id}/{choice}', [AppOpeningController::class, 'prepared'])->whereUuid('id')->where('choice', 'app|web')->middleware('throttle:uvh-resolve');
 Route::post('/app-links/continue', [AppOpeningController::class, 'continue'])->middleware(['uvh.csrf', 'throttle:uvh-resolve']);
+Route::get('/visitor-assets/{file}', [VisitorAssetController::class, 'show'])->where('file', '[a-z0-9.-]+');
 Route::get('/app-links/manrope-{weight}.woff2', [AppOpeningController::class, 'font'])->where('weight', '400|600');
 Route::get('/app-links/bridge.js', [AppOpeningController::class, 'bridgeScript'])->middleware('throttle:uvh-resolve');
 
@@ -37,7 +40,7 @@ Route::get('/r/{alias}/unlock', fn (string $alias) => redirect('/r/'.rawurlencod
 // The bare root of a hostname. First-party roots are served by the SPA before
 // Laravel; a custom domain's root is its owner's choice (root redirect or its
 // not-found mode) and lives here with the rest of the redirect surface.
-Route::get('/', [RedirectController::class, 'root'])->middleware('throttle:uvh-resolve');
+Route::get('/', [LanguageEntryController::class, 'root'])->middleware('throttle:uvh-resolve');
 
 // Canonical public surface: /{alias}.
 Route::get('/{alias}', [RedirectController::class, 'resolve'])->middleware('throttle:uvh-resolve');

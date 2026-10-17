@@ -1,6 +1,7 @@
 # Shared capability documents must never be cached or indexed.
-map $uri $uvh_report_robots { default ""; ~^/reports/ "noindex, nofollow, noarchive"; }
-map $uri $uvh_report_cache { default ""; ~^/reports/ "no-store"; }
+map $uri $uvh_report_robots { default ""; ~^/(?:es/|en/)?(?:app|auth|reports|invitations|legal/versions)(?:/|$) "noindex, nofollow, noarchive"; }
+map $uri $uvh_report_cache { default ""; ~^/(?:es/|en/)?(?:app|auth|reports|invitations)(?:/|$) "no-store"; }
+map $uri $uvh_ui_language { default es; ~^/en(?:/|$) en; }
 
 upstream uvh_php {
     server app:9000;
@@ -66,6 +67,8 @@ log_format uvh_edge '$remote_addr - [$time_local] "$request" $status limit=$limi
 access_log /var/log/nginx/access.log uvh_edge;
 
 server_tokens off;
+# Relative redirects preserve the external HTTPS origin and never expose the internal listener port.
+absolute_redirect off;
 
 server {
     listen 8080;
@@ -129,13 +132,18 @@ server {
         add_header Content-Security-Policy "default-src 'none'; script-src 'self' https://hcaptcha.com https://*.hcaptcha.com; style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com; img-src https://hcaptcha.com https://*.hcaptcha.com data:; connect-src https://hcaptcha.com https://*.hcaptcha.com; frame-src https://hcaptcha.com https://*.hcaptcha.com; media-src https://hcaptcha.com https://*.hcaptcha.com; object-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'" always;
     }
 
-    location ~* \.(?:css|js|woff2?|png|jpe?g|gif|svg|ico|webp)$ {
+    location ~ \.mjs$ { default_type text/javascript; try_files $uri =404; expires 1y; }
+
+    location ~* \.(?:css|m?js|woff2?|png|jpe?g|gif|svg|ico|webp)$ {
         try_files $uri =404;
         expires 1y;
     }
 
+    location = / { try_files "" @laravel; }
+    include /etc/nginx/conf.d/localisation/app.conf;
     location / {
-        try_files $uri $uri/ /index.html;
+        error_page 404 =404 @uvh_localised_not_found;
+        try_files $uri =404;
         expires -1;
     }
 
@@ -156,6 +164,8 @@ server {
     listen 8080;
     server_name ${PUBLIC_HOST} www.${PUBLIC_HOST};
     root /usr/share/nginx/html;
+    add_header X-Robots-Tag $uvh_report_robots always;
+    add_header Cache-Control $uvh_report_cache always;
     index index.html;
     client_max_body_size 2m;
 
@@ -182,20 +192,13 @@ server {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types angular angular#bundler uvh#qr-worker" always;
 
     location ^~ /internal/ { return 404; }
-    location = / { try_files /index.html =404; expires -1; }
-    location ^~ /legal/ { try_files $uri /index.html; expires -1; }
-    location = /legal { try_files /index.html =404; expires -1; }
-    # Public Angular pages need the SPA shell on direct navigation and reload;
-    # otherwise the generic public fallback incorrectly treats them as aliases.
-    location = /help { try_files /index.html =404; expires -1; }
-    location = /help/ { return 308 /help; }
-    location = /status { try_files /index.html =404; expires -1; }
-    location = /status/ { return 308 /status; }
+    location = / { try_files "" @laravel_public; }
     location = /health { try_files "" @laravel_public; }
     location = /.well-known/apple-app-site-association { try_files "" @laravel_public; }
     location = /.well-known/assetlinks.json { try_files "" @laravel_public; }
     location ^~ /a/ { try_files "" @laravel_public; }
     location ^~ /app-links/ { try_files "" @laravel_public; }
+    location ^~ /visitor-assets/ { try_files "" @laravel_public; }
     location ^~ /.well-known/uvh-social/ { try_files "" @laravel_public; }
     location = /robots.txt { try_files "" @laravel_public; }
     location = /sitemap.xml { try_files "" @laravel_public; }
@@ -214,10 +217,14 @@ server {
         add_header Content-Security-Policy "default-src 'none'; script-src 'self' https://hcaptcha.com https://*.hcaptcha.com; style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com; img-src https://hcaptcha.com https://*.hcaptcha.com data:; connect-src https://hcaptcha.com https://*.hcaptcha.com; frame-src https://hcaptcha.com https://*.hcaptcha.com; media-src https://hcaptcha.com https://*.hcaptcha.com; object-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'" always;
     }
 
-    location ~* \.(?:css|js|woff2?|png|jpe?g|gif|svg|ico|webp)$ {
+    location ~ \.mjs$ { default_type text/javascript; try_files $uri =404; expires 1y; }
+
+    location ~* \.(?:css|m?js|woff2?|png|jpe?g|gif|svg|ico|webp)$ {
         try_files $uri =404;
         expires 1y;
     }
+
+    include /etc/nginx/conf.d/localisation/public.conf;
 
     location / { try_files $uri @laravel_public; }
 

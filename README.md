@@ -173,7 +173,19 @@ cd frontend && npm ci && npm start
 El perfil `laravel` levanta la API en `http://127.0.0.1:8000`, dos workers
 (`queue:work` sobre `mail,webhooks,domains,exports,analytics,security,default`
 y, aparte, la cola `destinations` con timeout de 20 s) y el scheduler. Angular
-sirve el panel en `http://127.0.0.1:4200`.
+sirve la web y el panel en `http://127.0.0.1:4200` mediante el servidor de
+desarrollo bilingüe: `/es/` y `/en/` comparten origen, sesión y proxy a Laravel.
+`npm start` arranca un compilador Angular por idioma y conserva la recarga en
+caliente. Hay que esperar a que terminen ambos compiladores. La raíz elige el
+idioma por la preferencia explícita del navegador y después por
+`Accept-Language`; una dirección con idioma siempre se respeta.
+
+Se puede cambiar el puerto con `npm start -- --port 4300` y el backend con
+`BACKEND_URL=http://127.0.0.1:8010 npm start`. Para trabajar deliberadamente
+con un solo idioma: `npm run start:single -- --build-target uvh:build:development,en`.
+El `ng serve` directo solo sirve un idioma y no permite probar el cambio entre
+ambas versiones. Las configuraciones explícitas, como
+`npm start -- --configuration design-preview`, mantienen su arranque propio.
 
 El registro comienza únicamente con el email y la comprobación antiabuso.
 El correo permite completar la cuenta: nombre, contraseña y aceptación de los
@@ -401,9 +413,32 @@ pasa si faltan e interruptores de seguridad— está en
 | `UVH_FEATURE_SOCIAL_PREVIEWS` | `false` | Tarjetas sociales. |
 | `UVH_FEATURE_APP_PROVIDERS` | `true` | Apertura de Spotify/YouTube/Maps. |
 | `UVH_FEATURE_NATIVE_APPS` | `true` | Apps propias vía AASA / Asset Links. |
+| `LOCALISATION_ENABLED` | `false` | Negociación de idioma, mensajes API y comunicaciones bilingües; activar tras desplegar ambos idiomas y auditar alias. |
 
 Las migraciones de cada función son aditivas y se aplican con
 `php artisan migrate --force` **antes** de desplegar el frontend.
+
+### Español e inglés británico
+
+`npm run build` en `frontend/` compila `/es/` y `/en/`, prerenderiza las seis
+páginas públicas de cada idioma y genera las reglas de publicación de Nginx.
+`shared/localisation/routes.json` es el mapa común de direcciones para Angular,
+Laravel, sitemap y despliegue. Las URL cortas y las rutas técnicas no se prefijan.
+
+Los textos se redactan en los catálogos del repositorio, sin servicios externos
+de traducción. Tras cambiar textos: `npm run i18n:extract`, actualizar la copia
+en `src/locale/translations.en-GB.json`, `npm run i18n:generate` y
+`npm run i18n:check`. La comprobación rechaza mensajes ausentes, fuentes obsoletas
+y cambios en los marcadores de interpolación. Los catálogos Laravel están en
+`backend-laravel/lang/es/` y `backend-laravel/lang/en_GB/`.
+
+Antes de activar, aplicar las migraciones, ejecutar `php artisan uvh:localisation-audit`
+y exportar la configuración pública con `php artisan uvh:frontend-public-config`.
+La identidad legal validada y los orígenes públicos de ese resultado son los
+únicos datos permitidos en `shared/localisation/public-site.config.json`.
+El comando falla si la identidad está incompleta; nunca copiar el `.env` ni
+secretos al build. Conservar intactas las copias históricas de documentos legales:
+las traducciones se publican por separado y tienen sus propios hashes.
 
 ## Despliegue
 

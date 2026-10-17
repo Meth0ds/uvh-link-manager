@@ -9,7 +9,7 @@
       <span class="section-icon"
         ><mat-icon aria-hidden="true">open_in_new</mat-icon></span
       ><span
-        ><strong>Abrir en una aplicación</strong
+        ><strong><ng-container i18n="@@ui.a6e1ae556573bd">Abrir en una aplicación</ng-container></strong
         ><small>{{ summary() }}</small></span
       ><mat-icon class="chevron" [class.open]="expanded()" aria-hidden="true"
         >expand_more</mat-icon
@@ -18,18 +18,18 @@
     @if (expanded()) {
       <div class="app-settings-body">
         <p class="intro">
-          Lleva al visitante al contenido de una app y conserva siempre una
+          <ng-container i18n="@@ui.afb2745b1f1ed1">Lleva al visitante al contenido de una app y conserva siempre una
           alternativa web.
-        </p>
-        <div class="choices" role="group" aria-label="Tipo de apertura">
+        </ng-container></p>
+        <div class="choices" role="group" aria-label="Tipo de apertura" i18n-aria-label="@@ui.dccdf5f5de0a03">
           <button
             type="button"
             [class.selected]="!spec()"
             [attr.aria-pressed]="!spec()"
             (click)="choose('off')"
           >
-            Solo web
-          </button>
+            <ng-container i18n="@@ui.64289729b255f0">Solo web
+          </ng-container></button>
           @if (apps.providers()) {
             <button
               type="button"
@@ -37,8 +37,8 @@
               [attr.aria-pressed]="spec()?.kind === 'provider'"
               (click)="choose('provider')"
             >
-              Servicio conocido
-            </button>
+              <ng-container i18n="@@ui.d3a316df8b63f6">Servicio conocido
+            </ng-container></button>
           }
           @if (apps.native()) {
             <button
@@ -48,30 +48,30 @@
               [disabled]="!profile()"
               (click)="choose('native')"
             >
-              App del workspace
-            </button>
+              <ng-container i18n="@@ui.8a1d473ff558cb">App del workspace
+            </ng-container></button>
           }
         </div>
         @if (apps.native() && !profile() && !loading()) {
           <p class="hint">
-            Para usar una app propia, selecciona un dominio personalizado con su
+            <ng-container i18n="@@ui.74f5e978c9c492">Para usar una app propia, selecciona un dominio personalizado con su
             aplicación publicada en el detalle del dominio.
-          </p>
+          </ng-container></p>
         }
         @if (loading()) {
-          <p role="status" class="hint">Consultando la app del dominio…</p>
+          <p role="status" class="hint"><ng-container i18n="@@ui.1390e3f694234a">Consultando la app del dominio…</ng-container></p>
         }
         @if (error()) {
           <p role="alert" class="error">
             {{ error() }}
             <button type="button" mat-button (click)="retryLoad()">
-              Reintentar
-            </button>
+              <ng-container i18n="@@ui.50b2a935ab38f2">Reintentar
+            </ng-container></button>
           </p>
         }
         @if (spec()?.kind === "provider" && apps.providers()) {
           <label
-            >Servicio<select
+            ><ng-container i18n="@@ui.1efa3b455a0624">Servicio</ng-container><select
               [ngModel]="provider().id"
               [ngModelOptions]="{ standalone: true }"
               (ngModelChange)="setProvider($event)"
@@ -84,79 +84,79 @@
           @if (
             provider().id === "google_maps" || provider().id === "apple_maps"
           ) {
-            <div class="choices" role="group" aria-label="Contenido del mapa">
+            <div class="choices" role="group" aria-label="Contenido del mapa" i18n-aria-label="@@ui.59d59dae825169">
               <button
                 type="button"
                 [class.selected]="mapDetails().mode === 'place'"
                 [attr.aria-pressed]="mapDetails().mode === 'place'"
                 (click)="updateMap('mode', 'place')"
               >
-                Un lugar</button
+                <ng-container i18n="@@ui.f13282c79a915f">Un lugar</ng-container></button
               ><button
                 type="button"
                 [class.selected]="mapDetails().mode === 'route'"
                 [attr.aria-pressed]="mapDetails().mode === 'route'"
                 (click)="updateMap('mode', 'route')"
               >
-                Una ruta
-              </button>
+                <ng-container i18n="@@ui.e01356a0cde65a">Una ruta
+              </ng-container></button>
             </div>
             @if (mapDetails().mode === "route") {
               <label
-                >Origen — opcional<input
+                ><ng-container i18n="@@ui.322aa9fdd5af06">Origen — opcional</ng-container><input
                   [ngModel]="mapDetails().origin"
                   [ngModelOptions]="{ standalone: true }"
                   (ngModelChange)="updateMap('origin', $event)"
                   maxlength="1000"
                   placeholder="Ubicación actual o una dirección"
-              /></label>
+               i18n-placeholder="@@ui.16e0add7bba591"/></label>
             }
             <label
               >{{
                 mapDetails().mode === "route"
-                  ? "Destino de la ruta"
-                  : "Lugar o dirección"
+                  ? uiText.ui_f08bfc167d2d1b
+                  : uiText.ui_3251e75e8f2670
               }}<input
                 [ngModel]="mapDetails().destination"
                 [ngModelOptions]="{ standalone: true }"
                 (ngModelChange)="updateMap('destination', $event)"
                 maxlength="1000"
                 placeholder="Por ejemplo, Museo del Prado, Madrid"
-            /></label>
+             i18n-placeholder="@@ui.3564068d1061e5"/></label>
             @if (mapDetails().mode === "route") {
               <label
-                >Cómo llegar<select
+                ><ng-container i18n="@@ui.ee4058f56b3a5a">Cómo llegar</ng-container><select
                   [ngModel]="mapDetails().travel"
                   [ngModelOptions]="{ standalone: true }"
                   (ngModelChange)="updateMap('travel', $event)"
                 >
-                  <option value="">Elegir en la aplicación</option>
+                  <option value=""><ng-container i18n="@@ui.735855a59ff9c0">Elegir en la aplicación</ng-container></option>
                   <option
                     [value]="provider().id === 'apple_maps' ? 'd' : 'driving'"
                   >
-                    En coche
-                  </option>
+                    <ng-container i18n="@@ui.51679747f0fc6b">En coche
+                  </ng-container></option>
                   <option
                     [value]="provider().id === 'apple_maps' ? 'w' : 'walking'"
                   >
-                    A pie
-                  </option>
+                    <ng-container i18n="@@ui.96628f18294263">A pie
+                  </ng-container></option>
                   <option
                     [value]="provider().id === 'apple_maps' ? 'r' : 'transit'"
                   >
-                    Transporte público
-                  </option>
+                    <ng-container i18n="@@ui.558de4edb61637">Transporte público
+                  </ng-container></option>
                 </select></label
               >
             }
             <p class="hint">
-              Prepararemos el enlace oficial de {{ provider().name }}. No se
+              <ng-container i18n="@@ui.5e4fb6c16da08f">Prepararemos el enlace oficial de {{ provider().name }}. No se
               consultará el proveedor mientras lo configuras.
-            </p>
+            </ng-container></p>
           } @else {
             <label
-              >Contenido en {{ provider().name
-              }}<input
+              ><ng-container i18n="@@ui.619311bd07823c">Contenido en {{ provider().name
+              }}</ng-container><input
                 type="url"
                 [placeholder]="provider().example"
                 [ngModel]="providerUrl()"
@@ -165,12 +165,12 @@
                 autocomplete="off"
                 maxlength="2048"
             /></label>
-            <p class="hint">{{ provider().help }} Usa su URL HTTPS oficial.</p>
+            <p class="hint"><ng-container i18n="@@ui.26b4dc513b22cf">{{ provider().help }} Usa su URL HTTPS oficial.</ng-container></p>
           }
         }
         @if (spec()?.kind === "native" && apps.native()) {
           <label
-            >Ruta dentro de la aplicación<input
+            ><ng-container i18n="@@ui.72cc080a64db70">Ruta dentro de la aplicación</ng-container><input
               type="text"
               placeholder="/productos/123"
               [ngModel]="route()"
@@ -178,19 +178,19 @@
               (ngModelChange)="setRoute($event)"
               maxlength="500"
               autocomplete="off"
-          /></label>
+           i18n-placeholder="@@ui.5cbf0ec384c586"/></label>
           <p class="hint">
-            Prefijos permitidos:
+            <ng-container i18n="@@ui.93c65f186559e7">Prefijos permitidos:
             {{
               profile()?.routePrefixes?.join(", ") ||
-                "La app ya no está disponible en este dominio. Revisa la configuración."
+                uiText.ui_c3cc713b8a4c34
             }}
-          </p>
+          </ng-container></p>
           <p class="hint">
-            Dirección de apertura:
-            <strong>{{ domain() }}/a/{{ alias() || "alias-automático" }}</strong
-            >. Los QR nuevos utilizarán esta dirección.
-          </p>
+            <ng-container i18n="@@ui.e927723a712e12">Dirección de apertura:
+            </ng-container><strong><ng-container i18n="@@ui.7e144552a18686">{{ domain() }}/a/{{ alias() || uiText.ui_3366d7cd9fd616 }}</ng-container></strong
+            ><ng-container i18n="@@ui.74586ae43c6a80">. Los QR nuevos utilizarán esta dirección.
+          </ng-container></p>
         }
         @if (validation()) {
           <p class="error" role="status">{{ validation() }}</p>
@@ -198,8 +198,8 @@
         @if (spec()) {
           <div class="platform-preview">
             <div class="preview-heading">
-              <strong>Qué verá el visitante</strong>
-              <div role="group" aria-label="Vista previa por plataforma">
+              <strong><ng-container i18n="@@ui.d512d8d358b073">Qué verá el visitante</ng-container></strong>
+              <div role="group" aria-label="Vista previa por plataforma" i18n-aria-label="@@ui.3126a4e5862697">
                 @for (p of ["ios", "android", "desktop"]; track p) {
                   <button
                     type="button"
@@ -209,27 +209,27 @@
                   >
                     {{
                       p === "ios"
-                        ? "iPhone"
+                        ? uiText.ui_38fdf519314e31
                         : p === "android"
-                          ? "Android"
-                          : "Escritorio"
+                          ? uiText.ui_6d612a86bee4b0
+                          : uiText.ui_557fb176483405
                     }}
                   </button>
                 }
               </div>
             </div>
             <p>{{ platformCopy() }}</p>
-            <span class="web-caption">Alternativa web</span
+            <span class="web-caption"><ng-container i18n="@@ui.bc6030c482af34">Alternativa web</ng-container></span
             ><span class="url">{{
-              webUrl() || "La URL de destino del enlace"
+              webUrl() || uiText.ui_4391367ced0e4f
             }}</span>
           </div>
           <div class="rule-note">
             <mat-icon aria-hidden="true">alt_route</mat-icon>
             <p>
-              Las reglas tienen prioridad. Si coincide una regla o se utiliza el
+              <ng-container i18n="@@ui.44bbfe9a807cb0">Las reglas tienen prioridad. Si coincide una regla o se utiliza el
               destino alternativo, se mantiene su redirección web.
-            </p>
+            </ng-container></p>
           </div>
         }
       </div>

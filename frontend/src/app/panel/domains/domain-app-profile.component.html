@@ -8,11 +8,11 @@
     >
       <mat-icon aria-hidden="true">phone_iphone</mat-icon
       ><span
-        ><strong>Aplicación del dominio</strong
+        ><strong><ng-container i18n="@@ui.5b16e4f474fddb">Aplicación del dominio</ng-container></strong
         ><small>{{
           profile()?.enabled
             ? profile()?.name
-            : "Conecta tu app de iPhone o Android"
+            : uiText.ui_ac2b8d733c2ca3
         }}</small></span
       ><mat-icon class="chevron" [class.open]="expanded()" aria-hidden="true"
         >expand_more</mat-icon
@@ -21,12 +21,12 @@
     @if (expanded()) {
       <div class="profile-body">
         <p class="intro">
-          Asocia una aplicación propia con <strong>{{ domain() }}</strong
-          >. Necesita integración nativa y una comprobación en un dispositivo
+          <ng-container i18n="@@ui.f2fcff309d2b1b">Asocia una aplicación propia con </ng-container><strong>{{ domain() }}</strong
+          ><ng-container i18n="@@ui.a6e496135c42cf">. Necesita integración nativa y una comprobación en un dispositivo
           real.
-        </p>
+        </ng-container></p>
         @if (loading()) {
-          <p role="status">Cargando configuración…</p>
+          <p role="status"><ng-container i18n="@@ui.c311e3fe80ddc4">Cargando configuración…</ng-container></p>
         }
         @if (error()) {
           <p class="alert error" role="alert">
@@ -37,76 +37,76 @@
               (click)="reload()"
               [disabled]="busy()"
             >
-              Recargar
-            </button>
+              <ng-container i18n="@@ui.6dbb18cc783dcf">Recargar
+            </ng-container></button>
           </p>
         }
         @if (!loading()) {
           <form (ngSubmit)="save()">
             <fieldset [disabled]="!canManage() || busy()">
               <label
-                >Nombre de la aplicación<input
+                ><ng-container i18n="@@ui.e35511149847bc">Nombre de la aplicación</ng-container><input
                   name="appName"
                   [(ngModel)]="name"
                   maxlength="120"
                   placeholder="Mi aplicación"
                   required
-              /></label>
+               i18n-placeholder="@@ui.0eff9ea1bc92a8"/></label>
               <div class="platform-fields">
                 <div>
-                  <h3>iPhone y iPad</h3>
+                  <h3><ng-container i18n="@@ui.dff9c9eeb24fdb">iPhone y iPad</ng-container></h3>
                   <label
-                    >Identificador de aplicación Apple<input
+                    ><ng-container i18n="@@ui.d3935f6c3e6578">Identificador de aplicación Apple</ng-container><input
                       name="iosAppId"
                       [(ngModel)]="iosAppId"
                       placeholder="ABCDE12345.es.empresa.app"
                       maxlength="255"
                       spellcheck="false"
-                  /></label>
+                   i18n-placeholder="@@ui.17129a083771fa"/></label>
                   <p>
-                    App ID Prefix y Bundle ID reales. Deben coincidir con la app
+                    <ng-container i18n="@@ui.06d991ecc07e9d">App ID Prefix y Bundle ID reales. Deben coincidir con la app
                     firmada.
-                  </p>
+                  </ng-container></p>
                 </div>
                 <div>
-                  <h3>Android</h3>
+                  <h3><ng-container i18n="@@ui.6d612a86bee4b0">Android</ng-container></h3>
                   <label
-                    >Nombre del paquete<input
+                    ><ng-container i18n="@@ui.f4cc618748ad28">Nombre del paquete</ng-container><input
                       name="androidPackage"
                       [(ngModel)]="androidPackage"
                       placeholder="es.empresa.app"
                       maxlength="255"
-                      spellcheck="false" /></label
+                      spellcheck="false"  i18n-placeholder="@@ui.deff82b4d967f7"/></label
                   ><label
-                    >Huellas SHA-256<textarea
+                    ><ng-container i18n="@@ui.5718d5d0b62244">Huellas SHA-256</ng-container><textarea
                       name="fingerprints"
                       [(ngModel)]="fingerprints"
                       rows="3"
                       placeholder="AA:BB:CC:… · una huella por línea"
                       spellcheck="false"
                       maxlength="960"
-                    ></textarea>
+                     i18n-placeholder="@@ui.d27c659b1f9f4a"></textarea>
                   </label>
                   <p>
-                    Hasta 10 huellas para rotar firmas. Usa la firma de
+                    <ng-container i18n="@@ui.6f1fe5e778be1f">Hasta 10 huellas para rotar firmas. Usa la firma de
                     distribución; no subas certificados privados.
-                  </p>
+                  </ng-container></p>
                 </div>
               </div>
               <label
-                >Prefijos de contenido permitidos<textarea
+                ><ng-container i18n="@@ui.adbf23a07e2f1d">Prefijos de contenido permitidos</ng-container><textarea
                   name="prefixes"
                   [(ngModel)]="prefixes"
                   rows="2"
                   placeholder="/productos/&#10;/ofertas/"
                   spellcheck="false"
                   maxlength="4020"
-                ></textarea>
+                 i18n-placeholder="@@ui.70912b64323bb9"></textarea>
               </label>
               <p>
-                Una ruta por línea. Los enlaces solo podrán abrir contenido bajo
+                <ng-container i18n="@@ui.2e479530b07f6e">Una ruta por línea. Los enlaces solo podrán abrir contenido bajo
                 estos prefijos.
-              </p>
+              </ng-container></p>
               <label class="enable"
                 ><input
                   type="checkbox"
@@ -114,18 +114,18 @@
                   [(ngModel)]="enabled"
                   [disabled]="!ready() && !enabled"
                 /><span
-                  ><strong>Publicar la asociación</strong
+                  ><strong><ng-container i18n="@@ui.c34addb04e588e">Publicar la asociación</ng-container></strong
                   ><small
-                    >Solo se asociarán las direcciones /a/. El panel y la API
-                    quedan fuera.</small
+                    ><ng-container i18n="@@ui.c54d8d8d849409">Solo se asociarán las direcciones /a/. El panel y la API
+                    quedan fuera.</ng-container></small
                   ></span
                 ></label
               >
               @if (!ready()) {
                 <p class="warning">
-                  El dominio debe estar reclamado, activo y con HTTPS operativo
+                  <ng-container i18n="@@ui.ad19976a2f5de2">El dominio debe estar reclamado, activo y con HTTPS operativo
                   antes de publicar.
-                </p>
+                </ng-container></p>
               }
             </fieldset>
             @if (canManage()) {
@@ -135,14 +135,14 @@
                   type="submit"
                   [disabled]="busy() || !name.trim()"
                 >
-                  {{ busy() ? "Procesando…" : "Guardar configuración" }}</button
+                  {{ busy() ? uiText.ui_8bd93100e763a7 : uiText.ui_768c232359516a }}</button
                 ><button
                   mat-stroked-button
                   type="button"
                   (click)="diagnose()"
                   [disabled]="busy() || !profile()"
                 >
-                  Comprobar publicación</button
+                  <ng-container i18n="@@ui.12d89681e15001">Comprobar publicación</ng-container></button
                 ><span role="status" class="saved">{{ success() }}</span>
               </div>
             }
@@ -150,33 +150,33 @@
           <div class="integration-note">
             <mat-icon aria-hidden="true">verified_user</mat-icon>
             <p>
-              La app debe consultar el resolver de UVH antes de mostrar
+              <ng-container i18n="@@ui.8e4ad4247534e4">La app debe consultar el resolver de UVH antes de mostrar
               contenido. Publicar estos archivos no acredita esa integración.
               Los cambios pueden tardar en llegar a los dispositivos.
-            </p>
+            </ng-container></p>
           </div>
           @if (profile(); as p) {
             <details class="developer-details">
-              <summary>Datos para tu equipo de desarrollo</summary>
+              <summary><ng-container i18n="@@ui.4dd85ebce4af4f">Datos para tu equipo de desarrollo</ng-container></summary>
               <label
-                >Resolver de UVH<input
+                ><ng-container i18n="@@ui.13e547e4d14b8c">Resolver de UVH</ng-container><input
                   readonly
                   [value]="apps.resolverUrl()"
                   aria-label="Endpoint del resolver nativo de UVH"
-              /></label>
+               i18n-aria-label="@@ui.2ca6b37b2bb78b"/></label>
               <p>
-                Fija este origen en la app. No obtengas el servidor de
+                <ng-container i18n="@@ui.0aaa5d4bbce2d3">Fija este origen en la app. No obtengas el servidor de
                 resolución del enlace recibido.
-              </p>
+              </ng-container></p>
               <p>
-                La app debe utilizar este identificador y validar el dominio
+                <ng-container i18n="@@ui.ff6df794601bfd">La app debe utilizar este identificador y validar el dominio
                 antes de consultar el resolver.
-              </p>
+              </ng-container></p>
               <label
-                >Identificador del perfil<input
+                ><ng-container i18n="@@ui.752f7afa3dc789">Identificador del perfil</ng-container><input
                   readonly
                   [value]="p.id"
-                  aria-label="Identificador del perfil de aplicación" /></label
+                  aria-label="Identificador del perfil de aplicación"  i18n-aria-label="@@ui.f1d2cbac674a5e"/></label
               ><button
                 mat-stroked-button
                 type="button"
@@ -186,13 +186,13 @@
                 <mat-icon aria-hidden="true">content_copy</mat-icon
                 >{{
                   copyFeedback.phase(p.id, copyScope) === "copied"
-                    ? "Copiado"
-                    : "Copiar identificador"
+                    ? uiText.ui_d8dd878fb14359
+                    : uiText.ui_cdc1f1de26581e
                 }}
               </button>
               <p>
-                Direcciones de apertura:
-                <code>https://{{ domain() }}/a/alias</code>
+                <ng-container i18n="@@ui.99878a520e51dc">Direcciones de apertura:
+                </ng-container><code>https://{{ domain() }}/a/alias</code>
               </p>
               <div class="association-links">
                 <a
@@ -203,26 +203,26 @@
                   "
                   target="_blank"
                   rel="noopener noreferrer"
-                  >Ver asociación Apple</a
+                  ><ng-container i18n="@@ui.53ea4efe651ea2">Ver asociación Apple</ng-container></a
                 ><a
                   [href]="
                     'https://' + domain() + '/.well-known/assetlinks.json'
                   "
                   target="_blank"
                   rel="noopener noreferrer"
-                  >Ver asociación Android</a
+                  ><ng-container i18n="@@ui.b66d5f6e5abcce">Ver asociación Android</ng-container></a
                 >
               </div>
             </details>
           }
           @if (diagnostics(); as d) {
             <div class="diagnostics" aria-live="polite">
-              <strong>Estado de la integración</strong>
+              <strong><ng-container i18n="@@ui.626fc8d9988e96">Estado de la integración</ng-container></strong>
               <p>
                 {{
                   d.domainVerified
-                    ? "Dominio verificado y HTTPS operativo"
-                    : "Dominio pendiente de verificación o HTTPS"
+                    ? uiText.ui_90fcbabc44dea5
+                    : uiText.ui_f403343e098eaa
                 }}
               </p>
               @for (f of d.files; track f.file) {
@@ -230,14 +230,14 @@
                   <code>{{ f.file }}</code
                   ><span>{{
                     f.published
-                      ? "Publicado y coincide"
-                      : "Pendiente o no coincide"
+                      ? uiText.ui_530eaf6c3c6c3f
+                      : uiText.ui_dc479e2c731c4a
                   }}</span>
                 </p>
               }
               <p>
-                Prueba en iPhone y Android:
-                <strong>Pendiente en dispositivo real</strong>
+                <ng-container i18n="@@ui.53b950ee95c4b4">Prueba en iPhone y Android:
+                </ng-container><strong><ng-container i18n="@@ui.b38da0eacdfc93">Pendiente en dispositivo real</ng-container></strong>
               </p>
             </div>
           }

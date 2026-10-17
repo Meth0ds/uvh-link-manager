@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Abrir contenido · UVH</title>
+<html lang="{{ app()->getLocale() === 'en_GB' ? 'en-GB' : 'es-ES' }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>{{ __('visitor.open_title') }} · UVH</title>
 @include('app-opening-style')
-</head><body><main><span class="brand" aria-label="UVH">uvh.</span><div class="app-icon" aria-hidden="true">↗</div><h1>Continúa en {{ $label }}</h1><p>Abre el contenido en la aplicación o continúa en la web.</p>
-@if($nativeUrl)<a class="primary" href="{{ $nativeUrl }}" rel="noreferrer">Abrir aplicación <span aria-hidden="true">↗</span></a>@else
-<a class="primary" href="{{ $preparedUrl }}" rel="noreferrer">Abrir {{ $label }} <span aria-hidden="true">↗</span></a>
+</head><body><main><span class="brand" aria-label="UVH">uvh.</span><div class="app-icon" aria-hidden="true">↗</div><h1>{{ __('visitor.open_heading', ['label' => $label]) }}</h1><p>{{ __('visitor.open_body') }}</p>
+@if($nativeUrl)<a class="primary" href="{{ $nativeUrl }}" rel="noreferrer">{{ __('visitor.open_app') }} <span aria-hidden="true">↗</span></a>@else
+<a class="primary" href="{{ $preparedUrl }}" rel="noreferrer">{{ __('visitor.open_provider', ['label' => $label]) }} <span aria-hidden="true">↗</span></a>
 @endif
-<a class="secondary" href="{{ $webPreparedUrl }}" rel="noreferrer">Abrir destino web</a>
-<aside>La apertura depende de tu dispositivo y del navegador. Si estás dentro de otra aplicación, prueba a abrir este enlace en Safari o Chrome.</aside></main></body></html>
+<a class="secondary" href="{{ $webPreparedUrl }}" rel="noreferrer">{{ __('visitor.open_web') }}</a>
+<aside>{{ __('visitor.open_hint') }}</aside></main></body></html>

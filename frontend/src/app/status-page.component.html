@@ -1,19 +1,15 @@
-<a class="skip-link" href="#status-content" (click)="focusMain(statusContent)">Saltar al contenido</a>
-<app-public-theme-toggle />
+<a class="skip-link" href="#status-content" (click)="focusMain(statusContent)"><ng-container i18n="@@ui.fdab69210d5cda">Saltar al contenido</ng-container></a>
+<app-language-selector /><app-public-theme-toggle />
 <main #statusContent id="status-content" tabindex="-1">
   <div class="wrap">
-    <p class="kicker">UVH Link Manager</p>
+    <p class="kicker"><ng-container i18n="@@ui.90498c7dead596">UVH Link Manager</ng-container></p>
     <h1>
       <span class="code" aria-hidden="true">{{ code }}</span>
       <span class="headline">{{ title }}</span>
     </h1>
     <p class="lead">{{ lead }}</p>
     <div class="actions">
-      @if (forbidden) {
-        <a mat-flat-button color="primary" href="/app/dashboard"><mat-icon aria-hidden="true">space_dashboard</mat-icon>Ir al panel</a>
-      } @else {
-        <a mat-flat-button color="primary" href="/"><mat-icon aria-hidden="true">home</mat-icon>Volver al inicio</a>
-      }
+      <a mat-flat-button color="primary" href="/app/dashboard"><mat-icon aria-hidden="true">space_dashboard</mat-icon><ng-container i18n="@@ui.3bc27cd067f366">Ir al panel</ng-container></a>
       @for (extra of extras; track extra.href) {
         <a mat-stroked-button [href]="extra.href"><mat-icon aria-hidden="true">{{ extra.icon }}</mat-icon>{{ extra.label }}</a>
       }

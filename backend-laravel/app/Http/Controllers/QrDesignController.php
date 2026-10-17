@@ -43,10 +43,10 @@ final class QrDesignController
             WorkspaceMutation::run($request, function () use ($request, $id): void {
                 $row = DB::table('qr_designs')->where('workspace_id', UvhRequest::workspaceId($request))->where('id', $id)->lockForUpdate()->first();
                 if (! $row) {
-                    throw new LinkException('Diseño no encontrado.', 404);
+                    throw new LinkException(__('messages.error_67669c5dba70dc'), 404);
                 }
                 if ($request->input('version') !== (int) $row->version) {
-                    throw new LinkException('El diseño cambió. Recarga antes de eliminarlo.', 409);
+                    throw new LinkException(__('messages.error_b1b0ce1e88b2f7'), 409);
                 }
                 DB::table('qr_designs')->where('id', $id)->delete();
             });

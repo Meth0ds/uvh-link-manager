@@ -1,3 +1,4 @@
+import { UI_TEXT } from "./localisation/template-messages";
 import { DOCUMENT } from "@angular/common";
 import { ChangeDetectionStrategy, Component, Injectable, inject, input, signal } from "@angular/core";
 import { MatTooltipModule } from "@angular/material/tooltip";
@@ -64,10 +65,10 @@ export class PublicThemeTransitionService {
       [attr.aria-disabled]="transition.busy()" [attr.aria-busy]="transition.busy()" [attr.aria-checked]="transition.theme.resolved() === 'dark'"
       aria-label="Modo oscuro"
       [matTooltipDisabled]="transition.busy()"
-      [matTooltip]="showLabel() ? '' : (transition.theme.resolved() === 'dark' ? 'Cambiar a papel claro' : 'Cambiar a tinta oscura')"
-      (click)="transition.toggle($event)">
+      [matTooltip]="showLabel() ? '' : (transition.theme.resolved() === 'dark' ? uiText.ui_11d6a696f637d4 : uiText.ui_c0edcc479f5825)"
+      (click)="transition.toggle($event)" i18n-aria-label="@@ui.808d4a199c7409">
       <span class="theme-disc" aria-hidden="true">◐</span>
-      @if (showLabel()) { <span>Apariencia</span><b>{{ transition.theme.resolved() === 'dark' ? 'Oscuro' : 'Claro' }}</b> }
+      @if (showLabel()) { <span><ng-container i18n="@@ui.e3e9cbaccaec3d">Apariencia</ng-container></span><b>{{ transition.theme.resolved() === 'dark' ? uiText.ui_1b1c27c397aee6 : uiText.ui_2f3e8dcc246498 }}</b> }
     </button>
   `,
   styles: `
@@ -85,6 +86,7 @@ export class PublicThemeTransitionService {
   `,
 })
 export class PublicThemeToggleComponent {
+  readonly uiText = UI_TEXT;
   readonly transition = inject(PublicThemeTransitionService);
   readonly showLabel = input(false);
 }

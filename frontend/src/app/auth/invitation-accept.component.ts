@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { Location } from "@angular/common";
 import { Component, DestroyRef, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
@@ -16,7 +17,7 @@ import { LatestRequest } from "../core/services/latest-request";
  * cookie now, so a refusal is not "the browser blocked storage": nothing was
  * stored, and the link in the email is the way back in.
  */
-const NOT_PARKED = "No hemos podido guardar la invitación en este navegador. Vuelve a abrir el enlace del correo.";
+const NOT_PARKED = $localize`:@@ui.d3aa338a1fd5cf:No hemos podido guardar la invitación en este navegador. Vuelve a abrir el enlace del correo.`;
 
 @Component({
   selector: "app-invitation-accept",
@@ -25,37 +26,37 @@ const NOT_PARKED = "No hemos podido guardar la invitación en este navegador. Vu
   template: `
     <app-auth-shell>
       <section class="card center" aria-labelledby="invitation-accept-title">
-        <span class="step-kicker">TRABAJO EN EQUIPO</span>
+        <span class="step-kicker"><ng-container i18n="@@ui.5c86807846494a">TRABAJO EN EQUIPO</ng-container></span>
         @if (busy()) {
-          <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" />
+          <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud"  i18n-aria-label="@@ui.ecd743d7dea145"/>
         }
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.invitation-neutral]="rejected()" [class.bad]="!busy() && !ok() && !rejected() && done() && !needsLogin()">{{ busy() ? 'hourglass_empty' : ok() ? 'group_add' : (rejected() ? 'person_remove' : (done() && !needsLogin() ? 'error_outline' : 'group_add')) }}</mat-icon>
-        <h2 id="invitation-accept-title">{{ busy() ? 'Procesando invitación' : ok() ? 'Ya formas parte del equipo' : (rejected() ? 'Invitación rechazada' : (ready() ? 'Invitación al equipo' : (sessionUnavailable() ? 'No se pudo comprobar la sesión' : done() && !needsLogin() ? 'No se pudo completar' : 'Acceso necesario'))) }}</h2>
-        <p class="sub" role="status">{{ busy() ? 'Espera a que termine la comprobación. No cierres la página mientras se procesa una acción.' : message() }}</p>
+        <h2 id="invitation-accept-title">{{ busy() ? uiText.ui_d8ddca5d1033ce : ok() ? uiText.ui_6e55481c74364b : (rejected() ? uiText.ui_da3acbb18634bc : (ready() ? uiText.ui_0f061ff50ef8ef : (sessionUnavailable() ? uiText.ui_ffdb43049f07da : done() && !needsLogin() ? uiText.ui_2df446caf2895b : uiText.ui_3fe835ebcad787))) }}</h2>
+        <p class="sub" role="status">{{ busy() ? uiText.ui_4a114118f7d4ed : message() }}</p>
         @if (ready()) {
-          <div class="decision-guide"><div><h3>Si aceptas</h3><p>Se añadirá tu cuenta al workspace de la invitación. El servidor comprobará que corresponde a tu cuenta.</p></div><div><h3>Si rechazas</h3><p>Este enlace de invitación quedará invalidado. Tendrás que pedir una nueva invitación si cambias de opinión.</p></div></div>
+          <div class="decision-guide"><div><h3><ng-container i18n="@@ui.2c70dc318581d8">Si aceptas</ng-container></h3><p><ng-container i18n="@@ui.f1de33dc439f24">Se añadirá tu cuenta al workspace de la invitación. El servidor comprobará que corresponde a tu cuenta.</ng-container></p></div><div><h3><ng-container i18n="@@ui.bfa6960a6788c2">Si rechazas</ng-container></h3><p><ng-container i18n="@@ui.d8e1729adf57ef">Este enlace de invitación quedará invalidado. Tendrás que pedir una nueva invitación si cambias de opinión.</ng-container></p></div></div>
           <div class="invitation-actions">
-          <button mat-flat-button color="primary" type="button" (click)="accept()" [disabled]="busy()">Aceptar invitación</button>
-          <button mat-stroked-button type="button" (click)="reject()" [disabled]="busy()">Rechazar</button>
+          <button mat-flat-button color="primary" type="button" (click)="accept()" [disabled]="busy()"><ng-container i18n="@@ui.fc34097a035972">Aceptar invitación</ng-container></button>
+          <button mat-stroked-button type="button" (click)="reject()" [disabled]="busy()"><ng-container i18n="@@ui.2a0515602d3158">Rechazar</ng-container></button>
           </div>
         }
         @if (ok() || rejected()) {
-          <a mat-flat-button color="primary" routerLink="/app">Ir a mi panel</a>
+          <a mat-flat-button color="primary" routerLink="/app"><ng-container i18n="@@ui.e015b8431b635c">Ir a mi panel</ng-container></a>
         }
         @if (sessionUnavailable() && !busy()) {
-          <button mat-flat-button color="primary" type="button" (click)="retrySession()">Reintentar comprobación</button>
+          <button mat-flat-button color="primary" type="button" (click)="retrySession()"><ng-container i18n="@@ui.6416f7f1035d2a">Reintentar comprobación</ng-container></button>
         }
         @if (done() && !ok() && needsLogin()) {
-          <a mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="{ returnTo: returnTo }">Iniciar sesión para continuar</a>
+          <a mat-flat-button color="primary" [routerLink]="['/auth']" [queryParams]="{ returnTo: returnTo }"><ng-container i18n="@@ui.56e01f3f7dbd1f">Iniciar sesión para continuar</ng-container></a>
         }
         @if (invalidIncoming || (!busy() && done() && !ok() && !rejected() && !needsLogin() && !hasParkedInvitation)) {
-          <a mat-stroked-button routerLink="/app">Volver a mi panel</a>
+          <a mat-stroked-button routerLink="/app"><ng-container i18n="@@ui.27293c2b727593">Volver a mi panel</ng-container></a>
         }
         @if (!busy() && done() && !ok() && !rejected() && !needsLogin() && !ready() && !sessionUnavailable() && hasParkedInvitation) {
           <div class="invitation-actions">
-          <button mat-flat-button color="primary" type="button" (click)="switchAccount()" [disabled]="busy()">Cambiar de cuenta</button>
-          <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()">Descartar de este navegador</button>
-          </div><p class="auth-note">Cambiar de cuenta cierra tu sesión actual. Descartar solo borra la invitación pendiente de este navegador; no equivale a rechazarla.</p>
+          <button mat-flat-button color="primary" type="button" (click)="switchAccount()" [disabled]="busy()"><ng-container i18n="@@ui.2b1f70db73aa44">Cambiar de cuenta</ng-container></button>
+          <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()"><ng-container i18n="@@ui.9a4afa3fa0d256">Descartar de este navegador</ng-container></button>
+          </div><p class="auth-note"><ng-container i18n="@@ui.a39e49df6956a9">Cambiar de cuenta cierra tu sesión actual. Descartar solo borra la invitación pendiente de este navegador; no equivale a rechazarla.</ng-container></p>
         }
       </section>
     </app-auth-shell>
@@ -64,6 +65,7 @@ const NOT_PARKED = "No hemos podido guardar la invitación en este navegador. Vu
   styleUrl: "./security-flow.scss",
 })
 export class InvitationAcceptComponent {
+  readonly uiText = UI_TEXT;
   private api = inject(ApiService);
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
@@ -107,7 +109,7 @@ export class InvitationAcceptComponent {
       this.done.set(true);
       this.message.set(error instanceof ApiRequestError
         ? error.message
-        : "No se pudo preparar la invitación. Vuelve a abrir el enlace del correo.");
+        : $localize`:@@ui.f5187380fcd279:No se pudo preparar la invitación. Vuelve a abrir el enlace del correo.`);
     });
   }
 
@@ -124,7 +126,7 @@ export class InvitationAcceptComponent {
       this.sessionUnavailable.set(true);
       this.busy.set(false);
       this.done.set(true);
-      this.message.set("No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.");
+      this.message.set($localize`:@@ui.c31dc33de862c8:No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.`);
     }
   }
 
@@ -152,10 +154,10 @@ export class InvitationAcceptComponent {
       this.ok.set(false);
       this.rejected.set(true);
       this.needsLogin.set(false);
-      this.message.set("La invitación ha sido rechazada.");
+      this.message.set($localize`:@@ui.675f29d30ec84c:La invitación ha sido rechazada.`);
     } catch (err) {
       if (this.operations.isCurrent(request, this.context()) && this.stillParked()) {
-        this.message.set(err instanceof ApiRequestError ? err.message : "No se pudo rechazar la invitación.");
+        this.message.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.afeb533e4c25e2:No se pudo rechazar la invitación.`);
       }
     } finally {
       if (this.operations.isCurrent(request, this.context())) {
@@ -176,7 +178,7 @@ export class InvitationAcceptComponent {
       await this.router.navigate(["/auth"], { queryParams: { returnTo: this.returnTo } });
     } catch (error) {
       if (this.operations.isCurrent(request, context)) {
-        this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo cerrar la sesión actual.");
+        this.message.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.35bcea074d5104:No se pudo cerrar la sesión actual.`);
       }
     } finally {
       if (this.operations.isCurrent(request, context)) this.busy.set(false);
@@ -212,15 +214,15 @@ export class InvitationAcceptComponent {
         || !this.stillParked()) return;
       this.invitations.hide();
       this.ok.set(true);
-      this.message.set("Te has unido al workspace. Ya puedes colaborar en sus enlaces.");
+      this.message.set($localize`:@@ui.90d0cf5694ec2b:Te has unido al workspace. Ya puedes colaborar en sus enlaces.`);
       try {
         const refreshed = await this.auth.refreshWorkspaces(generation);
         if (!refreshed && this.operations.isCurrent(request, this.context())) {
-          this.message.set("La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.");
+          this.message.set($localize`:@@ui.abe9500cfb810a:La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.`);
         }
       } catch {
         if (this.operations.isCurrent(request, this.context())) {
-          this.message.set("La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.");
+          this.message.set($localize`:@@ui.abe9500cfb810a:La invitación se ha aceptado. Recarga el panel si el nuevo workspace aún no aparece.`);
         }
       }
     } catch (err) {
@@ -228,7 +230,7 @@ export class InvitationAcceptComponent {
         this.ok.set(false);
         // 400 is the server's terminal answer, and it drops the cookie with it.
         if (err instanceof ApiRequestError && err.status === 400) this.invitations.hide();
-        this.message.set(err instanceof ApiRequestError ? err.message : "La invitación no es válida o ha caducado.");
+        this.message.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.745fe8ce2fbc2c:La invitación no es válida o ha caducado.`);
       }
     } finally {
       if (this.operations.isCurrent(request, this.context())) {
@@ -244,7 +246,7 @@ export class InvitationAcceptComponent {
       // that this browser happened to park on an earlier visit.
       this.busy.set(false);
       this.done.set(true);
-      this.message.set("Este enlace de invitación no es válido o ha caducado. Vuelve a abrir el enlace del correo.");
+      this.message.set($localize`:@@ui.9833805e345da8:Este enlace de invitación no es válido o ha caducado. Vuelve a abrir el enlace del correo.`);
       return;
     }
     if (!this.parked) {
@@ -259,7 +261,7 @@ export class InvitationAcceptComponent {
     if (!this.parked) {
       this.busy.set(false);
       this.done.set(true);
-      this.message.set("La invitación no está disponible o ha caducado.");
+      this.message.set($localize`:@@ui.018b81fff242e5:La invitación no está disponible o ha caducado.`);
       return;
     }
     // A park made moments ago may still be in flight, and the server may cap
@@ -294,7 +296,7 @@ export class InvitationAcceptComponent {
           this.sessionUnavailable.set(true);
           this.message.set(error instanceof ApiRequestError
             ? error.message
-            : "No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.");
+            : $localize`:@@ui.c31dc33de862c8:No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.`);
         }
         return;
       }
@@ -305,7 +307,7 @@ export class InvitationAcceptComponent {
       this.done.set(true);
       this.needsLogin.set(false);
       this.sessionUnavailable.set(true);
-      this.message.set("No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.");
+      this.message.set($localize`:@@ui.c31dc33de862c8:No se pudo comprobar la sesión. Reintenta cuando recuperes la conexión.`);
       return;
     }
     if (!this.auth.authenticated()) {
@@ -314,14 +316,14 @@ export class InvitationAcceptComponent {
       this.ok.set(false);
       this.needsLogin.set(true);
       this.message.set(this.invitations.persistent() === false
-        ? "Necesitas iniciar sesión, y este navegador no ha podido guardar la invitación. Inicia sesión y vuelve a abrir el enlace del correo."
-        : "Necesitas iniciar sesión para aceptar la invitación. Volveremos aquí automáticamente después del login.");
+        ? $localize`:@@ui.a6480d0f1b39d6:Necesitas iniciar sesión, y este navegador no ha podido guardar la invitación. Inicia sesión y vuelve a abrir el enlace del correo.`
+        : $localize`:@@ui.82fde904c2a4d8:Necesitas iniciar sesión para aceptar la invitación. Volveremos aquí automáticamente después del login.`);
       return;
     }
     this.busy.set(false);
     this.done.set(false);
     this.ready.set(true);
-    this.message.set("Acepta para añadir tu cuenta al workspace o rechaza para invalidar este enlace.");
+    this.message.set($localize`:@@ui.f7ad706d95db07:Acepta para añadir tu cuenta al workspace o rechaza para invalidar este enlace.`);
   }
 
   /** Ordering key of a request: which park, under which session generation. */

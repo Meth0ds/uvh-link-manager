@@ -16,12 +16,12 @@ final class LinkFavoriteController
     {
         try {
             if (array_keys($request->all()) !== ['favorite'] || ! is_bool($request->input('favorite'))) {
-                throw new LinkException('Preferencia inválida.', 422);
+                throw new LinkException(__('messages.error_94cfe427ce0fe7'), 422);
             }
             LinkPreferences::mutate($request, function () use ($request, $id): void {
                 $workspace = UvhRequest::workspaceId($request);
                 if (! Link::where('workspace_id', $workspace)->where('id', $id)->lockForUpdate()->first()) {
-                    throw new LinkException('Enlace no encontrado.', 404);
+                    throw new LinkException(__('messages.error_2f4bde2886e62b'), 404);
                 }
                 $key = ['workspace_id' => $workspace, 'user_id' => UvhRequest::user($request)->id, 'link_id' => $id];
                 if ($request->boolean('favorite')) {

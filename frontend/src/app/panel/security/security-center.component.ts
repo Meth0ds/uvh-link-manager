@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, NgZone, signal, untracked } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
@@ -19,24 +20,24 @@ import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
 
 const ACTION_LABELS: Record<string, string> = {
-  "auth.login": "Inicio de sesión",
-  "auth.logout": "Cierre de sesión",
-  "auth.password_change": "Contraseña cambiada",
-  "auth.password_reset": "Contraseña restablecida",
-  "auth.session_revoke": "Sesión revocada",
-  "auth.sessions_revoked_others": "Sesiones ajenas cerradas",
-  "auth.sessions_revoked_all": "Todas las sesiones cerradas",
-  "auth.mfa_enable": "MFA activado",
-  "auth.mfa_disable": "MFA desactivado",
-  "auth.mfa_reconfigured": "MFA reconfigurado",
-  "auth.mfa_recovery": "Código de recuperación utilizado",
-  "auth.mfa_recovery_regenerate": "Códigos de recuperación regenerados",
-  "auth.mfa_reauthenticated": "Reautenticación MFA completada",
-  "auth.email_change_requested": "Cambio de email solicitado",
-  "auth.email_change_cancelled": "Cambio de email cancelado",
-  "auth.email_change_confirmed": "Cambio de email confirmado",
-  "auth.emergency_access_revoked": "Acceso revocado por incidente",
-  "auth.account_recovery_completed": "Recuperación de cuenta completada",
+  "auth.login": $localize`:@@ui.ba4b93f605c830:Inicio de sesión`,
+  "auth.logout": $localize`:@@ui.b92130e45812b6:Cierre de sesión`,
+  "auth.password_change": $localize`:@@ui.e360581f0f7172:Contraseña cambiada`,
+  "auth.password_reset": $localize`:@@ui.d99eea8fc08d51:Contraseña restablecida`,
+  "auth.session_revoke": $localize`:@@ui.eef3d770790a42:Sesión revocada`,
+  "auth.sessions_revoked_others": $localize`:@@ui.d9e03e79e9c083:Sesiones ajenas cerradas`,
+  "auth.sessions_revoked_all": $localize`:@@ui.79abbc7f0fe148:Todas las sesiones cerradas`,
+  "auth.mfa_enable": $localize`:@@ui.99b29f803bfed8:MFA activado`,
+  "auth.mfa_disable": $localize`:@@ui.af28c171782d92:MFA desactivado`,
+  "auth.mfa_reconfigured": $localize`:@@ui.fe582c16b1cd7b:MFA reconfigurado`,
+  "auth.mfa_recovery": $localize`:@@ui.a6e9e9e5c668e2:Código de recuperación utilizado`,
+  "auth.mfa_recovery_regenerate": $localize`:@@ui.ef48f61b2a19f8:Códigos de recuperación regenerados`,
+  "auth.mfa_reauthenticated": $localize`:@@ui.650045ec3c9927:Reautenticación MFA completada`,
+  "auth.email_change_requested": $localize`:@@ui.7db77bc4a64919:Cambio de email solicitado`,
+  "auth.email_change_cancelled": $localize`:@@ui.0e55f6ade6c6aa:Cambio de email cancelado`,
+  "auth.email_change_confirmed": $localize`:@@ui.d9e2e10f9a5b26:Cambio de email confirmado`,
+  "auth.emergency_access_revoked": $localize`:@@ui.1a52e7acfe75cc:Acceso revocado por incidente`,
+  "auth.account_recovery_completed": $localize`:@@ui.d5a3b5c3dfb052:Recuperación de cuenta completada`,
 };
 
 @Component({
@@ -48,6 +49,7 @@ const ACTION_LABELS: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class SecurityCenterComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -146,7 +148,7 @@ export class SecurityCenterComponent {
       this.snapshot.set(null);
       this.sessions.set([]);
       this.sessionsTruncated.set(false);
-      this.error.set(err instanceof ApiRequestError && err.status === 401 ? "Tu sesión ya no está activa." : err instanceof ApiRequestError ? err.message : "No se pudo cargar el centro de seguridad");
+      this.error.set(err instanceof ApiRequestError && err.status === 401 ? $localize`:@@ui.ac31539228fd02:Tu sesión ya no está activa.` : err instanceof ApiRequestError ? err.message : $localize`:@@ui.26e6d21f4f1e8c:No se pudo cargar el centro de seguridad`);
     } finally {
       if (this.requests.isCurrent(request, this.contextKey())) this.loading.set(false);
     }
@@ -160,7 +162,7 @@ export class SecurityCenterComponent {
     try {
       await this.auth.refreshUser();
     } catch (err) {
-      if (current() && !(err instanceof AuthOperationSupersededError)) this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudieron actualizar los datos de la cuenta.", "Cerrar", { duration: 5000 });
+      if (current() && !(err instanceof AuthOperationSupersededError)) this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.0d772dabf374b2:No se pudieron actualizar los datos de la cuenta.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
     } finally {
       if (current()) this.refreshingAccount.set(false);
     }
@@ -176,50 +178,50 @@ export class SecurityCenterComponent {
     const selected = this.sessions().find(row => row.id === session.id);
     if (!intent || !selected) return;
     const confirmed = await this.actions.confirm({
-      title: selected.current ? "Cerrar esta sesión" : "Revocar sesión",
-      message: selected.current ? "Tendrás que volver a iniciar sesión en este dispositivo."
-        : `${this.agent(selected.user_agent)} dejará de tener acceso inmediatamente.`,
-      confirmLabel: selected.current ? "Cerrar sesión" : "Revocar acceso",
+      title: selected.current ? $localize`:@@ui.ac033b6147e116:Cerrar esta sesión` : $localize`:@@ui.6500e4818a8dcc:Revocar sesión`,
+      message: selected.current ? $localize`:@@ui.6fe2c139686296:Tendrás que volver a iniciar sesión en este dispositivo.`
+        : $localize`:@@ui.7c29c94c2a03e9:${this.agent(selected.user_agent)} dejará de tener acceso inmediatamente.`,
+      confirmLabel: selected.current ? $localize`:@@ui.c6e6960395f49b:Cerrar sesión` : $localize`:@@ui.09a1a14c32b62a:Revocar acceso`,
       destructive: true,
     });
     const live = this.sessions().find(row => row.id === selected.id);
     if (!confirmed || !live || live.current !== selected.current || Date.parse(live.expires_at) <= Date.now()) return;
     await this.runRevocation(selected.id, intent, async () => ({
       signedOut: await this.auth.revokeSession(selected.id, selected.current),
-      notice: "Sesión revocada",
-    }), "No se pudo revocar la sesión");
+      notice: $localize`:@@ui.eef3d770790a42:Sesión revocada`,
+    }), $localize`:@@ui.971a3b33f92d4b:No se pudo revocar la sesión`);
   }
 
   async closeOtherSessions(): Promise<void> {
     const intent = this.captureIntent();
     if (!intent) return;
     const confirmed = await this.actions.confirm({
-      title: "Cerrar las demás sesiones",
-      message: "Todos los demás dispositivos perderán el acceso inmediatamente. Esta sesión se mantiene abierta.",
-      confirmLabel: "Cerrar las demás",
+      title: $localize`:@@ui.96899890493bf4:Cerrar las demás sesiones`,
+      message: $localize`:@@ui.740dc42c43fcf7:Todos los demás dispositivos perderán el acceso inmediatamente. Esta sesión se mantiene abierta.`,
+      confirmLabel: $localize`:@@ui.43ea17d0a60160:Cerrar las demás`,
       destructive: true,
     });
     if (!confirmed) return;
     await this.runRevocation("bulk-others", intent, async () => {
       const revoked = await this.auth.revokeOtherSessions();
-      return { signedOut: false, notice: revoked > 0 ? `Se cerraron ${revoked} sesiones` : "No había otras sesiones abiertas" };
-    }, "No se pudieron cerrar las demás sesiones");
+      return { signedOut: false, notice: revoked > 0 ? `Se cerraron ${revoked} sesiones` : $localize`:@@ui.0682104e392053:No había otras sesiones abiertas` };
+    }, $localize`:@@ui.1497e4d3b70fff:No se pudieron cerrar las demás sesiones`);
   }
 
   async closeAllSessions(): Promise<void> {
     const intent = this.captureIntent();
     if (!intent) return;
     const confirmed = await this.actions.confirm({
-      title: "Cerrar todas las sesiones",
-      message: "Se cerrará la sesión de este dispositivo y la de todos los demás. Tendrás que volver a iniciar sesión.",
-      confirmLabel: "Cerrar todas",
+      title: $localize`:@@ui.18df0eef524e28:Cerrar todas las sesiones`,
+      message: $localize`:@@ui.3f875e171afcb7:Se cerrará la sesión de este dispositivo y la de todos los demás. Tendrás que volver a iniciar sesión.`,
+      confirmLabel: $localize`:@@ui.81c52b64777696:Cerrar todas`,
       destructive: true,
     });
     if (!confirmed) return;
     await this.runRevocation("bulk-all", intent, async () => {
       await this.auth.revokeAllSessions();
       return { signedOut: true };
-    }, "No se pudieron cerrar las sesiones");
+    }, $localize`:@@ui.4598b5bca70954:No se pudieron cerrar las sesiones`);
   }
 
   private async runRevocation(label: string, intent: { context: string; generation: number },
@@ -241,23 +243,23 @@ export class SecurityCenterComponent {
         const stillClosed = () => ownsCommand() && this.contextKey() === completedContext;
         try {
           const navigated = await this.router.navigate(["/auth"]);
-          if (!navigated && stillClosed()) this.snackbar.open("La sesión quedó cerrada. Abre la pantalla de acceso para continuar.", "Cerrar", { duration: 5000 });
+          if (!navigated && stillClosed()) this.snackbar.open($localize`:@@ui.50eb23c1cdbc23:La sesión quedó cerrada. Abre la pantalla de acceso para continuar.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
         } catch {
-          if (stillClosed()) this.snackbar.open("La sesión quedó cerrada, pero no se pudo abrir la pantalla de acceso.", "Cerrar", { duration: 5000 });
+          if (stillClosed()) this.snackbar.open($localize`:@@ui.b26fd1ec402975:La sesión quedó cerrada, pero no se pudo abrir la pantalla de acceso.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
         }
         return;
       }
       if (!current()) return;
-      this.snackbar.open(result.notice!, "Cerrar", { duration: label === "bulk-others" ? 3000 : 2500 });
+      this.snackbar.open(result.notice!, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: label === "bulk-others" ? 3000 : 2500 });
       await this.load();
     } catch (err) {
-      if (current()) this.snackbar.open(err instanceof ApiRequestError ? err.message : fallback, "Cerrar", { duration: 4000 });
+      if (current()) this.snackbar.open(err instanceof ApiRequestError ? err.message : fallback, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
     } finally {
       if (ownsCommand()) this.revokingId.set(null);
     }
   }
 
-  actionLabel(action: string): string { return ACTION_LABELS[action] ?? "Actividad de seguridad"; }
-  formatDate(value: string | null): string { return dateTimeMediumLabel(value, "Sin registro disponible"); }
+  actionLabel(action: string): string { return ACTION_LABELS[action] ?? $localize`:@@ui.d926b57ad7918b:Actividad de seguridad`; }
+  formatDate(value: string | null): string { return dateTimeMediumLabel(value, $localize`:@@ui.dc5e5da4e1a26b:Sin registro disponible`); }
   agent(value: string | null): string { return sessionAgentLabel(value); }
 }

@@ -79,7 +79,7 @@ final class EmailChangeAdmission
                 'expires_at' => $expiresAt,
                 'created_at' => now(),
             ]);
-            if (! UvhMail::emailChangeVerification($newEmail, $verificationUrl, $tokenHash)) {
+            if (! UvhMail::emailChangeVerification($newEmail, $verificationUrl, $tokenHash, $locked->language ?? 'es')) {
                 throw new MailAdmissionException('Email change verification outbox admission failed');
             }
             // The previous mailbox must receive a durable warning in the

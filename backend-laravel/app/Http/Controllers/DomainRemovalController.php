@@ -45,12 +45,12 @@ final class DomainRemovalController
             $ids = DomainReassignment::linkIds($request->input('linkIds'));
             $target = $request->input('targetDomainId');
             if (! $request->exists('targetDomainId') || ($target !== null && (! is_int($target) || $target < 1))) {
-                throw new LinkException('Selecciona un dominio de destino.', 422);
+                throw new LinkException(__('messages.error_6cb72695ed3a51'), 422);
             }
             $versions = $apply ? DomainReassignment::versions($request->input('expectedVersions'), $ids) : null;
             $key = $request->header('Idempotency-Key');
             if ($apply && ! Idempotency::validateKey($key)['ok']) {
-                throw new LinkException('Falta una Idempotency-Key válida.', 422);
+                throw new LinkException(__('messages.error_23fa3c35b27b1b'), 422);
             }
 
             return DB::transaction(function () use ($request, $id, $apply, $ids, $target, $versions, $key): JsonResponse {
@@ -65,7 +65,7 @@ final class DomainRemovalController
                         return response()->json($begin['body'], $begin['status'])->header('Idempotent-Replay', 'true');
                     }
                     if ($begin['state'] !== 'fresh') {
-                        throw new LinkException('Esta intención está en curso o cambió. Revisa la operación antes de reintentar.', 409);
+                        throw new LinkException(__('messages.error_e3832629a8f3ef'), 409);
                     }
                     $lease = (string) $begin['lease'];
                     Idempotency::renew((int) $user->id, $scope, (string) $key, $hash, $lease);
@@ -75,7 +75,7 @@ final class DomainRemovalController
                     return response()->json($prepared['preview']);
                 }
                 if (! $prepared['preview']['canApply']) {
-                    throw new LinkException('Hay enlaces bloqueados o alias ocupados. Revisa la selección antes de confirmar.', 409);
+                    throw new LinkException(__('messages.error_1a9c43a0582817'), 409);
                 }
                 $events = [];
                 foreach ($prepared['links'] as $link) {
@@ -98,7 +98,7 @@ final class DomainRemovalController
             return response()->json(['error' => $e->getMessage()], $e->status);
         } catch (QueryException $e) {
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'Un alias se ocupó durante la operación. Revisa de nuevo la selección.'], 409);
+                return response()->json(['error' => __('messages.error_4304d4a133d554')], 409);
             }
             throw $e;
         }

@@ -11,11 +11,11 @@ final class QrLogo
     public static function normalize(UploadedFile $file): array
     {
         if (! $file->isValid() || $file->getSize() > 2 * 1024 * 1024 || $file->getSize() < 12) {
-            throw new LinkException('El logo debe ser un PNG o JPG de hasta 2 MB.', 422);
+            throw new LinkException(__('messages.error_fe7ec48b82e539'), 422);
         }
         $bytes = file_get_contents($file->getPathname());
         if ($bytes === false) {
-            throw new LinkException('No se pudo leer el logo.', 422);
+            throw new LinkException(__('messages.error_b042045c337987'), 422);
         }
         $png = str_starts_with($bytes, "\x89PNG\r\n\x1a\n");
         $jpeg = str_starts_with($bytes, "\xff\xd8\xff");
@@ -23,16 +23,16 @@ final class QrLogo
         if ((! $png && ! $jpeg) || ! $size || ! in_array($size[2], [IMAGETYPE_PNG, IMAGETYPE_JPEG], true)
             || ($png && $size[2] !== IMAGETYPE_PNG) || ($jpeg && $size[2] !== IMAGETYPE_JPEG)
             || $size[0] < 1 || $size[1] < 1 || $size[0] > 4096 || $size[1] > 4096) {
-            throw new LinkException('El logo debe ser un PNG o JPG real, de hasta 4096 px por lado.', 422);
+            throw new LinkException(__('messages.error_d17ec1c95af37a'), 422);
         }
         $source = @imagecreatefromstring($bytes);
         if (! $source) {
-            throw new LinkException('La imagen no se puede decodificar.', 422);
+            throw new LinkException(__('messages.error_e6d7f131c7704b'), 422);
         }
         $target = null;
         try {
             if (imagesx($source) !== $size[0] || imagesy($source) !== $size[1]) {
-                throw new LinkException('Las dimensiones de la imagen no son válidas.', 422);
+                throw new LinkException(__('messages.error_7ad9eed96df05e'), 422);
             }
             if ($jpeg) {
                 $orientation = self::orientation($bytes);
@@ -48,7 +48,7 @@ final class QrLogo
                 if ($angle !== 0) {
                     $rotated = imagerotate($source, $angle, 0);
                     if (! $rotated) {
-                        throw new LinkException('No se pudo orientar el logo.', 422);
+                        throw new LinkException(__('messages.error_7fb072d0b9d34d'), 422);
                     }
                     imagedestroy($source);
                     $source = $rotated;
@@ -62,7 +62,7 @@ final class QrLogo
             imagesavealpha($target, true);
             imagefill($target, 0, 0, imagecolorallocatealpha($target, 0, 0, 0, 127));
             if (! imagecopyresampled($target, $source, 0, 0, 0, 0, $width, $height, imagesx($source), imagesy($source))) {
-                throw new LinkException('No se pudo normalizar la imagen.', 422);
+                throw new LinkException(__('messages.error_c26c81c6359a34'), 422);
             }
             $left = $width;
             $right = -1;
@@ -79,12 +79,12 @@ final class QrLogo
                 }
             }
             if ($right < $left) {
-                throw new LinkException('El logo no contiene píxeles visibles.', 422);
+                throw new LinkException(__('messages.error_9be64112fb6660'), 422);
             }
             if ($left !== 0 || $top !== 0 || $right !== $width - 1 || $bottom !== $height - 1) {
                 $cropped = imagecrop($target, ['x' => $left, 'y' => $top, 'width' => $right - $left + 1, 'height' => $bottom - $top + 1]);
                 if (! $cropped) {
-                    throw new LinkException('No se pudo ajustar el logo.', 422);
+                    throw new LinkException(__('messages.error_9ae33c26ec7de3'), 422);
                 }
                 imagedestroy($target);
                 $target = $cropped;
@@ -95,14 +95,14 @@ final class QrLogo
             ob_start();
             try {
                 if (! imagepng($target, null, 6)) {
-                    throw new LinkException('No se pudo codificar el logo.', 422);
+                    throw new LinkException(__('messages.error_f5ffaffdc2e71d'), 422);
                 }
                 $normalized = ob_get_contents();
             } finally {
                 ob_end_clean();
             }
             if (! is_string($normalized) || $normalized === '') {
-                throw new LinkException('No se pudo codificar el logo.', 422);
+                throw new LinkException(__('messages.error_f5ffaffdc2e71d'), 422);
             }
 
             return ['png' => $normalized, 'width' => $width, 'height' => $height, 'inputHash' => hash('sha256', $bytes)];

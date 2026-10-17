@@ -16,7 +16,7 @@ final class QrVariantController
     public function index(Request $request, int $linkId): JsonResponse
     {
         if (! DB::table('links')->where('workspace_id', UvhRequest::workspaceId($request))->where('id', $linkId)->exists()) {
-            return response()->json(['error' => 'Enlace no encontrado.'], 404);
+            return response()->json(['error' => __('messages.error_2f4bde2886e62b')], 404);
         }
         $rows = DB::table('qr_variants')->where('workspace_id', UvhRequest::workspaceId($request))->where('link_id', $linkId)->orderBy('id')->get();
 
@@ -54,17 +54,17 @@ final class QrVariantController
         }
         $workspaceId = UvhRequest::workspaceId($request);
         if (! DB::table('links')->where('workspace_id', $workspaceId)->where('id', $linkId)->exists()) {
-            return response()->json(['error' => 'Enlace no encontrado.'], 404);
+            return response()->json(['error' => __('messages.error_2f4bde2886e62b')], 404);
         }
         $from = $request->query('from', now('UTC')->subDays(29)->format('Y-m-d'));
         $to = $request->query('to', now('UTC')->format('Y-m-d'));
         if (! is_string($from) || ! is_string($to) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/D', $from) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/D', $to) || ! IsoDate::parse($from) || ! IsoDate::parse($to)) {
-            return response()->json(['error' => 'Usa fechas válidas YYYY-MM-DD.'], 422);
+            return response()->json(['error' => __('messages.error_7b31b3f97e2514')], 422);
         }
         $start = new \DateTimeImmutable($from, new \DateTimeZone('UTC'));
         $end = new \DateTimeImmutable($to, new \DateTimeZone('UTC'));
         if ($end < $start || $start->diff($end)->days >= WorkspaceLimits::ANALYTICS_RANGE_DAYS) {
-            return response()->json(['error' => 'El periodo solicitado no está permitido.'], 422);
+            return response()->json(['error' => __('messages.error_f23c7f83c19635')], 422);
         }
         $variants = DB::table('qr_variants')->where('workspace_id', $workspaceId)->where('link_id', $linkId)->orderBy('id')->get();
         $counts = DB::table('qr_daily_counts')->whereIn('variant_id', $variants->pluck('id'))->whereBetween('day', [$from, $to])->get();

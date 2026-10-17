@@ -192,6 +192,45 @@ final class DomainVisitorSurfaceTest extends TestCase
         $this->assertNull($domain->refresh()->not_found_mode);
     }
 
+    public function test_branded_missing_link_has_a_neutral_game_and_only_a_valid_root_action(): void
+    {
+        $domain = $this->domain(['not_found_mode' => 'branded', 'root_destination' => 'https://brand.example.test/home']);
+        $response = $this->get('http://shop.example.test/missing?token=private-secret');
+        $response->assertStatus(404)->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $response->assertSee('data-route-puzzle', false)->assertSee('Volver al sitio');
+        $response->assertDontSee('private-secret')->assertDontSee('Ir al panel')->assertDontSee('UVH');
+        $this->assertStringContainsString('https://brand.example.test/home', $response->getContent());
+        $domain->update(['root_destination' => 'javascript:alert(1)']);
+        $this->get('http://shop.example.test/missing')->assertDontSee('Volver al sitio')->assertDontSee('javascript:');
+    }
+
+    public function test_special_states_do_not_receive_the_missing_link_game(): void
+    {
+        $domain = $this->domain();
+        $link = $this->link($domain, 'paused-link');
+        $link->update(['state' => 'paused']);
+        $this->get('http://shop.example.test/paused-link')->assertStatus(404)->assertSee('Enlace en pausa')->assertDontSee('data-route-puzzle');
+    }
+
+    public function test_missing_unlock_keeps_the_json_contract(): void
+    {
+        $this->postJson('/r/missing-link/unlock', ['password' => 'not-real'])->assertStatus(404)->assertExactJson(['error' => 'Enlace no encontrado']);
+    }
+
+    public function test_game_assets_are_allowlisted_and_do_not_consume_link_visits(): void
+    {
+        $domain = $this->domain();
+        $link = $this->link($domain, 'one-use');
+        $before = $link->fresh()->getAttributes();
+        foreach (['puzzle.v1.mjs' => 'text/javascript', 'puzzle-core.v1.mjs' => 'text/javascript', 'not-found.v1.css' => 'text/css', 'manrope-400.woff2' => 'font/woff2', 'puzzle-static.v1.svg' => 'image/svg+xml'] as $asset => $type) {
+            $assetResponse = $this->get('http://shop.example.test/visitor-assets/'.$asset)->assertOk();
+            $this->assertStringStartsWith($type, $assetResponse->headers->get('Content-Type'));
+        }
+        $this->get('http://shop.example.test/visitor-assets/secret.env')->assertNotFound();
+        $this->get('http://shop.example.test/visitor-assets/puzzle.v1.d.mts')->assertNotFound();
+        $this->assertSame($before, $link->fresh()->getAttributes());
+    }
+
     private function signIn(User $user, Workspace $workspace): void
     {
         $session = SessionManager::create($user->id, Request::create('/'), (int) $user->security_version, true);

@@ -25,15 +25,15 @@ final class LinkDuplicateController extends LinkController
             $action = $request->input('passwordAction', 'keep');
             if (! is_int($request->input('sourceVersion')) || $request->input('sourceVersion') < 1
                 || ! in_array($action, ['keep', 'replace', 'remove'], true)) {
-                throw new LinkException('Datos de duplicación inválidos.', 422);
+                throw new LinkException(__('messages.error_211d7910b18238'), 422);
             }
             $body = Request::create('/', 'POST', $request->except(['sourceVersion', 'passwordAction']));
             if ($this->unsupportedBodyField($body) !== null || ! $this->validLinkBody($body, true)) {
-                throw new LinkException('Datos de duplicación inválidos.', 422);
+                throw new LinkException(__('messages.error_211d7910b18238'), 422);
             }
             if ($action === 'replace' && (! is_string($request->input('password')) || $request->input('password') === '' || strlen($request->input('password')) > 72)
                 || ($action !== 'replace' && $request->has('password'))) {
-                throw new LinkException('Elige mantener, sustituir o quitar la contraseña.', 422);
+                throw new LinkException(__('messages.error_726a9c1a51cfa9'), 422);
             }
             $workspaceId = UvhRequest::workspaceId($request);
             $user = UvhRequest::user($request);
@@ -43,24 +43,24 @@ final class LinkDuplicateController extends LinkController
                 $receipt = DB::table('link_duplicate_receipts')->where('workspace_id', $workspaceId)->where('user_id', $user->id)->where('idempotency_key', $key)->first();
                 if ($receipt) {
                     if (! hash_equals($receipt->request_hash, $hash)) {
-                        throw new LinkException('Esta clave corresponde a otra duplicación.', 409);
+                        throw new LinkException(__('messages.error_3e5ae87f85f5f5'), 409);
                     }
                     $previous = Link::where('workspace_id', $workspaceId)->where('id', $receipt->link_id)->first();
                     if (! $previous) {
-                        throw new LinkException('La copia creada con esta clave fue eliminada.', 410);
+                        throw new LinkException(__('messages.error_3522692bdac9c5'), 410);
                     }
 
                     return $previous;
                 }
                 $source = Link::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
                 if (! $source) {
-                    throw new LinkException('Enlace no encontrado.', 404);
+                    throw new LinkException(__('messages.error_2f4bde2886e62b'), 404);
                 }
                 if ($source->state === 'blocked' || $source->state === 'deleted') {
-                    throw new LinkException('No se puede duplicar un enlace bloqueado o eliminado.', 403);
+                    throw new LinkException(__('messages.error_2ce17c130e248e'), 403);
                 }
                 if ((int) $source->version !== $request->input('sourceVersion')) {
-                    throw new LinkException('El enlace original cambió. Recarga antes de duplicarlo.', 409);
+                    throw new LinkException(__('messages.error_28fba5e7585899'), 409);
                 }
                 $input = $this->inputFromRequest($body, $source);
                 if (! array_key_exists('app_opening', $input)) {

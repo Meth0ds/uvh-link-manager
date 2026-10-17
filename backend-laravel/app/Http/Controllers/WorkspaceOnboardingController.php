@@ -55,7 +55,7 @@ final class WorkspaceOnboardingController
         if (! $row) {
             // Match missing, revoked and foreign workspace responses without
             // leaking existence, names, invitation recipients or MFA secrets.
-            return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+            return response()->json(['error' => __('messages.error_d9a2380a9ab989')], 403);
         }
 
         return response()->json([
@@ -93,7 +93,7 @@ final class WorkspaceOnboardingController
         $user = UvhRequest::user($request);
         $hidden = $request->input('hidden');
         if (! is_bool($hidden)) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $updated = DB::table('memberships')
@@ -101,7 +101,7 @@ final class WorkspaceOnboardingController
             ->update(['onboarding_dismissed_at' => $hidden ? now() : null]);
         if ($updated === 0) {
             // Same answer as `show`: no existence oracle for foreign ids.
-            return response()->json(['error' => 'Sin acceso a este workspace'], 403);
+            return response()->json(['error' => __('messages.error_d9a2380a9ab989')], 403);
         }
 
         return response()->json([

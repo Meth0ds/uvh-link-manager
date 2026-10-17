@@ -18,6 +18,7 @@
 .public-menu-trigger { display: none; align-items: center; gap: 10px; min-height: 44px; padding: 8px 0 8px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: 700 14px Manrope, sans-serif; cursor: pointer; }
 .public-menu-trigger mat-icon { width: 22px; height: 22px; font-size: 22px; }
 .public-mobile-layer { display: none; }
+.public-mobile-preferences { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; padding-block: 14px; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 700; }
 .legal-main { padding-block: 64px 80px; scroll-margin-top: 104px; }
 .legal-main:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
 .legal-container { width: min(1280px, calc(100% - 112px)); margin: auto; }
@@ -45,6 +46,7 @@
 @media (max-width: 1200px) { .brand-caption { display: none; } .legal-nav-links { gap: 20px; } .legal-footer-inner { column-gap: 32px; } }
 @media (max-width: 1000px) { .legal-container, .legal-footer-inner { width: calc(100% - 64px); } }
 @media (max-width: 900px) {
+  .legal-actions > app-language-selector { display: none; }
   .legal-header-inner { gap: 16px; }
   .legal-nav-links { display: none; }
   .legal-actions { margin-left: auto; gap: 16px; }

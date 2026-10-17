@@ -20,7 +20,7 @@ export function apiMessage(error: unknown, fallback: string): string {
  */
 export function adminMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiRequestError && error.status === 403) {
-    return "La consola requiere una sesión de administrador con MFA completado en este navegador.";
+    return $localize`:@@ui.0bb8617b2ab391:La consola requiere una sesión de administrador con MFA completado en este navegador.`;
   }
   return apiMessage(error, fallback);
 }

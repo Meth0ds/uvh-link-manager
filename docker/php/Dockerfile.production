@@ -17,6 +17,8 @@ COPY backend-laravel/composer.json backend-laravel/composer.lock ./
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts \
         --ignore-platform-req=ext-intl --ignore-platform-req=ext-gd
 COPY backend-laravel ./
+COPY frontend/public/visitor-assets ./resources/visitor-assets
+COPY shared/localisation ./resources/localisation
 RUN APP_ENV=local \
     APP_DEBUG=false \
     APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \

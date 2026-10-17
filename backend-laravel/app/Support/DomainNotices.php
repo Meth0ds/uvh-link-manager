@@ -106,7 +106,7 @@ final class DomainNotices
         if (! $user || $user->email === '') {
             return;
         }
-        UvhMail::domainNotice(
+        MailLanguage::render($user->email, static fn (): bool => UvhMail::domainNotice(
             $user->email,
             $kind,
             $domain,
@@ -114,21 +114,22 @@ final class DomainNotices
             self::reasonLabel($reason),
             $userId,
             $eventUuid !== '' ? $eventUuid : 'kind:'.$kind,
-        );
+            Language::current(),
+        ), $user->language ?? 'es');
     }
 
     private static function reasonLabel(string $reason): string
     {
         return match ($reason) {
-            'ownership_missing' => 'no encontramos el registro TXT de propiedad',
-            'routing_missing' => 'el CNAME ya no apunta a UVH',
-            'ownership_and_routing_missing' => 'faltan el TXT de propiedad y el CNAME',
-            'domain_claimed_elsewhere' => 'otro workspace ha probado la propiedad del dominio',
-            'claim_transferred' => 'la propiedad del dominio cambió de workspace',
-            'resolver_unavailable' => 'no pudimos confirmar la configuración DNS',
-            'certificate_expired' => 'el certificado HTTPS ha caducado',
-            'certificate_probe_failed' => 'el certificado HTTPS dejó de responder',
-            default => 'la configuración DNS dejó de ser válida',
+            'ownership_missing' => __('notifications.domain_reason_ownership_missing'),
+            'routing_missing' => __('notifications.domain_reason_routing_missing'),
+            'ownership_and_routing_missing' => __('notifications.domain_reason_ownership_and_routing_missing'),
+            'domain_claimed_elsewhere' => __('notifications.domain_reason_domain_claimed_elsewhere'),
+            'claim_transferred' => __('notifications.domain_reason_claim_transferred'),
+            'resolver_unavailable' => __('notifications.domain_reason_resolver_unavailable'),
+            'certificate_expired' => __('notifications.domain_reason_certificate_expired'),
+            'certificate_probe_failed' => __('notifications.domain_reason_certificate_probe_failed'),
+            default => __('notifications.domain_reason_unknown'),
         };
     }
 }

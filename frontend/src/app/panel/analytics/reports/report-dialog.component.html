@@ -4,13 +4,13 @@
     <h2 mat-dialog-title>
       {{
         saved()
-          ? "Informe listo para compartir"
+          ? uiText.ui_62acf3026f5f19
           : data.report
-            ? "Editar informe compartido"
-            : "Compartir resultados"
+            ? uiText.ui_d2f526b17c81d6
+            : uiText.ui_a2dd4c9e79e7c5
       }}
     </h2>
-    <p>Un informe de solo lectura, con los datos que tú elijas.</p>
+    <p><ng-container i18n="@@ui.4d59fc170ea1dd">Un informe de solo lectura, con los datos que tú elijas.</ng-container></p>
   </div>
   <button
     mat-icon-button
@@ -18,12 +18,12 @@
     aria-label="Cerrar informe"
     (click)="close()"
     [disabled]="busy()"
-  >
+   i18n-aria-label="@@ui.b9dc18c75f38dc">
     <mat-icon>close</mat-icon>
   </button>
 </header>
 @if (busy()) {
-  <mat-progress-bar mode="indeterminate" aria-label="Guardando informe" />
+  <mat-progress-bar mode="indeterminate" aria-label="Guardando informe"  i18n-aria-label="@@ui.17dc0324fae0a6"/>
 }
 <mat-dialog-content>
   @if (saved(); as report) {
@@ -33,34 +33,34 @@
       <p>
         {{ report.links.length }}
         {{
-          report.links.length === 1 ? "enlace incluido" : "enlaces incluidos"
+          report.links.length === 1 ? uiText.ui_902a3c046e67e7 : uiText.ui_5cbb3cda530cf0
         }}
         ·
         {{
           report.passwordProtected
-            ? "Protegido con contraseña"
-            : "Acceso mediante URL secreta"
+            ? uiText.ui_db11226e41a4d6
+            : uiText.ui_98fd60ffca6c8c
         }}
       </p>
       <p>
         {{
           report.expiresAt
-            ? "Caduca el " + report.expiresAt.slice(0, 10)
-            : "Sin caducidad"
+            ? uiText.ui_883c7aa54a8ebc + report.expiresAt.slice(0, 10)
+            : uiText.ui_15cb784388aa7c
         }}
       </p>
       <div class="sharing-address">
-        <span>URL de acceso</span
+        <span><ng-container i18n="@@ui.9c4f99459bc6ec">URL de acceso</ng-container></span
         ><input
           readonly
           [value]="report.shareUrl"
           aria-label="URL secreta del informe"
-        />
+         i18n-aria-label="@@ui.9f0ddf8c297bb3"/>
       </div>
       <p class="private-note">
-        <mat-icon>lock_outline</mat-icon>Quien reciba esta URL podrá consultar
+        <mat-icon>lock_outline</mat-icon><ng-container i18n="@@ui.7fa7642aeeaac6">Quien reciba esta URL podrá consultar
         los datos publicados.
-      </p>
+      </ng-container></p>
       <div class="success-actions">
         <button
           mat-flat-button
@@ -75,15 +75,15 @@
           }}</mat-icon
           >{{
             copy.phase(report.shareUrl, copyContext) === "copied"
-              ? "URL copiada"
-              : "Copiar URL"
+              ? uiText.ui_8364e22cbc362b
+              : uiText.ui_96a1ec86cd74cb
           }}</button
         ><a
           mat-stroked-button
           [href]="report.shareUrl"
           target="_blank"
           rel="noopener noreferrer"
-          ><mat-icon>open_in_new</mat-icon>Abrir informe</a
+          ><mat-icon>open_in_new</mat-icon><ng-container i18n="@@ui.76a6a1d572ca49">Abrir informe</ng-container></a
         >
       </div>
     </section>
@@ -91,30 +91,30 @@
     <div class="report-layout">
       <form id="report-form" (ngSubmit)="save()" class="report-form">
         <section>
-          <h3>Contenido</h3>
+          <h3><ng-container i18n="@@ui.197c7a8551b91c">Contenido</ng-container></h3>
           <p>
-            Define qué resultados vas a compartir y cómo reconocerá los enlaces
+            <ng-container i18n="@@ui.af1d12d2ab10e7">Define qué resultados vas a compartir y cómo reconocerá los enlaces
             tu cliente.
-          </p>
+          </ng-container></p>
           <label
-            >Título del informe<input
+            ><ng-container i18n="@@ui.57924bd4d06132">Título del informe</ng-container><input
               name="title"
               [(ngModel)]="spec.title"
               maxlength="120"
               required
-              placeholder="Resultados de la campaña de otoño" /></label
+              placeholder="Resultados de la campaña de otoño"  i18n-placeholder="@@ui.1313e7b3b75e6d"/></label
           ><label
-            >Descripción <span>Opcional</span
+            ><ng-container i18n="@@ui.eb3937d988deb5">Descripción </ng-container><span><ng-container i18n="@@ui.a6e63474985fa1">Opcional</ng-container></span
             ><textarea
               name="description"
               [(ngModel)]="spec.description"
               maxlength="500"
               rows="2"
               placeholder="Contexto para interpretar estos resultados"
-            ></textarea>
+             i18n-placeholder="@@ui.1b1ea11a284135"></textarea>
           </label>
           <div class="selection-heading">
-            <strong>Enlaces incluidos</strong
+            <strong><ng-container i18n="@@ui.8a71dd4a2ed8c3">Enlaces incluidos</ng-container></strong
             ><span>{{ selection().length }} / 100</span>
           </div>
           @if (selection().length) {
@@ -126,12 +126,12 @@
                     (input)="label(link.linkId, $any($event.target).value)"
                     maxlength="120"
                     [attr.aria-label]="
-                      'Etiqueta pública del enlace ' + link.label
+                      uiText.ui_3e0db248c07da4 + link.label
                     "
                   /><button
                     mat-icon-button
                     type="button"
-                    [attr.aria-label]="'Quitar ' + link.label"
+                    [attr.aria-label]="uiText.ui_6737992f153c72 + link.label"
                     (click)="remove(link.linkId)"
                   >
                     <mat-icon>close</mat-icon>
@@ -141,8 +141,8 @@
             </div>
           }
           <small
-            >Las etiquetas son públicas. Usa un nombre interno solo si quieres
-            mostrarlo al cliente.</small
+            ><ng-container i18n="@@ui.688f8b01fe4075">Las etiquetas son públicas. Usa un nombre interno solo si quieres
+            mostrarlo al cliente.</ng-container></small
           >
           <label class="search-label"
             ><mat-icon>search</mat-icon
@@ -154,15 +154,15 @@
               placeholder="Buscar enlaces para incluir"
               maxlength="200"
               aria-label="Buscar enlaces para el informe"
-          /></label>
+           i18n-aria-label="@@ui.7240a7d802380c" i18n-placeholder="@@ui.2ce83bf96c6d9b"/></label>
           <div class="link-picker" [attr.aria-busy]="searching()">
             @if (searching()) {
-              <p role="status">Buscando enlaces…</p>
+              <p role="status"><ng-container i18n="@@ui.ad315c422e3032">Buscando enlaces…</ng-container></p>
             } @else if (searchError()) {
               <p role="alert">{{ searchError() }}</p>
               <button mat-button type="button" (click)="search()">
-                Reintentar
-              </button>
+                <ng-container i18n="@@ui.710d1a79fe2d8a">Reintentar
+              </ng-container></button>
             } @else {
               @for (link of results(); track link.id) {
                 <button
@@ -181,7 +181,7 @@
                   >
                 </button>
               } @empty {
-                <p>No hay enlaces disponibles para esta búsqueda.</p>
+                <p><ng-container i18n="@@ui.015cca0201ea3e">No hay enlaces disponibles para esta búsqueda.</ng-container></p>
               }
             }
           </div>
@@ -192,42 +192,42 @@
               [disabled]="searchPage <= 1 || searching()"
               (click)="page(-1)"
             >
-              Anterior</button
-            ><span>Página {{ searchPage }}</span
+              <ng-container i18n="@@ui.e4ce7c09d51e3b">Anterior</ng-container></button
+            ><span><ng-container i18n="@@ui.819366ca3c2a1c">Página {{ searchPage }}</ng-container></span
             ><button
               mat-button
               type="button"
               [disabled]="searchPage * 20 >= searchTotal() || searching()"
               (click)="page(1)"
             >
-              Siguiente
-            </button>
+              <ng-container i18n="@@ui.841e92b5096232">Siguiente
+            </ng-container></button>
           </div>
         </section>
         <section>
-          <h3>Datos visibles</h3>
+          <h3><ng-container i18n="@@ui.ae3667867bfb10">Datos visibles</ng-container></h3>
           <p>
-            El cliente podrá consultar únicamente este periodo y estas
+            <ng-container i18n="@@ui.67bbc2dd03c4f1">El cliente podrá consultar únicamente este periodo y estas
             secciones.
-          </p>
+          </ng-container></p>
           <label
-            >Periodo<select name="period" [(ngModel)]="spec.period">
-              <option value="7d">Últimos 7 días</option>
-              <option value="30d">Últimos 30 días</option>
-              <option value="90d">Últimos 90 días</option>
-              <option value="custom">Fechas concretas</option>
+            ><ng-container i18n="@@ui.fb5065f3c8c1ca">Periodo</ng-container><select name="period" [(ngModel)]="spec.period">
+              <option value="7d"><ng-container i18n="@@ui.bb16b73fa6875b">Últimos 7 días</ng-container></option>
+              <option value="30d"><ng-container i18n="@@ui.43b4552642c140">Últimos 30 días</ng-container></option>
+              <option value="90d"><ng-container i18n="@@ui.368dc5257e1e76">Últimos 90 días</ng-container></option>
+              <option value="custom"><ng-container i18n="@@ui.d71e379fc9a2ef">Fechas concretas</ng-container></option>
             </select></label
           >
           @if (spec.period === "custom") {
             <div class="date-pair">
               <label
-                >Desde<input
+                ><ng-container i18n="@@ui.8b4e93e928dfd6">Desde</ng-container><input
                   type="date"
                   name="from"
                   [(ngModel)]="spec.from"
                   required /></label
               ><label
-                >Hasta<input
+                ><ng-container i18n="@@ui.3c83e355810781">Hasta</ng-container><input
                   type="date"
                   name="to"
                   [(ngModel)]="spec.to"
@@ -247,35 +247,35 @@
           </div>
         </section>
         <section>
-          <h3>Acceso</h3>
-          <p>Puedes revocar el informe o cambiar su URL cuando lo necesites.</p>
+          <h3><ng-container i18n="@@ui.bf904abc16526a">Acceso</ng-container></h3>
+          <p><ng-container i18n="@@ui.e6021e355d7175">Puedes revocar el informe o cambiar su URL cuando lo necesites.</ng-container></p>
           <label
-            >Contraseña<select
+            ><ng-container i18n="@@ui.a389a638dec325">Contraseña</ng-container><select
               name="passwordAction"
               [(ngModel)]="passwordAction"
             >
               <option value="keep">
                 {{
                   data.report?.passwordProtected
-                    ? "Mantener contraseña actual"
-                    : "Sin contraseña"
+                    ? uiText.ui_a3b05976ab1e90
+                    : uiText.ui_93ec422cca0ae8
                 }}
               </option>
               <option value="set">
                 {{
                   data.report?.passwordProtected
-                    ? "Sustituir contraseña"
-                    : "Añadir contraseña"
+                    ? uiText.ui_7989777706c472
+                    : uiText.ui_4b7be5c0d87088
                 }}
               </option>
               @if (data.report?.passwordProtected) {
-                <option value="remove">Quitar contraseña</option>
+                <option value="remove"><ng-container i18n="@@ui.72e0651a13e6f6">Quitar contraseña</ng-container></option>
               }
             </select></label
           >
           @if (passwordAction === "set") {
             <label
-              >Nueva contraseña<input
+              ><ng-container i18n="@@ui.902e689d3d52a0">Nueva contraseña</ng-container><input
                 type="password"
                 name="password"
                 [(ngModel)]="password"
@@ -283,21 +283,21 @@
                 maxlength="72"
                 required
               /><small
-                >Mínimo 10 caracteres. Usa una frase larga y única.</small
+                ><ng-container i18n="@@ui.cbbfe26c1d9e8f">Mínimo 10 caracteres. Usa una frase larga y única.</ng-container></small
               ></label
             >
           }
           <mat-checkbox [(ngModel)]="expiryEnabled" name="expiryEnabled"
-            >Limitar el acceso por fecha</mat-checkbox
+            ><ng-container i18n="@@ui.3658d51510c898">Limitar el acceso por fecha</ng-container></mat-checkbox
           >
           @if (expiryEnabled) {
             <label
-              >Disponible hasta<input
+              ><ng-container i18n="@@ui.52a442a3408a44">Disponible hasta</ng-container><input
                 type="datetime-local"
                 name="expiry"
                 [(ngModel)]="expiry"
                 required
-              /><small>Hora local de tu dispositivo.</small></label
+              /><small><ng-container i18n="@@ui.d553b72a47cedd">Hora local de tu dispositivo.</ng-container></small></label
             >
           }
         </section>
@@ -306,51 +306,51 @@
         }
       </form>
       <aside class="report-preview">
-        <span class="preview-label">Vista previa del contenido público</span>
+        <span class="preview-label"><ng-container i18n="@@ui.8859918a003fc2">Vista previa del contenido público</ng-container></span>
         <div class="preview-paper">
-          <span class="brand">uvh.</span>
-          <h3>{{ spec.title || "Título del informe" }}</h3>
+          <span class="brand"><ng-container i18n="@@ui.d4f8ff6686bef2">uvh.</ng-container></span>
+          <h3>{{ spec.title || uiText.ui_57924bd4d06132 }}</h3>
           <p>
             {{
               spec.description ||
-                "Los resultados que elijas, en una página clara para tu cliente."
+                uiText.ui_02b83ae3383b5c
             }}
           </p>
           <span class="period-label">{{
             spec.period === "custom"
-              ? "Periodo seleccionado"
-              : "Últimos " + spec.period.slice(0, -1) + " días"
+              ? uiText.ui_efb7a645f609f8
+              : uiText.ui_15d888bd2476c7 + spec.period.slice(0, -1) + uiText.ui_cb3ee4ef470dae
           }}</span>
           @if (spec.sections.includes("visits")) {
             <div class="preview-metric">
-              <span>Visitas registradas</span><b>—</b>
+              <span><ng-container i18n="@@ui.f1fb0d49848123">Visitas registradas</ng-container></span><b>—</b>
             </div>
           }
           @if (spec.sections.includes("series")) {
             <div class="preview-chart">
-              <mat-icon>show_chart</mat-icon><span>Evolución diaria</span>
+              <mat-icon>show_chart</mat-icon><span><ng-container i18n="@@ui.4f60a7900f7ea1">Evolución diaria</ng-container></span>
             </div>
           }
           <div class="preview-categories">
             @if (spec.sections.includes("countries")) {
-              <span><mat-icon>public</mat-icon>Países</span>
+              <span><mat-icon>public</mat-icon><ng-container i18n="@@ui.993af13e12d377">Países</ng-container></span>
             }
             @if (spec.sections.includes("devices")) {
-              <span><mat-icon>devices</mat-icon>Dispositivos</span>
+              <span><mat-icon>devices</mat-icon><ng-container i18n="@@ui.a70a1e62833434">Dispositivos</ng-container></span>
             }
           </div>
-          <small>{{ selection().length }} enlaces seleccionados</small>
+          <small><ng-container i18n="@@ui.e53e21035e53f3">{{ selection().length }} enlaces seleccionados</ng-container></small>
         </div>
         <p>
-          Los datos reales se mostrarán al abrir el informe. Los destinos y las
+          <ng-container i18n="@@ui.2707f234d01ad3">Los datos reales se mostrarán al abrir el informe. Los destinos y las
           notas permanecerán privados.
-        </p>
+        </ng-container></p>
       </aside>
     </div>
   }</mat-dialog-content
 ><mat-dialog-actions align="end"
   ><button mat-button type="button" (click)="close()" [disabled]="busy()">
-    {{ saved() ? "Cerrar" : "Cancelar" }}
+    {{ saved() ? uiText.ui_aeccae342e4bd0 : uiText.ui_bb9dbb406dcbd5 }}
   </button>
   @if (!saved()) {
     <button
@@ -362,10 +362,10 @@
       <mat-icon>{{ busy() ? "hourglass_top" : "share" }}</mat-icon
       >{{
         busy()
-          ? "Guardando…"
+          ? uiText.ui_3c8dc4dc7a83dd
           : data.report
-            ? "Guardar cambios"
-            : "Crear informe"
+            ? uiText.ui_14bdfaf2face3a
+            : uiText.ui_6f5e5b19f4bbcd
       }}
     </button>
   }

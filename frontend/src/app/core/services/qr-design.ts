@@ -29,20 +29,20 @@ export function qrContrast(foreground: string, background: string): number {
 
 /** Also called at export boundaries; DOM controls are not a validation boundary. */
 export function validateQrDesign(value: unknown): QrDesignSpec {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Diseño QR inválido.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error($localize`:@@ui.6055f34b125113:Diseño QR inválido.`);
   const input = value as Record<string, unknown>;
   const keys = ["version", "foreground", "background", "correction", "quietZone", "logo", "frame", "caption"];
-  if (Object.keys(input).some(key => !keys.includes(key)) || keys.some(key => !(key in input))) throw new Error("El diseño contiene campos no admitidos.");
-  if (input.version !== 1) throw new Error("Versión de diseño no compatible.");
+  if (Object.keys(input).some(key => !keys.includes(key)) || keys.some(key => !(key in input))) throw new Error($localize`:@@ui.13f129586389a7:El diseño contiene campos no admitidos.`);
+  if (input.version !== 1) throw new Error($localize`:@@ui.c7b0cf5bb08bf3:Versión de diseño no compatible.`);
   const color = (value: unknown): value is string => typeof value === "string" && /^#[\da-f]{6}$/i.test(value);
-  if (!color(input.foreground) || !color(input.background)) throw new Error("Usa colores sólidos sin transparencia.");
-  if (qrLuminance(input.background) < 0.8 || qrContrast(input.foreground, input.background) < 7) throw new Error("Elige módulos oscuros sobre un fondo claro, con contraste mínimo de 7:1.");
-  if (!["L", "M", "Q", "H"].includes(String(input.correction)) || ![4, 6, 8].includes(Number(input.quietZone)) || typeof input.quietZone !== "number") throw new Error("Redundancia o margen inválidos.");
-  if (!["none", "border", "caption"].includes(String(input.frame))) throw new Error("Marco inválido.");
-  if (typeof input.caption !== "string" || [...input.caption].length > 80 || /[<>\p{Cc}\p{Cf}]/u.test(input.caption)) throw new Error("El texto admite hasta 80 caracteres, sin HTML ni caracteres de control.");
+  if (!color(input.foreground) || !color(input.background)) throw new Error($localize`:@@ui.7fbea1ec7cc881:Usa colores sólidos sin transparencia.`);
+  if (qrLuminance(input.background) < 0.8 || qrContrast(input.foreground, input.background) < 7) throw new Error($localize`:@@ui.49a638c01fa894:Elige módulos oscuros sobre un fondo claro, con contraste mínimo de 7:1.`);
+  if (!["L", "M", "Q", "H"].includes(String(input.correction)) || ![4, 6, 8].includes(Number(input.quietZone)) || typeof input.quietZone !== "number") throw new Error($localize`:@@ui.6b4237f40b06bb:Redundancia o margen inválidos.`);
+  if (!["none", "border", "caption"].includes(String(input.frame))) throw new Error($localize`:@@ui.5f66034c952f27:Marco inválido.`);
+  if (typeof input.caption !== "string" || [...input.caption].length > 80 || /[<>\p{Cc}\p{Cf}]/u.test(input.caption)) throw new Error($localize`:@@ui.4d7c91bacb5cec:El texto admite hasta 80 caracteres, sin HTML ni caracteres de control.`);
   const logo = input.logo as Record<string, unknown> | null;
-  if (!logo || typeof logo !== "object" || Array.isArray(logo) || !["none", "uvh", "custom"].includes(String(logo.kind)) || Object.keys(logo).some(key => !["kind", ...(logo.kind === "custom" ? ["assetId"] : [])].includes(key))) throw new Error("Logo inválido.");
-  if (logo.kind === "custom" && logo.assetId !== null && (!Number.isSafeInteger(logo.assetId) || Number(logo.assetId) < 1)) throw new Error("Logo inválido.");
+  if (!logo || typeof logo !== "object" || Array.isArray(logo) || !["none", "uvh", "custom"].includes(String(logo.kind)) || Object.keys(logo).some(key => !["kind", ...(logo.kind === "custom" ? ["assetId"] : [])].includes(key))) throw new Error($localize`:@@ui.936cd8003d644e:Logo inválido.`);
+  if (logo.kind === "custom" && logo.assetId !== null && (!Number.isSafeInteger(logo.assetId) || Number(logo.assetId) < 1)) throw new Error($localize`:@@ui.936cd8003d644e:Logo inválido.`);
   return {
     version: 1, foreground: input.foreground.toUpperCase(), background: input.background.toUpperCase(),
     correction: logo.kind === "none" ? input.correction as QrDesignSpec["correction"] : "H",
@@ -67,8 +67,8 @@ export interface QrPrintLayout { columns: number; rows: number; perPage: number;
 
 export function validateQrPhysicalSize(design: QrDesignSpec, modules: number, sizeMm: number): number {
   const minimumMm = Math.ceil((modules + design.quietZone * 2) * 0.4 * 10) / 10;
-  if (!Number.isFinite(sizeMm) || sizeMm < minimumMm) throw new Error(`Este QR necesita al menos ${minimumMm} mm para que cada módulo mida 0,4 mm.`);
-  if (sizeMm > 1000) throw new Error("El tamaño máximo del QR es de 1000 mm.");
+  if (!Number.isFinite(sizeMm) || sizeMm < minimumMm) throw new Error($localize`:@@ui.5adb935f0a7d85:Este QR necesita al menos ${minimumMm} mm para que cada módulo mida 0,4 mm.`);
+  if (sizeMm > 1000) throw new Error($localize`:@@ui.11636c786e94aa:El tamaño máximo del QR es de 1000 mm.`);
   return minimumMm;
 }
 
@@ -77,7 +77,7 @@ export function qrPrintLayout(design: QrDesignSpec, modules: number, options: Qr
   const extent = qrExtent(design);
   const widthMm = options.sizeMm * extent.width / 1000, heightMm = options.sizeMm * extent.height / 1000;
   const columns = Math.floor((190 + 5) / (widthMm + 5)), rows = Math.floor((277 + 5) / (heightMm + 5));
-  if (columns < 1 || rows < 1) throw new Error("El QR y su marco no caben en una hoja A4 con márgenes de 10 mm.");
+  if (columns < 1 || rows < 1) throw new Error($localize`:@@ui.c8fda8433f542a:El QR y su marco no caben en una hoja A4 con márgenes de 10 mm.`);
   const perPage = columns * rows;
   const copies = options.copies === "page" ? perPage : options.copies;
   if (!Number.isInteger(copies) || copies < 1 || copies > 500) throw new Error("Elige entre 1 y 500 copias.");

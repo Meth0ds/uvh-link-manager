@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -97,6 +98,7 @@ type PrivacyTypeFilter = "" | PrivacyRightType;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdminComponent {
+  readonly uiText = UI_TEXT;
   private readonly destroyRef = inject(DestroyRef);
   private readonly api = inject(ApiService);
   private readonly snackbar = inject(MatSnackBar);
@@ -105,22 +107,22 @@ export class AdminComponent {
   readonly canOperate = this.view.eligible;
   readonly activeTab = signal(0);
   readonly navigation = [
-    { label: "Cuentas", sections: [
-      { index: 0, label: "Usuarios", detail: "Permisos y estado", icon: "group" },
-      { index: 1, label: "Registros pendientes", detail: "Activación por email", icon: "mark_email_unread" },
-      { index: 2, label: "Recuperación de cuentas", detail: "Verificación independiente", icon: "support_agent" },
+    { label: $localize`:@@ui.7c1ca4e97e0771:Cuentas`, sections: [
+      { index: 0, label: $localize`:@@ui.b06b41abacd8e6:Usuarios`, detail: $localize`:@@ui.6428a83abbf15d:Permisos y estado`, icon: "group" },
+      { index: 1, label: $localize`:@@ui.ac9a0acba7b195:Registros pendientes`, detail: $localize`:@@ui.7093990048c8c3:Activación por email`, icon: "mark_email_unread" },
+      { index: 2, label: $localize`:@@ui.f131f2e7de5fe2:Recuperación de cuentas`, detail: $localize`:@@ui.fd64f926718bab:Verificación independiente`, icon: "support_agent" },
     ] },
-    { label: "Revisión y cumplimiento", sections: [
-      { index: 3, label: "Moderación", detail: "Denuncias y apelaciones", icon: "flag" },
-      { index: 6, label: "Privacidad", detail: "Ejercicio de derechos", icon: "policy" },
+    { label: $localize`:@@ui.f4db5ab777264e:Revisión y cumplimiento`, sections: [
+      { index: 3, label: $localize`:@@ui.d1d10024f9353c:Moderación`, detail: $localize`:@@ui.1940d3f6b3a52f:Denuncias y apelaciones`, icon: "flag" },
+      { index: 6, label: $localize`:@@ui.52233e2c4d6b2e:Privacidad`, detail: $localize`:@@ui.10c8e371bf0118:Ejercicio de derechos`, icon: "policy" },
     ] },
-    { label: "Plataforma", sections: [
-      { index: 4, label: "Dominios", detail: "Propiedad, DNS y HTTPS", icon: "language" },
-      { index: 5, label: "Auditoría", detail: "Historial de decisiones", icon: "history" },
-      { index: 7, label: "Sistema", detail: "Estado y entregas", icon: "monitor_heart" },
+    { label: $localize`:@@ui.5d7325dd007ccc:Plataforma`, sections: [
+      { index: 4, label: $localize`:@@ui.3facb8d257990f:Dominios`, detail: $localize`:@@ui.1c9e434af82757:Propiedad, DNS y HTTPS`, icon: "language" },
+      { index: 5, label: $localize`:@@ui.9cb403795f3e26:Auditoría`, detail: $localize`:@@ui.b0b33ea4873c46:Historial de decisiones`, icon: "history" },
+      { index: 7, label: $localize`:@@ui.f150afd3c5994d:Sistema`, detail: $localize`:@@ui.793459addc4fcc:Estado y entregas`, icon: "monitor_heart" },
     ] },
   ];
-  readonly sectionTitle = computed(() => this.navigation.flatMap(group => group.sections).find(section => section.index === this.activeTab())?.label ?? "Administración");
+  readonly sectionTitle = computed(() => this.navigation.flatMap(group => group.sections).find(section => section.index === this.activeTab())?.label ?? $localize`:@@ui.1a1b3e6ecc51b4:Administración`);
 
   /** Manual activation: arrows move focus; Enter/Space activate the native button. */
   onSectionKeydown(event: KeyboardEvent): void {
@@ -167,7 +169,7 @@ export class AdminComponent {
     destroyRef: this.destroyRef,
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudieron cargar los usuarios",
+    fallback: $localize`:@@ui.09b92f3a67bf33:No se pudieron cargar los usuarios`,
     message: adminMessage,
     filters: () => [this.userQuery(), this.userStatus()],
     read: async (page, perPage, signal) => {
@@ -189,7 +191,7 @@ export class AdminComponent {
     destroyRef: this.destroyRef,
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudieron cargar los registros pendientes",
+    fallback: $localize`:@@ui.3d1bcd3bc85a29:No se pudieron cargar los registros pendientes`,
     message: adminMessage,
     filters: () => [this.pendingQuery()],
     read: async (page, perPage, signal) => {
@@ -209,7 +211,7 @@ export class AdminComponent {
     destroyRef: this.destroyRef,
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudieron cargar las recuperaciones",
+    fallback: $localize`:@@ui.276fbff4d894b4:No se pudieron cargar las recuperaciones`,
     message: adminMessage,
     filters: () => [this.recoveryQuery(), this.recoveryStatus()],
     read: async (page, perPage, signal) => {
@@ -229,7 +231,7 @@ export class AdminComponent {
     destroyRef: this.destroyRef,
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudieron cargar los dominios",
+    fallback: $localize`:@@ui.d32bda0e1dfe12:No se pudieron cargar los dominios`,
     message: adminMessage,
     filters: () => [this.domainQuery(), this.domainState()],
     read: async (page, perPage, signal) => {
@@ -248,7 +250,7 @@ export class AdminComponent {
     destroyRef: this.destroyRef,
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudo cargar la auditoría",
+    fallback: $localize`:@@ui.dadeab03cb91b1:No se pudo cargar la auditoría`,
     message: adminMessage,
     pageSize: 50,
     filters: () => [this.auditQuery()],
@@ -268,7 +270,7 @@ export class AdminComponent {
     destroyRef: this.destroyRef,
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudo cargar el outbox de correo",
+    fallback: $localize`:@@ui.cad7c43b4cbeaf:No se pudo cargar el outbox de correo`,
     message: adminMessage,
     filters: () => [this.mailStatus()],
     read: async (page, perPage, signal) => {
@@ -291,7 +293,7 @@ export class AdminComponent {
     destroyRef: this.destroyRef,
     context: () => this.view.key(),
     enabled: () => this.view.capture()(),
-    fallback: "No se pudieron cargar las solicitudes de privacidad",
+    fallback: $localize`:@@ui.eb4e031f6f528e:No se pudieron cargar las solicitudes de privacidad`,
     message: adminMessage,
     pageSize: 20,
     filters: () => [this.privacyStatus(), this.privacyType()],
@@ -325,7 +327,7 @@ export class AdminComponent {
   }
 
   private static readonly HEALTH_LABELS: Record<string, string> = {
-    pending: "pendiente",
+    pending: $localize`:@@ui.b66292585132b8:pendiente`,
     verified: "verificada",
     lost: "perdida",
     unknown: "desconocida",
@@ -334,12 +336,12 @@ export class AdminComponent {
     failed: "fallida",
     provisioning: "emitiendo",
     ready: "lista",
-    expiring: "por caducar",
-    error: "con error",
+    expiring: $localize`:@@ui.1a9b6590a6db20:por caducar`,
+    error: $localize`:@@ui.a1d5bc5e9a8b41:con error`,
     enabled: "activado",
     disabled: "desactivado",
-    online: "en línea",
-    offline: "fuera de servicio",
+    online: $localize`:@@ui.a62ce4a10681fc:en línea`,
+    offline: $localize`:@@ui.94f0d0dfaa0b3f:fuera de servicio`,
   };
   readonly recoveryLabel = accountRecoveryStateLabel;
   readonly mailStatusLabel = mailOutboxStateLabel;
@@ -472,9 +474,9 @@ export class AdminComponent {
     const intent = this.view.capture();
     if (!intent() || this.recoveries.stale() || this.actionKey()) return;
     const confirmed = await this.actions.confirm({
-      title: "Registrar aprobación independiente",
-      message: `Confirma únicamente si has verificado personalmente la identidad de ${recovery.email} mediante el procedimiento externo aprobado. Esta decisión queda auditada y no sustituye la aprobación de otro administrador.`,
-      confirmLabel: "He verificado la identidad",
+      title: $localize`:@@ui.1ed59964cb3535:Registrar aprobación independiente`,
+      message: $localize`:@@ui.499f77d196d608:Confirma únicamente si has verificado personalmente la identidad de ${recovery.email} mediante el procedimiento externo aprobado. Esta decisión queda auditada y no sustituye la aprobación de otro administrador.`,
+      confirmLabel: $localize`:@@ui.b96015e624552e:He verificado la identidad`,
       destructive: false,
     });
     if (!confirmed || !intent() || this.recoveries.stale()) return;
@@ -485,9 +487,9 @@ export class AdminComponent {
     const intent = this.view.capture();
     if (!intent() || this.recoveries.stale() || this.actionKey()) return;
     const confirmed = await this.actions.confirm({
-      title: "Rechazar recuperación",
-      message: `El expediente de ${recovery.email} se cerrará sin cambiar la contraseña, MFA ni sesiones de la cuenta.`,
-      confirmLabel: "Rechazar expediente",
+      title: $localize`:@@ui.ad65ed25b55d06:Rechazar recuperación`,
+      message: $localize`:@@ui.a8f0466a21ddc5:El expediente de ${recovery.email} se cerrará sin cambiar la contraseña, MFA ni sesiones de la cuenta.`,
+      confirmLabel: $localize`:@@ui.e6a5f7ed91af1d:Rechazar expediente`,
       destructive: true,
     });
     if (!confirmed || !intent() || this.recoveries.stale()) return;
@@ -505,11 +507,11 @@ export class AdminComponent {
       }, decodeAccountRecoveryDecision);
       if (!operation.isCurrent()) return;
       const message = result.status === "approved"
-        ? "Doble aprobación completada; se ha emitido un enlace de 30 minutos"
+        ? $localize`:@@ui.38f44920940009:Doble aprobación completada; se ha emitido un enlace de 30 minutos`
         : result.status === "in_review"
-          ? "Primera aprobación registrada; falta otro administrador"
-          : "Expediente rechazado sin modificar la cuenta";
-      this.snackbar.open(message, "Cerrar", { duration: 4000 });
+          ? $localize`:@@ui.262587987834b5:Primera aprobación registrada; falta otro administrador`
+          : $localize`:@@ui.3545f06c340f7e:Expediente rechazado sin modificar la cuenta`;
+      this.snackbar.open(message, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
       await Promise.all([this.recoveries.load(), this.audit.load(), this.loadOperations()]);
     } catch (error) {
       if (!operation.isCurrent()) return;
@@ -530,7 +532,7 @@ export class AdminComponent {
       this.overview.set(response);
     } catch (error) {
       if (!this.overviewRequests.isCurrent(request, this.view.key())) return;
-      this.summaryError.set(adminMessage(error, "No se pudo cargar el resumen"));
+      this.summaryError.set(adminMessage(error, $localize`:@@ui.326740ebb5e2a9:No se pudo cargar el resumen`));
     } finally {
       if (this.overviewRequests.isCurrent(request, this.view.key())) this.summaryLoading.set(false);
     }
@@ -564,11 +566,11 @@ export class AdminComponent {
     if (!intent() || this.users.stale() || this.actionKey()) return;
     const granting = !this.isAdminUser(user);
     const confirmed = await this.actions.confirm({
-      title: granting ? "Conceder acceso administrador" : "Retirar acceso administrador",
+      title: granting ? $localize`:@@ui.5ebc3b7faec459:Conceder acceso administrador` : $localize`:@@ui.54ac88e0100d79:Retirar acceso administrador`,
       message: granting
-        ? `${user.email} podrá gestionar cuentas, moderación y operación de la plataforma. El acceso seguirá requiriendo MFA.`
-        : `${user.email} dejará de acceder a la consola administrativa.`,
-      confirmLabel: granting ? "Conceder acceso" : "Retirar acceso",
+        ? $localize`:@@ui.ab507f9c56cef8:${user.email} podrá gestionar cuentas, moderación y operación de la plataforma. El acceso seguirá requiriendo MFA.`
+        : $localize`:@@ui.87baa526d57dba:${user.email} dejará de acceder a la consola administrativa.`,
+      confirmLabel: granting ? $localize`:@@ui.15c9821aca551d:Conceder acceso` : $localize`:@@ui.5a21a586096b58:Retirar acceso`,
       destructive: !granting,
     });
     if (!confirmed || !intent() || this.users.stale()) return;
@@ -579,7 +581,7 @@ export class AdminComponent {
     try {
       await this.api.patch(`/api/v1/admin/users/${user.id}`, { isAdmin: granting });
       if (!operation.isCurrent()) return;
-      this.snackbar.open("Permisos actualizados", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.2f2881dead948f:Permisos actualizados`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       await Promise.all([this.users.load(), this.audit.load()]);
     } catch (error) {
       if (!operation.isCurrent()) return;
@@ -594,11 +596,11 @@ export class AdminComponent {
     if (!intent() || this.users.stale() || this.actionKey()) return;
     const blocking = !user.deleted_at;
     const confirmed = await this.actions.confirm({
-      title: blocking ? "Bloquear cuenta" : "Restaurar cuenta",
+      title: blocking ? $localize`:@@ui.0d14d4b6fc7e3e:Bloquear cuenta` : $localize`:@@ui.086b329c4b2255:Restaurar cuenta`,
       message: blocking
-        ? `Se cerrarán las sesiones de ${user.email} y se invalidarán sus tokens de API y recuperación pendientes.`
-        : `${user.email} podrá volver a iniciar sesión. Sus sesiones y tokens anteriores seguirán invalidados.`,
-      confirmLabel: blocking ? "Bloquear cuenta" : "Restaurar cuenta",
+        ? $localize`:@@ui.a74671b9b4b06e:Se cerrarán las sesiones de ${user.email} y se invalidarán sus tokens de API y recuperación pendientes.`
+        : $localize`:@@ui.4d2711f7a6ecd3:${user.email} podrá volver a iniciar sesión. Sus sesiones y tokens anteriores seguirán invalidados.`,
+      confirmLabel: blocking ? $localize`:@@ui.0d14d4b6fc7e3e:Bloquear cuenta` : $localize`:@@ui.086b329c4b2255:Restaurar cuenta`,
       destructive: blocking,
     });
     if (!confirmed || !intent() || this.users.stale()) return;
@@ -609,7 +611,7 @@ export class AdminComponent {
     try {
       await this.api.patch(`/api/v1/admin/users/${user.id}`, { blocked: blocking });
       if (!operation.isCurrent()) return;
-      this.snackbar.open(blocking ? "Cuenta bloqueada" : "Cuenta restaurada", "Cerrar", { duration: 2500 });
+      this.snackbar.open(blocking ? $localize`:@@ui.9c16dc4e07497b:Cuenta bloqueada` : $localize`:@@ui.24e36ab42f6760:Cuenta restaurada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       await Promise.all([this.users.load(), this.loadOverview(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
       if (!operation.isCurrent()) return;
@@ -669,7 +671,7 @@ export class AdminComponent {
       this.operations.set(response);
     } catch (error) {
       if (!this.operationsRequests.isCurrent(request, this.view.key())) return;
-      this.operationsError.set(adminMessage(error, "No se pudo leer el estado operativo"));
+      this.operationsError.set(adminMessage(error, $localize`:@@ui.dedd8818133636:No se pudo leer el estado operativo`));
     } finally {
       if (this.operationsRequests.isCurrent(request, this.view.key())) this.operationsLoading.set(false);
     }
@@ -684,9 +686,9 @@ export class AdminComponent {
     const intent = this.view.capture();
     if (!intent() || !message.retryable || this.mail.stale() || this.actionKey()) return;
     const confirmed = await this.actions.confirm({
-      title: "Reintentar correo transaccional",
-      message: "Se volverá a comprobar el estado del evento antes de publicar el correo. El destinatario y el contenido permanecen cifrados y no se muestran en esta consola.",
-      confirmLabel: "Reintentar entrega",
+      title: $localize`:@@ui.15b1ded02f848b:Reintentar correo transaccional`,
+      message: $localize`:@@ui.1a0e8ca806370f:Se volverá a comprobar el estado del evento antes de publicar el correo. El destinatario y el contenido permanecen cifrados y no se muestran en esta consola.`,
+      confirmLabel: $localize`:@@ui.a26d82f2608297:Reintentar entrega`,
       destructive: false,
     });
     if (!confirmed || !intent() || this.mail.stale()) return;
@@ -696,7 +698,7 @@ export class AdminComponent {
     try {
       await this.api.post(`/api/v1/admin/mail-outbox/${message.id}/retry`, {});
       if (!operation.isCurrent()) return;
-      this.snackbar.open("Correo admitido de nuevo en la cola", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.2800275e9a267c:Correo admitido de nuevo en la cola`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       await Promise.all([this.mail.load(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
       if (!operation.isCurrent()) return;
@@ -711,11 +713,11 @@ export class AdminComponent {
     const intent = this.view.capture();
     if (!intent() || this.actionKey()) return;
     const confirmed = await this.actions.confirm({
-      title: paused ? "Pausar registros" : "Reanudar registros",
+      title: paused ? $localize`:@@ui.96f972a8dba5bd:Pausar registros` : $localize`:@@ui.7d335b2b786d24:Reanudar registros`,
       message: paused
-        ? "Mientras dure la pausa, el formulario público anunciará «Registros temporalmente pausados» y no se creará ninguna cuenta nueva. Los registros pendientes existentes siguen su curso."
-        : "El formulario público volverá a aceptar registros nuevos.",
-      confirmLabel: paused ? "Pausar registros" : "Reanudar registros",
+        ? $localize`:@@ui.e757393433aac9:Mientras dure la pausa, el formulario público anunciará «Registros temporalmente pausados» y no se creará ninguna cuenta nueva. Los registros pendientes existentes siguen su curso.`
+        : $localize`:@@ui.53f80004300fea:El formulario público volverá a aceptar registros nuevos.`,
+      confirmLabel: paused ? $localize`:@@ui.96f972a8dba5bd:Pausar registros` : $localize`:@@ui.7d335b2b786d24:Reanudar registros`,
       destructive: paused,
     });
     if (!confirmed || !intent()) return;
@@ -725,7 +727,7 @@ export class AdminComponent {
     try {
       const applied = await this.api.post("/api/v1/admin/registration-pause", { paused }, decodeRegistrationPause);
       if (!operation.isCurrent()) return;
-      this.snackbar.open(applied ? "Registros pausados" : "Registros reanudados", "Cerrar", { duration: 3000 });
+      this.snackbar.open(applied ? $localize`:@@ui.976f6fcaf2fa42:Registros pausados` : $localize`:@@ui.e200c6c9640f8b:Registros reanudados`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       await Promise.all([this.loadOverview(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
       if (!operation.isCurrent()) return;
@@ -753,28 +755,28 @@ export class AdminComponent {
   async requestPrivacyInformation(request: PrivacyRightRequest): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.privacy.stale() || this.actionKey()) return;
-    const message = await this.privacyMessage(request, "request_information", "", "Solicitar información", "Explica qué información adicional es necesaria. No solicites contraseñas, códigos MFA ni documentos por este canal.", "Enviar petición");
+    const message = await this.privacyMessage(request, "request_information", "", $localize`:@@ui.261e02fb61b0b0:Solicitar información`, $localize`:@@ui.33aca8cd818a2c:Explica qué información adicional es necesaria. No solicites contraseñas, códigos MFA ni documentos por este canal.`, $localize`:@@ui.ba2fe3137e1380:Enviar petición`);
     if (message && intent()) await this.runPrivacyAction(request, "request_information", message, "", intent);
   }
 
   async completePrivacy(request: PrivacyRightRequest): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.privacy.stale() || this.actionKey()) return;
-    const message = await this.privacyMessage(request, "complete", "", "Resolver solicitud", "Redacta una respuesta autosuficiente que describa las medidas aplicadas o los datos facilitados.", "Registrar resolución");
+    const message = await this.privacyMessage(request, "complete", "", $localize`:@@ui.5afbd44130967c:Resolver solicitud`, $localize`:@@ui.799210b26df04e:Redacta una respuesta autosuficiente que describa las medidas aplicadas o los datos facilitados.`, $localize`:@@ui.d63180d30b5111:Registrar resolución`);
     if (message && intent()) await this.runPrivacyAction(request, "complete", message, "", intent);
   }
 
   async rejectPrivacy(request: PrivacyRightRequest): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.privacy.stale() || this.actionKey()) return;
-    const message = await this.privacyMessage(request, "reject", "", "Cerrar con respuesta motivada", "Explica de forma concreta el fundamento, las alternativas y las vías de reclamación aplicables.", "Cerrar expediente", true);
+    const message = await this.privacyMessage(request, "reject", "", $localize`:@@ui.3e6eaa38058e41:Cerrar con respuesta motivada`, $localize`:@@ui.02441b434ca483:Explica de forma concreta el fundamento, las alternativas y las vías de reclamación aplicables.`, $localize`:@@ui.884962070af04b:Cerrar expediente`, true);
     if (message && intent()) await this.runPrivacyAction(request, "reject", message, "", intent);
   }
 
   async extendPrivacy(request: PrivacyRightRequest, reasonCode: "complexity" | "request_volume"): Promise<void> {
     const intent = this.view.capture();
     if (!intent() || this.privacy.stale() || this.actionKey()) return;
-    const message = await this.privacyMessage(request, "extend", reasonCode, "Ampliar plazo", "Explica por qué la complejidad o el volumen impiden responder dentro del mes ordinario.", "Notificar ampliación");
+    const message = await this.privacyMessage(request, "extend", reasonCode, $localize`:@@ui.147101aec692d2:Ampliar plazo`, $localize`:@@ui.ac790e8635d01d:Explica por qué la complejidad o el volumen impiden responder dentro del mes ordinario.`, $localize`:@@ui.b1fe9814e7fe5f:Notificar ampliación`);
     if (message && intent()) await this.runPrivacyAction(request, "extend", message, reasonCode, intent);
   }
 
@@ -789,10 +791,10 @@ export class AdminComponent {
       message,
       confirmLabel,
       destructive,
-      inputLabel: "Respuesta para el expediente",
+      inputLabel: $localize`:@@ui.7b09d544eaff6d:Respuesta para el expediente`,
       inputMultiline: true,
       inputValue: this.privacyDrafts()[this.privacyDraftKey(request, action, reasonCode)] ?? "",
-      inputPlaceholder: "Respuesta clara y verificable…",
+      inputPlaceholder: $localize`:@@ui.ea3a88ccc9ea82:Respuesta clara y verificable…`,
       inputHint: "Entre 10 y 2.000 caracteres.",
       inputRequired: true,
       inputMinLength: 10,
@@ -816,10 +818,10 @@ export class AdminComponent {
         : action === "request_information" ? "waiting_user" : action === "complete" ? "completed"
           : action === "reject" ? "rejected" : request.status;
       try { decodePrivacyAdminAction(response, expectedStatus); }
-      catch { throw new ApiRequestError("No pudimos confirmar la actualización. Revisa el expediente antes de repetirla; el borrador se conserva en esta sesión.", 502); }
+      catch { throw new ApiRequestError($localize`:@@ui.c59fd040db785d:No pudimos confirmar la actualización. Revisa el expediente antes de repetirla; el borrador se conserva en esta sesión.`, 502); }
       this.privacyDrafts.update(drafts => { const next = { ...drafts }; delete next[draftKey]; return next; });
       this.privacyUnconfirmed.update(cases => { const next = { ...cases }; delete next[request.id]; return next; });
-      this.snackbar.open("Expediente actualizado", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.c2f2075895a2c0:Expediente actualizado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       await Promise.all([this.privacy.load(), this.loadOperations(), this.audit.load()]);
     } catch (error) {
       if (!operation.isCurrent()) return;
@@ -852,10 +854,10 @@ export class AdminComponent {
 
   /** Which deployment this process is running in, said in the panel's language. */
   environmentLabel(value: string): string {
-    return ({ local: "Desarrollo local", testing: "Pruebas", staging: "Preproducción", production: "Producción" } as Record<string, string>)[value] ?? value;
+    return ({ local: $localize`:@@ui.86687b9f3c3842:Desarrollo local`, testing: "Pruebas", staging: $localize`:@@ui.8b508322f84f62:Preproducción`, production: $localize`:@@ui.ce2f505af2a46e:Producción` } as Record<string, string>)[value] ?? value;
   }
 
-  ageLabel(seconds: number | null, absent = "Sin espera"): string {
+  ageLabel(seconds: number | null, absent = $localize`:@@ui.72bf88408a9457:Sin espera`): string {
     if (seconds === null) return absent;
     if (seconds < 60) return `${seconds} s`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
@@ -863,6 +865,6 @@ export class AdminComponent {
   }
 
   private showError(error: unknown): void {
-    this.snackbar.open(apiMessage(error, "No se pudo completar la acción"), "Cerrar", { duration: 4000 });
+    this.snackbar.open(apiMessage(error, $localize`:@@ui.e04201e3425722:No se pudo completar la acción`), $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 });
   }
 }

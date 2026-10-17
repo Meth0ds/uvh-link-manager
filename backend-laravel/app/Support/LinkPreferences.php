@@ -12,7 +12,7 @@ final class LinkPreferences
     public static function enabled(): void
     {
         if (! config('workflows.enabled')) {
-            throw new LinkException('Las mejoras de enlaces todavía no están activadas.', 404);
+            throw new LinkException(__('messages.error_3f12969005266b'), 404);
         }
     }
 
@@ -24,7 +24,7 @@ final class LinkPreferences
             $user = UvhRequest::user($request);
             $context = SecurityContext::lock($user, UvhRequest::sessionId($request), requireVerifiedEmail: true);
             if (! $context || ! WorkspaceAccess::getMembershipForContext($context, UvhRequest::workspaceId($request))) {
-                throw new LinkException('Tu acceso al workspace cambió.', 403);
+                throw new LinkException(__('messages.error_6ceb5f3ceeb057'), 403);
             }
 
             return $callback();
@@ -35,24 +35,24 @@ final class LinkPreferences
     {
         if (! is_array($spec) || ($spec['version'] ?? null) !== 1
             || array_diff(array_keys($spec), ['version', 'q', 'state', 'tag', 'domainId', 'collectionId', 'utmCampaign', 'favorites', 'sort']) !== []) {
-            throw new LinkException('Filtro inválido.', 422);
+            throw new LinkException(__('messages.error_161b60685bcbab'), 422);
         }
         foreach (['q' => 300, 'tag' => 40, 'utmCampaign' => 100] as $key => $limit) {
             $value = $spec[$key] ?? '';
             if (! is_string($value) || ! mb_check_encoding($value, 'UTF-8') || mb_strlen($value) > $limit || preg_match('/[\p{Cc}\p{Cf}]/u', $value)) {
-                throw new LinkException('Filtro inválido.', 422);
+                throw new LinkException(__('messages.error_161b60685bcbab'), 422);
             }
         }
         foreach (['domainId', 'collectionId'] as $key) {
             $value = $spec[$key] ?? null;
             if ($value !== null && (! is_int($value) || $value < 1)) {
-                throw new LinkException('Referencia del filtro inválida.', 422);
+                throw new LinkException(__('messages.error_a91f879c7e9897'), 422);
             }
         }
         if (! in_array($spec['state'] ?? '', ['', 'active', 'scheduled', 'paused', 'expired', 'archived', 'blocked'], true)
             || ! in_array($spec['sort'] ?? 'created_at_desc', ['created_at_desc', 'created_at_asc', 'clicks_desc', 'alias_asc', 'name_asc', 'name_desc'], true)
             || (isset($spec['favorites']) && ! is_bool($spec['favorites']))) {
-            throw new LinkException('Filtro inválido.', 422);
+            throw new LinkException(__('messages.error_161b60685bcbab'), 422);
         }
     }
 

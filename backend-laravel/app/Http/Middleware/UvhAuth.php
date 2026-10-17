@@ -22,16 +22,16 @@ class UvhAuth
         $user = UvhRequest::user($request);
 
         if (! $user) {
-            return $level === 'optional' ? $next($request) : response()->json(['error' => 'No autenticado'], 401);
+            return $level === 'optional' ? $next($request) : response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
         if ($error = $this->expectedAccountError($request, $user)) {
             return $error;
         }
         if ($level === 'verified' && ! $user->email_verified_at) {
-            return response()->json(['error' => 'Verifica tu email para continuar'], 403);
+            return response()->json(['error' => __('messages.error_6c955667ccf0c8')], 403);
         }
         if ($level === 'admin' && ! $user->is_admin) {
-            return response()->json(['error' => 'Acceso restringido'], 403);
+            return response()->json(['error' => __('messages.error_7c0d7d7d6042d9')], 403);
         }
 
         return $next($request);
@@ -45,13 +45,13 @@ class UvhAuth
         }
         $expected = $request->header('X-Uvh-Account-Id');
         if (! is_string($expected) || preg_match('/^[1-9][0-9]{0,18}$/D', $expected) !== 1) {
-            return response()->json(['error' => 'Contexto de cuenta inválido', 'reason' => 'invalid_account_context'], 400);
+            return response()->json(['error' => __('messages.error_3a73b69b2cfb4f'), 'reason' => 'invalid_account_context'], 400);
         }
         if ($expected !== (string) $user->id) {
             // Do not revoke or replace the cookie: it may belong to a valid
             // newer login in another tab. Do not disclose either account ID.
             return response()->json([
-                'error' => 'La sesión cambió. Vuelve a comprobar tu cuenta antes de continuar.',
+                'error' => __('messages.error_ae258ba6e61fc0'),
                 'reason' => 'session_context_changed',
             ], 409);
         }

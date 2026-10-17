@@ -27,7 +27,7 @@ final class MfaConfigurationController
         $codeInput = $request->input('code');
 
         if ($password === '' || strlen($password) > 72 || ($codeInput !== null && ! is_string($codeInput))) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
         $code = is_string($codeInput) ? trim($codeInput) : null;
 
@@ -37,7 +37,7 @@ final class MfaConfigurationController
         $encryptedSecret = UvhCrypto::encryptAtRest($secret);
         $setup = MfaConfigurationAdmission::setup($user, $sessionId, $password, $code, $encryptedSecret);
         if ($setup === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión antes de configurar MFA'], 409);
+            return response()->json(['error' => __('messages.error_97c5b24eff8715')], 409);
         }
         if ($setup === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, 'mfa-setup');
@@ -46,10 +46,10 @@ final class MfaConfigurationController
             return MfaFreshness::reauthenticationRequired();
         }
         if ($setup === 'password') {
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return response()->json(['error' => __('messages.error_30124a1d7f08a4')], 403);
         }
         if ($setup !== 'ok') {
-            return response()->json(['error' => 'Código de autenticación o recuperación requerido para reconfigurar MFA'], 403);
+            return response()->json(['error' => __('messages.error_e1c56528479fd9')], 403);
         }
         $uri = Totp::provisioningUri($user->email, 'UVH', $secret);
 
@@ -60,7 +60,7 @@ final class MfaConfigurationController
     {
         $code = UvhRequest::inputString($request, 'code');
         if (! preg_match('/^\d{6}$/', $code)) {
-            return response()->json(['error' => 'Código inválido'], 422);
+            return response()->json(['error' => __('messages.error_f86b8a9bfef328')], 422);
         }
 
         $user = UvhRequest::user($request);
@@ -72,10 +72,10 @@ final class MfaConfigurationController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['operation' => 'mfa_enable']);
 
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se modificó MFA. Espera al siguiente código del autenticador e inténtalo de nuevo'], 503);
+            return response()->json(['error' => __('messages.error_39029df9cbc48a')], 503);
         }
         if ($enabled === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión antes de activar MFA.'], 409);
+            return response()->json(['error' => __('messages.error_8489bcb73e8c6c')], 409);
         }
         if ($enabled === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, 'mfa-enable');
@@ -83,7 +83,7 @@ final class MfaConfigurationController
         if ($enabled === 'invalid') {
             Audit::write($user->id, 'auth.mfa_enable_failed', 'user', $user->id);
 
-            return response()->json(['error' => 'La configuración MFA ha caducado o el código es incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_0d92aa47f77da5')], 403);
         }
 
         return response()->json([
@@ -99,7 +99,7 @@ final class MfaConfigurationController
 
         $cancelled = MfaConfigurationAdmission::cancel($user, $sessionId);
         if (! $cancelled) {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión antes de cancelar la configuración MFA.'], 409);
+            return response()->json(['error' => __('messages.error_44eea620de5939')], 409);
         }
 
         return response()->json(['ok' => true]);
@@ -115,7 +115,7 @@ final class MfaConfigurationController
         $isRecovery = preg_match('/^[A-Z2-9]{16}$/D', $normalizedRecovery) === 1;
 
         if ($password === '' || strlen($password) > 72 || (! $isTotp && ! $isRecovery)) {
-            return response()->json(['error' => 'Contraseña y segundo factor requeridos'], 422);
+            return response()->json(['error' => __('messages.error_4b111e944de437')], 422);
         }
 
         $user = UvhRequest::user($request);
@@ -127,10 +127,10 @@ final class MfaConfigurationController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['operation' => 'mfa_recovery_regenerate']);
 
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. Los códigos anteriores siguen vigentes. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_bebdb13f2aca48')], 503);
         }
         if ($result['status'] === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión antes de regenerar códigos'], 409);
+            return response()->json(['error' => __('messages.error_1e4a9e062e50e0')], 409);
         }
         if ($result['status'] === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, MfaStepUp::ATTEMPT_PURPOSE);
@@ -141,12 +141,12 @@ final class MfaConfigurationController
         if ($result['status'] === 'password') {
             Audit::write($user->id, 'auth.mfa_recovery_regenerate_failed', 'user', $user->id, ['reason' => 'password']);
 
-            return response()->json(['error' => 'Contraseña incorrecta'], 403);
+            return response()->json(['error' => __('messages.error_30124a1d7f08a4')], 403);
         }
         if ($result['status'] !== 'ok') {
             Audit::write($user->id, 'auth.mfa_recovery_regenerate_failed', 'user', $user->id, ['reason' => 'factor']);
 
-            return response()->json(['error' => 'El código de autenticación o recuperación es incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_94f7173a80a9cb')], 403);
         }
 
         return response()->json([
@@ -163,7 +163,7 @@ final class MfaConfigurationController
         $isRecovery = preg_match('/^[A-Z2-9]{16}$/D', $normalizedRecovery) === 1;
 
         if ($password === '' || strlen($password) > 72 || (! $isTotp && ! $isRecovery)) {
-            return response()->json(['error' => 'Contraseña y segundo factor requeridos'], 422);
+            return response()->json(['error' => __('messages.error_4b111e944de437')], 422);
         }
 
         $user = UvhRequest::user($request);
@@ -177,11 +177,11 @@ final class MfaConfigurationController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['operation' => 'mfa_disable']);
 
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. MFA sigue activo. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_70bfb4424fae69')], 503);
         } catch (MfaInfrastructureUnavailable $error) {
             report($error);
 
-            return response()->json(['error' => 'La verificación MFA no está disponible. MFA sigue activo. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_d91541919924ab')], 503);
         }
         if ($disabled === 'locked') {
             return MfaAttempts::tooManyResponse($user->id, 'mfa-disable');
@@ -190,15 +190,15 @@ final class MfaConfigurationController
             return MfaFreshness::reauthenticationRequired();
         }
         if ($disabled === 'stale') {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión'], 409);
+            return response()->json(['error' => __('messages.error_3fd9c1eb0bc788')], 409);
         }
         if ($disabled === 'admin_required') {
-            return response()->json(['error' => 'Retira primero el rol de administrador de plataforma antes de desactivar MFA'], 409);
+            return response()->json(['error' => __('messages.error_f6045099d04e3f')], 409);
         }
         if ($disabled !== 'ok') {
             Audit::write($user->id, 'auth.mfa_disable_failed', 'user', $user->id);
 
-            return response()->json(['error' => 'Contraseña o segundo factor incorrecto'], 403);
+            return response()->json(['error' => __('messages.error_9dfef0f6d97a7d')], 403);
         }
 
         return response()->json(['ok' => true]);

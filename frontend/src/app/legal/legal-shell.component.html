@@ -1,26 +1,27 @@
-<a class="skip-link" [routerLink]="[]" fragment="public-content" (click)="publicContent.focus()" [attr.inert]="mobileOpen() ? '' : null">Ir al contenido</a>
+<a class="skip-link" [routerLink]="[]" fragment="public-content" (click)="publicContent.focus()" [attr.inert]="mobileOpen() ? '' : null"><ng-container i18n="@@ui.bb2b678a305de4">Ir al contenido</ng-container></a>
 <header class="legal-header">
   <div class="legal-header-inner">
-    <a class="brand" routerLink="/" aria-label="UVH, volver a la página principal" (click)="closeMenu()">uvh<span>.</span></a>
-    <span class="brand-caption">Acorta y gestiona<br />tus enlaces.</span>
-    <nav class="legal-nav-links" aria-label="Navegación pública">
+    <a class="brand" routerLink="/" aria-label="UVH, volver a la página principal" (click)="closeMenu()" i18n-aria-label="@@ui.001d49a9167aca"><ng-container i18n="@@ui.3e4f24607f6041">uvh</ng-container><span>.</span></a>
+    <span class="brand-caption"><ng-container i18n="@@ui.e2131a132d53f5">Acorta y gestiona</ng-container><br /><ng-container i18n="@@ui.b090cbadf88fd2">tus enlaces.</ng-container></span>
+    <nav class="legal-nav-links" aria-label="Navegación pública" i18n-aria-label="@@ui.c3b7985f86e9ec">
       @for (page of pages; track page.path) { <a [routerLink]="page.path" routerLinkActive="active" ariaCurrentWhenActive="page">{{ page.label }}</a> }
     </nav>
-    <div class="legal-actions"><app-public-theme-toggle /><a class="public-account" routerLink="/auth" (click)="closeMenu()">Entrar</a><button #menuButton type="button" class="public-menu-trigger" aria-controls="public-mobile-navigation" [attr.aria-expanded]="mobileOpen()" [attr.aria-label]="mobileOpen() ? 'Cerrar navegación' : 'Abrir navegación'" (click)="toggleMenu()"><span>{{ mobileOpen() ? 'Cerrar' : 'Menú' }}</span><mat-icon aria-hidden="true">{{ mobileOpen() ? 'close' : 'menu' }}</mat-icon></button></div>
+    <div class="legal-actions"><app-language-selector /><app-public-theme-toggle /><a class="public-account" routerLink="/auth" (click)="closeMenu()"><ng-container i18n="@@ui.4105811890aee7">Entrar</ng-container></a><button #menuButton type="button" class="public-menu-trigger" aria-controls="public-mobile-navigation" [attr.aria-expanded]="mobileOpen()" [attr.aria-label]="mobileOpen() ? uiText.ui_288e3886685fd1 : uiText.ui_3b1e8affeb8721" (click)="toggleMenu()"><span>{{ mobileOpen() ? uiText.ui_aeccae342e4bd0 : uiText.ui_23fbd830a5c5c0 }}</span><mat-icon aria-hidden="true">{{ mobileOpen() ? 'close' : 'menu' }}</mat-icon></button></div>
   </div>
 </header>
 <div class="public-mobile-layer" [class.open]="mobileOpen()" [attr.aria-hidden]="!mobileOpen()" [attr.inert]="mobileOpen() ? null : ''">
-  <nav id="public-mobile-navigation" class="public-mobile-nav" aria-label="Navegación móvil">
+  <nav id="public-mobile-navigation" class="public-mobile-nav" aria-label="Navegación móvil" i18n-aria-label="@@ui.dac639a2120095">
     @for (page of pages; track page.path) { <a [routerLink]="page.path" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMenu()">{{ page.label }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></a> }
-    <a class="public-mobile-account" routerLink="/auth" (click)="closeMenu()">Entrar a mi cuenta<mat-icon aria-hidden="true">login</mat-icon></a>
-    <a class="public-mobile-home" routerLink="/" (click)="closeMenu()">Volver al inicio<mat-icon aria-hidden="true">home</mat-icon></a>
+    <div class="public-mobile-preferences"><span i18n="@@language.label">Idioma</span><app-language-selector [fullName]="true" /></div>
+    <a class="public-mobile-account" routerLink="/auth" (click)="closeMenu()"><ng-container i18n="@@ui.a87df5724c52ea">Entrar a mi cuenta</ng-container><mat-icon aria-hidden="true">login</mat-icon></a>
+    <a class="public-mobile-home" routerLink="/" (click)="closeMenu()"><ng-container i18n="@@ui.3906c387259faf">Volver al inicio</ng-container><mat-icon aria-hidden="true">home</mat-icon></a>
   </nav>
 </div>
 <main #publicContent class="legal-main" id="public-content" tabindex="-1" [attr.inert]="mobileOpen() ? '' : null"><div class="legal-container"><ng-content /></div></main>
 <footer class="legal-footer" [attr.inert]="mobileOpen() ? '' : null"><div class="legal-footer-inner">
-  <div class="footer-brand"><a class="brand" routerLink="/" aria-label="UVH, inicio">uvh<span>.</span></a><p>Acorta, organiza y actualiza<br />los enlaces que compartes.</p></div>
-  <nav aria-label="Ayuda y soporte"><h2>Ayuda y soporte</h2><a routerLink="/help">Centro de ayuda</a><a routerLink="/status">Estado del servicio</a><a routerLink="/legal/denuncias">Denunciar un enlace</a></nav>
-  <nav aria-label="Información legal"><h2>Información legal</h2><a routerLink="/legal/privacidad">Privacidad</a><a routerLink="/legal/terminos">Términos del servicio</a></nav>
-  <nav aria-label="Tu cuenta"><h2>Tu cuenta</h2><a routerLink="/auth">Entrar</a><a routerLink="/auth" [queryParams]="{mode: 'register'}">Crear cuenta</a></nav>
-  <div class="footer-bottom"><span>© {{ year }} UVH</span><a routerLink="/">Volver al inicio<mat-icon aria-hidden="true">arrow_upward</mat-icon></a></div>
+  <div class="footer-brand"><a class="brand" routerLink="/" aria-label="UVH, inicio" i18n-aria-label="@@ui.8afc7c79bbbb0d"><ng-container i18n="@@ui.3e4f24607f6041">uvh</ng-container><span>.</span></a><p><ng-container i18n="@@ui.12efc5eb3e475f">Acorta, organiza y actualiza</ng-container><br /><ng-container i18n="@@ui.91ce9252f181ac">los enlaces que compartes.</ng-container></p></div>
+  <nav aria-label="Ayuda y soporte" i18n-aria-label="@@ui.b7b7ae5be292e7"><h2><ng-container i18n="@@ui.b7b7ae5be292e7">Ayuda y soporte</ng-container></h2><a routerLink="/help"><ng-container i18n="@@ui.7bd8389e26df94">Centro de ayuda</ng-container></a><a routerLink="/status"><ng-container i18n="@@ui.33c62602febfb0">Estado del servicio</ng-container></a><a routerLink="/legal/denuncias"><ng-container i18n="@@ui.f6b9c77fff38ae">Denunciar un enlace</ng-container></a></nav>
+  <nav aria-label="Información legal" i18n-aria-label="@@ui.7bf153fbb17c4e"><h2><ng-container i18n="@@ui.7bf153fbb17c4e">Información legal</ng-container></h2><a routerLink="/legal/privacidad"><ng-container i18n="@@ui.52233e2c4d6b2e">Privacidad</ng-container></a><a routerLink="/legal/terminos"><ng-container i18n="@@ui.206f4cc40d6744">Términos del servicio</ng-container></a></nav>
+  <nav aria-label="Tu cuenta" i18n-aria-label="@@ui.d30c5ae09ef074"><h2><ng-container i18n="@@ui.d30c5ae09ef074">Tu cuenta</ng-container></h2><a routerLink="/auth"><ng-container i18n="@@ui.4105811890aee7">Entrar</ng-container></a><a routerLink="/auth" [queryParams]="{mode: 'register'}"><ng-container i18n="@@ui.f620f0331df880">Crear cuenta</ng-container></a></nav>
+  <div class="footer-bottom"><span><ng-container i18n="@@ui.911b7aa2da51d6">© {{ year }} UVH</ng-container></span><a routerLink="/"><ng-container i18n="@@ui.3906c387259faf">Volver al inicio</ng-container><mat-icon aria-hidden="true">arrow_upward</mat-icon></a></div>
 </div></footer>

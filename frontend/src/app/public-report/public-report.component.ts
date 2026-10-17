@@ -1,3 +1,5 @@
+import { UI_LOCALE } from "../core/localisation/locale";
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { Meta } from "@angular/platform-browser";
 import { DOCUMENT, DatePipe } from "@angular/common";
 import { Component, DestroyRef, computed, inject, signal } from "@angular/core";
@@ -25,6 +27,7 @@ import type { PublicReport } from "../core/sharing";
   styleUrl: "./public-report.component.scss",
 })
 export class PublicReportComponent {
+  readonly uiText = UI_TEXT;
   private readonly meta = inject(Meta);
   private readonly api = inject(ApiService);
   private readonly document = inject(DOCUMENT);
@@ -39,7 +42,7 @@ export class PublicReportComponent {
   readonly error = signal("");
   readonly unavailable = signal(false);
   password = "";
-  readonly number = new Intl.NumberFormat("es-ES");
+  readonly number = new Intl.NumberFormat(UI_LOCALE);
   readonly graph = computed(() => {
     const series = this.report()?.series ?? [];
     const max = Math.max(
@@ -140,7 +143,7 @@ export class PublicReportComponent {
         this.error.set(
           e instanceof ApiRequestError
             ? e.message
-            : "No se pudo abrir el informe.",
+            : $localize`:@@ui.37d2a46265d9de:No se pudo abrir el informe.`,
         );
         this.unavailable.set(e instanceof ApiRequestError && e.status === 404);
       }
@@ -161,7 +164,7 @@ export class PublicReportComponent {
       );
       if (this.requests.isCurrent(request, this.id)) {
         this.report.set(data);
-        this.document.title = data.title + " · Informe UVH";
+        this.document.title = data.title + $localize`:@@ui.94d7033db698ea: · Informe UVH`;
       }
     } catch (e) {
       if (this.requests.isCurrent(request, this.id)) {
@@ -169,7 +172,7 @@ export class PublicReportComponent {
         this.error.set(
           e instanceof ApiRequestError
             ? e.message
-            : "No se pudieron actualizar los resultados.",
+            : $localize`:@@ui.87f43233fde235:No se pudieron actualizar los resultados.`,
         );
         this.unavailable.set(
           e instanceof ApiRequestError && [401, 404].includes(e.status),
@@ -187,7 +190,7 @@ export class PublicReportComponent {
     return (
       (
         {
-          mobile: "Móvil",
+          mobile: $localize`:@@ui.cac5d3230b6884:Móvil`,
           desktop: "Ordenador",
           tablet: "Tablet",
           bot: "Automatizado",
@@ -198,7 +201,7 @@ export class PublicReportComponent {
   country(key: string): string {
     try {
       return (
-        new Intl.DisplayNames(["es"], { type: "region" }).of(
+        new Intl.DisplayNames([UI_LOCALE], { type: "region" }).of(
           key.toUpperCase(),
         ) ?? key
       );

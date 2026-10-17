@@ -65,17 +65,17 @@ class TagController
 
         $tag = Tag::where('id', $id)->where('workspace_id', $workspaceId)->first();
         if (! $tag) {
-            return response()->json(['error' => 'Etiqueta no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_235ca42a252632')], 404);
         }
         if ($this->nameTaken($workspaceId, $name, $id)) {
-            return response()->json(['error' => 'Ya existe una etiqueta con ese nombre'], 409);
+            return response()->json(['error' => __('messages.error_d195fbf506821f')], 409);
         }
 
         try {
             WorkspaceMutation::run($request, function () use ($workspaceId, $id, $name): string {
                 $tag = Tag::where('workspace_id', $workspaceId)->where('id', $id)->lockForUpdate()->first();
                 if (! $tag) {
-                    throw new LinkException('Etiqueta no encontrada', 404);
+                    throw new LinkException(__('messages.error_235ca42a252632'), 404);
                 }
                 $from = $tag->name;
                 if ($from === $name) {
@@ -100,7 +100,7 @@ class TagController
             // petición tomó el nombre en ese hueco, el índice único es el que
             // decide y el resultado es un conflicto, no un error 500.
             if (($e->errorInfo[0] ?? null) === '23505') {
-                return response()->json(['error' => 'Ya existe una etiqueta con ese nombre'], 409);
+                return response()->json(['error' => __('messages.error_d195fbf506821f')], 409);
             }
             throw $e;
         }
@@ -121,26 +121,26 @@ class TagController
         $sourceIds = $request->input('sourceIds');
         $targetId = $request->input('targetId');
         if (! is_array($sourceIds) || $sourceIds === [] || count($sourceIds) > 50) {
-            return response()->json(['error' => 'Etiquetas de origen inválidas'], 422);
+            return response()->json(['error' => __('messages.error_4531403657f74e')], 422);
         }
         $sources = [];
         foreach ($sourceIds as $sourceId) {
             if (! is_int($sourceId) || $sourceId < 1 || isset($sources[$sourceId]) || $sourceId === $targetId) {
-                return response()->json(['error' => 'Etiquetas de origen inválidas'], 422);
+                return response()->json(['error' => __('messages.error_4531403657f74e')], 422);
             }
             $sources[$sourceId] = true;
         }
         if (! is_int($targetId) || $targetId < 1) {
-            return response()->json(['error' => 'Etiqueta destino inválida'], 422);
+            return response()->json(['error' => __('messages.error_db5122c7c16c4d')], 422);
         }
 
         $target = Tag::where('id', $targetId)->where('workspace_id', $workspaceId)->first();
         if (! $target) {
-            return response()->json(['error' => 'Etiqueta destino no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_ca28f59f7721c0')], 404);
         }
         $found = Tag::where('workspace_id', $workspaceId)->whereIn('id', array_keys($sources))->count();
         if ($found !== count($sources)) {
-            return response()->json(['error' => 'Etiqueta de origen no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_fc1eea8bfe09b7')], 404);
         }
 
         try {
@@ -159,10 +159,10 @@ class TagController
                 // fusión tardía reescribiría el resultado de la temprana y un
                 // enlace acabaría en un grupo que nadie eligió.
                 if (! $locked->has($targetId)) {
-                    throw new LinkException('Etiqueta destino no encontrada', 404);
+                    throw new LinkException(__('messages.error_ca28f59f7721c0'), 404);
                 }
                 if ($locked->count() !== count($lockIds)) {
-                    throw new LinkException('Etiqueta de origen no encontrada', 404);
+                    throw new LinkException(__('messages.error_fc1eea8bfe09b7'), 404);
                 }
 
                 $links = Link::withTrashed()->where('workspace_id', $workspaceId)
@@ -209,7 +209,7 @@ class TagController
         if (! is_string($name) || ! mb_check_encoding($name, 'UTF-8')
             || mb_strlen(trim($name)) < 1 || mb_strlen($name) > 40
             || preg_match('/[\x00-\x1f\x7f]/', $name)) {
-            return 'Nombre de etiqueta inválido';
+            return __('display.display_b162d2129b69b2');
         }
 
         return null;

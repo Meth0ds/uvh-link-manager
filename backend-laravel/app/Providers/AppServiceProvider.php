@@ -105,7 +105,7 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('uvh-login', function (Request $request) {
             $identity = hash('sha256', strtolower(trim(UvhRequest::inputString($request, 'email'))));
-            $response = fn ($request, $headers) => response()->json(['error' => 'Demasiados intentos. Espera unos minutos.'], 429)->withHeaders($headers);
+            $response = fn ($request, $headers) => response()->json(['error' => __('messages.error_a2b4bef4559b31')], 429)->withHeaders($headers);
 
             return [
                 Limit::perMinutes(15, 60)->by('login-ip:'.$request->ip())->response($response),
@@ -115,7 +115,7 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('uvh-mfa', function (Request $request) {
             $challenge = hash('sha256', UvhRequest::inputString($request, 'challenge'));
-            $response = fn ($request, $headers) => response()->json(['error' => 'Demasiados intentos MFA. Espera unos minutos.'], 429)->withHeaders($headers);
+            $response = fn ($request, $headers) => response()->json(['error' => __('messages.error_60aab4e2b973c7')], 429)->withHeaders($headers);
 
             return [
                 Limit::perMinutes(15, 30)->by('mfa-ip:'.$request->ip())->response($response),
@@ -133,7 +133,7 @@ class AppServiceProvider extends ServiceProvider
                 || $request->is('api/v1/auth/account-deletion/cancel')
                 ? 'token:'.hash('sha256', UvhRequest::inputString($request, 'token'))
                 : 'account:'.hash('sha256', strtolower(trim(UvhRequest::inputString($request, 'email'))));
-            $response = fn ($request, $headers) => response()->json(['error' => 'Demasiados intentos de verificación. Espera unos minutos.'], 429)->withHeaders($headers);
+            $response = fn ($request, $headers) => response()->json(['error' => __('messages.error_092f6012f81094')], 429)->withHeaders($headers);
 
             return [
                 Limit::perMinutes(15, 30)->by('verify-ip:'.$request->ip())->response($response),
@@ -149,7 +149,7 @@ class AppServiceProvider extends ServiceProvider
             $identity = $request->is('api/v1/auth/reset-password')
                 ? 'token:'.hash('sha256', UvhRequest::inputString($request, 'token'))
                 : 'account:'.hash('sha256', strtolower(trim(UvhRequest::inputString($request, 'email'))));
-            $response = fn ($request, $headers) => response()->json(['error' => 'Demasiados intentos de recuperación. Espera unos minutos.'], 429)->withHeaders($headers);
+            $response = fn ($request, $headers) => response()->json(['error' => __('messages.error_153d8188bc7f0c')], 429)->withHeaders($headers);
 
             return [
                 Limit::perMinutes(15, 30)->by('reset-ip:'.$request->ip())->response($response),
@@ -159,7 +159,7 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('uvh-security-incident', function (Request $request) {
             $token = hash('sha256', UvhRequest::inputString($request, 'token'));
-            $response = fn ($request, $headers) => response()->json(['error' => 'Demasiados intentos. Espera unos minutos.'], 429)->withHeaders($headers);
+            $response = fn ($request, $headers) => response()->json(['error' => __('messages.error_a2b4bef4559b31')], 429)->withHeaders($headers);
 
             return [
                 Limit::perMinutes(15, 30)->by('incident-ip:'.$request->ip())->response($response),
@@ -172,7 +172,7 @@ class AppServiceProvider extends ServiceProvider
             $identity = str_ends_with($requestPath, '/request')
                 ? 'account:'.hash('sha256', strtolower(trim(UvhRequest::inputString($request, 'email'))))
                 : 'token:'.hash('sha256', UvhRequest::inputString($request, 'token'));
-            $response = fn ($request, $headers) => response()->json(['error' => 'Demasiados intentos de recuperación. Espera unos minutos.'], 429)->withHeaders($headers);
+            $response = fn ($request, $headers) => response()->json(['error' => __('messages.error_153d8188bc7f0c')], 429)->withHeaders($headers);
 
             return [
                 Limit::perMinutes(60, 20)->by('account-recovery-ip:'.$request->ip())->response($response),
@@ -185,19 +185,19 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinutes(15, 10)
                 ->by('credential:'.($session ?? $request->ip()).'|'.$request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiados intentos de seguridad. Espera unos minutos.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_a873979489bffb')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-register', function (Request $request) {
             return Limit::perMinutes(60, (int) config('uvh.rate_limits.register'))
                 ->by($request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiados registros desde esta IP.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_fffa2e6f5fd3be')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-link-create', function (Request $request) {
             return Limit::perMinute((int) config('uvh.rate_limits.link_create'))
                 ->by($request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiados enlaces en poco tiempo.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_3dfb24dd704ec2')], 429)->withHeaders($headers));
         });
 
         // Parking a handoff mints a signed cookie and touches nothing else, so
@@ -208,19 +208,19 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('uvh-pending', function (Request $request) {
             return Limit::perMinute((int) config('uvh.rate_limits.pending'))
                 ->by('pending:'.$request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas credenciales aparcadas en poco tiempo. Espera un minuto.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_fce08c12a8f923')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-pending-read', function (Request $request) {
             return Limit::perMinute((int) config('uvh.rate_limits.pending_read'))
                 ->by('pending-read:'.$request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de credenciales pendientes. Espera un minuto.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_a4b8fddf2e2d7e')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-resolve', function (Request $request) {
             return Limit::perMinute((int) config('uvh.rate_limits.resolve'))
                 ->by($request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas resoluciones de enlaces.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_a7be35880c8736')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-appeal', function (Request $request) {
@@ -231,7 +231,7 @@ class AppServiceProvider extends ServiceProvider
 
             return [
                 Limit::perHour(5)->by('appeal-session:'.$session)->response(
-                    fn ($request, $headers) => response()->json(['error' => 'Demasiadas apelaciones. Espera antes de enviar otra.'], 429)->withHeaders($headers),
+                    fn ($request, $headers) => response()->json(['error' => __('messages.error_6ca7256cb4176f')], 429)->withHeaders($headers),
                 ),
                 Limit::perHour(10)->by('appeal-ip:'.$request->ip()),
             ];
@@ -240,13 +240,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('uvh-report', function (Request $request) {
             return Limit::perMinute(10)
                 ->by($request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas denuncias.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_963860d7d2f927')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-status', function (Request $request) {
             return Limit::perMinute(60)
                 ->by($request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de estado.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_845c49e052316f')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-rule-simulation', function (Request $request) {
@@ -256,19 +256,19 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(max(1, (int) config('uvh.rate_limits.rule_simulation', 30)))
                 ->by('rule-simulation:'.$identity.'|workspace:'.$workspace)
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas simulaciones. Espera un momento.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_9f4a1cd92a3e47')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-health', function (Request $request) {
             return Limit::perMinute(120)
                 ->by('health:'.$request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas comprobaciones.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_6213d1604f131a')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-api', function (Request $request) {
             return Limit::perMinute(120)
                 ->by($request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Rate limit de API excedido.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_e2bebc41a8434d')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-activity', function (Request $request) {
@@ -277,7 +277,7 @@ class AppServiceProvider extends ServiceProvider
             $actor = UvhRequest::user($request);
 
             return Limit::perMinute(60)->by($actor ? 'user:'.$actor->id : 'ip:'.$request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de actividad.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_f484193879056c')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-usage', function (Request $request) {
@@ -285,13 +285,13 @@ class AppServiceProvider extends ServiceProvider
             $actor = UvhRequest::user($request);
 
             return Limit::perMinute(30)->by($actor ? 'user:'.$actor->id : 'ip:'.$request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de uso.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_899993b1bad4d3')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-admin', function (Request $request) {
             return Limit::perMinute(60)
                 ->by($request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Rate limit administrativo.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_4024be0866b5d9')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-mail-retry', function (Request $request) {
@@ -299,7 +299,7 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perHour(10)
                 ->by('mail-retry:'.$session.'|'.$request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiados reintentos manuales de correo.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_f37d561c0b7ea9')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-privacy', function (Request $request) {
@@ -307,7 +307,7 @@ class AppServiceProvider extends ServiceProvider
 
             return [
                 Limit::perMinutes(60, 20)->by('privacy-session:'.$session)->response(
-                    fn ($request, $headers) => response()->json(['error' => 'Demasiadas operaciones sobre solicitudes de privacidad.'], 429)->withHeaders($headers),
+                    fn ($request, $headers) => response()->json(['error' => __('messages.error_6baf2c6f3528c8')], 429)->withHeaders($headers),
                 ),
                 Limit::perMinutes(60, 40)->by('privacy-ip:'.$request->ip()),
             ];
@@ -317,7 +317,7 @@ class AppServiceProvider extends ServiceProvider
             $session = UvhRequest::sessionId($request) ?? $request->ip();
 
             return Limit::perMinutes(60, 60)->by('privacy-admin:'.$session.'|'.$request->ip())
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas operaciones administrativas de privacidad.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_d4a0624bb17cdd')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-report-access', fn (Request $request) => [
@@ -332,7 +332,7 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(60)
                 ->by('analytics:'.$session.'|'.$workspace)
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas consultas de analítica. Espera un minuto.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_29e66e7ddd4d13')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-api-token', function (Request $request) {
@@ -341,7 +341,7 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute((int) config('uvh.rate_limits.api_token'))
                 ->by($key)
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Rate limit de API excedido para este token.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_da605297547861')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-app-resolve', fn (Request $request) => Limit::perMinute(60)->by('native-resolve:'.$request->ip().'|'.RedirectService::canonicalHost($request->getHost()))->response(fn ($request, $headers) => response()->json(['kind' => 'rate_limited'], 429)->withHeaders($headers)));
@@ -380,7 +380,7 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(6)
                 ->by('domain-dns:'.$session.'|'.$domainId)
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas comprobaciones DNS. Espera un minuto antes de reintentar.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_7611643d410413')], 429)->withHeaders($headers));
         });
 
         // TLS activation spends ACME capacity, not just local CPU: its budget is
@@ -392,7 +392,7 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(3)
                 ->by('domain-tls:'.$session.'|'.$domainId)
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas solicitudes de certificado. Espera un minuto antes de reintentar.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_29027511cfa39a')], 429)->withHeaders($headers));
         });
 
         RateLimiter::for('uvh-invitation', function (Request $request) {
@@ -407,7 +407,7 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinutes(15, 20)
                 ->by('invitation:'.$identity.'|workspace:'.$workspace)
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas invitaciones o reenvíos. Espera unos minutos.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_65b7349a0e198d')], 429)->withHeaders($headers));
         });
 
         // Las pruebas y reintentos disparan trabajo de red asíncrono. Se
@@ -419,7 +419,7 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinutes(15, 30)
                 ->by('webhook-action:'.$session.'|'.$workspace)
-                ->response(fn ($request, $headers) => response()->json(['error' => 'Demasiadas pruebas o reenvíos de webhooks. Espera unos minutos.'], 429)->withHeaders($headers));
+                ->response(fn ($request, $headers) => response()->json(['error' => __('messages.error_baef8059c14f33')], 429)->withHeaders($headers));
         });
     }
 

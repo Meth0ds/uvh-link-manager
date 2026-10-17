@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { afterNextRender, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, Injector, signal, viewChild } from "@angular/core";
 import { DOCUMENT, Location } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -18,20 +19,20 @@ import { decodeCredentialChange } from "../core/services/public-action-response-
   template: `
     <app-auth-shell>
       <section class="card center" aria-labelledby="confirm-email-change-title">
-        <span class="step-kicker">CAMBIO DE DIRECCIÓN</span>
-        @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud" /> }
+        <span class="step-kicker"><ng-container i18n="@@ui.c8aa41712d72c1">CAMBIO DE DIRECCIÓN</ng-container></span>
+        @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Procesando solicitud"  i18n-aria-label="@@ui.ecd743d7dea145"/> }
         <mat-icon class="icon" aria-hidden="true" [class.ok]="ok()" [class.bad]="done() && !ok()">
           {{ ok() ? 'mark_email_read' : (done() ? 'error_outline' : 'mark_email_unread') }}
         </mat-icon>
-        <h2 id="confirm-email-change-title">{{ ok() ? 'Email actualizado' : (!hasLink ? 'Enlace no disponible' : (done() ? 'No se pudo completar' : 'Confirmar nuevo email')) }}</h2>
+        <h2 id="confirm-email-change-title">{{ ok() ? uiText.ui_83c1c60c444173 : (!hasLink ? uiText.ui_11e385a1023bde : (done() ? uiText.ui_2df446caf2895b : uiText.ui_f55fa997596b2c)) }}</h2>
         <p class="sub" [attr.role]="done() && !ok() ? 'alert' : 'status'">{{ message() }}</p>
         @if (!done() || retryable()) {
           <button #confirmButton mat-flat-button color="primary" type="button" (click)="confirm()" [disabled]="busy()">
-            {{ busy() ? 'Confirmando…' : (retryable() ? 'Reintentar confirmación' : 'Confirmar y cerrar sesiones') }}
+            {{ busy() ? uiText.ui_923b438a98a7e0 : (retryable() ? uiText.ui_536ca3adeeb621 : uiText.ui_39eceba13641aa) }}
           </button>
-          <a class="back" routerLink="/auth">No cambiar mi email</a>
+          <a class="back" routerLink="/auth"><ng-container i18n="@@ui.283ef4751dae28">No cambiar mi email</ng-container></a>
         } @else {
-          <a #accessLink mat-flat-button color="primary" routerLink="/auth">{{ ok() ? 'Iniciar sesión con el nuevo email' : 'Volver al acceso' }}</a>
+          <a #accessLink mat-flat-button color="primary" routerLink="/auth">{{ ok() ? uiText.ui_d85a75aa77f91f : uiText.ui_7c60b6892ea0a1 }}</a>
         }
       </section>
     </app-auth-shell>
@@ -40,6 +41,7 @@ import { decodeCredentialChange } from "../core/services/public-action-response-
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class ConfirmEmailChangeComponent {
+  readonly uiText = UI_TEXT;
   private api = inject(ApiService);
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
@@ -57,14 +59,14 @@ export class ConfirmEmailChangeComponent {
   readonly done = signal(false);
   readonly ok = signal(false);
   readonly retryable = signal(false);
-  readonly message = signal("Al confirmar, el nuevo email sustituirá al actual y todas las sesiones quedarán cerradas.");
+  readonly message = signal($localize`:@@ui.cd05bcd9b0ba95:Al confirmar, el nuevo email sustituirá al actual y todas las sesiones quedarán cerradas.`);
 
   constructor() {
     this.token = authBearer(this.route);
     this.location.replaceState("/auth/confirm-email");
     if (!this.token) {
       this.done.set(true);
-      this.message.set("Falta el token de confirmación.");
+      this.message.set($localize`:@@ui.74346950fede1b:Falta el token de confirmación.`);
     }
   }
 
@@ -83,12 +85,12 @@ export class ConfirmEmailChangeComponent {
       if (result.current) this.auth.accountSignedOut(generation);
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(true);
-      this.message.set("La nueva dirección ha quedado verificada. Hemos cerrado todas las sesiones para proteger la cuenta.");
+      this.message.set($localize`:@@ui.3615391401758f:La nueva dirección ha quedado verificada. Hemos cerrado todas las sesiones para proteger la cuenta.`);
     } catch (error) {
       if (!this.requests.isCurrent(request, this.token)) return;
       this.ok.set(false);
       this.retryable.set(!(error instanceof ApiRequestError) || error.status === 0 || error.status === 429 || error.status >= 500);
-      this.message.set(error instanceof ApiRequestError ? error.message : "No se pudo conectar con el servidor. Inténtalo de nuevo.");
+      this.message.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.75ea5152f1621d:No se pudo conectar con el servidor. Inténtalo de nuevo.`);
     } finally {
       if (this.requests.isCurrent(request, this.token)) {
         this.busy.set(false);

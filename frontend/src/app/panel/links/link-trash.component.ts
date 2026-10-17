@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, viewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -31,6 +32,7 @@ import { PanelSkeletonComponent } from "../panel-skeleton.component";
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class LinkTrashComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly workspaces = inject(WorkspaceService);
@@ -95,7 +97,7 @@ export class LinkTrashComponent {
     } catch (err) {
       if (!this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}:${this.domainId()}`)) return;
       this.rows.set([]); this.total.set(0);
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo cargar la papelera");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.165c82d93b061c:No se pudo cargar la papelera`);
     } finally {
       if (this.requests.isCurrent(request, `${this.workspaces.currentId()}:${page}:${perPage}:${this.q()}:${this.domainId()}`)) this.loading.set(false);
     }
@@ -115,11 +117,11 @@ export class LinkTrashComponent {
     try {
       await this.api.post(`/api/v1/links/${row.link.id}/restore`);
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Enlace restaurado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.a9415edd73f52b:Enlace restaurado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       await this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo restaurar", "Cerrar", { duration: 4500 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.00fc1b2dd33729:No se pudo restaurar`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4500 });
     } finally { this.mutations.settle(action); }
   }
 
@@ -141,7 +143,7 @@ export class LinkTrashComponent {
     // permanent delete must not be sent after another workspace took over the
     // screen, not even with a confirmation dialog in between.
     const target = targetWorkspace(this.workspaces);
-    const confirmed = await this.actions.confirm({ title: "Borrar definitivamente", message: "Esta acción elimina el enlace y sus datos relacionados de forma irreversible.", confirmLabel: "Borrar definitivamente", destructive: true });
+    const confirmed = await this.actions.confirm({ title: $localize`:@@ui.3bd64247a478ab:Borrar definitivamente`, message: $localize`:@@ui.eab4b4dfa5d2bc:Esta acción elimina el enlace y sus datos relacionados de forma irreversible.`, confirmLabel: $localize`:@@ui.3bd64247a478ab:Borrar definitivamente`, destructive: true });
     if (!confirmed || !target.isCurrent()) return;
     const action = this.mutations.begin(row.link.id);
     try {
@@ -151,11 +153,11 @@ export class LinkTrashComponent {
       // muestra su snackbar y no provoca su reload (ver `OwnedMutations`).
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
       this.closePurge();
-      this.snackbar.open("Enlace borrado definitivamente", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.5c167fe6db786a:Enlace borrado definitivamente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       await this.load();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo borrar definitivamente", "Cerrar", { duration: 5000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.886d890a558c5b:No se pudo borrar definitivamente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
     } finally {
       // Only the operation that still owns the slot may clear it: a stale
       // `purge` landing late must not re-enable the rows of a newer action, and

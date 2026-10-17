@@ -125,7 +125,7 @@ final class AccountExportDocument
             DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
 
             $account = DB::table('users')->where('id', $userId)->first([
-                'id', 'email', 'name', 'email_verified_at', 'mfa_enabled', 'created_at', 'updated_at',
+                'id', 'email', 'name', 'language', 'email_verified_at', 'mfa_enabled', 'created_at', 'updated_at',
             ]);
             $write('account', $account ?? (object) []);
 

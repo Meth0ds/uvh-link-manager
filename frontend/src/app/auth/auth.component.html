@@ -4,31 +4,31 @@
     @if (developmentCaptchaFallback()) {
       <aside class="development-notice" role="status">
         <mat-icon aria-hidden="true">code</mat-icon>
-        <span><b>Solo desarrollo local</b>Si hCaptcha no está disponible, podrás continuar. La contraseña, la verificación de email y MFA siguen siendo obligatorias cuando correspondan.</span>
+        <span><b><ng-container i18n="@@ui.40e7f2e3f36c7b">Solo desarrollo local</ng-container></b><ng-container i18n="@@ui.c43cfaa2fb943d">Si hCaptcha no está disponible, podrás continuar. La contraseña, la verificación de email y MFA siguen siendo obligatorias cuando correspondan.</ng-container></span>
       </aside>
     }
     @if (busy()) {
-      <mat-progress-bar mode="indeterminate" class="top-bar" aria-label="Procesando" />
+      <mat-progress-bar mode="indeterminate" class="top-bar" aria-label="Procesando"  i18n-aria-label="@@ui.d9ab8c014a6923"/>
     }
 
     @if (pendingLink()) {
       <aside class="intent-context" role="status">
         <span class="intent-context-icon"><mat-icon aria-hidden="true">bookmark_added</mat-icon></span>
         <span>
-          <b>Continúa con tu URL</b>
-          <small>Completa el acceso para retomarla antes de que caduque.</small>
+          <b><ng-container i18n="@@ui.37cacdb0148dcd">Continúa con tu URL</ng-container></b>
+          <small><ng-container i18n="@@ui.fa6c11003a3b31">Completa el acceso para retomarla antes de que caduque.</ng-container></small>
         </span>
       </aside>
     }
 
     @if (step() === 'login' || step() === 'register') {
-      <div class="auth-mode-tabs" role="tablist" aria-label="Elige cómo acceder">
+      <div class="auth-mode-tabs" role="tablist" aria-label="Elige cómo acceder" i18n-aria-label="@@ui.e9d14156c5ead2">
         <span class="mode-indicator" [class.register]="tabIndex() === 1" aria-hidden="true"></span>
         <button id="login-tab" type="button" role="tab" aria-controls="login-panel" [attr.aria-selected]="tabIndex() === 0" [attr.tabindex]="tabIndex() === 0 ? 0 : -1" [class.active]="tabIndex() === 0" [disabled]="busy() || verificationBusy()" (click)="onTabChange(0)" (keydown)="onAuthTabKeydown($event, 0)">
-          <mat-icon aria-hidden="true">login</mat-icon><span>Iniciar sesión</span>
+          <mat-icon aria-hidden="true">login</mat-icon><span><ng-container i18n="@@ui.8d518bb65ea3de">Iniciar sesión</ng-container></span>
         </button>
         <button id="register-tab" type="button" role="tab" aria-controls="register-panel" [attr.aria-selected]="tabIndex() === 1" [attr.tabindex]="tabIndex() === 1 ? 0 : -1" [class.active]="tabIndex() === 1" [disabled]="busy() || verificationBusy()" (click)="onTabChange(1)" (keydown)="onAuthTabKeydown($event, 1)">
-          <mat-icon aria-hidden="true">person_add</mat-icon><span>Crear cuenta</span>
+          <mat-icon aria-hidden="true">person_add</mat-icon><span><ng-container i18n="@@ui.f620f0331df880">Crear cuenta</ng-container></span>
         </button>
       </div>
 
@@ -36,42 +36,42 @@
           <section id="login-panel" class="auth-step login-step" role="tabpanel" aria-labelledby="login-tab login-title">
             <div class="welcome-row">
               <div>
-                <h2 id="login-title">Iniciar sesión en UVH</h2>
-                <p>{{ pendingLink() ? 'Accede para retomar el enlace que acabas de preparar.' : 'Accede a tu cuenta para gestionar enlaces, dominios y equipo.' }}</p>
+                <h2 id="login-title"><ng-container i18n="@@ui.9bb739ccef8a09">Iniciar sesión en UVH</ng-container></h2>
+                <p>{{ pendingLink() ? uiText.ui_6e2504df591809 : uiText.ui_62cdebbc314b72 }}</p>
               </div>
               <span class="step-icon blue"><mat-icon aria-hidden="true">login</mat-icon></span>
             </div>
 
             <form class="form" [formGroup]="loginForm" (ngSubmit)="onLogin()" novalidate>
               <mat-form-field subscriptSizing="dynamic" appearance="outline">
-                <mat-label>Email</mat-label>
+                <mat-label><ng-container i18n="@@ui.969ccbd3cf6300">Email</ng-container></mat-label>
                 <input #loginEmail matInput type="email" formControlName="email" autocomplete="email" />
                 <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
                 @if (loginForm.controls.email.hasError('required') && loginForm.controls.email.touched) {
-                  <mat-error>Introduce tu email.</mat-error>
+                  <mat-error><ng-container i18n="@@ui.18dfa5da271c6a">Introduce tu email.</ng-container></mat-error>
                 }
                 @if (loginForm.controls.email.hasError('email') && loginForm.controls.email.touched) {
-                  <mat-error>Introduce un email válido.</mat-error>
+                  <mat-error><ng-container i18n="@@ui.dad41e5a7f6695">Introduce un email válido.</ng-container></mat-error>
                 }
               </mat-form-field>
               <mat-form-field subscriptSizing="dynamic" appearance="outline">
-                <mat-label>Contraseña</mat-label>
+                <mat-label><ng-container i18n="@@ui.a389a638dec325">Contraseña</ng-container></mat-label>
                 <input matInput [type]="hidePassword() ? 'password' : 'text'" formControlName="password" autocomplete="current-password" maxlength="72" />
                 <mat-icon matPrefix aria-hidden="true">lock_outline</mat-icon>
-                <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())" [attr.aria-label]="hidePassword() ? 'Mostrar contraseña' : 'Ocultar contraseña'">
+                <button mat-icon-button matSuffix type="button" (click)="hidePassword.set(!hidePassword())" [attr.aria-label]="hidePassword() ? uiText.ui_5fe3b78d0838f4 : uiText.ui_20d93396e534a5">
                   <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
                 </button>
               </mat-form-field>
               <div class="form-row">
-                <button class="forgot" type="button" (click)="goForgot()" [disabled]="busy()">¿Olvidaste tu contraseña?</button>
+                <button class="forgot" type="button" (click)="goForgot()" [disabled]="busy()"><ng-container i18n="@@ui.8eb9cbdec36eae">¿Olvidaste tu contraseña?</ng-container></button>
               </div>
 
               @if (captchaConfigBusy()) {
-                <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
+                <div class="captcha-bootstrap" role="status"><span><b><ng-container i18n="@@ui.5284d73a63e99c">Cargando hCaptcha…</ng-container></b></span><mat-progress-bar mode="indeterminate" /></div>
               } @else if (hcaptchaSiteKey(); as siteKey) {
                 <app-hcaptcha-widget #loginCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onLoginCaptchaToken($event)" />
               } @else if (!developmentCaptchaFallback()) {
-                <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
+                <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
               }
 
               @if (error()) {
@@ -84,7 +84,7 @@
                 <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
               }
               <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="loginForm.invalid || busy() || verificationBusy() || !captchaReady()">
-                <span>{{ busy() ? 'Verificando acceso…' : (pendingLink() ? 'Entrar y retomar enlace' : 'Entrar en mi panel') }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                <span>{{ busy() ? uiText.ui_19b877dc467acf : (pendingLink() ? uiText.ui_fcca8e3da3d73c : uiText.ui_bda7a296a2787d) }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
               </button>
             </form>
 
@@ -95,36 +95,36 @@
           <section id="register-panel" class="auth-step register-step" role="tabpanel" aria-labelledby="register-tab register-title">
             <div class="register-heading">
               <div>
-                <h2 id="register-title">{{ changeEmailMode() ? 'Corrige tu email' : 'Crea tu cuenta en UVH' }}</h2>
-                <p>{{ changeEmailMode() ? 'Actualiza la dirección para continuar con tu solicitud.' : 'Empieza con tu email. Al abrir el correo elegirás tu nombre y contraseña.' }}</p>
+                <h2 id="register-title">{{ changeEmailMode() ? uiText.ui_7cff67dfcc57e5 : uiText.ui_75c3981211dcc7 }}</h2>
+                <p>{{ changeEmailMode() ? uiText.ui_47be73a2da8707 : uiText.ui_7943c3a279a484 }}</p>
               </div>
               <span class="step-icon teal"><mat-icon aria-hidden="true">mail_outline</mat-icon></span>
             </div>
             @if (registrationsPaused() && !changeEmailMode()) {
-              <div class="alert info" role="alert"><mat-icon aria-hidden="true">pause_circle</mat-icon><span>Registros temporalmente pausados. Inténtalo de nuevo más tarde.</span></div>
+              <div class="alert info" role="alert"><mat-icon aria-hidden="true">pause_circle</mat-icon><span><ng-container i18n="@@ui.dc4d5c8cb668e0">Registros temporalmente pausados. Inténtalo de nuevo más tarde.</ng-container></span></div>
             }
             <form class="form auth-step-panel" [formGroup]="registerForm" (ngSubmit)="onRegister()" novalidate>
               <mat-form-field subscriptSizing="dynamic" appearance="outline">
-                <mat-label>Email</mat-label>
+                <mat-label><ng-container i18n="@@ui.969ccbd3cf6300">Email</ng-container></mat-label>
                 <input matInput type="email" formControlName="email" autocomplete="email" maxlength="254" />
                 <mat-icon matPrefix aria-hidden="true">mail_outline</mat-icon>
                 @if (registerForm.controls.email.hasError('required') && registerForm.controls.email.touched) {
-                  <mat-error>Introduce tu email.</mat-error>
+                  <mat-error><ng-container i18n="@@ui.18dfa5da271c6a">Introduce tu email.</ng-container></mat-error>
                 }
                 @if (registerForm.controls.email.hasError('email') && registerForm.controls.email.touched) {
-                  <mat-error>Introduce un email válido.</mat-error>
+                  <mat-error><ng-container i18n="@@ui.dad41e5a7f6695">Introduce un email válido.</ng-container></mat-error>
                 }
               </mat-form-field>
               <div class="workspace-note">
                 <mat-icon aria-hidden="true">mark_email_read</mat-icon>
-                <span><b>{{ changeEmailMode() ? 'Confirma la nueva dirección' : 'Completa tu cuenta desde el correo' }}</b><small>Elegirás tu nombre y contraseña y aceptarás los términos al abrir el enlace. Tu workspace se creará al completar el registro.</small></span>
+                <span><b>{{ changeEmailMode() ? uiText.ui_3760e90afefa17 : uiText.ui_0cad810c36b400 }}</b><small><ng-container i18n="@@ui.84796f639a3cb5">Elegirás tu nombre y contraseña y aceptarás los términos al abrir el enlace. Tu workspace se creará al completar el registro.</ng-container></small></span>
               </div>
               @if (captchaConfigBusy()) {
-                <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
+                <div class="captcha-bootstrap" role="status"><span><b><ng-container i18n="@@ui.5284d73a63e99c">Cargando hCaptcha…</ng-container></b></span><mat-progress-bar mode="indeterminate" /></div>
               } @else if (hcaptchaSiteKey(); as siteKey) {
                 <app-hcaptcha-widget #registerCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onRegisterCaptchaToken($event)" />
               } @else if (!developmentCaptchaFallback()) {
-                <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
+                <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
               }
               <input class="honeypot" type="text" formControlName="company" tabindex="-1" autocomplete="off" aria-hidden="true" />
               @if (error()) {
@@ -134,11 +134,11 @@
                 <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
               }
               <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="registerForm.invalid || busy() || !captchaReady() || (registrationsPaused() && !changeEmailMode())">
-                <span>{{ busy() ? 'Enviando…' : (changeEmailMode() ? 'Actualizar email' : 'Enviar enlace de registro') }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                <span>{{ busy() ? uiText.ui_9415ac2416c571 : (changeEmailMode() ? uiText.ui_04e8686a98d81f : uiText.ui_73274b6ce454ac) }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
               </button>
             </form>
             @if (!changeEmailMode()) {
-              <button class="register-recovery" type="button" (click)="openVerificationRecovery()">¿Ya solicitaste el registro? Solicita otro enlace</button>
+              <button class="register-recovery" type="button" (click)="openVerificationRecovery()"><ng-container i18n="@@ui.52e2ee7ca60586">¿Ya solicitaste el registro? Solicita otro enlace</ng-container></button>
             }
           </section>
       }
@@ -147,19 +147,19 @@
     @if (step() === 'mfa') {
       <div class="otp-modal-scrim" role="presentation" (keydown)="onOtpModalKeydown($event)">
         <section #mfaDialog class="otp-modal" role="dialog" tabindex="-1" aria-modal="true" [attr.aria-busy]="busy()" aria-labelledby="mfa-title" aria-describedby="mfa-lead">
-          <div class="mfa-stepper" aria-label="Paso 2 de 2">
-            <span class="done"><mat-icon aria-hidden="true">check</mat-icon><b>Credenciales</b></span>
+          <div class="mfa-stepper" aria-label="Paso 2 de 2" i18n-aria-label="@@ui.9890560c273526">
+            <span class="done"><mat-icon aria-hidden="true">check</mat-icon><b><ng-container i18n="@@ui.0ed882b8ea64fa">Credenciales</ng-container></b></span>
             <i aria-hidden="true"></i>
-            <span class="current"><em>2</em><b>Verificación</b></span>
+            <span class="current"><em>2</em><b><ng-container i18n="@@ui.353abbf1409422">Verificación</ng-container></b></span>
           </div>
           <span class="mode-illustration"><mat-icon aria-hidden="true">phonelink_lock</mat-icon></span>
-          <span class="mode-kicker">Segundo paso</span>
-          <h2 class="card-title" id="mfa-title">Confirma que eres tú</h2>
-          <p class="card-sub" id="mfa-lead">Abre tu aplicación de autenticación e introduce el código temporal.</p>
-          <div class="mfa-account"><mat-icon aria-hidden="true">account_circle</mat-icon><span><small>Accediendo como</small><b>{{ loginForm.controls.email.value }}</b></span></div>
+          <span class="mode-kicker"><ng-container i18n="@@ui.cce27df6ebe6e8">Segundo paso</ng-container></span>
+          <h2 class="card-title" id="mfa-title"><ng-container i18n="@@ui.2bf2c76cc993b2">Confirma que eres tú</ng-container></h2>
+          <p class="card-sub" id="mfa-lead"><ng-container i18n="@@ui.e2ee4bac36f170">Abre tu aplicación de autenticación e introduce el código temporal.</ng-container></p>
+          <div class="mfa-account"><mat-icon aria-hidden="true">account_circle</mat-icon><span><small><ng-container i18n="@@ui.aeb2fcac005842">Accediendo como</ng-container></small><b>{{ loginForm.controls.email.value }}</b></span></div>
           <form class="form" [formGroup]="mfaForm" (ngSubmit)="onMfa()">
             <app-otp-code-input [control]="mfaForm.controls.code" [disabled]="busy()" (completed)="onOtpCompleted()" />
-            <p class="otp-help" id="totp-help">6 dígitos · cambia cada 30 segundos</p>
+            <p class="otp-help" id="totp-help"><ng-container i18n="@@ui.c322bd15421a0f">6 dígitos · cambia cada 30 segundos</ng-container></p>
             @if (error()) {
               <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
             }
@@ -167,12 +167,12 @@
               <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
             }
             <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="mfaForm.invalid || busy()">
-              <span>{{ busy() ? 'Verificando…' : 'Confirmar y entrar' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+              <span>{{ busy() ? uiText.ui_c2f6ff98f69578 : uiText.ui_6f15cf738b2679 }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
             </button>
             @if (mfaRecoveryAvailable()) {
-              <button mat-button type="button" class="method-link" (click)="goRecovery()" [disabled]="busy()"><mat-icon aria-hidden="true">key</mat-icon>Usar un código de recuperación</button>
+              <button mat-button type="button" class="method-link" (click)="goRecovery()" [disabled]="busy()"><mat-icon aria-hidden="true">key</mat-icon><ng-container i18n="@@ui.1e00ef9d1d1a45">Usar un código de recuperación</ng-container></button>
             }
-            <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()">Volver al inicio de sesión</button>
+            <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()"><ng-container i18n="@@ui.1581ca4764202a">Volver al inicio de sesión</ng-container></button>
           </form>
         </section>
       </div>
@@ -180,19 +180,19 @@
 
     @if (step() === 'recovery') {
       <section class="auth-step compact-step mfa-stage" aria-labelledby="recovery-title">
-        <div class="mfa-stepper" aria-label="Paso 2 de 2">
-          <span class="done"><mat-icon aria-hidden="true">check</mat-icon><b>Credenciales</b></span>
+        <div class="mfa-stepper" aria-label="Paso 2 de 2" i18n-aria-label="@@ui.9890560c273526">
+          <span class="done"><mat-icon aria-hidden="true">check</mat-icon><b><ng-container i18n="@@ui.0ed882b8ea64fa">Credenciales</ng-container></b></span>
           <i aria-hidden="true"></i>
-          <span class="current"><em>2</em><b>Recuperación</b></span>
+          <span class="current"><em>2</em><b><ng-container i18n="@@ui.cc142969aa8da8">Recuperación</ng-container></b></span>
         </div>
         <span class="mode-illustration amber"><mat-icon aria-hidden="true">key</mat-icon></span>
-        <span class="mode-kicker">Método alternativo</span>
-        <h2 class="card-title" id="recovery-title">Usa un código de recuperación</h2>
-        <p class="card-sub">Cada código funciona una sola vez. Puedes escribirlo con o sin guiones.</p>
+        <span class="mode-kicker"><ng-container i18n="@@ui.423236c0c8f8ed">Método alternativo</ng-container></span>
+        <h2 class="card-title" id="recovery-title"><ng-container i18n="@@ui.b664963fcb33a1">Usa un código de recuperación</ng-container></h2>
+        <p class="card-sub"><ng-container i18n="@@ui.d37034967dcde7">Cada código funciona una sola vez. Puedes escribirlo con o sin guiones.</ng-container></p>
         <form class="form" [formGroup]="recoveryForm" (ngSubmit)="onRecovery()">
           <mat-form-field subscriptSizing="dynamic" appearance="outline" class="recovery-field">
-            <mat-label>Código de recuperación</mat-label>
-            <input #recoveryCode matInput formControlName="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX" />
+            <mat-label><ng-container i18n="@@ui.4841a70c13dc50">Código de recuperación</ng-container></mat-label>
+            <input #recoveryCode matInput formControlName="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX"  i18n-placeholder="@@ui.c288c995b9c7d4"/>
             <mat-icon matPrefix aria-hidden="true">key</mat-icon>
           </mat-form-field>
           @if (error()) {
@@ -202,11 +202,11 @@
             <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ info() }}</span></div>
           }
           <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="recoveryForm.invalid || busy()">
-            <span>{{ busy() ? 'Comprobando…' : 'Usar código y entrar' }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+            <span>{{ busy() ? uiText.ui_d2a7094a2bfccb : uiText.ui_6ea32309e74d44 }}</span><mat-icon aria-hidden="true">arrow_forward</mat-icon>
           </button>
-          <button mat-button type="button" class="method-link" (click)="backToMfa()" [disabled]="busy()"><mat-icon aria-hidden="true">phonelink_lock</mat-icon>Usar la aplicación autenticadora</button>
-          <a mat-button class="method-link" [routerLink]="busy() ? null : '/auth/account-recovery'" [disabled]="busy()"><mat-icon aria-hidden="true">support_agent</mat-icon>No tengo acceso a ningún factor</a>
-          <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()">Volver al inicio de sesión</button>
+          <button mat-button type="button" class="method-link" (click)="backToMfa()" [disabled]="busy()"><mat-icon aria-hidden="true">phonelink_lock</mat-icon><ng-container i18n="@@ui.2a69bf904b360a">Usar la aplicación autenticadora</ng-container></button>
+          <a mat-button class="method-link" [routerLink]="busy() ? null : '/auth/account-recovery'" [disabled]="busy()"><mat-icon aria-hidden="true">support_agent</mat-icon><ng-container i18n="@@ui.eb52fc1dfce53e">No tengo acceso a ningún factor</ng-container></a>
+          <button mat-button type="button" class="quiet-link" (click)="restartMfaLogin()" [disabled]="busy()"><ng-container i18n="@@ui.1581ca4764202a">Volver al inicio de sesión</ng-container></button>
         </form>
       </section>
     }
@@ -214,28 +214,28 @@
     @if (step() === 'verify-pending') {
       <section class="auth-step pending-stage" aria-labelledby="pending-title">
         @if (!verificationRecovery()) {
-        <div class="pending-progress" aria-label="Email enviado. Abre el enlace para completar el registro.">
-          <span class="pending-progress-done"><mat-icon aria-hidden="true">check</mat-icon> Email</span>
+        <div class="pending-progress" aria-label="Email enviado. Abre el enlace para completar el registro." i18n-aria-label="@@ui.d1e25b80f8e0d0">
+          <span class="pending-progress-done"><mat-icon aria-hidden="true">check</mat-icon> <ng-container i18n="@@ui.969ccbd3cf6300">Email</ng-container></span>
           <span class="pending-progress-rule" aria-hidden="true"></span>
-          <span class="pending-progress-current"><b>2</b> Confirma tu email</span>
+          <span class="pending-progress-current"><b>2</b> <ng-container i18n="@@ui.c5b70c6a213876">Confirma tu email</ng-container></span>
         </div>
         }
 
         <div class="pending-symbol" aria-hidden="true"><mat-icon>outgoing_mail</mat-icon><span></span></div>
-        <h2 class="card-title" id="pending-title">{{ verificationRecovery() ? 'Solicitar otro enlace de verificación' : 'Confirma tu email' }}</h2>
-        <p class="pending-intro">{{ verificationRecovery() ? 'Si ya solicitaste la cuenta, pide otro enlace para confirmar tu dirección. Lo enviaremos solo si sigue pendiente.' : (verificationEditable() ? 'Si esta dirección puede completar el registro, recibirás un enlace para confirmarla y elegir tu nombre y contraseña. Si ya tienes una cuenta, vuelve al inicio de sesión o recupera tu contraseña.' : 'Abre el enlace que te enviamos para confirmar tu dirección y poder acceder a tu espacio.') }}</p>
+        <h2 class="card-title" id="pending-title">{{ verificationRecovery() ? uiText.ui_3754a427dda2a8 : uiText.ui_c5b70c6a213876 }}</h2>
+        <p class="pending-intro">{{ verificationRecovery() ? uiText.ui_6f70cdd9b1963a : (verificationEditable() ? uiText.ui_4295686b12a7cf : uiText.ui_b4c74b8c5a3c65) }}</p>
 
         @if (verificationEmail(); as pendingEmail) {
           <div class="pending-email">
-            <span>{{ verificationRecovery() || verificationEditable() ? 'Dirección indicada' : 'Correo enviado a' }}</span>
+            <span>{{ verificationRecovery() || verificationEditable() ? uiText.ui_d96de136cb7142 : uiText.ui_50ac174bd60543 }}</span>
             <strong>{{ pendingEmail }}</strong>
             @if (verificationEditable()) {
-              <button type="button" (click)="changeRegistrationEmail()" [disabled]="verificationBusy()">¿Te equivocaste de dirección? Cámbiala</button>
+              <button type="button" (click)="changeRegistrationEmail()" [disabled]="verificationBusy()"><ng-container i18n="@@ui.c8f693f8f14075">¿Te equivocaste de dirección? Cámbiala</ng-container></button>
             }
           </div>
         }
         @if (pendingLink()) {
-          <p class="pending-saved-link"><mat-icon aria-hidden="true">link</mat-icon> Confirma tu dirección para retomar tu URL si sigue disponible.</p>
+          <p class="pending-saved-link"><mat-icon aria-hidden="true">link</mat-icon> <ng-container i18n="@@ui.fec1b0520f3aff">Confirma tu dirección para retomar tu URL si sigue disponible.</ng-container></p>
         }
         @if (error()) {
           <div class="alert error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error() }}</span></div>
@@ -244,22 +244,22 @@
           <div class="alert info" role="status"><mat-icon aria-hidden="true">info</mat-icon><span>{{ notice }}</span></div>
         }
         @if (captchaConfigBusy()) {
-          <div class="captcha-bootstrap" role="status"><span><b>Cargando hCaptcha…</b></span><mat-progress-bar mode="indeterminate" /></div>
+          <div class="captcha-bootstrap" role="status"><span><b><ng-container i18n="@@ui.5284d73a63e99c">Cargando hCaptcha…</ng-container></b></span><mat-progress-bar mode="indeterminate" /></div>
         } @else if (hcaptchaSiteKey(); as siteKey) {
           <app-hcaptcha-widget #resendCaptcha [siteKey]="siteKey" [invisible]="true" (tokenChange)="onResendCaptchaToken($event)" />
         } @else if (!developmentCaptchaFallback()) {
-          <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()">Reintentar</button></div>
+          <div class="captcha-config-error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ captchaConfigError() }}</span><button type="button" (click)="retryCaptchaConfiguration()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
         }
         <div class="pending-actions">
           @if (localMailInbox; as inbox) {
-            <a mat-flat-button color="primary" class="pending-inbox" [href]="inbox" target="_blank" rel="noopener noreferrer"><mat-icon aria-hidden="true">open_in_new</mat-icon> Abrir bandeja local</a>
+            <a mat-flat-button color="primary" class="pending-inbox" [href]="inbox" target="_blank" rel="noopener noreferrer"><mat-icon aria-hidden="true">open_in_new</mat-icon> <ng-container i18n="@@ui.311c61cd93c3a0">Abrir bandeja local</ng-container></a>
           }
-          <p class="pending-help">¿No encuentras el mensaje? Revisa spam o solicita otro enlace.</p>
+          <p class="pending-help"><ng-container i18n="@@ui.91afe8aaa458ba">¿No encuentras el mensaje? Revisa spam o solicita otro enlace.</ng-container></p>
           <button mat-stroked-button type="button" class="pending-resend" (click)="resendVerification()" [disabled]="verificationBusy() || !captchaReady()">
             <mat-icon aria-hidden="true">refresh</mat-icon>
-            {{ verificationBusy() ? 'Enviando…' : 'Reenviar enlace' }}
+            {{ verificationBusy() ? uiText.ui_9415ac2416c571 : uiText.ui_6f90326bc126bb }}
           </button>
-          <button mat-button type="button" class="pending-exit" (click)="closeRegistration()" [disabled]="verificationBusy()">Volver al inicio de sesión</button>
+          <button mat-button type="button" class="pending-exit" (click)="closeRegistration()" [disabled]="verificationBusy()"><ng-container i18n="@@ui.1581ca4764202a">Volver al inicio de sesión</ng-container></button>
         </div>
       </section>
     }
@@ -267,20 +267,20 @@
   } @else if (navigationFailure()) {
     <section #navigationStatus class="card auth-card" tabindex="-1" aria-labelledby="navigation-title" [attr.aria-busy]="navigationBusy()">
       @if (navigationBusy()) {
-        <mat-progress-bar mode="indeterminate" class="top-bar" aria-label="Abriendo tu espacio" />
+        <mat-progress-bar mode="indeterminate" class="top-bar" aria-label="Abriendo tu espacio"  i18n-aria-label="@@ui.0700d44e873af3"/>
       }
       <div class="welcome-row">
         <div>
-          <h2 id="navigation-title">Tu sesión está iniciada.</h2>
-          <p>No hemos podido abrir la página de destino. Puedes volver a intentarlo para continuar.</p>
+          <h2 id="navigation-title"><ng-container i18n="@@ui.d2e5bde420b242">Tu sesión está iniciada.</ng-container></h2>
+          <p><ng-container i18n="@@ui.8a300e18bbe2cd">No hemos podido abrir la página de destino. Puedes volver a intentarlo para continuar.</ng-container></p>
         </div>
         <span class="step-icon blue"><mat-icon aria-hidden="true">check</mat-icon></span>
       </div>
-      <button mat-flat-button class="navigation-retry" type="button" (click)="retryNavigation()" [disabled]="navigationBusy()">{{ navigationBusy() ? 'Abriendo…' : 'Volver a intentarlo' }}</button>
+      <button mat-flat-button class="navigation-retry" type="button" (click)="retryNavigation()" [disabled]="navigationBusy()">{{ navigationBusy() ? uiText.ui_2d5bf11d9a53df : uiText.ui_c35a102ad7130f }}</button>
     </section>
   } @else {
     <div class="card auth-card" role="status" aria-live="polite">
-      <div class="captcha-bootstrap"><span><b>Comprobando tu sesión…</b></span><mat-progress-bar mode="indeterminate" /></div>
+      <div class="captcha-bootstrap"><span><b><ng-container i18n="@@ui.e844527edd0bba">Comprobando tu sesión…</ng-container></b></span><mat-progress-bar mode="indeterminate" /></div>
     </div>
   }
 </app-auth-shell>

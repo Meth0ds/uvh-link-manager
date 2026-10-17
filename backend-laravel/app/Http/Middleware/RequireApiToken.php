@@ -32,27 +32,27 @@ class RequireApiToken
         $token = preg_match('/^Bearer[ \t]+(\S+)$/i', $header, $matches) === 1 ? $matches[1] : null;
 
         if (! $token) {
-            return response()->json(['error' => 'Token de API requerido'], 401);
+            return response()->json(['error' => __('messages.error_2d70e861687117')], 401);
         }
 
         if (strlen($token) > 256) {
-            return response()->json(['error' => 'Token inválido o revocado'], 401);
+            return response()->json(['error' => __('messages.error_f885d26fffa074')], 401);
         }
 
         $row = ApiToken::with('creator')->where('token_hash', Ids::sha256Hex($token))
             ->whereHas('creator', fn ($q) => $q->whereNull('deleted_at')->whereNotNull('email_verified_at'))
             ->first();
         if (! $row || ! $row->creator || $row->revoked_at || ($row->expires_at && $row->expires_at->lte(now()))) {
-            return response()->json(['error' => 'Token inválido o revocado'], 401);
+            return response()->json(['error' => __('messages.error_f885d26fffa074')], 401);
         }
         $membership = Membership::where('workspace_id', $row->workspace_id)->where('user_id', $row->created_by)->first();
         if (! $membership) {
-            return response()->json(['error' => 'Token inválido o revocado'], 401);
+            return response()->json(['error' => __('messages.error_f885d26fffa074')], 401);
         }
 
         $scopes = $row->scopes ?? [];
         if (! is_array($scopes) || array_diff($scopes, self::SCOPES) !== []) {
-            return response()->json(['error' => 'Token inválido o revocado'], 401);
+            return response()->json(['error' => __('messages.error_f885d26fffa074')], 401);
         }
         foreach ($required as $r) {
             if (! in_array($r, $scopes, true)) {
@@ -63,7 +63,7 @@ class RequireApiToken
             // intersect them with the creator's current workspace authority.
             $minimumRole = str_ends_with($r, ':write') ? 'editor' : 'viewer';
             if (! WorkspaceAccess::roleAtLeast((string) $membership->role, $minimumRole)) {
-                return response()->json(['error' => 'El rol actual del creador ya no permite esta operación'], 403);
+                return response()->json(['error' => __('messages.error_527fd953159867')], 403);
             }
         }
 

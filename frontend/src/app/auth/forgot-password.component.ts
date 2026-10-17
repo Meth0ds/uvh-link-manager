@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { Component, DestroyRef, ViewChild, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
@@ -30,6 +31,7 @@ interface PublicAuthConfig {
   styleUrl: "./auth-card.scss",
 })
 export class ForgotPasswordComponent {
+  readonly uiText = UI_TEXT;
   @ViewChild("forgotCaptcha") private captchaWidget?: HCaptchaWidgetComponent;
 
   private fb = inject(FormBuilder);
@@ -70,7 +72,7 @@ export class ForgotPasswordComponent {
     if (this.sent()) return;
     if (this.form.invalid || this.busy() || !this.captchaToken()) {
       this.form.markAllAsTouched();
-      if (!this.captchaToken()) this.error.set("Completa hCaptcha para continuar.");
+      if (!this.captchaToken()) this.error.set($localize`:@@ui.00dcf638b0a511:Completa hCaptcha para continuar.`);
       return;
     }
     const email = this.form.controls.email.value.toLowerCase();
@@ -86,7 +88,7 @@ export class ForgotPasswordComponent {
       this.sent.set(true);
     } catch (err) {
       if (!this.submitRequests.isCurrent(request, email)) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudo enviar el correo");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.c37de695fcb903:No se pudo enviar el correo`);
       this.captchaToken.set("");
       this.captchaWidget?.reset();
     } finally {
@@ -111,12 +113,12 @@ export class ForgotPasswordComponent {
       const config = await this.api.get<PublicAuthConfig>("/api/v1/config", undefined, decodePublicConfig, { signal: request.signal });
       if (!this.configRequests.isCurrent(request, null)) return;
       const siteKey = config.hcaptcha?.enabled ? config.hcaptcha.siteKey : null;
-      if (!siteKey || !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey)) throw new Error("hCaptcha no está configurado");
+      if (!siteKey || !/^[A-Za-z0-9_-]{20,200}$/.test(siteKey)) throw new Error($localize`:@@ui.39e75d7eb57a06:hCaptcha no está configurado`);
       this.hcaptchaSiteKey.set(siteKey);
     } catch {
       if (this.configRequests.isCurrent(request, null)) {
         this.hcaptchaSiteKey.set("");
-        this.captchaConfigError.set("No se pudo cargar hCaptcha.");
+        this.captchaConfigError.set($localize`:@@ui.f818e9091c2c63:No se pudo cargar hCaptcha.`);
       }
     } finally {
       if (this.configRequests.isCurrent(request, null)) this.captchaConfigBusy.set(false);

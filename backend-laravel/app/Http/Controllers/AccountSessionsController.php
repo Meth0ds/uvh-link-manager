@@ -18,7 +18,7 @@ final class AccountSessionsController
     {
         $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if ($context === null) {
-            return response()->json(['error' => 'No autenticado'], 401);
+            return response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
 
         return response()->json(AccountQueries::sessions($context));
@@ -32,7 +32,7 @@ final class AccountSessionsController
     {
         $context = AccountReadContext::resolve(UvhRequest::user($request), UvhRequest::sessionId($request));
         if ($context === null) {
-            return response()->json(['error' => 'No autenticado'], 401);
+            return response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
 
         return response()->json(AccountQueries::securityCenter($context));
@@ -41,7 +41,7 @@ final class AccountSessionsController
     public function revokeSession(Request $request, string $id): JsonResponse
     {
         if (! preg_match('/^[a-f0-9]{64}$/D', $id)) {
-            return response()->json(['error' => 'Sesión no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_e4a7fd46b06c10')], 404);
         }
         $user = UvhRequest::user($request);
         $currentId = UvhRequest::sessionId($request);
@@ -49,10 +49,10 @@ final class AccountSessionsController
         try {
             $found = SessionRevocationAdmission::revoke($user, $currentId, $id);
         } catch (MailAdmissionException) {
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se revocó la sesión. Inténtalo de nuevo.'], 503);
+            return response()->json(['error' => __('messages.error_f885502ab6976e')], 503);
         }
         if (! $found) {
-            return response()->json(['error' => 'Sesión no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_e4a7fd46b06c10')], 404);
         }
 
         $response = response()->json(['ok' => true, 'current' => $current]);
@@ -79,10 +79,10 @@ final class AccountSessionsController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'sessions_revoked_others']);
 
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se cerró ninguna sesión. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_5570d3ce63ede3')], 503);
         }
         if ($revoked < 0) {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión antes de cerrar accesos.'], 409);
+            return response()->json(['error' => __('messages.error_3a06960a5cdd1b')], 409);
         }
 
         return response()->json(['ok' => true, 'revoked' => $revoked]);
@@ -102,10 +102,10 @@ final class AccountSessionsController
         } catch (MailAdmissionException) {
             Audit::write($user->id, 'auth.email_delivery_failed', 'user', $user->id, ['kind' => 'sessions_revoked_all']);
 
-            return response()->json(['error' => 'No se pudo guardar el aviso de seguridad. No se cerró ninguna sesión. Inténtalo de nuevo más tarde'], 503);
+            return response()->json(['error' => __('messages.error_5570d3ce63ede3')], 503);
         }
         if ($revoked < 0) {
-            return response()->json(['error' => 'La sesión cambió. Vuelve a iniciar sesión antes de cerrar accesos.'], 409);
+            return response()->json(['error' => __('messages.error_3a06960a5cdd1b')], 409);
         }
 
         return response()->json(['ok' => true, 'revoked' => $revoked])->withCookie(SessionManager::clearCookie());

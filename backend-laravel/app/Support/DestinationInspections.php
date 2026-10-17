@@ -22,28 +22,28 @@ final class DestinationInspections
             $user = UvhRequest::user($request);
             $workspace = UvhRequest::workspaceId($request);
             if (! $user || ! $workspace) {
-                throw new LinkException('No tienes acceso a este workspace.', 403);
+                throw new LinkException(__('messages.error_f279ddcf8a041c'), 403);
             }
             $context = SecurityContext::lock($user, UvhRequest::sessionId($request), true);
             if (! $context || ! WorkspaceAccess::getMembershipForContext($context, $workspace, $linkId === null ? 'editor' : 'viewer')) {
-                throw new LinkException('Tu acceso cambió. Recarga antes de continuar.', 403);
+                throw new LinkException(__('messages.error_ecf7ae22fbd94f'), 403);
             }
             $mode = $linkId === null ? 'preview' : 'health';
             $link = null;
             if ($linkId !== null) {
                 $link = Link::where('workspace_id', $workspace)->where('id', $linkId)->lockForUpdate()->first();
                 if (! $link) {
-                    throw new LinkException('Enlace no encontrado.', 404);
+                    throw new LinkException(__('messages.error_2f4bde2886e62b'), 404);
                 }
                 if (! is_int($request->input('linkVersion')) || $request->input('linkVersion') !== (int) $link->version) {
-                    throw new LinkException('El enlace cambió. Recárgalo antes de comprobarlo.', 409);
+                    throw new LinkException(__('messages.error_d08dee8ddc9540'), 409);
                 }
                 $url = $link->destination;
             } else {
                 $url = UvhRequest::inputString($request, 'url');
             }
             if (! UrlUtil::validateDestination($url)['ok']) {
-                throw new LinkException('Introduce una URL HTTP o HTTPS válida.', 422);
+                throw new LinkException(__('messages.error_325d5ada579aa2'), 422);
             }
             $url = explode('#', $url, 2)[0];
             $fingerprint = hash_hmac('sha256', 'inspection:v1:'.$mode.':'.($linkId ?? 'draft').':'.($link->version ?? 0).':'.$url, UvhCrypto::secret());
@@ -59,7 +59,7 @@ final class DestinationInspections
             $workspaceKey = 'destination-inspection:workspace:'.$workspace;
             foreach ([[$userKey, (int) config('destination-inspections.user_per_minute', 10)], [$workspaceKey, (int) config('destination-inspections.workspace_per_minute', 30)]] as [$key, $limit]) {
                 if (RateLimiter::tooManyAttempts($key, max(1, $limit))) {
-                    throw new LinkException('Has realizado varias comprobaciones. Espera un minuto.', 429);
+                    throw new LinkException(__('messages.error_781a832feb9839'), 429);
                 }
             }
             RateLimiter::hit($userKey, 60);
@@ -88,7 +88,7 @@ final class DestinationInspections
                 ->where('workspace_id', UvhRequest::workspaceId($request))->where('session_id', UvhRequest::sessionId($request))
                 ->where('expires_at', '>', now())->first();
             if (! $row || ! self::authorized($row)) {
-                throw new LinkException('Comprobación no disponible. Vuelve a solicitarla.', 404);
+                throw new LinkException(__('messages.error_5b62a628e63745'), 404);
             }
             if (! self::currentLink($row)) {
                 $row->status = 'stale';
@@ -171,7 +171,7 @@ final class DestinationInspections
     private static function enabled(): void
     {
         if (! config('workflows.enabled', false)) {
-            throw new LinkException('Esta función todavía no está disponible.', 404);
+            throw new LinkException(__('messages.error_3f80b725d8fbb6'), 404);
         }
     }
 

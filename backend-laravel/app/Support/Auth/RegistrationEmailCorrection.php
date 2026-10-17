@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\Audit;
 use App\Support\FrontendUrl;
 use App\Support\Ids;
+use App\Support\Language;
 use App\Support\MailAdmissionException;
 use App\Support\RegistrationEdit;
 use App\Support\RegistrationLinkHandoff;
@@ -55,7 +56,7 @@ final class RegistrationEmailCorrection
             } elseif (! $taken) {
                 // A previously occupied or activated context can start a NEW
                 // pending row, never attach/mutate an existing account or row.
-                $pending = PendingRegistration::create(['email' => $newEmail, 'security_version' => 1]);
+                $pending = PendingRegistration::create(['email' => $newEmail, 'security_version' => 1, 'language' => Language::current()]);
             }
             $attempt->update([
                 'email' => $newEmail,

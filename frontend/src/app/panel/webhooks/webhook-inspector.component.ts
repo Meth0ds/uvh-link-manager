@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -26,6 +27,7 @@ import { webhookDeliveryIcon, webhookDeliveryLabel, webhookStateLabel } from "..
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class WebhookInspectorComponent {
+  readonly uiText = UI_TEXT;
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly workspaces = inject(WorkspaceService);
@@ -81,7 +83,7 @@ export class WebhookInspectorComponent {
       this.page.set(1);
       this.error.set(null);
       if (webhookId === null) {
-        this.error.set("El identificador del webhook no es válido");
+        this.error.set($localize`:@@ui.2b44b8d766c0ad:El identificador del webhook no es válido`);
         this.loading.set(false);
         return;
       }
@@ -126,7 +128,7 @@ export class WebhookInspectorComponent {
       ]);
       if (!this.requests.isCurrent(request, this.currentContext(targetPage))) return;
       const webhook = webhooksResponse.webhooks.find((item) => item.id === webhookId) ?? null;
-      if (!webhook) throw new ApiRequestError("Webhook no encontrado", 404);
+      if (!webhook) throw new ApiRequestError($localize`:@@ui.4f185028f9e466:Webhook no encontrado`, 404);
       this.webhook.set(webhook);
       this.deliveries.set(deliveryPage.deliveries);
       this.total.set(deliveryPage.total);
@@ -141,8 +143,8 @@ export class WebhookInspectorComponent {
       this.deliveries.set([]);
       this.total.set(0);
       this.error.set(err instanceof ApiRequestError && (err.status === 401 || err.status === 403)
-        ? "Ya no tienes acceso a este inspector."
-        : err instanceof ApiRequestError ? err.message : "No se pudo cargar el inspector");
+        ? $localize`:@@ui.63fec022ea3617:Ya no tienes acceso a este inspector.`
+        : err instanceof ApiRequestError ? err.message : $localize`:@@ui.5fd75211a2c93a:No se pudo cargar el inspector`);
     } finally {
       if (this.requests.isCurrent(request, this.currentContext(targetPage))) this.loading.set(false);
     }
@@ -158,11 +160,11 @@ export class WebhookInspectorComponent {
       // operación vieja que llega tarde no dispara el reload del inspector
       // nuevo (el cambio de contexto ya hizo `reset()` del hueco).
       if (!this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Ping admitido en la cola", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.c641e5be13b986:Ping admitido en la cola`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       await this.load(1);
     } catch (err) {
       if (!this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo enviar la prueba", "Cerrar", { duration: 5000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.6a73f7e65ed77e:No se pudo enviar la prueba`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
     } finally {
       // Only the operation that still owns the slot may clear it.
       this.mutations.settle(action);
@@ -176,11 +178,11 @@ export class WebhookInspectorComponent {
     try {
       await this.api.post(`/api/v1/webhooks/${webhook.id}/deliveries/${delivery.id}/resend`);
       if (!this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Entrega pendiente en la cola", "Cerrar", { duration: 3000 });
+      this.snackbar.open($localize`:@@ui.cad33a5254a7dc:Entrega pendiente en la cola`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
       await this.load(this.page());
     } catch (err) {
       if (!this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo programar el reenvío", "Cerrar", { duration: 5000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.d4d5f3d1e1fbff:No se pudo programar el reenvío`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
     } finally {
       // Only the operation that still owns the slot may clear it.
       this.mutations.settle(action);

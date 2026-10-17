@@ -17,18 +17,18 @@ final class AnalyticsReports
     public static function enabled(): void
     {
         if (! config('sharing.reports')) {
-            throw new LinkException('Esta función todavía no está disponible.', 404);
+            throw new LinkException(__('messages.error_3f80b725d8fbb6'), 404);
         }
     }
 
     public static function text(mixed $value, int $max, bool $required = false): string
     {
         if (! is_string($value) || ! mb_check_encoding($value, 'UTF-8') || mb_strlen($value) > $max || preg_match('/[\p{Cc}\p{Cf}]/u', $value)) {
-            throw new LinkException('El texto no es válido.', 422);
+            throw new LinkException(__('messages.error_6e945cb32e4e03'), 422);
         }
         $value = trim($value);
         if ($required && $value === '') {
-            throw new LinkException('Completa el título y las etiquetas públicas.', 422);
+            throw new LinkException(__('messages.error_fa9ad80f64af35'), 422);
         }
 
         return $value;
@@ -38,29 +38,29 @@ final class AnalyticsReports
     public static function validateSpec(mixed $spec): array
     {
         if (! is_array($spec) || ($spec['version'] ?? null) !== 1 || array_diff(array_keys($spec), ['version', 'title', 'description', 'period', 'from', 'to', 'sections'])) {
-            throw new LinkException('Configuración del informe inválida.', 422);
+            throw new LinkException(__('messages.error_0f981ad61e734d'), 422);
         }
         $sections = $spec['sections'] ?? self::SECTIONS;
         if (! is_array($sections) || ! array_is_list($sections) || $sections === [] || count($sections) > 4 || array_filter($sections, fn ($s) => ! is_string($s) || ! in_array($s, self::SECTIONS, true)) || count(array_unique($sections)) !== count($sections)) {
-            throw new LinkException('Elige las secciones que podrá consultar el cliente.', 422);
+            throw new LinkException(__('messages.error_e2e6db86bd17fe'), 422);
         }
         $period = $spec['period'] ?? '30d';
         if (! in_array($period, ['7d', '30d', '90d', 'custom'], true)) {
-            throw new LinkException('Periodo inválido.', 422);
+            throw new LinkException(__('messages.error_0d14aab02b505c'), 422);
         }
         $from = $spec['from'] ?? null;
         $to = $spec['to'] ?? null;
         if ($period === 'custom') {
             if (! is_string($from) || ! is_string($to) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/D', $from) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/D', $to) || ! IsoDate::parse($from) || ! IsoDate::parse($to)) {
-                throw new LinkException('Selecciona dos fechas válidas.', 422);
+                throw new LinkException(__('messages.error_3cd29fc00890bb'), 422);
             }
             $a = CarbonImmutable::parse($from, 'UTC');
             $b = CarbonImmutable::parse($to, 'UTC')->endOfDay();
             if ($a->gt($b) || $b->gt($a->addDays(180))) {
-                throw new LinkException('El periodo debe abarcar como máximo 180 días.', 422);
+                throw new LinkException(__('messages.error_e158c7195bf71c'), 422);
             }
         } elseif ($from !== null || $to !== null) {
-            throw new LinkException('Las fechas solo se admiten en un periodo personalizado.', 422);
+            throw new LinkException(__('messages.error_88fb8e43a11554'), 422);
         }
 
         return ['version' => 1, 'title' => self::text($spec['title'] ?? '', 120, true), 'description' => self::text($spec['description'] ?? '', 500), 'period' => $period, 'from' => $from, 'to' => $to, 'sections' => $sections];
@@ -70,22 +70,22 @@ final class AnalyticsReports
     public static function validateLinks(mixed $items, int $workspace): array
     {
         if (! is_array($items) || ! array_is_list($items) || count($items) < 1 || count($items) > 100) {
-            throw new LinkException('Selecciona entre 1 y 100 enlaces.', 422);
+            throw new LinkException(__('messages.error_6e8d2b02559e60'), 422);
         }
         $result = [];
         foreach ($items as $item) {
             if (! is_array($item) || array_diff(array_keys($item), ['linkId', 'label']) || ! is_int($item['linkId'] ?? null) || $item['linkId'] < 1) {
-                throw new LinkException('Selección de enlaces inválida.', 422);
+                throw new LinkException(__('messages.error_bc32a92b40f30d'), 422);
             }
             $result[] = ['linkId' => $item['linkId'], 'label' => self::text($item['label'] ?? '', 120, true)];
         }
         $ids = array_column($result, 'linkId');
         if (count(array_unique($ids)) !== count($ids)) {
-            throw new LinkException('Hay enlaces repetidos.', 422);
+            throw new LinkException(__('messages.error_dbf14a8edfd856'), 422);
         }
         $count = DB::table('links')->where('workspace_id', $workspace)->whereIn('id', $ids)->whereNull('deleted_at')->whereNotIn('state', ['deleted', 'blocked'])->orderBy('id')->sharedLock()->get(['id']);
         if ($count->count() !== count($ids)) {
-            throw new LinkException('Algún enlace no está disponible en este workspace.', 422);
+            throw new LinkException(__('messages.error_a90309bddc0a86'), 422);
         }
 
         return $result;
@@ -143,11 +143,11 @@ final class AnalyticsReports
         self::enabled();
         $key = $request->header('Idempotency-Key');
         if (! Idempotency::validateKey($key)['ok']) {
-            throw new LinkException('Falta una clave de idempotencia válida.', 422);
+            throw new LinkException(__('messages.error_02a33307f17e7f'), 422);
         }
         $allowed = $operation === 'save' ? ['spec', 'links', 'expiresAt', 'password', ...($id === null ? [] : ['version'])] : ['version'];
         if (array_diff(array_keys($request->all()), $allowed)) {
-            throw new LinkException('La petición contiene campos no admitidos.', 422);
+            throw new LinkException(__('messages.error_2298b523ab2157'), 422);
         }
 
         return DB::transaction(function () use ($request, $id, $operation, $key): array {
@@ -155,7 +155,7 @@ final class AnalyticsReports
             $workspace = UvhRequest::workspaceId($request);
             $context = SecurityContext::lock($user, UvhRequest::sessionId($request), requireVerifiedEmail: true);
             if (! $context || ! WorkspaceAccess::getMembershipForContext($context, $workspace, 'admin')) {
-                throw new LinkException('Solo los propietarios y administradores pueden publicar informes.', 403);
+                throw new LinkException(__('messages.error_b307495fe0e470'), 403);
             }
             $scope = "analytics-reports:$workspace:$operation:".($id ?? 'new');
             $hashes = array_map(fn ($secret) => hash_hmac('sha256', $request->getContent(), hash_hmac('sha256', 'report-intent', $secret, true)), UvhCrypto::secrets());
@@ -166,14 +166,14 @@ final class AnalyticsReports
                 return json_decode(UvhCrypto::decryptAtRest($begin['body']['encrypted']), true, 64, JSON_THROW_ON_ERROR);
             }
             if ($begin['state'] !== 'fresh') {
-                throw new LinkException('Esta operación está en curso o la clave corresponde a otra petición.', 409);
+                throw new LinkException(__('messages.error_caba7f6f419d79'), 409);
             }
             $row = $id === null ? null : DB::table('analytics_reports')->where('workspace_id', $workspace)->where('id', $id)->lockForUpdate()->first();
             if ($id !== null && ! $row) {
-                throw new LinkException('Informe no encontrado.', 404);
+                throw new LinkException(__('messages.error_f57ae32f4988cf'), 404);
             }
             if ($row && $request->input('version') !== (int) $row->version) {
-                throw new LinkException('El informe cambió. Recarga antes de continuar.', 409);
+                throw new LinkException(__('messages.error_2e9505b5144fd1'), 409);
             }
             $values = ['updated_at' => now()];
             if ($row) {
@@ -182,26 +182,26 @@ final class AnalyticsReports
             }
             if ($operation === 'save') {
                 if ($row && $row->revoked_at !== null) {
-                    throw new LinkException('Crea otro informe para sustituir uno revocado.', 409);
+                    throw new LinkException(__('messages.error_7970ce39e2c03c'), 409);
                 }
                 $spec = self::validateSpec($request->input('spec'));
                 $links = self::validateLinks($request->input('links'), $workspace);
                 $expires = $request->input('expiresAt', $row ? ($row->expires_at === null ? null : CarbonImmutable::parse($row->expires_at)->format('Y-m-d\TH:i:s.uP')) : now()->addDays(30)->toIso8601String());
                 if ($expires !== null && (! is_string($expires) || ! IsoDate::parse($expires) || IsoDate::parse($expires)->lte(now()))) {
-                    throw new LinkException('La caducidad debe ser una fecha futura o estar desactivada.', 422);
+                    throw new LinkException(__('messages.error_5e2d528a7d34ad'), 422);
                 }
                 $values['expires_at'] = $expires;
                 $values['spec'] = json_encode($spec, JSON_THROW_ON_ERROR);
                 if ($request->exists('password')) {
                     $password = $request->input('password');
                     if ($password !== null && (! is_string($password) || ! PasswordStrength::isAcceptable($password))) {
-                        throw new LinkException('Usa una contraseña segura de al menos 10 caracteres y hasta 72 bytes.', 422);
+                        throw new LinkException(__('messages.error_3485d9d697bb20'), 422);
                     }
                     $values['password_hash'] = $password === null ? null : Hash::make($password);
                 }
                 if (! $row) {
                     if (DB::table('analytics_reports')->where('workspace_id', $workspace)->whereNull('revoked_at')->count() >= (int) config('sharing.max_reports', 50)) {
-                        throw new LinkException('Has alcanzado el límite de informes. Revoca uno antes de crear otro.', 409);
+                        throw new LinkException(__('messages.error_668fda164a2c61'), 409);
                     }
                     $secret = Ids::base64urlEncode(random_bytes(32));
                     $values += ['workspace_id' => $workspace, 'created_by' => $user->id, 'public_id' => Str::uuid()->toString(), 'secret_digest' => hash('sha256', $secret), 'secret_encrypted' => UvhCrypto::encryptAtRest($secret), 'created_at' => now()];
@@ -216,7 +216,7 @@ final class AnalyticsReports
                     $values['revoked_at'] = now();
                 } elseif ($operation === 'rotate') {
                     if ($row->revoked_at !== null) {
-                        throw new LinkException('El informe está revocado.', 409);
+                        throw new LinkException(__('messages.error_ad2e1b33fda560'), 409);
                     }
                     $secret = Ids::base64urlEncode(random_bytes(32));
                     $values['secret_digest'] = hash('sha256', $secret);

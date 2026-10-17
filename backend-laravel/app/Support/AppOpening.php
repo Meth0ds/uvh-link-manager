@@ -16,29 +16,29 @@ final class AppOpening
             return null;
         }
         if (! is_array($value) || ($value['version'] ?? null) !== 1) {
-            throw new LinkException('La configuración de aplicación no es válida.', 422);
+            throw new LinkException(__('messages.error_78068dfceed601'), 422);
         }
         if (($value['kind'] ?? null) === 'provider') {
             if (array_diff(array_keys($value), ['version', 'kind', 'provider', 'url'])) {
-                throw new LinkException('La configuración contiene campos no admitidos.', 422);
+                throw new LinkException(__('messages.error_766cf70122c6ff'), 422);
             }
             if (! is_string($value['provider'] ?? null)) {
-                throw new LinkException('Selecciona un servicio conocido.', 422);
+                throw new LinkException(__('messages.error_448ed1c480fe4d'), 422);
             }
 
             $url = AppProviders::normalize($value['provider'], $value['url'] ?? null);
             if (DestinationDenylist::reason($url) !== null) {
-                throw new LinkException('Este destino de aplicación está bloqueado.', 422);
+                throw new LinkException(__('messages.error_e826c5d61c6baa'), 422);
             }
 
             return ['version' => 1, 'kind' => 'provider', 'provider' => $value['provider'], 'url' => $url];
         }
         if (($value['kind'] ?? null) !== 'native' || array_diff(array_keys($value), ['version', 'kind', 'profileId', 'route']) || ! is_string($value['profileId'] ?? null) || ! is_string($value['route'] ?? null)) {
-            throw new LinkException('Selecciona una app y una ruta de contenido válida.', 422);
+            throw new LinkException(__('messages.error_0004cfbb08bb34'), 422);
         }
         $profile = self::profile($value['profileId'], $workspace, $domain);
         if (! $profile || ! self::routeAllowed($value['route'], json_decode($profile->route_prefixes, true))) {
-            throw new LinkException('La app no está disponible en este dominio o la ruta no está permitida.', 422);
+            throw new LinkException(__('messages.error_ec038cd6e2db5e'), 422);
         }
 
         return ['version' => 1, 'kind' => 'native', 'profileId' => $profile->public_id, 'route' => $value['route']];

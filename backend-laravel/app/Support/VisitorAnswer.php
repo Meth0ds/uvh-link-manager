@@ -38,7 +38,7 @@ final class VisitorAnswer
     public static function passwordRequired(Request $request, string $alias): Response
     {
         if (! self::wantsPage($request)) {
-            return self::envelope('Enlace protegido con contraseña', 403, ['passwordRequired' => true]);
+            return self::envelope(__('visitor.password_required'), 403, ['passwordRequired' => true]);
         }
 
         return self::gate($request, $alias, null, 403);
@@ -48,30 +48,30 @@ final class VisitorAnswer
     public static function staleForm(Request $request, string $alias): Response
     {
         if (! self::wantsPage($request)) {
-            return self::envelope('Token CSRF inválido', 403);
+            return self::envelope(__('visitor.csrf_invalid'), 403);
         }
 
-        return self::gate($request, $alias, 'Caducó la comprobación de seguridad de este formulario. Inténtalo otra vez.', 403);
+        return self::gate($request, $alias, __('visitor.form_expired'), 403);
     }
 
     /** La contraseña enviada no tiene una longitud usable. */
     public static function passwordOutOfRange(Request $request, string $alias): Response
     {
         if (! self::wantsPage($request)) {
-            return self::envelope('Contraseña requerida', 422);
+            return self::envelope(__('visitor.password_missing'), 422);
         }
 
-        return self::gate($request, $alias, 'La contraseña debe tener entre 1 y 72 caracteres.', 422);
+        return self::gate($request, $alias, __('visitor.password_range'), 422);
     }
 
     /** La contraseña no es la del enlace. */
     public static function wrongPassword(Request $request, string $alias): Response
     {
         if (! self::wantsPage($request)) {
-            return self::envelope('Contraseña incorrecta', 403);
+            return self::envelope(__('visitor.wrong_password'), 403);
         }
 
-        return self::gate($request, $alias, 'Contraseña incorrecta. Inténtalo de nuevo.', 403);
+        return self::gate($request, $alias, __('visitor.wrong_password_retry'), 403);
     }
 
     /**
@@ -98,10 +98,32 @@ final class VisitorAnswer
     public static function noSuchLink(Request $request): Response
     {
         if (! self::wantsPage($request)) {
-            return self::envelope('Enlace no encontrado', 404);
+            return self::envelope(__('visitor.missing'), 404);
         }
 
-        return self::notice('Enlace no encontrado', 'El enlace que buscas no existe o fue eliminado.', 404);
+        return self::notFound();
+    }
+
+    /** Only the explicit missing-link outcome uses the interactive 404. */
+    public static function notFound(?string $brandHost = null, ?string $rootDestination = null): Response
+    {
+        $home = rtrim((string) config('uvh.public_origin'), '/');
+        $panel = app()->environment('production')
+            ? 'https://'.config('uvh.app_host')
+            : rtrim((string) (config('uvh.frontend_url') ?: config('app.url')), '/');
+        $root = is_string($rootDestination) && UrlUtil::validateDestination($rootDestination)['ok']
+            && DestinationDenylist::reason($rootDestination) === null ? $rootDestination : null;
+
+        return response()->view('visitor.not-found', [
+            'brandHost' => $brandHost,
+            'root' => $root,
+            'home' => $home,
+            'homeUrl' => $home.(config('uvh.localisation_enabled') ? Language::path('/') : '/'),
+            'helpUrl' => $home.(config('uvh.localisation_enabled') ? Language::path('/help') : '/help'),
+            'privacyUrl' => $home.(config('uvh.localisation_enabled') ? Language::path('/legal/privacidad') : '/legal/privacidad'),
+            'panelUrl' => $panel.(config('uvh.localisation_enabled') ? Language::path('/app/dashboard') : '/app/dashboard'),
+            'panel' => $panel,
+        ], 404)->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
     /**
@@ -112,13 +134,13 @@ final class VisitorAnswer
      */
     public static function tooManyAttempts(Request $request, array $headers): Response
     {
-        $message = 'Demasiados intentos para este enlace.';
+        $message = __('visitor.too_many');
 
         if (! self::wantsPage($request)) {
             return self::envelope($message, 429)->withHeaders($headers);
         }
 
-        return self::gate($request, (string) $request->route('alias'), $message.' Espera un minuto antes de volver a intentarlo.', 429, mint: false)
+        return self::gate($request, (string) $request->route('alias'), $message.' '.__('visitor.wait_minute'), 429, mint: false)
             ->withHeaders($headers);
     }
 

@@ -36,11 +36,11 @@ final class DestinationInspectionController
         try {
             $row = DestinationInspections::find($request, $id);
             if ($row->status !== 'ready' || ! is_string($row->icon_ciphertext) || $row->icon_ciphertext === '') {
-                throw new LinkException('Icono no disponible.', 404);
+                throw new LinkException(__('messages.error_eb284ecca51619'), 404);
             }
             $icon = base64_decode(UvhCrypto::decryptAtRest($row->icon_ciphertext), true);
             if (! is_string($icon)) {
-                throw new LinkException('Icono no disponible.', 404);
+                throw new LinkException(__('messages.error_eb284ecca51619'), 404);
             }
 
             return response($icon)->header('Content-Type', 'image/png')->header('Cache-Control', 'no-store, private')->header('X-Content-Type-Options', 'nosniff');
@@ -53,7 +53,7 @@ final class DestinationInspectionController
     {
         $allowed = $id === null ? ['url'] : ['linkVersion'];
         if (array_diff(array_keys($request->all()), $allowed) !== []) {
-            return response()->json(['error' => 'La solicitud contiene campos no admitidos.'], 422);
+            return response()->json(['error' => __('messages.error_9b2b2d2c45e497')], 422);
         }
         try {
             $inspection = DestinationInspections::create($request, $id);

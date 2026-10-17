@@ -76,6 +76,7 @@ final class UvhRequest
             'id' => $u->id,
             'email' => $u->email,
             'name' => $u->name,
+            'language' => in_array($u->language, ['es', 'en'], true) ? $u->language : null,
             'isAdmin' => (bool) $u->is_admin,
             'emailVerified' => (bool) $u->email_verified_at,
             'mfaEnabled' => (bool) $u->mfa_enabled,

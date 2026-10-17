@@ -1,4 +1,6 @@
-import { inject } from "@angular/core";
+import { UI_LOCALE } from "../localisation/locale";
+import { isPlatformServer } from "@angular/common";
+import { inject, PLATFORM_ID } from "@angular/core";
 import { HttpErrorResponse, HttpInterceptorFn } from "@angular/common/http";
 import { catchError, from, throwError } from "rxjs";
 import { WorkspaceService } from "../services/workspace.service";
@@ -53,6 +55,7 @@ async function blobSessionConflict(blob: Blob): Promise<boolean> {
  */
 export const apiInterceptor: HttpInterceptorFn = (req, next) => {
   const path = apiPathname(req.url);
+  if (isPlatformServer(inject(PLATFORM_ID))) return next(req);
   const workspace = inject(WorkspaceService).currentId();
   const auth = inject(AuthService);
   const generation = auth.sessionGeneration();
@@ -63,6 +66,7 @@ export const apiInterceptor: HttpInterceptorFn = (req, next) => {
     && Number.isSafeInteger(workspace) && (workspace as number) > 0
     ? { "X-Workspace-Id": String(workspace) }
     : {};
+  headers["Accept-Language"] = UI_LOCALE;
   if (sessionRequest && Number.isSafeInteger(account) && (account as number) > 0) {
     headers["X-Uvh-Account-Id"] = String(account);
   }

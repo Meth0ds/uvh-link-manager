@@ -1,25 +1,25 @@
-<a class="skip-link" href="#panel-content" (click)="skipToContent($event)">Saltar al contenido</a>
+<a class="skip-link" href="#panel-content" (click)="skipToContent($event)"><ng-container i18n="@@ui.fdab69210d5cda">Saltar al contenido</ng-container></a>
 <mat-sidenav-container class="shell" [class.navigation-rail]="mainNavRail()" [class.navigation-pinned]="mainNavPinned()" (keydown.escape)="onMainNavEscape($event)">
   <mat-sidenav #sidenav id="panel-navigation" [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile() || mobileOpen()" [disableClose]="!isMobile()" (closedStart)="mobileOpen.set(false)" class="side" [class.navigation-expanded]="mainNavExpanded()"
     (pointerenter)="onMainNavPointerEnter($event)" (pointerleave)="onMainNavPointerLeave()"
     (focusin)="onMainNavFocusIn($event)" (focusout)="onMainNavFocusOut($event)"
-    fixedInViewport aria-label="Navegación principal">
+    fixedInViewport aria-label="Navegación principal" i18n-aria-label="@@ui.781509b25aa032">
     <div class="side-head">
-      <a class="brand" routerLink="/" aria-label="UVH · Ir al inicio">
-        <span class="brand-name" aria-hidden="true">uvh<span>.</span></span>
-        <span class="brand-caption" aria-hidden="true">El enlace, bajo control.</span>
+      <a class="brand" routerLink="/" aria-label="UVH · Ir al inicio" i18n-aria-label="@@ui.0cdd350eb061aa">
+        <span class="brand-name" aria-hidden="true"><ng-container i18n="@@ui.3e4f24607f6041">uvh</ng-container><span>.</span></span>
+        <span class="brand-caption" aria-hidden="true"><ng-container i18n="@@ui.54afaf4137b5a8">El enlace, bajo control.</ng-container></span>
       </a>
-      <button mat-icon-button class="side-close" type="button" (click)="mobileOpen.set(false)" aria-label="Cerrar menú"><mat-icon>close</mat-icon></button>
+      <button mat-icon-button class="side-close" type="button" (click)="mobileOpen.set(false)" aria-label="Cerrar menú" i18n-aria-label="@@ui.f296f95ab8b393"><mat-icon>close</mat-icon></button>
       <div class="workspace-summary">
         <mat-icon aria-hidden="true">workspaces</mat-icon>
         <span><b>{{ workspaceName() }}</b><small>{{ roleLabel() }}</small></span>
       </div>
       @if (canCreate() && (isMobile() || !hasContextualCreate())) {
-        <button mat-flat-button class="new-link side-primary" type="button" (click)="newLink()" aria-label="Crear enlace"><mat-icon aria-hidden="true">add</mat-icon><span class="navigation-copy">Crear enlace</span></button>
+        <button mat-flat-button class="new-link side-primary" type="button" (click)="newLink()" aria-label="Crear enlace" i18n-aria-label="@@ui.3daf36ee52f052"><mat-icon aria-hidden="true">add</mat-icon><span class="navigation-copy"><ng-container i18n="@@ui.3daf36ee52f052">Crear enlace</ng-container></span></button>
       }
     </div>
 
-    <mat-nav-list class="nav-list" aria-label="Secciones de tu espacio">
+    <mat-nav-list class="nav-list" aria-label="Secciones de tu espacio" i18n-aria-label="@@ui.51b0ada3037d7d">
       @for (group of visibleNav(); track group.label) {
         <span class="nav-group">{{ group.label }}</span>
         @for (item of group.items; track item.path) {
@@ -44,19 +44,19 @@
     </mat-nav-list>
 
     <div class="side-foot">
-      <a class="help-link" routerLink="/help" aria-label="Ayuda: guías y soluciones" matTooltip="Ayuda y guías" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350"><mat-icon aria-hidden="true">help_outline</mat-icon><span class="navigation-copy">¿Cómo se hace?<small>Guías y soluciones</small></span><mat-icon aria-hidden="true">north_east</mat-icon></a>
-      <button mat-button class="workspace-create" (click)="createWorkspace()" aria-label="Crear workspace" matTooltip="Crear workspace" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350"><mat-icon aria-hidden="true">create_new_folder</mat-icon><span class="navigation-copy">Crear workspace</span></button>
-      <a class="side-account" aria-label="Perfil y preferencias" routerLink="/app/settings" (click)="mobileOpen.set(false)" matTooltip="Perfil y preferencias" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350"><span class="account-initials" aria-hidden="true">{{ initials() }}</span><span class="navigation-copy"><b>{{ user()?.name || 'Tu cuenta' }}</b><small>Perfil y preferencias</small></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
+      <a class="help-link" routerLink="/help" aria-label="Ayuda: guías y soluciones" matTooltip="Ayuda y guías" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350" i18n-matTooltip="@@ui.f387a3c6766c64" i18n-aria-label="@@ui.46a8262bd0d53b"><mat-icon aria-hidden="true">help_outline</mat-icon><span class="navigation-copy"><ng-container i18n="@@ui.3b27ef5719eda8">¿Cómo se hace?</ng-container><small><ng-container i18n="@@ui.b8dcec958c9f1f">Guías y soluciones</ng-container></small></span><mat-icon aria-hidden="true">north_east</mat-icon></a>
+      <button mat-button class="workspace-create" (click)="createWorkspace()" aria-label="Crear workspace" matTooltip="Crear workspace" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350" i18n-matTooltip="@@ui.204a65194041a4" i18n-aria-label="@@ui.204a65194041a4"><mat-icon aria-hidden="true">create_new_folder</mat-icon><span class="navigation-copy"><ng-container i18n="@@ui.204a65194041a4">Crear workspace</ng-container></span></button>
+      <a class="side-account" aria-label="Perfil y preferencias" routerLink="/app/settings" (click)="mobileOpen.set(false)" matTooltip="Perfil y preferencias" [matTooltipDisabled]="mainNavExpanded()" matTooltipPosition="right" [matTooltipShowDelay]="350" i18n-matTooltip="@@ui.db1c6de09a689a" i18n-aria-label="@@ui.db1c6de09a689a"><span class="account-initials" aria-hidden="true">{{ initials() }}</span><span class="navigation-copy"><b>{{ user()?.name || uiText.ui_d30c5ae09ef074 }}</b><small><ng-container i18n="@@ui.db1c6de09a689a">Perfil y preferencias</ng-container></small></span><mat-icon aria-hidden="true">arrow_forward</mat-icon></a>
     </div>
   </mat-sidenav>
 
   <mat-sidenav-content class="content">
-    <mat-toolbar class="topbar" aria-label="Barra de herramientas">
+    <mat-toolbar class="topbar" aria-label="Barra de herramientas" i18n-aria-label="@@ui.450307bfd9f463">
       @if (mainNavRail()) {
         <button #mainNavToggle mat-icon-button class="navigation-pin" type="button"
           (click)="toggleMainNavPinned()" [attr.aria-pressed]="mainNavPinned()" [attr.aria-expanded]="mainNavExpanded()"
-          [attr.aria-label]="mainNavPinned() ? 'Contraer menú principal' : 'Expandir y mantener abierto el menú principal'"
-          [matTooltip]="mainNavPinned() ? 'Contraer menú' : 'Expandir y mantener abierto'"
+          [attr.aria-label]="mainNavPinned() ? uiText.ui_d4500816b1f020 : uiText.ui_1cbe1f8d507909"
+          [matTooltip]="mainNavPinned() ? uiText.ui_f7889ffa2c3bc8 : uiText.ui_dd82501cbd44c4"
           aria-controls="panel-navigation">
           <mat-icon aria-hidden="true">{{ mainNavPinned() ? 'menu_open' : 'menu' }}</mat-icon>
         </button>
@@ -67,32 +67,32 @@
         class="menu-btn"
         [class.open]="mobileOpen()"
         (click)="mobileOpen.set(!mobileOpen())"
-        [attr.aria-label]="mobileOpen() ? 'Cerrar menú' : 'Abrir menú'"
+        [attr.aria-label]="mobileOpen() ? uiText.ui_f296f95ab8b393 : uiText.ui_1a7de9bc490f0e"
         [attr.aria-expanded]="mobileOpen()"
         aria-controls="panel-navigation"
       >
         <span class="menu-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
       </button>
 
-      <button mat-button class="workspace-picker" type="button" [matMenuTriggerFor]="workspaceMenu" aria-label="Cambiar workspace">
+      <button mat-button class="workspace-picker" type="button" [matMenuTriggerFor]="workspaceMenu" aria-label="Cambiar workspace" i18n-aria-label="@@ui.2de87a72779737">
         <span class="workspace-emblem" aria-hidden="true"><mat-icon>workspaces</mat-icon></span>
-        <span class="workspace-picker-copy"><small>Espacio de trabajo</small><b>{{ workspaceName() }}</b></span>
+        <span class="workspace-picker-copy"><small><ng-container i18n="@@ui.b326fc96874e1a">Espacio de trabajo</ng-container></small><b>{{ workspaceName() }}</b></span>
       </button>
       <mat-menu #workspaceMenu="matMenu" class="workspace-menu">
-        <div class="user-head"><b>Tus espacios de trabajo</b><span>Cambiar de espacio cambia los enlaces y datos visibles.</span></div>
+        <div class="user-head"><b><ng-container i18n="@@ui.1b4eb1b1e0b083">Tus espacios de trabajo</ng-container></b><span><ng-container i18n="@@ui.139b0bdb88774a">Cambiar de espacio cambia los enlaces y datos visibles.</ng-container></span></div>
         @for (w of workspaces.list(); track w.id) {
           <button mat-menu-item type="button" (click)="onWorkspaceChange(w.id)" [attr.aria-current]="workspaces.currentId() === w.id ? 'true' : null">
             <mat-icon aria-hidden="true">{{ workspaces.currentId() === w.id ? 'check' : 'workspaces' }}</mat-icon><span class="workspace-menu-copy"><b>{{ w.name }}</b><small>{{ roleLabelFor(w.role) }}</small></span>
           </button>
         }
         <mat-divider />
-        <button mat-menu-item type="button" (click)="createWorkspace()"><mat-icon aria-hidden="true">create_new_folder</mat-icon>Crear workspace</button>
+        <button mat-menu-item type="button" (click)="createWorkspace()"><mat-icon aria-hidden="true">create_new_folder</mat-icon><ng-container i18n="@@ui.204a65194041a4">Crear workspace</ng-container></button>
       </mat-menu>
-      <div class="route-context" aria-label="Página actual"><span aria-hidden="true">/</span><b>{{ currentPage() }}</b></div>
+      <div class="route-context" aria-label="Página actual" i18n-aria-label="@@ui.cfdb7400a9d11a"><span aria-hidden="true">/</span><b>{{ currentPage() }}</b></div>
 
       <span class="spacer"></span>
-      <button mat-button class="global-search-trigger" type="button" (click)="openSearch($event)" [attr.aria-keyshortcuts]="searchShortcut === '⌘ K' ? 'Meta+k' : 'Control+k'" aria-label="Buscar enlaces, dominios y acciones">
-        <mat-icon aria-hidden="true">search</mat-icon><span class="search-trigger-copy">Buscar…</span><kbd aria-hidden="true">{{ searchShortcut }}</kbd>
+      <button mat-button class="global-search-trigger" type="button" (click)="openSearch($event)" [attr.aria-keyshortcuts]="searchShortcut === '⌘ K' ? 'Meta+k' : 'Control+k'" aria-label="Buscar enlaces, dominios y acciones" i18n-aria-label="@@ui.a448569dc7e0de">
+        <mat-icon aria-hidden="true">search</mat-icon><span class="search-trigger-copy"><ng-container i18n="@@ui.9120df43bebb82">Buscar…</ng-container></span><kbd aria-hidden="true">{{ searchShortcut }}</kbd>
       </button>
 
       <a mat-icon-button class="notifications-bell" routerLink="/app/notifications" [attr.aria-label]="unreadNotificationsLabel()">
@@ -102,22 +102,22 @@
         }
       </a>
 
-      <app-public-theme-toggle class="panel-theme" />
+      <app-language-selector /><app-public-theme-toggle class="panel-theme" />
 
-      <button mat-button [matMenuTriggerFor]="userMenu" class="avatar-btn" aria-label="Menú de usuario">
+      <button mat-button [matMenuTriggerFor]="userMenu" class="avatar-btn" aria-label="Menú de usuario" i18n-aria-label="@@ui.219ff7e6a44544">
         <span class="avatar"><span>{{ initials() }}</span></span>
-        <span class="user-button-copy"><b>{{ user()?.name || 'Tu cuenta' }}</b><small>Cuenta personal</small></span>
+        <span class="user-button-copy"><b>{{ user()?.name || uiText.ui_d30c5ae09ef074 }}</b><small><ng-container i18n="@@ui.7c82d9b28a01c0">Cuenta personal</ng-container></small></span>
       </button>
       <mat-menu #userMenu="matMenu" xPosition="before">
         <div class="user-head">
           <b>{{ user()?.name }}</b>
           <span>{{ user()?.email }}</span>
         </div>
-        <a mat-menu-item routerLink="/app/settings"><mat-icon>settings</mat-icon> Ajustes</a>
-        <a mat-menu-item routerLink="/app/team"><mat-icon>group</mat-icon> Equipo</a>
-        <a mat-menu-item routerLink="/"><mat-icon>language</mat-icon> Ir a la web</a>
+        <a mat-menu-item routerLink="/app/settings"><mat-icon>settings</mat-icon> <ng-container i18n="@@ui.4f2debbbf4fab6">Ajustes</ng-container></a>
+        <a mat-menu-item routerLink="/app/team"><mat-icon>group</mat-icon> <ng-container i18n="@@ui.c29446754ae19b">Equipo</ng-container></a>
+        <a mat-menu-item routerLink="/"><mat-icon>language</mat-icon> <ng-container i18n="@@ui.44872bfc7edcd7">Ir a la web</ng-container></a>
         <mat-divider></mat-divider>
-        <button mat-menu-item (click)="logout()" [disabled]="logoutBusy()"><mat-icon>logout</mat-icon> {{ logoutBusy() ? 'Cerrando sesión…' : 'Cerrar sesión' }}</button>
+        <button mat-menu-item (click)="logout()" [disabled]="logoutBusy()"><mat-icon>logout</mat-icon> {{ logoutBusy() ? uiText.ui_a6c0a323b1b5c1 : uiText.ui_c6e6960395f49b }}</button>
       </mat-menu>
     </mat-toolbar>
 

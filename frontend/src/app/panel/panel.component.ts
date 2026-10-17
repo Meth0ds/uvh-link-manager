@@ -1,3 +1,6 @@
+import { LanguageSelectorComponent } from "../core/localisation/language-selector.component";
+import { LocaleLinkDirective } from "../core/localisation/locale-link.directive";
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { DestroyRef, Component, computed, effect, HostListener, ElementRef, inject, signal, ChangeDetectionStrategy, viewChild } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { BreakpointObserver } from "@angular/cdk/layout";
@@ -33,7 +36,7 @@ const NAVIGATION_CLOSE_DELAY = 100;
 @Component({
   selector: "app-panel",
   standalone: true,
-  imports: [
+  imports: [LocaleLinkDirective, LanguageSelectorComponent,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
@@ -55,6 +58,7 @@ const NAVIGATION_CLOSE_DELAY = 100;
   styleUrl: "./panel.component.scss",
 })
 export class PanelComponent {
+  readonly uiText = UI_TEXT;
   private auth = inject(AuthService);
   private readonly dialogOwner = inject(DestroyRef);
   private router = inject(Router);
@@ -80,10 +84,10 @@ export class PanelComponent {
   readonly notifications = inject(NotificationService);
   readonly user = this.auth.user;
   readonly unreadNotificationsLabel = computed(() => this.notifications.unread() > 0
-    ? `${this.notifications.unread()} notificaciones sin leer`
+    ? $localize`:@@ui.b0aa321667aa75:${this.notifications.unread()} notificaciones sin leer`
     : "Notificaciones");
   readonly isAdmin = computed(() => this.user()?.isAdmin === true);
-  readonly workspaceName = computed(() => this.workspaces.list().find((workspace) => workspace.id === this.workspaces.currentId())?.name ?? "Sin workspace");
+  readonly workspaceName = computed(() => this.workspaces.list().find((workspace) => workspace.id === this.workspaces.currentId())?.name ?? $localize`:@@ui.2ffebbe4b6701f:Sin workspace`);
   readonly workspaceRole = computed(() => this.workspaces.list().find(w => w.id === this.workspaces.currentId())?.role);
   readonly canCreate = computed(() => canEditLinks(this.user(), this.workspaces.currentRole()));
   readonly roleLabel = computed(() => {
@@ -91,8 +95,8 @@ export class PanelComponent {
   });
 
   roleLabelFor(role: string | null | undefined): string {
-    if (!role) return "Sin rol asignado";
-    return isWorkspaceRole(role) ? workspaceRoleLabel(role) : "Rol personalizado";
+    if (!role) return $localize`:@@ui.b166fa53c87ba6:Sin rol asignado`;
+    return isWorkspaceRole(role) ? workspaceRoleLabel(role) : $localize`:@@ui.9ad1b93b62e693:Rol personalizado`;
   }
   // Derive the breadcrumb from known routes only; never echo URL parameters.
   private readonly currentUrl = toSignal(this.router.events.pipe(
@@ -261,7 +265,7 @@ export class PanelComponent {
       width: "min(480px, 92vw)",
       maxWidth: "92vw",
       autoFocus: "first-tabbable",
-      ariaLabel: "Crear workspace",
+      ariaLabel: $localize`:@@ui.204a65194041a4:Crear workspace`,
     }).afterClosed().subscribe(async (result: WorkspaceDialogResult | undefined) => {
       if (!result) return;
       await this.auth.refreshWorkspaces();
@@ -276,7 +280,7 @@ export class PanelComponent {
       await this.auth.logout();
       await this.router.navigate(["/"]);
     } catch {
-      this.snackbar.open("No se pudo confirmar el cierre de sesión. Vuelve a intentarlo.", "Cerrar", { duration: 6000 });
+      this.snackbar.open($localize`:@@ui.d546600d15b60e:No se pudo confirmar el cierre de sesión. Vuelve a intentarlo.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 6000 });
     } finally {
       this.logoutBusy.set(false);
     }

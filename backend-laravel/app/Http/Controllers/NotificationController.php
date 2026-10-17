@@ -8,6 +8,7 @@ use App\Support\IsoDate;
 use App\Support\NotificationInbox;
 use App\Support\NotificationKinds;
 use App\Support\NotificationPreferences;
+use App\Support\NotificationSubject;
 use App\Support\SecurityContext;
 use App\Support\StaleSecurityContext;
 use App\Support\UvhRequest;
@@ -33,7 +34,7 @@ final class NotificationController extends Controller
     {
         $user = $this->liveReadUser($request);
         if ($user === null) {
-            return response()->json(['error' => 'No autenticado'], 401);
+            return response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
         $limit = self::boundedLimit($request->query('limit'));
         $before = $request->query('before');
@@ -50,7 +51,7 @@ final class NotificationController extends Controller
         $notifications = $page->map(fn ($row): array => [
             'id' => (int) $row->id,
             'kind' => (string) $row->kind,
-            'subject' => is_string($row->subject) ? $row->subject : null,
+            'subject' => NotificationSubject::forRow($row),
             'workspaceId' => $row->workspace_id !== null ? (int) $row->workspace_id : null,
             'route' => is_string($row->route) ? $row->route : null,
             'createdAt' => IsoDate::format($row->created_at),
@@ -69,7 +70,7 @@ final class NotificationController extends Controller
     {
         $user = $this->liveReadUser($request);
         if ($user === null) {
-            return response()->json(['error' => 'No autenticado'], 401);
+            return response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
 
         return response()->json(['unread' => NotificationInbox::unreadCount((int) $user->id)]);
@@ -99,7 +100,7 @@ final class NotificationController extends Controller
             return NotificationInbox::unreadCount((int) $user->id);
         });
         if ($unread === null) {
-            return response()->json(['error' => 'Notificación no encontrada'], 404);
+            return response()->json(['error' => __('messages.error_ebb63e1750a4a6')], 404);
         }
 
         return response()->json(['unread' => $unread]);
@@ -124,7 +125,7 @@ final class NotificationController extends Controller
     {
         $user = $this->liveReadUser($request);
         if ($user === null) {
-            return response()->json(['error' => 'No autenticado'], 401);
+            return response()->json(['error' => __('messages.error_bf623cf00a0e86')], 401);
         }
 
         return response()->json(['preferences' => $this->preferenceView((int) $user->id)]);
@@ -139,7 +140,7 @@ final class NotificationController extends Controller
     {
         $input = $request->input('preferences');
         if (! is_array($input) || $input === []) {
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         $changes = [];
@@ -148,10 +149,10 @@ final class NotificationController extends Controller
                 || ! isset($entry['kind'], $entry['delivery'])
                 || ! is_string($entry['kind'])
                 || ! is_string($entry['delivery'])) {
-                return response()->json(['error' => 'Datos inválidos'], 422);
+                return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
             }
             if (array_key_exists($entry['kind'], $changes)) {
-                return response()->json(['error' => 'Datos inválidos'], 422);
+                return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
             }
             $changes[$entry['kind']] = $entry['delivery'];
         }
@@ -171,10 +172,10 @@ final class NotificationController extends Controller
                 static fn (string $kind): bool => NotificationKinds::exists($kind) && NotificationKinds::isMandatory($kind),
             );
             if ($locked !== []) {
-                return response()->json(['error' => 'Los avisos de seguridad no se pueden desactivar'], 422);
+                return response()->json(['error' => __('messages.error_645f1d733646bc')], 422);
             }
 
-            return response()->json(['error' => 'Datos inválidos'], 422);
+            return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
         }
 
         return response()->json(['preferences' => $preferences]);

@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../core/localisation/template-messages";
 import { DOCUMENT } from "@angular/common";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, NgZone, ViewChild, afterNextRender, computed, inject, input, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
@@ -10,41 +11,42 @@ export interface LegalSection { readonly id: string; readonly title: string; }
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./legal-document-navigation.component.scss",
   template: `
-    <nav id="document-index" tabindex="-1" aria-label="Índice del documento">
+    <nav id="document-index" tabindex="-1" aria-label="Índice del documento" i18n-aria-label="@@ui.41a9156503a03b">
       <div class="outline-heading">
-        <span>En este documento</span>
+        <span><ng-container i18n="@@ui.88e6efb3084388">En este documento</ng-container></span>
         <button class="outline-toggle" type="button" [attr.aria-expanded]="expanded()" aria-controls="legal-outline-body" (click)="toggle()">
-          {{ expanded() ? 'Cerrar índice' : 'Ver índice' }} <span class="toggle-mark" [class.is-open]="expanded()" aria-hidden="true"></span>
+          {{ expanded() ? uiText.ui_fcbcef75b48f69 : uiText.ui_6b37bc8af603f5 }} <span class="toggle-mark" [class.is-open]="expanded()" aria-hidden="true"></span>
         </button>
       </div>
       @if (reading(); as position) {
-        <div class="reading-position" role="progressbar" aria-label="Recorrido por el documento" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="position.percent" [attr.aria-valuetext]="'Apartado ' + (position.index + 1) + ' de ' + sections().length">
-          <span>En este punto</span><b>{{ number(position.id) }} / {{ sections().length }}</b>
+        <div class="reading-position" role="progressbar" aria-label="Recorrido por el documento" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="position.percent" [attr.aria-valuetext]="uiText.ui_5eda18b899d81c + (position.index + 1) + uiText.ui_553c27d45c0c54 + sections().length" i18n-aria-label="@@ui.04deade24081d2">
+          <span><ng-container i18n="@@ui.ef4b66b6f1f60e">En este punto</ng-container></span><b>{{ number(position.id) }} / {{ sections().length }}</b>
           <div class="reading-track" aria-hidden="true"><i [style.transform]="'scaleX(' + position.percent / 100 + ')' "></i></div>
         </div>
         <div class="document-track" aria-hidden="true"><i [style.transform]="'scaleX(' + position.percent / 100 + ')' "></i></div>
       }
       <div #body id="legal-outline-body" class="outline-body" [class.collapsed]="!expanded()">
-        <label for="legal-chapter-search">Buscar un apartado</label>
+        <label for="legal-chapter-search"><ng-container i18n="@@ui.c3701a46a8954e">Buscar un apartado</ng-container></label>
         <div class="search-field">
-          <input #search id="legal-chapter-search" type="search" autocomplete="off" placeholder="Ej. seguridad" [value]="query()" (input)="searchChanged(search.value)" />
-          @if (query()) { <button type="button" aria-label="Limpiar búsqueda" (click)="clear()">×</button> }
+          <input #search id="legal-chapter-search" type="search" autocomplete="off" placeholder="Ej. seguridad" [value]="query()" (input)="searchChanged(search.value)"  i18n-placeholder="@@ui.e77a81b8195588"/>
+          @if (query()) { <button type="button" aria-label="Limpiar búsqueda" (click)="clear()" i18n-aria-label="@@ui.a7859bae872b6c">×</button> }
         </div>
-        <p class="outline-result" role="status">{{ query() ? filtered().length + ' apartados encontrados' : sections().length + ' apartados' }}</p>
+        <p class="outline-result" role="status">{{ query() ? filtered().length + uiText.ui_8e2d1073666ba5 : sections().length + uiText.ui_0ba53f647f35d6 }}</p>
         <ol>
           @for (section of filtered(); track section.id) {
             <li><a [routerLink]="[]" [fragment]="section.id" [class.is-current]="reading()?.id === section.id" [attr.aria-current]="reading()?.id === section.id ? 'location' : null">
               <span aria-hidden="true">{{ number(section.id) }}</span><span>{{ section.title }}</span>
             </a></li>
-          } @empty { <li class="no-results">No hay apartados con ese nombre. Prueba otra búsqueda.</li> }
+          } @empty { <li class="no-results"><ng-container i18n="@@ui.ab7d797f3b4ea7">No hay apartados con ese nombre. Prueba otra búsqueda.</ng-container></li> }
         </ol>
-        <p class="outline-hint">La búsqueda filtra el índice. El documento siempre se muestra completo.</p>
+        <p class="outline-hint"><ng-container i18n="@@ui.f5912615afb52c">La búsqueda filtra el índice. El documento siempre se muestra completo.</ng-container></p>
       </div>
-      <button class="print-document" type="button" (click)="print()"><span aria-hidden="true">↗</span> Imprimir o guardar PDF</button>
+      <button class="print-document" type="button" (click)="print()"><span aria-hidden="true">↗</span> <ng-container i18n="@@ui.295877a4557d04">Imprimir o guardar PDF</ng-container></button>
     </nav>
   `,
 })
 export class LegalDocumentNavigationComponent {
+  readonly uiText = UI_TEXT;
   private readonly document = inject(DOCUMENT);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);

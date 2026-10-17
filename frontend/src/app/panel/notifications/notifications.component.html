@@ -3,61 +3,61 @@
   eyebrow="Cuenta"
   title="Notificaciones"
   description="Avisos de seguridad y operativos de tu cuenta, en un solo sitio."
->
+ i18n-title="@@ui.80dade6fab6f93" i18n-description="@@ui.fafd9ec2e7d4f6" i18n-eyebrow="@@ui.e436ddcd06e85c">
   @if (items().length) {
     <button mat-stroked-button type="button" (click)="markAllRead()" [disabled]="loading() || busy() || unread() === 0">
-      <mat-icon aria-hidden="true">done_all</mat-icon>Marcar todas como leídas
-    </button>
+      <mat-icon aria-hidden="true">done_all</mat-icon><ng-container i18n="@@ui.5b09d0cb818713">Marcar todas como leídas
+    </ng-container></button>
   }
 </app-page-header>
 
 @if (loading() && !items().length) {
-  <app-panel-skeleton variant="list" label="Cargando notificaciones" />
+  <app-panel-skeleton variant="list" label="Cargando notificaciones"  i18n-label="@@ui.4c376006bf007d"/>
 } @else {
-  @if (loading()) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando notificaciones" /> }
+  @if (loading()) { <mat-progress-bar mode="indeterminate" aria-label="Actualizando notificaciones"  i18n-aria-label="@@ui.62d2ce3f209ec9"/> }
   @if (error(); as message) {
     <div class="alert error" role="alert">
       <mat-icon aria-hidden="true">error_outline</mat-icon>
       <span>{{ message }}</span>
-      <button mat-stroked-button type="button" (click)="load()">Reintentar</button>
+      <button mat-stroked-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button>
     </div>
   }
 
   @if (!error() && !items().length) {
     <div class="empty-state" role="status">
       <mat-icon aria-hidden="true">notifications_none</mat-icon>
-      <b>No tienes notificaciones</b>
-      <p>Aquí verás los avisos de seguridad y la actividad de tu cuenta. Puedes elegir cómo recibirlos.</p>
-      <a mat-stroked-button routerLink="/app/settings/notifications">Preferencias de notificaciones</a>
+      <b><ng-container i18n="@@ui.e5e75572f1af46">No tienes notificaciones</ng-container></b>
+      <p><ng-container i18n="@@ui.f9406788701df8">Aquí verás los avisos de seguridad y la actividad de tu cuenta. Puedes elegir cómo recibirlos.</ng-container></p>
+      <a mat-stroked-button routerLink="/app/settings/notifications"><ng-container i18n="@@ui.db0b37f6ae821a">Preferencias de notificaciones</ng-container></a>
     </div>
   }
 
   @if (items().length) {
-    <div class="inbox-summary" role="status"><span>{{ unread() === 0 ? 'Todo al día' : unread() + ' sin leer' }}</span><a routerLink="/app/settings/notifications">Preferencias de avisos</a></div>
-    <ul class="notification-list" aria-label="Avisos de tu cuenta" [attr.aria-busy]="loading() || busy()">
+    <div class="inbox-summary" role="status"><span>{{ unread() === 0 ? uiText.ui_c5d537e2cf1120 : unread() + uiText.ui_dbd95e51c4907b }}</span><a routerLink="/app/settings/notifications"><ng-container i18n="@@ui.f79d1999469cff">Preferencias de avisos</ng-container></a></div>
+    <ul class="notification-list" aria-label="Avisos de tu cuenta" [attr.aria-busy]="loading() || busy()" i18n-aria-label="@@ui.62bb8eb024d02c">
       @for (item of items(); track item.id) {
         <li class="notification-row" [class.unread]="item.readAt === null">
           <span class="notification-icon" aria-hidden="true"><mat-icon>{{ kindIcon(item.kind) }}</mat-icon></span>
           <div class="notification-copy">
-            <div class="notification-heading"><b>{{ kindLabel(item.kind) }}</b>@if (item.readAt === null) { <span class="unread-label">Sin leer</span> }</div>
+            <div class="notification-heading"><b>{{ kindLabel(item.kind) }}</b>@if (item.readAt === null) { <span class="unread-label"><ng-container i18n="@@ui.739b468f01d75d">Sin leer</ng-container></span> }</div>
             @if (item.subject) { <span class="notification-subject">{{ item.subject }}</span> }
-            <time [attr.datetime]="item.createdAt">{{ item.createdAt | date:'dd/MM/yyyy HH:mm':'UTC' }} UTC</time>
+            <time [attr.datetime]="item.createdAt"><ng-container i18n="@@ui.19d01c34501b1a">{{ item.createdAt | date:'dd/MM/yyyy HH:mm':'UTC' }} UTC</ng-container></time>
           </div>
           <div class="notification-actions">
             @if (item.route) {
-              <button mat-stroked-button type="button" (click)="openDetail(item)">Ver detalle</button>
+              <button mat-stroked-button type="button" (click)="openDetail(item)"><ng-container i18n="@@ui.3139c028decfe0">Ver detalle</ng-container></button>
             }
             @if (item.readAt === null) {
-              <button mat-button type="button" (click)="markRead(item)" [disabled]="loading() || busy()">Marcar como leída</button>
+              <button mat-button type="button" (click)="markRead(item)" [disabled]="loading() || busy()"><ng-container i18n="@@ui.9efa7e51ac6ae8">Marcar como leída</ng-container></button>
             } @else {
-              <span class="read-mark"><mat-icon aria-hidden="true">task_alt</mat-icon>Leída</span>
+              <span class="read-mark"><mat-icon aria-hidden="true">task_alt</mat-icon><ng-container i18n="@@ui.303dbc723024dd">Leída</ng-container></span>
             }
           </div>
         </li>
       }
     </ul>
     @if (hasMore()) {
-      <div class="row-actions"><button mat-stroked-button type="button" (click)="loadMore()" [disabled]="loading() || busy()">{{ busy() ? 'Cargando…' : 'Cargar más' }}</button></div>
+      <div class="row-actions"><button mat-stroked-button type="button" (click)="loadMore()" [disabled]="loading() || busy()">{{ busy() ? uiText.ui_205443ee88568e : uiText.ui_86cddfa2fa5348 }}</button></div>
     }
   }
 }

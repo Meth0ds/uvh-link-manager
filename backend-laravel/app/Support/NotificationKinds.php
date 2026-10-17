@@ -135,7 +135,13 @@ final class NotificationKinds
     /** @return array<string, array{category: string, workspace: bool, route: ?string, title: string}> */
     public static function all(): array
     {
-        return self::CATALOG;
+        $catalogue = self::CATALOG;
+        foreach ($catalogue as $kind => &$definition) {
+            $definition['title'] = __('notifications.'.$kind);
+        }
+        unset($definition);
+
+        return $catalogue;
     }
 
     public static function exists(string $kind): bool
@@ -165,6 +171,6 @@ final class NotificationKinds
 
     public static function title(string $kind): ?string
     {
-        return self::CATALOG[$kind]['title'] ?? null;
+        return isset(self::CATALOG[$kind]) ? __('notifications.'.$kind) : null;
     }
 }

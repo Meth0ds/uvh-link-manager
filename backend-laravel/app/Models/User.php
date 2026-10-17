@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
  * Larastan types datetime columns from the database schema as `string` and
  * ignores the `datetime` cast, so attributes used as dates are declared here.
  *
+ * @property string|null $language
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $mfa_pending_expires_at
  * @property array<int, mixed>|string|null $recovery_codes
@@ -26,6 +27,7 @@ class User extends Authenticatable
     protected $fillable = [
         'email',
         'name',
+        'language',
         'password_hash',
         'email_verified_at',
         'is_admin',

@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, signal, viewChild } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
@@ -18,6 +19,7 @@ import { AuthService } from "../../core/services/auth.service";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PasswordChangeDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly ref = inject(MatDialogRef<PasswordChangeDialogComponent, boolean>);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
@@ -79,7 +81,7 @@ export class PasswordChangeDialogComponent {
     }
     if (this.auth.sessionGeneration() !== this.context) {
       this.clearSecrets();
-      this.error.set("Tu sesión ha cambiado. Cierra esta ventana y empieza de nuevo.");
+      this.error.set($localize`:@@ui.2538ca555395be:Tu sesión ha cambiado. Cierra esta ventana y empieza de nuevo.`);
       this.moveTo(1);
       return;
     }
@@ -101,7 +103,7 @@ export class PasswordChangeDialogComponent {
     } catch (error) {
       if (!this.destroyRef.destroyed) {
         this.clearSecrets();
-        this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar el cambio. La contraseña no se ha modificado.");
+        this.error.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.84879e0eb2a65d:No se pudo confirmar el cambio. La contraseña no se ha modificado.`);
         this.moveTo(1);
       }
     } finally {

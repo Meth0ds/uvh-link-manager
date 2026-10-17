@@ -32,6 +32,15 @@ const user = {
 };
 
 describe("authentication response decoders", () => {
+  it("preserves older responses without a language and validates explicit preferences", () => {
+    expect(decodeAuthUserResponse({ user })).toEqual({ user });
+    for (const language of ["es", "en", null] as const) {
+      expect(decodeAuthUserResponse({ user: { ...user, language } }).user?.language).toBe(language);
+    }
+    for (const language of ["en-US", "../en", 1, {}, false]) {
+      expect(() => decodeAuthUserResponse({ user: { ...user, language } })).toThrow();
+    }
+  });
   it("requires a consistent registration session without bypassing MFA", () => {
     const activation = { ok: true as const, newAccount: true, authenticated: true, user: { ...user, mfaEnabled: false }, pendingLink: true };
     expect(decodeRegistrationActivation(activation)).toEqual(activation);

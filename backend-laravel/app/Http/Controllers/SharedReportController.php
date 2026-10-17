@@ -24,14 +24,14 @@ final class SharedReportController
             $origin = $request->header('Origin');
             $expected = rtrim((string) (config('uvh.frontend_url') ?: config('app.url')), '/');
             if (($origin !== null && $origin !== $expected) || (app()->isProduction() && $origin === null)) {
-                throw new LinkException('No se pudo validar el origen de la solicitud.', 403);
+                throw new LinkException(__('messages.error_12b05ee5b67e2f'), 403);
             }
 
             return DB::transaction(function () use ($request, $publicId): JsonResponse {
                 $row = $this->row($publicId);
                 $token = $request->input('token');
                 if (! is_string($token) || ! preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) || ! hash_equals($row->secret_digest, hash('sha256', $token))) {
-                    throw new LinkException('Este informe no está disponible.', 404);
+                    throw new LinkException(__('messages.error_9a895b0394b3aa'), 404);
                 }
                 $password = $request->input('password');
                 if ($row->password_hash !== null) {
@@ -39,7 +39,7 @@ final class SharedReportController
                         return response()->json(['passwordRequired' => true]);
                     }
                     if (! is_string($password) || strlen($password) > 72 || ! Hash::check($password, $row->password_hash)) {
-                        throw new LinkException('La contraseña no es correcta.', 422);
+                        throw new LinkException(__('messages.error_c042b468cbc31f'), 422);
                     }
                 }
                 $seconds = $row->expires_at === null ? 1800 : max(1, min(1800, (int) now()->diffInSeconds(CarbonImmutable::parse($row->expires_at), false)));
@@ -64,7 +64,7 @@ final class SharedReportController
                 $cookie = $request->cookies->get($this->cookieName($publicId));
                 $access = is_string($cookie) ? SignedToken::verify($cookie, fn ($p) => json_decode($p, true)) : null;
                 if (! is_array($access) || ($access['kind'] ?? null) !== 'shared-report' || ($access['report'] ?? null) !== $publicId || ($access['version'] ?? null) !== (int) $row->access_version) {
-                    throw new LinkException('Abre la URL compartida para acceder al informe.', 401);
+                    throw new LinkException(__('messages.error_f67fdd6fe64283'), 401);
                 }
                 $spec = json_decode($row->spec, true, 32, JSON_THROW_ON_ERROR);
                 $end = $spec['period'] === 'custom' ? CarbonImmutable::parse($spec['to'], 'UTC')->endOfDay() : CarbonImmutable::now('UTC');
@@ -91,12 +91,12 @@ final class SharedReportController
     {
         $hint = DB::table('analytics_reports')->where('public_id', $id)->first(['workspace_id']);
         if (! $hint || ! DB::table('workspaces')->where('id', $hint->workspace_id)->sharedLock()->first(['id'])) {
-            throw new LinkException('Este informe no está disponible.', 404);
+            throw new LinkException(__('messages.error_9a895b0394b3aa'), 404);
         }
         // Same workspace -> report -> links order as mutations and workspace erasure.
         $row = DB::table('analytics_reports')->where('public_id', $id)->where('workspace_id', $hint->workspace_id)->sharedLock()->first();
         if (! $row || ! AnalyticsReports::available($row)) {
-            throw new LinkException('Este informe no está disponible.', 404);
+            throw new LinkException(__('messages.error_9a895b0394b3aa'), 404);
         }
 
         return $row;

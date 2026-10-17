@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { SharingService } from "../../core/services/sharing.service";
 import { Component, computed, DestroyRef, effect, inject, signal, untracked, ChangeDetectionStrategy } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
@@ -83,6 +84,7 @@ type StateFilter = "" | LinkState;
   styleUrl: "./links.component.scss",
 })
 export class LinksComponent {
+  readonly uiText = UI_TEXT;
   readonly sharing = inject(SharingService);
   readonly reportSnapshotBusy = signal(false);
   async shareSelectedReport(): Promise<void> {
@@ -90,7 +92,7 @@ export class LinksComponent {
     if (this.reportSnapshotBusy() || !this.sharing.canPublish() || !ids.length || ids.length > 100) return;
     this.reportSnapshotBusy.set(true);
     try { const links = await this.qrLibrary.snapshot(ids); if (!this.dialogOwner.destroyed && context === this.sharing.context()) await this.sharing.open(links.map(l => ({linkId:l.id,label:l.alias}))); }
-    catch (error) { if (!this.dialogOwner.destroyed && context === this.sharing.context()) this.error.set(error instanceof Error ? error.message : "No se pudo preparar el informe."); }
+    catch (error) { if (!this.dialogOwner.destroyed && context === this.sharing.context()) this.error.set(error instanceof Error ? error.message : $localize`:@@ui.216fb51acc1569:No se pudo preparar el informe.`); }
     finally { if (!this.dialogOwner.destroyed) this.reportSnapshotBusy.set(false); }
   }
   private api = inject(ApiService);
@@ -200,7 +202,7 @@ export class LinksComponent {
   }
 
   constructor() {
-    effect(() => { const message = this.favorites.error(); if (message) this.snackbar.open(message, "Cerrar", { duration: 4000 }); });
+    effect(() => { const message = this.favorites.error(); if (message) this.snackbar.open(message, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 4000 }); });
     effect(() => { if (this.workflows.enabled()) untracked(() => { void this.loadCollections(); void this.reload(); }); });
     this.route.queryParamMap?.pipe(takeUntilDestroyed(this.dialogOwner)).subscribe(params => {
       const query = (params.get("q") ?? "").slice(0, 200);
@@ -297,7 +299,7 @@ export class LinksComponent {
       void this.openPendingLink();
     } catch (err) {
       if (!this.requests.isCurrent(request, this.viewContext())) return;
-      this.error.set(err instanceof ApiRequestError ? err.message : "No se pudieron cargar los enlaces");
+      this.error.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.4a9d4c0a86cfbd:No se pudieron cargar los enlaces`);
     } finally {
       if (this.requests.isCurrent(request, this.viewContext())) this.loading.set(false);
     }
@@ -447,9 +449,9 @@ export class LinksComponent {
   async bulkTrash(): Promise<void> {
     const count = this.selected().size;
     const confirmed = await this.actions.confirm({
-      title: "Eliminar enlaces seleccionados",
-      message: `¿Quieres eliminar ${count} ${count === 1 ? "enlace" : "enlaces"}? Podrás restaurarlos desde la papelera.`,
-      confirmLabel: "Eliminar enlaces",
+      title: $localize`:@@ui.cfb6121e63e583:Eliminar enlaces seleccionados`,
+      message: `¿Quieres eliminar ${count} ${count === 1 ? $localize`:@@ui.902ee7f27eee59:enlace` : $localize`:@@ui.41b0ae1f3fe239:enlaces`}? Podrás restaurarlos desde la papelera.`,
+      confirmLabel: $localize`:@@ui.1ca8be52a15b5b:Eliminar enlaces`,
       destructive: true,
     });
     if (!confirmed) return;
@@ -492,7 +494,7 @@ export class LinksComponent {
       this.lastBulk = null;
       this.bulkRetry = null;
       this.clearSelection();
-      this.snackbar.open("Acción aplicada", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.0fd0b8cbddb6c1:Acción aplicada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
       void this.reload();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(op)) return;
@@ -502,7 +504,7 @@ export class LinksComponent {
         // intención nueva que volvería a ejecutar lo ya aplicado.
         this.bulkRetry = { signature, body, key };
         this.snackbar
-          .open(err.message, "Reintentar", { duration: 8000 })
+          .open(err.message, $localize`:@@ui.a9254c5f812829:Reintentar`, { duration: 8000 })
           .onAction()
           .subscribe(() => void this.retryBulk());
         return;
@@ -511,7 +513,7 @@ export class LinksComponent {
       // nuevo intento es una nueva intención. Sin respuesta (red o 5xx) se
       // conserva para que el reintento reproduzca en vez de aplicar dos veces.
       if (err instanceof ApiRequestError && err.status > 0 && err.status < 500) this.lastBulk = null;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo aplicar la acción", "Cerrar", { duration: 3500 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.1df54c6dfe957d:No se pudo aplicar la acción`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
     } finally {
       this.mutations.settle(op);
     }
@@ -529,13 +531,13 @@ export class LinksComponent {
       if (!current()) return;
       const stamp = new Date().toISOString().slice(0, 10);
       if (!downloadBlob(blob, `uvh-links-${stamp}.csv`)) {
-        this.snackbar.open("No se pudo iniciar la descarga", "Cerrar", { duration: 3000 });
+        this.snackbar.open($localize`:@@ui.5d0c0bc073faba:No se pudo iniciar la descarga`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
         return;
       }
-      this.snackbar.open("Export CSV descargado", "Cerrar", { duration: 2500 });
+      this.snackbar.open($localize`:@@ui.ce19729a8f11a8:Export CSV descargado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
     } catch (err) {
       if (!current()) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "No se pudo exportar el CSV", "Cerrar", { duration: 3500 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : $localize`:@@ui.50636b22ef90a7:No se pudo exportar el CSV`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
     } finally {
       if (current()) this.exporting.set(false);
     }
@@ -604,13 +606,13 @@ export class LinksComponent {
   async exportSelectedQr(): Promise<void> {
     if (this.qrSnapshotBusy()) return;
     const ids = [...this.selected()];
-    if (!ids.length || ids.length > 100) { this.error.set("Selecciona entre 1 y 100 enlaces para exportar sus QR."); return; }
+    if (!ids.length || ids.length > 100) { this.error.set($localize`:@@ui.197aae3f2fe773:Selecciona entre 1 y 100 enlaces para exportar sus QR.`); return; }
     const request = this.qrRequests.begin(this.viewContext()); this.qrSnapshotBusy.set(true);
     try {
       const links = await this.qrLibrary.snapshot(ids, { signal: request.signal });
       if (!this.qrRequests.isCurrent(request, this.viewContext())) return;
       this.dialog.open(QrDialogComponent, { data: { url: links[0].shortUrl, links }, width: "820px", maxWidth: "calc(100vw - 24px)" });
-    } catch (error) { if (this.qrRequests.isCurrent(request, this.viewContext())) this.error.set(error instanceof Error ? error.message : "No se pudo preparar la selección."); }
+    } catch (error) { if (this.qrRequests.isCurrent(request, this.viewContext())) this.error.set(error instanceof Error ? error.message : $localize`:@@ui.e7fd883f1600e1:No se pudo preparar la selección.`); }
     finally { if (this.qrRequests.isCurrent(request, this.viewContext())) this.qrSnapshotBusy.set(false); }
   }
 
@@ -626,14 +628,14 @@ export class LinksComponent {
 
   async discardPendingLink(): Promise<void> {
     const confirmed = await this.actions.confirm({
-      title: "Descartar URL guardada",
-      message: "La URL dejará de estar disponible para crear un enlace más tarde.",
-      confirmLabel: "Descartar URL",
+      title: $localize`:@@ui.76ad65c89eec26:Descartar URL guardada`,
+      message: $localize`:@@ui.0259e11031e177:La URL dejará de estar disponible para crear un enlace más tarde.`,
+      confirmLabel: $localize`:@@ui.adc914051ce0da:Descartar URL`,
       destructive: true,
     });
     if (!confirmed) return;
     void this.intents.complete();
-    this.snackbar.open("URL guardada descartada", "Cerrar", { duration: 2500 });
+    this.snackbar.open($localize`:@@ui.27cfe0e5ed8faa:URL guardada descartada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
   }
 
   edit(link: LinkDto): void {
@@ -652,11 +654,11 @@ export class LinksComponent {
     try {
       await this.api.post(`/api/v1/links/${link.id}/state`, { state });
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Estado actualizado", "Cerrar", { duration: 2000 });
+      this.snackbar.open($localize`:@@ui.64c6aa1a673969:Estado actualizado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 });
       void this.reload();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
     } finally {
       this.mutations.settle(action);
     }
@@ -667,9 +669,9 @@ export class LinksComponent {
     // dialog after switching tenants must not delete from the new one.
     const target = targetWorkspace(this.workspaces);
     const confirmed = await this.actions.confirm({
-      title: "Eliminar enlace",
-      message: `¿Quieres eliminar ${link.shortUrl}? Podrás restaurarlo desde una integración, pero dejará de estar disponible ahora.`,
-      confirmLabel: "Eliminar enlace",
+      title: $localize`:@@ui.ad730f5de914c2:Eliminar enlace`,
+      message: $localize`:@@ui.e1bdd1017640d5:¿Quieres eliminar ${link.shortUrl}? Podrás restaurarlo desde una integración, pero dejará de estar disponible ahora.`,
+      confirmLabel: $localize`:@@ui.ad730f5de914c2:Eliminar enlace`,
       destructive: true,
     });
     if (!confirmed || this.actionId() || !target.isCurrent()) return;
@@ -677,12 +679,12 @@ export class LinksComponent {
     try {
       await this.api.delete(`/api/v1/links/${link.id}`);
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open("Enlace eliminado", "Cerrar", { duration: 2000 });
+      this.snackbar.open($localize`:@@ui.603361fe8b670b:Enlace eliminado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 });
       this.selected.update(ids => { const next = new Set(ids); next.delete(link.id); return next; });
       void this.reload();
     } catch (err) {
       if (!target.isCurrent() || !this.mutations.isCurrent(action)) return;
-      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", "Cerrar", { duration: 3000 });
+      this.snackbar.open(err instanceof ApiRequestError ? err.message : "Error", $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
     } finally {
       // Only the operation that still owns the slot may clear it: a stale
       // `remove` landing late must not re-enable the rows of a newer action.
@@ -706,8 +708,8 @@ export class LinksComponent {
       await this.openPendingLink();
     } catch (err) {
       this.snackbar.open(
-        err instanceof ApiRequestError ? err.message : "No se pudo guardar la URL para continuar",
-        "Cerrar",
+        err instanceof ApiRequestError ? err.message : $localize`:@@ui.73c96ebbdea386:No se pudo guardar la URL para continuar`,
+        $localize`:@@ui.aeccae342e4bd0:Cerrar`,
         { duration: 3500 },
       );
     }
@@ -733,8 +735,8 @@ export class LinksComponent {
     } catch (err) {
       if (this.dialogOwner.destroyed || context !== this.viewContext()) return;
       this.snackbar.open(
-        err instanceof ApiRequestError ? err.message : "No se pudo recuperar la URL guardada",
-        "Cerrar",
+        err instanceof ApiRequestError ? err.message : $localize`:@@ui.9f5054351eb6bd:No se pudo recuperar la URL guardada`,
+        $localize`:@@ui.aeccae342e4bd0:Cerrar`,
         { duration: 3500 },
       );
     } finally {

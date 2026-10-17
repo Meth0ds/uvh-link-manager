@@ -1,3 +1,4 @@
+import { UI_TEXT } from "../../core/localisation/template-messages";
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, signal, viewChild } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
@@ -22,6 +23,7 @@ export interface EmailAccessDialogData {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EmailAccessDialogComponent {
+  readonly uiText = UI_TEXT;
   readonly data = inject<EmailAccessDialogData>(MAT_DIALOG_DATA);
   readonly auth = inject(AuthService);
   readonly ref = inject(MatDialogRef<EmailAccessDialogComponent, boolean>);
@@ -49,7 +51,7 @@ export class EmailAccessDialogComponent {
   }
 
   title(): string {
-    return this.data.mode === "change" ? "Cambiar el email de acceso" : "Cancelar el cambio pendiente";
+    return this.data.mode === "change" ? $localize`:@@ui.7d85a47228f751:Cambiar el email de acceso` : $localize`:@@ui.48c9d38aec1202:Cancelar el cambio pendiente`;
   }
 
   nextFromEmail(): void {
@@ -93,7 +95,7 @@ export class EmailAccessDialogComponent {
     }
     if (this.auth.sessionGeneration() !== this.context) {
       this.clearSecrets();
-      this.error.set("Tu sesión ha cambiado. Cierra esta ventana y empieza de nuevo.");
+      this.error.set($localize`:@@ui.2538ca555395be:Tu sesión ha cambiado. Cierra esta ventana y empieza de nuevo.`);
       this.moveTo(1);
       return;
     }
@@ -113,7 +115,7 @@ export class EmailAccessDialogComponent {
     } catch (error) {
       if (!this.destroyRef.destroyed) {
         this.clearSecrets();
-        this.error.set(error instanceof ApiRequestError ? error.message : "No se pudo confirmar la operación. No repitas el envío hasta comprobar el estado del email en Ajustes.");
+        this.error.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.f9198bd59d721a:No se pudo confirmar la operación. No repitas el envío hasta comprobar el estado del email en Ajustes.`);
         this.moveTo(1);
       }
     } finally {

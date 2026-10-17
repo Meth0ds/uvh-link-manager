@@ -1,41 +1,41 @@
 <header class="simulator-header">
-  <div class="title"><span class="title-icon" aria-hidden="true"><mat-icon>alt_route</mat-icon></span><div><h2 mat-dialog-title>Probar reglas</h2><p>Simula un visitante sin crear una visita ni consumir usos.</p></div></div>
-  <button mat-icon-button type="button" mat-dialog-close aria-label="Cerrar simulador"><mat-icon>close</mat-icon></button>
+  <div class="title"><span class="title-icon" aria-hidden="true"><mat-icon>alt_route</mat-icon></span><div><h2 mat-dialog-title><ng-container i18n="@@ui.b950dd613b10f6">Probar reglas</ng-container></h2><p><ng-container i18n="@@ui.eb062c999ad152">Simula un visitante sin crear una visita ni consumir usos.</ng-container></p></div></div>
+  <button mat-icon-button type="button" mat-dialog-close aria-label="Cerrar simulador" i18n-aria-label="@@ui.534c48ee807af6"><mat-icon>close</mat-icon></button>
 </header>
 <mat-dialog-content class="simulator-content">
-  <div class="simulator-note" role="note"><mat-icon aria-hidden="true">science</mat-icon><span>Resultado ilustrativo; no se ha ejecutado una redirección real.</span></div>
+  <div class="simulator-note" role="note"><mat-icon aria-hidden="true">science</mat-icon><span><ng-container i18n="@@ui.977538d8660489">Resultado ilustrativo; no se ha ejecutado una redirección real.</ng-container></span></div>
   <form [formGroup]="form" (ngSubmit)="simulate()" class="simulator-form">
-    <div class="section-heading"><span class="eyebrow">Contexto del visitante</span><h3>¿Qué quieres comprobar?</h3><p>Los campos vacíos representan cualquier valor.</p></div>
+    <div class="section-heading"><span class="eyebrow"><ng-container i18n="@@ui.f22439482ca476">Contexto del visitante</ng-container></span><h3><ng-container i18n="@@ui.77c480232ea3f8">¿Qué quieres comprobar?</ng-container></h3><p><ng-container i18n="@@ui.5ef2d9d2c73c8a">Los campos vacíos representan cualquier valor.</ng-container></p></div>
     <div class="field-grid">
-      <mat-form-field appearance="outline"><mat-label>País</mat-label><input matInput formControlName="country" maxlength="2" placeholder="ES" autocomplete="off" /><mat-hint>ISO 3166</mat-hint></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Dispositivo</mat-label><mat-select formControlName="device"><mat-option value="">Cualquiera</mat-option><mat-option value="desktop">Escritorio</mat-option><mat-option value="mobile">Móvil</mat-option><mat-option value="tablet">Tablet</mat-option></mat-select></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Idioma</mat-label><input matInput formControlName="language" maxlength="8" placeholder="es-ES" autocomplete="off" /></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Sistema operativo</mat-label><input matInput formControlName="os" maxlength="40" placeholder="Android" autocomplete="off" /></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Referente</mat-label><input matInput formControlName="referrer" maxlength="200" placeholder="google.com" autocomplete="off" /></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Campaña</mat-label><input matInput formControlName="campaign" maxlength="100" placeholder="navidad" autocomplete="off" /></mat-form-field>
-      <mat-form-field appearance="outline" class="time-field"><mat-label>Hora local</mat-label><input matInput formControlName="localTime" type="time" /><mat-hint>{{ timezone }} @if (utcPreview(); as utc) { · {{ utc }} }</mat-hint></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.bb8921362413d4">País</ng-container></mat-label><input matInput formControlName="country" maxlength="2" placeholder="ES" autocomplete="off"  i18n-placeholder="@@ui.ce344a41812796"/><mat-hint><ng-container i18n="@@ui.50f0ec8ea69bb8">ISO 3166</ng-container></mat-hint></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.1c555eb7f1c05e">Dispositivo</ng-container></mat-label><mat-select formControlName="device"><mat-option value=""><ng-container i18n="@@ui.792f808c97648c">Cualquiera</ng-container></mat-option><mat-option value="desktop"><ng-container i18n="@@ui.557fb176483405">Escritorio</ng-container></mat-option><mat-option value="mobile"><ng-container i18n="@@ui.cac5d3230b6884">Móvil</ng-container></mat-option><mat-option value="tablet"><ng-container i18n="@@ui.e34a879c8b8b67">Tablet</ng-container></mat-option></mat-select></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.7ae9d418353b39">Idioma</ng-container></mat-label><input matInput formControlName="language" maxlength="8" placeholder="es-ES" autocomplete="off"  i18n-placeholder="@@ui.22f76e4a2ad12e"/></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.7cf274c1d0f127">Sistema operativo</ng-container></mat-label><input matInput formControlName="os" maxlength="40" placeholder="Android" autocomplete="off"  i18n-placeholder="@@ui.6d612a86bee4b0"/></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.a01fc317a2d76a">Referente</ng-container></mat-label><input matInput formControlName="referrer" maxlength="200" placeholder="google.com" autocomplete="off"  i18n-placeholder="@@ui.d4c9d902732627"/></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label><ng-container i18n="@@ui.98c0f6d4a303e4">Campaña</ng-container></mat-label><input matInput formControlName="campaign" maxlength="100" placeholder="navidad" autocomplete="off"  i18n-placeholder="@@ui.dd22025b5f9a91"/></mat-form-field>
+      <mat-form-field appearance="outline" class="time-field"><mat-label><ng-container i18n="@@ui.80cd3c37e969bf">Hora local</ng-container></mat-label><input matInput formControlName="localTime" type="time" /><mat-hint>{{ timezone }} @if (utcPreview(); as utc) { · {{ utc }} }</mat-hint></mat-form-field>
     </div>
-    <p class="timezone-note"><mat-icon aria-hidden="true">schedule</mat-icon>Las reglas se guardan en UTC. La equivalencia puede cambiar con el horario de verano.</p>
-    <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()"><mat-icon>{{ busy() ? 'hourglass_top' : 'play_arrow' }}</mat-icon>{{ busy() ? 'Probando…' : 'Probar configuración' }}</button>
+    <p class="timezone-note"><mat-icon aria-hidden="true">schedule</mat-icon><ng-container i18n="@@ui.909aa3529d0cbf">Las reglas se guardan en UTC. La equivalencia puede cambiar con el horario de verano.</ng-container></p>
+    <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || busy()"><mat-icon>{{ busy() ? 'hourglass_top' : 'play_arrow' }}</mat-icon>{{ busy() ? uiText.ui_a3da3a488d2e46 : uiText.ui_39130f87eb10b3 }}</button>
   </form>
-  @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Probando reglas" /> }
-  @if (error(); as message) { <div class="error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span><button mat-button type="button" (click)="simulate()">Reintentar</button></div> }
+  @if (busy()) { <mat-progress-bar mode="indeterminate" aria-label="Probando reglas"  i18n-aria-label="@@ui.18b2d6740dfee6"/> }
+  @if (error(); as message) { <div class="error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span><button mat-button type="button" (click)="simulate()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div> }
   @if (result(); as output) {
     <section class="result-card" aria-live="polite" aria-labelledby="result-title">
-      @if (data.appOpeningConfigured) { <p class="simulator-note">Cuando la configuración de app esté activa, solo se aplicará al destino principal. La URL de abajo será su alternativa web. Las reglas y el destino alternativo conservan la redirección web.</p> }
-      <div class="result-heading"><div class="result-icon" [class.rule]="output.source === 'rule'"><mat-icon>{{ output.source === 'rule' ? 'alt_route' : output.source === 'fallback' ? 'turn_right' : 'north_east' }}</mat-icon></div><div><span class="eyebrow">Resultado</span><h3 id="result-title">{{ output.source === 'rule' ? 'Coincide una regla' : output.source === 'fallback' ? 'Destino fallback' : 'Destino principal' }}</h3></div></div>
-      @if (output.ruleIndex !== null) { <p class="match-meta">Regla {{ output.ruleIndex + 1 }} · prioridad {{ output.priority }}</p> }
+      @if (data.appOpeningConfigured) { <p class="simulator-note"><ng-container i18n="@@ui.5e17df5eadda71">Cuando la configuración de app esté activa, solo se aplicará al destino principal. La URL de abajo será su alternativa web. Las reglas y el destino alternativo conservan la redirección web.</ng-container></p> }
+      <div class="result-heading"><div class="result-icon" [class.rule]="output.source === 'rule'"><mat-icon>{{ output.source === 'rule' ? 'alt_route' : output.source === 'fallback' ? 'turn_right' : 'north_east' }}</mat-icon></div><div><span class="eyebrow"><ng-container i18n="@@ui.a71bc39fe3f33e">Resultado</ng-container></span><h3 id="result-title">{{ output.source === 'rule' ? uiText.ui_3e1fd1216aec73 : output.source === 'fallback' ? uiText.ui_c527dcf0a1e4b1 : uiText.ui_e3943d810e2182 }}</h3></div></div>
+      @if (output.ruleIndex !== null) { <p class="match-meta"><ng-container i18n="@@ui.0d96e09d870817">Regla {{ output.ruleIndex + 1 }} · prioridad {{ output.priority }}</ng-container></p> }
       <p class="destination" [title]="output.destinationWithUtm">{{ output.destinationWithUtm }}</p>
       @if (output.warnings.shadowedRules.length || output.warnings.overlappingRules.length || output.warnings.duplicateDestinations.length || output.warnings.impossibleRules.length || output.warnings.timezoneWarnings.length) {
-        <mat-expansion-panel class="warnings"><mat-expansion-panel-header><mat-panel-title><mat-icon aria-hidden="true">warning_amber</mat-icon> Conflictos detectados</mat-panel-title></mat-expansion-panel-header><ul>
-          @if (output.warnings.shadowedRules.length) { <li>Reglas ocultas por anteriores: {{ ruleNumbers(output.warnings.shadowedRules) }}.</li> }
-          @if (output.warnings.overlappingRules.length) { <li>Reglas con condiciones solapadas: {{ ruleNumbers(output.warnings.overlappingRules) }}.</li> }
-          @if (output.warnings.duplicateDestinations.length) { <li>Hay destinos repetidos en {{ output.warnings.duplicateDestinations.length }} grupos.</li> }
-          @if (output.warnings.impossibleRules.length) { <li>Reglas que no pueden coincidir: {{ ruleNumbers(output.warnings.impossibleRules) }}.</li> }
-          @if (output.warnings.timezoneWarnings.length) { <li>La hora local es ambigua por el cambio horario; se ha usado el primer instante válido.</li> }
+        <mat-expansion-panel class="warnings"><mat-expansion-panel-header><mat-panel-title><mat-icon aria-hidden="true">warning_amber</mat-icon> <ng-container i18n="@@ui.d72598e4463e4e">Conflictos detectados</ng-container></mat-panel-title></mat-expansion-panel-header><ul>
+          @if (output.warnings.shadowedRules.length) { <li><ng-container i18n="@@ui.9d307e4f96a8b3">Reglas ocultas por anteriores: {{ ruleNumbers(output.warnings.shadowedRules) }}.</ng-container></li> }
+          @if (output.warnings.overlappingRules.length) { <li><ng-container i18n="@@ui.3b943c31afaffd">Reglas con condiciones solapadas: {{ ruleNumbers(output.warnings.overlappingRules) }}.</ng-container></li> }
+          @if (output.warnings.duplicateDestinations.length) { <li><ng-container i18n="@@ui.66ecca88639f43">Hay destinos repetidos en {{ output.warnings.duplicateDestinations.length }} grupos.</ng-container></li> }
+          @if (output.warnings.impossibleRules.length) { <li><ng-container i18n="@@ui.f9ab0aa0703e9c">Reglas que no pueden coincidir: {{ ruleNumbers(output.warnings.impossibleRules) }}.</ng-container></li> }
+          @if (output.warnings.timezoneWarnings.length) { <li><ng-container i18n="@@ui.91e9a35900437d">La hora local es ambigua por el cambio horario; se ha usado el primer instante válido.</ng-container></li> }
         </ul></mat-expansion-panel>
-      } @else { <p class="clean"><mat-icon aria-hidden="true">check_circle</mat-icon>No se han detectado conflictos demostrables.</p> }
+      } @else { <p class="clean"><mat-icon aria-hidden="true">check_circle</mat-icon><ng-container i18n="@@ui.2d0ddea59a1fa9">No se han detectado conflictos demostrables.</ng-container></p> }
     </section>
   }
 </mat-dialog-content>
-<mat-dialog-actions align="end"><button mat-button type="button" (click)="reset()">Limpiar</button><button mat-stroked-button type="button" (click)="close()">Cerrar</button></mat-dialog-actions>
+<mat-dialog-actions align="end"><button mat-button type="button" (click)="reset()"><ng-container i18n="@@ui.08df229fa5adc7">Limpiar</ng-container></button><button mat-stroked-button type="button" (click)="close()"><ng-container i18n="@@ui.aeccae342e4bd0">Cerrar</ng-container></button></mat-dialog-actions>

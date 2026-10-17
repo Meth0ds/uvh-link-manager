@@ -3,24 +3,24 @@
 }
 
 @if (loading() && !link()) {
-  <app-panel-skeleton variant="detail" label="Cargando detalle del enlace" />
+  <app-panel-skeleton variant="detail" label="Cargando detalle del enlace"  i18n-label="@@ui.e54ae90dec1b66"/>
 }
 
 @if (error()) {
-  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()">Reintentar</button></div>
+  <div class="alert error" role="alert"><span>{{ error() }}</span><button mat-stroked-button type="button" (click)="load()"><ng-container i18n="@@ui.a9254c5f812829">Reintentar</ng-container></button></div>
 }
 
 @if (link(); as link) {
   <section class="link-hero">
-    <a class="back" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> Enlaces</a>
+    <a class="back" routerLink="/app/links"><mat-icon>arrow_back</mat-icon> <ng-container i18n="@@ui.f1a5125bb4f0ad">Enlaces</ng-container></a>
     <div class="hero-head">
       <div class="link-identity">
         <span class="link-icon" aria-hidden="true"><mat-icon>link</mat-icon></span>
         <div class="link-copy">
-          <span class="link-eyebrow">Detalle operativo</span>
+          <span class="link-eyebrow"><ng-container i18n="@@ui.6f1dfc40c678b3">Detalle operativo</ng-container></span>
           <div class="link-title-line">
             <h1 class="tnum">{{ link.name || displayUrl(link.shortUrl) }}</h1>
-            @if (workflows.enabled()) { <button mat-icon-button class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="favorites.value(link) ? 'Quitar de favoritos' : 'Añadir a favoritos'" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button> }
+            @if (workflows.enabled()) { <button mat-icon-button class="favorite-star" [class.is-favorite]="favorites.value(link)" [attr.aria-pressed]="favorites.value(link)" [attr.aria-busy]="favorites.pending().has(link.id)" [attr.aria-label]="favorites.value(link) ? uiText.ui_66ba4c7c288144 : uiText.ui_cd2319d6f377b6" (click)="favorites.toggle(link)"><mat-icon>{{ favorites.value(link) ? 'star' : 'star_outline' }}</mat-icon></button> }
             <span class="state-chip" [class]="'st-' + link.state">{{ stateLabel(link.state) }}</span>
           </div>
           @if (link.name) { <p class="named-short-url tnum">{{ displayUrl(link.shortUrl) }}</p> }
@@ -28,91 +28,91 @@
         </div>
       </div>
       @if (link.appOpening; as app) {
-        <div class="app-opening-summary"><mat-icon aria-hidden="true">open_in_new</mat-icon><div><strong>{{ app.kind === 'native' ? 'Aplicación del workspace' : app.provider === 'google_maps' ? 'Google Maps' : app.provider === 'apple_maps' ? 'Apple Maps' : app.provider === 'spotify' ? 'Spotify' : 'YouTube' }}</strong><p>{{ app.kind === 'native' ? app.route : app.url }}</p>@if (link.appLaunchUrl) { <p>Para compartir: <span>{{ link.appLaunchUrl }}</span></p><p>Dirección web compatible: <span>{{ link.shortUrl }}</span></p> }<small>Las reglas y el destino alternativo tienen prioridad. Siempre se conserva la alternativa web.</small></div></div>
+        <div class="app-opening-summary"><mat-icon aria-hidden="true">open_in_new</mat-icon><div><strong>{{ app.kind === 'native' ? uiText.ui_9deb7229b6a0bc : app.provider === 'google_maps' ? uiText.ui_2923740fe800e2 : app.provider === 'apple_maps' ? uiText.ui_a77127219f80c2 : app.provider === 'spotify' ? uiText.ui_7005c0064bda4e : uiText.ui_fb7accfff8c6f8 }}</strong><p>{{ app.kind === 'native' ? app.route : app.url }}</p>@if (link.appLaunchUrl) { <p><ng-container i18n="@@ui.eb146d5dcac284">Para compartir: </ng-container><span>{{ link.appLaunchUrl }}</span></p><p><ng-container i18n="@@ui.fd9d26b74585f5">Dirección web compatible: </ng-container><span>{{ link.shortUrl }}</span></p> }<small><ng-container i18n="@@ui.b13236f4cce914">Las reglas y el destino alternativo tienen prioridad. Siempre se conserva la alternativa web.</ng-container></small></div></div>
       }
       <div class="actions">
-        <button class="copy-action" mat-stroked-button [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying'" (click)="copy((link.shareUrl || link.shortUrl))"><app-copy-feedback-icon [phase]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope)" /> {{ copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copied' ? 'Copiado' : copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying' ? 'Copiando…' : 'Copiar' }}</button>
-        @if (sharing.canPublish()) { <button mat-stroked-button type="button" (click)="shareReport()"><mat-icon>insert_chart_outlined</mat-icon>Compartir informe</button> }
-        <button mat-stroked-button (click)="showQr()"><mat-icon>qr_code_2</mat-icon> QR</button>
-        @if (workflows.linkHistoryEnabled()) { <button mat-stroked-button type="button" (click)="openHistory()"><mat-icon>history</mat-icon> Historial</button> }
+        <button class="copy-action" mat-stroked-button [disabled]="copyFeedback.busy()" [attr.aria-busy]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying'" (click)="copy((link.shareUrl || link.shortUrl))"><app-copy-feedback-icon [phase]="copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope)" /> {{ copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copied' ? uiText.ui_d8dd878fb14359 : copyFeedback.phase((link.shareUrl || link.shortUrl), copyScope) === 'copying' ? uiText.ui_1d37b4eba1772a : uiText.ui_39dcf1cbeb5adb }}</button>
+        @if (sharing.canPublish()) { <button mat-stroked-button type="button" (click)="shareReport()"><mat-icon>insert_chart_outlined</mat-icon><ng-container i18n="@@ui.ff831cef7042e8">Compartir informe</ng-container></button> }
+        <button mat-stroked-button (click)="showQr()"><mat-icon>qr_code_2</mat-icon> <ng-container i18n="@@ui.a439fba430a33b">QR</ng-container></button>
+        @if (workflows.linkHistoryEnabled()) { <button mat-stroked-button type="button" (click)="openHistory()"><mat-icon>history</mat-icon> <ng-container i18n="@@ui.995c071dfaee74">Historial</ng-container></button> }
         @if (canWrite()) {
-          @if (sharing.socialEnabled()) { <button mat-stroked-button type="button" (click)="editSocialCard()"><mat-icon>preview</mat-icon>Tarjeta social</button> }
-          <button mat-flat-button color="primary" (click)="edit()" [disabled]="actionBusy()"><mat-icon>edit</mat-icon> Editar</button>
-          <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones" [disabled]="actionBusy()"><mat-icon>more_vert</mat-icon></button>
+          @if (sharing.socialEnabled()) { <button mat-stroked-button type="button" (click)="editSocialCard()"><mat-icon>preview</mat-icon><ng-container i18n="@@ui.36107c599701c0">Tarjeta social</ng-container></button> }
+          <button mat-flat-button color="primary" (click)="edit()" [disabled]="actionBusy()"><mat-icon>edit</mat-icon> <ng-container i18n="@@ui.2eba946b2e1ee4">Editar</ng-container></button>
+          <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Más acciones" [disabled]="actionBusy()" i18n-aria-label="@@ui.78eb2e0551731b"><mat-icon>more_vert</mat-icon></button>
           <mat-menu #menu="matMenu">
-            @if (workflows.enabled() && link.state !== 'blocked') { <button mat-menu-item (click)="duplicate()" [disabled]="actionBusy()"><mat-icon>library_add</mat-icon>Duplicar enlace</button> }
+            @if (workflows.enabled() && link.state !== 'blocked') { <button mat-menu-item (click)="duplicate()" [disabled]="actionBusy()"><mat-icon>library_add</mat-icon><ng-container i18n="@@ui.cbce5acbfee967">Duplicar enlace</ng-container></button> }
             @if (link.state === 'active') {
-              <button mat-menu-item (click)="setState('paused')" [disabled]="actionBusy()"><mat-icon>pause</mat-icon> Pausar</button>
+              <button mat-menu-item (click)="setState('paused')" [disabled]="actionBusy()"><mat-icon>pause</mat-icon> <ng-container i18n="@@ui.cd25ee5b1db8f5">Pausar</ng-container></button>
             }
             @if (link.state === 'paused') {
-              <button mat-menu-item (click)="setState('active')" [disabled]="actionBusy()"><mat-icon>play_arrow</mat-icon> Reactivar</button>
+              <button mat-menu-item (click)="setState('active')" [disabled]="actionBusy()"><mat-icon>play_arrow</mat-icon> <ng-container i18n="@@ui.44f9bcc469524e">Reactivar</ng-container></button>
             }
             @if (link.state !== 'archived') {
-              <button mat-menu-item (click)="setState('archived')" [disabled]="actionBusy()"><mat-icon>archive</mat-icon> Archivar</button>
+              <button mat-menu-item (click)="setState('archived')" [disabled]="actionBusy()"><mat-icon>archive</mat-icon> <ng-container i18n="@@ui.f35f9141f4427c">Archivar</ng-container></button>
             }
             <mat-divider></mat-divider>
-            <button mat-menu-item class="danger" (click)="remove()" [disabled]="actionBusy()"><mat-icon>delete</mat-icon> Eliminar</button>
+            <button mat-menu-item class="danger" (click)="remove()" [disabled]="actionBusy()"><mat-icon>delete</mat-icon> <ng-container i18n="@@ui.c9894cf002f90b">Eliminar</ng-container></button>
           </mat-menu>
         }
       </div>
     </div>
   </section>
-  <dl class="metric-strip" aria-label="Resumen del enlace">
-    <div class="metric primary-metric"><dt>Clics</dt><dd>{{ link.clickCount }}</dd><dd class="metric-note">Actividad acumulada</dd></div>
-    <div class="metric"><dt>Límite</dt><dd>{{ link.maxClicks ?? "∞" }}</dd><dd class="metric-note">Máximo configurado</dd></div>
-    <div class="metric"><dt>Estado</dt><dd>{{ stateLabel(link.state) }}</dd><dd class="metric-note">Situación actual</dd></div>
-    <div class="metric"><dt>Creado</dt><dd>{{ link.createdAt.slice(0, 10) }}</dd><dd class="metric-note">Fecha de alta</dd></div>
+  <dl class="metric-strip" aria-label="Resumen del enlace" i18n-aria-label="@@ui.045e091d83eeb8">
+    <div class="metric primary-metric"><dt><ng-container i18n="@@ui.826c2d3872dac9">Clics</ng-container></dt><dd>{{ link.clickCount }}</dd><dd class="metric-note"><ng-container i18n="@@ui.fd9a1f188256b2">Actividad acumulada</ng-container></dd></div>
+    <div class="metric"><dt><ng-container i18n="@@ui.078079096ed8c4">Límite</ng-container></dt><dd>{{ link.maxClicks ?? "∞" }}</dd><dd class="metric-note"><ng-container i18n="@@ui.ab7741a7cc6a0a">Máximo configurado</ng-container></dd></div>
+    <div class="metric"><dt><ng-container i18n="@@ui.98e5acddb6c46a">Estado</ng-container></dt><dd>{{ stateLabel(link.state) }}</dd><dd class="metric-note"><ng-container i18n="@@ui.62478b9999ba39">Situación actual</ng-container></dd></div>
+    <div class="metric"><dt><ng-container i18n="@@ui.1bba71a51144f3">Creado</ng-container></dt><dd>{{ link.createdAt.slice(0, 10) }}</dd><dd class="metric-note"><ng-container i18n="@@ui.62956ad3a5c1a4">Fecha de alta</ng-container></dd></div>
   </dl>
   @if (link.state === "blocked") {
     <section class="block-notice" aria-labelledby="block-notice-title">
       <mat-icon class="notice-icon" aria-hidden="true">gpp_maybe</mat-icon>
       <div class="block-copy">
-        <b id="block-notice-title">Este enlace lo bloqueó la plataforma</b>
+        <b id="block-notice-title"><ng-container i18n="@@ui.0a305c2cc5a54c">Este enlace lo bloqueó la plataforma</ng-container></b>
         @if (blockReason(); as reason) {
-          <p class="notice-reason">Motivo: {{ reason }}</p>
+          <p class="notice-reason"><ng-container i18n="@@ui.78dd0147360032">Motivo: {{ reason }}</ng-container></p>
         }
-        <p class="notice-help">Mientras siga bloqueado, el enlace no resuelve. Consulta las <a routerLink="/legal/terminos">condiciones de uso</a>.</p>
+        <p class="notice-help"><ng-container i18n="@@ui.a9a40ed2d7de93">Mientras siga bloqueado, el enlace no resuelve. Consulta las </ng-container><a routerLink="/legal/terminos"><ng-container i18n="@@ui.de4002ce8048d8">condiciones de uso</ng-container></a>.</p>
         @if (appeal(); as a) {
           <p class="appeal-state" role="status">
             <mat-icon aria-hidden="true">{{ a.status === "open" ? "hourglass_top" : "gavel" }}</mat-icon>
-            <span><b>{{ appealStatusLabel(a.status) }}</b>@if (appealDate(a); as date) { · {{ a.status === "open" ? "solicitada el" : "resuelta el" }} {{ date }} }</span>
+            <span><b>{{ appealStatusLabel(a.status) }}</b>@if (appealDate(a); as date) { · {{ a.status === "open" ? uiText.ui_000c5ed969a042 : uiText.ui_f699b1cdd8cdd2 }} {{ date }} }</span>
           </p>
           @if (a.decisionNote; as note) {
-            <p class="appeal-decision"><span>Respuesta de la administración</span>{{ note }}</p>
+            <p class="appeal-decision"><span><ng-container i18n="@@ui.fa04be7d4d7622">Respuesta de la administración</ng-container></span>{{ note }}</p>
           }
         }
         @if (canRequestReview()) {
           <button mat-stroked-button type="button" (click)="requestReview()" [disabled]="actionBusy()">
-            <mat-icon>campaign</mat-icon> Solicitar revisión
-          </button>
+            <mat-icon>campaign</mat-icon> <ng-container i18n="@@ui.106d584824d8b4">Solicitar revisión
+          </ng-container></button>
         } @else if (!canWrite()) {
-          <p class="appeal-note">Solo un rol con permiso de edición puede solicitar una revisión.</p>
+          <p class="appeal-note"><ng-container i18n="@@ui.a227e41897e62f">Solo un rol con permiso de edición puede solicitar una revisión.</ng-container></p>
         }
       </div>
     </section>
   }
   <app-destination-inspection [link]="link" />
   <div class="period-row">
-    <span class="section-title">Analítica</span>
+    <span class="section-title"><ng-container i18n="@@ui.f5b4c86a85509e">Analítica</ng-container></span>
     <mat-form-field appearance="outline" class="period">
-      <mat-select [value]="period()" (selectionChange)="onPeriod($event.value)" aria-label="Periodo">
-        <mat-option value="24h">Últimas 24 horas</mat-option>
-        <mat-option value="7d">7 días</mat-option>
-        <mat-option value="30d">30 días</mat-option>
-        <mat-option value="90d">90 días</mat-option>
+      <mat-select [value]="period()" (selectionChange)="onPeriod($event.value)" aria-label="Periodo" i18n-aria-label="@@ui.fb5065f3c8c1ca">
+        <mat-option value="24h"><ng-container i18n="@@ui.f6b12b22a24db3">Últimas 24 horas</ng-container></mat-option>
+        <mat-option value="7d"><ng-container i18n="@@ui.f21b7e014222ce">7 días</ng-container></mat-option>
+        <mat-option value="30d"><ng-container i18n="@@ui.66d20ec35d5f2a">30 días</ng-container></mat-option>
+        <mat-option value="90d"><ng-container i18n="@@ui.d1172ad34584c1">90 días</ng-container></mat-option>
       </mat-select>
     </mat-form-field>
   </div>
   @if (analyticsError(); as message) {
-    <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="retryAnalytics()">Reintentar analítica</button></div>
+    <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="retryAnalytics()"><ng-container i18n="@@ui.8d633c82b254c9">Reintentar analítica</ng-container></button></div>
   }
   @if (analytics(); as a) {
     <app-charts [overview]="a" />
   }
   @if (!analytics() && !analyticsError() && !loading()) {
-    <div class="empty-state"><mat-icon>query_stats</mat-icon><b>Sin datos de este periodo</b><p>Comparte el enlace para empezar a medir su rendimiento.</p></div>
+    <div class="empty-state"><mat-icon>query_stats</mat-icon><b><ng-container i18n="@@ui.70b4f95c369f6d">Sin datos de este periodo</ng-container></b><p><ng-container i18n="@@ui.7b3a194c873667">Comparte el enlace para empezar a medir su rendimiento.</ng-container></p></div>
   }
-  <div class="section-heading-row"><span class="section-title">Reglas de redirección</span>@if (workflows.ruleSimulatorEnabled()) { <button mat-stroked-button type="button" (click)="openRuleSimulator()"><mat-icon>play_arrow</mat-icon> Probar reglas</button> }</div>
+  <div class="section-heading-row"><span class="section-title"><ng-container i18n="@@ui.dcf4d220c5bbc0">Reglas de redirección</ng-container></span>@if (workflows.ruleSimulatorEnabled()) { <button mat-stroked-button type="button" (click)="openRuleSimulator()"><mat-icon>play_arrow</mat-icon> <ng-container i18n="@@ui.b950dd613b10f6">Probar reglas</ng-container></button> }</div>
   <div class="rules-block">
     @for (rule of rules(); track rule.id ?? $index; let i = $index) {
       <div class="rule-card">
@@ -124,12 +124,12 @@
       </div>
     }
     @if (!rules().length) {
-      <p class="none">Sin reglas condicionales. El enlace redirige siempre al destino principal.</p>
+      <p class="none"><ng-container i18n="@@ui.eadcfa1e54529e">Sin reglas condicionales. El enlace redirige siempre al destino principal.</ng-container></p>
     }
   </div>
-  <span class="section-title">Actividad</span>
+  <span class="section-title"><ng-container i18n="@@ui.d134a8ecb32a6e">Actividad</ng-container></span>
   @if (activityError(); as message) {
-    <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="retryActivity()">Reintentar actividad</button></div>
+    <div class="alert error" role="alert"><span>{{ message }}</span><button mat-stroked-button type="button" (click)="retryActivity()"><ng-container i18n="@@ui.21074b9005170e">Reintentar actividad</ng-container></button></div>
   }
   <div class="activity-block">
     @for (ev of activity(); track ev.id) {
@@ -143,10 +143,10 @@
       </div>
     }
     @if (activityTruncated()) {
-      <p class="none">Se muestran los 50 eventos más recientes. Hay actividad anterior que no cabe aquí.</p>
+      <p class="none"><ng-container i18n="@@ui.930b159703db31">Se muestran los 50 eventos más recientes. Hay actividad anterior que no cabe aquí.</ng-container></p>
     }
     @if (!activity().length) {
-      <p class="none">Sin actividad registrada.</p>
+      <p class="none"><ng-container i18n="@@ui.7dab825448f6a5">Sin actividad registrada.</ng-container></p>
     }
   </div>
 }

@@ -22,7 +22,7 @@ final class QrAssetController
         try {
             $file = $request->file('logo');
             if (! $file instanceof UploadedFile) {
-                throw new LinkException('Elige un PNG o JPG.', 422);
+                throw new LinkException(__('messages.error_0b2c1253828868'), 422);
             }
             $key = QrDesign::requestKey($request->header('Idempotency-Key'));
             $logo = QrLogo::normalize($file);
@@ -31,14 +31,14 @@ final class QrAssetController
                 $old = DB::table('qr_assets')->where('workspace_id', $workspaceId)->where('request_key', $key)->first();
                 if ($old) {
                     if (! hash_equals($old->input_hash, $logo['inputHash'])) {
-                        throw new LinkException('La clave de carga corresponde a otra imagen.', 409);
+                        throw new LinkException(__('messages.error_5ca7cc128a3469'), 409);
                     }
 
                     return $old;
                 }
                 $used = (int) DB::table('qr_assets')->where('workspace_id', $workspaceId)->sum('bytes');
                 if ($used + strlen($logo['png']) > (int) config('qr.asset_bytes_per_workspace', 64 * 1024 * 1024)) {
-                    throw new LinkException('El workspace ha alcanzado el límite de espacio para logos.', 409);
+                    throw new LinkException(__('messages.error_90c5ddf723f4bc'), 409);
                 }
                 $id = DB::table('qr_assets')->insertGetId(['workspace_id' => $workspaceId, 'created_by' => UvhRequest::user($request)->id,
                     'request_key' => $key, 'input_hash' => $logo['inputHash'], 'path' => $workspaceId.'/'.Str::uuid().'.png',
@@ -50,12 +50,12 @@ final class QrAssetController
                 // The reservation is committed BEFORE filesystem I/O. A crash or
                 // loss of permission leaves a visible, collectable pending row.
                 if (! Storage::disk('qr-private')->put($asset->path, $logo['png'])) {
-                    throw new LinkException('No se pudo guardar el logo. Reintenta más tarde.', 503);
+                    throw new LinkException(__('messages.error_3e8f819865203d'), 503);
                 }
                 WorkspaceMutation::run($request, function () use ($asset, $workspaceId): void {
                     $row = DB::table('qr_assets')->where('workspace_id', $workspaceId)->where('id', $asset->id)->lockForUpdate()->first();
                     if (! $row) {
-                        throw new LinkException('Esta carga ya no está disponible.', 409);
+                        throw new LinkException(__('messages.error_38fe4ab0ebb64e'), 409);
                     }
                     DB::table('qr_assets')->where('id', $asset->id)->update(['status' => 'ready', 'updated_at' => now()]);
                 });
@@ -71,11 +71,11 @@ final class QrAssetController
     {
         $row = DB::table('qr_assets')->where('workspace_id', UvhRequest::workspaceId($request))->where('id', $id)->where('status', 'ready')->first();
         if (! $row) {
-            return response()->json(['error' => 'Logo no encontrado.'], 404);
+            return response()->json(['error' => __('messages.error_afc4f75f13755a')], 404);
         }
         $bytes = Storage::disk('qr-private')->get($row->path);
         if ($bytes === null) {
-            return response()->json(['error' => 'El logo no está disponible.'], 503);
+            return response()->json(['error' => __('messages.error_b1d66efbeb16b4')], 503);
         }
 
         return response($bytes)->header('Content-Type', 'image/png')->header('X-Content-Type-Options', 'nosniff')->header('Cache-Control', 'private, no-store')->header('Content-Disposition', 'inline; filename="uvh-logo.png"');

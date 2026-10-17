@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "./localisation/locale";
 /**
  * A timestamp as the panel prints it.
  *
@@ -15,7 +16,7 @@
  *   - `dateTimeMediumLabel` — «22 sept 2026, 1:38», la de cuenta y seguridad.
  */
 
-const MEDIUM = new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" });
+const MEDIUM = new Intl.DateTimeFormat(UI_LOCALE, { dateStyle: "medium", timeStyle: "short" });
 
 function read(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -26,7 +27,7 @@ function read(value: string | null | undefined): Date | null {
 /** La lectura de la consola: numérica y con segundos. */
 export function dateTimeLabel(value: string): string {
   const date = read(value);
-  return date === null ? "—" : date.toLocaleString("es-ES");
+  return date === null ? "—" : date.toLocaleString(UI_LOCALE);
 }
 
 /**
