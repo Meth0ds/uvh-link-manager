@@ -780,6 +780,11 @@ class UvhHousekeeping extends Command
         }
 
         $batch = max(1, min(500, (int) config('uvh.reputation.recheck_batch', 50)));
+        // `staleLinkIds()` returns link ids on purpose. A shared destination has
+        // one cached verdict, but each link still needs its own decision: the
+        // block/release transition is versioned per row and audits that row's
+        // workspace. One job per link is the unit of that decision; a hash-level
+        // job would still have to fan out to every link to apply it.
         foreach (DestinationReputationService::staleLinkIds($batch) as $linkId) {
             DestinationReputationService::dispatchCheck((int) $linkId);
         }
@@ -848,7 +853,7 @@ class UvhHousekeeping extends Command
         // Intent, not health: every domain the user wants enabled is checked,
         // including one that fell to `failed`. That is what makes a repaired
         // DNS configuration come back without anyone opening the panel.
-        $ids = CustomDomain::where('desired_state', 'enabled')
+        $dueDomains = CustomDomain::where('desired_state', 'enabled')
             ->where(function ($query) {
                 $query->whereNull('dns_check_started_at')
                     ->orWhereColumn('dns_check_completed_at', '>=', 'dns_check_started_at');
@@ -871,15 +876,12 @@ class UvhHousekeeping extends Command
             ->orderByRaw('dns_check_completed_at NULLS FIRST')
             ->orderBy('id')
             ->limit(max(1, min(500, (int) config('uvh.custom_domains.revalidation_batch', 20))))
-            ->pluck('id');
+            ->get(['id', 'workspace_id']);
 
-        foreach ($ids as $id) {
-            $snapshot = CustomDomain::where('id', $id)->first(['workspace_id']);
-            if (! $snapshot) {
-                continue;
-            }
-            $workspaceId = (int) $snapshot->workspace_id;
-            $dedupeKey = 'uvh:domain-verification:'.$workspaceId.':'.(int) $id;
+        foreach ($dueDomains as $dueDomain) {
+            $id = (int) $dueDomain->id;
+            $workspaceId = (int) $dueDomain->workspace_id;
+            $dedupeKey = 'uvh:domain-verification:'.$workspaceId.':'.$id;
             $lock = Cache::lock($dedupeKey, 600);
             if (! $lock->get()) {
                 continue;

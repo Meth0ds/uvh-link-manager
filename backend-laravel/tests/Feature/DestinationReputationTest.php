@@ -664,6 +664,30 @@ final class DestinationReputationTest extends TestCase
         $this->assertNotNull(DB::table('links')->where('id', $stale->id)->value('reputation_checked_at'));
     }
 
+    public function test_a_shared_stale_destination_returns_every_link_that_needs_its_own_decision(): void
+    {
+        config(['uvh.reputation.provider_url' => 'https://reputation.example.test/api']);
+        // The verdict is cached by hash, but the service deliberately returns
+        // link ids: each link has its own state, version and audit trail, so the
+        // per-link decision cannot be replaced by one hash-level decision.
+        $first = $this->link('https://shared.example/path');
+        $second = $this->link('https://shared.example/path');
+        $this->cacheVerdict('https://shared.example/path', 'safe', provider: 'reputation.example.test');
+
+        $this->assertSame([], DestinationReputationService::staleLinkIds(10));
+
+        $key = DestinationDenylist::key('https://shared.example/path');
+        $this->assertNotNull($key);
+        DB::table('destination_reputation_checks')
+            ->where('url_hash', $key['url_hash'])
+            ->update(['expires_at' => now()->subMinute()]);
+
+        $this->assertEqualsCanonicalizing(
+            [$first->id, $second->id],
+            DestinationReputationService::staleLinkIds(10),
+        );
+    }
+
     public function test_a_truncated_propagation_carries_the_cursor_forward(): void
     {
         Queue::fake();

@@ -429,19 +429,21 @@ final class DestinationReputationService
             return [];
         }
 
+        $candidateIds = $candidates->pluck('id')->all();
+
         // Every candidate is stamped, whether or not it turns out to need a
         // check: the stamp is the queue position, and a candidate that keeps its
         // place would starve the ones behind it — which is the defect this
         // column exists to remove. Links whose check is dispatched get stamped
         // twice (here and when the job evaluates them); that is cheaper than a
         // second pass and keeps the two paths independent.
-        self::markExamined($candidates->pluck('id')->all());
+        self::markExamined($candidateIds);
 
         // One query for every rule in the batch: a sweep that opened a query per
         // link would cost more than the checks it schedules.
         $rulesByLink = [];
         $rules = DB::table('redirect_rules')
-            ->whereIn('link_id', $candidates->pluck('id')->all())
+            ->whereIn('link_id', $candidateIds)
             ->orderBy('id')
             ->get(['link_id', 'destination']);
         foreach ($rules as $rule) {
@@ -450,9 +452,15 @@ final class DestinationReputationService
             }
         }
 
-        $hashes = [];
         $byHash = [];
+        $machineBlocked = [];
         foreach ($candidates as $candidate) {
+            // A self-applied block is re-checked even when its verdict is
+            // still fresh: what may have expired is the block's own ground,
+            // not the verdict that produced it.
+            if ($candidate->reputation_blocked_at !== null) {
+                $machineBlocked[(int) $candidate->id] = true;
+            }
             $destinations = [$candidate->destination, $candidate->fallback_destination, ...($rulesByLink[(int) $candidate->id] ?? [])];
             foreach ($destinations as $destination) {
                 if (! is_string($destination) || trim($destination) === '') {
@@ -462,38 +470,34 @@ final class DestinationReputationService
                 if ($key === null) {
                     continue;
                 }
-                $hashes[$key['url_hash']] = true;
                 $byHash[$key['url_hash']][] = (int) $candidate->id;
             }
         }
-        if ($hashes === []) {
+        if ($byHash === []) {
             return [];
         }
 
-        $fresh = DB::table('destination_reputation_checks')
-            ->whereIn('url_hash', array_keys($hashes))
-            /* A row with no expiry never goes stale; a row whose expiry passed
-               is exactly what this sweep exists to refresh. */
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->pluck('url_hash')
-            ->all();
-
-        $machineBlocked = [];
-        foreach ($candidates as $candidate) {
-            if ($candidate->reputation_blocked_at !== null) {
-                $machineBlocked[(int) $candidate->id] = true;
-            }
-        }
+        // Membership uses a hash table: the previous in_array() scan compared
+        // every candidate hash with every fresh row, which is quadratic once a
+        // sweep fills its window. Only membership matters here; insertion order
+        // does not affect the result.
+        $freshHashes = array_fill_keys(
+            DB::table('destination_reputation_checks')
+                ->whereIn('url_hash', array_keys($byHash))
+                /* A row with no expiry never goes stale; a row whose expiry passed
+                   is exactly what this sweep exists to refresh. */
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->pluck('url_hash')
+                ->all(),
+            true,
+        );
 
         $stale = [];
         foreach ($byHash as $hash => $ids) {
-            $freshVerdict = in_array($hash, $fresh, true);
+            $freshVerdict = isset($freshHashes[$hash]);
             foreach ($ids as $id) {
-                // A self-applied block is re-checked even when its verdict is
-                // still fresh: what may have expired is the block's own ground,
-                // not the verdict that produced it.
                 if (! $freshVerdict || isset($machineBlocked[$id])) {
                     $stale[$id] = true;
                 }
