@@ -64,7 +64,11 @@
                   "maximumError": "72kb"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "localize": [
+                "es",
+                "en-GB"
+              ]
             },
             "development": {
               "optimization": false,
@@ -94,6 +98,17 @@
                 "en-GB"
               ]
             },
+            "fr": {
+              "localize": [
+                "fr"
+              ]
+            },
+            "fr-draft": {
+              "localize": [
+                "fr"
+              ],
+              "i18nMissingTranslation": "warning"
+            },
             "development-es": {
               "server": false,
               "baseHref": "/es/",
@@ -107,6 +122,14 @@
               "localize": [
                 "en-GB"
               ]
+            },
+            "development-fr": {
+              "server": false,
+              "baseHref": "/fr/",
+              "localize": [
+                "fr"
+              ],
+              "i18nMissingTranslation": "warning"
             }
           },
           "defaultConfiguration": "production"
@@ -159,6 +182,10 @@
           "en-GB": {
             "translation": "src/locale/messages.en-GB.xlf",
             "subPath": "en"
+          },
+          "fr": {
+            "translation": "src/locale/messages.fr.xlf",
+            "subPath": "fr"
           }
         }
       }

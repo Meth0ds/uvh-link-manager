@@ -5,6 +5,9 @@ use App\Support\AccountExportDocument;
 return [
     'repository_root' => env('UVH_REPO_ROOT', dirname(base_path())),
     'localisation_enabled' => env('LOCALISATION_ENABLED', false),
+    // Publish French only after its authored catalogue, mail and legal copies
+    // are reviewed. Off by default; Spanish and English are unaffected.
+    'french_enabled' => env('UVH_FRENCH_ENABLED', false),
     'visitor_asset_source' => env('UVH_REPO_ROOT', dirname(base_path())).'/frontend/public/visitor-assets',
     'metrics' => [
         'bearer_token' => env('METRICS_BEARER_TOKEN', ''),

@@ -138,7 +138,7 @@ final class VisitorPage
         // El título y el cuerpo se escapan por separado: `<title>` es texto
         // crudo, así que interpolar ahí sin escapar sería una inyección aunque
         // el cuerpo ya viniera escapado.
-        return '<!doctype html><html lang="'.(Language::current() === 'en' ? 'en-GB' : 'es-ES').'"><head><meta charset="utf-8">'
+        return '<!doctype html><html lang="'.Language::tag(Language::current()).'"><head><meta charset="utf-8">'
             .'<meta name="viewport" content="width=device-width,initial-scale=1">'
             .'<meta name="color-scheme" content="light dark">'
             .'<meta name="robots" content="noindex">'

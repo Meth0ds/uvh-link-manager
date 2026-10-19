@@ -55,7 +55,7 @@ class PublicController
     {
         $private = ['/api/', '/app/', '/auth/', '/reports/', '/legal/versions/'];
         if (config('uvh.localisation_enabled')) {
-            foreach (Language::SUPPORTED as $language) {
+            foreach (Language::enabled() as $language) {
                 foreach (['app', 'auth', 'reports', 'legal/versions'] as $surface) {
                     $private[] = '/'.$language.'/'.$surface.'/';
                 }
@@ -73,12 +73,17 @@ class PublicController
             $origin = rtrim((string) config('uvh.public_origin'), '/');
             $escape = static fn (string $value): string => htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
             $urls = [];
+            $languages = Language::enabled();
+            $alternateCodes = ['es' => ['es'], 'en' => ['en-GB', 'en'], 'fr' => ['fr-FR', 'fr']];
             foreach (Language::routes() as $translations) {
                 $alternatives = '';
-                foreach (['es' => 'es', 'en-GB' => 'en', 'en' => 'en', 'x-default' => 'es'] as $hreflang => $language) {
-                    $alternatives .= '<xhtml:link rel="alternate" hreflang="'.$hreflang.'" href="'.$escape($origin.'/'.$language.$translations[$language]).'"/>';
+                foreach ($languages as $language) {
+                    foreach ($alternateCodes[$language] ?? [$language] as $hreflang) {
+                        $alternatives .= '<xhtml:link rel="alternate" hreflang="'.$hreflang.'" href="'.$escape($origin.'/'.$language.$translations[$language]).'"/>';
+                    }
                 }
-                foreach (Language::SUPPORTED as $language) {
+                $alternatives .= '<xhtml:link rel="alternate" hreflang="x-default" href="'.$escape($origin.'/es'.$translations['es']).'"/>';
+                foreach ($languages as $language) {
                     $urls[] = '<url><loc>'.$escape($origin.'/'.$language.$translations[$language]).'</loc>'.$alternatives.'</url>';
                 }
             }

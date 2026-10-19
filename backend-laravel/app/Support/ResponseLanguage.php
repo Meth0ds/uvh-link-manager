@@ -24,7 +24,7 @@ final class ResponseLanguage
                 }
             }
             $response->setVary(implode(', ', array_unique([...$response->getVary(), 'Accept-Language', 'Cookie'])));
-            $response->headers->set('Content-Language', $language === 'en' ? 'en-GB' : 'es-ES');
+            $response->headers->set('Content-Language', Language::tag($language));
 
             return $response;
         } finally {

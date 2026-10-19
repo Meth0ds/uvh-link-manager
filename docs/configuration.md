@@ -555,6 +555,11 @@ controlados.
   y `REGISTRATION_EDIT_TTL_HOURS`. Acredita que quien corrige la dirección de
   una inscripción sin verificar es el navegador que la creó; la contraseña que
   deja ese registro es una propuesta y no autoriza nada.
+- **`UVH_FRENCH_ENABLED`** (defecto `false`): publica el francés. Habilita la
+  negociación y la preferencia de cuenta, reserva el alias `fr`, añade `/fr` al
+  sitemap/robots y arranca el tercer compilador de desarrollo. Exige
+  `backend-laravel/lang/fr/`; la auditoría falla si la bandera está encendida y
+  el catálogo no existe. Detalle en [`localisation.md`](localisation.md).
 - **Pausa operativa de registros** (1 variable interna, con defecto funcional):
   `OPERATIONAL_SETTINGS_CACHE_SECONDS` (defecto `30`, clamp en código 5–300 s).
   TTL de la caché de lectura del flag `registration_paused` en

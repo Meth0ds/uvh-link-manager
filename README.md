@@ -174,11 +174,13 @@ El perfil `laravel` levanta la API en `http://127.0.0.1:8000`, dos workers
 (`queue:work` sobre `mail,webhooks,domains,exports,analytics,security,default`
 y, aparte, la cola `destinations` con timeout de 20 s) y el scheduler. Angular
 sirve la web y el panel en `http://127.0.0.1:4200` mediante el servidor de
-desarrollo bilingüe: `/es/` y `/en/` comparten origen, sesión y proxy a Laravel.
+desarrollo localizado: `/es/` y `/en/` comparten origen, sesión y proxy a Laravel.
 `npm start` arranca un compilador Angular por idioma y conserva la recarga en
-caliente. Hay que esperar a que terminen ambos compiladores. La raíz elige el
+caliente. Hay que esperar a que terminen todos los compiladores. La raíz elige el
 idioma por la preferencia explícita del navegador y después por
-`Accept-Language`; una dirección con idioma siempre se respeta.
+`Accept-Language`; una dirección con idioma siempre se respeta. El francés solo
+arranca su tercer compilador con `UVH_FRENCH_ENABLED=true` y sigue siendo un
+borrador sin publicar.
 
 Se puede cambiar el puerto con `npm start -- --port 4300` y el backend con
 `BACKEND_URL=http://127.0.0.1:8010 npm start`. Para trabajar deliberadamente
@@ -413,24 +415,32 @@ pasa si faltan e interruptores de seguridad— está en
 | `UVH_FEATURE_SOCIAL_PREVIEWS` | `false` | Tarjetas sociales. |
 | `UVH_FEATURE_APP_PROVIDERS` | `true` | Apertura de Spotify/YouTube/Maps. |
 | `UVH_FEATURE_NATIVE_APPS` | `true` | Apps propias vía AASA / Asset Links. |
-| `LOCALISATION_ENABLED` | `false` | Negociación de idioma, mensajes API y comunicaciones bilingües; activar tras desplegar ambos idiomas y auditar alias. |
+| `LOCALISATION_ENABLED` | `false` | Negociación de idioma, mensajes API y comunicaciones localizadas; activar tras desplegar los idiomas publicados y auditar alias. |
+| `UVH_FRENCH_ENABLED` | `false` | Publica el francés: negociación, preferencia de cuenta, alias `fr`, sitemap y compilador de desarrollo. Exige catálogo, correo y legal revisados. |
 
 Las migraciones de cada función son aditivas y se aplican con
 `php artisan migrate --force` **antes** de desplegar el frontend.
 
-### Español e inglés británico
+### Idiomas y catálogos
 
 `npm run build` en `frontend/` compila `/es/` y `/en/`, prerenderiza las seis
 páginas públicas de cada idioma y genera las reglas de publicación de Nginx.
+`/fr/` está registrado de extremo a extremo y se valida con
+`--configuration fr-draft`, pero no entra en el build de producción hasta que su
+catálogo esté redactado y revisado. El detalle está en
+[docs/localisation.md](docs/localisation.md).
 `shared/localisation/routes.json` es el mapa común de direcciones para Angular,
 Laravel, sitemap y despliegue. Las URL cortas y las rutas técnicas no se prefijan.
 
 Los textos se redactan en los catálogos del repositorio, sin servicios externos
 de traducción. Tras cambiar textos: `npm run i18n:extract`, actualizar la copia
 en `src/locale/translations.en-GB.json`, `npm run i18n:generate` y
-`npm run i18n:check`. La comprobación rechaza mensajes ausentes, fuentes obsoletas
-y cambios en los marcadores de interpolación. Los catálogos Laravel están en
-`backend-laravel/lang/es/` y `backend-laravel/lang/en_GB/`.
+`npm run i18n:check`. Para el francés, los mismos comandos aceptan `--locale=fr`
+y `--draft` mientras falten unidades. La comprobación rechaza mensajes ausentes,
+fuentes obsoletas y cambios en los marcadores de interpolación. Los catálogos
+Laravel están en `backend-laravel/lang/es/` y `backend-laravel/lang/en_GB/`; el
+francés se añadirá como `lang/fr/` en la tanda de redacción, y su ausencia hace
+fallar la auditoría si la bandera está encendida.
 
 Antes de activar, aplicar las migraciones, ejecutar `php artisan uvh:localisation-audit`
 y exportar la configuración pública con `php artisan uvh:frontend-public-config`.
@@ -469,6 +479,7 @@ las traducciones se publican por separado y tienen sus propios hashes.
 | [Seguridad](docs/security.md) | Controles de aplicación y checklist de release. |
 | [Modelo de amenazas](docs/threat-model.md) | Activos, actores, amenazas y riesgos pendientes. |
 | [Sistema de diseño](docs/design-system.md) | Tokens, temas, tipografía y convenciones visuales del panel. |
+| [Localización](docs/localisation.md) | Catálogos, borrador de francés, banderas de publicación y verificación. |
 | [Pruebas E2E](docs/e2e-testing.md) | Aislamiento, ejecución, cobertura y límites de Playwright. |
 | [Análisis estático](docs/static-analysis.md) | Configuración de Pint y Larastan, y su baseline. |
 | [Control local](docs/local-control.md) | Panel web local, arranque y diagnóstico. |

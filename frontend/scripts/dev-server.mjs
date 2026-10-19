@@ -6,37 +6,42 @@ import path from 'node:path';
 import routes from '../../shared/localisation/routes.json' with {type: 'json'};
 
 const frontend = fileURLToPath(new URL('../', import.meta.url));
-const supported = ['es', 'en'];
+const manifestLanguages = Object.keys(routes.home);
+// French compilers only start once its catalogue is authored; the switch keeps
+// the existing Spanish/English development flow byte-for-byte identical.
+const supported = process.env.UVH_FRENCH_ENABLED === 'true' ? manifestLanguages : manifestLanguages.filter(language => language !== 'fr');
+const languagePrefix = languages => new RegExp(`^/(?:${languages.join('|')})(?=/|$)`);
 
-export function preferredLanguage(headers) {
+export function preferredLanguage(headers, languages = supported) {
   const cookie = String(headers.cookie ?? '').split(';').map(item => item.trim()).find(item => item.startsWith('uvh_language='))?.slice(13);
-  if (supported.includes(cookie)) return cookie;
+  if (languages.includes(cookie)) return cookie;
   return String(headers['accept-language'] ?? '').slice(0, 4096).split(',').flatMap((part, order) => {
-    const match = /^\s*(es|en)(?:-[a-z0-9-]+)?\s*(?:;\s*q=(0(?:\.\d{1,3})?|1(?:\.0{1,3})?))?\s*$/i.exec(part);
+    const match = /^\s*([a-z]{2,3})(?:-[a-z0-9-]+)?\s*(?:;\s*q=(0(?:\.\d{1,3})?|1(?:\.0{1,3})?))?\s*$/i.exec(part);
     const quality = Number(match?.[2] ?? 1);
-    return match && quality > 0 ? [{language: match[1].toLowerCase(), quality, order}] : [];
+    const language = match?.[1]?.toLowerCase();
+    return match && quality > 0 && languages.includes(language) ? [{language, quality, order}] : [];
   }).sort((a, b) => b.quality - a.quality || a.order - b.order)[0]?.language ?? 'es';
 }
 
 /** Only known UI addresses are localised. Short links and technical paths stay intact. */
-export function developmentRoute(raw, headers = {}) {
+export function developmentRoute(raw, headers = {}, languages = supported) {
   if (!raw?.startsWith('/') || raw.startsWith('//') || /[\r\n\\]/.test(raw)) return {status: 400};
   const url = new URL(raw, 'http://localhost');
   const pathname = url.pathname;
-  if (pathname === '/') return {status: 302, location: `/${preferredLanguage(headers)}/${url.search}`};
-  const prefixed = /^\/(es|en)(?=\/|$)/.exec(pathname);
+  if (pathname === '/') return {status: 302, location: `/${preferredLanguage(headers, languages)}/${url.search}`};
+  const prefixed = languagePrefix(languages).exec(pathname);
   if (prefixed) {
-    const language = prefixed[1];
+    const language = prefixed[0].slice(1);
     if (pathname === `/${language}`) return {status: 308, location: `/${language}/${url.search}`};
-    const rest = pathname.slice(3).replace(/\/$/, '') || '/';
+    const rest = pathname.slice(language.length + 1).replace(/\/$/, '') || '/';
     for (const translations of Object.values(routes)) {
-      if (Object.values(translations).includes(rest) && translations[language] !== pathname.slice(3)) {
+      if (Object.values(translations).includes(rest) && translations[language] !== pathname.slice(language.length + 1)) {
         return {status: 308, location: `/${language}${translations[language]}${url.search}`};
       }
     }
     return {target: language, path: raw};
   }
-  const legacy = {'/help': 'help', '/ayuda': 'help', '/status': 'status', '/estado': 'status', '/legal': 'terms'};
+  const legacy = {'/help': 'help', '/ayuda': 'help', '/aide': 'help', '/status': 'status', '/estado': 'status', '/statut': 'status', '/legal': 'terms'};
   const normalised = pathname.replace(/\/$/, '');
   const id = legacy[normalised] ?? Object.keys(routes).find(key => Object.values(routes[key]).includes(normalised));
   if (id) return {status: 308, location: `/es${routes[id].es}${url.search}`};
@@ -168,7 +173,9 @@ export async function startDevelopment(args = process.argv.slice(2)) {
     child.once('error', error => { console.error(error.message); stop(1); });
     child.once('exit', code => { if (!stopping) stop(code || 1); });
   }
-  console.log(`UVH bilingual development: http://${host === '::1' ? '[::1]' : host}:${port}/ (Spanish /es/, British English /en/). Both compilers must finish before opening.`);
+  const labels = {es: 'Spanish /es/', en: 'British English /en/', fr: 'French /fr/'};
+  const surfaces = supported.map(language => labels[language] ?? `/${language}`).join(', ');
+  console.log(`UVH localised development: http://${host === '::1' ? '[::1]' : host}:${port}/ (${surfaces}). All compilers must finish before opening.`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

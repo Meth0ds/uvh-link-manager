@@ -9,8 +9,12 @@ test('public pages have exact static routes and retain legacy redirects',()=>{
  assert.ok(config.includes('location = /help { return 308 /es/ayuda$is_args$args; }'));
  assert.ok(config.includes('location ^~ /legal/versions/ { try_files $uri =404;'));
  assert.ok(config.includes('error_page 404 =404'));
- assert.ok(config.includes('location = /en/legal/privacidad { return 308 /en/legal/privacy$is_args$args; }'));
- assert.ok(config.includes('location = /es/help { return 308 /es/ayuda$is_args$args; }'));
+ assert.ok(config.includes('location = /en/legal/privacidad { return 308 /en/legal/privacy$is_args$args; }'));  assert.ok(config.includes('location = /es/help { return 308 /es/ayuda$is_args$args; }'));
+  assert.ok(config.includes('location = /fr/aide { try_files /fr/aide/index.html =404;'));
+  assert.ok(config.includes('location = /fr/help { return 308 /fr/aide$is_args$args; }'));
+  assert.ok(config.includes('location = /fr/legal/conditions { try_files /fr/legal/conditions/index.html =404;'));
+  assert.ok(config.includes('location = /fr/legal/terms { return 308 /fr/legal/conditions$is_args$args; }'));
+  assert.ok(config.includes('location ~ ^/(?:es|en|fr)(?:/|$)'));
 });
 
 test('app keeps public navigation on the configured public origin, never a reflected Host',()=>{

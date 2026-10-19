@@ -12,6 +12,16 @@ test('localises the private no-script shell and prevents indexing', () => {
   assert.ok(!html.includes('Español'));
 });
 
+test('finalises a third locale from its own tag and route manifest', () => {
+  const frenchShell = '<html lang="fr-FR"><head><title>Titre</title></head><body><app-root>Contenu</app-root><noscript>Español</noscript></body></html>';
+  const html = finaliseDocument(frenchShell, 'fr');
+  assert.ok(html.includes('lang="fr-FR"'));
+  assert.ok(html.includes('Raccourcissez'));
+  assert.ok(html.includes('href="/fr/aide"'));
+  assert.ok(html.includes('href="/fr/"'));
+  assert.ok(html.includes('noindex, nofollow'));
+});
+
 test('public prerendered content remains readable without a redundant JavaScript notice', () => {
   const html = finaliseDocument(shell, 'en', { publicPage: true });
   assert.ok(html.includes('<app-root>Existing public content</app-root>'));
@@ -21,4 +31,5 @@ test('public prerendered content remains readable without a redundant JavaScript
 test('refuses unsupported or mismatched locale documents', () => {
   assert.throws(() => finaliseDocument(shell, '../../en'), /Unsupported/);
   assert.throws(() => finaliseDocument(shell, 'es'), /mismatch/);
+  assert.throws(() => finaliseDocument(shell, 'fr'), /mismatch/);
 });

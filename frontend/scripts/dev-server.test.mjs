@@ -10,6 +10,8 @@ const close = async server => { server.closeAllConnections(); await new Promise(
 
 test('root negotiation respects explicit preference, weighted regional languages and fallback', () => {
   assert.equal(preferredLanguage({'accept-language': 'fr,en-US;q=0.7,es-MX;q=0.9'}), 'es');
+  assert.equal(preferredLanguage({'accept-language': 'fr-FR,de;q=0.8'}, ['es', 'en', 'fr']), 'fr');
+  assert.equal(preferredLanguage({cookie: 'uvh_language=fr'}, ['es', 'en', 'fr']), 'fr');
   assert.equal(preferredLanguage({cookie: 'other=1; uvh_language=en', 'accept-language': 'es'}), 'en');
   assert.equal(preferredLanguage({cookie: 'uvh_language=../../en', 'accept-language': 'de,en-GB;q=0'}), 'es');
   assert.equal(preferredLanguage({'accept-language': 'en;q=0.9,es;q=0.9'}), 'en');
@@ -22,6 +24,12 @@ test('explicit locale wins and public route equivalents come from the shared man
   assert.deepEqual(developmentRoute('/es/help'), {status: 308, location: '/es/ayuda'});
   assert.deepEqual(developmentRoute('/en'), {status: 308, location: '/en/'});
   assert.deepEqual(developmentRoute('/en/'), {target: 'en', path: '/en/'});
+  assert.deepEqual(developmentRoute('/fr', {}, ['es', 'en', 'fr']), {status: 308, location: '/fr/'});
+  assert.deepEqual(developmentRoute('/fr/', {}, ['es', 'en', 'fr']), {target: 'fr', path: '/fr/'});
+  assert.deepEqual(developmentRoute('/fr/'), {target: 'backend', path: '/fr/'});
+  assert.deepEqual(developmentRoute('/fr/help', {}, ['es', 'en', 'fr']), {status: 308, location: '/fr/aide'});
+  assert.deepEqual(developmentRoute('/fr/aide', {}, ['es', 'en', 'fr']), {target: 'fr', path: '/fr/aide'});
+  assert.deepEqual(developmentRoute('/es/aide', {}, ['es', 'en', 'fr']), {status: 308, location: '/es/ayuda'});
 });
 
 test('legacy navigation preserves opaque queries and never localises short links or APIs', () => {

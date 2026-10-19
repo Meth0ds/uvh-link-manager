@@ -5,7 +5,7 @@ import { NavigationEnd, Router, TitleStrategy } from "@angular/router";
 import { filter } from "rxjs";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { PUBLIC_SITE_CONFIGURATION } from "./public-site";
-import { localePath, PUBLIC_ROUTES, UI_LANGUAGE, UI_LOCALE, type PublicRouteId } from "./locale";
+import { LANGUAGE_TAGS, localePath, PUBLIC_ROUTES, RELEASED_LANGUAGES, UI_LANGUAGE, UI_LOCALE, type AppLanguage, type PublicRouteId } from "./locale";
 
 @Injectable({providedIn: "root"})
 export class PublicSeoService {
@@ -30,9 +30,11 @@ export class PublicSeoService {
       for (const name of ["twitter:title", "twitter:description", "twitter:card"]) this.meta.removeTag(`name="${name}"`);
       return;
     }
-    const absolute = (language: "es"|"en") => this.site.publicOrigin.replace(/\/$/, "") + localePath(PUBLIC_ROUTES[id][language], language);
+    const absolute = (language: AppLanguage) => this.site.publicOrigin.replace(/\/$/, "") + localePath(PUBLIC_ROUTES[id][language], language);
     this.link("canonical", absolute(UI_LANGUAGE));
-    for (const [language, href] of [["es",absolute("es")],["en-GB",absolute("en")],["en",absolute("en")],["x-default",absolute("es")]]) this.link("alternate",href,language);
+    const hreflang: Record<AppLanguage, readonly string[]> = { es: ["es"], en: ["en-GB", "en"], fr: ["fr-FR", "fr"] };
+    for (const language of RELEASED_LANGUAGES) for (const code of hreflang[language]) this.link("alternate", absolute(language), code);
+    this.link("alternate", absolute("es"), "x-default");
     const description = this.description(id);
     // NavigationEnd fires before the router's document-title update. Read the
     // resolved route title, so prerendered social tags cannot retain index.html's title.
@@ -41,7 +43,7 @@ export class PublicSeoService {
     this.meta.updateTag({property:"og:description",content:description});
     this.meta.updateTag({property:"og:title",content:title});
     this.meta.updateTag({property:"og:url",content:absolute(UI_LANGUAGE)});
-    this.meta.updateTag({property:"og:locale",content:UI_LANGUAGE === "en" ? "en_GB" : "es_ES"});
+    this.meta.updateTag({property:"og:locale",content:LANGUAGE_TAGS[UI_LANGUAGE].replace("-", "_")});
     this.meta.updateTag({name:"twitter:card",content:"summary"});
     this.meta.updateTag({name:"twitter:title",content:title});
     this.meta.updateTag({name:"twitter:description",content:description});

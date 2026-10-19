@@ -15,7 +15,7 @@ final class RequestLanguage
         $previous = app()->getLocale();
         // Existing integration clients keep Spanish unless they explicitly negotiate.
         $language = $request->is('api/*')
-            ? Language::negotiate($request->header('Accept-Language'))
+            ? Language::negotiate($request->header('Accept-Language'), Language::enabled())
             : Language::fromRequest($request, Language::isFirstPartyHost($request->getHost()));
         if (! config('uvh.localisation_enabled')) {
             $language = 'es';

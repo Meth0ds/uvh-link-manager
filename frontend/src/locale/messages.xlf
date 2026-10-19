@@ -2588,7 +2588,7 @@
     </unit>
     <unit id="language.current">
       <notes>
-        <note category="location">src/app/core/localisation/language-selector.component.ts:20</note>
+        <note category="location">src/app/core/localisation/language-selector.component.ts:24</note>
       </notes>
       <segment>
         <source>Idioma de UVH: <ph id="0" equiv="language" disp="this.languageName()"/>.</source>
@@ -2596,7 +2596,7 @@
     </unit>
     <unit id="language.changeTitle">
       <notes>
-        <note category="location">src/app/core/localisation/language-selector.component.ts:41</note>
+        <note category="location">src/app/core/localisation/language-selector.component.ts:49</note>
       </notes>
       <segment>
         <source>Cambiar de idioma</source>
@@ -2604,7 +2604,7 @@
     </unit>
     <unit id="language.discardWarning">
       <notes>
-        <note category="location">src/app/core/localisation/language-selector.component.ts:41</note>
+        <note category="location">src/app/core/localisation/language-selector.component.ts:49</note>
       </notes>
       <segment>
         <source>La página se recargará. Los cambios sin guardar y las operaciones en curso pueden perderse.</source>
@@ -2612,7 +2612,7 @@
     </unit>
     <unit id="language.confirm">
       <notes>
-        <note category="location">src/app/core/localisation/language-selector.component.ts:41</note>
+        <note category="location">src/app/core/localisation/language-selector.component.ts:49</note>
       </notes>
       <segment>
         <source>Cambiar de idioma</source>
@@ -2620,7 +2620,7 @@
     </unit>
     <unit id="language.saveError">
       <notes>
-        <note category="location">src/app/core/localisation/language-selector.component.ts:54</note>
+        <note category="location">src/app/core/localisation/language-selector.component.ts:62</note>
       </notes>
       <segment>
         <source>No se pudo guardar el idioma. Inténtalo de nuevo.</source>
@@ -2628,7 +2628,7 @@
     </unit>
     <unit id="seo.home.description">
       <notes>
-        <note category="location">src/app/core/localisation/public-seo.service.ts:58</note>
+        <note category="location">src/app/core/localisation/public-seo.service.ts:60</note>
       </notes>
       <segment>
         <source>Crea enlaces cortos, actualiza su destino y consulta sus visitas. Organiza enlaces, QR y campañas con tu equipo en UVH.</source>
@@ -2636,7 +2636,7 @@
     </unit>
     <unit id="seo.help.description">
       <notes>
-        <note category="location">src/app/core/localisation/public-seo.service.ts:59</note>
+        <note category="location">src/app/core/localisation/public-seo.service.ts:61</note>
       </notes>
       <segment>
         <source>Aprende a crear y gestionar enlaces, códigos QR, dominios y campañas en UVH. Encuentra respuestas y ayuda para tu cuenta.</source>
@@ -2644,7 +2644,7 @@
     </unit>
     <unit id="seo.status.description">
       <notes>
-        <note category="location">src/app/core/localisation/public-seo.service.ts:60</note>
+        <note category="location">src/app/core/localisation/public-seo.service.ts:62</note>
       </notes>
       <segment>
         <source>Consulta el estado de los servicios de UVH y los incidentes operativos publicados.</source>
@@ -2652,7 +2652,7 @@
     </unit>
     <unit id="seo.terms.description">
       <notes>
-        <note category="location">src/app/core/localisation/public-seo.service.ts:61</note>
+        <note category="location">src/app/core/localisation/public-seo.service.ts:63</note>
       </notes>
       <segment>
         <source>Consulta las condiciones de uso de UVH, las responsabilidades del servicio y las normas para compartir enlaces.</source>
@@ -2660,7 +2660,7 @@
     </unit>
     <unit id="seo.privacy.description">
       <notes>
-        <note category="location">src/app/core/localisation/public-seo.service.ts:62</note>
+        <note category="location">src/app/core/localisation/public-seo.service.ts:64</note>
       </notes>
       <segment>
         <source>Conoce cómo UVH trata tus datos personales, qué derechos tienes y cómo gestionar tus preferencias de privacidad.</source>
@@ -2668,7 +2668,7 @@
     </unit>
     <unit id="seo.report.description">
       <notes>
-        <note category="location">src/app/core/localisation/public-seo.service.ts:63</note>
+        <note category="location">src/app/core/localisation/public-seo.service.ts:65</note>
       </notes>
       <segment>
         <source>Comunica un enlace de UVH que pueda incumplir las normas o contener contenido ilícito mediante el formulario de denuncia.</source>
@@ -11683,7 +11683,7 @@
     </unit>
     <unit id="ui.e9841ae573b767">
       <notes>
-        <note category="location">src/app/legal/legal.routes.ts:9</note>
+        <note category="location">src/app/legal/legal.routes.ts:19</note>
       </notes>
       <segment>
         <source>Términos del servicio · UVH</source>
@@ -11691,7 +11691,7 @@
     </unit>
     <unit id="ui.7afcdfe8388db7">
       <notes>
-        <note category="location">src/app/legal/legal.routes.ts:14</note>
+        <note category="location">src/app/legal/legal.routes.ts:24</note>
       </notes>
       <segment>
         <source>Política de privacidad · UVH</source>
@@ -11699,7 +11699,7 @@
     </unit>
     <unit id="ui.9d8506d2296219">
       <notes>
-        <note category="location">src/app/legal/legal.routes.ts:19</note>
+        <note category="location">src/app/legal/legal.routes.ts:29</note>
       </notes>
       <segment>
         <source>Denunciar un enlace · UVH</source>

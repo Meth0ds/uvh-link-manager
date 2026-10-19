@@ -2,7 +2,7 @@ import { UI_LANGUAGE } from "../core/localisation/locale";
 import { LocaleLinkDirective } from "../core/localisation/locale-link.directive";
 import { UI_TEXT } from "../core/localisation/template-messages";
 import { Component, ChangeDetectionStrategy, inject } from "@angular/core";
-import { PRIVACY_VERSION } from "../core/legal-documents";
+import { PRIVACY_VERSION, legalCopyPath } from "../core/legal-documents";
 import { RouterLink } from "@angular/router";
 import { LegalShellComponent } from "./legal-shell.component";
 import { LegalIdentityService } from "./legal-identity.service";
@@ -19,7 +19,7 @@ import { LegalDocumentNavigationComponent, type LegalSection } from "./legal-doc
 export class PrivacyComponent {
   readonly uiText = UI_TEXT;
   readonly version = PRIVACY_VERSION;
-  readonly versionCopy = UI_LANGUAGE === "en" ? `/legal/versions/${this.version}/en/privacy.html` : `/legal/versions/${this.version}/privacidad.html`;
+  readonly versionCopy = legalCopyPath(UI_LANGUAGE, "privacy", this.version);
   readonly sections: readonly LegalSection[] = [
     { id: "responsable", title: $localize`:@@ui.76f655e1da1aa0:Responsable del tratamiento` },
     { id: "datos-tratados", title: $localize`:@@ui.770dec81c1537a:Qué datos tratamos y de dónde proceden` },

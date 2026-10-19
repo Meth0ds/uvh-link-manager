@@ -5,11 +5,12 @@ import copy from '../src/locale/document-copy.json' with {type:'json'};
 import routes from '../../shared/localisation/routes.json' with {type:'json'};
 
 const escape=text=>text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const LANGUAGE_TAGS={es:'es-ES',en:'en-GB',fr:'fr-FR'};
 
 /** Fixed, authored document copy only. Never translates page content or user data. */
 export function finaliseDocument(html,language,{publicPage=false}={}){
- if(!Object.hasOwn(copy,language))throw new Error('Unsupported document language');
- const lang=language==='en'?'en-GB':'es-ES';
+ if(!Object.hasOwn(copy,language)||!Object.hasOwn(LANGUAGE_TAGS,language))throw new Error('Unsupported document language');
+ const lang=LANGUAGE_TAGS[language];
  const compiledLanguage=/<html[^>]*lang="([^"]+)"/.exec(html)?.[1];
  if(![lang,language].includes(compiledLanguage))throw new Error('Compiled document locale mismatch');
  html=html.replace(/(<html[^>]*lang=")[^"]+"/,`$1${lang}"`);

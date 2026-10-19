@@ -4,7 +4,9 @@ import { ActionDialogService } from "../../panel/action-dialog.service";
 import { AuthService } from "../services/auth.service";
 import { ApiService } from "../services/api.service";
 import { MatMenuModule } from "@angular/material/menu";
-import { AppLanguage, isAppLanguage, localePath, UI_LANGUAGE } from "./locale";
+import { AppLanguage, LANGUAGE_TAGS, RELEASED_LANGUAGES, isAppLanguage, localePath, UI_LANGUAGE } from "./locale";
+
+const LANGUAGE_NAMES: Record<AppLanguage, string> = { es: "Español", en: "English", fr: "Français" };
 
 @Component({
   selector: "app-language-selector", standalone: true, changeDetection: ChangeDetectionStrategy.OnPush,
@@ -15,10 +17,16 @@ import { AppLanguage, isAppLanguage, localePath, UI_LANGUAGE } from "./locale";
 export class LanguageSelectorComponent {
   readonly accountPreference = input(false);
   readonly fullName = input(false);
-  readonly languageName = computed(() => this.language() === "en" ? "English" : "Español");
+  readonly languageName = computed(() => LANGUAGE_NAMES[this.language()]);
+  readonly languageTag = computed(() => LANGUAGE_TAGS[this.language()]);
+  readonly includesFrench = RELEASED_LANGUAGES.includes("fr");
   readonly showFullName = computed(() => this.fullName() || this.accountPreference());
   readonly accessibleLabel = computed(() => $localize`:@@language.current:Idioma de UVH: ${this.languageName()}:language:.`);
-  readonly language = computed(() => this.accountPreference() ? this.auth.user()?.language ?? "es" : UI_LANGUAGE);
+  readonly language = computed<AppLanguage>(() => {
+    if (!this.accountPreference()) return UI_LANGUAGE;
+    const preferred = this.auth.user()?.language;
+    return isAppLanguage(preferred) ? preferred : "es";
+  });
   readonly busy = signal(false);
   readonly error = signal("");
   private readonly document = inject(DOCUMENT);

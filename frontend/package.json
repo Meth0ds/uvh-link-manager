@@ -23,6 +23,11 @@
     "i18n:extract": "ng extract-i18n",
     "i18n:generate": "cd .. && node scripts/localisation-catalogue.mjs generate",
     "i18n:check": "cd .. && node scripts/localisation-catalogue.mjs check && node scripts/localisation-integrity.mjs",
+    "i18n:next:fr": "cd .. && node scripts/localisation-catalogue.mjs next --locale=fr",
+    "i18n:apply-next:fr": "cd .. && node scripts/localisation-catalogue.mjs apply-next --locale=fr",
+    "i18n:generate:fr": "cd .. && node scripts/localisation-catalogue.mjs generate --locale=fr",
+    "i18n:status:fr": "cd .. && node scripts/localisation-catalogue.mjs status --locale=fr",
+    "i18n:check:fr": "cd .. && node scripts/localisation-catalogue.mjs check --locale=fr --draft && node scripts/localisation-integrity.mjs --locale=fr --draft",
     "i18n:test": "node --test ../scripts/localisation-integrity.test.mjs",
     "start:single": "ng serve",
     "start:test": "node --test scripts/dev-server.test.mjs"

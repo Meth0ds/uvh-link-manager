@@ -2,7 +2,7 @@ import { UI_LANGUAGE } from "../core/localisation/locale";
 import { LocaleLinkDirective } from "../core/localisation/locale-link.directive";
 import { UI_TEXT } from "../core/localisation/template-messages";
 import { Component, ChangeDetectionStrategy, inject } from "@angular/core";
-import { TERMS_VERSION } from "../core/legal-documents";
+import { TERMS_VERSION, legalCopyPath } from "../core/legal-documents";
 import { RouterLink } from "@angular/router";
 import { LegalShellComponent } from "./legal-shell.component";
 import { LegalIdentityService } from "./legal-identity.service";
@@ -19,7 +19,7 @@ import { LegalDocumentNavigationComponent, type LegalSection } from "./legal-doc
 export class TermsComponent {
   readonly uiText = UI_TEXT;
   readonly version = TERMS_VERSION;
-  readonly versionCopy = UI_LANGUAGE === "en" ? `/legal/versions/${this.version}/en/terms.html` : `/legal/versions/${this.version}/terminos.html`;
+  readonly versionCopy = legalCopyPath(UI_LANGUAGE, "terms", this.version);
   readonly sections: readonly LegalSection[] = [
     { id: "alcance", title: $localize`:@@ui.3181b7423e1540:Alcance y aceptación` },
     { id: "servicio", title: $localize`:@@ui.d9a6f001aa9280:Qué hace UVH` },

@@ -97,6 +97,27 @@ final class LanguagePreferenceTest extends TestCase
         $this->get('/robots.txt')->assertOk()->assertSee('Disallow: /en/auth/', false)->assertSee('Disallow: /es/app/', false);
     }
 
+    public function test_french_negotiation_and_availability_wait_for_its_release_flag(): void
+    {
+        config(['uvh.french_enabled' => false]);
+        $this->assertFalse(Language::available('fr'));
+        $this->assertSame('es', Language::negotiate('fr-FR,de;q=0.8', Language::enabled()));
+        config(['uvh.french_enabled' => true]);
+        $this->assertTrue(Language::available('fr'));
+        $this->assertSame('fr', Language::negotiate('fr-FR,de;q=0.8', Language::enabled()));
+    }
+
+    public function test_sitemap_publishes_french_only_when_enabled(): void
+    {
+        config(['uvh.localisation_enabled' => true, 'uvh.french_enabled' => true, 'uvh.public_origin' => 'https://uvh.test']);
+        $xml = $this->get('/sitemap.xml')->assertOk()->getContent();
+        $this->assertSame(18, substr_count($xml, '<url>'));
+        $this->assertStringContainsString('https://uvh.test/fr/aide', $xml);
+        $this->assertStringContainsString('hreflang="fr-FR"', $xml);
+        $this->assertStringContainsString('hreflang="fr"', $xml);
+        $this->get('/robots.txt')->assertOk()->assertSee('Disallow: /fr/auth/', false);
+    }
+
     public function test_visitor_pages_translate_system_copy_and_keep_owner_content_literal(): void
     {
         config(['uvh.localisation_enabled' => true]);

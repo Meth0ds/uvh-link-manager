@@ -14,5 +14,13 @@
     "home": "Back to home",
     "help": "Help",
     "imageAlt": "A path waiting to be connected"
+  },
+  "fr": {
+    "title": "UVH · Raccourcissez et gérez vos liens",
+    "heading": "Trouvez votre chemin.",
+    "message": "Activez JavaScript pour ouvrir les pages et les outils d’UVH. Si vous êtes arrivé par un lien qui ne fonctionne pas, demandez-en un nouveau à la personne qui vous l’a partagé.",
+    "home": "Retour à l’accueil",
+    "help": "Aide",
+    "imageAlt": "Un chemin en attente d’être relié"
   }
 }

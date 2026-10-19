@@ -24,9 +24,11 @@ final class NotificationSubject
                 return $fallback;
             }
 
+            $language = Language::current();
+
             return __('notifications.subject_expiry', [
                 'label' => $label,
-                'date' => $date->format(Language::current() === 'en' ? 'j M Y, H:i' : 'd/m/Y H:i'),
+                'date' => $date->locale($language)->translatedFormat($language === 'es' ? 'd/m/Y H:i' : 'j M Y, H:i'),
             ]);
         }
         if (($data['type'] ?? null) === 'remaining' && is_int($data['remaining'] ?? null) && $data['remaining'] >= 0) {

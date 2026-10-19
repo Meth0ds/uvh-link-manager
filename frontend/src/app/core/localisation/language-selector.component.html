@@ -2,7 +2,7 @@
   [class.open]="menuTrigger.menuOpen" [matMenuTriggerFor]="languageMenu" #menuTrigger="matMenuTrigger"
   [attr.aria-label]="accessibleLabel()" [attr.title]="languageName()" [attr.aria-busy]="busy()" [disabled]="busy()">
   <svg class="language-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z"/></svg>
-  <span class="language-name" [attr.lang]="language() === 'en' ? 'en-GB' : 'es'">{{ showFullName() ? languageName() : language().toUpperCase() }}</span>
+  <span class="language-name" [attr.lang]="languageTag()">{{ showFullName() ? languageName() : language().toUpperCase() }}</span>
   <svg class="language-chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 4.5 3 3 3-3"/></svg>
 </button>
 <mat-menu #languageMenu="matMenu" class="uvh-language-menu" xPosition="before">
@@ -12,5 +12,10 @@
   <button mat-menu-item role="menuitemradio" [attr.aria-checked]="language() === 'en'" [class.language-selected]="language() === 'en'" [disabled]="busy()" (click)="selectLanguage('en')">
     <span class="language-option"><span lang="en-GB" i18n="@@ui.ba118bf7fc9c1a">English</span><span class="language-option-code" aria-hidden="true">EN</span>@if (language() === 'en') { <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg> }</span>
   </button>
+  @if (includesFrench) {
+    <button mat-menu-item role="menuitemradio" [attr.aria-checked]="language() === 'fr'" [class.language-selected]="language() === 'fr'" [disabled]="busy()" (click)="selectLanguage('fr')">
+      <span class="language-option"><span lang="fr-FR">Français</span><span class="language-option-code" aria-hidden="true">FR</span>@if (language() === 'fr') { <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg> }</span>
+    </button>
+  }
 </mat-menu>
 @if (error()) { <span class="language-error" role="status">{{ error() }}</span> }

@@ -14,7 +14,7 @@ final class AccountLanguageController
     public function update(Request $request): JsonResponse
     {
         $language = $request->input('language');
-        if (! Language::valid($language)) {
+        if (! Language::available($language)) {
             return response()->json(['error' => __('messages.invalid_language'), 'code' => 'invalid_language'], 422);
         }
         $user = UvhRequest::user($request);

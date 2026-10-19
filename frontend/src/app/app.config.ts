@@ -1,10 +1,10 @@
 import { LocaleUrlSerializer } from "./core/localisation/locale-url-serializer";
 import "./core/localisation/locale-data";
 import { PublicSeoService } from "./core/localisation/public-seo.service";
-import { UI_LANGUAGE, PUBLIC_ROUTES } from "./core/localisation/locale";
+import { UI_LANGUAGE, UI_LOCALE, PUBLIC_ROUTES } from "./core/localisation/locale";
 import { SharingService } from "./core/services/sharing.service";
 import { isPlatformBrowser } from "@angular/common";
-import { ApplicationConfig, inject, PLATFORM_ID, provideAppInitializer } from "@angular/core";
+import { ApplicationConfig, LOCALE_ID, inject, PLATFORM_ID, provideAppInitializer } from "@angular/core";
 import { provideRouter, UrlSerializer, RouteReuseStrategy, withComponentInputBinding, withInMemoryScrolling, type RouterFeatures, type Routes } from "@angular/router";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
@@ -90,6 +90,7 @@ export const routerFeatures: RouterFeatures[] = [
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    { provide: LOCALE_ID, useValue: UI_LOCALE },
     { provide: UrlSerializer, useClass: LocaleUrlSerializer },
     provideAppInitializer(() => { inject(PublicSeoService); }),
     provideRouter(routes, ...routerFeatures),

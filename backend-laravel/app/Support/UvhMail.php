@@ -665,7 +665,7 @@ class UvhMail
     {
         $safeTitle = self::esc($title);
         $helpUrl = self::esc(FrontendUrl::page('/help'));
-        $language = Language::current() === 'en' ? 'en-GB' : 'es-ES';
+        $language = Language::tag(Language::current());
         $tagline = self::esc(__('mail.layout_tagline'));
         $footer = self::esc(__('mail.layout_footer'));
         $helpLabel = self::esc(__('mail.layout_help'));

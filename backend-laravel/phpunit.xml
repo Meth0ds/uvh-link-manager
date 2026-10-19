@@ -41,9 +41,13 @@
         <env name="UVH_FEATURE_SOCIAL_PREVIEWS" value="false" force="true"/>
         <server name="APP_ENV" value="testing" force="true"/>
         <server name="LOCALISATION_ENABLED" value="false" force="true"/>
+        <!-- French publication is opt-in; tests that exercise it enable the
+             config key explicitly, so a developer environment cannot leak in. -->
+        <server name="UVH_FRENCH_ENABLED" value="false" force="true"/>
         <server name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="LOCALISATION_ENABLED" value="false" force="true"/>
+        <env name="UVH_FRENCH_ENABLED" value="false" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>

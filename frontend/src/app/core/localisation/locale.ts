@@ -1,30 +1,74 @@
 import manifest from "../../../../../shared/localisation/routes.json";
 
-export type AppLanguage = "es" | "en";
+export type AppLanguage = "es" | "en" | "fr";
+
+/** Every language the tooling, router and manifest understand. */
+export const SUPPORTED_LANGUAGES: readonly AppLanguage[] = ["es", "en", "fr"];
+
+/**
+ * Languages whose compiled bundles are deployed together. French joins this
+ * list when its catalogue is authored and reviewed; until then the switch must
+ * not offer a route that has no bundle behind it.
+ */
+export const RELEASED_LANGUAGES: readonly AppLanguage[] = ["es", "en"];
+
+export const LANGUAGE_TAGS: Record<AppLanguage, string> = { es: "es-ES", en: "en-GB", fr: "fr-FR" };
+
 const COMPILED_LOCALE = (typeof $localize !== "undefined" && $localize.locale) || "es";
-export const UI_LOCALE = COMPILED_LOCALE.toLowerCase().startsWith("en") ? "en-GB" : "es-ES";
-export const UI_LANGUAGE: AppLanguage = UI_LOCALE.toLowerCase().startsWith("en") ? "en" : "es";
+const normalisedLocale = COMPILED_LOCALE.toLowerCase();
+export const UI_LANGUAGE: AppLanguage = normalisedLocale.startsWith("fr") ? "fr" : normalisedLocale.startsWith("en") ? "en" : "es";
+export const UI_LOCALE = LANGUAGE_TAGS[UI_LANGUAGE];
 export const PUBLIC_ROUTES = manifest;
 export type PublicRouteId = keyof typeof PUBLIC_ROUTES;
-const LEGACY_PUBLIC: Record<string, PublicRouteId> = {
-  "/": "home", "/help": "help", "/ayuda": "help", "/status": "status", "/estado": "status",
+
+/** Old or untranslated paths that still resolve to a public page. */
+const LEGACY_ALIASES: Record<string, PublicRouteId> = {
+  "/help": "help", "/ayuda": "help", "/status": "status", "/estado": "status",
   "/legal": "terms", "/legal/terminos": "terms", "/legal/terms": "terms",
   "/legal/privacidad": "privacy", "/legal/privacy": "privacy",
   "/legal/denuncias": "reportAbuse", "/legal/report-abuse": "reportAbuse",
 };
-export function isAppLanguage(value: unknown): value is AppLanguage { return value === "es" || value === "en"; }
+/** Every manifest route, so a new language needs no second table. */
+const MANIFEST_PATHS: Record<string, PublicRouteId> = {};
+for (const id of Object.keys(PUBLIC_ROUTES) as PublicRouteId[]) {
+  for (const language of SUPPORTED_LANGUAGES) {
+    if (PUBLIC_ROUTES[id][language] !== "/") MANIFEST_PATHS[PUBLIC_ROUTES[id][language]] = id;
+  }
+}
+const LEGACY_PUBLIC: Record<string, PublicRouteId> = { ...LEGACY_ALIASES, ...MANIFEST_PATHS };
+
+const LANGUAGE_PREFIX = new RegExp(`^/(?:${SUPPORTED_LANGUAGES.join("|")})(?=/|$)`);
+const PUBLIC_PATHS = new Set(Object.values(PUBLIC_ROUTES).flatMap(route => SUPPORTED_LANGUAGES.map(language => route[language])));
+
+export function isAppLanguage(value: unknown): value is AppLanguage {
+  return typeof value === "string" && (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
+}
+
+/** Only application surfaces and translated public pages are localised. */
+function isLocalisablePath(pathname: string): boolean {
+  const bare = pathname.replace(/\/+$/, "") || "/";
+  if (bare === "/" || PUBLIC_PATHS.has(bare)) return true;
+  return /^\/(?:app|auth|reports|invitations|forbidden|not-found|legal)(?:\/|$)/.test(bare);
+}
+
 export function routePath(path: string, language: AppLanguage = UI_LANGUAGE): string {
   if (!path.startsWith("/") || path.startsWith("//")) return path;
-  const stripped = path.replace(/^\/(?:es|en)(?=\/|$)/, "") || "/";
+  const stripped = path.replace(LANGUAGE_PREFIX, "") || "/";
   const match = /^([^?#]*)([?#].*)?$/.exec(stripped)!;
   const id = LEGACY_PUBLIC[match[1].replace(/\/$/, "") || "/"];
   return (id ? PUBLIC_ROUTES[id][language] : match[1]) + (match[2] ?? "");
 }
+
 export function localePath(path: string, language: AppLanguage = UI_LANGUAGE): string {
-  if (!/^\/(?:[?#]|$|(?:es|en)(?:\/|$)|app(?:\/|$)|auth(?:\/|$)|reports\/|invitations\/|help(?:[/?#]|$)|ayuda(?:[/?#]|$)|status(?:[/?#]|$)|estado(?:[/?#]|$)|legal(?:[/?#]|$)|forbidden(?:[/?#]|$)|not-found(?:[/?#]|$))/.test(path)
-    || path.startsWith("/legal/versions/") || /^\/(?:es|en)\/legal\/versions\//.test(path)) return path;
-  const translated = routePath(path, language);
-  return `/${language}${translated === "/" ? "/" : translated}`;
+  if (!path.startsWith("/") || path.startsWith("//")) return path;
+  const match = /^([^?#]*)([?#].*)?$/.exec(path)!;
+  const pathname = match[1];
+  const suffix = match[2] ?? "";
+  const bare = LANGUAGE_PREFIX.test(pathname) ? pathname.replace(LANGUAGE_PREFIX, "") || "/" : pathname;
+  // Historical documents are immutable bytes: never rewrite their path.
+  if (bare.startsWith("/legal/versions/") || !isLocalisablePath(bare)) return path;
+  const translated = routePath(bare, language);
+  return `/${language}${translated === "/" ? "/" : translated}` + suffix;
 }
 
 /** Only explicitly trusted UVH origins may have their UI paths rewritten. */

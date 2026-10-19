@@ -10,6 +10,14 @@ describe("locale paths", () => {
     expect(localePath("/#features", "en")).toBe("/en/#features");
     expect(routePath("/es/help", "es")).toBe("/ayuda");
   });
+  it("translates French routes from the same manifest without a second table", () => {
+    expect(routePath("/fr/aide", "en")).toBe("/help");
+    expect(localePath("/fr/aide", "es")).toBe("/es/ayuda");
+    expect(localePath("/fr/help", "fr")).toBe("/fr/aide");
+    expect(localePath("/en/legal/terms", "fr")).toBe("/fr/legal/conditions");
+    expect(localePath("/aide", "fr")).toBe("/fr/aide");
+    expect(localePath("/fr/legal/versions/2026-10-09/fr/terms.html", "en")).toBe("/fr/legal/versions/2026-10-09/fr/terms.html");
+  });
   it("leaves aliases, native routes, assets, historical documents and remote URLs intact", () => {
     for (const path of ["/summer", "/r/summer", "/a/summer", "/api/v1/links", "/visitor-assets/puzzle.v1.mjs", "/legal/versions/2026-10-09/terminos.html", "https://other.test/help", "//other.test/app", "#section"]) {
       expect(localePath(path, "en")).toBe(path);

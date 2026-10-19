@@ -1,7 +1,7 @@
 # Shared capability documents must never be cached or indexed.
-map $uri $uvh_report_robots { default ""; ~^/(?:es/|en/)?(?:app|auth|reports|invitations|legal/versions)(?:/|$) "noindex, nofollow, noarchive"; }
-map $uri $uvh_report_cache { default ""; ~^/(?:es/|en/)?(?:app|auth|reports|invitations)(?:/|$) "no-store"; }
-map $uri $uvh_ui_language { default es; ~^/en(?:/|$) en; }
+map $uri $uvh_report_robots { default ""; ~^/(?:es/|en/|fr/)?(?:app|auth|reports|invitations|legal/versions)(?:/|$) "noindex, nofollow, noarchive"; }
+map $uri $uvh_report_cache { default ""; ~^/(?:es/|en/|fr/)?(?:app|auth|reports|invitations)(?:/|$) "no-store"; }
+map $uri $uvh_ui_language { default es; ~^/en(?:/|$) en; ~^/fr(?:/|$) fr; }
 
 upstream uvh_php {
     server app:9000;
