@@ -67,7 +67,8 @@
               "outputHashing": "all",
               "localize": [
                 "es",
-                "en-GB"
+                "en-GB",
+                "fr"
               ]
             },
             "development": {

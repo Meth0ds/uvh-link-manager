@@ -6,11 +6,11 @@ export type AppLanguage = "es" | "en" | "fr";
 export const SUPPORTED_LANGUAGES: readonly AppLanguage[] = ["es", "en", "fr"];
 
 /**
- * Languages whose compiled bundles are deployed together. French joins this
- * list when its catalogue is authored and reviewed; until then the switch must
- * not offer a route that has no bundle behind it.
+ * Languages whose compiled bundles are deployed together. Keep this list in
+ * step with `production.localize` so the switch never offers a route that has
+ * no bundle behind it.
  */
-export const RELEASED_LANGUAGES: readonly AppLanguage[] = ["es", "en"];
+export const RELEASED_LANGUAGES: readonly AppLanguage[] = ["es", "en", "fr"];
 
 export const LANGUAGE_TAGS: Record<AppLanguage, string> = { es: "es-ES", en: "en-GB", fr: "fr-FR" };
 

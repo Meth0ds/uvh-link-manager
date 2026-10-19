@@ -25,7 +25,7 @@ docker compose -f docker-compose.local.yml --env-file .env.docker.local up -d po
 docker compose -f docker-compose.local.yml --env-file .env.docker.local --profile laravel up -d
 
 # 3. Frontend (Angular dev server con proxy /api y /r)
-cd frontend && npm install && npm start
+cd frontend && npm install && UVH_FRENCH_ENABLED=true npm start
 ```
 
 El proxy de `ng serve` (`src/proxy.conf.js`) reenvía `/api` y `/r` a `BACKEND_URL` (por defecto `http://127.0.0.1:8000`).

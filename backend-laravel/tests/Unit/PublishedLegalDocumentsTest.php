@@ -69,4 +69,31 @@ final class PublishedLegalDocumentsTest extends TestCase
             $this->assertStringContainsString('noindex,nofollow', $copy);
         }
     }
+
+    public function test_french_copies_are_registered_as_published_static_documents(): void
+    {
+        $directory = RepositoryRoot::path().'/frontend/public/legal/versions/2026-10-09';
+        $es = json_decode(file_get_contents($directory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+        $fr = json_decode(file_get_contents($directory.'/fr/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+        $registry = json_decode(file_get_contents(RepositoryRoot::path().'/shared/localisation/legal-documents.json'), true, flags: JSON_THROW_ON_ERROR);
+        foreach (['terms' => 'terminos', 'privacy' => 'privacidad'] as $slug => $source) {
+            $copy = file_get_contents($directory.'/fr/'.$slug.'.html');
+            $this->assertIsString($copy);
+            $this->assertSame('fr-FR', $fr[$slug]['language']);
+            $this->assertSame('es-ES', $fr[$slug]['sourceLanguage']);
+            $this->assertSame($es[$source]['sha256'], $fr[$slug]['sourceSha256']);
+            $this->assertSame(hash('sha256', $copy), $fr[$slug]['sha256']);
+            $this->assertSame($es[$source]['anchors'], $fr[$slug]['anchors']);
+            $this->assertStringContainsString('<html lang="fr-FR">', $copy);
+            $this->assertStringNotContainsString('<script', $copy);
+            $this->assertStringNotContainsString('i18n=', $copy);
+            $this->assertStringContainsString('noindex,nofollow', $copy);
+            $entry = $registry[$slug === 'terms' ? 'terms' : 'privacy_notice']['2026-10-09']['fr'];
+            $this->assertSame('/legal/versions/2026-10-09/fr/'.$slug.'.html', $entry['path']);
+            $this->assertSame($fr[$slug]['sha256'], $entry['sha256']);
+            foreach ($fr[$slug]['anchors'] as $anchor) {
+                $this->assertSame(1, substr_count($copy, 'id="'.$anchor.'"'));
+            }
+        }
+    }
 }

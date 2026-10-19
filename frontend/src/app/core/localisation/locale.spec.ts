@@ -1,4 +1,4 @@
-import { localeHref, localePath, routePath } from "./locale";
+import { localeHref, localePath, RELEASED_LANGUAGES, routePath } from "./locale";
 import { LocaleUrlSerializer } from "./locale-url-serializer";
 
 describe("locale paths", () => {
@@ -9,6 +9,9 @@ describe("locale paths", () => {
     expect(localePath("/app/links/17?q=a%20b", "en")).toBe("/en/app/links/17?q=a%20b");
     expect(localePath("/#features", "en")).toBe("/en/#features");
     expect(routePath("/es/help", "es")).toBe("/ayuda");
+  });
+  it("releases French together with the compiled production bundles", () => {
+    expect(RELEASED_LANGUAGES).toEqual(["es", "en", "fr"]);
   });
   it("translates French routes from the same manifest without a second table", () => {
     expect(routePath("/fr/aide", "en")).toBe("/help");

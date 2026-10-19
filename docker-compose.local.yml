@@ -46,6 +46,8 @@ x-php-service: &php-service
     UVH_FEATURE_NATIVE_APPS: ${UVH_FEATURE_NATIVE_APPS:-true}
     # French stays unpublished until its authored catalogue and legal copies exist.
     UVH_FRENCH_ENABLED: ${UVH_FRENCH_ENABLED:-false}
+    # Master switch for language negotiation, localised API messages and mail.
+    LOCALISATION_ENABLED: ${LOCALISATION_ENABLED:-false}
     # The PHP development server runs inside Linux but serves files from a
     # Windows bind mount. A small worker pool prevents one cold request from
     # making every local health/API request appear hung.

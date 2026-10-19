@@ -6,6 +6,10 @@ import routes from '../../shared/localisation/routes.json' with {type:'json'};
 
 const escape=text=>text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const LANGUAGE_TAGS={es:'es-ES',en:'en-GB',fr:'fr-FR'};
+// Prefer the authored no-JS fallback (the block holding nf-page). Angular's critical-CSS pass can add an unrelated <noscript> to the head, which must not be replaced.
+const AUTHORED_FALLBACK=/<noscript>(?:(?!<\/noscript>)[\s\S])*?nf-page[\s\S]*?<\/noscript>/;
+const ANY_NOSCRIPT=/<noscript>[\s\S]*?<\/noscript>/;
+const FALLBACK_BLOCK={test:html=>AUTHORED_FALLBACK.test(html)||ANY_NOSCRIPT.test(html),replace:(html,value)=>html.replace(AUTHORED_FALLBACK.test(html)?AUTHORED_FALLBACK:ANY_NOSCRIPT,value)};
 
 /** Fixed, authored document copy only. Never translates page content or user data. */
 export function finaliseDocument(html,language,{publicPage=false}={}){
@@ -14,11 +18,11 @@ export function finaliseDocument(html,language,{publicPage=false}={}){
  const compiledLanguage=/<html[^>]*lang="([^"]+)"/.exec(html)?.[1];
  if(![lang,language].includes(compiledLanguage))throw new Error('Compiled document locale mismatch');
  html=html.replace(/(<html[^>]*lang=")[^"]+"/,`$1${lang}"`);
- if(!/<noscript>[\s\S]*?<\/noscript>/.test(html))throw new Error('Expected the single source noscript fallback');
- if(publicPage)return html.replace(/<noscript>[\s\S]*?<\/noscript>/,'');
+ if(!FALLBACK_BLOCK.test(html))throw new Error('Expected the single source noscript fallback');
+ if(publicPage)return FALLBACK_BLOCK.replace(html,'');
  const text=copy[language];
  const fallback=`<noscript><link rel="stylesheet" href="/visitor-assets/not-found.v1.css"><div class="nf-page"><header class="nf-header"><a class="nf-brand" href="/${language}/">uvh.</a></header><main class="nf-main"><section class="nf-copy"><h1>${escape(text.heading)}</h1><p class="nf-lead">${escape(text.message)}</p><div class="nf-actions"><a class="nf-button nf-button-primary" href="/${language}/">${escape(text.home)}</a><a class="nf-button" href="/${language}${routes.help[language]}">${escape(text.help)}</a></div></section><img class="nf-fallback" src="/visitor-assets/puzzle-static.v1.svg" width="270" height="270" alt="${escape(text.imageAlt)}"></main></div></noscript>`;
- return html.replace(/<noscript>[\s\S]*?<\/noscript>/,fallback)
+ return FALLBACK_BLOCK.replace(html,fallback)
   .replace(/<title>[\s\S]*?<\/title>/,`<title>${escape(text.title)}</title>`)
   .replace(/<meta\s+(?:name="description"|property="og:(?:title|description)")[^>]*>/g,'')
   .replace('</head>','<meta name="robots" content="noindex, nofollow"></head>');

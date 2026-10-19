@@ -76,7 +76,7 @@ el prerender y el sitemap derivan los idiomas del manifiesto o de
 
 | Interruptor | Efecto | Defecto |
 | --- | --- | --- |
-| `RELEASED_LANGUAGES` (`locale.ts`) | Idiomas que el selector ofrece y que `hreflang` anuncia. | `es`, `en` |
+| `RELEASED_LANGUAGES` (`locale.ts`) | Idiomas que el selector ofrece y que `hreflang` anuncia. | `es`, `en`, `fr` |
 | `UVH_FRENCH_ENABLED` | Negociación, cookie, preferencia de cuenta, reserva del alias `fr`, sitemap/robots y tercer compilador de desarrollo. | `false` |
 | `LOCALISATION_ENABLED` | Habilita la localización en general. | `false` |
 
@@ -84,12 +84,23 @@ Con `UVH_FRENCH_ENABLED=false`, `/fr` no se sirve desde el servidor de
 desarrollo, el backend no negocia francés y `php artisan uvh:localisation-audit`
 no reserva el alias. Al encenderlo, el comando exige que exista
 `backend-laravel/lang/fr/`; si falta, falla en vez de publicar una interfaz
-francesa con mensajes en español.
+francesa con mensajes en español. Para el entorno local completo se encienden
+ambas banderas:
+
+```bash
+UVH_FRENCH_ENABLED=true LOCALISATION_ENABLED=true \
+  docker compose -f docker-compose.local.yml --env-file .env.docker.local --profile laravel up -d
+UVH_FRENCH_ENABLED=true npm start
+```
+
+El francés quedó publicado el 2026-10-19 por decisión del titular. La revisión
+nativa y jurídica del texto sigue pendiente; la publicación técnica no la
+sustituye.
 
 ## 5. Build
 
-`npm run build` compila **solo** `es` y `en-GB` (`production.localize`) y
-finaliza 14 documentos. Las configuraciones explícitas son:
+`npm run build` compila `es`, `en-GB` y `fr` (`production.localize`) y finaliza
+21 documentos. Las configuraciones explícitas son:
 
 - `fr`: build estricto del francés; falla mientras quede una unidad sin traducir.
 - `fr-draft`: mismo build con `i18nMissingTranslation: "warning"`, para validar
@@ -127,19 +138,25 @@ a quien ya aceptó el texto español.
 
 ## 7. Estado actual del francés (2026-10-19)
 
-- `messages.fr.xlf`: **0 de 4.099** unidades con `<target>`.
-- `translations.fr.json`: no existe, a propósito; no hay memoria aprobada.
-- `backend-laravel/lang/fr/`: ausente a propósito. Con `UVH_FRENCH_ENABLED=true`,
-  `uvh:localisation-audit` falla en vez de servir mensajes en español bajo una
-  interfaz francesa.
-- `shared/localisation/legal-documents.json`: sin entradas `fr`.
-- `document-copy.json`: seis cadenas francesas escritas **solo** para que el
-  build `fr-draft` pueda finalizar un documento. No están revisadas.
-- El endónimo «Français» del selector está oculto mientras
-  `RELEASED_LANGUAGES` no incluya `fr`.
+- `messages.fr.xlf`: **4.099 de 4.099** unidades con `<target>`, redactadas a
+  mano. `check --locale fr` (estricto) pasa.
+- `translations.fr.json`: memoria completa redactada a mano, **pendiente de
+  revisión nativa** antes de declararla aprobada.
+- `backend-laravel/lang/fr/`: seis catálogos (973 claves) redactados a mano, con
+  paridad de claves y marcadores verificada. Pendiente de revisión nativa.
+- Documentos legales: copias francesas en
+  `frontend/public/legal/versions/2026-10-09/fr/` (`terms.html`,
+  `privacy.html` y `manifest.json`), generadas desde el build `fr` y registradas
+  en `shared/localisation/legal-documents.json`.
+- `shared/localisation/legal-documents.json`: entradas `fr` para `terms` y
+  `privacy_notice`, con sus hashes.
+- `document-copy.json`: cadenas francesas del fallback sin JavaScript; el build
+  de producción las finaliza junto a las de español e inglés.
+- El selector ofrece «Français» porque `RELEASED_LANGUAGES` incluye `fr`.
 
-Nada de esto constituye copia aprobada. La publicación exige memoria completa,
-correo y legal revisados, y firma de un revisor nativo por lote.
+**Decisión del titular:** el idioma se publicó el 2026-10-19. La revisión nativa
+y jurídica del texto francés sigue pendiente y no se declara aprobada; antes de
+un despliegue público hay que registrarla.
 
 ## 8. Verificación
 
@@ -156,5 +173,5 @@ npm run build
 ```
 
 En backend, `php artisan test` contra `uvh_test`, Pint y PHPStan. La
-localización francesa no se considera publicada hasta que su catálogo, sus
-correos y sus copias legales tengan revisión nativa registrada.
+publicación técnica del francés ya está hecha; la revisión nativa y jurídica
+sigue pendiente y debe registrarse antes de un despliegue público.

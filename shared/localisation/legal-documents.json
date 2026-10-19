@@ -8,6 +8,10 @@
       "en": {
         "path": "/legal/versions/2026-10-09/en/terms.html",
         "sha256": "bda8ae27999d27ad46ae1fc670ac8395ab09be39217fb64c33230c9d27a99914"
+      },
+      "fr": {
+        "path": "/legal/versions/2026-10-09/fr/terms.html",
+        "sha256": "62b37d1895bb091af67c5b39d357b1b896ded58d59e74283b7c8d8dac189e3ea"
       }
     }
   },
@@ -20,6 +24,10 @@
       "en": {
         "path": "/legal/versions/2026-10-09/en/privacy.html",
         "sha256": "b9c2ead27562347dc7cbd42c5a43bc680bd73903fb18c3c01dab2df4ecba0a3a"
+      },
+      "fr": {
+        "path": "/legal/versions/2026-10-09/fr/privacy.html",
+        "sha256": "5f9879b8589bc21d70785c44b8bdc630cf1488c553ba029dd8f0a1039bc3eeb2"
       }
     }
   }

@@ -91,9 +91,10 @@ describe("Language menu presentation", () => {
     expect(fixture.nativeElement.querySelector("select")).toBeNull();
     trigger.focus(); trigger.click(); fixture.detectChanges(); await fixture.whenStable();
     const options = document.querySelectorAll<HTMLElement>(".uvh-language-menu [role=menuitemradio]");
-    expect(options.length).toBe(2);
+    expect(options.length).toBe(3);
     expect(options[0].textContent).toContain("Español");
     expect(options[1].textContent).toContain("English");
+    expect(options[2].textContent).toContain("Français");
     expect(options[0].getAttribute("aria-checked")).toBe("true");
     fixture.debugElement.query(By.directive(MatMenuTrigger)).injector.get(MatMenuTrigger).closeMenu();
     fixture.detectChanges(); await fixture.whenStable();

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { validateLocalisation, sourceFingerprint } from './localisation-integrity.mjs';
 
 const sourceMessage = 'Hola <ph id="0" equiv="NAME"/>';
@@ -22,6 +23,12 @@ test('rejects dropped or changed placeholders', () => {
 test('rejects incompatible duplicate ids and unexpected HTML', () => {
   assert.ok(validateLocalisation(xml(unit() + unit()), xml(unit('Hello <ph id="0" equiv="NAME"/>'), true), memory).some(error => error.includes('duplicate message id')));
   assert.ok(validateLocalisation(xml(unit()), xml(unit('<script>alert(1)</script>'), true), memory).some(error => error.includes('Unexpected translation markup')));
+});
+test('the French legal document names French as its language', () => {
+  const xlf = readFileSync(new URL('../frontend/src/locale/messages.fr.xlf', import.meta.url), 'utf8');
+  const unit = /<unit id="legal\.documentLanguage">([\s\S]*?)<\/unit>/.exec(xlf)?.[1];
+  assert.ok(unit, 'French catalogue must keep the legal.documentLanguage unit');
+  assert.match(unit, /<target>Français<\/target>/);
 });
 test('accepts a second locale and its draft state without weakening structure', () => {
   assert.deepEqual(validateLocalisation(xml(unit()), xml(unit(), 'fr'), {}, { locale: 'fr', allowMissing: true }), []);

@@ -167,7 +167,7 @@ docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm
 docker compose -f docker-compose.local.yml --env-file .env.docker.local run --rm php php artisan key:generate
 docker compose -f docker-compose.local.yml --env-file .env.docker.local --profile laravel up -d
 
-cd frontend && npm ci && npm start
+cd frontend && npm ci && UVH_FRENCH_ENABLED=true npm start
 ```
 
 El perfil `laravel` levanta la API en `http://127.0.0.1:8000`, dos workers
@@ -178,9 +178,9 @@ desarrollo localizado: `/es/` y `/en/` comparten origen, sesión y proxy a Larav
 `npm start` arranca un compilador Angular por idioma y conserva la recarga en
 caliente. Hay que esperar a que terminen todos los compiladores. La raíz elige el
 idioma por la preferencia explícita del navegador y después por
-`Accept-Language`; una dirección con idioma siempre se respeta. El francés solo
-arranca su tercer compilador con `UVH_FRENCH_ENABLED=true` y sigue siendo un
-borrador sin publicar.
+`Accept-Language`; una dirección con idioma siempre se respeta. El francés
+arranca su tercer compilador con `UVH_FRENCH_ENABLED=true`; con esa bandera
+`/fr/` se sirve y el selector lo ofrece.
 
 Se puede cambiar el puerto con `npm start -- --port 4300` y el backend con
 `BACKEND_URL=http://127.0.0.1:8010 npm start`. Para trabajar deliberadamente
@@ -416,19 +416,16 @@ pasa si faltan e interruptores de seguridad— está en
 | `UVH_FEATURE_APP_PROVIDERS` | `true` | Apertura de Spotify/YouTube/Maps. |
 | `UVH_FEATURE_NATIVE_APPS` | `true` | Apps propias vía AASA / Asset Links. |
 | `LOCALISATION_ENABLED` | `false` | Negociación de idioma, mensajes API y comunicaciones localizadas; activar tras desplegar los idiomas publicados y auditar alias. |
-| `UVH_FRENCH_ENABLED` | `false` | Publica el francés: negociación, preferencia de cuenta, alias `fr`, sitemap y compilador de desarrollo. Exige catálogo, correo y legal revisados. |
+| `UVH_FRENCH_ENABLED` | `false` | Publica el francés: negociación, preferencia de cuenta, alias `fr`, sitemap y compilador de desarrollo. Exige catálogo, correo y copias legales registradas. |
 
 Las migraciones de cada función son aditivas y se aplican con
 `php artisan migrate --force` **antes** de desplegar el frontend.
 
 ### Idiomas y catálogos
 
-`npm run build` en `frontend/` compila `/es/` y `/en/`, prerenderiza las seis
-páginas públicas de cada idioma y genera las reglas de publicación de Nginx.
-`/fr/` está registrado de extremo a extremo y se valida con
-`--configuration fr-draft`, pero no entra en el build de producción hasta que su
-catálogo esté redactado y revisado. El detalle está en
-[docs/localisation.md](docs/localisation.md).
+`npm run build` en `frontend/` compila `/es/`, `/en/` y `/fr/`, prerenderiza las
+seis páginas públicas de cada idioma y genera las reglas de publicación de
+Nginx. El detalle está en [docs/localisation.md](docs/localisation.md).
 `shared/localisation/routes.json` es el mapa común de direcciones para Angular,
 Laravel, sitemap y despliegue. Las URL cortas y las rutas técnicas no se prefijan.
 
@@ -438,9 +435,9 @@ en `src/locale/translations.en-GB.json`, `npm run i18n:generate` y
 `npm run i18n:check`. Para el francés, los mismos comandos aceptan `--locale=fr`
 y `--draft` mientras falten unidades. La comprobación rechaza mensajes ausentes,
 fuentes obsoletas y cambios en los marcadores de interpolación. Los catálogos
-Laravel están en `backend-laravel/lang/es/` y `backend-laravel/lang/en_GB/`; el
-francés se añadirá como `lang/fr/` en la tanda de redacción, y su ausencia hace
-fallar la auditoría si la bandera está encendida.
+Laravel están en `backend-laravel/lang/es/`, `backend-laravel/lang/en_GB/` y
+`backend-laravel/lang/fr/`; la ausencia del catálogo francés hace fallar la
+auditoría si la bandera está encendida.
 
 Antes de activar, aplicar las migraciones, ejecutar `php artisan uvh:localisation-audit`
 y exportar la configuración pública con `php artisan uvh:frontend-public-config`.
