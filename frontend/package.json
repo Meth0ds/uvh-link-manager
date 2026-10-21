@@ -53,7 +53,7 @@
   },
   "devDependencies": {
     "@angular/build": "~22.2.0",
-    "@angular/cli": "~22.2.0",
+    "@angular/cli": "~22.2.3",
     "@angular/compiler-cli": "~22.2.1",
     "@axe-core/playwright": "4.13.0",
     "@eslint/js": "^10.0.1",
