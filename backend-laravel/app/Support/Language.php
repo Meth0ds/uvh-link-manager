@@ -80,7 +80,10 @@ final class Language
     {
         return match ($language) {
             'en' => 'en_GB',
-            'fr' => 'fr_FR',
+            // The Laravel catalogue is stored under lang/fr. Keep the
+            // presentation locale aligned with that directory; the BCP-47
+            // response tag remains fr-FR via tag().
+            'fr' => 'fr',
             default => 'es',
         };
     }
@@ -99,7 +102,7 @@ final class Language
     {
         return match (app()->getLocale()) {
             'en_GB', 'en' => 'en',
-            'fr_FR', 'fr' => 'fr',
+            'fr' => 'fr',
             default => 'es',
         };
     }

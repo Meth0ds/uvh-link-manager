@@ -130,7 +130,7 @@
       </notes>
       <segment>
         <source>Escribe exactamente RECUPERAR MI CUENTA.</source>
-        <target>Saisissez exactement RÉCUPÉRER MON COMPTE.</target>
+        <target>Saisissez exactement RECUPERAR MI CUENTA.</target>
       </segment>
     </unit>
     <unit id="ui.a07f69bff8d0a0">
@@ -32499,7 +32499,7 @@ offre-2,https://example.org/nouveautes,"[""éditorial""]"</target>
       </notes>
       <segment>
         <source>Escribe exactamente ELIMINAR MI CUENTA.</source>
-        <target>Saisissez exactement SUPPRIMER MON COMPTE.</target>
+        <target>Saisissez exactement ELIMINAR MI CUENTA.</target>
       </segment>
     </unit>
     <unit id="ui.4e309c1abbd893">

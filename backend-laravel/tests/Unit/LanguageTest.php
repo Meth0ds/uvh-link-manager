@@ -42,7 +42,7 @@ final class LanguageTest extends TestCase
 
     public function test_french_maps_to_its_locale_and_html_tag(): void
     {
-        $this->assertSame('fr_FR', Language::locale('fr'));
+        $this->assertSame('fr', Language::locale('fr'));
         $this->assertSame('fr-FR', Language::tag('fr'));
     }
 }

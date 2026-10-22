@@ -72,9 +72,9 @@ function literal<T extends string>(value: unknown, allowed: Set<T>, contract: st
 
 function authUser(value: unknown): AuthUser {
   const source = record(value, "auth user");
-  if (source["language"] !== undefined && source["language"] !== null && source["language"] !== "es" && source["language"] !== "en") invalid("auth user language");
+  if (source["language"] !== undefined && source["language"] !== null && source["language"] !== "es" && source["language"] !== "en" && source["language"] !== "fr") invalid("auth user language");
   const decoded: AuthUser = {
-    ...(source["language"] !== undefined ? { language: source["language"] as "es" | "en" | null } : {}),
+    ...(source["language"] !== undefined ? { language: source["language"] as "es" | "en" | "fr" | null } : {}),
     id: integer(source["id"], "auth user", 1),
     email: text(source["email"], "auth user"),
     name: text(source["name"], "auth user"),

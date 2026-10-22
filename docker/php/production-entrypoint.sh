@@ -32,6 +32,10 @@ unset secret_name secret_file
 # capability on which authentication, SSRF controls or PostgreSQL depend.
 php -r '$required=["curl","gd","intl","mbstring","openssl","pcntl","pdo_pgsql","redis"]; $missing=array_values(array_filter($required, fn($ext) => !extension_loaded($ext))); if ($missing !== []) { fwrite(STDERR, "Missing required PHP extensions: ".implode(",", $missing).PHP_EOL); exit(1); }'
 
+# PHP2Shell (CVE-2026-109618/CVE-2026-109619) has no complete ini-level
+# mitigation. Refuse to start production on a vulnerable PHP 8.4 build.
+php -r 'if (PHP_MAJOR_VERSION === 8 && PHP_MINOR_VERSION === 4 && version_compare(PHP_VERSION, "8.4.27", "<")) { fwrite(STDERR, "PHP 8.4.27 or newer is required: vulnerable PHP2Shell build detected (".PHP_VERSION.")".PHP_EOL); exit(1); } if (PHP_MAJOR_VERSION < 8 || (PHP_MAJOR_VERSION === 8 && PHP_MINOR_VERSION < 4)) { fwrite(STDERR, "Unsupported PHP runtime for production: ".PHP_VERSION.PHP_EOL); exit(1); }'
+
 # Build configuration from runtime secrets on every fresh container. The
 # command boots the application, so ProductionSecurity aborts startup before a
 # worker can serve traffic when an invariant is missing or unsafe.

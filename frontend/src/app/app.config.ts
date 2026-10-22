@@ -1,7 +1,7 @@
 import { LocaleUrlSerializer } from "./core/localisation/locale-url-serializer";
 import "./core/localisation/locale-data";
 import { PublicSeoService } from "./core/localisation/public-seo.service";
-import { UI_LANGUAGE, UI_LOCALE, PUBLIC_ROUTES } from "./core/localisation/locale";
+import { UI_LOCALE, PUBLIC_ROUTES } from "./core/localisation/locale";
 import { SharingService } from "./core/services/sharing.service";
 import { isPlatformBrowser } from "@angular/common";
 import { ApplicationConfig, LOCALE_ID, inject, PLATFORM_ID, provideAppInitializer } from "@angular/core";
@@ -13,7 +13,21 @@ import { PendingHandoffService } from "./core/services/pending-handoff.service";
 import { AuthRouteReuseStrategy } from "./core/auth-route-reuse";
 
 export const routes: Routes = [
-  ...(UI_LANGUAGE === "es" ? [{ path: "help", redirectTo: "ayuda", pathMatch: "full" as const }, { path: "status", redirectTo: "estado", pathMatch: "full" as const }] : []),
+  // Register every public slug. Angular's localize transform does not
+  // guarantee `$localize.locale` during module evaluation, so a single
+  // computed slug can render correctly while the router only knows another
+  // language's path. The edge still canonicalises cross-language URLs.
+  ...["help", "status"].flatMap((id) => Object.values(PUBLIC_ROUTES[id as "help" | "status"])
+    .filter((path) => path !== "/")
+    .map((path) => ({
+      path: path.slice(1),
+      title: id === "help"
+        ? $localize`:@@ui.7dfc1cd4408199:Ayuda técnica · UVH`
+        : $localize`:@@ui.71de223b0148f2:Estado del servicio · UVH`,
+      loadComponent: id === "help"
+        ? () => import("./help/help.component").then((m) => m.HelpComponent)
+        : () => import("./public-status/public-status.component").then((m) => m.PublicStatusComponent),
+    }))),
   { path: "reports/:publicId", title: $localize`:@@ui.a901db2fb4198d:Informe compartido · UVH`, loadComponent: () => import("./public-report/public-report.component").then(m => m.PublicReportComponent) },
   {
     path: "",
@@ -27,16 +41,6 @@ export const routes: Routes = [
   {
     path: "legal",
     loadChildren: () => import("./legal/legal.routes").then((m) => m.legalRoutes),
-  },
-  {
-    path: PUBLIC_ROUTES.help[UI_LANGUAGE].slice(1),
-    title: $localize`:@@ui.7dfc1cd4408199:Ayuda técnica · UVH`,
-    loadComponent: () => import("./help/help.component").then((m) => m.HelpComponent),
-  },
-  {
-    path: PUBLIC_ROUTES.status[UI_LANGUAGE].slice(1),
-    title: $localize`:@@ui.71de223b0148f2:Estado del servicio · UVH`,
-    loadComponent: () => import("./public-status/public-status.component").then((m) => m.PublicStatusComponent),
   },
   {
     // Canonical invitation URL used by email links. Keep the legacy root alias

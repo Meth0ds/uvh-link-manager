@@ -14,7 +14,11 @@ export const RELEASED_LANGUAGES: readonly AppLanguage[] = ["es", "en", "fr"];
 
 export const LANGUAGE_TAGS: Record<AppLanguage, string> = { es: "es-ES", en: "en-GB", fr: "fr-FR" };
 
-const COMPILED_LOCALE = (typeof $localize !== "undefined" && $localize.locale) || "es";
+// Angular's localize transform translates templates but does not reliably set
+// `$localize.locale` in the browser bundle. The generated document already has
+// the authoritative locale, so read it before falling back to the source locale.
+const DOCUMENT_LOCALE = typeof document !== "undefined" ? document.documentElement.lang : "";
+const COMPILED_LOCALE = DOCUMENT_LOCALE || (typeof $localize !== "undefined" && $localize.locale) || "es";
 const normalisedLocale = COMPILED_LOCALE.toLowerCase();
 export const UI_LANGUAGE: AppLanguage = normalisedLocale.startsWith("fr") ? "fr" : normalisedLocale.startsWith("en") ? "en" : "es";
 export const UI_LOCALE = LANGUAGE_TAGS[UI_LANGUAGE];

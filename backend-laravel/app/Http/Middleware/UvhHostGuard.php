@@ -31,9 +31,11 @@ class UvhHostGuard
             if ($path === '/' && ($this->isAppHost($host) || $this->isPublicHost($host))) {
                 return $next($request);
             }
-            $path = preg_replace('#^/(es|en)(?=/|$)#', '', $path) ?: '/';
+            $path = preg_replace('#^/(?:es|en|fr)(?=/|$)#', '', $path) ?: '/';
             $path = match ($path) {
-                '/ayuda' => '/help', '/estado' => '/status', default => $path,
+                '/ayuda', '/aide' => '/help',
+                '/estado', '/statut' => '/status',
+                default => $path,
             };
         }
 

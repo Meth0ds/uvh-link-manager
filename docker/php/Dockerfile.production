@@ -24,7 +24,7 @@ RUN APP_ENV=local \
     APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
     composer dump-autoload --no-dev --classmap-authoritative --no-interaction
 
-FROM php:8.4-fpm-bookworm@sha256:a6d6f0b794dfd212886d3278498f8dc37f66890eddfa428b1cd87796438ecef6
+FROM php:8.4.27-fpm-bookworm@sha256:6d2c08c2ce0548e9bc55e21aab68f5a2613e635e4225fdea84290459728995e7
 
 # phpredis is not bundled with PHP, so it is compiled here. The build
 # toolchain ($PHPIZE_DEPS) is purged in the same layer: the runtime image must

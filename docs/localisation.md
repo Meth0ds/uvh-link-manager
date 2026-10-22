@@ -1,16 +1,15 @@
 # Localización
 
-UVH publica la interfaz en español (idioma fuente) y en inglés británico. El
-francés de Francia (`fr-FR`, trato «vous») está registrado de extremo a extremo,
-pero **no está publicado**: su catálogo está vacío a propósito y su bandera está
-apagada. Ninguna cadena francesa de este árbol debe considerarse aprobada hasta
-que exista memoria de traducción revisada.
+UVH publica la interfaz en español (idioma fuente), inglés británico y francés
+de Francia (`fr-FR`, trato «vous»). El francés está publicado técnicamente
+detrás de una bandera y su catálogo está completo; la revisión nativa y jurídica
+sigue siendo necesaria antes de tratar el texto como definitivo.
 
 | Idioma | Código | Prefijo | Estado |
 | --- | --- | --- | --- |
 | Español | `es` / `es-ES` | `/es/` | Fuente y publicación por defecto |
 | Inglés británico | `en-GB` | `/en/` | Publicado |
-| Francés de Francia | `fr` / `fr-FR` | `/fr/` | Registrado, sin publicar |
+| Francés de Francia | `fr` / `fr-FR` | `/fr/` | Publicado detrás de `UVH_FRENCH_ENABLED`; revisión pendiente |
 
 ## 1. Ficheros
 

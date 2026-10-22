@@ -292,7 +292,11 @@ final class RegistrationAdmission
 
     private static function defaultWorkspaceName(string $userName, string $language = 'es'): string
     {
-        $prefix = $language === 'en' ? 'Workspace for ' : 'Workspace de ';
+        $prefix = match ($language) {
+            'en' => 'Workspace for ',
+            'fr' => 'Espace de travail de ',
+            default => 'Workspace de ',
+        };
         $maximumWorkspaceCharacters = 80;
         $availableCharacters = $maximumWorkspaceCharacters - mb_strlen($prefix, 'UTF-8');
 

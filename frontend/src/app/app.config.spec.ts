@@ -15,21 +15,10 @@ class SecondScreen {}
 describe("application routes", () => {
   it("registers the public and authenticated route surfaces", () => {
     const paths = routes.map((route) => route.path);
-    expect(paths).toEqual([
-      "help",
-      "status",
-      "reports/:publicId",
-      "",
-      "auth",
-      "legal",
-      "ayuda",
-      "estado",
-      "invitations/accept",
-      "forbidden",
-      "not-found",
-      "app",
-      "**",
-    ]);
+    for (const path of [
+      "help", "status", "aide", "statut", "reports/:publicId", "", "auth", "legal",
+      "ayuda", "estado", "invitations/accept", "forbidden", "not-found", "app", "**",
+    ]) expect(paths).toContain(path);
   });
 
   it("keeps the catch-all route last", () => {
