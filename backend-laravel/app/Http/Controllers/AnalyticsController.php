@@ -10,6 +10,7 @@ use App\Support\WorkspaceLimits;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -206,7 +207,7 @@ class AnalyticsController
         // exact, even if it is close to now or overrides a preset period.
         $keyStart = $rolling ? intdiv(IsoDate::parse($start)->getTimestamp(), $ttl) : $start;
         $keyEnd = $rolling ? intdiv(IsoDate::parse($end)->getTimestamp(), $ttl) : $end;
-        $key = 'uvh:analytics:overview:v2:'.hash('sha256', json_encode([$workspaceId, $linkId, $rolling, $keyStart, $keyEnd], JSON_THROW_ON_ERROR));
+        $key = 'uvh:analytics:overview:v3:'.hash('sha256', json_encode([$workspaceId, $linkId, $rolling, $keyStart, $keyEnd], JSON_THROW_ON_ERROR));
         try {
             $cached = Cache::get($key);
             if (is_array($cached)) {
@@ -227,7 +228,17 @@ class AnalyticsController
 
     private function buildOverview(int $workspaceId, ?int $linkId, string $start, string $end): array
     {
-        return app(AnalyticsOverview::class)->overview($workspaceId, $linkId === null ? null : [$linkId], $start, $end);
+        $overview = app(AnalyticsOverview::class)->overview($workspaceId, $linkId === null ? null : [$linkId], $start, $end);
+        // Cache stores refuse PHP classes to prevent gadget-chain attacks.
+        // Normalize at this cache boundary without changing the service's
+        // collection contract for shared reports and other consumers.
+        foreach (['series', 'topLinks'] as $section) {
+            if ($overview[$section] instanceof Collection) {
+                $overview[$section] = $overview[$section]->all();
+            }
+        }
+
+        return $overview;
     }
 
     /** @return array{ok: bool, value: ?int} */

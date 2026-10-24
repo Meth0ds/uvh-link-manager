@@ -15,6 +15,9 @@
 # producción usa para PHP-FPM, y una etiqueta móvil movería el techo medido sin
 # que nadie lo decidiera.
 FROM php:8.4.27-fpm@sha256:070c5a1dac19c108905c09093e3f5cf228ece8feaea84e33135b3da99de32946
+# Security floor for CVE-2026-109618 / CVE-2026-109619 (PHP advisory, 2026-10-21).
+# Fail closed if a future base change accidentally reintroduces an older runtime.
+RUN php -r 'if (version_compare(PHP_VERSION, "8.4.27", "<")) { fwrite(STDERR, "PHP 8.4.27 or newer required\n"); exit(1); }'
 
 WORKDIR /app
 

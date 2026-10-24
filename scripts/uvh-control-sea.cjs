@@ -38,6 +38,13 @@ async function main() {
       names.add(name); mkdirSync(dirname(dest), { recursive: true, mode: 0o700 });
       writeFileSync(dest, Buffer.from(sea.getAsset(`panel/${name}`)), { flag: 'wx', mode: 0o600 });
     }
+    const recoveryModules = JSON.parse(sea.getAsset('recovery-manifest.json', 'utf8'));
+    if (!Array.isArray(recoveryModules) || recoveryModules.length > 20 || !recoveryModules.includes('engine.mjs')) throw new Error('Módulos de recuperación incompletos.');
+    mkdirSync(join(privateDir, 'recovery'), { mode: 0o700 });
+    for (const name of recoveryModules) {
+      if (!/^[a-z-]+\.mjs$/.test(name)) throw new Error('Módulo de recuperación no válido.');
+      writeFileSync(join(privateDir, 'recovery', name), sea.getAsset(`recovery/${name}`, 'utf8'), { flag: 'wx', mode: 0o600 });
+    }
     cliPath = join(privateDir, 'uvh-control.mjs');
     writeFileSync(cliPath, sea.getAsset('cli.mjs', 'utf8'), { flag: 'wx', mode: 0o600 });
     process.env.UVH_CONTROL_PANEL_DIR = panelDir;

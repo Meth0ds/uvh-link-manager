@@ -1,0 +1,25 @@
+<section class="backup-center" aria-labelledby="backup-center-heading">
+  <div class="backup-center-head">
+    <div>
+      <p class="eyebrow" i18n="@@recovery.backupCenterEyebrow">Protección del entorno</p>
+      <h3 id="backup-center-heading" i18n="@@recovery.backupCenterHeading">Centro de backups</h3>
+      <p class="muted" i18n="@@recovery.backupCenterDescription">La copia local está siempre disponible. Puedes añadir un destino externo cuando necesites una segunda ubicación.</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="create.emit()" [disabled]="busy() || !canCreate()">
+      <mat-icon>add_to_photos</mat-icon>
+      <ng-container i18n="@@recovery.createBackup">Crear copia ahora</ng-container>
+    </button>
+  </div>
+  <div class="backup-metrics">
+    <div><span class="eyebrow" i18n="@@recovery.localStatus">Copia local</span><strong>{{ snapshot().backups.length }}</strong><small i18n="@@recovery.registeredBackups">registradas</small></div>
+    <div><span class="eyebrow" i18n="@@recovery.externalStatus">Destino externo</span><strong>{{ snapshot().destinations.length }}</strong><small>@if(snapshot().destinations.length){<ng-container i18n="@@recovery.destinationsConfigured">configurados</ng-container>}@else{<ng-container i18n="@@recovery.destinationsOptional">opcional</ng-container>}</small></div>
+    <div><span class="eyebrow" i18n="@@recovery.retentionStatus">Retención</span><strong>{{ snapshot().policy.dailyRetention }}/{{ snapshot().policy.weeklyRetention || 4 }}</strong><small i18n="@@recovery.retentionLabel">diarias / semanales</small></div>
+  </div>
+  <div class="destination-list">
+    @for(destination of snapshot().destinations; track destination.id){
+      <div class="destination-row"><span class="status-marker"></span><span><b>{{ destination.name }}</b><small>{{ destination.type === 'folder' ? 'Carpeta externa' : 'Almacenamiento compatible' }}</small></span><strong [class.is-good]="destination.configured && destination.status !== 'failed'">{{ destination.status === 'failed' ? 'Revisar' : destination.configured ? 'Preparado' : 'Pendiente' }}</strong></div>
+    } @empty {
+      <p class="muted" i18n="@@recovery.noDestination">No hay destino externo configurado. Las copias locales siguen activas.</p>
+    }
+  </div>
+</section>

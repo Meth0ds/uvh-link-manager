@@ -15,10 +15,12 @@ x-php-service: &php-service
   build:
     context: .
     dockerfile: docker/php/Dockerfile
-  image: uvh-php:8.4
+  image: ${UVH_LOCAL_PHP_IMAGE:-uvh-php:8.4}
   working_dir: /app
   volumes:
     - ./backend-laravel:/app
+    # Dedicated authenticated mailbox only; never expose Docker or private recovery state.
+    - ./.uvh-runtime/recovery-bridge:/run/uvh-recovery
     # Los contratos de tests/Unit describen ficheros que viven FUERA de
     # backend-laravel/: las topologías de Compose, los Dockerfiles, los
     # workflows de CI, la configuración del edge, la plantilla de entorno. Sin
@@ -32,6 +34,8 @@ x-php-service: &php-service
     # suite corre dentro de este contenedor.
     UVH_REPO_ROOT: /repo
     APP_ENV: local
+    UVH_RECOVERY_ENABLED: ${UVH_RECOVERY_ENABLED:-false}
+    UVH_RECOVERY_BRIDGE: /run/uvh-recovery
     APP_URL: http://localhost:8000
     FRONTEND_URL: ${UVH_FRONTEND_URL:-http://localhost:4200}
     DB_CONNECTION: pgsql
@@ -166,7 +170,7 @@ services:
         condition: service_started
     # `security` is the pool the reputation checks run on: without it, blocking
     # a destination never reanalyses the links that point at it.
-    command: ["php", "artisan", "queue:work", "--queue=mail,webhooks,domains,exports,analytics,security,default", "--timeout=660", "--tries=3"]
+    command: ["php", "artisan", "queue:work", "--force", "--queue=mail,webhooks,domains,exports,analytics,security,default", "--timeout=660", "--tries=3"]
 
   queue-destinations:
     <<: *php-service
@@ -180,7 +184,7 @@ services:
         condition: service_healthy
     deploy:
       replicas: 2
-    command: ["php", "artisan", "queue:work", "--queue=destinations", "--sleep=1", "--tries=1", "--timeout=20"]
+    command: ["php", "artisan", "queue:work", "--force", "--queue=destinations", "--sleep=1", "--tries=1", "--timeout=20"]
 
   # Laravel: scheduler local (php artisan schedule:work).
   schedule:

@@ -192,6 +192,22 @@ final class AnalyticsRangePrecisionTest extends TestCase
         $this->assertClicks('overview', $bounds, 1);
     }
 
+    #[DataProvider('consumers')]
+    public function test_database_cache_preserves_the_data_only_projection(string $consumer): void
+    {
+        config(['cache.default' => 'database', 'uvh.analytics.overview_cache_seconds' => 30]);
+        $this->assertFalse(config('cache.serializable_classes'));
+        $bounds = ['period' => 'custom', 'from' => '2026-01-01', 'to' => '2026-01-01'];
+        $this->event('2026-01-01T12:00:00Z');
+        $first = $this->getJson($this->path($consumer, $bounds))->assertOk();
+        $cached = $this->getJson($this->path($consumer, $bounds))->assertOk();
+        $this->assertSame($first->getContent(), $cached->getContent());
+        $this->assertClicks($consumer, $bounds, 1);
+        if ($consumer !== 'csv') {
+            $cached->assertJsonPath('topLinks.0.alias', 'precision');
+        }
+    }
+
     public function test_redirect_job_preserves_microseconds_on_storage_and_duplicate_delivery(): void
     {
         $instant = CarbonImmutable::parse('2026-01-01T23:59:59.987654Z');

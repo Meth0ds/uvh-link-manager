@@ -1,25 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <xliff version="2.0" xmlns="urn:oasis:names:tc:xliff:document:2.0" srcLang="es">
   <file id="ngi18n" original="ng.template">
-    <unit id="ui.a901db2fb4198d">
-      <notes>
-        <note category="location">src/app/app.config.ts:17</note>
-      </notes>
-      <segment>
-        <source>Informe compartido · UVH</source>
-      </segment>
-    </unit>
-    <unit id="ui.965c2fdd1a3422">
-      <notes>
-        <note category="location">src/app/app.config.ts:20</note>
-      </notes>
-      <segment>
-        <source>UVH · Acorta y gestiona tus enlaces</source>
-      </segment>
-    </unit>
     <unit id="ui.7dfc1cd4408199">
       <notes>
-        <note category="location">src/app/app.config.ts:33</note>
+        <note category="location">src/app/app.config.ts:25</note>
       </notes>
       <segment>
         <source>Ayuda técnica · UVH</source>
@@ -27,15 +11,31 @@
     </unit>
     <unit id="ui.71de223b0148f2">
       <notes>
-        <note category="location">src/app/app.config.ts:38</note>
+        <note category="location">src/app/app.config.ts:26</note>
       </notes>
       <segment>
         <source>Estado del servicio · UVH</source>
       </segment>
     </unit>
+    <unit id="ui.a901db2fb4198d">
+      <notes>
+        <note category="location">src/app/app.config.ts:31</note>
+      </notes>
+      <segment>
+        <source>Informe compartido · UVH</source>
+      </segment>
+    </unit>
+    <unit id="ui.965c2fdd1a3422">
+      <notes>
+        <note category="location">src/app/app.config.ts:34</note>
+      </notes>
+      <segment>
+        <source>UVH · Acorta y gestiona tus enlaces</source>
+      </segment>
+    </unit>
     <unit id="ui.cd27bea26135a1">
       <notes>
-        <note category="location">src/app/app.config.ts:50</note>
+        <note category="location">src/app/app.config.ts:54</note>
       </notes>
       <segment>
         <source>403 · Acceso restringido · UVH</source>
@@ -43,7 +43,7 @@
     </unit>
     <unit id="ui.fd4b8d18f72051">
       <notes>
-        <note category="location">src/app/app.config.ts:56</note>
+        <note category="location">src/app/app.config.ts:60</note>
       </notes>
       <segment>
         <source>404 · Página no encontrada · UVH</source>
@@ -566,7 +566,7 @@
         <note category="location">src/app/legal/legal-shell.component.html:24</note>
         <note category="location">src/app/legal/legal-shell.component.ts:30</note>
         <note category="location">src/app/not-found.component.html:26</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:117</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:120</note>
       </notes>
       <segment>
         <source>Privacidad</source>
@@ -3391,13 +3391,13 @@
         <note category="location">src/app/panel/admin/admin-reports.component.ts:204</note>
         <note category="location">src/app/panel/admin/admin-reports.component.ts:247</note>
         <note category="location">src/app/panel/admin/admin-reports.component.ts:258</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:514</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:584</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:614</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:701</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:730</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:824</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:868</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:518</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:588</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:618</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:705</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:734</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:828</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:872</note>
         <note category="location">src/app/panel/analytics/analytics.component.ts:199</note>
         <note category="location">src/app/panel/analytics/analytics.component.ts:202</note>
         <note category="location">src/app/panel/analytics/analytics.component.ts:205</note>
@@ -4065,7 +4065,7 @@
     <unit id="ui.b66292585132b8">
       <notes>
         <note category="location">src/app/core/localisation/template-messages.ts:158</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:330</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:334</note>
       </notes>
       <segment>
         <source>pendiente</source>
@@ -7087,7 +7087,7 @@
     <unit id="ui.f150afd3c5994d">
       <notes>
         <note category="location">src/app/core/localisation/template-messages.ts:530</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:122</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:126</note>
         <note category="location">src/app/panel/panel-navigation.ts:46</note>
       </notes>
       <segment>
@@ -10967,7 +10967,7 @@
       <notes>
         <note category="location">src/app/landing/landing.component.html:86</note>
         <note category="location">src/app/panel/admin/admin.component.html:4,5</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:125</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:129</note>
       </notes>
       <segment>
         <source>Administración</source>
@@ -11683,7 +11683,7 @@
     </unit>
     <unit id="ui.e9841ae573b767">
       <notes>
-        <note category="location">src/app/legal/legal.routes.ts:19</note>
+        <note category="location">src/app/legal/legal.routes.ts:20</note>
       </notes>
       <segment>
         <source>Términos del servicio · UVH</source>
@@ -11691,7 +11691,7 @@
     </unit>
     <unit id="ui.7afcdfe8388db7">
       <notes>
-        <note category="location">src/app/legal/legal.routes.ts:24</note>
+        <note category="location">src/app/legal/legal.routes.ts:25</note>
       </notes>
       <segment>
         <source>Política de privacidad · UVH</source>
@@ -11699,7 +11699,7 @@
     </unit>
     <unit id="ui.9d8506d2296219">
       <notes>
-        <note category="location">src/app/legal/legal.routes.ts:29</note>
+        <note category="location">src/app/legal/legal.routes.ts:30</note>
       </notes>
       <segment>
         <source>Denunciar un enlace · UVH</source>
@@ -15799,7 +15799,7 @@
       <notes>
         <note category="location">src/app/panel/admin/admin-appeals.component.ts:139</note>
         <note category="location">src/app/panel/admin/admin-reports.component.ts:258</note>
-        <note category="location">src/app/panel/admin/admin.component.ts:868</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:872</note>
       </notes>
       <segment>
         <source>No se pudo completar la acción</source>
@@ -16335,6 +16335,310 @@
         <source>No había enlaces que apuntaran ahí.</source>
       </segment>
     </unit>
+    <unit id="recovery.eyebrow">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:4,5</note>
+      </notes>
+      <segment>
+        <source>Continuidad del entorno local</source>
+      </segment>
+    </unit>
+    <unit id="recovery.heading">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:5,6</note>
+      </notes>
+      <segment>
+        <source>Actualizaciones y recuperación</source>
+      </segment>
+    </unit>
+    <unit id="recovery.description">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:6,8</note>
+      </notes>
+      <segment>
+        <source>Comprueba si hay una versión nueva, protege tus datos y actualiza desde un centro independiente de la aplicación.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.maintenance">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:16</note>
+      </notes>
+      <segment>
+        <source>En mantenimiento</source>
+      </segment>
+    </unit>
+    <unit id="recovery.available">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:16</note>
+      </notes>
+      <segment>
+        <source>Controlador disponible</source>
+      </segment>
+    </unit>
+    <unit id="recovery.statusProtected">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:17</note>
+      </notes>
+      <segment>
+        <source>El servicio está protegido mientras se comprueba el entorno.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.statusReady">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:17,19</note>
+      </notes>
+      <segment>
+        <source>Listo para revisar y proteger el entorno.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.versionsEyebrow">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:22</note>
+      </notes>
+      <segment>
+        <source>Canal de versiones</source>
+      </segment>
+    </unit>
+    <unit id="recovery.versions">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:22,23</note>
+      </notes>
+      <segment>
+        <source>Versión y comprobaciones</source>
+      </segment>
+    </unit>
+    <unit id="recovery.installed">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:24</note>
+      </notes>
+      <segment>
+        <source>Instalada</source>
+      </segment>
+    </unit>
+    <unit id="recovery.candidate">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:24</note>
+      </notes>
+      <segment>
+        <source>Disponible</source>
+      </segment>
+    </unit>
+    <unit id="recovery.checksLabel">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:25</note>
+      </notes>
+      <segment>
+        <source>Comprobaciones de la versión</source>
+      </segment>
+    </unit>
+    <unit id="recovery.stale">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:26,27</note>
+      </notes>
+      <segment>
+        <source>La comprobación está desactualizada. Vuelve a consultar antes de actualizar.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.noChecks">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:27,28</note>
+      </notes>
+      <segment>
+        <source>Todavía no hay una comprobación de versiones.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.check">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:28,29</note>
+      </notes>
+      <segment>
+        <source>Buscar actualización</source>
+      </segment>
+    </unit>
+    <unit id="recovery.backupsEyebrow">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:32</note>
+      </notes>
+      <segment>
+        <source>Copias verificadas</source>
+      </segment>
+    </unit>
+    <unit id="recovery.backupsTitle">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:32,33</note>
+      </notes>
+      <segment>
+        <source>Preparado para recuperar</source>
+      </segment>
+    </unit>
+    <unit id="recovery.backupCount">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:33,34</note>
+      </notes>
+      <segment>
+        <source>copias registradas</source>
+      </segment>
+    </unit>
+    <unit id="recovery.backupsInfo">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:34,35</note>
+      </notes>
+      <segment>
+        <source>La instalación exige una copia con restauración comprobada y códigos de emergencia configurados.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.codesReady">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:35</note>
+      </notes>
+      <segment>
+        <source>Acceso de emergencia configurado</source>
+      </segment>
+    </unit>
+    <unit id="recovery.codesMissing">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:35,37</note>
+      </notes>
+      <segment>
+        <source>Configura el acceso de emergencia antes de actualizar.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.accessEyebrow">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:44</note>
+      </notes>
+      <segment>
+        <source>Autorización administrativa</source>
+      </segment>
+    </unit>
+    <unit id="recovery.openTitle">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:44</note>
+      </notes>
+      <segment>
+        <source>Abrir el centro de recuperación</source>
+      </segment>
+    </unit>
+    <unit id="recovery.openInfo">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:44,45</note>
+      </notes>
+      <segment>
+        <source>Se abre en una ventana independiente y permanece disponible durante el mantenimiento. Confirma con tu contraseña y segundo factor.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.password">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:45</note>
+      </notes>
+      <segment>
+        <source>Contraseña</source>
+      </segment>
+    </unit>
+    <unit id="recovery.factor">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:45</note>
+      </notes>
+      <segment>
+        <source>Segundo factor o código de recuperación</source>
+      </segment>
+    </unit>
+    <unit id="recovery.open">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:45</note>
+      </notes>
+      <segment>
+        <source>Acceder al centro</source>
+      </segment>
+    </unit>
+    <unit id="recovery.changesEyebrow">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:48</note>
+      </notes>
+      <segment>
+        <source>Resumen de la versión</source>
+      </segment>
+    </unit>
+    <unit id="recovery.changes">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:48</note>
+      </notes>
+      <segment>
+        <source>Cambios detectados</source>
+      </segment>
+    </unit>
+    <unit id="recovery.localOnly">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:50</note>
+      </notes>
+      <segment>
+        <source>Conecta el controlador local</source>
+      </segment>
+    </unit>
+    <unit id="recovery.setup">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:50</note>
+      </notes>
+      <segment>
+        <source>Activa UVH_RECOVERY_ENABLED en la configuración local e inicia UVH Control. Esta función no está disponible en producción.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.retry">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.html:50</note>
+      </notes>
+      <segment>
+        <source>Volver a consultar</source>
+      </segment>
+    </unit>
+    <unit id="recovery.loadError">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.ts:60</note>
+      </notes>
+      <segment>
+        <source>No se pudo consultar el controlador local. Inicia UVH Control con recuperación habilitada.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.backupError">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.ts:72</note>
+      </notes>
+      <segment>
+        <source>No se pudo iniciar la copia. Consulta el resultado antes de repetirla.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.checkError">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.ts:79</note>
+      </notes>
+      <segment>
+        <source>No se pudo iniciar la comprobación. Consulta el resultado antes de repetirla.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.popupError">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.ts:87</note>
+      </notes>
+      <segment>
+        <source>Permite abrir la ventana del centro de recuperación y vuelve a intentarlo.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.portalError">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.ts:98</note>
+      </notes>
+      <segment>
+        <source>No se pudo conectar con la página de recuperación. Comprueba que el controlador siga abierto.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.authError">
+      <notes>
+        <note category="location">src/app/panel/admin/admin-updates.component.ts:99</note>
+      </notes>
+      <segment>
+        <source>No se pudo autorizar el acceso de recuperación.</source>
+      </segment>
+    </unit>
     <unit id="ui.13e4bdcb8f25f8">
       <notes>
         <note category="location">src/app/panel/admin/admin.component.html:3,5</note>
@@ -16500,7 +16804,7 @@
     </unit>
     <unit id="ui.7c1ca4e97e0771">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:110</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:113</note>
       </notes>
       <segment>
         <source>Cuentas</source>
@@ -16508,7 +16812,7 @@
     </unit>
     <unit id="ui.b06b41abacd8e6">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:111</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:114</note>
       </notes>
       <segment>
         <source>Usuarios</source>
@@ -16516,7 +16820,7 @@
     </unit>
     <unit id="ui.6428a83abbf15d">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:111</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:114</note>
       </notes>
       <segment>
         <source>Permisos y estado</source>
@@ -16524,7 +16828,7 @@
     </unit>
     <unit id="ui.ac9a0acba7b195">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:112</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:115</note>
       </notes>
       <segment>
         <source>Registros pendientes</source>
@@ -16532,7 +16836,7 @@
     </unit>
     <unit id="ui.7093990048c8c3">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:112</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:115</note>
       </notes>
       <segment>
         <source>Activación por email</source>
@@ -16540,7 +16844,7 @@
     </unit>
     <unit id="ui.f131f2e7de5fe2">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:113</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:116</note>
       </notes>
       <segment>
         <source>Recuperación de cuentas</source>
@@ -16548,7 +16852,7 @@
     </unit>
     <unit id="ui.fd64f926718bab">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:113</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:116</note>
       </notes>
       <segment>
         <source>Verificación independiente</source>
@@ -16556,7 +16860,7 @@
     </unit>
     <unit id="ui.f4db5ab777264e">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:115</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:118</note>
       </notes>
       <segment>
         <source>Revisión y cumplimiento</source>
@@ -16564,7 +16868,7 @@
     </unit>
     <unit id="ui.d1d10024f9353c">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:116</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:119</note>
       </notes>
       <segment>
         <source>Moderación</source>
@@ -16572,7 +16876,7 @@
     </unit>
     <unit id="ui.1940d3f6b3a52f">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:116</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:119</note>
       </notes>
       <segment>
         <source>Denuncias y apelaciones</source>
@@ -16580,7 +16884,7 @@
     </unit>
     <unit id="ui.10c8e371bf0118">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:117</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:120</note>
       </notes>
       <segment>
         <source>Ejercicio de derechos</source>
@@ -16588,7 +16892,7 @@
     </unit>
     <unit id="ui.5d7325dd007ccc">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:119</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:122</note>
       </notes>
       <segment>
         <source>Plataforma</source>
@@ -16596,7 +16900,7 @@
     </unit>
     <unit id="ui.3facb8d257990f">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:120</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:123</note>
         <note category="location">src/app/panel/panel-navigation.ts:26</note>
         <note category="location">src/app/panel/search/global-search-dialog.component.ts:49</note>
         <note category="location">src/app/panel/usage/usage.component.ts:35</note>
@@ -16607,7 +16911,7 @@
     </unit>
     <unit id="ui.1c9e434af82757">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:120</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:123</note>
       </notes>
       <segment>
         <source>Propiedad, DNS y HTTPS</source>
@@ -16615,7 +16919,7 @@
     </unit>
     <unit id="ui.9cb403795f3e26">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:121</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:124</note>
       </notes>
       <segment>
         <source>Auditoría</source>
@@ -16623,15 +16927,31 @@
     </unit>
     <unit id="ui.b0b33ea4873c46">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:121</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:124</note>
       </notes>
       <segment>
         <source>Historial de decisiones</source>
       </segment>
     </unit>
+    <unit id="recovery.navigation">
+      <notes>
+        <note category="location">src/app/panel/admin/admin.component.ts:125</note>
+      </notes>
+      <segment>
+        <source>Actualizaciones</source>
+      </segment>
+    </unit>
+    <unit id="recovery.navigationDetail">
+      <notes>
+        <note category="location">src/app/panel/admin/admin.component.ts:125</note>
+      </notes>
+      <segment>
+        <source>Versiones y recuperación</source>
+      </segment>
+    </unit>
     <unit id="ui.793459addc4fcc">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:122</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:126</note>
       </notes>
       <segment>
         <source>Estado y entregas</source>
@@ -16639,7 +16959,7 @@
     </unit>
     <unit id="ui.09b92f3a67bf33">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:172</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:176</note>
       </notes>
       <segment>
         <source>No se pudieron cargar los usuarios</source>
@@ -16647,7 +16967,7 @@
     </unit>
     <unit id="ui.3d1bcd3bc85a29">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:194</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:198</note>
       </notes>
       <segment>
         <source>No se pudieron cargar los registros pendientes</source>
@@ -16655,7 +16975,7 @@
     </unit>
     <unit id="ui.276fbff4d894b4">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:214</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:218</note>
       </notes>
       <segment>
         <source>No se pudieron cargar las recuperaciones</source>
@@ -16663,7 +16983,7 @@
     </unit>
     <unit id="ui.d32bda0e1dfe12">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:234</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:238</note>
         <note category="location">src/app/panel/domains/domains.component.ts:194</note>
       </notes>
       <segment>
@@ -16672,7 +16992,7 @@
     </unit>
     <unit id="ui.dadeab03cb91b1">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:253</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:257</note>
       </notes>
       <segment>
         <source>No se pudo cargar la auditoría</source>
@@ -16680,7 +17000,7 @@
     </unit>
     <unit id="ui.cad7c43b4cbeaf">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:273</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:277</note>
       </notes>
       <segment>
         <source>No se pudo cargar el outbox de correo</source>
@@ -16688,7 +17008,7 @@
     </unit>
     <unit id="ui.eb4e031f6f528e">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:296</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:300</note>
       </notes>
       <segment>
         <source>No se pudieron cargar las solicitudes de privacidad</source>
@@ -16696,7 +17016,7 @@
     </unit>
     <unit id="ui.1a9b6590a6db20">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:339</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:343</note>
       </notes>
       <segment>
         <source>por caducar</source>
@@ -16704,7 +17024,7 @@
     </unit>
     <unit id="ui.a1d5bc5e9a8b41">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:340</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:344</note>
       </notes>
       <segment>
         <source>con error</source>
@@ -16712,7 +17032,7 @@
     </unit>
     <unit id="ui.a62ce4a10681fc">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:343</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:347</note>
       </notes>
       <segment>
         <source>en línea</source>
@@ -16720,7 +17040,7 @@
     </unit>
     <unit id="ui.94f0d0dfaa0b3f">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:344</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:348</note>
       </notes>
       <segment>
         <source>fuera de servicio</source>
@@ -16728,7 +17048,7 @@
     </unit>
     <unit id="ui.1ed59964cb3535">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:477</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:481</note>
       </notes>
       <segment>
         <source>Registrar aprobación independiente</source>
@@ -16736,7 +17056,7 @@
     </unit>
     <unit id="ui.499f77d196d608">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:478</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:482</note>
       </notes>
       <segment>
         <source>Confirma únicamente si has verificado personalmente la identidad de <ph id="0" equiv="PH" disp="recovery.email"/> mediante el procedimiento externo aprobado. Esta decisión queda auditada y no sustituye la aprobación de otro administrador.</source>
@@ -16744,7 +17064,7 @@
     </unit>
     <unit id="ui.b96015e624552e">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:479</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:483</note>
       </notes>
       <segment>
         <source>He verificado la identidad</source>
@@ -16752,7 +17072,7 @@
     </unit>
     <unit id="ui.ad65ed25b55d06">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:490</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:494</note>
       </notes>
       <segment>
         <source>Rechazar recuperación</source>
@@ -16760,7 +17080,7 @@
     </unit>
     <unit id="ui.a8f0466a21ddc5">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:491</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:495</note>
       </notes>
       <segment>
         <source>El expediente de <ph id="0" equiv="PH" disp="recovery.email"/> se cerrará sin cambiar la contraseña, MFA ni sesiones de la cuenta.</source>
@@ -16768,7 +17088,7 @@
     </unit>
     <unit id="ui.e6a5f7ed91af1d">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:492</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:496</note>
       </notes>
       <segment>
         <source>Rechazar expediente</source>
@@ -16776,7 +17096,7 @@
     </unit>
     <unit id="ui.38f44920940009">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:510</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:514</note>
       </notes>
       <segment>
         <source>Doble aprobación completada; se ha emitido un enlace de 30 minutos</source>
@@ -16784,7 +17104,7 @@
     </unit>
     <unit id="ui.262587987834b5">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:512</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:516</note>
       </notes>
       <segment>
         <source>Primera aprobación registrada; falta otro administrador</source>
@@ -16792,7 +17112,7 @@
     </unit>
     <unit id="ui.3545f06c340f7e">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:513</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:517</note>
       </notes>
       <segment>
         <source>Expediente rechazado sin modificar la cuenta</source>
@@ -16800,7 +17120,7 @@
     </unit>
     <unit id="ui.326740ebb5e2a9">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:535</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:539</note>
       </notes>
       <segment>
         <source>No se pudo cargar el resumen</source>
@@ -16808,7 +17128,7 @@
     </unit>
     <unit id="ui.5ebc3b7faec459">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:569</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:573</note>
       </notes>
       <segment>
         <source>Conceder acceso administrador</source>
@@ -16816,7 +17136,7 @@
     </unit>
     <unit id="ui.54ac88e0100d79">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:569</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:573</note>
       </notes>
       <segment>
         <source>Retirar acceso administrador</source>
@@ -16824,7 +17144,7 @@
     </unit>
     <unit id="ui.ab507f9c56cef8">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:571</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:575</note>
       </notes>
       <segment>
         <source><ph id="0" equiv="PH" disp="user.email"/> podrá gestionar cuentas, moderación y operación de la plataforma. El acceso seguirá requiriendo MFA.</source>
@@ -16832,7 +17152,7 @@
     </unit>
     <unit id="ui.87baa526d57dba">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:572</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:576</note>
       </notes>
       <segment>
         <source><ph id="0" equiv="PH" disp="user.email"/> dejará de acceder a la consola administrativa.</source>
@@ -16840,7 +17160,7 @@
     </unit>
     <unit id="ui.15c9821aca551d">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:573</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:577</note>
       </notes>
       <segment>
         <source>Conceder acceso</source>
@@ -16848,7 +17168,7 @@
     </unit>
     <unit id="ui.5a21a586096b58">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:573</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:577</note>
       </notes>
       <segment>
         <source>Retirar acceso</source>
@@ -16856,7 +17176,7 @@
     </unit>
     <unit id="ui.2f2881dead948f">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:584</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:588</note>
       </notes>
       <segment>
         <source>Permisos actualizados</source>
@@ -16864,8 +17184,8 @@
     </unit>
     <unit id="ui.0d14d4b6fc7e3e">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:599</note>
         <note category="location">src/app/panel/admin/admin.component.ts:603</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:607</note>
       </notes>
       <segment>
         <source>Bloquear cuenta</source>
@@ -16873,8 +17193,8 @@
     </unit>
     <unit id="ui.086b329c4b2255">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:599</note>
         <note category="location">src/app/panel/admin/admin.component.ts:603</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:607</note>
       </notes>
       <segment>
         <source>Restaurar cuenta</source>
@@ -16882,7 +17202,7 @@
     </unit>
     <unit id="ui.a74671b9b4b06e">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:601</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:605</note>
       </notes>
       <segment>
         <source>Se cerrarán las sesiones de <ph id="0" equiv="PH" disp="user.email"/> y se invalidarán sus tokens de API y recuperación pendientes.</source>
@@ -16890,7 +17210,7 @@
     </unit>
     <unit id="ui.4d2711f7a6ecd3">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:602</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:606</note>
       </notes>
       <segment>
         <source><ph id="0" equiv="PH" disp="user.email"/> podrá volver a iniciar sesión. Sus sesiones y tokens anteriores seguirán invalidados.</source>
@@ -16898,7 +17218,7 @@
     </unit>
     <unit id="ui.9c16dc4e07497b">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:614</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:618</note>
       </notes>
       <segment>
         <source>Cuenta bloqueada</source>
@@ -16906,7 +17226,7 @@
     </unit>
     <unit id="ui.24e36ab42f6760">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:614</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:618</note>
       </notes>
       <segment>
         <source>Cuenta restaurada</source>
@@ -16914,7 +17234,7 @@
     </unit>
     <unit id="ui.dedd8818133636">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:674</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:678</note>
       </notes>
       <segment>
         <source>No se pudo leer el estado operativo</source>
@@ -16922,7 +17242,7 @@
     </unit>
     <unit id="ui.15b1ded02f848b">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:689</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:693</note>
       </notes>
       <segment>
         <source>Reintentar correo transaccional</source>
@@ -16930,7 +17250,7 @@
     </unit>
     <unit id="ui.1a0e8ca806370f">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:690</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:694</note>
       </notes>
       <segment>
         <source>Se volverá a comprobar el estado del evento antes de publicar el correo. El destinatario y el contenido permanecen cifrados y no se muestran en esta consola.</source>
@@ -16938,7 +17258,7 @@
     </unit>
     <unit id="ui.a26d82f2608297">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:691</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:695</note>
       </notes>
       <segment>
         <source>Reintentar entrega</source>
@@ -16946,7 +17266,7 @@
     </unit>
     <unit id="ui.2800275e9a267c">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:701</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:705</note>
       </notes>
       <segment>
         <source>Correo admitido de nuevo en la cola</source>
@@ -16954,8 +17274,8 @@
     </unit>
     <unit id="ui.96f972a8dba5bd">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:716</note>
         <note category="location">src/app/panel/admin/admin.component.ts:720</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:724</note>
       </notes>
       <segment>
         <source>Pausar registros</source>
@@ -16963,8 +17283,8 @@
     </unit>
     <unit id="ui.7d335b2b786d24">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:716</note>
         <note category="location">src/app/panel/admin/admin.component.ts:720</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:724</note>
       </notes>
       <segment>
         <source>Reanudar registros</source>
@@ -16972,7 +17292,7 @@
     </unit>
     <unit id="ui.e757393433aac9">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:718</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:722</note>
       </notes>
       <segment>
         <source>Mientras dure la pausa, el formulario público anunciará «Registros temporalmente pausados» y no se creará ninguna cuenta nueva. Los registros pendientes existentes siguen su curso.</source>
@@ -16980,7 +17300,7 @@
     </unit>
     <unit id="ui.53f80004300fea">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:719</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:723</note>
       </notes>
       <segment>
         <source>El formulario público volverá a aceptar registros nuevos.</source>
@@ -16988,7 +17308,7 @@
     </unit>
     <unit id="ui.976f6fcaf2fa42">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:730</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:734</note>
       </notes>
       <segment>
         <source>Registros pausados</source>
@@ -16996,7 +17316,7 @@
     </unit>
     <unit id="ui.e200c6c9640f8b">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:730</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:734</note>
       </notes>
       <segment>
         <source>Registros reanudados</source>
@@ -17004,7 +17324,7 @@
     </unit>
     <unit id="ui.261e02fb61b0b0">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:758</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:762</note>
       </notes>
       <segment>
         <source>Solicitar información</source>
@@ -17012,7 +17332,7 @@
     </unit>
     <unit id="ui.33aca8cd818a2c">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:758</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:762</note>
       </notes>
       <segment>
         <source>Explica qué información adicional es necesaria. No solicites contraseñas, códigos MFA ni documentos por este canal.</source>
@@ -17020,7 +17340,7 @@
     </unit>
     <unit id="ui.ba2fe3137e1380">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:758</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:762</note>
       </notes>
       <segment>
         <source>Enviar petición</source>
@@ -17028,7 +17348,7 @@
     </unit>
     <unit id="ui.5afbd44130967c">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:765</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:769</note>
       </notes>
       <segment>
         <source>Resolver solicitud</source>
@@ -17036,7 +17356,7 @@
     </unit>
     <unit id="ui.799210b26df04e">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:765</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:769</note>
       </notes>
       <segment>
         <source>Redacta una respuesta autosuficiente que describa las medidas aplicadas o los datos facilitados.</source>
@@ -17044,7 +17364,7 @@
     </unit>
     <unit id="ui.d63180d30b5111">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:765</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:769</note>
       </notes>
       <segment>
         <source>Registrar resolución</source>
@@ -17052,7 +17372,7 @@
     </unit>
     <unit id="ui.3e6eaa38058e41">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:772</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:776</note>
       </notes>
       <segment>
         <source>Cerrar con respuesta motivada</source>
@@ -17060,7 +17380,7 @@
     </unit>
     <unit id="ui.02441b434ca483">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:772</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:776</note>
       </notes>
       <segment>
         <source>Explica de forma concreta el fundamento, las alternativas y las vías de reclamación aplicables.</source>
@@ -17068,7 +17388,7 @@
     </unit>
     <unit id="ui.884962070af04b">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:772</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:776</note>
       </notes>
       <segment>
         <source>Cerrar expediente</source>
@@ -17076,7 +17396,7 @@
     </unit>
     <unit id="ui.147101aec692d2">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:779</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:783</note>
       </notes>
       <segment>
         <source>Ampliar plazo</source>
@@ -17084,7 +17404,7 @@
     </unit>
     <unit id="ui.ac790e8635d01d">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:779</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:783</note>
       </notes>
       <segment>
         <source>Explica por qué la complejidad o el volumen impiden responder dentro del mes ordinario.</source>
@@ -17092,7 +17412,7 @@
     </unit>
     <unit id="ui.b1fe9814e7fe5f">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:779</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:783</note>
       </notes>
       <segment>
         <source>Notificar ampliación</source>
@@ -17100,7 +17420,7 @@
     </unit>
     <unit id="ui.7b09d544eaff6d">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:794</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:798</note>
       </notes>
       <segment>
         <source>Respuesta para el expediente</source>
@@ -17108,7 +17428,7 @@
     </unit>
     <unit id="ui.ea3a88ccc9ea82">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:797</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:801</note>
       </notes>
       <segment>
         <source>Respuesta clara y verificable…</source>
@@ -17116,7 +17436,7 @@
     </unit>
     <unit id="ui.c59fd040db785d">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:821</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:825</note>
       </notes>
       <segment>
         <source>No pudimos confirmar la actualización. Revisa el expediente antes de repetirla; el borrador se conserva en esta sesión.</source>
@@ -17124,7 +17444,7 @@
     </unit>
     <unit id="ui.c2f2075895a2c0">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:824</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:828</note>
       </notes>
       <segment>
         <source>Expediente actualizado</source>
@@ -17132,7 +17452,7 @@
     </unit>
     <unit id="ui.86687b9f3c3842">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:857</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:861</note>
       </notes>
       <segment>
         <source>Desarrollo local</source>
@@ -17140,7 +17460,7 @@
     </unit>
     <unit id="ui.8b508322f84f62">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:857</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:861</note>
       </notes>
       <segment>
         <source>Preproducción</source>
@@ -17148,7 +17468,7 @@
     </unit>
     <unit id="ui.ce2f505af2a46e">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:857</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:861</note>
       </notes>
       <segment>
         <source>Producción</source>
@@ -17156,10 +17476,106 @@
     </unit>
     <unit id="ui.72bf88408a9457">
       <notes>
-        <note category="location">src/app/panel/admin/admin.component.ts:860</note>
+        <note category="location">src/app/panel/admin/admin.component.ts:864</note>
       </notes>
       <segment>
         <source>Sin espera</source>
+      </segment>
+    </unit>
+    <unit id="recovery.backupCenterEyebrow">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:4,5</note>
+      </notes>
+      <segment>
+        <source>Protección del entorno</source>
+      </segment>
+    </unit>
+    <unit id="recovery.backupCenterHeading">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:5,6</note>
+      </notes>
+      <segment>
+        <source>Centro de backups</source>
+      </segment>
+    </unit>
+    <unit id="recovery.backupCenterDescription">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:6,8</note>
+      </notes>
+      <segment>
+        <source>La copia local está siempre disponible. Puedes añadir un destino externo cuando necesites una segunda ubicación.</source>
+      </segment>
+    </unit>
+    <unit id="recovery.createBackup">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:10,12</note>
+      </notes>
+      <segment>
+        <source>Crear copia ahora</source>
+      </segment>
+    </unit>
+    <unit id="recovery.localStatus">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:14</note>
+      </notes>
+      <segment>
+        <source>Copia local</source>
+      </segment>
+    </unit>
+    <unit id="recovery.registeredBackups">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:14,15</note>
+      </notes>
+      <segment>
+        <source>registradas</source>
+      </segment>
+    </unit>
+    <unit id="recovery.externalStatus">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:15</note>
+      </notes>
+      <segment>
+        <source>Destino externo</source>
+      </segment>
+    </unit>
+    <unit id="recovery.destinationsConfigured">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:15</note>
+      </notes>
+      <segment>
+        <source>configurados</source>
+      </segment>
+    </unit>
+    <unit id="recovery.destinationsOptional">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:15,16</note>
+      </notes>
+      <segment>
+        <source>opcional</source>
+      </segment>
+    </unit>
+    <unit id="recovery.retentionStatus">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:16</note>
+      </notes>
+      <segment>
+        <source>Retención</source>
+      </segment>
+    </unit>
+    <unit id="recovery.retentionLabel">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:16,18</note>
+      </notes>
+      <segment>
+        <source>diarias / semanales</source>
+      </segment>
+    </unit>
+    <unit id="recovery.noDestination">
+      <notes>
+        <note category="location">src/app/panel/admin/backup-center.component.html:22,26</note>
+      </notes>
+      <segment>
+        <source>No hay destino externo configurado. Las copias locales siguen activas.</source>
       </segment>
     </unit>
     <unit id="ui.5414b324d57d11">

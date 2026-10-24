@@ -7,6 +7,7 @@ use App\Http\Controllers\AccountProfileController;
 use App\Http\Controllers\AccountRecoveryController;
 use App\Http\Controllers\AccountSessionsController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminUpdatesController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AnalyticsReportController;
 use App\Http\Controllers\AuthController;
@@ -345,6 +346,20 @@ Route::prefix('v1')->middleware('uvh.csrf')->group(function () {
 
     // Admin (MFA-gated).
     Route::prefix('admin')->middleware(['uvh.auth:admin', 'uvh.mfa:fresh', 'throttle:uvh-admin'])->group(function () {
+        Route::get('updates', [AdminUpdatesController::class, 'status']);
+        Route::post('updates/access', [AdminUpdatesController::class, 'access']);
+        Route::post('updates/{action}', [AdminUpdatesController::class, 'command'])
+            ->where('action', 'check|preflight|install|backup|verify|restore|restore-selective|resume|policy|destination|destination-test|delete|protect|reconcile');
+        Route::get('backups', [AdminUpdatesController::class, 'status']);
+        Route::get('backups/{id}', [AdminUpdatesController::class, 'backupDetail'])->where('id', '[a-f0-9-]{36}');
+        Route::post('backups', [AdminUpdatesController::class, 'backup']);
+        Route::post('backups/{id}/{action}', [AdminUpdatesController::class, 'backupAction'])
+            ->where('id', '[a-f0-9-]{36}')->where('action', 'verify|restore|restore-selective|protect|delete');
+        Route::get('backup-destinations', [AdminUpdatesController::class, 'destinations']);
+        Route::post('backup-destinations', [AdminUpdatesController::class, 'command'])->defaults('action', 'destination');
+        Route::patch('backup-policy', [AdminUpdatesController::class, 'command'])->defaults('action', 'policy');
+        Route::get('backup-operations/{id}', [AdminUpdatesController::class, 'operation'])->where('id', '[a-f0-9-]{36}');
+        Route::get('backup-operations/{id}/events', [AdminUpdatesController::class, 'operationEvents'])->where('id', '[a-f0-9-]{36}');
         Route::get('overview', [AdminController::class, 'overview']);
         Route::post('registration-pause', [AdminController::class, 'setRegistrationPause']);
         Route::get('users', [AdminController::class, 'users']);

@@ -610,3 +610,13 @@ La migración `2026_10_14_000003_index_social_asset_references` crea índices co
 ## Apertura de aplicaciones
 
 `UVH_FEATURE_APP_PROVIDERS=true` habilita los servicios conocidos y `UVH_FEATURE_NATIVE_APPS=true` habilita los perfiles de apps propias. Ambas modalidades están activadas por defecto y pueden desactivarse por separado con `false`. Docker local transmite estas variables a todos los procesos PHP. Si un despliegue existente las fija explícitamente a `false`, hay que actualizar su entorno y regenerar la caché de configuración. Las apps propias requieren igualmente integración nativa firmada y dominio HTTPS. Ver [el protocolo y despliegue](native-apps/README.md).
+
+
+## Centro local de recuperación
+
+| Variable | Por defecto | Función |
+| --- | --- | --- |
+| `UVH_RECOVERY_ENABLED` | `false` | Habilita el gateway estable de mantenimiento, backups y recuperación de UVH Control en instalaciones locales. Nunca debe activarse para producción. |
+| `UVH_RECOVERY_BRIDGE` | `/run/uvh-recovery` | Ruta interna del buzón autenticado que comparte Laravel con el controlador. No debe publicarse ni montarse desde Docker salvo en el servicio local. |
+
+La activación y el procedimiento están documentados en [Centro local de actualizaciones y recuperación](local-recovery.md).

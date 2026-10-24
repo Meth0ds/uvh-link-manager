@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CorrelateRequest;
+use App\Http\Middleware\LocalRecoveryMaintenance;
 use App\Http\Middleware\RecordOperationalResponse;
 use App\Http\Middleware\RequestLanguage;
 use App\Http\Middleware\RequireApiToken;
@@ -65,6 +66,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // Global: security headers, session hydration, host separation.
+        $middleware->append(LocalRecoveryMaintenance::class);
         $middleware->append(CorrelateRequest::class);
         $middleware->append(RecordOperationalResponse::class);
         $middleware->append(SecurityHeaders::class);

@@ -40,6 +40,13 @@ class ProductionSecurityTest extends TestCase
         $this->assertStringContainsString('intl \\', $dockerfile);
     }
 
+    public function test_production_disables_php_session_upload_progress(): void
+    {
+        $ini = RepositoryRoot::read('docker/php/uvh-production.ini');
+
+        $this->assertStringContainsString('session.upload_progress.enabled=0', $ini);
+    }
+
     public function test_development_captcha_fallback_prevents_production_startup(): void
     {
         $settings = $this->validSettings();

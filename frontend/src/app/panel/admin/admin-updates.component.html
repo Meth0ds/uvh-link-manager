@@ -1,0 +1,52 @@
+<section class="updates" aria-labelledby="updates-heading">
+  <header class="updates-hero">
+    <div class="hero-copy">
+      <div class="eyebrow" i18n="@@recovery.eyebrow">Continuidad del entorno local</div>
+      <h2 id="updates-heading" i18n="@@recovery.heading">Actualizaciones y recuperación</h2>
+      <p class="hero-lead" i18n="@@recovery.description">Comprueba si hay una versión nueva, protege tus datos y actualiza desde un centro independiente de la aplicación.</p>
+    </div>
+    <div class="hero-mark" aria-hidden="true"><mat-icon>system_update_alt</mat-icon><span>UVH / CONTROL</span></div>
+  </header>
+
+  @if (error(); as message) { <div class="notice error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ message }}</span></div> }
+
+  @if (state(); as snapshot) {
+    <div class="status-strip" [class.is-maintenance]="snapshot.maintenance.maintenance">
+      <span class="status-marker" aria-hidden="true"></span>
+      <div><strong>@if(snapshot.maintenance.maintenance){<ng-container i18n="@@recovery.maintenance">En mantenimiento</ng-container>}@else{<ng-container i18n="@@recovery.available">Controlador disponible</ng-container>}</strong><small>{{ date(snapshot.updatedAt) }}</small></div>
+      <span class="status-caption">@if(snapshot.maintenance.maintenance){<ng-container i18n="@@recovery.statusProtected">El servicio está protegido mientras se comprueba el entorno.</ng-container>}@else{<ng-container i18n="@@recovery.statusReady">Listo para revisar y proteger el entorno.</ng-container>}</span>
+    </div>
+
+    <div class="summary-grid">
+      <section class="summary-card version-card">
+        <div class="card-heading"><span class="icon-box"><mat-icon>verified</mat-icon></span><div><p class="eyebrow" i18n="@@recovery.versionsEyebrow">Canal de versiones</p><h3 i18n="@@recovery.versions">Versión y comprobaciones</h3></div></div>
+        @if(snapshot.github; as version){
+          <div class="version-pair"><div><span class="label" i18n="@@recovery.installed">Instalada</span><code>{{ version.from.slice(0, 12) }}</code></div><div class="arrow" aria-hidden="true">→</div><div><span class="label" i18n="@@recovery.candidate">Disponible</span><code>{{ version.sha.slice(0, 12) }}</code></div></div>
+          <div class="checks" aria-label="Comprobaciones de la versión" i18n-aria-label="@@recovery.checksLabel">@for(check of version.checks;track check.workflow){<p><span>{{ check.workflow }}</span><strong [class.is-good]="check.state === 'passed'">{{ check.state }}</strong></p>}</div>
+          @if(version.stale){<p class="notice compact" i18n="@@recovery.stale">La comprobación está desactualizada. Vuelve a consultar antes de actualizar.</p>}
+        } @else { <p class="muted" i18n="@@recovery.noChecks">Todavía no hay una comprobación de versiones.</p> }
+        <button mat-stroked-button type="button" (click)="check()" [disabled]="busy() || !canOperate() || snapshot.operation?.state === 'running'"><mat-icon>sync</mat-icon><ng-container i18n="@@recovery.check">Buscar actualización</ng-container></button>
+      </section>
+
+      <section class="summary-card backup-card">
+        <div class="card-heading"><span class="icon-box warm"><mat-icon>shield</mat-icon></span><div><p class="eyebrow" i18n="@@recovery.backupsEyebrow">Copias verificadas</p><h3 i18n="@@recovery.backupsTitle">Preparado para recuperar</h3></div></div>
+        <div class="backup-count"><strong>{{ snapshot.backups.length }}</strong><span i18n="@@recovery.backupCount">copias registradas</span></div>
+        <p class="muted" i18n="@@recovery.backupsInfo">La instalación exige una copia con restauración comprobada y códigos de emergencia configurados.</p>
+        <div class="readiness">@if(snapshot.recoveryConfigured){<mat-icon>check_circle</mat-icon><span i18n="@@recovery.codesReady">Acceso de emergencia configurado</span>}@else{<mat-icon>warning</mat-icon><span i18n="@@recovery.codesMissing">Configura el acceso de emergencia antes de actualizar.</span>}</div>
+      </section>
+    </div>
+
+    @if(snapshot.operation; as operation){<section class="operation-banner" [class.is-error]="!!operation.error"><mat-icon>{{ operation.error ? 'error_outline' : 'sync' }}</mat-icon><div><strong>{{ operation.action }} · {{ operation.state }}</strong><span>{{ operation.error || operation.phase }}</span></div></section>}
+
+    <app-backup-center [snapshot]="snapshot" [busy]="busy()" [canCreate]="!!password && !!factorCode" (create)="createBackup()" />
+
+
+    <section class="access-card"><div class="access-copy"><p class="eyebrow" i18n="@@recovery.accessEyebrow">Autorización administrativa</p><h3 i18n="@@recovery.openTitle">Abrir el centro de recuperación</h3><p class="muted" i18n="@@recovery.openInfo">Se abre en una ventana independiente y permanece disponible durante el mantenimiento. Confirma con tu contraseña y segundo factor.</p></div>
+      <form (ngSubmit)="openRecovery()"><mat-form-field appearance="outline"><mat-label i18n="@@recovery.password">Contraseña</mat-label><input matInput type="password" name="password" [(ngModel)]="password" autocomplete="current-password" required maxlength="72" /></mat-form-field><mat-form-field appearance="outline"><mat-label i18n="@@recovery.factor">Segundo factor o código de recuperación</mat-label><input matInput name="factorCode" [(ngModel)]="factorCode" autocomplete="one-time-code" required maxlength="24" /></mat-form-field><button mat-flat-button type="submit" [disabled]="busy() || !canOperate() || !!error() || !password || !factorCode"><mat-icon>admin_panel_settings</mat-icon><ng-container i18n="@@recovery.open">Acceder al centro</ng-container></button></form>
+    </section>
+
+    @if(snapshot.github?.commits?.length){<section class="changes-card"><div class="card-heading"><span class="icon-box"><mat-icon>receipt_long</mat-icon></span><div><p class="eyebrow" i18n="@@recovery.changesEyebrow">Resumen de la versión</p><h3 i18n="@@recovery.changes">Cambios detectados</h3></div></div>@for(commit of snapshot.github!.commits;track commit.sha){<p class="commit"><code>{{ commit.sha.slice(0,8) }}</code><span>{{ commit.message.split('\n')[0] }}</span></p>}</section>}
+  } @else {
+    <section class="empty-card"><span class="icon-box"><mat-icon>link_off</mat-icon></span><div><h3 i18n="@@recovery.localOnly">Conecta el controlador local</h3><p class="muted" i18n="@@recovery.setup">Activa UVH_RECOVERY_ENABLED en la configuración local e inicia UVH Control. Esta función no está disponible en producción.</p><button mat-stroked-button type="button" (click)="reload()" [disabled]="loading() || !canOperate()"><ng-container i18n="@@recovery.retry">Volver a consultar</ng-container></button></div></section>
+  }
+</section>

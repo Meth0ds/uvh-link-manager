@@ -104,10 +104,6 @@ vulnerabilities:
     statement: "`gosu` sólo cambia de usuario y hace `exec`: no abre conexiones TLS, así que la reanudación de sesión vulnerable es inalcanzable en él. La imagen es de ensayo, no se despliega, y se cierra cuando el registro publique una `postgres:16-alpine` con gosu reconstruido. Mientras tanto la puerta sigue vigilando el resto de la imagen y de las demás bases."
     expired_at: 2027-03-31
 
-  # Fase de compilación del frontend de `uvh-web`: esta base compila la SPA y no
-  # llega al artefacto que se despliega. El hallazgo sí es real dentro de ella.
-  - id: CVE-2026-59873
-    paths:
-      - "usr/local/lib/node_modules/npm/node_modules/tar/package.json"
-    statement: "Es el `tar` que npm lleva dentro de la imagen de Node, no una dependencia del proyecto: `frontend/package-lock.json` no lo resuelve y ninguna etapa posterior lo conserva. La etiqueta publicada el 2026-08-25 —la más reciente— sigue trayendo 7.5.11, así que cambiar el pin no lo cierra; se cierra cuando Node publique una imagen con npm sobre tar 7.5.19, y la fecha obliga a comprobarlo. Un `tar` vulnerable en un proceso que sólo descomprime lo que pide el `package-lock.json` es denegación de servicio en la compilación, no ejecución en el artefacto."
-    expired_at: 2026-12-31
+  # Cerrada el 2026-10-22: la base Node fijada en de170b39439e ya no contiene
+  # CVE-2026-59873. Se retira la excepción de tar; el resto de los avisos del
+  # compilador sigue visible y requiere su propia evaluación.

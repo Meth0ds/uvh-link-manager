@@ -109,7 +109,7 @@ El detalle de componentes, flujos y decisiones está en
 | Capa | Tecnología |
 | --- | --- |
 | Frontend | Angular 22.2, TypeScript 6 estricto, Angular Material/CDK, signals, componentes standalone y workers propios para QR. |
-| Backend | Laravel 13 sobre PHP 8.4, jobs asíncronos por cola y scheduler. |
+| Backend | Laravel 13 sobre PHP 8.4.27 o posterior de la rama 8.4, jobs asíncronos por cola y scheduler. |
 | Datos | PostgreSQL 16; Redis 7 para caché, límites, locks y colas. Transacciones y bloqueos pesimistas para operaciones con carreras. |
 | Calidad | Pint, Larastan/PHPStan, ESLint (`--max-warnings=0`) y `tsc --noEmit`. |
 | Pruebas | PHPUnit, Karma/Jasmine y Playwright 1.63 sobre Chromium (WebKit y móvil se validan en las revisiones de función). |
@@ -480,6 +480,7 @@ las traducciones se publican por separado y tienen sus propios hashes.
 | [Pruebas E2E](docs/e2e-testing.md) | Aislamiento, ejecución, cobertura y límites de Playwright. |
 | [Análisis estático](docs/static-analysis.md) | Configuración de Pint y Larastan, y su baseline. |
 | [Control local](docs/local-control.md) | Panel web local, arranque y diagnóstico. |
+| [Recuperación local](docs/local-recovery.md) | Mantenimiento, backups cifrados, actualizaciones y restauración local. |
 | [Redis](docs/redis-operations.md) | Qué vive en Redis, operación y modo degradado. |
 | [Matriz de exportación](docs/data-export-matrix.md) | Contenido autoritativo de las exportaciones de datos. |
 | [Política npm audit](docs/npm-audit-policy.md) | Excepciones y caducidad de avisos de dependencias. |

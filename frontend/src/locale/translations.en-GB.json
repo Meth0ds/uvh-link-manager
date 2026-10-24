@@ -16406,5 +16406,213 @@
   "language.current": {
     "sourceHash": "2016f1f0a00e20e6e4a33ac4e146344bd76ae460a218de9a4db4b6e24d26c0d5",
     "text": "UVH language: ⟦0⟧."
+  },
+  "recovery.eyebrow": {
+    "sourceHash": "d61d5294f26e942d843cc10d897eb0e15bcd3870b9ac4a8b53fdcdedf8076b06",
+    "text": "Local service continuity"
+  },
+  "recovery.heading": {
+    "sourceHash": "e300dc7859cc1c91c3db020063c35265d579fe92362148a3e07b22a7136237ad",
+    "text": "Updates and recovery"
+  },
+  "recovery.description": {
+    "sourceHash": "adf49117525899ec5a0c44876d734fe521de87c94ec45a8359e86c1060d5778c",
+    "text": "Vérifiez si une nouvelle version est disponible, protégez vos données et effectuez la mise à jour depuis un centre indépendant de l’application."
+  },
+  "recovery.maintenance": {
+    "sourceHash": "4e5402bccde7de4a0ae7056e66a498fb4285d3e0c67bfc4dfe69959dba510962",
+    "text": "Under maintenance"
+  },
+  "recovery.available": {
+    "sourceHash": "cd1386f0a5e262b61dde16953cba03f735f3ab453e1ef5b20617188845f774e1",
+    "text": "Controller available"
+  },
+  "recovery.versions": {
+    "sourceHash": "78ffc3d5d735b8f39deec2380fe4802936f52e74aca6f2f6e89ee863520ec509",
+    "text": "Version et vérifications"
+  },
+  "recovery.installed": {
+    "sourceHash": "8cef9a023116b6864a41089c0e8080d8cc75782798b34a146b29070a9e086cee",
+    "text": "Installée"
+  },
+  "recovery.candidate": {
+    "sourceHash": "f4e4f699637be88f2791dfbf9cdd596b9b29fa2692f3db5d3d5634076a684e5a",
+    "text": "Disponible"
+  },
+  "recovery.stale": {
+    "sourceHash": "6c0c19a595328a6c44b2b272f7710fd101090197b0b429bf651eaf31bc81b1c9",
+    "text": "Cette vérification est obsolète. Consultez à nouveau avant la mise à jour."
+  },
+  "recovery.noChecks": {
+    "sourceHash": "cdba37ec942805f56b26831406b324e836af0c015b57e97c97a983accd9fb2d0",
+    "text": "Aucune vérification de version n’a encore été effectuée."
+  },
+  "recovery.check": {
+    "sourceHash": "73bb75189124b8ff78b587683c49ab3aa709bb2aec3a8f55824c275f064f2503",
+    "text": "Rechercher des mises à jour"
+  },
+  "recovery.backupsEyebrow": {
+    "sourceHash": "b6b01041d2a69679cba74f855334d81d8b55118dd5f5218c2905a6ea1c839934",
+    "text": "Verified backups"
+  },
+  "recovery.backupsTitle": {
+    "sourceHash": "4ddf44ad6fabf423088b6048aa84a501407a8aea5c84705bb337db69c4e2c82f",
+    "text": "Ready to recover"
+  },
+  "recovery.backupsInfo": {
+    "sourceHash": "ceb6429fa4aa8c4d808b1639bf7cf194ef3c3c0ff32b2a6d5e5b69fd1fd8bb64",
+    "text": "Installation requires a backup with a tested restore and configured emergency codes."
+  },
+  "recovery.backupCount": {
+    "sourceHash": "544319ea2f676304eb25c82b09ab493b2f45b541bbd28e9a85b653df81e628c4",
+    "text": "registered backups"
+  },
+  "recovery.codesReady": {
+    "sourceHash": "6f32e19978d7b19fe4152823d24bc22b61e6b83859aef9d22b07951102affd3a",
+    "text": "Emergency access configured"
+  },
+  "recovery.codesMissing": {
+    "sourceHash": "8a824797848289391060f0166982e4223c5c41ad13b26c407b7928cf1733f0af",
+    "text": "Set up emergency access before updating."
+  },
+  "recovery.accessEyebrow": {
+    "sourceHash": "7ab8437ef62e4963d8db8515395810a1e1f45a52ace77ce507a08751ad6773ff",
+    "text": "Administrator authorisation"
+  },
+  "recovery.openTitle": {
+    "sourceHash": "3ed041023799b2e40dbeab72a375a49bc9880ebe379d408b7c5a4ed984eaf237",
+    "text": "Open the recovery centre"
+  },
+  "recovery.openInfo": {
+    "sourceHash": "d666d4405ce864e4d08c8f9d54efea0be0c7b4089ee2c9190bd5c471a627b3f1",
+    "text": "Opens in a separate window and remains available during maintenance. Confirm with your password and second factor."
+  },
+  "recovery.password": {
+    "sourceHash": "a389a638dec32538f55b0c8dc5c84f84aad65bcd5aacd5f05d36f30b71271a6b",
+    "text": "Password"
+  },
+  "recovery.factor": {
+    "sourceHash": "84f127e33bba80aedde439f98f0cce122068351fe9625cfa85d094169bb691f7",
+    "text": "Second factor or recovery code"
+  },
+  "recovery.open": {
+    "sourceHash": "d3cf5ec6558b4834f14318cf6b2d588214fce4030f417522d601b5ce25ac386a",
+    "text": "Access the centre"
+  },
+  "recovery.changes": {
+    "sourceHash": "dc9b1cca1a28797fd6807410be80acd64ec3d5f9f8ff70cf5fc57df273909979",
+    "text": "Detected changes"
+  },
+  "recovery.localOnly": {
+    "sourceHash": "2c6f2484df476b6a1aee44d6bb517265f1eec739a4958cd6157d0fefac2af6d3",
+    "text": "Connect the local controller"
+  },
+  "recovery.setup": {
+    "sourceHash": "b3ce27291712fbafeefe5f5035f31edd0c3148fd6a681193ff7fdeaec44a65d7",
+    "text": "Enable UVH_RECOVERY_ENABLED in your local configuration and start UVH Control. This feature is not available in production."
+  },
+  "recovery.retry": {
+    "sourceHash": "19515717785392e5b35e721c055fc5fb26725cff068312122f8b433bda7e0aed",
+    "text": "Check again"
+  },
+  "recovery.loadError": {
+    "sourceHash": "478bd953822d77ca59ad2372fb0ce2de64ec0b9d88ab192e028296bd05fc0d98",
+    "text": "Could not contact the local controller. Start UVH Control with recovery enabled."
+  },
+  "recovery.checkError": {
+    "sourceHash": "5a67d5a3ef2af1a927b0528164f614c62cdab1b0830b761f3944a5f2c7ce5e1d",
+    "text": "Could not start the check. Review the result before trying again."
+  },
+  "recovery.popupError": {
+    "sourceHash": "aeec3e902b93f40dc2e9849390601ee594fef4a5959524ebeab341e86c830438",
+    "text": "Allow the recovery centre window to open and try again."
+  },
+  "recovery.portalError": {
+    "sourceHash": "e702751cb094c154dead926f2202f0e9522263525e953fb98d682828f5c33dc9",
+    "text": "Could not connect to the recovery page. Check that the controller is still running."
+  },
+  "recovery.authError": {
+    "sourceHash": "c6db26880cb8d695352192c4b61561c6a434f60f5fdf68ae4c5baa43171c6779",
+    "text": "Could not authorise recovery access."
+  },
+  "recovery.navigation": {
+    "sourceHash": "f165314f21f8b5a14739e711bbd9b26e7327d21dc488cefb176d43c265fe54c3",
+    "text": "Updates"
+  },
+  "recovery.navigationDetail": {
+    "sourceHash": "dd3eaea2601e447d5c7f6b6876bf300f165f7fe6bf971db100b30f155d92b997",
+    "text": "Versions and recovery"
+  },
+  "recovery.statusProtected": {
+    "sourceHash": "3ccf4abed41a8baec250b095c2b3e1bff8d6990425f136e95c9c42b59795f5d1",
+    "text": "Le service est protégé pendant la vérification de l’environnement."
+  },
+  "recovery.statusReady": {
+    "sourceHash": "d3767fae72496b3c12d99b0d5729e080ff06fe3c70c888552182d9d7af9ebe21",
+    "text": "Prêt à vérifier et à protéger l’environnement."
+  },
+  "recovery.versionsEyebrow": {
+    "sourceHash": "dcabe729c83a179ed5d3e7f8447f57e995e72dcd4db8bf8d3637f5bfcbf1db90",
+    "text": "Canal des versions"
+  },
+  "recovery.checksLabel": {
+    "sourceHash": "1f38f5ef2434a329b51e82c3c1d14be798eda6cada21fdf8d1d6140ad045fef5",
+    "text": "Vérifications de la version"
+  },
+  "recovery.changesEyebrow": {
+    "sourceHash": "342d74deac624875be678b7c8b26bc086167a579ad67b35ff950c87a5bc17d66",
+    "text": "Résumé de la version"
+  },
+  "recovery.backupCenterEyebrow": {
+    "sourceHash": "32c0cd01b08ae62f8378143ac58dd5dedc25b395d035577c04b1459bdfb2a09d",
+    "text": "Environment protection"
+  },
+  "recovery.backupCenterHeading": {
+    "sourceHash": "0b295dcc8413e116ec011d3ac7f7dd9f19778b6573c557dcf88a635325400e77",
+    "text": "Backup centre"
+  },
+  "recovery.backupCenterDescription": {
+    "sourceHash": "cbef0210a842bb48caa91a0e80256a9e0db3d44a605e36c49e4a23fb58e97133",
+    "text": "The local copy is always available. Add an external destination when you need a second location."
+  },
+  "recovery.createBackup": {
+    "sourceHash": "3c5a6a3ed208a658e889eda13f29f283ba1876bc100c0e70e71f5dd0ad42459d",
+    "text": "Create backup now"
+  },
+  "recovery.localStatus": {
+    "sourceHash": "e493b2184335477a0183f847d74ed9a690767522c31978647b7114fdd88453de",
+    "text": "Local backup"
+  },
+  "recovery.registeredBackups": {
+    "sourceHash": "682080abb75058bfd0ba905799f1b166bb21fb5f1b77f79c3e45be481b04b67f",
+    "text": "registered"
+  },
+  "recovery.externalStatus": {
+    "sourceHash": "78bd29ccf6398d9546c9522e93134c666bc6f968200260fa6e80a08a5f9e9b28",
+    "text": "External destination"
+  },
+  "recovery.destinationsConfigured": {
+    "sourceHash": "9519c76a769053cea9cef8ce7cf614ea735617c93621cb627c07eaad7edfa5d2",
+    "text": "configured"
+  },
+  "recovery.destinationsOptional": {
+    "sourceHash": "80621acfc2e1ad03f113af3d2ea9e303140ed1c7317289142dd88b2ed73982bb",
+    "text": "optional"
+  },
+  "recovery.retentionStatus": {
+    "sourceHash": "0c4ba52f7f0ad3408e6fb67516475a14fd0acf32cd17e901ca17f3c738d47636",
+    "text": "Retention"
+  },
+  "recovery.retentionLabel": {
+    "sourceHash": "c06dc4c7af63c9a70ff161a4fa54b24bdc50103b6ee74eb2c2f66b653b3f7581",
+    "text": "daily / weekly"
+  },
+  "recovery.noDestination": {
+    "sourceHash": "71a21552c0d9338a7d578c22a2cffa45d30d636bfeb596441cc8a4d5ccac6499",
+    "text": "No external destination is configured. Local copies remain active."
+  },
+  "recovery.backupError": {
+    "sourceHash": "120726ffa75b3b45d39902a4f6951fa8c0b02b86e43f2a3a52368f49fb1288fe",
+    "text": "The backup could not be started. Check the result before trying again."
   }
 }

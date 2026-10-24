@@ -66,6 +66,8 @@ import { AdminAppealsComponent } from "./admin-appeals.component";
 import { AdminDestinationsComponent } from "./admin-destinations.component";
 import { AdminReportsComponent } from "./admin-reports.component";
 
+import { AdminUpdatesComponent } from "./admin-updates.component";
+
 type UserStatus = "" | AdminUserFilterValue;
 type RecoveryStatus = "" | AccountRecoveryStatus;
 type DomainFilter = "" | DomainState;
@@ -90,6 +92,7 @@ type PrivacyTypeFilter = "" | PrivacyRightType;
     PageHeaderComponent,
     PanelSkeletonComponent,
     AdminAppealsComponent,
+    AdminUpdatesComponent,
     AdminDestinationsComponent,
     AdminReportsComponent,
   ],
@@ -119,6 +122,7 @@ export class AdminComponent {
     { label: $localize`:@@ui.5d7325dd007ccc:Plataforma`, sections: [
       { index: 4, label: $localize`:@@ui.3facb8d257990f:Dominios`, detail: $localize`:@@ui.1c9e434af82757:Propiedad, DNS y HTTPS`, icon: "language" },
       { index: 5, label: $localize`:@@ui.9cb403795f3e26:Auditoría`, detail: $localize`:@@ui.b0b33ea4873c46:Historial de decisiones`, icon: "history" },
+      { index: 8, label: $localize`:@@recovery.navigation:Actualizaciones`, detail: $localize`:@@recovery.navigationDetail:Versiones y recuperación`, icon: "system_update_alt" },
       { index: 7, label: $localize`:@@ui.f150afd3c5994d:Sistema`, detail: $localize`:@@ui.793459addc4fcc:Estado y entregas`, icon: "monitor_heart" },
     ] },
   ];

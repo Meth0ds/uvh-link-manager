@@ -27,7 +27,10 @@ class TokenController
 {
     private const SCOPES = ['links:read', 'links:write', 'analytics:read', 'domains:read', 'domains:write'];
 
-    private const EXPIRY_ERROR = __('display.display_7227db0203d086');
+    private static function expiryError(): string
+    {
+        return __('display.display_7227db0203d086');
+    }
 
     public function index(Request $request)
     {
@@ -75,7 +78,7 @@ class TokenController
                 return response()->json(['error' => __('messages.error_0aa9eb7787117b')], 422);
             }
             if (! $this->validExpiry($expiresAtValue)) {
-                return response()->json(['error' => self::EXPIRY_ERROR], 422);
+                return response()->json(['error' => self::expiryError()], 422);
             }
         }
         try {
@@ -95,7 +98,7 @@ class TokenController
                     return ['status' => 'forbidden'];
                 }
                 if (! $this->validExpiry($expiresAtValue)) {
-                    throw new LinkException(self::EXPIRY_ERROR, 422);
+                    throw new LinkException(self::expiryError(), 422);
                 }
                 $active = ApiToken::where('workspace_id', $workspaceId)->whereNull('revoked_at')
                     ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
@@ -111,7 +114,7 @@ class TokenController
                 // Throw so the step-up's SQL MFA proof also rolls back; the
                 // shared TOTP anti-replay policy remains conservative.
                 if (! $this->validExpiry($expiresAtValue)) {
-                    throw new LinkException(self::EXPIRY_ERROR, 422);
+                    throw new LinkException(self::expiryError(), 422);
                 }
                 if (isset($stepUp['recovery_codes'])) {
                     $lockedUser->update(['recovery_codes' => $stepUp['recovery_codes'], 'updated_at' => now()]);

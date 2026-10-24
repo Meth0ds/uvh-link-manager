@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 // UVH Control: local-only controller. No production access and no test runner.
 import { spawn } from 'node:child_process';
+import { createRecoveryIO } from './recovery/io.mjs';
+import { createRecoveryEngine } from './recovery/engine.mjs';
+import { serveRecoveryGateway, drainBridge } from './recovery/gateway.mjs';
+import { createKeyProvider } from './recovery/key-provider.mjs';
+import { directory as recoveryDirectory, unwrap as recoveryUnwrap, read as recoveryRead } from './recovery/store.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -9,7 +14,7 @@ import { createInterface } from 'node:readline/promises';
 import {
   existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync,
   lstatSync, realpathSync, readdirSync, openSync, closeSync, readSync, fstatSync,
-  linkSync, rmdirSync,
+  linkSync, rmdirSync, cpSync,
 } from 'node:fs';
 import { dirname, join, resolve, relative, isAbsolute, extname, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -208,6 +213,50 @@ export function createController(options = {}) {
   const confirmations = new Map();
   let operation = null, admitting = false, journal = [], statusPending = null, cachedStatus = null;
   const limits = options.limits ?? LIMITS;
+  let recovery = null, gateway = null, bridgeTimer = null, frozenCli = fileURLToPath(import.meta.url);
+  const recoveryEnabled = () => options.recoveryEnabled ?? (environment().UVH_RECOVERY_ENABLED === 'true');
+  const frontendPort = () => options.frontendPort ?? (recoveryEnabled() ? 4201 : 4200);
+  async function startRecovery() {
+    if (!recoveryEnabled() || recovery) return;
+    ensureRuntime();
+    const home = recoveryDirectory(join(runtime, 'recovery'));
+    const controllerDir = recoveryDirectory(join(home, `controller-${randomUUID()}`));
+    // The active engine, assets and supervisor remain frozen while the checkout changes.
+    cpSync(fileURLToPath(import.meta.url), join(controllerDir, 'uvh-control.mjs'));
+    cpSync(join(dirname(fileURLToPath(import.meta.url)), 'recovery'), join(controllerDir, 'recovery'), { recursive: true });
+    frozenCli = join(controllerDir, 'uvh-control.mjs');
+    const backupKeyProvider = createKeyProvider({ path: join(home, 'backup-key'), service: 'uvh-recovery-backups', account: 'backup-key' });
+    const metadataKeyProvider = createKeyProvider({ path: join(home, 'metadata-key'), service: 'uvh-recovery-metadata', account: 'metadata-key' });
+    const io = createRecoveryIO({ root, home, key: backupKeyProvider.get(), run: runner,
+      compose: composeArgs, stopFrontend, startFrontend, probe, externalNode });
+    io.diagnose = async () => {
+      cachedStatus = null;
+      const value = await status();
+      let sha = null; try { sha = await io.head(); } catch { /* Explicit unknown identity. */ }
+      let applicationReady = value.endpoints.backend.status === 'ok';
+      if (!applicationReady && recovery?.blocking()) { try { applicationReady = await io.applicationReady(); } catch { /* Still unhealthy. */ } }
+      return { sha, checkedAt: value.checkedAt, healthy: applicationReady
+        && ['ok', 'slow'].includes(value.endpoints.frontend.status) && value.migrations.status === 'current'
+        && value.services.every(item => item.status === 'running'),
+        services: value.services.map(({ name, status, health }) => ({ name, status, health })),
+        endpoints: Object.fromEntries(Object.entries(value.endpoints).map(([name, item]) => [name, { status: item.status, latencyMs: item.latencyMs }])) };
+    };
+    recovery = createRecoveryEngine({ root, home, io, metadataKeyProvider, exclusive: { acquire, release }, ...options.recoveryOptions });
+    recoveryDirectory(join(recovery.bridge, 'requests')); recoveryDirectory(join(recovery.bridge, 'responses'));
+    recovery.enable();
+    gateway = await serveRecoveryGateway({ engine: recovery, port: options.gatewayPort ?? 4200, upstreamPort: frontendPort(),
+      font: join(root, 'panel/node_modules/@fontsource/manrope/files/manrope-latin-400-normal.woff2') });
+    recovery.start();
+    let draining = false;
+    bridgeTimer = setInterval(() => { if (!draining) { draining = true; void drainBridge(recovery).finally(() => { draining = false; }).catch(() => {}); } }, 1000);
+    bridgeTimer.unref();
+  }
+  function recoveryBlocks() {
+    if (recovery) return recovery.blocking();
+    const bridge = join(runtime, 'recovery-bridge');
+    if (!recoveryEnabled() || !existsSync(join(bridge, 'maintenance.json'))) return false;
+    return recoveryUnwrap(readFileSync(join(bridge, 'key'), 'utf8'), recoveryRead(join(bridge, 'maintenance.json'))).maintenance === true;
+  }
   function ensureRuntime() {
     mkdirSync(runtime, { recursive: true, mode: 0o700 });
     const stat = lstatSync(runtime);
@@ -304,6 +353,7 @@ export function createController(options = {}) {
   }
   async function acquire(mode, requestId) {
     return withGate(async () => {
+      if (!mode.startsWith('recovery-') && mode !== 'stop' && recoveryBlocks()) throw new ControlError('El entorno está en mantenimiento. Usa el centro de recuperación para validar y reabrir.', 409);
       const previous = await lockState();
       if (previous?.live || previous?.lock.uncertain) throw new ControlError('Ya hay una operación en curso o pendiente de revisión.', 409);
       if (previous) unlinkSync(lockFile);
@@ -367,11 +417,11 @@ export function createController(options = {}) {
   }
   async function startFrontend() {
     if (await trackedFrontend()) return 'Frontend ya iniciado.';
-    if (await occupied(options.frontendPort ?? 4200)) throw new ControlError('El puerto 4200 está ocupado por otro proceso. No se modificó.');
+    if (await occupied(frontendPort())) throw new ControlError('El puerto 4200 está ocupado por otro proceso. No se modificó.');
     const cli = join(root, 'frontend/node_modules/@angular/cli/bin/ng.js');
     if (!existsSync(cli)) throw new ControlError('Faltan dependencias del frontend. Ejecuta npm ci dentro de frontend y vuelve a iniciar.');
     const nonce = randomUUID();
-    const child = spawn(externalNode(), [fileURLToPath(import.meta.url), '--frontend-supervisor', nonce, root],
+    const child = spawn(externalNode(), [frozenCli, '--frontend-supervisor', nonce, root, String(frontendPort())],
       { cwd: root, detached: true, stdio: 'ignore', windowsHide: true });
     await new Promise((yes, no) => { child.once('spawn', yes); child.once('error', no); }); child.unref();
     // The child publishes its own real OS identity before launching Angular.
@@ -535,7 +585,7 @@ export function createController(options = {}) {
   }
   async function collectStatus() {
     const signal = context.getStore()?.signal;
-    const [backend, frontend] = await Promise.all([probe('http://127.0.0.1:8000/health', signal), probe('http://127.0.0.1:4200/', signal)]);
+    const [backend, frontend] = await Promise.all([probe('http://127.0.0.1:8000/health', signal), probe(`http://127.0.0.1:${frontendPort()}/`, signal)]);
     const version = await dockerVersion();
     let docker = { status: version ? 'running' : 'unavailable', version };
     if (!version) {
@@ -598,6 +648,7 @@ export function createController(options = {}) {
   }
   async function shutdown() {
     if (operation?.status === 'running') throw new ControlError('Hay una operación activa. Espera antes de cerrar.', 409);
+    if (recovery) { recovery.stop(); clearInterval(bridgeTimer); if (gateway) await gateway.close(); }
   }
   async function serve({ port = 4580, open = true } = {}) {
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new ControlError('Puerto no válido.', 400);
@@ -657,10 +708,11 @@ export function createController(options = {}) {
     server.requestTimeout = 15000; server.headersTimeout = 10000; server.keepAliveTimeout = 5000;
     await new Promise((yes, no) => { server.once('error', no); server.listen(port, '127.0.0.1', yes); });
     origin = `http://127.0.0.1:${server.address().port}`;
+    try { await startRecovery(); } catch (error) { server.close(); throw error; }
     if (open) openBrowser(`${origin}/`);
     return { server, origin };
   }
-  return { root, status, logs, state, admit, confirm, serve, shutdown, database, bounded, execute, acquire, release, trackedFrontend };
+  return { root, status, logs, state, admit, confirm, serve, shutdown, database, bounded, execute, acquire, release, trackedFrontend, get recovery() { return recovery; } };
 }
 
 async function readBody(req) {
@@ -683,7 +735,8 @@ function openBrowser(url) {
   const child = spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: true, shell: false });
   child.once('error', () => process.stderr.write('No se pudo abrir el navegador automáticamente. Abre la URL indicada.\n')); child.unref();
 }
-async function frontendSupervisor(nonce, requestedRoot) {
+async function frontendSupervisor(nonce, requestedRoot, requestedPort = '4200') {
+  if (!['4200', '4201'].includes(requestedPort)) throw new ControlError('Puerto del supervisor no válido.');
   if (!/^[a-f0-9-]{36}$/.test(nonce ?? '')) throw new ControlError('Supervisor no válido.');
   const root = realpathSync(requestedRoot), runtime = join(root, '.uvh-runtime');
   const identity = await inspectProcess(process.pid);
@@ -694,8 +747,10 @@ async function frontendSupervisor(nonce, requestedRoot) {
     return openSync(path, 'a', 0o600);
   });
   const cli = join(root, 'frontend/node_modules/@angular/cli/bin/ng.js');
-  const child = spawn(process.execPath, [cli, 'serve', '--host', '0.0.0.0', '--port', '4200'],
-    { cwd: join(root, 'frontend'), env: { ...process.env, PORT: '4200' }, detached: process.platform !== 'win32',
+  const child = spawn(process.execPath, requestedPort === '4201'
+    ? [join(root, 'frontend/scripts/dev-server.mjs'), '--host', '127.0.0.1', '--port', requestedPort]
+    : [cli, 'serve', '--host', '127.0.0.1', '--port', requestedPort],
+    { cwd: join(root, 'frontend'), env: { ...process.env, PORT: requestedPort }, detached: process.platform !== 'win32',
       stdio: ['ignore', ...fds], windowsHide: true });
   for (const fd of fds) closeSync(fd);
   await new Promise((yes, no) => { child.once('spawn', yes); child.once('error', no); });

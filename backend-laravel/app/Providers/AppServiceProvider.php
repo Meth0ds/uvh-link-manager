@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Cache\UvhRateLimiter;
+use App\Support\LocalRecoveryGate;
 use App\Support\OperationalMetrics;
 use App\Support\ProductionSecurity;
 use App\Support\RedirectService;
@@ -82,10 +83,11 @@ class AppServiceProvider extends ServiceProvider
         // A throttled shared heartbeat proves that a real queue worker is
         // looping, even when the queue is empty. It contains no job payload or
         // account identifier and avoids writing to a database cache each loop.
-        Queue::looping(function (): void {
+        Queue::looping(function (): ?bool {
+            $paused = app()->isDownForMaintenance() || LocalRecoveryGate::paused();
             static $lastHeartbeat = 0;
             if (time() - $lastHeartbeat < 30) {
-                return;
+                return $paused ? false : null;
             }
             try {
                 $timestamp = time();
@@ -101,6 +103,8 @@ class AppServiceProvider extends ServiceProvider
             } catch (\Throwable) {
                 OperationalMetrics::increment('lock.unavailable');
             }
+
+            return $paused ? false : null;
         });
 
         RateLimiter::for('uvh-login', function (Request $request) {

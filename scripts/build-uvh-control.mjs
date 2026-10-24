@@ -73,6 +73,10 @@ async function main() {
     }
   }
   walk(browser);
+  const recoveryModules = readdirSync(join(ROOT, 'scripts/recovery')).filter(name => name.endsWith('.mjs')).sort();
+  for (const name of recoveryModules) assets[`recovery/${name}`] = join(ROOT, 'scripts/recovery', name);
+  writeFileSync(join(BUILD, 'recovery-manifest.json'), JSON.stringify(recoveryModules));
+  assets['recovery-manifest.json'] = join(BUILD, 'recovery-manifest.json');
   const licenses = join(ROOT, 'panel/dist/panel/3rdpartylicenses.txt');
   if (!existsSync(licenses)) throw new Error('Faltan licencias del build Angular.');
   assets['panel/3rdpartylicenses.txt'] = licenses; manifest.push('3rdpartylicenses.txt');

@@ -33,19 +33,19 @@
     "start:test": "node --test scripts/dev-server.test.mjs"
   },
   "dependencies": {
-    "@angular/animations": "22.2.1",
+    "@angular/animations": "22.2.3",
     "@angular/cdk": "22.2.1",
-    "@angular/common": "22.2.1",
-    "@angular/compiler": "22.2.1",
-    "@angular/core": "22.2.1",
-    "@angular/forms": "22.2.1",
-    "@angular/localize": "22.2.1",
+    "@angular/common": "22.2.3",
+    "@angular/compiler": "22.2.3",
+    "@angular/core": "22.2.3",
+    "@angular/forms": "22.2.3",
+    "@angular/localize": "22.2.3",
     "@angular/material": "22.2.1",
-    "@angular/platform-browser": "22.2.1",
-    "@angular/platform-browser-dynamic": "22.2.1",
-    "@angular/platform-server": "22.2.1",
-    "@angular/router": "22.2.1",
-    "@angular/ssr": "22.2.0",
+    "@angular/platform-browser": "22.2.3",
+    "@angular/platform-browser-dynamic": "22.2.3",
+    "@angular/platform-server": "22.2.3",
+    "@angular/router": "22.2.3",
+    "@angular/ssr": "22.2.3",
     "@fontsource/manrope": "5.3.0",
     "@pdf-lib/fontkit": "1.1.1",
     "fflate": "0.8.3",
@@ -57,9 +57,9 @@
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
-    "@angular/build": "~22.2.0",
-    "@angular/cli": "~22.2.0",
-    "@angular/compiler-cli": "~22.2.1",
+    "@angular/build": "22.2.3",
+    "@angular/cli": "22.2.3",
+    "@angular/compiler-cli": "22.2.3",
     "@axe-core/playwright": "4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "1.63.0",
@@ -80,9 +80,11 @@
     "typescript-eslint": "^8.69.0"
   },
   "overrides": {
-    "fast-uri": "3.1.8",
+    "fast-uri": "3.1.9",
     "less": "4.9.1",
     "qs": "6.16.0",
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "vite": "8.3.3",
+    "body-parser": "1.20.9"
   }
 }
