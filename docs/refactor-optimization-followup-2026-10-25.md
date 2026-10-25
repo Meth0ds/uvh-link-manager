@@ -65,6 +65,8 @@ El puente administrativo también rechaza cursores de eventos no numéricos ante
 
 La auditoría actual del árbol frontend no encuentra vulnerabilidades (`0` informativas, bajas, moderadas, altas o críticas en 736 dependencias). Composer tampoco devuelve advisories ni paquetes abandonados en el árbol bloqueado. Las comprobaciones permanecen reproducibles con `npm run audit:policy` y `composer audit --locked` en CI.
 
+El formateo numérico de fechas del panel reutiliza ahora un `Intl.DateTimeFormat` por locale, igual que el formato medio, en lugar de construirlo durante cada render. La salida validada para ISO y timestamps de PostgreSQL se mantiene igual.
+
 ## Verificación
 
 - 90 pruebas Node del controlador y recuperación: todas correctas.
