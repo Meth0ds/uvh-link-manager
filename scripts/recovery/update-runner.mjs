@@ -2,6 +2,7 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fail, RecoveryError } from './store.mjs';
+import { validateSelectivePaths } from './restore-policy.mjs';
 
 export function createUpdateRunner({ home, io, data, event, save, backups, withExtract, backup, reopen, maintenance, validateCandidate, checked }) {
   async function restore(id, { automatic = false, emergencyWithoutBackup = false } = {}) {
@@ -22,7 +23,7 @@ export function createUpdateRunner({ home, io, data, event, save, backups, withE
   async function restoreSelective(id, paths, emergencyWithoutBackup = false) {
     const entry = backups().find(value => value.id === id);
     if (!entry?.restoredAt) fail('backup_unverified', 'Selecciona una copia con restauración comprobada.');
-    if (!Array.isArray(paths) || paths.length < 1 || paths.length > 100 || paths.some(path => typeof path !== 'string' || path.length > 240 || path.startsWith('/') || path.includes('..'))) fail('invalid_restore_paths', 'La selección de archivos no es válida.');
+    validateSelectivePaths(paths);
     await withExtract(entry, folder => io.verify(folder));
     await io.clean(); maintenance('recovery'); await io.quiesce();
     try { const preventive = await backup('pre-restore'); data.operation.preventiveBackup = preventive.id; save(); }

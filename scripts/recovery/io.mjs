@@ -7,6 +7,7 @@ import { join, relative, dirname } from 'node:path';
 import { fail, directory, regular, atomic } from './store.mjs';
 import { COMPONENTS, createManifest, digestFile, validateManifest, hashStream } from './backup-format.mjs';
 import { createImageSelection, DEFAULT_PHP_IMAGE } from './image-selection.mjs';
+import { validateSelectivePaths } from './restore-policy.mjs';
 
 /** Binary output is streamed to private files; it never enters process logs. */
 export async function fileProcess(file, args, { cwd, input, output, timeoutMs = 600000, env = process.env } = {}) {
@@ -211,7 +212,7 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
   }
   async function restoreSelective(folder, paths) {
     const storage = join(root, 'backend-laravel/storage/app'), extracted = directory(join(folder, 'storage-selective'));
-    if (!Array.isArray(paths) || paths.length === 0 || paths.length > 1000 || paths.some(path => typeof path !== 'string' || path.length === 0 || path.length > 1024)) fail('invalid_restore_paths', 'La selección de archivos no es válida.', 400);
+    validateSelectivePaths(paths);
     const allowed = paths.map(value => value.replace(/^\.\//, '')).filter(value => value && !value.includes('..') && !/[\\\x00-\x1f]/.test(value));
     if (!allowed.length || allowed.length !== paths.length) fail('invalid_restore_paths', 'La selección de archivos no es válida.');
     await fileProcess('tar', ['-xf', join(folder, 'storage.tar'), '-C', extracted]); await safeTree(extracted);

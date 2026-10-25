@@ -13,6 +13,7 @@ import { createHealthMonitor } from './health-monitor.mjs';
 import { planRetention, backupCategory } from './backup-catalog.mjs';
 import { createRecoveryRepository } from './state-repository.mjs';
 import { createBridgePublisher } from './bridge-publisher.mjs';
+import { validateSelectivePaths } from './restore-policy.mjs';
 const TERMINAL = new Set(['completed', 'restored', 'failed', 'cancelled', 'requires_intervention']);
 const ACTIONS = new Set(['check', 'preflight', 'install', 'backup', 'verify', 'restore', 'restore-selective', 'resume', 'policy', 'destination', 'destination-test', 'delete', 'protect', 'reconcile', 'cancel']);
 export function createRecoveryEngine({ root, home, io, exclusive, github = createGithub(), clock = Date.now, metadataKeyProvider = null }) {
@@ -146,7 +147,7 @@ export function createRecoveryEngine({ root, home, io, exclusive, github = creat
     const keys = { check: [], preflight: ['sha'], install: ['sha'], backup: ['tag'], verify: ['id'], restore: ['id', 'withoutPreventive'], 'restore-selective': ['id', 'paths', 'withoutPreventive'], resume: [], reconcile: [], cancel: ['id'], policy: ['daily', 'dailyRetention', 'weeklyRetention', 'updateRetention', 'backupDir'], destination: ['id', 'name', 'type', 'path', 'endpoint', 'bucket', 'region', 'prefix', 'accessKey', 'secretKey', 'enabled'], 'destination-test': ['id'], delete: ['id'], protect: ['id', 'protected'] }[action];
     if (Object.keys(target).some(key => !keys.includes(key))) fail('invalid_command', 'Campos de orden no admitidos.', 400);
     if (['preflight', 'install'].includes(action) && !/^[a-f0-9]{40}$/.test(target.sha ?? '')) fail('invalid_sha', 'Commit no válido.', 400);
-    if (action === 'restore-selective' && (!Array.isArray(target.paths) || target.paths.length === 0 || target.paths.length > 1000 || target.paths.some(path => typeof path !== 'string' || path.length === 0 || path.length > 1024))) fail('invalid_restore_paths', 'La selección de archivos no es válida.', 400);
+    if (action === 'restore-selective') validateSelectivePaths(target.paths);
     if (['verify', 'restore', 'restore-selective', 'delete', 'protect'].includes(action)) pathFor(target.id);
   }
   const orchestrator = createOperationOrchestrator({ enabled: () => config.enabled, data, validate, exclusive, now, save, execute, retain, maintenance });

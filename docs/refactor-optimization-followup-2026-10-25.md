@@ -36,6 +36,8 @@ Las copias a carpeta/NAS también usan una sola tubería de lectura, escritura t
 
 El `backup-runner` reutiliza el catálogo que ya contiene la copia recién creada al pasar por la verificación aislada. Así evita una lectura completa adicional antes de sincronizar destinos, manteniendo la persistencia y el orden de verificación.
 
+La política de restauración selectiva vive ahora en `restore-policy.mjs` y la comparten la admisión, el orquestador y el acceso al almacenamiento: como máximo 100 rutas de 240 caracteres, sin absolutas, traversal, separadores de Windows ni controles. Una orden fuera de esos límites se rechaza antes de adquirir el lock.
+
 ## Accesibilidad y evidencia visual
 
 El tablist administrativo ahora expone los grupos como presentación, describe cada pestaña con su plataforma y conserva la navegación por flechas. La comparación visual de la app real mantiene 55 capturas, cero errores de navegador, cero overflow y ninguna regresión de accesibilidad entre base y refactor.
@@ -71,7 +73,7 @@ El formateo numérico de fechas del panel reutiliza ahora un `Intl.DateTimeForma
 
 ## Verificación
 
-- 91 pruebas Node del controlador y recuperación: todas correctas.
+- 92 pruebas Node del controlador y recuperación: todas correctas.
 - 2.316 pruebas Angular: todas correctas.
 - TypeScript, ESLint y build SEA correctos.
 - PHP supply-chain contract: 8 pruebas y 476 assertions correctas.
