@@ -190,6 +190,23 @@ final class LocalRecoveryTest extends TestCase
         self::assertCount(0, File::files($this->bridge.'/requests'));
     }
 
+    public function test_operation_event_cursor_rejects_malformed_values_without_restarting_from_zero(): void
+    {
+        $this->adminSession();
+        $id = (string) Str::uuid();
+        $this->publish('snapshot.json', [
+            'schema' => 1,
+            'expires' => (int) floor(microtime(true) * 1000) + 90000,
+            'operation' => ['id' => $id, 'events' => [['sequence' => 1, 'message' => 'fixture']]],
+            'history' => [],
+            'auditEvents' => [],
+        ]);
+
+        $this->getJson("/api/v1/admin/backup-operations/{$id}/events?cursor=abc")->assertUnprocessable();
+        $this->getJson("/api/v1/admin/backup-operations/{$id}/events?cursor=1")
+            ->assertOk()->assertJsonPath('events', [])->assertJsonPath('cursor', 1);
+    }
+
     private function publish(string $name, array $value): void
     {
         file_put_contents($this->bridge.'/'.$name, json_encode(app(LocalRecoveryBridge::class)->sign($value), JSON_THROW_ON_ERROR));

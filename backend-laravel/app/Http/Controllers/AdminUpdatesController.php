@@ -116,7 +116,11 @@ final class AdminUpdatesController
             if ($operation === null) {
                 return response()->json(['error' => 'Operación no encontrada.'], 404);
             }
-            $cursor = max(0, (int) $request->query('cursor', 0));
+            $rawCursor = $request->query('cursor', '0');
+            if (! is_string($rawCursor) || preg_match('/\A(?:0|[1-9][0-9]{0,9})\z/D', $rawCursor) !== 1) {
+                return response()->json(['error' => 'Cursor no válido.'], 422);
+            }
+            $cursor = (int) $rawCursor;
             $events = RecoveryOperationLookup::events($operation, $cursor);
 
             return response()->json(['events' => $events, 'cursor' => $events === [] ? $cursor : $events[array_key_last($events)]['sequence']])->header('Cache-Control', 'no-store');

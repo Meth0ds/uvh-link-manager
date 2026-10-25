@@ -59,6 +59,8 @@ El controlador y el motor de recuperación reutilizan el parseo de `.env.docker.
 
 La admisión y el restaurador aplican ahora la misma frontera de entrada: la selección debe ser un array no vacío de como máximo 1.000 rutas, cada una string y de hasta 1.024 caracteres. Las entradas no estructuradas se rechazan con `invalid_restore_paths` antes de adquirir el lock o tocar el almacenamiento; las rutas relativas válidas conservan el flujo anterior.
 
+El puente administrativo también rechaza cursores de eventos no numéricos antes de consultar el historial; así una entrada como `abc` no vuelve silenciosamente al principio de la secuencia.
+
 ## Dependencias
 
 La auditoría actual del árbol frontend no encuentra vulnerabilidades (`0` informativas, bajas, moderadas, altas o críticas en 736 dependencias). Composer tampoco devuelve advisories ni paquetes abandonados en el árbol bloqueado. Las comprobaciones permanecen reproducibles con `npm run audit:policy` y `composer audit --locked` en CI.
@@ -70,6 +72,7 @@ La auditoría actual del árbol frontend no encuentra vulnerabilidades (`0` info
 - TypeScript, ESLint y build SEA correctos.
 - PHP supply-chain contract: 8 pruebas y 476 assertions correctas.
 - PHPStan: sin errores.
+- Lint PHP: 683 archivos correctos; prueba de recuperación local: 12 casos correctos (con advertencias de entorno por `.env` local ausente).
 - Smoke SEA macOS ARM64 y Linux x64: correctos.
 - Docker quedó apagado durante una primera comprobación y el contrato se repitió después de iniciarlo; el resultado final fue correcto.
 
