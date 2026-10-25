@@ -14,8 +14,8 @@ export function createBackupRunner({ home, io, getConfig, data, now, clock, even
     try { await io.unpack(entry, pathFor(entry.id), folder); return await callback(folder); }
     finally { rmSync(folder, { recursive: true, force: true }); }
   }
-  async function verify(id) {
-    const entries = backups(), entry = entries.find(value => value.id === id);
+  async function verify(id, catalog = null) {
+    const entries = catalog ?? backups(), entry = entries.find(value => value.id === id);
     if (!entry) fail('backup_missing', 'No existe esa copia.', 404);
     event('verifying_backup', 'Comprobando cifrado y restauración en una base aislada.');
     try {
@@ -34,11 +34,9 @@ export function createBackupRunner({ home, io, getConfig, data, now, clock, even
       await io.backup(folder, sha);
       const crypt = await io.encrypt(folder, pathFor(id));
       const entry = { id, sha, category: tag, createdAt: now(), protected: false, integrityAt: null, restoredAt: null, ...crypt };
-      saveBackups([...backups(), entry]); persisted = true; publish();
-      const verified = await verify(id);
-      const catalog = backups();
-      const position = catalog.findIndex(value => value.id === id);
-      catalog[position] = verified;
+      const catalog = [...backups(), entry];
+      saveBackups(catalog); persisted = true; publish();
+      const verified = await verify(id, catalog);
       const destinationValues = destinations(), external = destinationValues.filter(destination => destination.enabled !== false);
       if (!external.length) return verified;
       verified.external = external.map(destination => ({ id: destination.id, status: 'pending' })); saveBackups(catalog); save();

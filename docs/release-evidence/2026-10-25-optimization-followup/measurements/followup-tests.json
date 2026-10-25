@@ -1,7 +1,7 @@
 {
   "node": {
-    "tests": 90,
-    "passed": 90
+    "tests": 91,
+    "passed": 91
   },
   "angular": {
     "tests": 2316,

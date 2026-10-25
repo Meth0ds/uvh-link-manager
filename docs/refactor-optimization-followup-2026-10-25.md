@@ -34,6 +34,8 @@ La batería pasa **11 pruebas**: Fetch real, GET/DELETE sin body, lectura trunca
 
 Las copias a carpeta/NAS también usan una sola tubería de lectura, escritura temporal y hash incremental. Antes se copiaba el archivo y después se volvía a recorrer el temporal para calcular el digest; ahora el archivo se lee una vez, se verifica el tamaño y se renombra atómicamente. Un digest incorrecto elimina el temporal y nunca publica el destino final. La regresión comprueba además que un fallo de integridad no deja `.uploading` ni destino final.
 
+El `backup-runner` reutiliza el catálogo que ya contiene la copia recién creada al pasar por la verificación aislada. Así evita una lectura completa adicional antes de sincronizar destinos, manteniendo la persistencia y el orden de verificación.
+
 ## Accesibilidad y evidencia visual
 
 El tablist administrativo ahora expone los grupos como presentación, describe cada pestaña con su plataforma y conserva la navegación por flechas. La comparación visual de la app real mantiene 55 capturas, cero errores de navegador, cero overflow y ninguna regresión de accesibilidad entre base y refactor.
@@ -69,7 +71,7 @@ El formateo numérico de fechas del panel reutiliza ahora un `Intl.DateTimeForma
 
 ## Verificación
 
-- 90 pruebas Node del controlador y recuperación: todas correctas.
+- 91 pruebas Node del controlador y recuperación: todas correctas.
 - 2.316 pruebas Angular: todas correctas.
 - TypeScript, ESLint y build SEA correctos.
 - PHP supply-chain contract: 8 pruebas y 476 assertions correctas.
