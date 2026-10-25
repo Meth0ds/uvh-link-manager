@@ -1,0 +1,26 @@
+ Container uvh-refactor-validation-postgres-1 Running 
+ Container uvh-refactor-validation-redis-1 Running 
+ Container uvh-refactor-validation-hcaptcha-1 Running 
+ Container uvh-refactor-validation-postgres-1 Waiting 
+ Container uvh-refactor-validation-redis-1 Waiting 
+ Container uvh-refactor-validation-redis-1 Healthy 
+ Container uvh-refactor-validation-postgres-1 Healthy 
+ Container uvh-refactor-validation-app-run-b0a59b8add35 Creating 
+ Container uvh-refactor-validation-app-run-b0a59b8add35 Created 
+
+   PASS  Tests\Feature\LocalRecoveryTest
+  ✓ normal user cannot read recovery state                               0.20s  
+  ✓ administrator reads only an authenticated fresh snapshot             0.02s  
+  ✓ access requires concrete second factor and consumes it               0.06s  
+  ✓ a mutation requires step up and admits only a signed target          0.04s  
+  ✓ maintenance also blocks direct backend requests and fails closed     0.02s  
+  ✓ recovery audit is idempotent and can be replayed after restore       0.02s  
+  ✓ received audit events need one read and no transactions              0.09s  
+  ✓ duplicate event ids keep the first admitted action                   0.02s  
+  ✓ receipt and audit admission roll back together                       0.02s  
+  ✓ a receipt arriving after the batch read is not duplicated            0.02s  
+  ✓ invalid fields and untrusted targets are rejected                    0.02s  
+
+  Tests:    11 passed (33 assertions)
+  Duration: 1.09s
+

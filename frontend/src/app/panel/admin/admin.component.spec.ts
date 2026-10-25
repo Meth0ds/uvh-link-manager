@@ -137,6 +137,7 @@ describe("AdminComponent", () => {
       "Privacidad",
       "Dominios",
       "Auditoría",
+      "Actualizaciones",
       "Sistema",
     ]);
   });

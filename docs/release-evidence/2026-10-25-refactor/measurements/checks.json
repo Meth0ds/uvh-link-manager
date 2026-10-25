@@ -1,0 +1,27 @@
+{
+  "node": {
+    "passed": 81,
+    "failed": 0
+  },
+  "angular": {
+    "passed": 2317,
+    "failed": 0
+  },
+  "phpBatches": {
+    "cases": 3138,
+    "passed": 3136,
+    "failed": 2
+  },
+  "finalRecoveryCases": {
+    "passed": 11,
+    "assertions": 33,
+    "failed": 0
+  },
+  "phpstan": "passed",
+  "pintModifiedFiles": "passed",
+  "englishTranslations": 4151,
+  "spanishProductionBuild": "passed",
+  "macosArm64Smoke": "passed",
+  "linuxX64ContainerSmoke": "passed",
+  "windowsX64": "compiled_only"
+}

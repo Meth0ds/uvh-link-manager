@@ -200,6 +200,9 @@ jobs:
       # Docker Hub como segunda vía, porque ambas limitan la tasa por separado:
       # en una IP de runner compartida, una sola vía da 429 y deja la puerta sin
       # contenido. Lo que no pudo comprobar lo declara en vez de callarlo.
+      - name: Verify local controller and recovery contracts
+        run: node --test scripts/uvh-control.test.mjs scripts/recovery/*.test.mjs
+
       - name: Verify digest availability regression without a registry
         run: node --test scripts/check-image-digests.test.mjs
 

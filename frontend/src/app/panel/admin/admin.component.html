@@ -87,11 +87,11 @@
     <div class="admin-layout">
       <aside class="admin-sidebar">
         <div class="section-navigation" role="tablist" aria-label="Secciones de administración" aria-orientation="vertical" i18n-aria-label="@@ui.36254c5cf26027">
-          @for (group of navigation; track group.label) {
-            <div class="navigation-group" role="group" [attr.aria-label]="group.label">
-              <h2>{{ group.label }}</h2>
+          @for (group of navigation; track group.label; let groupIndex = $index) {
+            <div class="navigation-group" role="presentation">
+              <h2 [id]="'admin-navigation-group-' + groupIndex" aria-hidden="true">{{ group.label }}</h2>
               @for (section of group.sections; track section.index) {
-                <button type="button" role="tab" [id]="'admin-section-' + section.index" [attr.aria-label]="section.label" [attr.aria-selected]="activeTab() === section.index" [attr.tabindex]="activeTab() === section.index ? 0 : -1" aria-controls="admin-content" (click)="openTab(section.index)" (keydown)="onSectionKeydown($event)">
+                <button type="button" role="tab" [id]="'admin-section-' + section.index" [attr.aria-label]="section.label" [attr.aria-describedby]="'admin-navigation-group-' + groupIndex" [attr.aria-selected]="activeTab() === section.index" [attr.tabindex]="activeTab() === section.index ? 0 : -1" aria-controls="admin-content" (click)="openTab(section.index)" (keydown)="onSectionKeydown($event)">
                   <mat-icon aria-hidden="true">{{ section.icon }}</mat-icon>
                   <span><b>{{ section.label }}</b><small>{{ section.detail }}</small></span>
                 </button>
@@ -102,7 +102,13 @@
       </aside>
       <section class="admin-content" id="admin-content" role="tabpanel" tabindex="0" [attr.aria-label]="sectionTitle()">
         @switch (activeTab()) {
-          @case (8) { <app-admin-updates /> }
+          @case (8) {
+            @defer (when activeTab() === 8) {
+              <app-admin-updates />
+            } @placeholder {
+              <div class="tab-loading" role="status" aria-live="polite" i18n="@@recovery.loading">Cargando continuidad del entorno…</div>
+            }
+          }
           @case (0) {
         <section class="tab-panel">
           <!-- A failed read leaves the previous page on screen for context, but

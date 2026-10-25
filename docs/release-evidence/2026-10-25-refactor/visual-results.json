@@ -1,0 +1,1039 @@
+{
+  "at": "2026-10-25T00:32:43.484Z",
+  "results": [
+    {
+      "name": "admin-local-light-390-before",
+      "errors": [],
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "name": "admin-local-light-390-after",
+      "errors": [],
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "name": "independent-light-390",
+      "errors": []
+    },
+    {
+      "name": "admin-local-light-1440-before",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-local-light-1440-after",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-external-light-1440-before",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-external-light-1440-after",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-progress-light-1440-before",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-progress-light-1440-after",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-external-error-light-1440-before",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-external-error-light-1440-after",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-intervention-light-1440-before",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-intervention-light-1440-after",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"] > small"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(1) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              "div[_ngcontent-ng-c1092437631=\"\"]:nth-child(3) > .label[_ngcontent-ng-c1092437631=\"\"]"
+            ],
+            [
+              ".backup-card > .muted"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "independent-light-1440",
+      "errors": []
+    },
+    {
+      "name": "admin-local-dark-390-before",
+      "errors": [],
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "name": "admin-local-dark-390-after",
+      "errors": [],
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "name": "independent-dark-390",
+      "errors": []
+    },
+    {
+      "name": "admin-local-dark-1440-before",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "p:nth-child(1) > .is-good"
+            ],
+            [
+              "p:nth-child(2) > .is-good"
+            ],
+            [
+              "p:nth-child(3) > .is-good"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin-local-dark-1440-after",
+      "errors": [],
+      "overflow": false,
+      "violations": [
+        {
+          "id": "aria-required-children",
+          "impact": "critical",
+          "targets": [
+            [
+              ".section-navigation"
+            ]
+          ]
+        },
+        {
+          "id": "aria-required-parent",
+          "impact": "critical",
+          "targets": [
+            [
+              "#admin-section-0"
+            ],
+            [
+              "#admin-section-1"
+            ],
+            [
+              "#admin-section-2"
+            ],
+            [
+              "#admin-section-3"
+            ],
+            [
+              "#admin-section-6"
+            ],
+            [
+              "#admin-section-4"
+            ],
+            [
+              "#admin-section-5"
+            ],
+            [
+              "#admin-section-8"
+            ],
+            [
+              "#admin-section-7"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "p:nth-child(1) > .is-good"
+            ],
+            [
+              "p:nth-child(2) > .is-good"
+            ],
+            [
+              "p:nth-child(3) > .is-good"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "independent-dark-1440",
+      "errors": []
+    }
+  ],
+  "comparisons": [
+    {
+      "name": "admin-local-light-390",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-backups-light-390",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-access-light-390",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "settings-light-390",
+      "identical": false,
+      "sameSize": true,
+      "changedPixels": 10,
+      "maxChannelDelta": 1,
+      "equivalent": true
+    },
+    {
+      "name": "admin-local-light-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-backups-light-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-access-light-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-external-light-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-progress-light-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-external-error-light-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-intervention-light-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "settings-light-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-local-dark-390",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-backups-dark-390",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-access-dark-390",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "settings-dark-390",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-local-dark-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-backups-dark-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "admin-access-dark-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    },
+    {
+      "name": "settings-dark-1440",
+      "identical": true,
+      "sameSize": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "equivalent": true
+    }
+  ],
+  "accessibilityComparisons": [
+    {
+      "name": "admin-local-light-390",
+      "identical": true
+    },
+    {
+      "name": "admin-local-light-1440",
+      "identical": true
+    },
+    {
+      "name": "admin-external-light-1440",
+      "identical": true
+    },
+    {
+      "name": "admin-progress-light-1440",
+      "identical": true
+    },
+    {
+      "name": "admin-external-error-light-1440",
+      "identical": true
+    },
+    {
+      "name": "admin-intervention-light-1440",
+      "identical": true
+    },
+    {
+      "name": "admin-local-dark-390",
+      "identical": true
+    },
+    {
+      "name": "admin-local-dark-1440",
+      "identical": true
+    }
+  ]
+}

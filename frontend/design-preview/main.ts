@@ -26,6 +26,7 @@ import { PublicStatusPreviewComponent } from "./public-status-preview.component"
 import { SecurityPreviewComponent } from "./security-preview.component";
 import { SettingsPreviewComponent } from "./settings-preview.component";
 import { QrPreviewComponent } from "./qr-preview.component";
+import { AdminPreviewComponent } from "./admin-preview.component";
 
 @Component({
   selector: "app-design-preview-content",
@@ -76,6 +77,7 @@ void bootstrapApplication(DesignPreviewRootComponent, {
       { path: "forbidden", component: StatusPageComponent, data: { kind: "forbidden" }, title: "403 · Vista de diseño" },
       { path: "not-found", component: StatusPageComponent, data: { kind: "not-found" }, title: "404 · Vista de diseño" },
       { path: "app", component: PanelComponent, children: [
+        { path: "admin", component: AdminPreviewComponent },
         { path: "links/:id", component: LinkDetailComponent },
         { path: "links", component: WorkspacePreviewComponent, data: { page: "links" } },
         { path: "notifications", component: WorkspacePreviewComponent, data: { page: "notifications" } },

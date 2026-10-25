@@ -1,4 +1,4 @@
-import { localDateTimeValue, parseHttpDate, parseLocalDateTime, parseRouteId, type StrictDecoder } from "./strict-wire";
+import { localDateTimeValue, localTimeToUtcTime, utcTimeToLocalTime, parseHttpDate, parseLocalDateTime, parseRouteId, type StrictDecoder } from "./strict-wire";
 
 /**
  * The contract suite runs over every decoder; the corpora are the family
@@ -100,5 +100,39 @@ describe("localDateTimeValue [strict-wire contract]", () => {
     for (const iso of [null, undefined, "", " ", "not-a-date", "2026-13-40", "1e3"]) {
       expect(localDateTimeValue(iso)).withContext(String(iso)).toBe("");
     }
+  });
+});
+
+describe("recurring times with shared zone formatters", () => {
+  it("reuses formatters across twenty rules without caching the reference date", () => {
+    const constructors = spyOn(Intl, "DateTimeFormat").and.callThrough();
+    const winter = new Date("2026-01-15T12:00:00Z");
+    const summer = new Date("2026-07-15T12:00:00Z");
+    for (let rule = 0; rule < 20; rule++) {
+      expect(localTimeToUtcTime("14:00", "Pacific/Chatham", winter)).toBe("00:15");
+      expect(localTimeToUtcTime("14:00", "Pacific/Chatham", summer)).toBe("01:15");
+      expect(utcTimeToLocalTime("00:15", "Pacific/Chatham", winter)).toBe("14:00");
+    }
+    expect(constructors.calls.count()).toBeLessThanOrEqual(2);
+  });
+
+  it("keeps DST gaps invalid and recalculates offsets when the date changes", () => {
+    expect(localTimeToUtcTime("02:30", "Europe/Madrid", new Date("2026-03-29T12:00:00Z"))).toBeNull();
+    expect(localTimeToUtcTime("09:30", "Europe/Madrid", new Date("2026-03-28T12:00:00Z"))).toBe("08:30");
+    expect(localTimeToUtcTime("09:30", "Europe/Madrid", new Date("2026-03-29T12:00:00Z"))).toBe("07:30");
+    expect(localTimeToUtcTime("09:30", "Europe/Madrid", new Date("2026-10-25T12:00:00Z"))).toBe("08:30");
+    expect(utcTimeToLocalTime("08:30", "Europe/Madrid", new Date("2026-10-25T12:00:00Z"))).toBe("09:30");
+  });
+
+  it("evicts old zones instead of retaining an unbounded formatter cache", () => {
+    const constructors = spyOn(Intl, "DateTimeFormat").and.callThrough();
+    const zones = Intl.supportedValuesOf("timeZone").slice(0, 40);
+    const reference = new Date("2026-07-15T12:00:00Z");
+    for (const zone of zones) utcTimeToLocalTime("00:00", zone, reference);
+    const count = constructors.calls.count();
+    utcTimeToLocalTime("00:00", zones[0], reference);
+    expect(constructors.calls.count()).toBe(count + 1);
+    for (let rule = 0; rule < 20; rule++) utcTimeToLocalTime("00:00", zones[0], reference);
+    expect(constructors.calls.count()).toBe(count + 1);
   });
 });

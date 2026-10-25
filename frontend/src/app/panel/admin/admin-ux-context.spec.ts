@@ -226,7 +226,7 @@ describe("Administration actual UI and context", () => {
   });
   it("names missing worker and scheduler pulses as missing signals", async () => {
     state.component.operations.set({ ...operations, metrics: { ...operations.metrics, queueHeartbeatAgeSeconds: null, schedulerHeartbeatAgeSeconds: null } });
-    const tabs = state.fixture.nativeElement.querySelectorAll('[role="tab"]'); (tabs[7] as HTMLElement).click();
+    (state.fixture.nativeElement.querySelector('[role="tab"][aria-label="Sistema"]') as HTMLElement).click();
     state.fixture.detectChanges(); await state.fixture.whenStable(); state.fixture.detectChanges();
     await state.fixture.whenStable(); state.fixture.detectChanges();
     const cells = [...state.fixture.nativeElement.querySelectorAll(".system-overview > div")] as HTMLElement[];

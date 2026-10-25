@@ -1,0 +1,44 @@
+{
+  "before": {
+    "chunks": 238,
+    "javascriptBytes": 6201565,
+    "components": [
+      {
+        "file": "chunk-B-h81RAS.js",
+        "entry": "src/app/panel/admin/admin.component.ts",
+        "bytes": 193597
+      },
+      {
+        "file": "chunk-Cvn5ornB.js",
+        "entry": "src/app/panel/settings/settings.component.ts",
+        "bytes": 242651
+      },
+      {
+        "file": "chunk-JubiuDvB.js",
+        "entry": "src/app/panel/links/link-dialog.component.ts",
+        "bytes": 118155
+      }
+    ]
+  },
+  "after": {
+    "chunks": 238,
+    "javascriptBytes": 6214290,
+    "components": [
+      {
+        "file": "chunk-DpP7zzEf.js",
+        "entry": "src/app/panel/settings/settings.component.ts",
+        "bytes": 255235
+      },
+      {
+        "file": "chunk-Nxk0N-aX.js",
+        "entry": "src/app/panel/admin/admin.component.ts",
+        "bytes": 193912
+      },
+      {
+        "file": "chunk-n9epzQwG.js",
+        "entry": "src/app/panel/links/link-dialog.component.ts",
+        "bytes": 118190
+      }
+    ]
+  }
+}

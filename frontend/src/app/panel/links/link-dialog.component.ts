@@ -1,57 +1,55 @@
-import { UI_TEXT } from "../../core/localisation/template-messages";
-import { AppOpeningEditorComponent } from "./app-opening-editor.component";
-import { AppOpeningService } from "../../core/services/app-opening.service";
-import { recommendedLinkUrl, type AppOpeningSpec } from "../../core/app-opening";
-import { SharingService } from "../../core/services/sharing.service";
-import type { SocialPreviewSpec } from "../../core/sharing";
-import { SocialPreviewEditorComponent } from "./social-preview-editor.component";
-import { unicodeMaxLength } from "../../core/unicode-validators";
-import { Component, DestroyRef, effect, inject, signal, ChangeDetectionStrategy, ElementRef, viewChild, afterNextRender, Injector } from "@angular/core";
+import { afterNextRender, ChangeDetectionStrategy, Component, DestroyRef, effect, ElementRef, inject, Injector, signal, viewChild } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
   FormBuilder,
-  FormControl,
-  FormGroup,
   ReactiveFormsModule,
   Validators,
   type AbstractControl,
   type ValidationErrors,
 } from "@angular/forms";
-import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatButtonModule } from "@angular/material/button";
-import { MatFormFieldModule } from "@angular/material/form-field";
-import { MatInputModule } from "@angular/material/input";
-import { MatSelectModule } from "@angular/material/select";
 import { MatCheckboxModule } from "@angular/material/checkbox";
-import { MatIconModule } from "@angular/material/icon";
-import { MatTabsModule } from "@angular/material/tabs";
 import { MatChipsModule } from "@angular/material/chips";
+import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
+import { MatFormFieldModule } from "@angular/material/form-field";
+import { MatIconModule } from "@angular/material/icon";
+import { MatInputModule } from "@angular/material/input";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
+import { MatSelectModule } from "@angular/material/select";
+import { MatTabsModule } from "@angular/material/tabs";
 import { MatTooltipModule } from "@angular/material/tooltip";
+import { recommendedLinkUrl, type AppOpeningSpec } from "../../core/app-opening";
+import { UI_TEXT } from "../../core/localisation/template-messages";
+import { AppOpeningService } from "../../core/services/app-opening.service";
+import { SharingService } from "../../core/services/sharing.service";
+import type { SocialPreviewSpec } from "../../core/sharing";
+import { unicodeMaxLength } from "../../core/unicode-validators";
+import { AppOpeningEditorComponent } from "./app-opening-editor.component";
+import { CONTROL_CHARACTERS, createRuleForm, httpUrlValidator, noControlCharacters, serializeRuleForms, type RuleGroup } from "./link-rule-form";
+import { SocialPreviewEditorComponent } from "./social-preview-editor.component";
 
-import { ApiService, ApiRequestError } from "../../core/services/api.service";
+import { Router, RouterLink } from "@angular/router";
+import { Subject } from "rxjs";
+import { defaultExpiredPage } from "../../core/link-workflows";
 import type { CollectionDto, DomainDto, LinkDto, LinkTemplateDto, LinkTemplatePayload, RedirectRule } from "../../core/models";
+import { ApiRequestError, ApiService } from "../../core/services/api.service";
+import { CopyFeedbackService } from "../../core/services/copy-feedback.service";
 import { decodeDomainsResponse } from "../../core/services/domain-response-decoders";
+import { LatestRequest } from "../../core/services/latest-request";
 import { decodeAliasAvailability, decodeLinkResponse, decodeRulesResponse } from "../../core/services/link-response-decoders";
+import { LinkWorkflowService } from "../../core/services/link-workflow.service";
 import {
   decodeCollectionsResponse,
   decodeTemplateResponse,
   decodeTemplatesResponse,
 } from "../../core/services/scale-response-decoders";
-import { ActionDialogService } from "../action-dialog.service";
-import { WorkspaceService } from "../../core/services/workspace.service";
 import { SessionContextService } from "../../core/services/session-context.service";
 import { targetWorkspace } from "../../core/services/workspace-target";
-import { LatestRequest } from "../../core/services/latest-request";
-import { localDateTimeIso, localDateTimeValue, localTimeToUtcTime, parseLocalDateTime, utcTimeToLocalTime } from "../../core/strict-wire";
-import { RouterLink } from "@angular/router";
-import { LinkWorkflowService } from "../../core/services/link-workflow.service";
+import { WorkspaceService } from "../../core/services/workspace.service";
+import { localDateTimeIso, localDateTimeValue, localTimeToUtcTime, parseLocalDateTime } from "../../core/strict-wire";
+import { ActionDialogService } from "../action-dialog.service";
 import { DestinationInspectionComponent } from "./destination-inspection.component";
 import { ExpiredPageEditorComponent, validExpiredPage } from "./expired-page-editor.component";
-import { defaultExpiredPage } from "../../core/link-workflows";
-import { CopyFeedbackService } from "../../core/services/copy-feedback.service";
-import { Router } from "@angular/router";
-import { Subject } from "rxjs";
 
 export type LinkDialogView = "quick" | "advanced" | "success";
 
@@ -64,38 +62,6 @@ export interface LinkDialogData {
 }
 
 export type LinkCreationEvent = { type: "created"; link: LinkDto } | { type: "closed" };
-type RuleGroup = FormGroup<{
-  priority: FormControl<number>;
-  country: FormControl<string>;
-  language: FormControl<string>;
-  device: FormControl<string>;
-  os: FormControl<string>;
-  timeFrom: FormControl<string>;
-  timeTo: FormControl<string>;
-  referrer: FormControl<string>;
-  campaign: FormControl<string>;
-  destination: FormControl<string>;
-}>;
-
-function httpUrlValidator(control: AbstractControl): ValidationErrors | null {
-  const raw = String(control.value ?? "").trim();
-  if (!raw) return null;
-  if (raw.length > 2048) return { url: true };
-  try {
-    const url = new URL(raw);
-    return /^https?:$/.test(url.protocol) && !url.username && !url.password ? null : { url: true };
-  } catch {
-    return { url: true };
-  }
-}
-
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
-
-function noControlCharacters(control: AbstractControl): ValidationErrors | null {
-  const value = String(control.value ?? "");
-  return CONTROL_CHARACTERS.test(value) ? { controlCharacters: true } : null;
-}
-
 function localDateTimeValidator(control: AbstractControl): ValidationErrors | null {
   const value = String(control.value ?? "");
   if (!value) return null;
@@ -130,11 +96,6 @@ function lifecycleOrderValidator(
     && preserves("expiresAt", String(expires.value));
   return start !== null && end !== null && (start < end || retainsWindow) ? null : { lifecycleOrder: true };
 }
-
-function integerValidator(control: AbstractControl): ValidationErrors | null {
-  return control.value == null || Number.isInteger(control.value) ? null : { integer: true };
-}
-
 
 
 @Component({
@@ -652,23 +613,7 @@ export class LinkDialogComponent {
 
   addRule(initial: Partial<RedirectRule> = {}): void {
     if (this.rules.length >= 20) return;
-    const raw = initial as RedirectRule & { time_from?: string | null; time_to?: string | null };
-    this.rules.push(
-      this.fb.nonNullable.group({
-        priority: [initial.priority ?? this.rules.length, [Validators.min(0), Validators.max(1000), integerValidator]],
-        country: [initial.country ?? "", [Validators.pattern(/^[a-zA-Z]{2}$/)]],
-        language: [initial.language ?? "", [Validators.maxLength(8), Validators.pattern(/^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,4})?$/)]],
-        device: [initial.device ?? ""],
-        os: [initial.os ?? "", [unicodeMaxLength(40), noControlCharacters]],
-        timeFrom: [utcTimeToLocalTime(initial.timeFrom ?? raw.time_from ?? "", this.ruleTimezone) ?? initial.timeFrom ?? raw.time_from ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
-        timeTo: [utcTimeToLocalTime(initial.timeTo ?? raw.time_to ?? "", this.ruleTimezone) ?? initial.timeTo ?? raw.time_to ?? "", [Validators.pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)]],
-        referrer: [initial.referrer ?? "", [unicodeMaxLength(200), noControlCharacters]],
-        campaign: [initial.campaign ?? "", [unicodeMaxLength(100), noControlCharacters]],
-        // Empty means delete/omit the row. Non-empty destinations must still
-        // satisfy exactly the same URL contract as the primary destination.
-        destination: [initial.destination ?? "", [Validators.maxLength(2048), httpUrlValidator]],
-      }),
-    );
+    this.rules.push(createRuleForm(this.fb, initial, this.rules.length, this.ruleTimezone));
   }
 
   removeRule(index: number): void {
@@ -676,25 +621,7 @@ export class LinkDialogComponent {
   }
 
   private rulesPayload(): RedirectRule[] {
-    const out: RedirectRule[] = [];
-    this.rules.controls.forEach((g, index) => {
-      const v = g.value;
-      const destination = v.destination?.trim();
-      if (!destination) return;
-      out.push({
-        priority: v.priority ?? index,
-        country: v.country?.trim() || null,
-        language: v.language?.trim() || null,
-        device: (v.device as "desktop" | "mobile" | "tablet" | null) || null,
-        os: v.os?.trim() || null,
-        timeFrom: v.timeFrom ? localTimeToUtcTime(v.timeFrom, this.ruleTimezone) : null,
-        timeTo: v.timeTo ? localTimeToUtcTime(v.timeTo, this.ruleTimezone) : null,
-        referrer: v.referrer?.trim() || null,
-        campaign: v.campaign?.trim() || null,
-        destination,
-      });
-    });
-    return out;
+    return serializeRuleForms(this.rules.controls, this.ruleTimezone);
   }
 
   dialogRefClose(): void { this.dialogRef.close(); }

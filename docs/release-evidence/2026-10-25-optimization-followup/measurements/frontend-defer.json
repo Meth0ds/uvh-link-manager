@@ -1,0 +1,9 @@
+{
+  "chunks": 239,
+  "javascriptBytes": 6220719,
+  "adminChunkBytes": 165475,
+  "deferredChunkBytes": 29001,
+  "deferredEntry": "src/app/panel/admin/admin-updates.component.ts",
+  "baselineAdminChunkBytes": 193597,
+  "baselineJavascriptBytes": 6201565
+}

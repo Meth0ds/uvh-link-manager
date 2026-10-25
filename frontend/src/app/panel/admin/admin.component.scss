@@ -268,6 +268,7 @@ button { min-height: 44px; }
 .summary-disclosure > summary:focus-visible { outline: 2px solid var(--uvh-electric); outline-offset: 3px; }
 .command-meta { display: flex; align-items: center; justify-content: flex-end; gap: 16px; flex-wrap: wrap; }
 .section-picker { display: none; width: 100%; margin-bottom: 12px; }
+.tab-loading { min-height: 180px; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
 @container (max-width: 900px) {
   .section-picker { display: block; }
   .section-picker ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }

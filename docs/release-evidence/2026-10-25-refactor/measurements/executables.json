@@ -1,0 +1,20 @@
+[
+  {
+    "file": "uvh-control-macos-arm64",
+    "sha256": "76615c8c2762163f2404265bb1066f4fec10646f974afd9b26a643efd89797b8",
+    "bytes": 122706160,
+    "runtime": "v24.21.0"
+  },
+  {
+    "file": "uvh-control-windows-x64.exe",
+    "sha256": "4671c20ff40c5ffe06fd095a5f7dcaf05d41946b2e8891511dd303a66eb65584",
+    "bytes": 95239680,
+    "runtime": "v24.21.0"
+  },
+  {
+    "file": "uvh-control-linux-x64",
+    "sha256": "a27d920e7d03a5c7c837c274fe75c354101208137f9bcc79d56477b0625c34cc",
+    "bytes": 128191680,
+    "runtime": "v24.21.0"
+  }
+]

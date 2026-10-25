@@ -14,6 +14,8 @@ export interface AsyncPollerOptions {
   attempt: () => void | Promise<void>;
   /** Pause while the tab is hidden and resume when it returns (default true). */
   pauseWhenHidden?: boolean;
+  /** Some screens refresh on visibility only to preserve their polling contract. */
+  resumeOnFocus?: boolean;
 }
 
 /**
@@ -34,7 +36,7 @@ export class AsyncPoller {
     this.pauseWhenHidden = options.pauseWhenHidden ?? true;
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", this.syncVisibility);
-      window.addEventListener("focus", this.syncVisibility);
+      if (options.resumeOnFocus !== false) window.addEventListener("focus", this.syncVisibility);
     }
     options.destroyRef.onDestroy(() => {
       this.stop();

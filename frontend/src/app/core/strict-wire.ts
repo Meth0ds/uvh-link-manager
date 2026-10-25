@@ -119,12 +119,27 @@ const TIME_ONLY = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 type ZoneParts = { year: number; month: number; day: number; hour: number; minute: number };
 
+// The formatter depends on the zone, never on the current date or account.
+// Bound the cache because the helper is also used with caller-supplied zones.
+const zoneFormatters = new Map<string, Intl.DateTimeFormat>();
+function zoneFormatter(timezone: string): Intl.DateTimeFormat {
+  const cached = zoneFormatters.get(timezone);
+  if (cached) return cached;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  });
+  if (zoneFormatters.size >= 32) {
+    const oldest = zoneFormatters.keys().next().value;
+    if (oldest !== undefined) zoneFormatters.delete(oldest);
+  }
+  zoneFormatters.set(timezone, formatter);
+  return formatter;
+}
+
 function zoneParts(instant: Date, timezone: string): ZoneParts | null {
   try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-    }).formatToParts(instant);
+    const parts = zoneFormatter(timezone).formatToParts(instant);
     const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
     const output = { year: value("year"), month: value("month"), day: value("day"), hour: value("hour"), minute: value("minute") };
     return Object.values(output).every(Number.isInteger) ? output : null;

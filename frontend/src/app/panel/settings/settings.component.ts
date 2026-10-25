@@ -1,35 +1,33 @@
+import { Location } from "@angular/common";
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, NgZone, signal, untracked, viewChild, type AfterViewInit } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { LanguageSelectorComponent } from "../../core/localisation/language-selector.component";
 import { LocaleLinkDirective } from "../../core/localisation/locale-link.directive";
 import { UI_TEXT } from "../../core/localisation/template-messages";
-import { afterNextRender, NgZone, Component, computed, effect, inject, signal, untracked, ChangeDetectionStrategy, DestroyRef, ElementRef, Injector, viewChild, type AfterViewInit } from "@angular/core";
-import { Location } from "@angular/common";
-import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { AccountDeletionDialogComponent } from "./account-deletion-dialog.component";
+import { DataExportDialogComponent, type DataExportDialogResult } from "./data-export-dialog.component";
 import { EmailAccessDialogComponent, type EmailAccessDialogData } from "./email-access-dialog.component";
 import { PasswordChangeDialogComponent } from "./password-change-dialog.component";
-import { DataExportDialogComponent, type DataExportDialogResult } from "./data-export-dialog.component";
+import { SettingsExportCoordinator } from "./settings-export-coordinator";
+import { SettingsMfaCoordinator } from "./settings-mfa-coordinator";
+import { SettingsPrivacyCoordinator } from "./settings-privacy-coordinator";
+import { SettingsSessionsCoordinator } from "./settings-sessions-coordinator";
 
-import { ActivatedRoute, Router } from "@angular/router";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
-import { MAT_FORM_FIELD_DEFAULT_OPTIONS, MatFormFieldModule } from "@angular/material/form-field";
-import { MatInputModule } from "@angular/material/input";
-import { MatIconModule } from "@angular/material/icon";
-import { MatProgressBarModule } from "@angular/material/progress-bar";
-import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
-import { MatDividerModule } from "@angular/material/divider";
 import { MatCheckboxModule } from "@angular/material/checkbox";
-import { MatSelectModule } from "@angular/material/select";
+import { MatDividerModule } from "@angular/material/divider";
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS, MatFormFieldModule } from "@angular/material/form-field";
+import { MatIconModule } from "@angular/material/icon";
+import { MatInputModule } from "@angular/material/input";
 import { MatPaginatorModule, type PageEvent } from "@angular/material/paginator";
-import { QrCodeService } from "../../core/services/qr-code.service";
+import { MatProgressBarModule } from "@angular/material/progress-bar";
+import { MatSelectModule } from "@angular/material/select";
+import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
+import { ActivatedRoute, Router } from "@angular/router";
+import { AsyncPoller } from "../../core/async-poller";
 import { dateTimeMediumLabel } from "../../core/date-time-label";
-import { sessionAgentLabel } from "../../core/session-agent-label";
-import { AuthService } from "../../core/services/auth.service";
-import { WorkspaceService } from "../../core/services/workspace.service";
-import { ThemeService, type ThemePreference } from "../../core/services/theme.service";
-import { downloadBlob } from "../../core/services/browser-download";
-import { ApiRequestError, ApiService } from "../../core/services/api.service";
 import type { AccountDeletionImpact, DataExportStage, DataExportStatus, NotificationPreference, PrivacyRightRequest, PrivacyRightType, Session } from "../../core/models";
 import {
   NOTIFICATION_DELIVERIES,
@@ -38,28 +36,31 @@ import {
   type NotificationDelivery,
   type NotificationKind,
 } from "../../core/notification-kinds";
-import { NotificationService } from "../../core/services/notification.service";
 import {
   PRIVACY_RIGHT_GUIDANCE,
+  PRIVACY_RIGHT_TYPE_ORDER,
+  privacyRightIsActive,
   privacyRightMessageAuthor,
   privacyRightNextStep,
-  privacyRightIsActive,
   privacyRightStatusLabel,
   privacyRightTypeLabel,
-  PRIVACY_RIGHT_TYPE_ORDER,
 } from "../../core/privacy-right-label";
+import { ReadDeadline } from "../../core/read-deadline";
+import { ApiRequestError, ApiService } from "../../core/services/api.service";
+import { AuthService } from "../../core/services/auth.service";
+import { LatestRequest } from "../../core/services/latest-request";
+import { NotificationService } from "../../core/services/notification.service";
+import { QrCodeService } from "../../core/services/qr-code.service";
+import { ThemeService, type ThemePreference } from "../../core/services/theme.service";
+import { WorkspaceService } from "../../core/services/workspace.service";
+import { sessionAgentLabel } from "../../core/session-agent-label";
 import { ActionDialogService } from "../action-dialog.service";
+import { AsyncOperationStatusComponent, type AsyncOperationTone } from "../async-operation-status.component";
 import { PageHeaderComponent } from "../page-header.component";
 import { PanelSkeletonComponent } from "../panel-skeleton.component";
-import { LatestRequest } from "../../core/services/latest-request";
-import { decodePrivacyRequestsPage, decodePrivacyRequestCreated } from "../../core/services/privacy-response-decoders";
-import { decodePublicActionAcknowledgement } from "../../core/services/public-action-response-decoders";
-import { ReadDeadline } from "../../core/read-deadline";
-import { AsyncPoller } from "../../core/async-poller";
-import { AsyncOperationStatusComponent, type AsyncOperationTone } from "../async-operation-status.component";
-import { SettingsSectionNavComponent, type SettingsSectionNavItem } from "./settings-section-nav.component";
-import { SettingsSectionHeaderComponent } from "./settings-section-header.component";
 import { SettingsPreferenceRowComponent } from "./settings-preference-row.component";
+import { SettingsSectionHeaderComponent } from "./settings-section-header.component";
+import { SettingsSectionNavComponent, type SettingsSectionNavItem } from "./settings-section-nav.component";
 
 @Component({
   selector: "app-settings",
@@ -393,6 +394,140 @@ export class SettingsComponent implements AfterViewInit {
     }
   }
 
+  private readonly exportCoordinator = this.createSettingsExportCoordinator();
+
+  private createSettingsExportCoordinator(): SettingsExportCoordinator {
+    const owner = () => this;
+    return new SettingsExportCoordinator({
+      $EXPORT_STAGE_LABELS: SettingsComponent.EXPORT_STAGE_LABELS,
+      $EXPORT_STATUS_LABELS: SettingsComponent.EXPORT_STATUS_LABELS,
+      accountContext: this.accountContext.bind(this),
+      get actions() { return owner().actions; },
+      get auth() { return owner().auth; },
+      get destroyRef() { return owner().destroyRef; },
+      get dialogs() { return owner().dialogs; },
+      get exportBusy() { return owner().exportBusy; },
+      get exportDialog() { return owner().exportDialog; },
+      set exportDialog(value) { owner().exportDialog = value; },
+      get exportError() { return owner().exportError; },
+      get exportExpiryTimer() { return owner().exportExpiryTimer; },
+      set exportExpiryTimer(value) { owner().exportExpiryTimer = value; },
+      get exportHeading() { return owner().exportHeading; },
+      get exportHistory() { return owner().exportHistory; },
+      get exportHistoryRequest() { return owner().exportHistoryRequest; },
+      get exportLoading() { return owner().exportLoading; },
+      get exportMutationRequest() { return owner().exportMutationRequest; },
+      get exportPollLastStatus() { return owner().exportPollLastStatus; },
+      set exportPollLastStatus(value) { owner().exportPollLastStatus = value; },
+      get exportPoller() { return owner().exportPoller; },
+      get exportRefreshing() { return owner().exportRefreshing; },
+      get exportRequest() { return owner().exportRequest; },
+      get exportStatus() { return owner().exportStatus; },
+      get injector() { return owner().injector; },
+      settleAfterConfirmedMutation: this.settleAfterConfirmedMutation.bind(this),
+      get snackbar() { return owner().snackbar; },
+      toast: this.toast.bind(this),
+      get user() { return owner().user; },
+    });
+  }
+
+  private readonly sessionsCoordinator = this.createSettingsSessionsCoordinator();
+
+  private createSettingsSessionsCoordinator(): SettingsSessionsCoordinator {
+    const owner = () => this;
+    return new SettingsSessionsCoordinator({
+      accountContext: this.accountContext.bind(this),
+      get auth() { return owner().auth; },
+      get destroyRef() { return owner().destroyRef; },
+      get router() { return owner().router; },
+      get sessionDeadline() { return owner().sessionDeadline; },
+      get sessionDeadlineContext() { return owner().sessionDeadlineContext; },
+      set sessionDeadlineContext(value) { owner().sessionDeadlineContext = value; },
+      get sessionRevocationRequests() { return owner().sessionRevocationRequests; },
+      get sessions() { return owner().sessions; },
+      get sessionsError() { return owner().sessionsError; },
+      get sessionsLoading() { return owner().sessionsLoading; },
+      get sessionsRequest() { return owner().sessionsRequest; },
+      get sessionsTruncated() { return owner().sessionsTruncated; },
+      get snackbar() { return owner().snackbar; },
+      toast: this.toast.bind(this),
+      get user() { return owner().user; },
+    });
+  }
+
+  private readonly privacyCoordinator = this.createSettingsPrivacyCoordinator();
+
+  private createSettingsPrivacyCoordinator(): SettingsPrivacyCoordinator {
+    const owner = () => this;
+    return new SettingsPrivacyCoordinator({
+      accountContext: this.accountContext.bind(this),
+      get actions() { return owner().actions; },
+      get activeSection() { return owner().activeSection; },
+      get api() { return owner().api; },
+      get auth() { return owner().auth; },
+      get destroyRef() { return owner().destroyRef; },
+      get injector() { return owner().injector; },
+      get privacyAction() { return owner().privacyAction; },
+      get privacyBusy() { return owner().privacyBusy; },
+      get privacyError() { return owner().privacyError; },
+      get privacyForm() { return owner().privacyForm; },
+      get privacyLoading() { return owner().privacyLoading; },
+      get privacyMutationError() { return owner().privacyMutationError; },
+      get privacyMutationRequest() { return owner().privacyMutationRequest; },
+      get privacyPage() { return owner().privacyPage; },
+      get privacyPageSize() { return owner().privacyPageSize; },
+      get privacyReceipt() { return owner().privacyReceipt; },
+      get privacyReceiptBlock() { return owner().privacyReceiptBlock; },
+      get privacyRequest() { return owner().privacyRequest; },
+      get privacyRequests() { return owner().privacyRequests; },
+      get privacyResponseContext() { return owner().privacyResponseContext; },
+      set privacyResponseContext(value) { owner().privacyResponseContext = value; },
+      get privacyResponseDrafts() { return owner().privacyResponseDrafts; },
+      get privacyResponseForm() { return owner().privacyResponseForm; },
+      get privacyResponseId() { return owner().privacyResponseId; },
+      get privacyResponseInput() { return owner().privacyResponseInput; },
+      get privacyTotal() { return owner().privacyTotal; },
+      get snackbar() { return owner().snackbar; },
+      toast: this.toast.bind(this),
+      get user() { return owner().user; },
+    });
+  }
+
+  private readonly mfaCoordinator = this.createSettingsMfaCoordinator();
+
+  private createSettingsMfaCoordinator(): SettingsMfaCoordinator {
+    const owner = () => this;
+    return new SettingsMfaCoordinator({
+      accountContext: this.accountContext.bind(this),
+      get actions() { return owner().actions; },
+      get auth() { return owner().auth; },
+      get destroyRef() { return owner().destroyRef; },
+      loadSessions: this.loadSessions.bind(this),
+      get mfaBusy() { return owner().mfaBusy; },
+      get mfaCodeForm() { return owner().mfaCodeForm; },
+      get mfaDisableForm() { return owner().mfaDisableForm; },
+      get mfaPasswordForm() { return owner().mfaPasswordForm; },
+      get mfaQr() { return owner().mfaQr; },
+      get mfaQrLoading() { return owner().mfaQrLoading; },
+      get mfaReconfigureForm() { return owner().mfaReconfigureForm; },
+      get mfaReconfiguring() { return owner().mfaReconfiguring; },
+      get mfaRequests() { return owner().mfaRequests; },
+      get mfaSecret() { return owner().mfaSecret; },
+      get mfaUri() { return owner().mfaUri; },
+      get qrCode() { return owner().qrCode; },
+      get recoveryCodes() { return owner().recoveryCodes; },
+      get recoveryCodesAcknowledged() { return owner().recoveryCodesAcknowledged; },
+      get recoveryRegenerateForm() { return owner().recoveryRegenerateForm; },
+      get recoveryRegenerating() { return owner().recoveryRegenerating; },
+      settleAfterConfirmedMutation: this.settleAfterConfirmedMutation.bind(this),
+      get snackbar() { return owner().snackbar; },
+      toast: this.toast.bind(this),
+      get uncertainMfaSetup() { return owner().uncertainMfaSetup; },
+      get userMutationUnconfirmed() { return owner().userMutationUnconfirmed; },
+      get userRefreshRequired() { return owner().userRefreshRequired; },
+    });
+  }
+
   constructor() {
     this.profileForm.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.profileSaveState.set("idle"));
     let identity = this.accountContext();
@@ -617,29 +752,7 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async loadSessions(): Promise<void> {
-    if (!this.user() || this.destroyRef.destroyed) return;
-    this.sessionDeadline.stop();
-    const context = this.accountContext();
-    const request = this.sessionsRequest.begin(context);
-    this.sessionsLoading.set(true);
-    this.sessionsError.set(null);
-    try {
-      const { sessions, truncated } = await this.auth.listSessions({ signal: request.signal });
-      if (!this.sessionsRequest.isCurrent(request, this.accountContext())) return;
-      const now = Date.now();
-      this.sessions.set(sessions.filter((session) => !session.revoked_at && new Date(session.expires_at).getTime() > now));
-      this.sessionsTruncated.set(truncated);
-      this.sessionDeadlineContext = context;
-      const deadlines = this.sessions().map(row => Date.parse(row.expires_at));
-      this.sessionDeadline.schedule(deadlines.length ? Math.min(...deadlines) : null);
-    } catch (err) {
-      if (!this.sessionsRequest.isCurrent(request, this.accountContext())) return;
-      this.sessions.set([]);
-      this.sessionsTruncated.set(false);
-      this.sessionsError.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.0a77c5488d3df2:No se pudieron cargar las sesiones`);
-    } finally {
-      if (this.sessionsRequest.isCurrent(request, this.accountContext())) this.sessionsLoading.set(false);
-    }
+    return this.sessionsCoordinator.loadSessions();
   }
 
   /**
@@ -648,52 +761,12 @@ export class SettingsComponent implements AfterViewInit {
    * reintenta). Un fallo de lectura nunca confirma que no hay exportación.
    */
   async loadExportStatus(notify = true, silent = false, reloadHistory = true): Promise<void> {
-    if (!this.user() || this.destroyRef.destroyed) return;
-    const context = this.auth.sessionGeneration();
-    const request = this.exportRequest.begin(context);
-    if (!silent) this.exportLoading.set(true);
-    try {
-      const status = await this.auth.dataExportStatus({ signal: request.signal });
-      if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
-      const statusChanged = (status?.status ?? null) !== this.exportPollLastStatus;
-      if (statusChanged) this.exportPoller.reset();
-      this.exportPollLastStatus = status?.status ?? null;
-      this.exportStatus.set(status);
-      this.exportError.set(null);
-      this.armExportExpiryCheck(status);
-      // El historial sólo cambia cuando cambia el estado visible; las sondas
-      // silenciosas no lo tocan mientras la exportación siga igual.
-      if (statusChanged && reloadHistory) void this.loadExportHistory();
-    } catch (err) {
-      if (!this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) return;
-      this.exportError.set(err instanceof ApiRequestError ? err.message : $localize`:@@ui.221074773ba701:No se pudo consultar el estado de la exportación`);
-      if (notify && !silent) this.toast(err, $localize`:@@ui.221074773ba701:No se pudo consultar el estado de la exportación`);
-    } finally {
-      if (this.exportRequest.isCurrent(request, this.auth.sessionGeneration())) {
-        if (!silent) this.exportLoading.set(false);
-        this.exportPoller.schedule();
-      }
-    }
+    return this.exportCoordinator.loadExportStatus(notify, silent, reloadHistory);
   }
 
   /** Recover the observation, keeping keyboard focus and never replaying a write. */
   async retryExportStatus(): Promise<void> {
-    if (!this.exportError() || this.exportRefreshing() || this.exportLoading() || this.exportBusy()
-      || !this.user() || this.destroyRef.destroyed) return;
-    const context = this.accountContext();
-    const current = () => context === this.accountContext() && !this.destroyRef.destroyed;
-    this.exportRefreshing.set(true);
-    this.exportPoller.stop();
-    this.stopExportExpiryCheck();
-    try {
-      await this.loadExportStatus(false, true);
-      if (current() && !this.exportError()) this.exportHeading()?.nativeElement.focus({ preventScroll: true });
-    } finally {
-      if (current()) {
-        this.exportRefreshing.set(false);
-        this.exportPoller.schedule();
-      }
-    }
+    return this.exportCoordinator.retryExportStatus();
   }
 
   /**
@@ -701,22 +774,11 @@ export class SettingsComponent implements AfterViewInit {
    * tarjeta de estado: lo que manda es la exportación activa.
    */
   async loadExportHistory(): Promise<void> {
-    if (!this.user() || this.destroyRef.destroyed) return;
-    const context = this.auth.sessionGeneration();
-    const request = this.exportHistoryRequest.begin(context);
-    try {
-      const exports = await this.auth.dataExportHistory({ signal: request.signal });
-      if (!this.exportHistoryRequest.isCurrent(request, this.auth.sessionGeneration())) return;
-      this.exportHistory.set(exports);
-    } catch {
-      // Sin historial no se pierde nada operativo; se conserva el último visto.
-    }
+    return this.exportCoordinator.loadExportHistory();
   }
 
   private exportNeedsPoll(): boolean {
-    // Sólo la generación avanza sola. `ready` es un estado final vivo: no se
-    // sondea, se refresca al recuperar la pestaña y al caducar la descarga.
-    return !this.exportRefreshing() && (this.exportStatus()?.status ?? null) === "processing";
+    return this.exportCoordinator.exportNeedsPoll();
   }
 
   /** Una exportación lista no sondea: al volver a la pestaña se refresca una vez. */
@@ -730,85 +792,28 @@ export class SettingsComponent implements AfterViewInit {
    * refresca una vez y pasa a `expired` sin sondeos periódicos.
    */
   private armExportExpiryCheck(status: DataExportStatus | null): void {
-    this.stopExportExpiryCheck();
-    if (status?.status !== "ready" || !status.downloadExpiresAt) return;
-    const expiresAt = new Date(status.downloadExpiresAt).getTime();
-    if (!Number.isFinite(expiresAt)) return;
-    // setTimeout acepta hasta 2^31-1 ms; un retardo negativo ya ha caducado.
-    const delay = Math.min(Math.max(expiresAt - Date.now(), 0), 2_147_483_647);
-    this.exportExpiryTimer = setTimeout(() => {
-      this.exportExpiryTimer = null;
-      void this.loadExportStatus(false, true);
-    }, delay);
+    return this.exportCoordinator.armExportExpiryCheck(status);
   }
 
   private stopExportExpiryCheck(): void {
-    if (this.exportExpiryTimer !== null) {
-      clearTimeout(this.exportExpiryTimer);
-      this.exportExpiryTimer = null;
-    }
+    return this.exportCoordinator.stopExportExpiryCheck();
   }
 
   openDataExportDialog(purpose: "request" | "download" = "request"): void {
-    if (this.exportDialog || this.exportBusy() || this.exportLoading() || this.exportError() || this.exportRefreshing()
-      || !this.user() || this.destroyRef.destroyed) return;
-    const context = this.accountContext();
-    const dialog = this.dialogs.open(DataExportDialogComponent, {
-      data: { purpose },
-      width: "min(560px, 94vw)", maxWidth: "94vw", maxHeight: "92dvh",
-      autoFocus: "#export-password-step input", restoreFocus: true, injector: this.injector,
-      ariaLabel: purpose === "download" ? $localize`:@@ui.d14302fe9e5469:Descargar la exportación de datos` : $localize`:@@ui.638968dd8eea63:Solicitar una exportación de datos`,
-    });
-    this.exportDialog = dialog;
-    dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
-      if (this.exportDialog !== dialog) return;
-      this.exportDialog = undefined;
-      if (!result || context !== this.accountContext() || this.destroyRef.destroyed) return;
-      if (result === "unconfirmed") {
-        this.snackbar.open($localize`:@@ui.8ba338ee08955f:Archivo descargado. No pudimos confirmar la recepción: puedes descargarlo de nuevo o dejar que caduque.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 6000 });
-      } else {
-        this.snackbar.open(purpose === "download" ? $localize`:@@ui.415a5c68626ffb:Archivo descargado` : $localize`:@@ui.0f44741eab4e98:Solicitud de exportación iniciada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
-      }
-      void this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.loadExportHistory()]);
-    });
+    return this.exportCoordinator.openDataExportDialog(purpose);
   }
 
   async cancelDataExport(): Promise<void> {
-    if (this.exportBusy() || this.exportLoading() || this.exportError() || this.exportRefreshing()
-      || !this.user() || this.destroyRef.destroyed) return;
-    const request = this.exportMutationRequest.begin(this.accountContext());
-    const current = () => this.exportMutationRequest.isCurrent(request, this.accountContext());
-    const confirmed = await this.actions.confirm({
-      title: $localize`:@@ui.18b3cbc9663064:Cancelar exportación`,
-      message: $localize`:@@ui.773975fc9171ab:La descarga pendiente dejará de funcionar y se eliminará el archivo privado si ya estaba preparado.`,
-      confirmLabel: $localize`:@@ui.18b3cbc9663064:Cancelar exportación`,
-      destructive: true,
-    });
-    // The answer can arrive after another attempt started; the dialog is not a
-    // lock on the operation it describes.
-    if (!confirmed || !current() || this.exportBusy() || this.exportLoading() || this.exportError() || this.exportRefreshing()) return;
-    this.exportBusy.set(true);
-    try {
-      await this.auth.cancelDataExport();
-      if (!current()) return;
-      this.snackbar.open($localize`:@@ui.5de8ee35ff5ac2:Exportación cancelada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
-      await this.settleAfterConfirmedMutation([this.loadExportStatus(false), this.loadExportHistory()]);
-    } catch (err) {
-      if (current()) this.toast(err, "");
-    } finally {
-      if (current()) this.exportBusy.set(false);
-    }
+    return this.exportCoordinator.cancelDataExport();
   }
 
   exportIsActive(): boolean {
-    return ["processing", "ready"].includes(this.exportStatus()?.status ?? "");
+    return this.exportCoordinator.exportIsActive();
   }
 
   /** Los estados con acción propia no repiten la entrada «Solicitar mi archivo». */
   exportShowsRequestEntry(): boolean {
-    if (!this.user() || this.exportLoading() || this.exportError() || this.exportRefreshing()) return false;
-    const status = this.exportStatus()?.status ?? null;
-    return status === null || status === "downloaded" || status === "cancelled";
+    return this.exportCoordinator.exportShowsRequestEntry();
   }
 
   private static readonly EXPORT_STAGE_LABELS: Record<DataExportStage, string> = {
@@ -830,28 +835,20 @@ export class SettingsComponent implements AfterViewInit {
 
   /** Etapa viva de la generación; sin etapa conocida, texto neutro. */
   exportStageLabel(stage: DataExportStage | null): string {
-    return stage ? SettingsComponent.EXPORT_STAGE_LABELS[stage] : $localize`:@@ui.5462b220b401da:Preparando el archivo`;
+    return this.exportCoordinator.exportStageLabel(stage);
   }
 
   exportStatusLabel(status: DataExportStatus["status"]): string {
-    return SettingsComponent.EXPORT_STATUS_LABELS[status];
+    return this.exportCoordinator.exportStatusLabel(status);
   }
 
   /** Icono y tono de la tarjeta comparten el estado de la exportación. */
   exportTone(status: DataExportStatus["status"]): AsyncOperationTone {
-    return status === "processing" ? "working"
-      : status === "ready" ? "ready"
-      : status === "failed" ? "failed"
-      : status === "expired" ? "expired"
-      : "done";
+    return this.exportCoordinator.exportTone(status);
   }
 
   exportIcon(status: DataExportStatus["status"]): string {
-    return status === "processing" ? "hourglass_top"
-      : status === "ready" ? "task_alt"
-      : status === "downloaded" ? "download_done"
-      : status === "failed" ? "error_outline"
-      : "history";
+    return this.exportCoordinator.exportIcon(status);
   }
 
   /** El límite automático se resuelve por el flujo de portabilidad, no por soporte. */
@@ -903,204 +900,51 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async loadPrivacyRequests(notify = false): Promise<void> {
-    if (!this.user() || this.destroyRef.destroyed) return;
-    const page = this.privacyPage() + 1;
-    const perPage = this.privacyPageSize();
-    const context = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${perPage}`;
-    const request = this.privacyRequest.begin(context);
-    this.privacyLoading.set(true);
-    this.privacyError.set(null);
-    try {
-      const response = await this.api.get<{ requests: PrivacyRightRequest[]; total: number }>("/api/v1/auth/privacy-requests", {
-        page,
-        perPage,
-      }, (value) => decodePrivacyRequestsPage(value, { page, perPage }), { signal: request.signal });
-      const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
-      if (!this.privacyRequest.isCurrent(request, current)) return;
-      this.privacyRequests.set(response.requests);
-      this.privacyTotal.set(response.total);
-    } catch (error) {
-      const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
-      if (!this.privacyRequest.isCurrent(request, current)) return;
-      this.privacyRequests.set([]);
-      this.privacyError.set(error instanceof ApiRequestError ? error.message : $localize`:@@ui.cfaf0e382ffa5a:No se pudieron cargar las solicitudes`);
-      if (notify) this.toast(error, $localize`:@@ui.cfaf0e382ffa5a:No se pudieron cargar las solicitudes`);
-    } finally {
-      const current = `${this.auth.sessionGeneration()}:${this.privacyPage()}:${this.privacyPageSize()}`;
-      if (this.privacyRequest.isCurrent(request, current)) this.privacyLoading.set(false);
-    }
+    return this.privacyCoordinator.loadPrivacyRequests(notify);
   }
 
   onPrivacyPage(event: PageEvent): void {
-    this.privacyPage.set(event.pageIndex);
-    this.privacyPageSize.set(event.pageSize);
-    void this.loadPrivacyRequests();
+    return this.privacyCoordinator.onPrivacyPage(event);
   }
 
   async submitPrivacyRequest(): Promise<void> {
-    if (!this.user() || this.destroyRef.destroyed) return;
-    const type = this.privacyForm.controls.type.value;
-    const detailControl = this.privacyForm.controls.details;
-    const details = detailControl.value.trim();
-    if (detailControl.hasError("detailRequired")) {
-      const remaining = { ...(detailControl.errors ?? {}) };
-      delete remaining["detailRequired"];
-      detailControl.setErrors(Object.keys(remaining).length ? remaining : null);
-    }
-    if (["rectification", "objection", "restriction"].includes(type) && details.length < 10) {
-      detailControl.setErrors({ ...(detailControl.errors ?? {}), detailRequired: true });
-    }
-    if (this.privacyForm.invalid || this.privacyBusy()) {
-      this.privacyForm.markAllAsTouched();
-      return;
-    }
-    const request = this.privacyMutationRequest.begin(this.accountContext());
-    const current = () => this.privacyMutationRequest.isCurrent(request, this.accountContext());
-    this.startPrivacyMutation("create");
-    try {
-      const response = await this.api.post<unknown>("/api/v1/auth/privacy-requests", { type, details });
-      if (!current()) return;
-      let admitted: PrivacyRightRequest;
-      try { admitted = decodePrivacyRequestCreated(response, type); }
-      catch { throw new ApiRequestError($localize`:@@ui.9014251881a1ec:No pudimos confirmar el registro. Conservamos el texto; comprueba el seguimiento antes de volver a enviarlo.`, 502); }
-      this.privacyReceipt.set({ id: admitted.id, type: admitted.type, dueAt: admitted.dueAt });
-      afterNextRender(() => {
-        if (current() && this.activeSection() === "privacy" && this.privacyReceipt()?.id === admitted.id) {
-          const receipt = this.privacyReceiptBlock()?.nativeElement;
-          receipt?.focus({ preventScroll: true });
-          receipt?.scrollIntoView({ block: "nearest", behavior: "instant" });
-        }
-      }, { injector: this.injector });
-      this.privacyForm.reset({ type: "access", details: "" });
-      this.privacyPage.set(0);
-      await this.loadPrivacyRequests(false);
-      if (!current()) return;
-      this.snackbar.open($localize`:@@ui.7741b3a10a9b4d:Solicitud registrada y plazo iniciado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3500 });
-    } catch (error) {
-      if (!current()) return;
-      this.privacyMutationError.set(this.privacyFailure(error));
-      await this.loadPrivacyRequests(false);
-    } finally {
-      if (current()) this.finishPrivacyMutation();
-    }
+    return this.privacyCoordinator.submitPrivacyRequest();
   }
 
   beginPrivacyResponse(id: number): void {
-    if (!this.user() || this.destroyRef.destroyed || this.privacyBusy()) return;
-    const context = this.accountContext();
-    if (this.privacyResponseId() === id && this.privacyResponseContext === context) return;
-    this.rememberPrivacyResponse();
-    this.privacyResponseId.set(id);
-    this.privacyResponseContext = context;
-    this.privacyResponseForm.reset({ message: this.privacyResponseDrafts.get(`${context}:${id}`) ?? "" });
-    afterNextRender(() => {
-      if (!this.destroyRef.destroyed && context === this.accountContext() && this.privacyResponseId() === id
-        && this.activeSection() === "privacy") this.privacyResponseInput()?.nativeElement.focus({ preventScroll: true });
-    }, { injector: this.injector });
+    return this.privacyCoordinator.beginPrivacyResponse(id);
   }
 
   async respondPrivacy(request: PrivacyRightRequest): Promise<void> {
-    if (!this.user() || this.destroyRef.destroyed) return;
-    if (this.privacyResponseForm.invalid || this.privacyBusy()) {
-      this.privacyResponseForm.markAllAsTouched();
-      return;
-    }
-    const mutation = this.privacyMutationRequest.begin(this.accountContext());
-    const current = () => this.privacyMutationRequest.isCurrent(mutation, this.accountContext());
-    this.startPrivacyMutation("respond");
-    try {
-      const response = await this.api.post<unknown>(`/api/v1/auth/privacy-requests/${request.id}/respond`, {
-        message: this.privacyResponseForm.controls.message.value.trim(),
-      });
-      if (!current()) return;
-      this.confirmPrivacyAcknowledgement(response);
-      this.privacyResponseDrafts.delete(`${this.accountContext()}:${request.id}`);
-      this.privacyResponseId.set(null);
-      this.privacyResponseContext = null;
-      this.privacyResponseForm.reset();
-      await this.loadPrivacyRequests(false);
-      if (!current()) return;
-      this.snackbar.open($localize`:@@ui.5e1fff735fdae3:Respuesta incorporada al expediente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 3000 });
-    } catch (error) {
-      if (!current()) return;
-      this.privacyMutationError.set(this.privacyFailure(error));
-      await this.loadPrivacyRequests(false);
-    } finally {
-      if (current()) this.finishPrivacyMutation();
-    }
+    return this.privacyCoordinator.respondPrivacy(request);
   }
 
   async cancelPrivacy(request: PrivacyRightRequest): Promise<void> {
-    if (!this.user() || this.destroyRef.destroyed || this.privacyBusy()) return;
-    const mutation = this.privacyMutationRequest.begin(this.accountContext());
-    const current = () => this.privacyMutationRequest.isCurrent(mutation, this.accountContext());
-    const confirmed = await this.actions.confirm({
-      title: $localize`:@@ui.c9d98050b715ed:Cancelar solicitud`,
-      message: $localize`:@@ui.dbdcf79b5764a9:El expediente quedará cerrado como cancelado. Podrás crear otra solicitud del mismo tipo más adelante.`,
-      confirmLabel: $localize`:@@ui.c9d98050b715ed:Cancelar solicitud`,
-      destructive: true,
-    });
-    if (!confirmed || !current() || this.privacyBusy()) return;
-    this.startPrivacyMutation("cancel");
-    try {
-      const response = await this.api.post<unknown>(`/api/v1/auth/privacy-requests/${request.id}/cancel`, {});
-      if (!current()) return;
-      this.confirmPrivacyAcknowledgement(response);
-      await this.loadPrivacyRequests();
-      if (!current()) return;
-      this.snackbar.open($localize`:@@ui.e075f56997a31c:Solicitud cancelada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
-    } catch (error) {
-      if (!current()) return;
-      this.privacyMutationError.set(this.privacyFailure(error));
-      await this.loadPrivacyRequests(false);
-    } finally {
-      if (current()) this.finishPrivacyMutation();
-    }
+    return this.privacyCoordinator.cancelPrivacy(request);
   }
 
   closePrivacyResponse(): void {
-    if (this.privacyBusy() || this.destroyRef.destroyed) return;
-    this.rememberPrivacyResponse();
-    this.privacyResponseId.set(null);
-    this.privacyResponseContext = null;
+    return this.privacyCoordinator.closePrivacyResponse();
   }
 
   private rememberPrivacyResponse(): void {
-    const id = this.privacyResponseId(), context = this.privacyResponseContext;
-    if (id === null || context !== this.accountContext()) return;
-    const key = `${context}:${id}`;
-    this.privacyResponseDrafts.delete(key);
-    if (this.privacyResponseDrafts.size >= 20) {
-      const oldest = this.privacyResponseDrafts.keys().next().value;
-      if (oldest !== undefined) this.privacyResponseDrafts.delete(oldest);
-    }
-    this.privacyResponseDrafts.set(key, this.privacyResponseForm.controls.message.value);
+    return this.privacyCoordinator.rememberPrivacyResponse();
   }
 
   private startPrivacyMutation(action: "create" | "respond" | "cancel"): void {
-    this.privacyBusy.set(true);
-    this.privacyAction.set(action);
-    this.privacyMutationError.set(null);
-    this.privacyReceipt.set(null);
-    this.privacyForm.disable({ emitEvent: false });
-    this.privacyResponseForm.disable({ emitEvent: false });
+    return this.privacyCoordinator.startPrivacyMutation(action);
   }
 
   private finishPrivacyMutation(): void {
-    this.privacyBusy.set(false);
-    this.privacyAction.set(null);
-    this.privacyForm.enable({ emitEvent: false });
-    this.privacyResponseForm.enable({ emitEvent: false });
+    return this.privacyCoordinator.finishPrivacyMutation();
   }
 
   private confirmPrivacyAcknowledgement(response: unknown): void {
-    try { decodePublicActionAcknowledgement(response); }
-    catch { throw new ApiRequestError($localize`:@@ui.8caf71d50f77ff:No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.`, 502); }
+    return this.privacyCoordinator.confirmPrivacyAcknowledgement(response);
   }
 
   private privacyFailure(error: unknown): string {
-    return error instanceof ApiRequestError ? error.message
-      : $localize`:@@ui.8caf71d50f77ff:No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.`;
+    return this.privacyCoordinator.privacyFailure(error);
   }
 
   readonly privacyGuidance = PRIVACY_RIGHT_GUIDANCE;
@@ -1129,176 +973,39 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   async revokeSession(session: Session): Promise<void> {
-    if (!this.user() || this.destroyRef.destroyed || this.sessionsLoading() || this.sessionsError()
-      || session.revoked_at !== null || Date.parse(session.expires_at) <= Date.now()) return;
-    const generation = this.auth.sessionGeneration();
-    const context = this.accountContext();
-    const request = this.sessionRevocationRequests.begin(context);
-    const live = () => this.sessionRevocationRequests.isCurrent(request, context);
-    let revokedCurrent: boolean;
-    try {
-      revokedCurrent = await this.auth.revokeSession(session.id, session.current);
-    } catch (err) {
-      if (live() && this.accountContext() === context) this.toast(err, $localize`:@@ui.971a3b33f92d4b:No se pudo revocar la sesión`);
-      return;
-    }
-    if (!live()) return;
-    const completedContext = this.accountContext();
-    // Revoking this browser deliberately expires its own local identity. Only
-    // that single transition may navigate; a newer login owns its own route.
-    const ownLogout = revokedCurrent && this.auth.sessionGeneration() === generation + 1 && this.auth.user() === null;
-    if (completedContext !== context && !ownLogout) return;
-    const current = () => live() && this.accountContext() === completedContext;
-    if (revokedCurrent) {
-      try {
-        const navigated = await this.router.navigate(["/auth"]);
-        if (!current()) return;
-        if (!navigated) this.snackbar.open($localize`:@@ui.e6482d2ddd1e69:La sesión quedó revocada. Abre la pantalla de acceso para continuar.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
-      } catch {
-        if (current()) this.snackbar.open($localize`:@@ui.36ad28621f6de0:La sesión quedó revocada, pero no se pudo abrir la pantalla de acceso.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
-      }
-      return;
-    }
-    this.snackbar.open($localize`:@@ui.eef3d770790a42:Sesión revocada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
-    void this.loadSessions();
+    return this.sessionsCoordinator.revokeSession(session);
   }
 
   async startMfaSetup(): Promise<void> {
-    if (this.mfaPasswordForm.invalid || this.mfaBusy() || this.userRefreshRequired()) return;
-    await this.stageMfaSetup(this.mfaPasswordForm.controls.password.value);
+    return this.mfaCoordinator.startMfaSetup();
   }
 
   async startMfaReconfiguration(): Promise<void> {
-    if (this.mfaReconfigureForm.invalid || this.mfaBusy() || this.userRefreshRequired()) return;
-    await this.stageMfaSetup(
-      this.mfaReconfigureForm.controls.password.value,
-      this.mfaReconfigureForm.controls.factorCode.value,
-    );
+    return this.mfaCoordinator.startMfaReconfiguration();
   }
 
   private async stageMfaSetup(password: string, code?: string): Promise<void> {
-    const request = this.mfaRequests.begin(this.accountContext());
-    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
-    this.mfaBusy.set(true);
-    try {
-      const { secret, uri } = await this.auth.mfaSetup(password, code);
-      if (!current()) return;
-      this.mfaCodeForm.reset();
-      this.mfaSecret.set(secret);
-      this.mfaUri.set(uri);
-      this.mfaQr.set(null);
-      this.mfaQrLoading.set(true);
-      try {
-        const generator = await this.qrCode.load();
-        if (!current()) return;
-        const qr = await generator.toDataURL(uri, { width: 480 });
-        if (!current()) return;
-        this.mfaQr.set(qr);
-      } catch {
-        if (!current()) return;
-        // The server-side setup already exists. Preserve the manual secret
-        // instead of inviting a retry that could rotate it again.
-        this.mfaQr.set(null);
-        this.snackbar.open($localize`:@@ui.8bf0f88cbc0a91:La configuración está preparada, pero no se pudo generar el QR. Usa la clave manual mostrada.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
-      } finally {
-        if (current()) this.mfaQrLoading.set(false);
-      }
-      if (code) await this.settleAfterConfirmedMutation([this.auth.refreshUser()]);
-    } catch (err) {
-      if (!current()) return;
-      this.toast(err, "");
-    } finally {
-      if (current()) this.mfaBusy.set(false);
-    }
+    return this.mfaCoordinator.stageMfaSetup(password, code);
   }
 
   beginMfaReconfiguration(): void {
-    if (this.mfaBusy() || this.userRefreshRequired()) return;
-    this.mfaReconfiguring.set(true);
-    this.mfaReconfigureForm.reset();
+    return this.mfaCoordinator.beginMfaReconfiguration();
   }
 
   async enableMfa(): Promise<void> {
-    if (this.mfaCodeForm.invalid || this.mfaBusy() || this.userRefreshRequired()) return;
-    const request = this.mfaRequests.begin(this.accountContext());
-    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
-    this.mfaBusy.set(true);
-    try {
-      const { recoveryCodes } = await this.auth.mfaEnable(this.mfaCodeForm.controls.code.value);
-      if (!current()) return;
-      this.recoveryCodes.set(recoveryCodes);
-      this.uncertainMfaSetup.set(false);
-      this.recoveryCodesAcknowledged.set(false);
-      this.clearMfaSetupUi();
-      this.snackbar.open($localize`:@@ui.99b29f803bfed8:MFA activado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
-      await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
-    } catch (err) {
-      if (!current()) return;
-      if (this.userMutationUnconfirmed()) this.uncertainMfaSetup.set(true);
-      this.toast(err, "");
-    } finally {
-      if (current()) this.mfaBusy.set(false);
-    }
+    return this.mfaCoordinator.enableMfa();
   }
 
   async disableMfa(): Promise<void> {
-    if (this.mfaDisableForm.invalid || this.mfaBusy() || this.userRefreshRequired()) return;
-    const request = this.mfaRequests.begin(this.accountContext());
-    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
-    const confirmed = await this.actions.confirm({
-      title: $localize`:@@ui.abda53de5e75f0:Desactivar MFA`,
-      message: $localize`:@@ui.8ba04bd6cd693e:Tu cuenta perderá la verificación en dos pasos. Confirma con tu contraseña y un código de tu aplicación o de recuperación.`,
-      confirmLabel: $localize`:@@ui.abda53de5e75f0:Desactivar MFA`,
-      destructive: true,
-    });
-    if (!confirmed || !current() || this.mfaBusy() || this.userRefreshRequired()) return;
-    this.mfaBusy.set(true);
-    try {
-      await this.auth.mfaDisable(
-        this.mfaDisableForm.controls.password.value,
-        this.mfaDisableForm.controls.factorCode.value,
-      );
-      if (!current()) return;
-      this.mfaSecret.set(null);
-      this.mfaUri.set(null);
-      this.mfaQr.set(null);
-      this.recoveryCodes.set([]);
-      this.recoveryCodesAcknowledged.set(false);
-      this.mfaReconfiguring.set(false);
-      this.mfaPasswordForm.reset();
-      this.mfaCodeForm.reset();
-      this.mfaDisableForm.reset();
-      this.snackbar.open($localize`:@@ui.af28c171782d92:MFA desactivado`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
-      await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
-    } catch (err) {
-      if (!current()) return;
-      this.toast(err, "");
-    } finally {
-      if (current()) this.mfaBusy.set(false);
-    }
+    return this.mfaCoordinator.disableMfa();
   }
 
   async cancelMfaSetup(): Promise<void> {
-    if (this.mfaBusy()) return;
-    const request = this.mfaRequests.begin(this.accountContext());
-    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
-    this.mfaBusy.set(true);
-    try {
-      await this.auth.mfaCancelSetup();
-      if (!current()) return;
-      this.clearMfaSetupUi();
-    } catch (err) {
-      if (!current()) return;
-      this.toast(err, "");
-    } finally {
-      if (current()) this.mfaBusy.set(false);
-    }
+    return this.mfaCoordinator.cancelMfaSetup();
   }
 
   cancelMfaReconfiguration(): void {
-    if (this.mfaBusy()) return;
-    this.mfaReconfiguring.set(false);
-    this.mfaReconfigureForm.reset();
+    return this.mfaCoordinator.cancelMfaReconfiguration();
   }
 
   private accountContext(): string {
@@ -1306,125 +1013,39 @@ export class SettingsComponent implements AfterViewInit {
   }
 
   private clearSensitiveMfaUi(): void {
-    this.mfaRequests.invalidate();
-    this.clearMfaSetupUi();
-    this.recoveryCodes.set([]);
-    this.uncertainMfaSetup.set(false);
-    this.recoveryCodesAcknowledged.set(false);
-    this.recoveryRegenerating.set(false);
-    this.recoveryRegenerateForm.reset();
-    this.mfaDisableForm.reset();
-    this.mfaBusy.set(false);
+    return this.mfaCoordinator.clearSensitiveMfaUi();
   }
 
   private clearMfaSetupUi(): void {
-    this.mfaQrLoading.set(false);
-    this.mfaSecret.set(null);
-    this.mfaUri.set(null);
-    this.mfaQr.set(null);
-    this.mfaPasswordForm.reset();
-    this.mfaCodeForm.reset();
-    this.mfaReconfigureForm.reset();
-    this.mfaReconfiguring.set(false);
+    return this.mfaCoordinator.clearMfaSetupUi();
   }
 
   private settleUncertainMfaUi(): void {
-    this.uncertainMfaSetup.set(false);
-    this.clearMfaSetupUi();
-    this.recoveryCodes.set([]);
-    this.recoveryCodesAcknowledged.set(false);
-    this.recoveryRegenerating.set(false);
-    this.recoveryRegenerateForm.reset();
+    return this.mfaCoordinator.settleUncertainMfaUi();
   }
 
   finishRecoveryCodes(): void {
-    if (!this.recoveryCodesAcknowledged()) return;
-    this.recoveryCodes.set([]);
-    this.recoveryCodesAcknowledged.set(false);
-    this.snackbar.open($localize`:@@ui.8ab09e6cdebc14:Configuración completada`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
+    return this.mfaCoordinator.finishRecoveryCodes();
   }
 
   beginRecoveryRegeneration(): void {
-    if (this.mfaBusy() || this.userRefreshRequired()) return;
-    this.recoveryRegenerating.set(true);
-    this.recoveryRegenerateForm.reset();
+    return this.mfaCoordinator.beginRecoveryRegeneration();
   }
 
   cancelRecoveryRegeneration(): void {
-    if (this.mfaBusy()) return;
-    this.recoveryRegenerating.set(false);
-    this.recoveryRegenerateForm.reset();
+    return this.mfaCoordinator.cancelRecoveryRegeneration();
   }
 
   async regenerateRecoveryCodes(): Promise<void> {
-    if (this.recoveryRegenerateForm.invalid || this.mfaBusy() || this.userRefreshRequired()) {
-      this.recoveryRegenerateForm.markAllAsTouched();
-      return;
-    }
-    const request = this.mfaRequests.begin(this.accountContext());
-    const current = () => this.mfaRequests.isCurrent(request, this.accountContext());
-    const confirmed = await this.actions.confirm({
-      title: $localize`:@@ui.d11ca81ed62f56:Regenerar códigos de recuperación`,
-      message: $localize`:@@ui.dd893854c65e40:Los códigos anteriores dejarán de funcionar y se cerrarán las demás sesiones de tu cuenta.`,
-      confirmLabel: $localize`:@@ui.3ddb11527b0b1e:Regenerar códigos`,
-      destructive: true,
-    });
-    if (!confirmed || !current() || this.mfaBusy() || this.userRefreshRequired()) return;
-
-    this.mfaBusy.set(true);
-    try {
-      const { recoveryCodes } = await this.auth.mfaRegenerateRecoveryCodes(
-        this.recoveryRegenerateForm.controls.password.value,
-        this.recoveryRegenerateForm.controls.factorCode.value,
-      );
-      if (!current()) return;
-      this.recoveryCodes.set(recoveryCodes);
-      this.uncertainMfaSetup.set(false);
-      this.recoveryCodesAcknowledged.set(false);
-      this.recoveryRegenerating.set(false);
-      this.recoveryRegenerateForm.reset();
-      this.snackbar.open($localize`:@@ui.7787db03239183:Códigos regenerados`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
-      await this.settleAfterConfirmedMutation([this.auth.refreshUser(), this.loadSessions()]);
-    } catch (err) {
-      if (!current()) return;
-      if (this.userMutationUnconfirmed()) this.uncertainMfaSetup.set(true);
-      this.toast(err, "");
-    } finally {
-      if (current()) this.mfaBusy.set(false);
-    }
+    return this.mfaCoordinator.regenerateRecoveryCodes();
   }
 
   copyRecoveryCodes(): void {
-    const codes = this.recoveryCodes();
-    if (!codes.length) return;
-    const context = this.accountContext();
-    const current = () => !this.destroyRef.destroyed && context === this.accountContext() && codes === this.recoveryCodes();
-    const copy = navigator.clipboard?.writeText(codes.join("\n"));
-    if (!copy) {
-      this.snackbar.open($localize`:@@ui.b2b3a94dcbea08:El navegador no permite copiar automáticamente`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 });
-      return;
-    }
-    void copy.then(
-      () => { if (current()) this.snackbar.open($localize`:@@ui.03f45134535134:Códigos copiados`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2000 }); },
-      () => { if (current()) this.snackbar.open($localize`:@@ui.9e5d87300baeca:No se pudieron copiar los códigos`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 2500 }); },
-    );
+    return this.mfaCoordinator.copyRecoveryCodes();
   }
 
   downloadRecoveryCodes(): void {
-    const codes = this.recoveryCodes();
-    if (!codes.length || typeof document === "undefined") return;
-    const body = [
-      $localize`:@@ui.15572ca1eaeb8e:UVH · Códigos de recuperación`,
-      "",
-      $localize`:@@ui.3a70ca36235f4c:Cada código funciona una sola vez. Guárdalos fuera de tu cuenta.`,
-      "",
-      ...codes,
-      "",
-      `Generados: ${new Date().toISOString()}`,
-    ].join("\n");
-    if (!downloadBlob(new Blob([body], { type: "text/plain;charset=utf-8" }), "uvh-codigos-recuperacion.txt")) {
-      this.snackbar.open($localize`:@@ui.f499cedfd63ea2:El navegador no pudo descargar los códigos. Cópialos antes de continuar.`, $localize`:@@ui.aeccae342e4bd0:Cerrar`, { duration: 5000 });
-    }
+    return this.mfaCoordinator.downloadRecoveryCodes();
   }
 
   setTheme(pref: ThemePreference): void {

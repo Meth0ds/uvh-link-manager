@@ -7,6 +7,8 @@ use App\Support\Ids;
 use App\Support\LocalRecoveryBridge;
 use App\Support\LocalRecoveryGate;
 use App\Support\SessionManager;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -98,6 +100,87 @@ final class LocalRecoveryTest extends TestCase
         $bridge->reconcileAudit($snapshot);
         $bridge->reconcileAudit($snapshot);
         self::assertSame(1, DB::table('audit_events')->where('resource_id', $id)->count());
+    }
+
+    public function test_received_audit_events_need_one_read_and_no_transactions(): void
+    {
+        $bridge = app(LocalRecoveryBridge::class);
+        $snapshot = ['auditEvents' => array_map(static fn () => [
+            'id' => (string) Str::uuid(), 'action' => 'operation.backup.completed', 'actor' => null,
+        ], range(1, 100))];
+        $bridge->reconcileAudit($snapshot);
+        $queries = 0;
+        $transactions = 0;
+        DB::listen(static function (QueryExecuted $query) use (&$queries): void {
+            $queries++;
+        });
+        app('events')->listen(TransactionBeginning::class, static function () use (&$transactions): void {
+            $transactions++;
+        });
+
+        $bridge->reconcileAudit($snapshot);
+
+        self::assertSame(1, $queries);
+        self::assertSame(0, $transactions);
+    }
+
+    public function test_duplicate_event_ids_keep_the_first_admitted_action(): void
+    {
+        $id = (string) Str::uuid();
+        app(LocalRecoveryBridge::class)->reconcileAudit(['auditEvents' => [
+            ['id' => $id, 'action' => 'operation.restore.completed'],
+            ['id' => $id, 'action' => 'operation.backup.completed'],
+        ]]);
+        self::assertSame('local_recovery.operation.restore.completed', DB::table('audit_events')->where('resource_id', $id)->soleValue('action'));
+    }
+
+    public function test_receipt_and_audit_admission_roll_back_together(): void
+    {
+        $bridge = app(LocalRecoveryBridge::class);
+        $id = (string) Str::uuid();
+        $snapshot = ['auditEvents' => [['id' => $id, 'action' => 'operation.restore.completed']]];
+        $fail = true;
+        DB::listen(static function (QueryExecuted $query) use (&$fail): void {
+            if ($fail && str_starts_with(strtolower($query->sql), 'insert') && str_contains($query->sql, '"audit_outbox"')) {
+                throw new \RuntimeException('Fixture: audit admission interrupted');
+            }
+        });
+        try {
+            $bridge->reconcileAudit($snapshot);
+            self::fail('The interrupted audit must not be acknowledged.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Fixture: audit admission interrupted', $error->getMessage());
+        } finally {
+            $fail = false;
+        }
+        self::assertFalse(DB::table('local_recovery_audit_receipts')->where('event_id', $id)->exists());
+        $bridge->reconcileAudit($snapshot);
+        self::assertSame(1, DB::table('audit_events')->where('resource_id', $id)->count());
+
+        // A restored database contains neither the event nor its receipt.
+        DB::table('local_recovery_audit_receipts')->where('event_id', $id)->delete();
+        DB::table('audit_events')->where('resource_id', $id)->delete();
+        $bridge->reconcileAudit($snapshot);
+        $bridge->reconcileAudit($snapshot);
+        self::assertSame(1, DB::table('audit_events')->where('resource_id', $id)->count());
+    }
+
+    public function test_a_receipt_arriving_after_the_batch_read_is_not_duplicated(): void
+    {
+        $bridge = app(LocalRecoveryBridge::class);
+        $id = (string) Str::uuid();
+        $snapshot = ['auditEvents' => [['id' => $id, 'action' => 'operation.backup.completed']]];
+        $interleave = true;
+        DB::listen(static function (QueryExecuted $query) use (&$interleave, $bridge, $snapshot): void {
+            if ($interleave && str_starts_with(strtolower($query->sql), 'select') && str_contains($query->sql, '"local_recovery_audit_receipts"')) {
+                $interleave = false;
+                $bridge->reconcileAudit($snapshot);
+            }
+        });
+        $bridge->reconcileAudit($snapshot);
+        self::assertFalse($interleave);
+        self::assertSame(1, DB::table('audit_events')->where('resource_id', $id)->count());
+        self::assertSame(1, DB::table('local_recovery_audit_receipts')->where('event_id', $id)->count());
     }
 
     public function test_invalid_fields_and_untrusted_targets_are_rejected(): void

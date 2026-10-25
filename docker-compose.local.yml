@@ -15,7 +15,7 @@ x-php-service: &php-service
   build:
     context: .
     dockerfile: docker/php/Dockerfile
-  image: ${UVH_LOCAL_PHP_IMAGE:-uvh-php:8.4}
+  image: uvh-php:8.4
   working_dir: /app
   volumes:
     - ./backend-laravel:/app

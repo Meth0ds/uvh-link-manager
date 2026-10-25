@@ -74,8 +74,9 @@ export function createRecoveryAuth(store, bridgeKey, clock = Date.now) {
   }
   function reconcile(adminIds) {
     const data = state(), allowed = new Set(adminIds.map(String));
-    for (const [id, entry] of Object.entries(data.admins)) if (!allowed.has(id)) entry.revoked = true;
-    store.write('credentials', data);
+    let changed = false;
+    for (const [id, entry] of Object.entries(data.admins)) if (!allowed.has(id) && !entry.revoked) { entry.revoked = true; changed = true; }
+    if (changed) store.write('credentials', data);
     for (const [token, value] of sessions) if (!allowed.has(value.actor)) sessions.delete(token);
   }
   return { login, session, enroll, confirm, consume, reconcile, audit,

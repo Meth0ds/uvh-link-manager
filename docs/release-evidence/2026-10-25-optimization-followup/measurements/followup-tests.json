@@ -1,0 +1,20 @@
+{
+  "node": {
+    "tests": 90,
+    "passed": 90
+  },
+  "angular": {
+    "tests": 2316,
+    "passed": 2316
+  },
+  "phpSupplyChain": {
+    "tests": 8,
+    "assertions": 476,
+    "passed": true
+  },
+  "phpstan": true,
+  "smoke": {
+    "macosArm64": true,
+    "linuxX64": true
+  }
+}

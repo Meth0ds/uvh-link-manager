@@ -1,0 +1,219 @@
+[
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AdminController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AdminUserQueries.php",
+    "method": "users",
+    "bodyTokensIdentical": true,
+    "sha256": "e1677aa7ec3af44cebf916acf0399ebb14fbcf5d1f411ad948e4ecfe0407d638"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AdminController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AdminUserQueries.php",
+    "method": "pendingRegistrations",
+    "bodyTokensIdentical": true,
+    "sha256": "a8431a9cb9b304b48ddba0f19f8718efd117f53af42249d5689d5787177765bb"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AdminController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AdminAccountRecoveryActions.php",
+    "method": "accountRecoveries",
+    "bodyTokensIdentical": true,
+    "sha256": "64662e67e5886ef109affc7081feda1be705cadc037156e6f66413acf0106585"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AdminController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AdminAccountRecoveryActions.php",
+    "method": "decideAccountRecovery",
+    "bodyTokensIdentical": true,
+    "sha256": "9e1557383166a7aa9296cbdfef4c2752804273b3d773a9df2ae347566cfb0622"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AdminController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AdminOperationsQueries.php",
+    "method": "operations",
+    "bodyTokensIdentical": true,
+    "sha256": "a0a2a5990f075cd21cce74c65fc62b1c9583758f49ad62289e90567106d4f1a3"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AdminController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AdminOperationsQueries.php",
+    "method": "countsByState",
+    "bodyTokensIdentical": true,
+    "sha256": "2f8e62fdc14bfa93fa87849ae7c07867d10fe2e6c30eff9da263db0316bdb74c"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AdminController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AdminOperationsQueries.php",
+    "method": "heartbeatAge",
+    "bodyTokensIdentical": true,
+    "sha256": "e2d827d7e85cbb57097fdacbf3379b3309a3a115f11f1fbece141a439d387e24"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AdminController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AdminOperationsQueries.php",
+    "method": "operationCheck",
+    "bodyTokensIdentical": true,
+    "sha256": "ec8ae48aea2248b1e29bca9842f91b272511f742f9b5209d4d7274f4c595981c"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+    "method": "exportStatus",
+    "bodyTokensIdentical": true,
+    "sha256": "dddbf7ae39c69d4814167b9140a98eb87d71d0f19152de9c63b00e27c5e2d2c5"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+    "method": "exportHistory",
+    "bodyTokensIdentical": true,
+    "sha256": "3b3f84a7b1f40099f7e732986941ad1744712448755002b9022380ff6aac12dc"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+    "method": "requestExport",
+    "bodyTokensIdentical": true,
+    "sha256": "5896baa010d2f5b4e860ad029480ff071e7ee2b7e04b635d6ab3c3773fac2812"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+    "method": "cancelExport",
+    "bodyTokensIdentical": true,
+    "sha256": "0435eaa6160301c2e703d592389d1f2db5e3e5a6207c4b6e8dec7833180ee8eb"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+    "method": "downloadExport",
+    "bodyTokensIdentical": true,
+    "sha256": "e0b9fab87884b4371f3cb565931bc1f1bef301b428f5e342b2e34b667571e99f"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+    "method": "acknowledgeExportDownload",
+    "bodyTokensIdentical": true,
+    "sha256": "e95f526f958d2c34a5019aebdf911041e2b8979c2f8a4e6d3579e0f5689187de"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+    "method": "isExpired",
+    "bodyTokensIdentical": true,
+    "sha256": "ccbd383565219e0c466d08292571c222dfb89e61002b21a6c5ad60bc8761ee7d"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+    "method": "publicExport",
+    "bodyTokensIdentical": true,
+    "sha256": "7720938a676a90abdf24ad61f870f4b6d960584b426893c45285d90a2f425040"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountDeletionActions.php",
+    "method": "deletionImpact",
+    "bodyTokensIdentical": true,
+    "sha256": "961b50308c9c6c62aa263ffc3652f67259baef3508bfd27ddcfd7f0101387fc8"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountDeletionActions.php",
+    "method": "requestDeletion",
+    "bodyTokensIdentical": true,
+    "sha256": "3b4410dfd62862abc8298f8b8f25e94d89c3daed9af2ba2a541eb85c9f4bd910"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountDeletionActions.php",
+    "method": "confirmDeletion",
+    "bodyTokensIdentical": true,
+    "sha256": "6ea2e927a1f4a0cb231efcc6b2964748ce789bd52a81d31b9a7753fb90c58b47"
+  },
+  {
+    "origin": "backend-laravel/app/Http/Controllers/AccountController.php",
+    "destination": "backend-laravel/app/Http/Controllers/Concerns/AccountDeletionActions.php",
+    "method": "cancelDeletion",
+    "bodyTokensIdentical": true,
+    "sha256": "06dbc70649d888559d2bdff6431a901a26e752394f17dc286b89cb3950a55d68"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RetentionStages.php",
+    "method": "runPurges",
+    "bodyTokensIdentical": true,
+    "sha256": "50cc670ecc474a46693e22f01cbd243348e8f6fe549c8d43ad958df96ce8af68"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RetentionStages.php",
+    "method": "executeAccountDeletions",
+    "bodyTokensIdentical": true,
+    "sha256": "cec7f0ec64e8b8c021ad018c70852b58a6169ff926b55182880a17587892cc46"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RetentionStages.php",
+    "method": "purgeInBatches",
+    "bodyTokensIdentical": true,
+    "sha256": "be45b860f74f6a7da97708b5eea3cf49a5bca163942a42cd77d3ca67465e7a3c"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RetentionStages.php",
+    "method": "days",
+    "bodyTokensIdentical": true,
+    "sha256": "44938f94bc9f314b293611e9b2096dfe8fe9c286d036c416e5a260cb27428ca7"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RecoveryStages.php",
+    "method": "recoverAndQueueMailOutbox",
+    "bodyTokensIdentical": true,
+    "sha256": "6ac2f390a057136365af399549539098530e1c78ab3a7176c936ad18043b0223"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RecoveryStages.php",
+    "method": "queueDestinationRechecks",
+    "bodyTokensIdentical": true,
+    "sha256": "bdfc4a9faffae75d168a4d31d1d70e6c40a858af8b9706c465c3a2fc547eb360"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RecoveryStages.php",
+    "method": "releaseUnlistedBlocks",
+    "bodyTokensIdentical": true,
+    "sha256": "cb796caf08d2a1a1df7475ce5a42f9004b6b2e17568f58182f23674613fd8e6b"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RecoveryStages.php",
+    "method": "queueDomainRevalidations",
+    "bodyTokensIdentical": true,
+    "sha256": "9d28c064fe0fd5e8fbf36fa94909a81e4035f445e869b402b248d12151a8428b"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RecoveryStages.php",
+    "method": "queueTlsProbeChecks",
+    "bodyTokensIdentical": true,
+    "sha256": "85f65a719b05385f915bb1d8a27db4e4087f7660d491cb59bf2f78879f75ccd0"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RecoveryStages.php",
+    "method": "dnsCheckInProgress",
+    "bodyTokensIdentical": true,
+    "sha256": "8581d8546dd1a5fd4f89d415f7dd6d1c2e2c791cfc0502a04c21ceabcc62b757"
+  },
+  {
+    "origin": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+    "destination": "backend-laravel/app/Console/Commands/Concerns/RecoveryStages.php",
+    "method": "dnsCheckDue",
+    "bodyTokensIdentical": true,
+    "sha256": "354c5d7e6e496dd1bcfe9fa9f289d7562da6c46e8dbe3c0ce67fee3a5b8f1cf8"
+  }
+]

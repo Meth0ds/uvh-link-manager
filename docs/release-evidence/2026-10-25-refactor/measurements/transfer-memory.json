@@ -1,0 +1,23 @@
+[
+  {
+    "mib": 8,
+    "bytes": 8388608,
+    "parts": 1,
+    "milliseconds": 54.396874999999994,
+    "peakRssKiB": 87968
+  },
+  {
+    "mib": 64,
+    "bytes": 67108864,
+    "parts": 8,
+    "milliseconds": 82.630416,
+    "peakRssKiB": 146576
+  },
+  {
+    "mib": 256,
+    "bytes": 268435456,
+    "parts": 32,
+    "milliseconds": 271.167334,
+    "peakRssKiB": 174160
+  }
+]

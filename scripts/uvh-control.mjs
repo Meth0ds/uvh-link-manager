@@ -5,6 +5,7 @@ import { createRecoveryIO } from './recovery/io.mjs';
 import { createRecoveryEngine } from './recovery/engine.mjs';
 import { serveRecoveryGateway, drainBridge } from './recovery/gateway.mjs';
 import { createKeyProvider } from './recovery/key-provider.mjs';
+import { createImageSelection } from './recovery/image-selection.mjs';
 import { directory as recoveryDirectory, unwrap as recoveryUnwrap, read as recoveryRead } from './recovery/store.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -200,6 +201,7 @@ export function createController(options = {}) {
   const runtime = join(root, '.uvh-runtime');
   const envFile = join(root, '.env.docker.local');
   const composeFile = join(root, 'docker-compose.local.yml');
+  const images = createImageSelection({ home: join(runtime, 'recovery'), legacy: () => process.env.UVH_LOCAL_PHP_IMAGE ?? environment().UVH_LOCAL_PHP_IMAGE });
   const frontendFile = join(runtime, 'frontend.process.json');
   const lockFile = join(runtime, 'control.lock');
   const gateDir = join(runtime, 'control.gate');
@@ -211,7 +213,7 @@ export function createController(options = {}) {
   const context = new AsyncLocalStorage();
   const token = randomBytes(32).toString('hex');
   const confirmations = new Map();
-  let operation = null, admitting = false, journal = [], statusPending = null, cachedStatus = null;
+  let operation = null, admitting = false, journal = [], statusPending = null, cachedStatus = null, environmentCache = null;
   const limits = options.limits ?? LIMITS;
   let recovery = null, gateway = null, bridgeTimer = null, frozenCli = fileURLToPath(import.meta.url);
   const recoveryEnabled = () => options.recoveryEnabled ?? (environment().UVH_RECOVERY_ENABLED === 'true');
@@ -227,7 +229,7 @@ export function createController(options = {}) {
     frozenCli = join(controllerDir, 'uvh-control.mjs');
     const backupKeyProvider = createKeyProvider({ path: join(home, 'backup-key'), service: 'uvh-recovery-backups', account: 'backup-key' });
     const metadataKeyProvider = createKeyProvider({ path: join(home, 'metadata-key'), service: 'uvh-recovery-metadata', account: 'metadata-key' });
-    const io = createRecoveryIO({ root, home, key: backupKeyProvider.get(), run: runner,
+    const io = createRecoveryIO({ root, home, key: backupKeyProvider.get(), run: runner, images,
       compose: composeArgs, stopFrontend, startFrontend, probe, externalNode });
     io.diagnose = async () => {
       cachedStatus = null;
@@ -264,15 +266,22 @@ export function createController(options = {}) {
       throw new ControlError('Directorio runtime no seguro.');
   }
   function environment() {
-    const values = {};
-    if (existsSync(envFile)) {
-      if (regularFile(envFile).size > 65536) throw new ControlError('Entorno local demasiado grande.');
-      for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
-        const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-        if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, '');
-      }
+    if (!existsSync(envFile)) {
+      if (environmentCache?.signature === null) return { ...environmentCache.values };
+      environmentCache = { signature: null, values: {} };
+      return {};
     }
-    return values;
+    const metadata = regularFile(envFile);
+    if (metadata.size > 65536) throw new ControlError('Entorno local demasiado grande.');
+    const signature = `${metadata.mtimeMs}:${metadata.size}`;
+    if (environmentCache?.signature === signature) return { ...environmentCache.values };
+    const values = {};
+    for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, '');
+    }
+    environmentCache = { signature, values };
+    return { ...values };
   }
   function redact(value) {
     const secrets = Object.entries(environment()).filter(([key]) => /PASSWORD|SECRET|TOKEN|KEY/i.test(key)).map(([, value]) => value);
@@ -303,10 +312,10 @@ export function createController(options = {}) {
     ctx?.signal.throwIfAborted();
     return { ...result, output: redact(result.output) };
   }
-  function composeArgs(args) { return ['compose', '-f', composeFile, '--env-file', envFile, '--profile', 'laravel', ...args]; }
+  function composeArgs(args, imageFiles = images.files()) { return ['compose', '-f', composeFile, ...imageFiles, '--env-file', envFile, '--profile', 'laravel', ...args]; }
   async function compose(args) {
     if (!existsSync(envFile)) throw new ControlError('Entorno local no configurado. Inicia el entorno primero.');
-    const result = await command('docker', composeArgs(args));
+    const result = await command('docker', composeArgs(args), { env: images.environment() });
     if (result.code !== 0) throw new ControlError(result.output || 'Docker Compose devolvió un error.');
     return result.output;
   }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { recoveryAssets } from './recovery/runtime-assets.mjs';
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, lstatSync, writeFileSync, renameSync, unlinkSync, chmodSync } from 'node:fs';
@@ -73,7 +74,7 @@ async function main() {
     }
   }
   walk(browser);
-  const recoveryModules = readdirSync(join(ROOT, 'scripts/recovery')).filter(name => name.endsWith('.mjs')).sort();
+  const recoveryModules = recoveryAssets(join(ROOT, 'scripts'));
   for (const name of recoveryModules) assets[`recovery/${name}`] = join(ROOT, 'scripts/recovery', name);
   writeFileSync(join(BUILD, 'recovery-manifest.json'), JSON.stringify(recoveryModules));
   assets['recovery-manifest.json'] = join(BUILD, 'recovery-manifest.json');

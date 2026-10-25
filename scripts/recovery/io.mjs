@@ -1,10 +1,12 @@
+import { opendir, lstat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, lstatSync, readFileSync, writeFileSync, rmSync, copyFileSync, statfsSync } from 'node:fs';
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, lstatSync, readFileSync, writeFileSync, rmSync, copyFileSync, statfsSync } from 'node:fs';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
 import { join, relative, dirname } from 'node:path';
 import { fail, directory, regular, atomic } from './store.mjs';
-import { COMPONENTS, createManifest, digestFile as digestComponent, validateManifest } from './backup-format.mjs';
+import { COMPONENTS, createManifest, digestFile, validateManifest, hashStream } from './backup-format.mjs';
+import { createImageSelection, DEFAULT_PHP_IMAGE } from './image-selection.mjs';
 
 /** Binary output is streamed to private files; it never enters process logs. */
 export async function fileProcess(file, args, { cwd, input, output, timeoutMs = 600000, env = process.env } = {}) {
@@ -24,23 +26,32 @@ export async function fileProcess(file, args, { cwd, input, output, timeoutMs = 
   catch (error) { child.kill('SIGKILL'); await Promise.allSettled(streams); throw error; }
   finally { clearTimeout(timer); }
 }
-  async function digestFile(path) { return digestComponent(path); }
-function safeTree(path) {
-  if (!existsSync(path)) return;
-  const stat = lstatSync(path);
+async function safeTree(path) {
+  let stat;
+  try { stat = await lstat(path); }
+  catch (error) { if (error.code === 'ENOENT') return; throw error; }
   if (stat.isSymbolicLink() || (!stat.isDirectory() && !stat.isFile())) fail('unsafe_storage', 'El almacenamiento contiene enlaces o archivos especiales; revisa antes de copiar.');
-  if (stat.isDirectory()) for (const name of readdirSync(path)) safeTree(join(path, name));
+  if (stat.isDirectory()) {
+    const entries = await opendir(path);
+    for await (const entry of entries) await safeTree(join(path, entry.name));
+  }
 }
-export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, startFrontend, probe, externalNode }) {
-  let activeImage = null;
+export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, startFrontend, probe, externalNode, images }) {
+  const imageSelection = images ?? createImageSelection({ home, legacy: () => process.env.UVH_LOCAL_PHP_IMAGE ?? env().UVH_LOCAL_PHP_IMAGE });
   const dbArgs = ['exec', '-T', 'postgres'];
+  let environmentCache = null;
   function env() {
+    const path = join(root, '.env.docker.local');
+    const metadata = regular(path, 65536);
+    const signature = `${metadata.mtimeMs}:${metadata.size}`;
+    if (environmentCache?.signature === signature) return { ...environmentCache.values };
     const data = {};
-    for (const line of readFileSync(join(root, '.env.docker.local'), 'utf8').split(/\r?\n/)) {
+    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
       const match = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(line);
       if (match) data[match[1]] = match[2].replace(/^["']|["']$/g, '');
     }
-    return data;
+    environmentCache = { signature, values: data };
+    return { ...data };
   }
   function database() {
     const values = env(), user = values.POSTGRES_USER ?? 'uvh_local', db = values.POSTGRES_DB ?? 'uvh_local';
@@ -53,8 +64,8 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
     return result.output.trim();
   }
   async function git(args, options) { return cmd('git', args, options); }
-  async function cp(args, options = {}) { return cmd('docker', compose(args), { ...options, env: { ...process.env, ...(activeImage ? { UVH_LOCAL_PHP_IMAGE: activeImage } : {}) } }); }
-  async function binary(args, options) { return fileProcess('docker', compose(args), { cwd: root, env: { ...process.env, ...(activeImage ? { UVH_LOCAL_PHP_IMAGE: activeImage } : {}) }, ...options }); }
+  async function cp(args, options = {}) { return cmd('docker', compose(args, imageSelection.files()), { ...options, env: imageSelection.environment(options.env) }); }
+  async function binary(args, options = {}) { return fileProcess('docker', compose(args, imageSelection.files()), { cwd: root, ...options, env: imageSelection.environment(options.env) }); }
   async function head() { return git(['rev-parse', 'HEAD']); }
   async function clean() {
     if (await git(['status', '--porcelain', '--untracked-files=all'])) fail('dirty_checkout', 'Hay cambios locales. Guárdalos en Git y deja main limpio antes de continuar.');
@@ -92,7 +103,7 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
       else await cmd(npm, ['ci', '--ignore-scripts'], { cwd: join(path, folder) });
     }
     // The current Docker tool image runs Composer against a private staging mount.
-    await cmd('docker', ['run', '--rm', '--mount', `type=bind,source=${path}/backend-laravel,target=/app`, '--workdir', '/app', activeImage ?? 'uvh-php:8.4', 'composer', 'install', '--no-interaction', '--prefer-dist', '--no-scripts']);
+    await cmd('docker', ['run', '--rm', '--mount', `type=bind,source=${path}/backend-laravel,target=/app`, '--workdir', '/app', imageSelection.selected() ?? DEFAULT_PHP_IMAGE, 'composer', 'install', '--no-interaction', '--prefer-dist', '--no-scripts']);
   }
   async function prepare(sha, stage) {
     directory(stage);
@@ -116,7 +127,7 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
   async function backup(folder, sha) {
     const { user, db } = database();
     await binary([...dbArgs, 'pg_dump', '-U', user, '-d', db, '-Fc', '--no-owner', '--no-acl'], { output: join(folder, 'database.dump') });
-    const storage = join(root, 'backend-laravel/storage/app'); safeTree(storage);
+    const storage = join(root, 'backend-laravel/storage/app'); await safeTree(storage);
     if (!existsSync(storage)) mkdirSync(storage, { recursive: true });
     await fileProcess('tar', ['-cf', join(folder, 'storage.tar'), '-C', storage, '.']);
     await git(['bundle', 'create', join(folder, 'source.bundle'), 'HEAD', 'main']);
@@ -127,7 +138,7 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
     writeFileSync(join(folder, 'configuration.json'), JSON.stringify(config), { mode: 0o600, flag: 'wx' });
     const migrations = await cp([...dbArgs, 'psql', '-U', user, '-d', db, '-Atc', 'SELECT migration FROM migrations ORDER BY id']);
     const images = await cp(['images', '--format', 'json']);
-    const apiImage = await cmd('docker', ['image', 'inspect', activeImage ?? env().UVH_LOCAL_PHP_IMAGE ?? 'uvh-php:8.4', '--format', '{{.Id}}']);
+    const apiImage = await cmd('docker', ['image', 'inspect', imageSelection.selected() ?? DEFAULT_PHP_IMAGE, '--format', '{{.Id}}']);
     const release = { schema: 1, sha, db, user, migrations, images, apiImage };
     writeFileSync(join(folder, 'release.json'), JSON.stringify(release), { mode: 0o600, flag: 'wx' });
     await createManifest(folder, release);
@@ -136,8 +147,9 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
     const archive = join(folder, 'payload.tar');
     await fileProcess('tar', ['-cf', archive, '-C', folder, ...COMPONENTS, 'manifest.json']);
     const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', Buffer.from(key, 'hex'), iv);
-    await pipeline(createReadStream(archive), cipher, createWriteStream(dest, { flags: 'wx', mode: 0o600 }));
-    return { iv: iv.toString('hex'), tag: cipher.getAuthTag().toString('hex'), digest: await digestFile(dest), bytes: lstatSync(dest).size };
+    const hashing = hashStream();
+    await pipeline(createReadStream(archive), cipher, hashing.stream, createWriteStream(dest, { flags: 'wx', mode: 0o600 }));
+    return { iv: iv.toString('hex'), tag: cipher.getAuthTag().toString('hex'), digest: hashing.digest(), bytes: lstatSync(dest).size };
   }
   async function unpack(entry, source, folder) {
     if (await digestFile(source) !== entry.digest) fail('backup_integrity', 'La copia no coincide con su huella. No se ha restaurado nada.');
@@ -168,7 +180,7 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
     const listing = (await cmd('tar', ['-tf', join(folder, 'storage.tar')])).split(/\r?\n/).filter(Boolean);
     if (listing.some(name => !name.startsWith('./') || name.split('/').includes('..') || /[\\\x00-\x1f]/.test(name))) fail('invalid_storage', 'Rutas de almacenamiento no válidas.');
     const test = directory(join(folder, 'storage-check'));
-    await fileProcess('tar', ['-xf', join(folder, 'storage.tar'), '-C', test]); safeTree(test);
+    await fileProcess('tar', ['-xf', join(folder, 'storage.tar'), '-C', test]); await safeTree(test);
   }
   async function restore(folder, expectedHead) {
     const release = JSON.parse(readFileSync(join(folder, 'release.json'), 'utf8'));
@@ -179,7 +191,7 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
     // Import the source object before moving main, without overwriting local changes.
     await git(['fetch', join(folder, 'source.bundle'), 'HEAD']);
     await git(['reset', '--keep', release.sha]);
-    activeImage = release.apiImage;
+    imageSelection.select(release.apiImage);
     const { user, db } = database();
     if (db !== release.db || user !== release.user) fail('destination_changed', 'La identidad de la base no coincide con la copia.');
     const config = JSON.parse(readFileSync(join(folder, 'configuration.json'), 'utf8'));
@@ -189,11 +201,11 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
       writeFileSync(join(root, name), Buffer.from(value, 'base64'), { mode: 0o600 });
     }
     await binary([...dbArgs, 'pg_restore', '-U', user, '-d', db, '--clean', '--if-exists', '--exit-on-error', '--no-owner', '--no-acl'], { input: join(folder, 'database.dump') });
-    const storage = join(root, 'backend-laravel/storage/app'); safeTree(storage);
+    const storage = join(root, 'backend-laravel/storage/app'); await safeTree(storage);
     const old = `${storage}.recovery-${randomBytes(6).toString('hex')}`;
     if (existsSync(storage)) { const { renameSync } = await import('node:fs'); renameSync(storage, old); }
     mkdirSync(storage, { recursive: true, mode: 0o700 });
-    await fileProcess('tar', ['-xf', join(folder, 'storage.tar'), '-C', storage]); safeTree(storage);
+    await fileProcess('tar', ['-xf', join(folder, 'storage.tar'), '-C', storage]); await safeTree(storage);
     await dependencies(root);
     return release.sha;
   }
@@ -201,7 +213,8 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
     const storage = join(root, 'backend-laravel/storage/app'), extracted = directory(join(folder, 'storage-selective'));
     const allowed = paths.map(value => value.replace(/^\.\//, '')).filter(value => value && !value.includes('..') && !/[\\\x00-\x1f]/.test(value));
     if (!allowed.length || allowed.length !== paths.length) fail('invalid_restore_paths', 'La selección de archivos no es válida.');
-    await fileProcess('tar', ['-xf', join(folder, 'storage.tar'), '-C', extracted]); safeTree(extracted);
+    await fileProcess('tar', ['-xf', join(folder, 'storage.tar'), '-C', extracted]); await safeTree(extracted);
+    await safeTree(storage);
     for (const path of allowed) {
       const source = join(extracted, path), destination = join(storage, path);
       const sourceRelative = relative(extracted, source), destinationRelative = relative(storage, destination);
@@ -211,8 +224,8 @@ export function createRecoveryIO({ root, home, key, run, compose, stopFrontend, 
     return allowed;
   }
   async function apply(sha, from) {
-    activeImage = null;
     await clean(); if (await head() !== from) fail('checkout_changed', 'El checkout cambió desde la autorización.');
+    imageSelection.select(null);
     await git(['merge', '--ff-only', sha]);
     await dependencies(root);
     await cp(['build', 'php']);

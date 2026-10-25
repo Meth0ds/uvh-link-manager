@@ -45,6 +45,15 @@ test('canonical backup manifest detects component tampering and supports its ver
   const manifest = await createManifest(folder, release); assert.equal(manifest.schema, 2); assert.equal((await validateManifest(folder)).sourceSha, SHA);
   writeFileSync(join(folder, 'database.dump'), 'tampered'); await assert.rejects(() => validateManifest(folder), /coincide/);
 });
+test('a missing modern backup component never downgrades the manifest to legacy', async () => {
+  const folder = root();
+  for (const name of COMPONENTS) writeFileSync(join(folder, name), name);
+  await createManifest(folder, { schema: 1, sha: SHA });
+  rmSync(join(folder, 'database.dump'));
+  await assert.rejects(() => validateManifest(folder));
+  rmSync(join(folder, 'manifest.json'));
+  assert.equal((await validateManifest(folder)).legacy, true);
+});
 test('private directories reject symlinks', () => {
   const path = root(); directory(join(path, 'real')); symlinkSync(join(path, 'real'), join(path, 'link'));
   assert.throws(() => directory(join(path, 'link')), /seguro/);
@@ -108,9 +117,17 @@ async function run(engine, action, target = {}, id = randomUUID()) { const item 
 test('external folder destination is atomic and S3 destination verifies the signed request', async () => {
   const path = root(), source = join(path, 'copy.enc'), folder = join(path, 'external'); writeFileSync(source, 'backup-payload');
   const local = await copyToFolder(source, folder, randomUUID()); assert.equal(local.bytes, 14); assert.equal(readFileSync(join(folder, local.key), 'utf8'), 'backup-payload');
-  let request; const remote = await copyToS3(source, { endpoint: 'https://objects.example.test', bucket: 'uvh', region: 'eu-west-1', prefix: 'backups', accessKey: 'access', secretKey: 'secret' }, randomUUID(), async (url, options) => { request = { url, options }; return new Response('', { status: 200 }); });
+  let request; const remote = await copyToS3(source, { endpoint: 'https://objects.example.test', bucket: 'uvh', region: 'eu-west-1', prefix: 'backups', accessKey: 'access', secretKey: 'secret' }, randomUUID(), async (url, options) => { if (options.method === 'PUT') request = { url, options }; return new Response(options.method === 'GET' ? 'backup-payload' : '', { status: 200 }); });
   assert.equal(remote.bytes, 14); assert.match(request.options.headers.Authorization, /^AWS4-HMAC-SHA256/); assert.match(request.url, /objects\.example\.test\/uvh\/backups\//);
   await assert.rejects(() => copyToS3(source, { endpoint: 'http://objects.example.test', bucket: 'uvh', region: 'eu-west-1', accessKey: 'access', secretKey: 'secret' }, randomUUID(), async () => new Response('', { status: 200 })), /HTTPS/);
+});
+
+test('streamed folder copy removes its temporary file after an integrity mismatch', async () => {
+  const path = root(), source = join(path, 'copy.enc'), folder = join(path, 'external'), id = randomUUID();
+  writeFileSync(source, 'backup-payload');
+  await assert.rejects(() => copyToFolder(source, folder, id, { digest: '0'.repeat(64) }), { code: 'destination_integrity' });
+  assert.equal(existsSync(join(folder, `${id}.uvh.enc.uploading`)), false);
+  assert.equal(existsSync(join(folder, `${id}.uvh.enc`)), false);
 });
 test('large external copies use multipart transfer with a final completion request', async () => {
   const path = root(), source = join(path, 'large.enc'), statePath = join(path, 'multipart', 'state.json'); writeFileSync(source, 'multipart-payload'); const calls = [];
@@ -118,7 +135,7 @@ test('large external copies use multipart transfer with a final completion reque
     calls.push({ url, options });
     if (options.method === 'POST' && url.includes('uploads=')) return new Response('<UploadId>upload-1</UploadId>', { status: 200 });
     if (options.method === 'PUT') return new Response('', { status: 200, headers: { etag: '"part-1"' } });
-    return new Response('', { status: 200 });
+    return new Response(options.method === 'GET' ? 'multipart-payload' : '<CompleteMultipartUploadResult/>', { status: 200 });
   }, { statePath });
   assert.equal(result.multipart, true); assert.equal(result.parts, 1); assert.equal(calls.filter(item => item.options.method === 'PUT').length, 1); assert.ok(calls.some(item => item.options.method === 'POST' && item.url.includes('uploadId='))); assert.equal(existsSync(statePath), false);
 });
@@ -135,6 +152,20 @@ test('backup quiesces all writers before snapshot and restores only after verifi
   const f = fixture(); const op = await run(f.engine, 'backup'); assert.equal(op.state, 'completed');
   const calls = f.calls; assert.ok(calls.indexOf('quiesce') < calls.indexOf('backup')); assert.ok(calls.indexOf('verify') < calls.indexOf('reopen'));
   assert.equal(f.engine.snapshot().backups.length, 1); assert.ok(f.engine.snapshot().backups[0].restoredAt); assert.equal(f.engine.blocking(), false);
+});
+test('daily and weekly backup categories survive encryption, publication and retention', async () => {
+  const f = fixture();
+  await run(f.engine, 'policy', { daily: true, dailyRetention: 1, weeklyRetention: 1, updateRetention: 1 });
+  await run(f.engine, 'backup', { tag: 'daily' });
+  await run(f.engine, 'backup', { tag: 'daily' });
+  await run(f.engine, 'backup', { tag: 'weekly' });
+  await run(f.engine, 'backup', { tag: 'weekly' });
+  const copies = f.engine.snapshot().backups;
+  assert.equal(copies.filter(entry => entry.tag === 'daily').length, 1);
+  assert.equal(copies.filter(entry => entry.tag === 'weekly').length, 1);
+  const catalog = unwrap(readFileSync(join(f.home, 'metadata-key'), 'utf8'), JSON.parse(readFileSync(join(f.home, 'backups.json'), 'utf8')));
+  assert.ok(catalog.every(entry => entry.tag === '00'));
+  assert.ok(catalog.every(entry => ['daily', 'weekly'].includes(entry.category)));
 });
 test('backup verification failure preserves maintenance and cannot produce an eligible backup', async () => {
   const f = fixture({ verify: async () => { throw Error('restore failed'); } }); const op = await run(f.engine, 'backup');

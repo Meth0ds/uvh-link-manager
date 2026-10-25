@@ -1,0 +1,66 @@
+[
+  {
+    "batch": "refactor-batch-01",
+    "tests": 419,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-02",
+    "tests": 278,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-03",
+    "tests": 160,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-04",
+    "tests": 294,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-05",
+    "tests": 460,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-06",
+    "tests": 395,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-07",
+    "tests": 225,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-08",
+    "tests": 239,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-09",
+    "tests": 369,
+    "failed": []
+  },
+  {
+    "batch": "refactor-batch-10",
+    "tests": 228,
+    "failed": [
+      {
+        "class": "Tests.Unit.ImageSupplyChainContractTest",
+        "test": "test_every_compose_image_is_pinned_or_built_here"
+      },
+      {
+        "class": "Tests.Unit.ImageSupplyChainContractTest",
+        "test": "test_the_same_image_is_pinned_to_the_same_digest_everywhere"
+      }
+    ]
+  },
+  {
+    "batch": "refactor-batch-11",
+    "tests": 71,
+    "failed": []
+  }
+]

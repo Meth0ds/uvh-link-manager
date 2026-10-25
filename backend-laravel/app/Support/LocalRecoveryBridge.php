@@ -36,7 +36,9 @@ final class LocalRecoveryBridge
         return $key;
     }
 
-    /** @return array{body: string, mac: string} */
+    /** @param array<string, mixed> $value
+     * @return array{body: string, mac: string}
+     */
     public function sign(array $value): array
     {
         $body = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
@@ -44,6 +46,7 @@ final class LocalRecoveryBridge
         return ['body' => $body, 'mac' => hash_hmac('sha256', $body, $this->key())];
     }
 
+    /** @return array<string, mixed> */
     public function read(string $file): array
     {
         $path = $this->path($file);
@@ -63,6 +66,7 @@ final class LocalRecoveryBridge
         return $value;
     }
 
+    /** @return array<string, mixed> */
     public function snapshot(): array
     {
         $value = $this->read('snapshot.json');
@@ -73,14 +77,30 @@ final class LocalRecoveryBridge
         return $value;
     }
 
-    /** Independent receipts are replayed after a DB restore, without duplicate audit events. */
+    /** Independent receipts are replayed after a DB restore, without duplicate audit events.
+     * @param  array<string, mixed>  $snapshot
+     */
     public function reconcileAudit(array $snapshot): void
     {
+        $events = [];
         foreach (array_slice($snapshot['auditEvents'] ?? [], -1000) as $event) {
             if (! is_array($event) || ! Str::isUuid($event['id'] ?? '') || ! is_string($event['action'] ?? null)
                 || preg_match('/^[a-z._-]{1,100}$/D', $event['action']) !== 1) {
                 continue;
             }
+            // The previous per-event loop admitted the first occurrence.
+            $events[$event['id']] ??= $event;
+        }
+        if ($events === []) {
+            return;
+        }
+        $received = DB::table('local_recovery_audit_receipts')->whereIn('event_id', array_keys($events))->pluck('event_id')->all();
+        foreach ($received as $id) {
+            unset($events[$id]);
+        }
+        // insertOrIgnore inside each transaction still arbitrates concurrent
+        // reconcilers; the batch read only removes already completed work.
+        foreach ($events as $event) {
             DB::transaction(function () use ($event): void {
                 if (DB::table('local_recovery_audit_receipts')->insertOrIgnore(['event_id' => $event['id'], 'received_at' => now()]) === 0) {
                     return;
@@ -102,6 +122,7 @@ final class LocalRecoveryBridge
         ]), JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
     }
 
+    /** @param array<string, mixed> $target */
     public function enqueue(string $id, int $actor, string $action, array $target): void
     {
         $path = $this->path('requests/'.$id.'.json');

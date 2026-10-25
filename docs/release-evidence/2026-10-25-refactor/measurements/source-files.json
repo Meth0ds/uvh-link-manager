@@ -1,0 +1,345 @@
+{
+  "baseCommit": "d5d0b7d01aa6f740fbe0312012b1edf1178c4960",
+  "files": [
+    {
+      "file": "backend-laravel/app/Console/Commands/Concerns/RecoveryStages.php",
+      "bytes": 15789,
+      "sha256": "44c0b2dd895d1fd0fedef87b7b189205258257eaa9532470061f59c85515a40c"
+    },
+    {
+      "file": "backend-laravel/app/Console/Commands/Concerns/RetentionStages.php",
+      "bytes": 25462,
+      "sha256": "be1e8dc194962d460efffda445e0e1524b60d799c0dd0d8907c32182bfc4d63a"
+    },
+    {
+      "file": "backend-laravel/app/Http/Controllers/Concerns/AccountDeletionActions.php",
+      "bytes": 22227,
+      "sha256": "55f2e996a13e969810396c05f4df184ca4f032f41d1a9d03975ad079d63911cf"
+    },
+    {
+      "file": "backend-laravel/app/Http/Controllers/Concerns/AccountExportActions.php",
+      "bytes": 26892,
+      "sha256": "c5d179d931ccfef07f80b32890092ec889b3d67142c29553cfa2365ef5bb4955"
+    },
+    {
+      "file": "backend-laravel/app/Http/Controllers/Concerns/AdminAccountRecoveryActions.php",
+      "bytes": 12235,
+      "sha256": "41be32ec500c7a8de80fded91761796a8e6e90a0bfa49cda86bf1a1c1084912c"
+    },
+    {
+      "file": "backend-laravel/app/Http/Controllers/Concerns/AdminOperationsQueries.php",
+      "bytes": 14343,
+      "sha256": "c4d892ba5723a7fe92c17a4233e27c36dd912e5f0067e2c7109f6fabb1ded69d"
+    },
+    {
+      "file": "backend-laravel/app/Http/Controllers/Concerns/AdminUserQueries.php",
+      "bytes": 4976,
+      "sha256": "cdfadb2d2a974f3d83cc7af3e12da0540bbd509a2c5e621c5af3addfa16f9125"
+    },
+    {
+      "file": "backend-laravel/app/Support/RecoveryAuthorization.php",
+      "bytes": 1929,
+      "sha256": "ba89286e7666f5757154bc0a8d67ff9949903f75605c7e5f56bbe0c368d2d7e0"
+    },
+    {
+      "file": "backend-laravel/app/Support/RecoveryCommandAdmission.php",
+      "bytes": 2899,
+      "sha256": "07ec2d1704c7f1d7c349fcb47f41195f625befc4a8fa836ea38ec772be7c786a"
+    },
+    {
+      "file": "frontend/design-preview/admin-preview.component.ts",
+      "bytes": 3789,
+      "sha256": "6a98ea3f65dad07dcfa01eda0613bdf58925b90faa8328c8fd73bf21e42a0045"
+    },
+    {
+      "file": "frontend/src/app/panel/admin/recovery-admin-api.ts",
+      "bytes": 971,
+      "sha256": "97167cc35a684113ea6739c2eeac4bae3f4e1845e3be85dca3b146557043d34b"
+    },
+    {
+      "file": "frontend/src/app/panel/admin/recovery-portal.spec.ts",
+      "bytes": 5139,
+      "sha256": "f8d9cd7a66a1c546f9ba4ff5fdc37fbd7021d2cc7296d23212d6082c57d5c74b"
+    },
+    {
+      "file": "frontend/src/app/panel/admin/recovery-portal.ts",
+      "bytes": 2221,
+      "sha256": "f6f6ebe0361a8154c09e51402dfa41b10fd391150db2a194aae6307261b0c466"
+    },
+    {
+      "file": "frontend/src/app/panel/links/link-rule-form.ts",
+      "bytes": 3788,
+      "sha256": "32a5a84a8e399c397cd8cada3a15af10df2babc3a8a8adf64e02c06bbd0d43dd"
+    },
+    {
+      "file": "frontend/src/app/panel/settings/settings-export-coordinator.ts",
+      "bytes": 11462,
+      "sha256": "dd5f6af0addba20648f279cf8628b59b29fa7afbf6c9cd26b3d511e75ba8b85b"
+    },
+    {
+      "file": "frontend/src/app/panel/settings/settings-mfa-coordinator.ts",
+      "bytes": 14038,
+      "sha256": "32d0e3628500a4b1bbdf57119322c8ff23041b36ba4e40b58dd06aac6d686700"
+    },
+    {
+      "file": "frontend/src/app/panel/settings/settings-privacy-coordinator.ts",
+      "bytes": 13487,
+      "sha256": "2d5647ffb233e2ebdc8be69d91638030cd044798e97d832dc98d5c84d218423e"
+    },
+    {
+      "file": "frontend/src/app/panel/settings/settings-sessions-coordinator.ts",
+      "bytes": 5077,
+      "sha256": "a0c82bbabecaa5292887498b56a46f3b2d1550102a35ba255d19e25c69b240c2"
+    },
+    {
+      "file": "scripts/benchmark-refactor.mjs",
+      "bytes": 6625,
+      "sha256": "d0f290b410c746735dd1dd499d4e14ec382185e2834f28e769f39402b4360781"
+    },
+    {
+      "file": "scripts/benchmark-transfer.mjs",
+      "bytes": 2192,
+      "sha256": "0053f6cc1d2f6b6848147780a68ba314896404e87856580278a9d2892cad38ba"
+    },
+    {
+      "file": "scripts/recovery/backup-runner.mjs",
+      "bytes": 4457,
+      "sha256": "1d4f0f0a4f4751a5e4d57dc00f3137ea1df0c56eaf044b68ec509fa39808994a"
+    },
+    {
+      "file": "scripts/recovery/bridge-publisher.mjs",
+      "bytes": 895,
+      "sha256": "ea65c28d3abf8f1f85003cd363af1de5461c97ac314c2be98d4014000a5cf044"
+    },
+    {
+      "file": "scripts/recovery/health-monitor.mjs",
+      "bytes": 2463,
+      "sha256": "8cc1ffb426a9164b56307d1cca7f08559bd2fe42830872da42e45946e7df77f2"
+    },
+    {
+      "file": "scripts/recovery/health-monitor.test.mjs",
+      "bytes": 1254,
+      "sha256": "12250d73f20004ed6b19ff1951d420f906c3297071b9285f5013031d63adad1f"
+    },
+    {
+      "file": "scripts/recovery/operation-orchestrator.mjs",
+      "bytes": 4286,
+      "sha256": "dc2f2132a6bf7aa07c97b508d5653a0dcc8604c036dd2c322f2098ca47c4d799"
+    },
+    {
+      "file": "scripts/recovery/page-assets/admin.html",
+      "bytes": 6211,
+      "sha256": "cca60760e8c39e51e9fc422a20dbf409b64372e110d284e1cddd78f4e0f3f578"
+    },
+    {
+      "file": "scripts/recovery/page-assets/admin.js",
+      "bytes": 13881,
+      "sha256": "e6e9bd7e2590c8b5078964ea698d1f62384fb9ee9ea932b7d0cfc0c736e9b60a"
+    },
+    {
+      "file": "scripts/recovery/page-assets/maintenance.html",
+      "bytes": 1900,
+      "sha256": "a3950c78b7a521a749c661ce3afa44c544de191aa7164ee214f03698cec5bd86"
+    },
+    {
+      "file": "scripts/recovery/page-assets/maintenance.js",
+      "bytes": 2519,
+      "sha256": "83c3044fcb6f9b792bec050911e741ee1d6e27247605313add61138057bbef8e"
+    },
+    {
+      "file": "scripts/recovery/page-assets/style.css",
+      "bytes": 4523,
+      "sha256": "12434be8d0a6c145ecd4f67dd1e77698fd7f32b884c96efbf422073cd274b144"
+    },
+    {
+      "file": "scripts/recovery/persistence.test.mjs",
+      "bytes": 2832,
+      "sha256": "03af025357959dda86783e6c8fde9d4f0ce848c8139f0c63a529b5f502da25ff"
+    },
+    {
+      "file": "scripts/recovery/runtime-assets.mjs",
+      "bytes": 1476,
+      "sha256": "730f681633019bda5a16adad8540a3c3d9950d31fc322095a9920ff0552533ae"
+    },
+    {
+      "file": "scripts/recovery/runtime-assets.test.mjs",
+      "bytes": 2050,
+      "sha256": "f533a21443d4ed9cfc69c8740804da8be831fda6cfdf1dc146e7314f676c030c"
+    },
+    {
+      "file": "scripts/recovery/s3-multipart.mjs",
+      "bytes": 5095,
+      "sha256": "eac12e7c3a0abf2cf1b97defbf431283611cb396457adb863cf51e5d68bbc108"
+    },
+    {
+      "file": "scripts/recovery/s3-signing.mjs",
+      "bytes": 2456,
+      "sha256": "8e8c3a14cfedc2189543e6e5ee7443589f2cc198db749c222542dffe2a16f75e"
+    },
+    {
+      "file": "scripts/recovery/s3-transfer.test.mjs",
+      "bytes": 6191,
+      "sha256": "33d8380e7c3e13d578dc7b09342f571730e9dfd3917ba2c5d3a836b0767b347e"
+    },
+    {
+      "file": "scripts/recovery/s3-transport.mjs",
+      "bytes": 2031,
+      "sha256": "a235190078b353bb9d2909bcc61148dd8746ff5c22f244ae2b5fdad10bc5420a"
+    },
+    {
+      "file": "scripts/recovery/state-repository.mjs",
+      "bytes": 1022,
+      "sha256": "461309257db7805c89b440f02e1a783d2b94febc3f67685db91777e072a9a83d"
+    },
+    {
+      "file": "scripts/recovery/update-runner.mjs",
+      "bytes": 4508,
+      "sha256": "cc49b43e71e6a472dc3f851e6bdc3970050bcdf7d4eaac2f025ddd26a2d1138d"
+    },
+    {
+      "file": "scripts/refactor-visual-evidence.mjs",
+      "bytes": 13412,
+      "sha256": "b9aa8e48d0d3ae90695d918f2701b53f51d014d64a4382dd1788f3917b744ff7"
+    },
+    {
+      "file": "scripts/uvh-control-linux-smoke.mjs",
+      "bytes": 3242,
+      "sha256": "3d0e9ae06096229569b18bee244ade2b55f7dde0d8cb87823ae3ce859a690717"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "bytes": 22081,
+      "sha256": "459b1853db69d4704c8c6b701abbe77cab3691469c5789e28410860779be2eee"
+    },
+    {
+      "file": "backend-laravel/app/Console/Commands/UvhHousekeeping.php",
+      "bytes": 10646,
+      "sha256": "44c0bb32e5f53ab74c3374980ec28a8cb224112a56be2ef3e956a2223c58999a"
+    },
+    {
+      "file": "backend-laravel/app/Http/Controllers/AccountController.php",
+      "bytes": 1132,
+      "sha256": "c95472344ee34aced54d0260b1ffb2b6837436c292fd4b519a38297e04f3cb28"
+    },
+    {
+      "file": "backend-laravel/app/Http/Controllers/AdminController.php",
+      "bytes": 50544,
+      "sha256": "62e6a33c60eaae3a5180abced3059a42e37bb674bb46368605c01a7c0f897496"
+    },
+    {
+      "file": "backend-laravel/app/Http/Controllers/AdminUpdatesController.php",
+      "bytes": 5007,
+      "sha256": "83b5546a1e3432ebb2459ef9fa1b2fbba1fa40edc03392938d53a1d5259494da"
+    },
+    {
+      "file": "backend-laravel/app/Support/LocalRecoveryBridge.php",
+      "bytes": 6457,
+      "sha256": "06fce3ac22067f5a8708beb345bb85ec002ce4184aea504b6fc72b3c0d986ea9"
+    },
+    {
+      "file": "backend-laravel/tests/Feature/LocalRecoveryTest.php",
+      "bytes": 9876,
+      "sha256": "80e2842817ebcbe05f2af3dfec03c4c0a3c50f5a317e58880d980c5695ef4a71"
+    },
+    {
+      "file": "frontend/design-preview/main.ts",
+      "bytes": 7008,
+      "sha256": "454d7bfdefbba1a24ee0889ff1907d772f1d33c344e525d37d8e955b62290c71"
+    },
+    {
+      "file": "frontend/src/app/core/async-poller.ts",
+      "bytes": 3719,
+      "sha256": "91d36897826688bb322583dbec2bbb23ffc6a1987ed235734e923e1fa7b5ced5"
+    },
+    {
+      "file": "frontend/src/app/core/strict-wire.spec.ts",
+      "bytes": 6510,
+      "sha256": "74dc9b7b961fa998f20c88a0df3ef65b2455eb7fd3522f93e50bd10d0ff41209"
+    },
+    {
+      "file": "frontend/src/app/core/strict-wire.ts",
+      "bytes": 9451,
+      "sha256": "6913e5974be46e6f45360f10b6306ca5523882f10a1892c49d99b502fbba08ea"
+    },
+    {
+      "file": "frontend/src/app/panel/admin/admin-updates.component.ts",
+      "bytes": 5174,
+      "sha256": "859476f160f561dba2a759a42c9c21df7f24aeb6c1e0c602308bf16c8fca3efc"
+    },
+    {
+      "file": "frontend/src/app/panel/admin/admin-ux-context.spec.ts",
+      "bytes": 24712,
+      "sha256": "21316013883242fec0cfd0273c780de922aca4bac85e469f572623ca7345ff1d"
+    },
+    {
+      "file": "frontend/src/app/panel/admin/admin.component.spec.ts",
+      "bytes": 17680,
+      "sha256": "d6295dea29a02a9e5943187c672eddfd96e25ff4f952e24aa88940bc1dd3976f"
+    },
+    {
+      "file": "frontend/src/app/panel/links/link-dialog.component.ts",
+      "bytes": 39227,
+      "sha256": "e9b2d4c7a75ebf9e553d3680f9f92df0f93c08b64f7664ef209538dd98123123"
+    },
+    {
+      "file": "frontend/src/app/panel/settings/settings.component.ts",
+      "bytes": 51188,
+      "sha256": "32b19ec0e54aec7e26befae87a1ba5cdf94b588f7526ea6e298c8a5ed78d0167"
+    },
+    {
+      "file": "scripts/build-uvh-control.mjs",
+      "bytes": 7833,
+      "sha256": "6b058cb75d019ada141d8d003ae48fae61c2d3ce974dbe2f9a30cf021e971287"
+    },
+    {
+      "file": "scripts/recovery/auth.mjs",
+      "bytes": 5573,
+      "sha256": "733a526a7acd5c33408639c1c6b132c532091e19136430a9b93f17b7dd8a2938"
+    },
+    {
+      "file": "scripts/recovery/backup-catalog.mjs",
+      "bytes": 2264,
+      "sha256": "4e35fe99b877af606b27cad30b74e1ef2786c384b16b94ddea007196179b8d36"
+    },
+    {
+      "file": "scripts/recovery/backup-format.mjs",
+      "bytes": 2576,
+      "sha256": "20bc2e3d7ce5bcb73041e0a56e8b9dfe6b55f533286f10b04eb2fb098b5288a1"
+    },
+    {
+      "file": "scripts/recovery/destinations.mjs",
+      "bytes": 2930,
+      "sha256": "062201eafdd5debc62c18d38e255f3943b39de6873fe6954507d4ab4925b2614"
+    },
+    {
+      "file": "scripts/recovery/engine.mjs",
+      "bytes": 16214,
+      "sha256": "208f6603efcb914865d0d31c10e0247a7525e8d4a944353ecaaab528f1adb972"
+    },
+    {
+      "file": "scripts/recovery/io.mjs",
+      "bytes": 19128,
+      "sha256": "a309d8a7537953d4780a49b288803b3c4816e4d0f763387b94cbae5e1db9bc65"
+    },
+    {
+      "file": "scripts/recovery/pages.mjs",
+      "bytes": 449,
+      "sha256": "5e6c8aa4b59af3c1f078fec43000ad1fa344cd04641eeb4a2268ca3d0f9e1251"
+    },
+    {
+      "file": "scripts/recovery/recovery.test.mjs",
+      "bytes": 26898,
+      "sha256": "3939ba0bf0d7c3c01950ce51b3a034897676620a351bbfa57f68f9407835b30f"
+    },
+    {
+      "file": "scripts/recovery/store.mjs",
+      "bytes": 3130,
+      "sha256": "9b72cc737d3d8d551435673df6f797a8031955a953dc27e6929d4f7c89fc9fc3"
+    },
+    {
+      "file": "scripts/uvh-control-sea.cjs",
+      "bytes": 3813,
+      "sha256": "37678554cb2115dff8de41ea4d886389aee725a42aa13695de4c1de1afe1336a"
+    }
+  ]
+}

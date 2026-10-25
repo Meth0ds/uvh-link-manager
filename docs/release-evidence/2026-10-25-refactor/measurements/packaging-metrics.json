@@ -1,0 +1,15 @@
+{
+  "before": {
+    "count": 15,
+    "bytes": 154348
+  },
+  "after": {
+    "count": 26,
+    "bytes": 127002
+  },
+  "excluded": [
+    "backup-drill.mjs",
+    "recovery.test.mjs",
+    "screenshot-evidence.mjs"
+  ]
+}

@@ -52,6 +52,8 @@ export function unwrap(key, value) {
 }
 export function createStore(path) {
   directory(path);
-  return { path, read: (name, fallback) => read(join(path, `${name}.json`), fallback),
-    write: (name, value) => atomic(join(path, `${name}.json`), value) };
+  let revision = 0;
+  return { path, get revision() { return revision; },
+    read: (name, fallback) => read(join(path, `${name}.json`), fallback),
+    write: (name, value) => { atomic(join(path, `${name}.json`), value); revision++; } };
 }

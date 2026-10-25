@@ -1,0 +1,1302 @@
+{
+  "method": "Seven alternating subprocess pairs; 30 warm-up reads then 300 timed reads per catalogue size; 30 renewal cycles; 30 warm conversion batches.",
+  "summary": {
+    "before": {
+      "backupWrites": 34,
+      "backupReads": 31,
+      "backupMs": 5.801749999999998,
+      "timeConversionMs": 7.942875000000072,
+      "formatters": 480,
+      "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+      "snapshots": [
+        {
+          "size": 10,
+          "medianMs": 0.04475000000000051,
+          "p95Ms": 0.05287500000000023,
+          "renewalMs": 9.237416000000003
+        },
+        {
+          "size": 100,
+          "medianMs": 0.09666600000000614,
+          "p95Ms": 0.13862499999999045,
+          "renewalMs": 11.625500000000002
+        },
+        {
+          "size": 1000,
+          "medianMs": 0.6705420000000117,
+          "p95Ms": 0.8031659999999761,
+          "renewalMs": 44.842750000000024
+        }
+      ]
+    },
+    "after": {
+      "backupWrites": 21,
+      "backupReads": 27,
+      "backupMs": 4.364791999999998,
+      "timeConversionMs": 0.8043749999999932,
+      "formatters": 2,
+      "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+      "snapshots": [
+        {
+          "size": 10,
+          "medianMs": 0.04508399999999568,
+          "p95Ms": 0.05495800000000273,
+          "renewalMs": 3.4847500000000053
+        },
+        {
+          "size": 100,
+          "medianMs": 0.0974159999999955,
+          "p95Ms": 0.14291700000000418,
+          "renewalMs": 5.163249999999991
+        },
+        {
+          "size": 1000,
+          "medianMs": 0.6819580000000087,
+          "p95Ms": 0.8558330000000183,
+          "renewalMs": 20.577416000000028
+        }
+      ]
+    }
+  },
+  "samples": [
+    {
+      "trial": 0,
+      "variant": "before",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager/.uvh-runtime/refactor/baseline",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:46.610Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 10,
+            "access.json": 10,
+            "backups.json": 11
+          },
+          "writes": {
+            "state.json": 10,
+            "snapshot.json": 10,
+            "maintenance.json": 10,
+            "backups.json": 4
+          },
+          "readBytes": 14328,
+          "writtenBytes": 29928,
+          "milliseconds": 5.801749999999998,
+          "totalWrites": 34
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04475000000000051,
+            "p95Ms": 0.0690419999999996,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 122820,
+              "writtenBytes": 122940,
+              "milliseconds": 8.378791999999997
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09599999999999653,
+            "p95Ms": 0.14041699999999935,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 959820,
+              "writtenBytes": 665640,
+              "milliseconds": 11.935333
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6834589999999707,
+            "p95Ms": 0.8659169999999676,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 9356820,
+              "writtenBytes": 6119640,
+              "milliseconds": 45.566666999999995
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 480,
+          "milliseconds": 14.667291999999975,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 8.620458999999983,
+          "warmP95Ms": 10.22037499999999
+        },
+        "maxRssKiB": 509024
+      }
+    },
+    {
+      "trial": 0,
+      "variant": "after",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:47.397Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 9,
+            "access.json": 9,
+            "backups.json": 9
+          },
+          "writes": {
+            "state.json": 7,
+            "snapshot.json": 9,
+            "maintenance.json": 2,
+            "backups.json": 3
+          },
+          "readBytes": 12591,
+          "writtenBytes": 23931,
+          "milliseconds": 4.245958999999999,
+          "totalWrites": 21
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04433300000000173,
+            "p95Ms": 0.054999999999999716,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 117780,
+              "milliseconds": 3.4301249999999968
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09916699999999423,
+            "p95Ms": 0.14070900000000108,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 646980,
+              "milliseconds": 5.163249999999991
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6857499999999845,
+            "p95Ms": 0.852374999999995,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 5965980,
+              "milliseconds": 20.446000000000026
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 2,
+          "milliseconds": 6.395375000000001,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 0.7907500000000027,
+          "warmP95Ms": 0.9377079999999864
+        },
+        "maxRssKiB": 160256
+      }
+    },
+    {
+      "trial": 1,
+      "variant": "after",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:47.863Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 9,
+            "access.json": 9,
+            "backups.json": 9
+          },
+          "writes": {
+            "state.json": 7,
+            "snapshot.json": 9,
+            "maintenance.json": 2,
+            "backups.json": 3
+          },
+          "readBytes": 12591,
+          "writtenBytes": 23931,
+          "milliseconds": 4.481416000000003,
+          "totalWrites": 21
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04425000000000523,
+            "p95Ms": 0.05279199999999662,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 117780,
+              "milliseconds": 3.3854590000000044
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09720899999999233,
+            "p95Ms": 0.13887499999999875,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 646980,
+              "milliseconds": 5.025790999999998
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6818749999999909,
+            "p95Ms": 0.8497499999999718,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 5965980,
+              "milliseconds": 20.793999999999983
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 2,
+          "milliseconds": 6.213292000000024,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 0.7651250000000118,
+          "warmP95Ms": 0.8892079999999964
+        },
+        "maxRssKiB": 160192
+      }
+    },
+    {
+      "trial": 1,
+      "variant": "before",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager/.uvh-runtime/refactor/baseline",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:48.327Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 10,
+            "access.json": 10,
+            "backups.json": 11
+          },
+          "writes": {
+            "state.json": 10,
+            "snapshot.json": 10,
+            "maintenance.json": 10,
+            "backups.json": 4
+          },
+          "readBytes": 14328,
+          "writtenBytes": 29928,
+          "milliseconds": 5.691125000000003,
+          "totalWrites": 34
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04475000000000051,
+            "p95Ms": 0.05116600000000204,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 122820,
+              "writtenBytes": 122940,
+              "milliseconds": 9.237416000000003
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09741699999999298,
+            "p95Ms": 0.13808299999999463,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 959820,
+              "writtenBytes": 665640,
+              "milliseconds": 11.625500000000002
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6770830000000103,
+            "p95Ms": 0.8031659999999761,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 9356820,
+              "writtenBytes": 6119640,
+              "milliseconds": 44.32400000000001
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 480,
+          "milliseconds": 14.011874999999975,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 7.898415999999997,
+          "warmP95Ms": 9.039832999999987
+        },
+        "maxRssKiB": 506768
+      }
+    },
+    {
+      "trial": 2,
+      "variant": "before",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager/.uvh-runtime/refactor/baseline",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:49.078Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 10,
+            "access.json": 10,
+            "backups.json": 11
+          },
+          "writes": {
+            "state.json": 10,
+            "snapshot.json": 10,
+            "maintenance.json": 10,
+            "backups.json": 4
+          },
+          "readBytes": 14328,
+          "writtenBytes": 29928,
+          "milliseconds": 5.7905,
+          "totalWrites": 34
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04441699999999926,
+            "p95Ms": 0.05254200000000253,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 122820,
+              "writtenBytes": 122940,
+              "milliseconds": 8.792709000000002
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09654100000000199,
+            "p95Ms": 0.1394160000000042,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 959820,
+              "writtenBytes": 665640,
+              "milliseconds": 11.300207999999998
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6693750000000023,
+            "p95Ms": 0.7945409999999811,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 9356820,
+              "writtenBytes": 6119640,
+              "milliseconds": 44.674082999999996
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 480,
+          "milliseconds": 13.963957999999991,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 7.8819160000000466,
+          "warmP95Ms": 8.950167000000022
+        },
+        "maxRssKiB": 506816
+      }
+    },
+    {
+      "trial": 2,
+      "variant": "after",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:49.822Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 9,
+            "access.json": 9,
+            "backups.json": 9
+          },
+          "writes": {
+            "state.json": 7,
+            "snapshot.json": 9,
+            "maintenance.json": 2,
+            "backups.json": 3
+          },
+          "readBytes": 12591,
+          "writtenBytes": 23931,
+          "milliseconds": 4.274415999999999,
+          "totalWrites": 21
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04508399999999568,
+            "p95Ms": 0.05283300000000679,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 117780,
+              "milliseconds": 3.465665999999999
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09829200000000071,
+            "p95Ms": 0.14291700000000418,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 646980,
+              "milliseconds": 5.531458999999998
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6824579999999969,
+            "p95Ms": 0.8826669999999979,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 5965980,
+              "milliseconds": 20.69508400000001
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 2,
+          "milliseconds": 6.565917000000013,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 0.7963750000000118,
+          "warmP95Ms": 1.0071250000000305
+        },
+        "maxRssKiB": 160224
+      }
+    },
+    {
+      "trial": 3,
+      "variant": "after",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:50.291Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 9,
+            "access.json": 9,
+            "backups.json": 9
+          },
+          "writes": {
+            "state.json": 7,
+            "snapshot.json": 9,
+            "maintenance.json": 2,
+            "backups.json": 3
+          },
+          "readBytes": 12591,
+          "writtenBytes": 23931,
+          "milliseconds": 4.7158750000000005,
+          "totalWrites": 21
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.0449169999999981,
+            "p95Ms": 0.05495800000000273,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 117780,
+              "milliseconds": 3.5142080000000036
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09737499999999955,
+            "p95Ms": 0.14554100000000147,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 646980,
+              "milliseconds": 4.900332999999989
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6819580000000087,
+            "p95Ms": 0.859041000000019,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 5965980,
+              "milliseconds": 20.325417000000016
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 2,
+          "milliseconds": 6.472624999999994,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 0.8043749999999932,
+          "warmP95Ms": 0.9053330000000415
+        },
+        "maxRssKiB": 160112
+      }
+    },
+    {
+      "trial": 3,
+      "variant": "before",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager/.uvh-runtime/refactor/baseline",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:50.756Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 10,
+            "access.json": 10,
+            "backups.json": 11
+          },
+          "writes": {
+            "state.json": 10,
+            "snapshot.json": 10,
+            "maintenance.json": 10,
+            "backups.json": 4
+          },
+          "readBytes": 14328,
+          "writtenBytes": 29928,
+          "milliseconds": 6.1545000000000005,
+          "totalWrites": 34
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04475000000000051,
+            "p95Ms": 0.07000000000000028,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 122820,
+              "writtenBytes": 122940,
+              "milliseconds": 9.203916999999997
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09812500000001023,
+            "p95Ms": 0.1401249999999976,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 959820,
+              "writtenBytes": 665640,
+              "milliseconds": 12.388625000000005
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.678167000000002,
+            "p95Ms": 0.8186670000000049,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 9356820,
+              "writtenBytes": 6119640,
+              "milliseconds": 44.99087499999996
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 480,
+          "milliseconds": 14.282959000000005,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 7.944958000000042,
+          "warmP95Ms": 8.915917000000036
+        },
+        "maxRssKiB": 507664
+      }
+    },
+    {
+      "trial": 4,
+      "variant": "before",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager/.uvh-runtime/refactor/baseline",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:51.514Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 10,
+            "access.json": 10,
+            "backups.json": 11
+          },
+          "writes": {
+            "state.json": 10,
+            "snapshot.json": 10,
+            "maintenance.json": 10,
+            "backups.json": 4
+          },
+          "readBytes": 14328,
+          "writtenBytes": 29928,
+          "milliseconds": 6.186207999999999,
+          "totalWrites": 34
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.0445840000000004,
+            "p95Ms": 0.05287500000000023,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 122820,
+              "writtenBytes": 122940,
+              "milliseconds": 9.350375
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09683299999998951,
+            "p95Ms": 0.13787500000000108,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 959820,
+              "writtenBytes": 665640,
+              "milliseconds": 12.567499999999995
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6705420000000117,
+            "p95Ms": 0.7661670000000242,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 9356820,
+              "writtenBytes": 6119640,
+              "milliseconds": 44.842750000000024
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 480,
+          "milliseconds": 13.555999999999983,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 7.879582999999911,
+          "warmP95Ms": 16.308874999999944
+        },
+        "maxRssKiB": 334928
+      }
+    },
+    {
+      "trial": 4,
+      "variant": "after",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:52.260Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 9,
+            "access.json": 9,
+            "backups.json": 9
+          },
+          "writes": {
+            "state.json": 7,
+            "snapshot.json": 9,
+            "maintenance.json": 2,
+            "backups.json": 3
+          },
+          "readBytes": 12591,
+          "writtenBytes": 23931,
+          "milliseconds": 4.590166999999997,
+          "totalWrites": 21
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04654100000000483,
+            "p95Ms": 0.0762499999999946,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 117780,
+              "milliseconds": 3.566500000000005
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.1052090000000021,
+            "p95Ms": 0.14812500000000028,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 646980,
+              "milliseconds": 5.8173340000000024
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.714209000000011,
+            "p95Ms": 0.9180409999999881,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 5965980,
+              "milliseconds": 22.072791999999993
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 2,
+          "milliseconds": 8.14100000000002,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 0.8931249999999977,
+          "warmP95Ms": 1.163000000000011
+        },
+        "maxRssKiB": 160272
+      }
+    },
+    {
+      "trial": 5,
+      "variant": "after",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:52.772Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 9,
+            "access.json": 9,
+            "backups.json": 9
+          },
+          "writes": {
+            "state.json": 7,
+            "snapshot.json": 9,
+            "maintenance.json": 2,
+            "backups.json": 3
+          },
+          "readBytes": 12591,
+          "writtenBytes": 23931,
+          "milliseconds": 4.364791999999998,
+          "totalWrites": 21
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04541699999999338,
+            "p95Ms": 0.07345799999999514,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 117780,
+              "milliseconds": 3.4847500000000053
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09708299999999781,
+            "p95Ms": 0.14170800000000838,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 646980,
+              "milliseconds": 5.488374999999991
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.674207999999993,
+            "p95Ms": 0.8482919999999865,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 5965980,
+              "milliseconds": 20.577416000000028
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 2,
+          "milliseconds": 6.450416000000018,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 0.8472090000000208,
+          "warmP95Ms": 0.9369580000000042
+        },
+        "maxRssKiB": 160880
+      }
+    },
+    {
+      "trial": 5,
+      "variant": "before",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager/.uvh-runtime/refactor/baseline",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:53.262Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 10,
+            "access.json": 10,
+            "backups.json": 11
+          },
+          "writes": {
+            "state.json": 10,
+            "snapshot.json": 10,
+            "maintenance.json": 10,
+            "backups.json": 4
+          },
+          "readBytes": 14328,
+          "writtenBytes": 29928,
+          "milliseconds": 5.732208999999999,
+          "totalWrites": 34
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.0447919999999975,
+            "p95Ms": 0.05179199999999895,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 122820,
+              "writtenBytes": 122940,
+              "milliseconds": 9.351208
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09649999999999892,
+            "p95Ms": 0.1369579999999999,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 959820,
+              "writtenBytes": 665640,
+              "milliseconds": 11.456874999999997
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6671249999999986,
+            "p95Ms": 0.7924999999999613,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 9356820,
+              "writtenBytes": 6119640,
+              "milliseconds": 44.31741599999998
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 480,
+          "milliseconds": 14.183333000000005,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 7.942875000000072,
+          "warmP95Ms": 9.102041999999983
+        },
+        "maxRssKiB": 508448
+      }
+    },
+    {
+      "trial": 6,
+      "variant": "before",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager/.uvh-runtime/refactor/baseline",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:54.009Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 10,
+            "access.json": 10,
+            "backups.json": 11
+          },
+          "writes": {
+            "state.json": 10,
+            "snapshot.json": 10,
+            "maintenance.json": 10,
+            "backups.json": 4
+          },
+          "readBytes": 14328,
+          "writtenBytes": 29928,
+          "milliseconds": 6.220791999999998,
+          "totalWrites": 34
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.04437499999999517,
+            "p95Ms": 0.05375000000000085,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 122820,
+              "writtenBytes": 122940,
+              "milliseconds": 9.548500000000004
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.09666600000000614,
+            "p95Ms": 0.13862499999999045,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 959820,
+              "writtenBytes": 665640,
+              "milliseconds": 11.177832999999993
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6701249999999845,
+            "p95Ms": 0.8215419999999654,
+            "renewal": {
+              "reads": {
+                "backups.json": 30,
+                "credentials.json": 30,
+                "access.json": 30
+              },
+              "writes": {
+                "snapshot.json": 30,
+                "maintenance.json": 30
+              },
+              "readBytes": 9356820,
+              "writtenBytes": 6119640,
+              "milliseconds": 45.134375000000034
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 480,
+          "milliseconds": 14.34133300000002,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 8.169083,
+          "warmP95Ms": 9.284166000000027
+        },
+        "maxRssKiB": 508320
+      }
+    },
+    {
+      "trial": 6,
+      "variant": "after",
+      "data": {
+        "source": "/Users/roberto/Documents/uvh-link-manager",
+        "node": "v22.23.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "at": "2026-10-25T00:30:54.768Z",
+        "backup": {
+          "reads": {
+            "credentials.json": 9,
+            "access.json": 9,
+            "backups.json": 9
+          },
+          "writes": {
+            "state.json": 7,
+            "snapshot.json": 9,
+            "maintenance.json": 2,
+            "backups.json": 3
+          },
+          "readBytes": 12591,
+          "writtenBytes": 23931,
+          "milliseconds": 4.073540999999999,
+          "totalWrites": 21
+        },
+        "snapshots": [
+          {
+            "size": 10,
+            "medianMs": 0.045166000000001816,
+            "p95Ms": 0.05120900000000006,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 117780,
+              "milliseconds": 3.650874999999999
+            }
+          },
+          {
+            "size": 100,
+            "medianMs": 0.0974159999999955,
+            "p95Ms": 0.14479200000000247,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 646980,
+              "milliseconds": 4.9609999999999985
+            }
+          },
+          {
+            "size": 1000,
+            "medianMs": 0.6811670000000163,
+            "p95Ms": 0.8558330000000183,
+            "renewal": {
+              "reads": {},
+              "writes": {
+                "snapshot.json": 30
+              },
+              "readBytes": 0,
+              "writtenBytes": 5965980,
+              "milliseconds": 19.967375000000004
+            }
+          }
+        ],
+        "times": {
+          "conversions": 120,
+          "formatters": 2,
+          "milliseconds": 6.47504200000003,
+          "resultSha256": "9fed99157606713c58181b5a407c6deeae83f6d10c46e59d772086b8d71bf13e",
+          "warmMedianMs": 0.8182500000000346,
+          "warmP95Ms": 1.2132080000000087
+        },
+        "maxRssKiB": 160480
+      }
+    }
+  ]
+}

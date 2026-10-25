@@ -39,10 +39,11 @@ async function main() {
       writeFileSync(dest, Buffer.from(sea.getAsset(`panel/${name}`)), { flag: 'wx', mode: 0o600 });
     }
     const recoveryModules = JSON.parse(sea.getAsset('recovery-manifest.json', 'utf8'));
-    if (!Array.isArray(recoveryModules) || recoveryModules.length > 20 || !recoveryModules.includes('engine.mjs')) throw new Error('Módulos de recuperación incompletos.');
+    if (!Array.isArray(recoveryModules) || recoveryModules.length > 100 || !recoveryModules.includes('engine.mjs')) throw new Error('Módulos de recuperación incompletos.');
     mkdirSync(join(privateDir, 'recovery'), { mode: 0o700 });
     for (const name of recoveryModules) {
-      if (!/^[a-z-]+\.mjs$/.test(name)) throw new Error('Módulo de recuperación no válido.');
+      if (typeof name !== 'string' || !/^[a-z0-9/-]+\.(mjs|js|css|html)$/.test(name) || name.includes('..') || isAbsolute(name)) throw new Error('Módulo de recuperación no válido.');
+      mkdirSync(dirname(join(privateDir, 'recovery', name)), { recursive: true, mode: 0o700 });
       writeFileSync(join(privateDir, 'recovery', name), sea.getAsset(`recovery/${name}`, 'utf8'), { flag: 'wx', mode: 0o600 });
     }
     cliPath = join(privateDir, 'uvh-control.mjs');
