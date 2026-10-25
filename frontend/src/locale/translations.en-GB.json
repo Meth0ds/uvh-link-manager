@@ -16614,5 +16614,9 @@
   "recovery.backupError": {
     "sourceHash": "120726ffa75b3b45d39902a4f6951fa8c0b02b86e43f2a3a52368f49fb1288fe",
     "text": "The backup could not be started. Check the result before trying again."
+  },
+  "recovery.loading": {
+    "sourceHash": "b005dd7c02d7dbbe32a17c99f4f38366e51abb5536697c4e1da531d64c417385",
+    "text": "Loading local service continuity…"
   }
 }

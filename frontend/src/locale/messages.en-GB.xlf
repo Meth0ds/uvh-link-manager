@@ -3871,30 +3871,30 @@
         <note category="location">src/app/panel/security/security-center.component.ts:248</note>
         <note category="location">src/app/panel/security/security-center.component.ts:253</note>
         <note category="location">src/app/panel/security/security-center.component.ts:256</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:388</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:515</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:523</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:537</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:597</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:614</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:768</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:770</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:794</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:978</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1023</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1051</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1156</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1158</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1162</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1202</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1233</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1271</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1344</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1386</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1404</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1408</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1409</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1426</note>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:144</note>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:146</note>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:170</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:74</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:105</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:143</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:212</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:254</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:272</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:276</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:277</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:294</note>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:118</note>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:163</note>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:191</note>
+        <note category="location">src/app/panel/settings/settings-sessions-coordinator.ts:78</note>
+        <note category="location">src/app/panel/settings/settings-sessions-coordinator.ts:80</note>
+        <note category="location">src/app/panel/settings/settings-sessions-coordinator.ts:84</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:389</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:650</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:658</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:672</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:732</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:749</note>
         <note category="location">src/app/panel/team/team.component.ts:252</note>
         <note category="location">src/app/panel/team/team.component.ts:259</note>
         <note category="location">src/app/panel/team/team.component.ts:280</note>
@@ -6305,7 +6305,7 @@
       <notes>
         <note category="location">src/app/core/localisation/template-messages.ts:353</note>
         <note category="location">src/app/panel/settings/account-deletion-dialog.component.html:4,5</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:140</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:141</note>
       </notes>
       <segment>
         <source>Revisar</source>
@@ -6369,7 +6369,7 @@
     <unit id="ui.f29a5970a4ab27">
       <notes>
         <note category="location">src/app/core/localisation/template-messages.ts:360</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:614</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:749</note>
       </notes>
       <segment>
         <source>Contraseña actualizada</source>
@@ -6627,8 +6627,8 @@
       <notes>
         <note category="location">src/app/core/localisation/template-messages.ts:388</note>
         <note category="location">src/app/panel/links/qr-dialog.component.html:199,200</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:782</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:784</note>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:158</note>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:160</note>
       </notes>
       <segment>
         <source>Cancelar exportación</source>
@@ -7189,7 +7189,7 @@
     <unit id="ui.1b1c27c397aee6">
       <notes>
         <note category="location">src/app/core/localisation/template-messages.ts:450</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:318</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:319</note>
       </notes>
       <segment>
         <source>Oscuro</source>
@@ -7199,7 +7199,7 @@
     <unit id="ui.2f3e8dcc246498">
       <notes>
         <note category="location">src/app/core/localisation/template-messages.ts:451</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:317</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:318</note>
       </notes>
       <segment>
         <source>Claro</source>
@@ -7591,7 +7591,7 @@
     <unit id="ui.75f1f75e333774">
       <notes>
         <note category="location">src/app/core/localisation/template-messages.ts:494</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:143</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:144</note>
       </notes>
       <segment>
         <source>En curso</source>
@@ -8976,7 +8976,7 @@
     <unit id="ui.2ef68536d8e212">
       <notes>
         <note category="location">src/app/core/mail-outbox-state-label.ts:10</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:141</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:142</note>
       </notes>
       <segment>
         <source>Pendiente</source>
@@ -9796,7 +9796,7 @@
         <note category="location">src/app/core/services/copy-feedback.service.ts:62</note>
         <note category="location">src/app/panel/domains/domain-detail.component.ts:536</note>
         <note category="location">src/app/panel/domains/domains.component.ts:470</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1404</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:272</note>
         <note category="location">src/app/panel/webhooks/webhooks.component.ts:250</note>
       </notes>
       <segment>
@@ -10425,7 +10425,7 @@
       <notes>
         <note category="location">src/app/core/services/qr-worker-client.ts:36</note>
         <note category="location">src/app/core/services/qr-worker-client.ts:50</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:794</note>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:170</note>
       </notes>
       <segment>
         <source>Exportación cancelada</source>
@@ -18613,27 +18613,9 @@
         <target>Could not start the check. Review the result before trying again.</target>
       </segment>
     </unit>
-    <unit id="recovery.popupError">
-      <notes>
-        <note category="location">src/app/panel/admin/admin-updates.component.ts:87</note>
-      </notes>
-      <segment>
-        <source>Permite abrir la ventana del centro de recuperación y vuelve a intentarlo.</source>
-        <target>Allow the recovery centre window to open and try again.</target>
-      </segment>
-    </unit>
-    <unit id="recovery.portalError">
-      <notes>
-        <note category="location">src/app/panel/admin/admin-updates.component.ts:98</note>
-      </notes>
-      <segment>
-        <source>No se pudo conectar con la página de recuperación. Comprueba que el controlador siga abierto.</source>
-        <target>Could not connect to the recovery page. Check that the controller is still running.</target>
-      </segment>
-    </unit>
     <unit id="recovery.authError">
       <notes>
-        <note category="location">src/app/panel/admin/admin-updates.component.ts:99</note>
+        <note category="location">src/app/panel/admin/admin-updates.component.ts:89</note>
       </notes>
       <segment>
         <source>No se pudo autorizar el acceso de recuperación.</source>
@@ -18820,6 +18802,15 @@
       <segment>
         <source>Secciones de administración</source>
         <target>Administration sections</target>
+      </segment>
+    </unit>
+    <unit id="recovery.loading">
+      <notes>
+        <note category="location">src/app/panel/admin/admin.component.html:109,111</note>
+      </notes>
+      <segment>
+        <source>Cargando continuidad del entorno…</source>
+        <target>Loading local service continuity…</target>
       </segment>
     </unit>
     <unit id="ui.7c1ca4e97e0771">
@@ -19692,6 +19683,24 @@
       <segment>
         <source>No hay destino externo configurado. Las copias locales siguen activas.</source>
         <target>No external destination is configured. Local copies remain active.</target>
+      </segment>
+    </unit>
+    <unit id="recovery.popupError">
+      <notes>
+        <note category="location">src/app/panel/admin/recovery-portal.ts:15</note>
+      </notes>
+      <segment>
+        <source>Permite abrir la ventana del centro de recuperación y vuelve a intentarlo.</source>
+        <target>Allow the recovery centre window to open and try again.</target>
+      </segment>
+    </unit>
+    <unit id="recovery.portalError">
+      <notes>
+        <note category="location">src/app/panel/admin/recovery-portal.ts:44</note>
+      </notes>
+      <segment>
+        <source>No se pudo conectar con la página de recuperación. Comprueba que el controlador siga abierto.</source>
+        <target>Could not connect to the recovery page. Check that the controller is still running.</target>
       </segment>
     </unit>
     <unit id="ui.5414b324d57d11">
@@ -22110,7 +22119,7 @@
         <note category="location">src/app/panel/domains/domain-detail.component.html:61</note>
         <note category="location">src/app/panel/domains/domain-detail.component.html:68</note>
         <note category="location">src/app/panel/links/collections-dialog.component.ts:143</note>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:588</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:549</note>
         <note category="location">src/app/panel/links/link-history-dialog.component.ts:129</note>
         <note category="location">src/app/panel/links/saved-link-filters.component.ts:84</note>
         <note category="location">src/app/panel/links/tags-dialog.component.ts:140</note>
@@ -24556,7 +24565,7 @@
       <notes>
         <note category="location">src/app/panel/getting-started/getting-started.steps.ts:38</note>
         <note category="location">src/app/panel/settings/settings.component.html:94</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:141</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:142</note>
       </notes>
       <segment>
         <source>Acceso y seguridad</source>
@@ -26608,7 +26617,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
         <note category="location">src/app/panel/links/link-dialog.component.html:60</note>
         <note category="location">src/app/panel/links/link-dialog.component.html:60</note>
         <note category="location">src/app/panel/links/link-dialog.component.html:269,270</note>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:585</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:546</note>
       </notes>
       <segment>
         <source>Guardar como plantilla</source>
@@ -27687,7 +27696,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.0b5199432e4d5f">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:391</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:352</note>
       </notes>
       <segment>
         <source>No se pudieron cargar las reglas del enlace</source>
@@ -27696,7 +27705,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.e7722b999b4621">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:442</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:403</note>
       </notes>
       <segment>
         <source>¿Sustituir el nombre?</source>
@@ -27705,7 +27714,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.0e3f9935f56450">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:442</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:403</note>
       </notes>
       <segment>
         <source>El título del destino reemplazará el nombre que has escrito.</source>
@@ -27714,7 +27723,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.bbc99356358b94">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:442</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:403</note>
       </notes>
       <segment>
         <source>Usar título</source>
@@ -27723,8 +27732,8 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.daed9d000a21b4">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:486</note>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:512</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:447</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:473</note>
       </notes>
       <segment>
         <source>Alias inválido</source>
@@ -27733,7 +27742,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.ab60e11c358120">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:491</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:452</note>
       </notes>
       <segment>
         <source>Alias actual</source>
@@ -27742,7 +27751,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.ddb92c476524cf">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:508</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:469</note>
       </notes>
       <segment>
         <source>Alias disponible</source>
@@ -27751,7 +27760,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.6ff564ae4c334c">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:512</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:473</note>
       </notes>
       <segment>
         <source>Alias reservado</source>
@@ -27760,7 +27769,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.14a54c550a189f">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:512</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:473</note>
       </notes>
       <segment>
         <source>Este alias ya está en uso</source>
@@ -27769,7 +27778,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.a09b483a7124cc">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:581</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:542</note>
       </notes>
       <segment>
         <source>Escribe la URL de destino antes de guardar la plantilla.</source>
@@ -27778,7 +27787,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.aaed764d8b1249">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:586</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:547</note>
       </notes>
       <segment>
         <source>La plantilla guarda los valores del formulario, nunca el alias.</source>
@@ -27787,7 +27796,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.5c2f904dfdd30a">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:587</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:548</note>
       </notes>
       <segment>
         <source>Guardar plantilla</source>
@@ -27796,7 +27805,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.85f8f674da13e5">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:627</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:588</note>
       </notes>
       <segment>
         <source>No se pudo guardar la plantilla</source>
@@ -27805,7 +27814,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.019cc3e52a6d34">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:650</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:611</note>
       </notes>
       <segment>
         <source>Hora no disponible por cambio horario</source>
@@ -27814,7 +27823,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.1d5be8fa5e1863">
       <notes>
-        <note category="location">src/app/panel/links/link-dialog.component.ts:881</note>
+        <note category="location">src/app/panel/links/link-dialog.component.ts:808</note>
       </notes>
       <segment>
         <source>No se pudo guardar el enlace</source>
@@ -31470,7 +31479,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
         <note category="location">src/app/panel/notifications/notifications.component.html:4,5</note>
         <note category="location">src/app/panel/panel-navigation.ts:40</note>
         <note category="location">src/app/panel/settings/settings.component.html:248</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:142</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:143</note>
       </notes>
       <segment>
         <source>Notificaciones</source>
@@ -32545,7 +32554,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
       <notes>
         <note category="location">src/app/panel/security/security-center.component.ts:27</note>
         <note category="location">src/app/panel/security/security-center.component.ts:191</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1162</note>
+        <note category="location">src/app/panel/settings/settings-sessions-coordinator.ts:84</note>
       </notes>
       <segment>
         <source>Sesión revocada</source>
@@ -32573,7 +32582,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     <unit id="ui.99b29f803bfed8">
       <notes>
         <note category="location">src/app/panel/security/security-center.component.ts:30</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1233</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:105</note>
       </notes>
       <segment>
         <source>MFA activado</source>
@@ -32583,7 +32592,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     <unit id="ui.af28c171782d92">
       <notes>
         <note category="location">src/app/panel/security/security-center.component.ts:31</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1271</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:143</note>
       </notes>
       <segment>
         <source>MFA desactivado</source>
@@ -32638,7 +32647,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     <unit id="ui.0e55f6ade6c6aa">
       <notes>
         <note category="location">src/app/panel/security/security-center.component.ts:37</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:597</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:732</note>
       </notes>
       <segment>
         <source>Cambio de email cancelado</source>
@@ -32738,7 +32747,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     <unit id="ui.971a3b33f92d4b">
       <notes>
         <note category="location">src/app/panel/security/security-center.component.ts:192</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1142</note>
+        <note category="location">src/app/panel/settings/settings-sessions-coordinator.ts:64</note>
       </notes>
       <segment>
         <source>No se pudo revocar la sesión</source>
@@ -33140,7 +33149,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     <unit id="ui.200922014753a8">
       <notes>
         <note category="location">src/app/panel/settings/data-export-dialog.component.html:1</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:143</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:144</note>
       </notes>
       <segment>
         <source>Tus datos</source>
@@ -33288,7 +33297,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     <unit id="ui.7d85a47228f751">
       <notes>
         <note category="location">src/app/panel/settings/email-access-dialog.component.ts:54</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:590</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:725</note>
       </notes>
       <segment>
         <source>Cambiar el email de acceso</source>
@@ -33430,6 +33439,276 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
         <target>The change could not be confirmed. Your password has not been changed.</target>
       </segment>
     </unit>
+    <unit id="ui.221074773ba701">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:60</note>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:61</note>
+      </notes>
+      <segment>
+        <source>No se pudo consultar el estado de la exportación</source>
+        <target>The export status could not be checked</target>
+      </segment>
+    </unit>
+    <unit id="ui.d14302fe9e5469">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:136</note>
+      </notes>
+      <segment>
+        <source>Descargar la exportación de datos</source>
+        <target>Download data export</target>
+      </segment>
+    </unit>
+    <unit id="ui.638968dd8eea63">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:136</note>
+      </notes>
+      <segment>
+        <source>Solicitar una exportación de datos</source>
+        <target>Request a data export</target>
+      </segment>
+    </unit>
+    <unit id="ui.8ba338ee08955f">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:144</note>
+      </notes>
+      <segment>
+        <source>Archivo descargado. No pudimos confirmar la recepción: puedes descargarlo de nuevo o dejar que caduque.</source>
+        <target>File downloaded. We could not confirm receipt: you can download it again or let it expire.</target>
+      </segment>
+    </unit>
+    <unit id="ui.415a5c68626ffb">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:146</note>
+      </notes>
+      <segment>
+        <source>Archivo descargado</source>
+        <target>File downloaded</target>
+      </segment>
+    </unit>
+    <unit id="ui.0f44741eab4e98">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:146</note>
+      </notes>
+      <segment>
+        <source>Solicitud de exportación iniciada</source>
+        <target>Export request started</target>
+      </segment>
+    </unit>
+    <unit id="ui.773975fc9171ab">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:159</note>
+      </notes>
+      <segment>
+        <source>La descarga pendiente dejará de funcionar y se eliminará el archivo privado si ya estaba preparado.</source>
+        <target>The pending download will stop working, and the private archive will be deleted if already prepared.</target>
+      </segment>
+    </unit>
+    <unit id="ui.5462b220b401da">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-export-coordinator.ts:190</note>
+      </notes>
+      <segment>
+        <source>Preparando el archivo</source>
+        <target>Preparing the archive</target>
+      </segment>
+    </unit>
+    <unit id="ui.8bf0f88cbc0a91">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:74</note>
+      </notes>
+      <segment>
+        <source>La configuración está preparada, pero no se pudo generar el QR. Usa la clave manual mostrada.</source>
+        <target>Setup is ready, but the QR could not be generated. Use the manual key shown.</target>
+      </segment>
+    </unit>
+    <unit id="ui.abda53de5e75f0">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:121</note>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:123</note>
+        <note category="location">src/app/panel/settings/settings.component.html:195</note>
+      </notes>
+      <segment>
+        <source>Desactivar MFA</source>
+        <target>Disable MFA</target>
+      </segment>
+    </unit>
+    <unit id="ui.8ba04bd6cd693e">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:122</note>
+      </notes>
+      <segment>
+        <source>Tu cuenta perderá la verificación en dos pasos. Confirma con tu contraseña y un código de tu aplicación o de recuperación.</source>
+        <target>Two-step verification will be removed from your account. Confirm with your password and a code from your app or a recovery code.</target>
+      </segment>
+    </unit>
+    <unit id="ui.8ab09e6cdebc14">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:212</note>
+      </notes>
+      <segment>
+        <source>Configuración completada</source>
+        <target>Setup complete</target>
+      </segment>
+    </unit>
+    <unit id="ui.d11ca81ed62f56">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:235</note>
+      </notes>
+      <segment>
+        <source>Regenerar códigos de recuperación</source>
+        <target>Regenerate recovery codes</target>
+      </segment>
+    </unit>
+    <unit id="ui.dd893854c65e40">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:236</note>
+      </notes>
+      <segment>
+        <source>Los códigos anteriores dejarán de funcionar y se cerrarán las demás sesiones de tu cuenta.</source>
+        <target>Previous codes will stop working, and your account's other sessions will be closed.</target>
+      </segment>
+    </unit>
+    <unit id="ui.3ddb11527b0b1e">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:237</note>
+        <note category="location">src/app/panel/settings/settings.component.html:184,186</note>
+        <note category="location">src/app/panel/settings/settings.component.html:188</note>
+      </notes>
+      <segment>
+        <source>Regenerar códigos</source>
+        <target>Regenerate codes</target>
+      </segment>
+    </unit>
+    <unit id="ui.7787db03239183">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:254</note>
+      </notes>
+      <segment>
+        <source>Códigos regenerados</source>
+        <target>Codes regenerated</target>
+      </segment>
+    </unit>
+    <unit id="ui.03f45134535134">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:276</note>
+      </notes>
+      <segment>
+        <source>Códigos copiados</source>
+        <target>Codes copied</target>
+      </segment>
+    </unit>
+    <unit id="ui.9e5d87300baeca">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:277</note>
+      </notes>
+      <segment>
+        <source>No se pudieron copiar los códigos</source>
+        <target>The codes could not be copied</target>
+      </segment>
+    </unit>
+    <unit id="ui.15572ca1eaeb8e">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:285</note>
+      </notes>
+      <segment>
+        <source>UVH · Códigos de recuperación</source>
+        <target>UVH · Recovery codes</target>
+      </segment>
+    </unit>
+    <unit id="ui.3a70ca36235f4c">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:287</note>
+      </notes>
+      <segment>
+        <source>Cada código funciona una sola vez. Guárdalos fuera de tu cuenta.</source>
+        <target>Each code works only once. Store them outside your account.</target>
+      </segment>
+    </unit>
+    <unit id="ui.f499cedfd63ea2">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-mfa-coordinator.ts:294</note>
+      </notes>
+      <segment>
+        <source>El navegador no pudo descargar los códigos. Cópialos antes de continuar.</source>
+        <target>The browser could not download the codes. Copy them before continuing.</target>
+      </segment>
+    </unit>
+    <unit id="ui.cfaf0e382ffa5a">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:66</note>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:67</note>
+      </notes>
+      <segment>
+        <source>No se pudieron cargar las solicitudes</source>
+        <target>Requests could not be loaded</target>
+      </segment>
+    </unit>
+    <unit id="ui.9014251881a1ec">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:105</note>
+      </notes>
+      <segment>
+        <source>No pudimos confirmar el registro. Conservamos el texto; comprueba el seguimiento antes de volver a enviarlo.</source>
+        <target>We could not confirm submission. Your text is kept; check case tracking before submitting again.</target>
+      </segment>
+    </unit>
+    <unit id="ui.7741b3a10a9b4d">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:118</note>
+      </notes>
+      <segment>
+        <source>Solicitud registrada y plazo iniciado</source>
+        <target>Request recorded and response period started</target>
+      </segment>
+    </unit>
+    <unit id="ui.5e1fff735fdae3">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:163</note>
+      </notes>
+      <segment>
+        <source>Respuesta incorporada al expediente</source>
+        <target>Response added to the case</target>
+      </segment>
+    </unit>
+    <unit id="ui.c9d98050b715ed">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:178</note>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:180</note>
+        <note category="location">src/app/panel/settings/settings.component.html:419</note>
+      </notes>
+      <segment>
+        <source>Cancelar solicitud</source>
+        <target>Cancel request</target>
+      </segment>
+    </unit>
+    <unit id="ui.dbdcf79b5764a9">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:179</note>
+      </notes>
+      <segment>
+        <source>El expediente quedará cerrado como cancelado. Podrás crear otra solicitud del mismo tipo más adelante.</source>
+        <target>The case will be closed as cancelled. You can create another request of the same type later.</target>
+      </segment>
+    </unit>
+    <unit id="ui.e075f56997a31c">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:191</note>
+      </notes>
+      <segment>
+        <source>Solicitud cancelada</source>
+        <target>Request cancelled</target>
+      </segment>
+    </unit>
+    <unit id="ui.8caf71d50f77ff">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:238</note>
+        <note category="location">src/app/panel/settings/settings-privacy-coordinator.ts:243</note>
+      </notes>
+      <segment>
+        <source>No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.</source>
+        <target>We could not confirm the change. Your text is kept; check case tracking before repeating the action.</target>
+      </segment>
+    </unit>
     <unit id="ui.c503baa712db90">
       <notes>
         <note category="location">src/app/panel/settings/settings-section-nav.component.html:1</note>
@@ -33437,6 +33716,33 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
       <segment>
         <source>Secciones de ajustes</source>
         <target>Settings sections</target>
+      </segment>
+    </unit>
+    <unit id="ui.0a77c5488d3df2">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-sessions-coordinator.ts:47</note>
+      </notes>
+      <segment>
+        <source>No se pudieron cargar las sesiones</source>
+        <target>Sessions could not be loaded</target>
+      </segment>
+    </unit>
+    <unit id="ui.e6482d2ddd1e69">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-sessions-coordinator.ts:78</note>
+      </notes>
+      <segment>
+        <source>La sesión quedó revocada. Abre la pantalla de acceso para continuar.</source>
+        <target>Your session has been revoked. Open the sign-in page to continue.</target>
+      </segment>
+    </unit>
+    <unit id="ui.36ad28621f6de0">
+      <notes>
+        <note category="location">src/app/panel/settings/settings-sessions-coordinator.ts:80</note>
+      </notes>
+      <segment>
+        <source>La sesión quedó revocada, pero no se pudo abrir la pantalla de acceso.</source>
+        <target>Your session has been revoked, but the sign-in page could not be opened.</target>
       </segment>
     </unit>
     <unit id="ui.c32a9a1c315b36">
@@ -33505,7 +33811,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     <unit id="ui.86c6655806304c">
       <notes>
         <note category="location">src/app/panel/settings/settings.component.html:22</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:140</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:141</note>
       </notes>
       <segment>
         <source>Perfil y apariencia</source>
@@ -34011,17 +34317,6 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
         <target>Change app</target>
       </segment>
     </unit>
-    <unit id="ui.3ddb11527b0b1e">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.html:184,186</note>
-        <note category="location">src/app/panel/settings/settings.component.html:188</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1369</note>
-      </notes>
-      <segment>
-        <source>Regenerar códigos</source>
-        <target>Regenerate codes</target>
-      </segment>
-    </unit>
     <unit id="ui.932e8a18f065da">
       <notes>
         <note category="location">src/app/panel/settings/settings.component.html:188,189</note>
@@ -34056,17 +34351,6 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
       <segment>
         <source>Esta acción elimina la aplicación y todos los códigos de recuperación.</source>
         <target>This removes the app and all recovery codes.</target>
-      </segment>
-    </unit>
-    <unit id="ui.abda53de5e75f0">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.html:195</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1249</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1251</note>
-      </notes>
-      <segment>
-        <source>Desactivar MFA</source>
-        <target>Disable MFA</target>
       </segment>
     </unit>
     <unit id="ui.9603d7908289d5">
@@ -34600,17 +34884,6 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
         <target>Respond</target>
       </segment>
     </unit>
-    <unit id="ui.c9d98050b715ed">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.html:419</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1038</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1040</note>
-      </notes>
-      <segment>
-        <source>Cancelar solicitud</source>
-        <target>Cancel request</target>
-      </segment>
-    </unit>
     <unit id="ui.b4ee41843cf4de">
       <notes>
         <note category="location">src/app/panel/settings/settings.component.html:423</note>
@@ -34704,7 +34977,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     <unit id="ui.e11487df7ef5ea">
       <notes>
         <note category="location">src/app/panel/settings/settings.component.html:433</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:144</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:145</note>
       </notes>
       <segment>
         <source>Cerrar la cuenta</source>
@@ -34821,7 +35094,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.69d87dc7a26c46">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:140</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:141</note>
       </notes>
       <segment>
         <source>Nombre, email y tema</source>
@@ -34830,7 +35103,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.62cfe8ac639774">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:141</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:142</note>
       </notes>
       <segment>
         <source>Contraseña, MFA y sesiones</source>
@@ -34839,7 +35112,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.8c32d8d87598cb">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:141</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:142</note>
       </notes>
       <segment>
         <source>MFA recomendado</source>
@@ -34848,7 +35121,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.3f2c956adb16ad">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:142</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:143</note>
       </notes>
       <segment>
         <source>Avisos y frecuencia</source>
@@ -34857,7 +35130,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.90490606bc5b4b">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:143</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:144</note>
       </notes>
       <segment>
         <source>Descargas y solicitudes</source>
@@ -34866,7 +35139,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.6b11fcb8bef647">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:144</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:145</note>
       </notes>
       <segment>
         <source>Requisitos y consecuencias</source>
@@ -34875,7 +35148,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.a1b5f5425a6f80">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:319</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:320</note>
       </notes>
       <segment>
         <source>Seguir sistema</source>
@@ -34884,7 +35157,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.3f032ac1f4eac5">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:368</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:369</note>
       </notes>
       <segment>
         <source>No se pudieron cargar tus preferencias de aviso. Inténtalo de nuevo.</source>
@@ -34893,7 +35166,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.80ee592bd13d13">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:388</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:389</note>
       </notes>
       <segment>
         <source>Preferencia de avisos guardada</source>
@@ -34902,7 +35175,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.e6b3f4e6a5412d">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:390</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:391</note>
       </notes>
       <segment>
         <source>No se pudo guardar la preferencia. Inténtalo de nuevo.</source>
@@ -34911,7 +35184,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.b1c26ea000def7">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:514</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:649</note>
       </notes>
       <segment>
         <source>No se pudo completar la operación</source>
@@ -34920,7 +35193,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.118b2d3dee30e7">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:523</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:658</note>
       </notes>
       <segment>
         <source>El cambio se aplicó, pero no se pudo actualizar toda la vista. Recárgala antes de repetir la operación.</source>
@@ -34929,7 +35202,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.0d776709ee6731">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:537</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:672</note>
       </notes>
       <segment>
         <source>Perfil actualizado</source>
@@ -34938,7 +35211,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.8c51e56c2213c0">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:577</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:712</note>
       </notes>
       <segment>
         <source>Los cambios siguen confirmados, pero no se pudo actualizar la vista.</source>
@@ -34947,7 +35220,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.f07602dac1c062">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:590</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:725</note>
       </notes>
       <segment>
         <source>Cancelar el cambio de email pendiente</source>
@@ -34956,7 +35229,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.85a964ac8eaabf">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:597</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:732</note>
       </notes>
       <segment>
         <source>Confirmación enviada al nuevo email</source>
@@ -34965,89 +35238,16 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.1ae6668b609d6a">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:607</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:742</note>
       </notes>
       <segment>
         <source>Cambiar la contraseña de acceso</source>
         <target>Change sign-in password</target>
       </segment>
     </unit>
-    <unit id="ui.0a77c5488d3df2">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:639</note>
-      </notes>
-      <segment>
-        <source>No se pudieron cargar las sesiones</source>
-        <target>Sessions could not be loaded</target>
-      </segment>
-    </unit>
-    <unit id="ui.221074773ba701">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:669</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:670</note>
-      </notes>
-      <segment>
-        <source>No se pudo consultar el estado de la exportación</source>
-        <target>The export status could not be checked</target>
-      </segment>
-    </unit>
-    <unit id="ui.d14302fe9e5469">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:760</note>
-      </notes>
-      <segment>
-        <source>Descargar la exportación de datos</source>
-        <target>Download data export</target>
-      </segment>
-    </unit>
-    <unit id="ui.638968dd8eea63">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:760</note>
-      </notes>
-      <segment>
-        <source>Solicitar una exportación de datos</source>
-        <target>Request a data export</target>
-      </segment>
-    </unit>
-    <unit id="ui.8ba338ee08955f">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:768</note>
-      </notes>
-      <segment>
-        <source>Archivo descargado. No pudimos confirmar la recepción: puedes descargarlo de nuevo o dejar que caduque.</source>
-        <target>File downloaded. We could not confirm receipt: you can download it again or let it expire.</target>
-      </segment>
-    </unit>
-    <unit id="ui.415a5c68626ffb">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:770</note>
-      </notes>
-      <segment>
-        <source>Archivo descargado</source>
-        <target>File downloaded</target>
-      </segment>
-    </unit>
-    <unit id="ui.0f44741eab4e98">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:770</note>
-      </notes>
-      <segment>
-        <source>Solicitud de exportación iniciada</source>
-        <target>Export request started</target>
-      </segment>
-    </unit>
-    <unit id="ui.773975fc9171ab">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:783</note>
-      </notes>
-      <segment>
-        <source>La descarga pendiente dejará de funcionar y se eliminará el archivo privado si ya estaba preparado.</source>
-        <target>The pending download will stop working, and the private archive will be deleted if already prepared.</target>
-      </segment>
-    </unit>
     <unit id="ui.ded18e499b9989">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:815</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:820</note>
       </notes>
       <segment>
         <source>Recopilando tus datos</source>
@@ -35056,7 +35256,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.d0e456ee29ea8c">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:816</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:821</note>
       </notes>
       <segment>
         <source>Calculando totales</source>
@@ -35065,7 +35265,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.0de61228d15e5f">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:817</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:822</note>
       </notes>
       <segment>
         <source>Preparando el contenido</source>
@@ -35074,7 +35274,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.90a0155ac11d8c">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:818</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:823</note>
       </notes>
       <segment>
         <source>Cifrando el archivo</source>
@@ -35083,7 +35283,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.ec4e979c0a2474">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:819</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:824</note>
       </notes>
       <segment>
         <source>Finalizando la entrega</source>
@@ -35092,7 +35292,7 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.e7f805cdbc6e2a">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:823</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:828</note>
       </notes>
       <segment>
         <source>En preparación</source>
@@ -35101,26 +35301,17 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.184f9f08775f92">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:826</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:831</note>
       </notes>
       <segment>
         <source>Falló</source>
         <target>Failed</target>
       </segment>
     </unit>
-    <unit id="ui.5462b220b401da">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:833</note>
-      </notes>
-      <segment>
-        <source>Preparando el archivo</source>
-        <target>Preparing the archive</target>
-      </segment>
-    </unit>
     <unit id="ui.f704117f5b61d6">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:879</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:880</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:876</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:877</note>
       </notes>
       <segment>
         <source>No se pudo consultar el impacto de la eliminación</source>
@@ -35129,207 +35320,25 @@ oferta-2,https://example.org/novedades,"[""editorial""]"</target>
     </unit>
     <unit id="ui.71e30909a34f9d">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:892</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:889</note>
       </notes>
       <segment>
         <source>Solicitar el cierre de cuenta</source>
         <target>Request account closure</target>
       </segment>
     </unit>
-    <unit id="ui.cfaf0e382ffa5a">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:926</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:927</note>
-      </notes>
-      <segment>
-        <source>No se pudieron cargar las solicitudes</source>
-        <target>Requests could not be loaded</target>
-      </segment>
-    </unit>
-    <unit id="ui.9014251881a1ec">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:965</note>
-      </notes>
-      <segment>
-        <source>No pudimos confirmar el registro. Conservamos el texto; comprueba el seguimiento antes de volver a enviarlo.</source>
-        <target>We could not confirm submission. Your text is kept; check case tracking before submitting again.</target>
-      </segment>
-    </unit>
-    <unit id="ui.7741b3a10a9b4d">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:978</note>
-      </notes>
-      <segment>
-        <source>Solicitud registrada y plazo iniciado</source>
-        <target>Request recorded and response period started</target>
-      </segment>
-    </unit>
-    <unit id="ui.5e1fff735fdae3">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1023</note>
-      </notes>
-      <segment>
-        <source>Respuesta incorporada al expediente</source>
-        <target>Response added to the case</target>
-      </segment>
-    </unit>
-    <unit id="ui.dbdcf79b5764a9">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1039</note>
-      </notes>
-      <segment>
-        <source>El expediente quedará cerrado como cancelado. Podrás crear otra solicitud del mismo tipo más adelante.</source>
-        <target>The case will be closed as cancelled. You can create another request of the same type later.</target>
-      </segment>
-    </unit>
-    <unit id="ui.e075f56997a31c">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1051</note>
-      </notes>
-      <segment>
-        <source>Solicitud cancelada</source>
-        <target>Request cancelled</target>
-      </segment>
-    </unit>
-    <unit id="ui.8caf71d50f77ff">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1098</note>
-        <note category="location">src/app/panel/settings/settings.component.ts:1103</note>
-      </notes>
-      <segment>
-        <source>No pudimos confirmar el cambio. Conservamos tu texto; comprueba el seguimiento antes de repetir la acción.</source>
-        <target>We could not confirm the change. Your text is kept; check case tracking before repeating the action.</target>
-      </segment>
-    </unit>
     <unit id="ui.1e00cd61af484f">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1127</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:971</note>
       </notes>
       <segment>
         <source>No se pudo abrir el workspace</source>
         <target>The workspace could not be opened</target>
       </segment>
     </unit>
-    <unit id="ui.e6482d2ddd1e69">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1156</note>
-      </notes>
-      <segment>
-        <source>La sesión quedó revocada. Abre la pantalla de acceso para continuar.</source>
-        <target>Your session has been revoked. Open the sign-in page to continue.</target>
-      </segment>
-    </unit>
-    <unit id="ui.36ad28621f6de0">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1158</note>
-      </notes>
-      <segment>
-        <source>La sesión quedó revocada, pero no se pudo abrir la pantalla de acceso.</source>
-        <target>Your session has been revoked, but the sign-in page could not be opened.</target>
-      </segment>
-    </unit>
-    <unit id="ui.8bf0f88cbc0a91">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1202</note>
-      </notes>
-      <segment>
-        <source>La configuración está preparada, pero no se pudo generar el QR. Usa la clave manual mostrada.</source>
-        <target>Setup is ready, but the QR could not be generated. Use the manual key shown.</target>
-      </segment>
-    </unit>
-    <unit id="ui.8ba04bd6cd693e">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1250</note>
-      </notes>
-      <segment>
-        <source>Tu cuenta perderá la verificación en dos pasos. Confirma con tu contraseña y un código de tu aplicación o de recuperación.</source>
-        <target>Two-step verification will be removed from your account. Confirm with your password and a code from your app or a recovery code.</target>
-      </segment>
-    </unit>
-    <unit id="ui.8ab09e6cdebc14">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1344</note>
-      </notes>
-      <segment>
-        <source>Configuración completada</source>
-        <target>Setup complete</target>
-      </segment>
-    </unit>
-    <unit id="ui.d11ca81ed62f56">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1367</note>
-      </notes>
-      <segment>
-        <source>Regenerar códigos de recuperación</source>
-        <target>Regenerate recovery codes</target>
-      </segment>
-    </unit>
-    <unit id="ui.dd893854c65e40">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1368</note>
-      </notes>
-      <segment>
-        <source>Los códigos anteriores dejarán de funcionar y se cerrarán las demás sesiones de tu cuenta.</source>
-        <target>Previous codes will stop working, and your account's other sessions will be closed.</target>
-      </segment>
-    </unit>
-    <unit id="ui.7787db03239183">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1386</note>
-      </notes>
-      <segment>
-        <source>Códigos regenerados</source>
-        <target>Codes regenerated</target>
-      </segment>
-    </unit>
-    <unit id="ui.03f45134535134">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1408</note>
-      </notes>
-      <segment>
-        <source>Códigos copiados</source>
-        <target>Codes copied</target>
-      </segment>
-    </unit>
-    <unit id="ui.9e5d87300baeca">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1409</note>
-      </notes>
-      <segment>
-        <source>No se pudieron copiar los códigos</source>
-        <target>The codes could not be copied</target>
-      </segment>
-    </unit>
-    <unit id="ui.15572ca1eaeb8e">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1417</note>
-      </notes>
-      <segment>
-        <source>UVH · Códigos de recuperación</source>
-        <target>UVH · Recovery codes</target>
-      </segment>
-    </unit>
-    <unit id="ui.3a70ca36235f4c">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1419</note>
-      </notes>
-      <segment>
-        <source>Cada código funciona una sola vez. Guárdalos fuera de tu cuenta.</source>
-        <target>Each code works only once. Store them outside your account.</target>
-      </segment>
-    </unit>
-    <unit id="ui.f499cedfd63ea2">
-      <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1426</note>
-      </notes>
-      <segment>
-        <source>El navegador no pudo descargar los códigos. Cópialos antes de continuar.</source>
-        <target>The browser could not download the codes. Copy them before continuing.</target>
-      </segment>
-    </unit>
     <unit id="ui.4657b321be4201">
       <notes>
-        <note category="location">src/app/panel/settings/settings.component.ts:1435</note>
+        <note category="location">src/app/panel/settings/settings.component.ts:1056</note>
       </notes>
       <segment>
         <source>Fecha no disponible</source>
