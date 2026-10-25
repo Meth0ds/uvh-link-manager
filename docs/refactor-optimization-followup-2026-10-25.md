@@ -55,6 +55,10 @@ El ahorro se produce en la carga inicial del panel; la funcionalidad no se elimi
 
 El controlador y el motor de recuperación reutilizan el parseo de `.env.docker.local` mientras no cambien su `mtime` o tamaño. Cada acceso sigue comprobando que el archivo sea regular, privado y menor de 64 KiB; cualquier cambio invalida la caché en la siguiente operación. Esto evita releer el mismo archivo durante cada comando Docker, diagnóstico y redacción de logs sin conservar una configuración obsoleta tras una edición.
 
+## Restauración selectiva
+
+La admisión y el restaurador aplican ahora la misma frontera de entrada: la selección debe ser un array no vacío de como máximo 1.000 rutas, cada una string y de hasta 1.024 caracteres. Las entradas no estructuradas se rechazan con `invalid_restore_paths` antes de adquirir el lock o tocar el almacenamiento; las rutas relativas válidas conservan el flujo anterior.
+
 ## Dependencias
 
 La auditoría actual del árbol frontend no encuentra vulnerabilidades (`0` informativas, bajas, moderadas, altas o críticas en 736 dependencias). Composer tampoco devuelve advisories ni paquetes abandonados en el árbol bloqueado. Las comprobaciones permanecen reproducibles con `npm run audit:policy` y `composer audit --locked` en CI.

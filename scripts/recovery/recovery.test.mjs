@@ -210,6 +210,8 @@ test('selective restore only accepts relative private file paths', async () => {
   const f = fixture(); await run(f.engine, 'backup'); const entry = f.engine.snapshot().backups[0];
   const op = await run(f.engine, 'restore-selective', { id: entry.id, paths: ['documents/report.pdf'] }); assert.equal(op.state, 'completed'); assert.ok(f.calls.includes('restoreSelective'));
   const rejected = await run(f.engine, 'restore-selective', { id: entry.id, paths: ['../outside'] }); assert.equal(rejected.state, 'failed'); assert.equal(rejected.error.code, 'invalid_restore_paths');
+  await assert.rejects(() => run(f.engine, 'restore-selective', { id: entry.id, paths: 'documents/report.pdf' }), { code: 'invalid_restore_paths' });
+  await assert.rejects(() => run(f.engine, 'restore-selective', { id: entry.id, paths: [null] }), { code: 'invalid_restore_paths' });
 });
 test('a restored operation is not repeated when the response is lost', async () => {
   const f = fixture(), id = randomUUID(); await run(f.engine, 'backup', {}, id); const count = f.calls.length;
