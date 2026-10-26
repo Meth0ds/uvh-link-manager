@@ -22,7 +22,8 @@ COPY shared/localisation ./resources/localisation
 RUN APP_ENV=local \
     APP_DEBUG=false \
     APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
-    composer dump-autoload --no-dev --classmap-authoritative --no-interaction
+    composer dump-autoload --no-dev --classmap-authoritative --no-interaction \
+    && php -r 'require "vendor/autoload.php"; if (!class_exists("Resend")) { fwrite(STDERR, "Resend SDK missing from production dependencies\n"); exit(1); }'
 
 FROM php:8.4.27-fpm-bookworm@sha256:6d2c08c2ce0548e9bc55e21aab68f5a2613e635e4225fdea84290459728995e7
 # Security floor for CVE-2026-109618 / CVE-2026-109619 (PHP advisory, 2026-10-21).
