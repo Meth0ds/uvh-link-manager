@@ -79,7 +79,7 @@ describe("admin response decoders", () => {
     expect(() => decodeRegistrationPause({ ok: true, paused: "yes" })).toThrow();
     expect(() => decodeRegistrationPause({ ok: false, paused: true })).toThrow();
     expect(decodeAccountRecoveryDecision({ ok: true, status: "approved", approvalCount: 2 })).toEqual({ status: "approved", approvalCount: 2 });
-    expect(decodeAdminOperations({
+    const snapshot = {
       state: "healthy", environment: "testing", generatedAt: timestamp, registrationPaused: false,
       checks: [{ key: "queue", label: "Queue", status: "ok", detail: null }],
       metrics: {
@@ -91,7 +91,15 @@ describe("admin response decoders", () => {
         events60m: { login: 1 }, queueHeartbeatAgeSeconds: 2,
         schedulerHeartbeatAgeSeconds: 3, activePrivacyRequests: 0, overduePrivacyRequests: 0,
       },
-    }).state).toBe("healthy");
+    };
+    expect(decodeAdminOperations(snapshot).state).toBe("healthy");
+    // Production returns the full counter catalogue, including zero values.
+    // Reproduce its size rather than the single-counter fixture above.
+    const events60m = Object.fromEntries(Array.from({ length: 96 }, (_, index) => [`event.${index}`, 0]));
+    expect(decodeAdminOperations({ ...snapshot, metrics: { ...snapshot.metrics, events60m } }).metrics.events60m).toEqual(events60m);
+    expect(() => decodeAdminOperations({ ...snapshot, metrics: { ...snapshot.metrics, events60m: { ...events60m, invalid: -1 } } })).toThrow();
+    const oversized = Object.fromEntries(Array.from({ length: 129 }, (_, index) => [`event.${index}`, 0]));
+    expect(() => decodeAdminOperations({ ...snapshot, metrics: { ...snapshot.metrics, events60m: oversized } })).toThrow();
   });
 
   it("rejects stale pages, unsafe destinations and invalid operational counts", () => {
