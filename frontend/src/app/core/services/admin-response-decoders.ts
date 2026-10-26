@@ -312,7 +312,9 @@ export function decodeAdminOperations(value: unknown): AdminOperations {
       domains: countRecord(metrics["domains"], "domain metrics"),
       oldestDnsCheckAgeSeconds: nullableAge("oldestDnsCheckAgeSeconds"),
       oldestTlsProvisioningAgeSeconds: nullableAge("oldestTlsProvisioningAgeSeconds"),
-      events60m: countRecord(metrics["events60m"], "operational event metrics"),
+      // The backend publishes its full bounded OperationalMetrics catalogue,
+      // including counters with zero events; it already exceeds 64 entries.
+      events60m: countRecord(metrics["events60m"], "operational event metrics", 128),
       queueHeartbeatAgeSeconds: nullableAge("queueHeartbeatAgeSeconds"),
       schedulerHeartbeatAgeSeconds: nullableAge("schedulerHeartbeatAgeSeconds"),
       activePrivacyRequests: integer(metrics["activePrivacyRequests"], "admin operations metrics"),

@@ -38336,5 +38336,14 @@ offre-2,https://example.org/nouveautes,"[""éditorial""]"</target>
         <target>Votre compte n’a pas accès à cette ressource. Si vous pensez y avoir droit, demandez-le au propriétaire de l’espace de travail.</target>
       </segment>
     </unit>
+    <unit id="recovery.loading">
+      <notes>
+        <note category="location">src/app/panel/admin/admin.component.html:109</note>
+      </notes>
+      <segment>
+        <source>Cargando continuidad del entorno…</source>
+      <target>Chargement de la continuité du service local…</target>
+      </segment>
+    </unit>
   </file>
 </xliff>
