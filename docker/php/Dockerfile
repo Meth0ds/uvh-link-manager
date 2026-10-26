@@ -8,7 +8,7 @@
 # comprueba en CI que el digest sigue resolviendo.
 FROM composer:2@sha256:aaeab4b6b031e0a88efb907f0f26b563532a644fc2f4ea0d000ecf8658f7a2b8 AS composer
 
-FROM php:8.4.27-cli@sha256:1d7cdadb6f25e13425abcd9e7648955b7c297b6fb70e5a8f95b77f28df3bf8d8
+FROM php:8.5.10-cli@sha256:df50257c90ad9a53052fb4e9c6fdba8262cf72ca9e9a048b7c89f74c8d23fc0d
 # Security floor for CVE-2026-109618 / CVE-2026-109619 (PHP advisory, 2026-10-21).
 # Fail closed if a future base change accidentally reintroduces an older runtime.
 RUN php -r 'if (version_compare(PHP_VERSION, "8.4.27", "<")) { fwrite(STDERR, "PHP 8.4.27 or newer required\n"); exit(1); }'
