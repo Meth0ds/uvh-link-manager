@@ -25,7 +25,7 @@ RUN APP_ENV=local \
     composer dump-autoload --no-dev --classmap-authoritative --no-interaction \
     && php -r 'require "vendor/autoload.php"; if (!class_exists("Resend")) { fwrite(STDERR, "Resend SDK missing from production dependencies\n"); exit(1); }'
 
-FROM php:8.4.27-fpm-bookworm@sha256:6d2c08c2ce0548e9bc55e21aab68f5a2613e635e4225fdea84290459728995e7
+FROM php:8.5.11-fpm-bookworm@sha256:9e1dc1e2000d88569f9673eb58b6026fe242067084d9008ceafb516a566574e3
 # Security floor for CVE-2026-109618 / CVE-2026-109619 (PHP advisory, 2026-10-21).
 # Fail closed if a future base change accidentally reintroduces an older runtime.
 RUN php -r 'if (version_compare(PHP_VERSION, "8.4.27", "<")) { fwrite(STDERR, "PHP 8.4.27 or newer required\n"); exit(1); }'
