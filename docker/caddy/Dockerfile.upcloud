@@ -3,7 +3,7 @@ RUN xcaddy build v2.11.7 \
     --with github.com/caddy-dns/cloudflare@a8737d095ad5a48ca031cea6ab704057dbc2d250 \
     --replace golang.org/x/net=golang.org/x/net@v0.60.0
 
-FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 ENV XDG_CONFIG_HOME=/config XDG_DATA_HOME=/data
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 COPY --chmod=755 docker/caddy/upcloud-entrypoint.sh /usr/local/bin/uvh-caddy-entrypoint
